@@ -8,6 +8,7 @@
   import RouteSteps from "./map/RouteSteps.svelte";
   import { backend } from "$lib/api";
   import { formatCompact, formatDuration } from "$lib/format";
+  import { measuredRates, watchHistory } from "$lib/history.svelte";
   import { mapData, watchMapData } from "$lib/mapdata.svelte";
   import type { MapReading, MapRoute, SessionSummary, TrainingSpot, TrainingSpots } from "$lib/types";
 
@@ -28,7 +29,7 @@
   const SORTS: { id: Sort; label: string; title: string }[] = [
     { id: "exp", label: "EXP / clear", title: "Base EXP for defeating every monster on the map once" },
     { id: "efficiency", label: "EXP / HP", title: "Base EXP per 1,000 monster HP: how much EXP each hit is worth" },
-    { id: "measured", label: "Your rate", title: "EXP per hour you measured on the map with Leafline" },
+    { id: "measured", label: "Your rate", title: "EXP per hour you measured on the map, over every saved session and this one" },
     { id: "near", label: "Nearest", title: "Fewest portals from where you are" },
   ];
   /** Maps whose average monster level is this far below or above the character count as near. */
@@ -52,11 +53,9 @@
 
   const level = $derived(readLevel ?? manualLevel);
 
-  const measured = $derived(
-    (session?.maps ?? [])
-      .filter((m) => m.map != null && m.expPerHour != null && m.activeSeconds > 0)
-      .map((m) => ({ label: m.map!, expPerHour: m.expPerHour!, activeSeconds: m.activeSeconds })),
-  );
+  watchHistory();
+  // Saved sessions and the current one, so maps can be compared across play sessions.
+  const measured = $derived(measuredRates(session));
   const queryKey = $derived(JSON.stringify([map?.name, map?.street, measured]));
 
   $effect(() => {
@@ -238,7 +237,7 @@
                 {formatCompact(spot.expPerClear)} EXP / clear · {efficiency(spot).toFixed(0)} EXP per 1k HP
                 {#if spot.measured}
                   <br /><span class="yours"
-                    ><Gauge size={11} /> You measured {formatCompact(spot.measured.expPerHour)} EXP / hr over {formatDuration(
+                    ><Gauge size={11} /> You averaged {formatCompact(spot.measured.expPerHour)} EXP / hr over {formatDuration(
                       spot.measured.activeSeconds,
                     )}</span
                   >

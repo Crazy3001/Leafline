@@ -6,13 +6,14 @@ import { invoke, isTauri } from "@tauri-apps/api/core";
 import { LogicalSize } from "@tauri-apps/api/dpi";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { open } from "@tauri-apps/plugin-dialog";
+import { open, save } from "@tauri-apps/plugin-dialog";
 
 import type {
   Analysis,
   Calibration,
   DisplaySettings,
   Guide,
+  History,
   HudValues,
   MapDataDownload,
   MapDataStatus,
@@ -89,6 +90,14 @@ export interface Backend {
   recordPrice(price: NewPrice): Promise<PriceLog>;
   deletePrice(id: number): Promise<void>;
 
+  /** Saves the session the overlay shows (the last replay) to the history. */
+  saveSession(label: string): Promise<number>;
+  sessionHistory(): Promise<History>;
+  deleteSession(id: number): Promise<void>;
+  onHistory(handler: () => void): Promise<UnlistenFn>;
+  /** Asks where to save, then writes the price log or session history as CSV. Null if cancelled. */
+  exportCsv(what: "prices" | "sessions"): Promise<number | null>;
+
   /** The latest analysis and session, for a window opened after they were sent. */
   currentReadings(): Promise<{ analysis: Analysis | null; session: SessionSummary | null }>;
   pinStatus(): Promise<PinStatus>;
@@ -155,6 +164,18 @@ const tauriBackend: Backend = {
   priceLog: (item, upgrades, slots) => invoke("price_log", { item, upgrades, slots }),
   recordPrice: (price) => invoke("record_price", { price }),
   deletePrice: (id) => invoke("delete_price", { id }),
+  saveSession: (label) => invoke("save_session", { label }),
+  sessionHistory: () => invoke("session_history"),
+  deleteSession: (id) => invoke("delete_session", { id }),
+  onHistory: (handler) => listen("history", () => handler()),
+  async exportCsv(what) {
+    const stamp = new Date().toISOString().slice(0, 10);
+    const path = await save({
+      defaultPath: `leafline-${what === "prices" ? "price-log" : "sessions"}-${stamp}.csv`,
+      filters: [{ name: "CSV", extensions: ["csv"] }],
+    });
+    return path ? invoke<number>("export_csv", { what, path }) : null;
+  },
   currentReadings: () => invoke("current_readings"),
   pinStatus: () => invoke("pin_status"),
   pinPanel: (panel) => invoke("pin_panel", { panel }),

@@ -1,6 +1,7 @@
 <script lang="ts">
   // What one panel shows: as a tab of the overlay, or slimmed down in its own pinned window.
   import CharacterCard from "./CharacterCard.svelte";
+  import HistoryCard from "./HistoryCard.svelte";
   import ItemCard from "./ItemCard.svelte";
   import MapCard from "./MapCard.svelte";
   import QuestCard from "./QuestCard.svelte";
@@ -27,6 +28,7 @@
   {:else}
     <CharacterCard hud={analysis?.hud ?? null} mesos={analysis?.mesos ?? null} {session} />
     {#if session}<SessionCard {session} compact />{/if}
+    <HistoryCard />
   {/if}
 {:else if panel === "map"}
   {#if analysis?.map}

@@ -472,3 +472,38 @@ export interface DisplaySettings {
   /** 0.85 to 1.3. */
   scale: number;
 }
+
+// Session history (see src-tauri/src/userdata/sessions.rs).
+
+export interface SavedSession {
+  id: number;
+  label: string;
+  /** Unix seconds. */
+  savedAt: number;
+  startedAt: number | null;
+  level: number | null;
+  levelUps: number;
+  activeSeconds: number;
+  elapsedSeconds: number;
+  expGained: number;
+  expPerHour: number | null;
+  mesosGained: number;
+  mesosPerHour: number | null;
+  /** Most active time first; time that couldn't be placed on a map is left out. */
+  maps: { map: string; activeSeconds: number; expGained: number; mesosGained: number }[];
+}
+
+/** One map's rates over every saved session that spent time there. */
+export interface MapRate {
+  map: string;
+  sessions: number;
+  activeSeconds: number;
+  expPerHour: number;
+  mesosPerHour: number;
+}
+
+export interface History {
+  /** Newest first. */
+  sessions: SavedSession[];
+  maps: MapRate[];
+}

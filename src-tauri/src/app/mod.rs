@@ -6,8 +6,8 @@ mod launch;
 mod mapdata;
 mod overlay;
 mod pins;
-mod prices;
 mod readings;
+mod records;
 mod replay;
 mod settings;
 mod shortcuts;
@@ -21,8 +21,8 @@ use launch::LaunchImage;
 use mapdata::MapDataState;
 use overlay::{OVERLAY, OverlayState, WORKBENCH};
 use pins::PinState;
-use prices::UserDataState;
 use readings::Readings;
+use records::UserDataState;
 use replay::ReplayState;
 use settings::SettingsState;
 
@@ -100,9 +100,13 @@ pub fn run() {
             mapdata::quest_guide,
             mapdata::look_up_quest_items,
             mapdata::training_spots,
-            prices::price_log,
-            prices::record_price,
-            prices::delete_price,
+            records::price_log,
+            records::record_price,
+            records::delete_price,
+            records::save_session,
+            records::session_history,
+            records::delete_session,
+            records::export_csv,
             settings::get_settings,
             settings::update_settings,
             settings::show_settings,

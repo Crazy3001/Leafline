@@ -1,6 +1,6 @@
 <script lang="ts">
   // Settings: how the overlay looks, the hotkeys, downloaded data, and what Leafline is.
-  import { Check, ExternalLink, ShieldCheck, X } from "@lucide/svelte";
+  import { Check, Download, ExternalLink, ShieldCheck, X } from "@lucide/svelte";
   import { onMount } from "svelte";
 
   import { backend } from "$lib/api";
@@ -27,6 +27,16 @@
   let version = $state("");
   let opacity = $state(100);
   let saveTimer: ReturnType<typeof setTimeout> | undefined;
+  let exported = $state<string | null>(null);
+
+  async function exportCsv(what: "prices" | "sessions") {
+    try {
+      const rows = await backend.exportCsv(what);
+      if (rows != null) exported = `Saved ${rows} row${rows === 1 ? "" : "s"}.`;
+    } catch (e) {
+      exported = `Couldn't export: ${e}`;
+    }
+  }
 
   onMount(() => {
     watchSettings();
@@ -149,6 +159,18 @@
         you record leaves this PC.
       </p>
       <div class="box"><MapDataPanel /></div>
+
+      <div class="row">
+        <div class="label">
+          <span class="name">Your records</span>
+          <span class="help">The price log and saved sessions, as CSV for a spreadsheet.</span>
+        </div>
+        <div class="control exports">
+          <button class="button" onclick={() => exportCsv("prices")}><Download size={13} />Price log</button>
+          <button class="button" onclick={() => exportCsv("sessions")}><Download size={13} />Sessions</button>
+        </div>
+      </div>
+      {#if exported}<p class="note">{exported}</p>{/if}
     </section>
 
     <section id="about">
@@ -352,6 +374,32 @@
 
   .segmented button:focus-visible,
   .link:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+
+  .exports {
+    display: flex;
+    gap: 6px;
+  }
+
+  .button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+  }
+
+  .button:hover {
+    border-color: var(--accent);
+  }
+
+  .button:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 1px;
   }

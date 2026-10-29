@@ -1,6 +1,8 @@
 <script lang="ts">
   import {
+    Check,
     FolderOpen,
+    History,
     Image as ImageIcon,
     LoaderCircle,
     Play,
@@ -15,6 +17,7 @@
   import { backend, fileName } from "$lib/api";
   import Logo from "$lib/components/Logo.svelte";
   import { formatDuration } from "$lib/format";
+  import { isSaved, watchHistory } from "$lib/history.svelte";
   import type {
     Analysis,
     HudValues,
@@ -45,8 +48,22 @@
   let session = $state<SessionSummary | null>(null);
 
   const regions = $derived(analysis ? regionsOf(analysis, showText) : []);
+  let saving = $state(false);
+
+  /** Keeps the replayed session, so the Train tab can compare maps across sessions. */
+  async function saveSession() {
+    saving = true;
+    try {
+      await backend.saveSession(folder ? fileName(folder) : "");
+    } catch (e) {
+      error = String(e);
+    } finally {
+      saving = false;
+    }
+  }
 
   onMount(() => {
+    watchHistory();
     backend.takeLaunchImage().then((path) => {
       if (path) openPath(path);
     });
@@ -249,6 +266,15 @@
                   session.activeSeconds,
                 )} active.
               </p>
+              {#if session.activeSeconds > 0}
+                {#if isSaved(session)}
+                  <p class="hint saved"><Check size={12} /> Saved to your history.</p>
+                {:else}
+                  <button class="ghost wide" onclick={saveSession} disabled={saving}
+                    ><History size={14} />Save to history</button
+                  >
+                {/if}
+              {/if}
             {/if}
           {/if}
         </section>
@@ -601,6 +627,13 @@
   }
 
   .policy strong {
+    color: var(--good);
+  }
+
+  .saved {
+    display: flex;
+    align-items: center;
+    gap: 5px;
     color: var(--good);
   }
 

@@ -4,6 +4,8 @@
 import type { Backend } from "../api";
 import type {
   Analysis,
+  History,
+  SavedSession,
   DisplaySettings,
   PriceEntry,
   PriceLog,
@@ -85,6 +87,43 @@ function mockLog(item: string, upgrades: number | null, slots: number | null): P
     entries,
     all: summary(entries),
     likeThis: summary(entries.filter((p) => (p.upgrades ?? 0) === (upgrades ?? 0) && p.slots === slots)),
+  };
+}
+
+/** Saved sessions; one made-up session on the sample world's maps to start with. */
+let savedSessions: SavedSession[] = [
+  {
+    id: 1,
+    label: "",
+    savedAt: now - 86400 * 2,
+    startedAt: now - 86400 * 2 - 5400,
+    level: 29,
+    levelUps: 1,
+    activeSeconds: 4200,
+    elapsedSeconds: 5400,
+    expGained: 25_400,
+    expPerHour: 21_771,
+    mesosGained: 11_200,
+    mesosPerHour: 9_600,
+    maps: [
+      { map: "Fern Road : Mossbank Meadow II", activeSeconds: 3000, expGained: 19_600, mesosGained: 8_100 },
+      { map: "Fern Road : Burrow Den", activeSeconds: 1200, expGained: 5_800, mesosGained: 3_100 },
+    ],
+  },
+];
+const historyHandlers: (() => void)[] = [];
+
+function mockHistory(): History {
+  const byMap = new Map<string, { sessions: number; seconds: number; exp: number; mesos: number }>();
+  for (const session of savedSessions) {
+    for (const m of session.maps) {
+      const row = byMap.get(m.map) ?? { sessions: 0, seconds: 0, exp: 0, mesos: 0 };
+      byMap.set(m.map, { sessions: row.sessions + 1, seconds: row.seconds + m.activeSeconds, exp: row.exp + m.expGained, mesos: row.mesos + m.mesosGained });
+    }
+  }
+  return {
+    sessions: [...savedSessions].sort((a, b) => (b.startedAt ?? b.savedAt) - (a.startedAt ?? a.savedAt)),
+    maps: [...byMap].map(([map, r]) => ({ map, sessions: r.sessions, activeSeconds: r.seconds, expPerHour: (r.exp * 3600) / r.seconds, mesosPerHour: (r.mesos * 3600) / r.seconds })).sort((a, b) => b.activeSeconds - a.activeSeconds),
   };
 }
 
@@ -233,6 +272,41 @@ export const mockBackend: Backend = {
   },
   async deletePrice(id) {
     prices = prices.filter((p) => p.id !== id);
+  },
+  async saveSession(label) {
+    const s = sampleSessionSummary;
+    const id = Math.max(0, ...savedSessions.map((x) => x.id)) + 1;
+    savedSessions.push({
+      id,
+      label,
+      savedAt: Date.now() / 1000,
+      startedAt: s.startedAt,
+      level: s.level,
+      levelUps: s.levelUps,
+      activeSeconds: s.activeSeconds,
+      elapsedSeconds: s.elapsedSeconds,
+      expGained: s.expGained,
+      expPerHour: s.expPerHour,
+      mesosGained: s.mesosGained,
+      mesosPerHour: s.mesosPerHour,
+      maps: s.maps
+        .filter((m) => m.map && m.activeSeconds > 0)
+        .map((m) => ({ map: m.map!, activeSeconds: m.activeSeconds, expGained: m.expGained, mesosGained: m.mesosGained })),
+    });
+    historyHandlers.forEach((h) => h());
+    return id;
+  },
+  sessionHistory: async () => mockHistory(),
+  async deleteSession(id) {
+    savedSessions = savedSessions.filter((s) => s.id !== id);
+    historyHandlers.forEach((h) => h());
+  },
+  async onHistory(handler) {
+    historyHandlers.push(handler);
+    return () => {};
+  },
+  async exportCsv(what) {
+    return what === "prices" ? prices.length : savedSessions.length;
   },
   currentReadings: async () => ({
     analysis: preview?.empty ? null : sampleAnalysis,
