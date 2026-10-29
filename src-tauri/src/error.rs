@@ -12,7 +12,7 @@ pub enum Error {
     Invalid(String),
     #[error(transparent)]
     Tauri(#[from] tauri::Error),
-    #[error("map data cache: {0}")]
+    #[error("local database: {0}")]
     Database(#[from] rusqlite::Error),
     #[error("download failed: {0}")]
     Download(String),

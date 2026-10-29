@@ -4,6 +4,8 @@
 import type { Backend } from "../api";
 import type {
   Analysis,
+  PriceEntry,
+  PriceLog,
   Guide,
   TrainingSpots,
   MapDataStatus,
@@ -50,6 +52,38 @@ let mapStatus: MapDataStatus = preview?.map
   ? { ready: true, clientBuild: "preview", dataUpdatedAt: null, checkedAt: null, files: [] }
   : { ready: false, clientBuild: null, dataUpdatedAt: null, checkedAt: null, files: [] };
 const mapDataHandlers: ((status: MapDataStatus) => void)[] = [];
+
+/** Prices logged in this browser tab; made-up starting records for one item. */
+const now = Date.now() / 1000;
+let prices: PriceEntry[] = [
+  { id: 1, item: "Green Robin Hat", upgrades: 1, slots: 6, stats: "DEX +2, Weapon Def. +21", price: 85_000, kind: "traded", note: null, recordedAt: now - 86400 * 6 },
+  { id: 2, item: "Green Robin Hat", upgrades: null, slots: 7, stats: "", price: 30_000, kind: "asking", note: "FM shop", recordedAt: now - 86400 * 3 },
+  { id: 3, item: "Green Robin Hat", upgrades: 1, slots: 6, stats: "DEX +2, Weapon Def. +21", price: 95_000, kind: "asking", note: null, recordedAt: now - 86400 },
+];
+
+function mockLog(item: string, upgrades: number | null, slots: number | null): PriceLog {
+  const entries = prices.filter((p) => p.item.toLowerCase() === item.toLowerCase()).sort((a, b) => b.recordedAt - a.recordedAt);
+  const summary = (list: PriceEntry[]) => {
+    if (!list.length) return null;
+    const sorted = list.map((p) => p.price).sort((a, b) => a - b);
+    const n = sorted.length;
+    return {
+      count: n,
+      traded: list.filter((p) => p.kind === "traded").length,
+      median: n % 2 ? sorted[(n - 1) / 2] : Math.ceil((sorted[n / 2 - 1] + sorted[n / 2]) / 2),
+      low: sorted[0],
+      high: sorted[n - 1],
+      firstAt: Math.min(...list.map((p) => p.recordedAt)),
+      lastAt: Math.max(...list.map((p) => p.recordedAt)),
+    };
+  };
+  return {
+    item: entries.at(-1)?.item ?? null,
+    entries,
+    all: summary(entries),
+    likeThis: summary(entries.filter((p) => (p.upgrades ?? 0) === (upgrades ?? 0) && p.slots === slots)),
+  };
+}
 
 /** Quest items the mock wiki has been asked about. */
 const lookedUpItems = new Set<string>();
@@ -184,6 +218,14 @@ export const mockBackend: Backend = {
   async onMapData(handler) {
     mapDataHandlers.push(handler);
     return () => {};
+  },
+  priceLog: async (item, upgrades, slots) => mockLog(item, upgrades, slots),
+  async recordPrice(price) {
+    prices.push({ ...price, id: Math.max(0, ...prices.map((p) => p.id)) + 1, recordedAt: Date.now() / 1000 });
+    return mockLog(price.item, price.upgrades, price.slots);
+  },
+  async deletePrice(id) {
+    prices = prices.filter((p) => p.id !== id);
   },
   currentReadings: async () => ({
     analysis: sampleAnalysis,

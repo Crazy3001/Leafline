@@ -6,6 +6,7 @@ mod launch;
 mod mapdata;
 mod overlay;
 mod pins;
+mod prices;
 mod readings;
 mod replay;
 mod shortcuts;
@@ -19,6 +20,7 @@ use launch::LaunchImage;
 use mapdata::MapDataState;
 use overlay::{OVERLAY, OverlayState, WORKBENCH};
 use pins::PinState;
+use prices::UserDataState;
 use readings::Readings;
 use replay::ReplayState;
 
@@ -48,6 +50,7 @@ pub fn run() {
         .setup(|app| {
             app.manage(HudFontState::load(app.handle())?);
             app.manage(MapDataState::load(app.handle())?);
+            app.manage(UserDataState::load(app.handle())?);
             mapdata::check_for_updates(app.handle());
             app.manage(PinState::load(app.handle())?);
             pins::restore(app.handle())?;
@@ -93,6 +96,9 @@ pub fn run() {
             mapdata::quest_guide,
             mapdata::look_up_quest_items,
             mapdata::training_spots,
+            prices::price_log,
+            prices::record_price,
+            prices::delete_price,
             mapdata::open_link,
         ])
         .run(tauri::generate_context!())

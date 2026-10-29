@@ -423,3 +423,42 @@ export interface TrainingSpots {
   from: MapRef | null;
   spots: TrainingSpot[];
 }
+
+// Price log (see src-tauri/src/userdata/prices.rs): only prices the player logged.
+
+export type PriceKind = "traded" | "asking";
+
+export interface NewPrice {
+  item: string;
+  upgrades: number | null;
+  slots: number | null;
+  stats: string;
+  price: number;
+  kind: PriceKind;
+  note: string | null;
+}
+
+export interface PriceEntry extends NewPrice {
+  id: number;
+  /** Unix seconds. */
+  recordedAt: number;
+}
+
+export interface PriceStats {
+  count: number;
+  traded: number;
+  median: number;
+  low: number;
+  high: number;
+  firstAt: number;
+  lastAt: number;
+}
+
+export interface PriceLog {
+  item: string | null;
+  /** Newest first. */
+  entries: PriceEntry[];
+  all: PriceStats | null;
+  /** Records with the same upgrades and slots as the item asked about. */
+  likeThis: PriceStats | null;
+}

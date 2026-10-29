@@ -19,10 +19,12 @@ import type {
   MapRef,
   MapRoute,
   MeasuredRate,
+  NewPrice,
   MonsterDrops,
   OverlayStatus,
   Panel,
   PinStatus,
+  PriceLog,
   QuestQuery,
   ReplayOrder,
   ReplayProgress,
@@ -79,6 +81,11 @@ export interface Backend {
   /** Opens one of the card's link-outs or credits in the browser. */
   openLink(url: string): Promise<void>;
   onMapData(handler: (status: MapDataStatus) => void): Promise<UnlistenFn>;
+
+  /** The prices logged for an item, summarised for a copy with these upgrades and slots. */
+  priceLog(item: string, upgrades: number | null, slots: number | null): Promise<PriceLog>;
+  recordPrice(price: NewPrice): Promise<PriceLog>;
+  deletePrice(id: number): Promise<void>;
 
   /** The latest analysis and session, for a window opened after they were sent. */
   currentReadings(): Promise<{ analysis: Analysis | null; session: SessionSummary | null }>;
@@ -137,6 +144,9 @@ const tauriBackend: Backend = {
   trainingSpots: (mapName, mapStreet, measured) => invoke("training_spots", { mapName, mapStreet, measured }),
   openLink: (url) => invoke("open_link", { url }),
   onMapData: (handler) => listen<MapDataStatus>("map-data", (e) => handler(e.payload)),
+  priceLog: (item, upgrades, slots) => invoke("price_log", { item, upgrades, slots }),
+  recordPrice: (price) => invoke("record_price", { price }),
+  deletePrice: (id) => invoke("delete_price", { id }),
   currentReadings: () => invoke("current_readings"),
   pinStatus: () => invoke("pin_status"),
   pinPanel: (panel) => invoke("pin_panel", { panel }),
