@@ -11,6 +11,7 @@ import type {
   MonsterDrops,
   ObjectiveGuide,
   QuestQuery,
+  TrainingSpots,
 } from "../types";
 
 type Place = Omit<MapDetails, "map" | "links" | "returnMap" | "mobTotal" | "expPerClear" | "levelRange"> & {
@@ -303,4 +304,29 @@ export function sampleGuide(quests: QuestQuery[], from: number | null, lookedUp:
       }),
     })),
   };
+}
+
+/** Every sample map with monsters, as the training spot finder lists them. */
+export function sampleSpots(from: number | null): TrainingSpots {
+  const spots = Object.keys(places)
+    .map(Number)
+    .filter((id) => !places[id].isTown && places[id].mobs.length)
+    .map((id) => {
+      const card = sampleCard(id)!;
+      const total = card.mobTotal || 1;
+      const route = from == null ? null : sampleRoute(from, id);
+      return {
+        map: card.map,
+        region: card.region,
+        levelRange: card.levelRange!,
+        averageLevel: card.mobs.reduce((sum, m) => sum + m.level * m.count, 0) / total,
+        mobTotal: card.mobTotal,
+        expPerClear: card.expPerClear,
+        hpPerClear: card.mobs.reduce((sum, m) => sum + m.hp * m.count, 0),
+        mobs: card.mobs,
+        hops: route ? route.steps.length : null,
+        measured: id === 2 ? { expPerHour: 1840, activeSeconds: 1260 } : null,
+      };
+    });
+  return { from: from == null ? null : ref(from), spots };
 }

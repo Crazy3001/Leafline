@@ -109,12 +109,15 @@
           aria-controls="panel"
           tabindex={tab === panel.id ? 0 : -1}
           class:empty={signatures[panel.id] == null}
+          class:pinned={live.pins.pinned.includes(panel.id)}
+          title={live.pins.pinned.includes(panel.id) ? `${panel.title} (also pinned)` : undefined}
           onclick={() => select(panel.id)}
         >
-          <Icon size={14} />
+          <span class="icon">
+            <Icon size={14} />
+            {#if fresh(panel.id)}<span class="dot" aria-label="Updated"></span>{/if}
+          </span>
           <span>{panel.title}</span>
-          {#if fresh(panel.id)}<span class="dot" aria-label="Updated"></span>{/if}
-          {#if live.pins.pinned.includes(panel.id)}<span class="pinmark" title="Pinned"><Pin size={9} /></span>{/if}
         </button>
       {/each}
     </div>
@@ -247,18 +250,20 @@
   [role="tab"] {
     position: relative;
     display: inline-flex;
-    flex: 1;
+    flex: 1 1 auto;
     align-items: center;
     justify-content: center;
-    gap: 5px;
+    gap: 4px;
+    min-width: 0;
     height: 34px;
-    padding: 0 4px;
+    padding: 0 3px;
     border: 0;
     border-bottom: 2px solid transparent;
     background: transparent;
     color: var(--muted);
     font-size: 12px;
     font-weight: 500;
+    white-space: nowrap;
     cursor: pointer;
     transition:
       color 0.12s ease,
@@ -284,19 +289,24 @@
     border-radius: 4px;
   }
 
-  .dot {
-    align-self: flex-start;
-    margin: 9px 0 0 -3px;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--accent);
+  .icon {
+    position: relative;
+    display: inline-grid;
   }
 
-  .pinmark {
-    display: inline-grid;
+  .pinned .icon {
     color: var(--accent);
-    opacity: 0.85;
+  }
+
+  .dot {
+    position: absolute;
+    top: -2px;
+    right: -3px;
+    width: 6px;
+    height: 6px;
+    border: 1px solid var(--surface);
+    border-radius: 50%;
+    background: var(--accent);
   }
 
   .main {

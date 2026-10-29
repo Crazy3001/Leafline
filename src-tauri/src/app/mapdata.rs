@@ -12,8 +12,8 @@ use tauri_plugin_opener::OpenerExt;
 use crate::error::{Error, Result};
 use crate::mapdata::fetch::{self, Http};
 use crate::mapdata::{
-    Atlas, DataStatus, ItemSources, MapCard, MapMatch, MapRef, MonsterDrops, QuestGuide, QuestQuery, RefreshReport,
-    Route, Store, drops,
+    Atlas, DataStatus, ItemSources, MapCard, MapMatch, MapRef, MeasuredRate, MonsterDrops, QuestGuide, QuestQuery,
+    RefreshReport, Route, Store, TrainingSpot, drops,
 };
 
 const FILE_NAME: &str = "map-data.sqlite3";
@@ -196,6 +196,29 @@ pub async fn look_up_quest_items(app: AppHandle, items: Vec<String>) -> Result<V
     })
     .await
     .map_err(|err| Error::Invalid(err.to_string()))?
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Spots {
+    /// The map portals are counted from, when the minimap was read and matched.
+    from: Option<MapRef>,
+    spots: Vec<TrainingSpot>,
+}
+
+/// Every map with monsters to hunt, for the training spot finder, with the EXP per hour the
+/// player measured on each. `None` until map data has been downloaded.
+#[tauri::command]
+pub fn training_spots(
+    state: State<MapDataState>,
+    map_name: Option<String>,
+    map_street: Option<String>,
+    measured: Vec<MeasuredRate>,
+) -> Option<Spots> {
+    let atlas = state.atlas()?;
+    let from = map_name.and_then(|name| atlas.find(&name, map_street.as_deref())).map(|m| m.card.map);
+    let spots = atlas.training_spots(from.as_ref().map(|m| m.id), &measured);
+    Some(Spots { from, spots })
 }
 
 /// Opens one of the card's links in the default browser. Only the sites it links to are allowed.

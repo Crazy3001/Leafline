@@ -23,17 +23,19 @@ pub const PINS_EVENT: &str = "pins";
 pub enum Panel {
     Stats,
     Map,
+    Train,
     Quests,
     Item,
 }
 
 impl Panel {
-    const ALL: [Panel; 4] = [Panel::Stats, Panel::Map, Panel::Quests, Panel::Item];
+    const ALL: [Panel; 5] = [Panel::Stats, Panel::Map, Panel::Train, Panel::Quests, Panel::Item];
 
     fn id(self) -> &'static str {
         match self {
             Panel::Stats => "stats",
             Panel::Map => "map",
+            Panel::Train => "train",
             Panel::Quests => "quests",
             Panel::Item => "item",
         }
@@ -43,6 +45,7 @@ impl Panel {
         match self {
             Panel::Stats => "Stats",
             Panel::Map => "Map",
+            Panel::Train => "Train",
             Panel::Quests => "Quests",
             Panel::Item => "Item",
         }
@@ -56,7 +59,7 @@ impl Panel {
     fn width(self) -> f64 {
         match self {
             Panel::Stats => 264.0,
-            Panel::Map | Panel::Item => 300.0,
+            Panel::Map | Panel::Item | Panel::Train => 300.0,
             Panel::Quests => 280.0,
         }
     }

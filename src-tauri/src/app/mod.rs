@@ -92,6 +92,7 @@ pub fn run() {
             mapdata::monster_drops,
             mapdata::quest_guide,
             mapdata::look_up_quest_items,
+            mapdata::training_spots,
             mapdata::open_link,
         ])
         .run(tauri::generate_context!())

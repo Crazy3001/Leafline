@@ -5,6 +5,7 @@ import type { Backend } from "../api";
 import type {
   Analysis,
   Guide,
+  TrainingSpots,
   MapDataStatus,
   MapMatch,
   OverlayStatus,
@@ -13,7 +14,7 @@ import type {
   SessionSummary,
 } from "../types";
 import sample from "./sample-analysis.json";
-import { sampleCard, sampleDrops, sampleGuide, sampleRoute, sampleSearch } from "./sample-map";
+import { sampleCard, sampleDrops, sampleGuide, sampleRoute, sampleSearch, sampleSpots } from "./sample-map";
 import sampleSession from "./sample-session.json";
 
 const screenshots = import.meta.glob("/test-screenshots/*.{png,jpg,jpeg,webp}", {
@@ -31,6 +32,7 @@ interface Preview {
   session?: SessionSummary;
   map?: MapMatch;
   guide?: Guide;
+  spots?: TrainingSpots;
   pins?: PinStatus;
 }
 const preview = (globalThis as { __LEAFLINE_PREVIEW__?: Preview }).__LEAFLINE_PREVIEW__;
@@ -171,6 +173,10 @@ export const mockBackend: Backend = {
   async lookUpQuestItems(items) {
     await delay(900);
     items.forEach((item) => lookedUpItems.add(item));
+  },
+  async trainingSpots() {
+    if (!mapStatus.ready) return null;
+    return preview?.spots ?? sampleSpots(2);
   },
   async openLink(url) {
     window.open(url, "_blank", "noopener");

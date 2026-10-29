@@ -155,7 +155,7 @@ export interface Analysis {
 }
 
 /** The overlay's tabs, each of which can be pinned into a window of its own. */
-export type Panel = "stats" | "map" | "quests" | "item";
+export type Panel = "stats" | "map" | "train" | "quests" | "item";
 
 export interface PinStatus {
   pinned: Panel[];
@@ -392,4 +392,34 @@ export interface Guide {
   /** The map portals are counted from, when the minimap was read and matched. */
   from: MapRef | null;
   quests: QuestGuide[];
+}
+
+// Training spots (see src-tauri/src/mapdata/training.rs).
+
+/** EXP per hour the session tracker measured on a map, keyed by its minimap label. */
+export interface MeasuredRate {
+  label: string;
+  expPerHour: number;
+  activeSeconds: number;
+}
+
+export interface TrainingSpot {
+  map: MapRef;
+  region: string | null;
+  levelRange: [number, number];
+  /** Monster level averaged over everything the map spawns. */
+  averageLevel: number;
+  mobTotal: number;
+  /** Base EXP for killing every monster once. */
+  expPerClear: number;
+  /** Total HP of every monster on the map. */
+  hpPerClear: number;
+  mobs: MobRow[];
+  hops: number | null;
+  measured: { expPerHour: number; activeSeconds: number } | null;
+}
+
+export interface TrainingSpots {
+  from: MapRef | null;
+  spots: TrainingSpot[];
 }

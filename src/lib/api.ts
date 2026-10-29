@@ -18,6 +18,7 @@ import type {
   MapMatch,
   MapRef,
   MapRoute,
+  MeasuredRate,
   MonsterDrops,
   OverlayStatus,
   Panel,
@@ -27,6 +28,7 @@ import type {
   ReplayProgress,
   SessionSummary,
   ShortcutInfo,
+  TrainingSpots,
 } from "./types";
 
 export interface Backend {
@@ -72,6 +74,8 @@ export interface Backend {
   questGuide(quests: QuestQuery[], mapName: string | null, mapStreet: string | null): Promise<Guide | null>;
   /** Asks mapleclassic.wiki which monsters drop these quest items; cached for a week. */
   lookUpQuestItems(items: string[]): Promise<void>;
+  /** Every map with monsters to hunt, with the rates the player measured. Null until map data is downloaded. */
+  trainingSpots(mapName: string | null, mapStreet: string | null, measured: MeasuredRate[]): Promise<TrainingSpots | null>;
   /** Opens one of the card's link-outs or credits in the browser. */
   openLink(url: string): Promise<void>;
   onMapData(handler: (status: MapDataStatus) => void): Promise<UnlistenFn>;
@@ -130,6 +134,7 @@ const tauriBackend: Backend = {
   lookUpQuestItems: async (items) => {
     await invoke("look_up_quest_items", { items });
   },
+  trainingSpots: (mapName, mapStreet, measured) => invoke("training_spots", { mapName, mapStreet, measured }),
   openLink: (url) => invoke("open_link", { url }),
   onMapData: (handler) => listen<MapDataStatus>("map-data", (e) => handler(e.payload)),
   currentReadings: () => invoke("current_readings"),

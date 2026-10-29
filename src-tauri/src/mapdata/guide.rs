@@ -299,7 +299,7 @@ impl Atlas {
     }
 
     /// Portals from `from` to every map reachable through them.
-    fn hops_from(&self, from: u32) -> HashMap<u32, u32> {
+    pub(super) fn hops_from(&self, from: u32) -> HashMap<u32, u32> {
         let mut hops = HashMap::from([(from, 0)]);
         let mut queue = VecDeque::from([from]);
         while let Some(at) = queue.pop_front() {

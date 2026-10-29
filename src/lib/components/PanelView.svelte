@@ -6,6 +6,7 @@
   import QuestCard from "./QuestCard.svelte";
   import SessionCard from "./SessionCard.svelte";
   import StatsStrip from "./StatsStrip.svelte";
+  import TrainCard from "./TrainCard.svelte";
   import type { Analysis, Panel, SessionSummary } from "$lib/types";
 
   let {
@@ -33,6 +34,8 @@
   {:else}
     {@render empty("The minimap isn't in view. Its map's details show here when it is.")}
   {/if}
+{:else if panel === "train"}
+  <TrainCard level={analysis?.hud?.level ?? session?.level ?? null} map={analysis?.map ?? null} {session} plain={pinned} />
 {:else if panel === "quests"}
   {#if analysis?.quest}
     <QuestCard quest={analysis.quest} map={analysis.map} plain={pinned} />

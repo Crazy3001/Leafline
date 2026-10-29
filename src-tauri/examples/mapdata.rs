@@ -11,6 +11,8 @@
 //!
 //! `--quests <image>` reads the Quest Helper and minimap of one screenshot and prints where to go
 //! for each objective; add `--lookup` to ask mapleclassic.wiki who drops the quest items.
+//!
+//! `--train <level>` lists maps whose monsters average within a few levels of `level`.
 
 use std::path::Path;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -110,6 +112,24 @@ fn main() {
                     }
                 }
             }
+        }
+    }
+    if let Some(level) = value("--train", 1) {
+        let level: f64 = level.parse().expect("level");
+        let mut spots = atlas.training_spots(None, &[]);
+        spots.retain(|s| (s.average_level - level).abs() <= 5.0);
+        spots.sort_by_key(|s| std::cmp::Reverse(s.exp_per_clear));
+        for s in spots {
+            println!(
+                "{:<36} Lv {:>2}-{:<2} avg {:>4.1}  x{:<3} {:>6} EXP/clear  {:>5.1} EXP/1k HP",
+                s.map.name,
+                s.level_range.0,
+                s.level_range.1,
+                s.average_level,
+                s.mob_total,
+                s.exp_per_clear,
+                s.exp_per_clear as f64 * 1000.0 / s.hp_per_clear.max(1) as f64
+            );
         }
     }
     if let Some(folder) = value("--screens", 1) {
