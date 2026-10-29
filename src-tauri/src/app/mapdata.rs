@@ -21,9 +21,17 @@ const FILE_NAME: &str = "map-data.sqlite3";
 /// Emitted to every window when the cached map data changes.
 pub const MAP_DATA_EVENT: &str = "map-data";
 
-/// Sites the card may open in the browser: its link-outs and its credits.
-const LINK_HOSTS: [&str; 5] =
-    ["mapleclassic.wiki", "meowdb.com", "henesys.gg", "osmsdataexplorer.com", "creativecommons.org"];
+/// Sites Leafline may open in the browser: the map card's link-outs and the credits.
+const LINK_HOSTS: [&str; 8] = [
+    "mapleclassic.wiki",
+    "meowdb.com",
+    "henesys.gg",
+    "osmsdataexplorer.com",
+    "creativecommons.org",
+    "lucide.dev",
+    "tauri.app",
+    "svelte.dev",
+];
 
 pub struct MapDataState {
     path: PathBuf,

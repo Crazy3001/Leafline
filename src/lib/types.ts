@@ -462,3 +462,11 @@ export interface PriceLog {
   /** Records with the same upgrades and slots as the item asked about. */
   likeThis: PriceStats | null;
 }
+
+/** Display settings for the overlay and pinned panels (see src-tauri/src/app/settings.rs). */
+export interface DisplaySettings {
+  /** 0.4 to 1. */
+  opacity: number;
+  /** 0.85 to 1.3. */
+  scale: number;
+}

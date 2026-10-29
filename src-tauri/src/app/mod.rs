@@ -9,6 +9,7 @@ mod pins;
 mod prices;
 mod readings;
 mod replay;
+mod settings;
 mod shortcuts;
 mod tray;
 
@@ -23,6 +24,7 @@ use pins::PinState;
 use prices::UserDataState;
 use readings::Readings;
 use replay::ReplayState;
+use settings::SettingsState;
 
 pub fn run() {
     let args: Vec<String> = std::env::args().collect();
@@ -52,6 +54,8 @@ pub fn run() {
             app.manage(MapDataState::load(app.handle())?);
             app.manage(UserDataState::load(app.handle())?);
             mapdata::check_for_updates(app.handle());
+            app.manage(SettingsState::load(app.handle())?);
+            settings::apply(app.handle())?;
             app.manage(PinState::load(app.handle())?);
             pins::restore(app.handle())?;
             tray::create(app)?;
@@ -99,6 +103,9 @@ pub fn run() {
             prices::price_log,
             prices::record_price,
             prices::delete_price,
+            settings::get_settings,
+            settings::update_settings,
+            settings::show_settings,
             mapdata::open_link,
         ])
         .run(tauri::generate_context!())

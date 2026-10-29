@@ -9,6 +9,7 @@ use super::overlay::OverlayState;
 use super::shortcuts::{Action, log_error};
 
 const QUIT: &str = "quit";
+const SETTINGS: &str = "settings";
 
 pub fn create(app: &App) -> tauri::Result<()> {
     let item = |action: Action, text: &str| MenuItem::with_id(app, action_id(action), text, true, Some(action.keys()));
@@ -27,6 +28,7 @@ pub fn create(app: &App) -> tauri::Result<()> {
             &click_through,
             &item(Action::TogglePins, "Show / hide pinned panels")?,
             &item(Action::ShowWorkbench, "Open workbench")?,
+            &MenuItem::with_id(app, SETTINGS, "Settings…", true, None::<&str>)?,
             &PredefinedMenuItem::separator(app)?,
             &MenuItem::with_id(app, QUIT, "Quit Leafline", true, None::<&str>)?,
         ],
@@ -40,6 +42,10 @@ pub fn create(app: &App) -> tauri::Result<()> {
         .on_menu_event(|app, event| {
             if event.id() == QUIT {
                 app.exit(0);
+            } else if event.id() == SETTINGS {
+                if let Err(err) = super::settings::open(app) {
+                    log_error(&err);
+                }
             } else if let Some(action) = Action::ALL.into_iter().find(|a| event.id() == action_id(*a).as_str())
                 && let Err(err) = action.run(app)
             {

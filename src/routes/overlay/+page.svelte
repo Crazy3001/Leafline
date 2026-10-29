@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Lock, LockOpen, PanelsTopLeft, Pin, PinOff, X } from "@lucide/svelte";
+  import { Lock, LockOpen, PanelsTopLeft, Pin, PinOff, Settings, X } from "@lucide/svelte";
   import { onMount } from "svelte";
 
   import { backend } from "$lib/api";
@@ -7,6 +7,7 @@
   import PanelView from "$lib/components/PanelView.svelte";
   import { PANELS, panelInfo, signature } from "$lib/panels";
   import { live, watchLive } from "$lib/readings.svelte";
+  import { display, watchSettings } from "$lib/settings.svelte";
   import type { Panel } from "$lib/types";
 
   const TAB_KEY = "leafline.overlay.tab";
@@ -15,7 +16,10 @@
   /** What each panel showed when last looked at, to mark tabs with something new. */
   let seen = $state<Partial<Record<Panel, string | null>>>({});
 
-  onMount(watchLive);
+  onMount(() => {
+    watchLive();
+    watchSettings();
+  });
 
   const signatures = $derived(
     Object.fromEntries(PANELS.map((p) => [p.id, signature(p.id, live.analysis, live.session)])) as Record<
@@ -72,7 +76,7 @@
 
 <svelte:head><title>Leafline</title></svelte:head>
 
-<div class="shell" class:locked={live.status.clickThrough}>
+<div class="shell" style:opacity={display.opacity * (live.status.clickThrough ? 0.85 : 1)}>
   <header data-tauri-drag-region>
     <span class="brand" data-tauri-drag-region>
       <Logo size={16} />
@@ -80,8 +84,11 @@
       <span class="mode" data-tauri-drag-region>Offline</span>
     </span>
     <span class="actions">
-      <button title="Open workbench (Ctrl+Alt+W)" onclick={() => backend.showWorkbench()}>
+      <button title="Open workbench (Ctrl+Alt+W)" aria-label="Open workbench" onclick={() => backend.showWorkbench()}>
         <PanelsTopLeft size={14} />
+      </button>
+      <button title="Settings" aria-label="Settings" onclick={() => backend.showSettings()}>
+        <Settings size={14} />
       </button>
       <button
         title={live.status.clickThrough
@@ -92,7 +99,7 @@
       >
         {#if live.status.clickThrough}<Lock size={14} />{:else}<LockOpen size={14} />{/if}
       </button>
-      <button title="Hide (Ctrl+Alt+O). Pinned panels stay." onclick={() => backend.hideOverlay()}>
+      <button title="Hide (Ctrl+Alt+O). Pinned panels stay." aria-label="Hide overlay" onclick={() => backend.hideOverlay()}>
         <X size={14} />
       </button>
     </span>
@@ -141,11 +148,30 @@
     {:else}
       <div class="welcome">
         <Logo size={28} />
-        <p>Nothing to show yet.</p>
-        <p class="hint">
-          Open the workbench with <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>W</kbd> and load a screenshot. Its readings
-          appear here, just as they will during play.
-        </p>
+        <h1>Welcome to Leafline</h1>
+        <p class="hint">It reads what your game screen shows and puts useful facts beside it.</p>
+        <ol class="steps">
+          <li>
+            <span class="n">1</span>
+            <span
+              >Open the <button class="inline" onclick={() => backend.showWorkbench()}>workbench</button> and load a
+              screenshot. Its readings appear here, as they will during play.</span
+            >
+          </li>
+          <li>
+            <span class="n">2</span>
+            <span>Download map data in the Map tab for routes, training spots and quest help.</span>
+          </li>
+          <li>
+            <span class="n">3</span>
+            <span
+              ><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>O</kbd> shows or hides this window; <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd
+                >L</kbd
+              > lets clicks pass through it.</span
+            >
+          </li>
+        </ol>
+        <button class="inline small" onclick={() => backend.showSettings()}>Settings and what Leafline does</button>
       </div>
     {/if}
   </div>
@@ -167,10 +193,6 @@
     border-radius: var(--radius-lg);
     overflow: hidden;
     transition: opacity 0.2s ease;
-  }
-
-  .shell.locked {
-    opacity: 0.82;
   }
 
   header {
@@ -333,10 +355,18 @@
   .welcome {
     display: grid;
     justify-items: center;
-    gap: 4px;
-    padding: 40px 20px;
+    gap: 6px;
+    padding: 28px 18px;
     text-align: center;
     color: var(--muted);
+  }
+
+  .welcome h1 {
+    margin: 6px 0 0;
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
   }
 
   .welcome p {
@@ -344,9 +374,57 @@
   }
 
   .hint {
-    max-width: 240px;
+    max-width: 260px;
     font-size: 12px;
     color: var(--faint);
+  }
+
+  .steps {
+    display: grid;
+    gap: 10px;
+    margin: 12px 0 6px;
+    padding: 0;
+    list-style: none;
+    text-align: left;
+    font-size: 12px;
+  }
+
+  .steps li {
+    display: flex;
+    gap: 9px;
+  }
+
+  .n {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 10.5px;
+    font-weight: 600;
+  }
+
+  .inline {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--accent-strong);
+    font-size: inherit;
+    cursor: pointer;
+  }
+
+  .inline:hover,
+  .inline:focus-visible {
+    text-decoration: underline;
+    outline: none;
+  }
+
+  .inline.small {
+    font-size: 11.5px;
+    color: var(--muted);
   }
 
   kbd {

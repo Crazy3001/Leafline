@@ -1,8 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Permissions for the overlay, workbench and pinned panel windows",
-  "windows": ["overlay", "workbench", "pin-*"],
+  "description": "Permissions for the overlay, workbench, settings and pinned panel windows",
+  "windows": ["overlay", "workbench", "settings", "pin-*"],
   "permissions": [
     "core:default",
     "core:window:allow-start-dragging",

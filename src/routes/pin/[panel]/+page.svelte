@@ -9,6 +9,7 @@
   import PanelView from "$lib/components/PanelView.svelte";
   import { PANELS, panelInfo } from "$lib/panels";
   import { live, watchLive } from "$lib/readings.svelte";
+  import { display, watchSettings } from "$lib/settings.svelte";
   import type { Panel } from "$lib/types";
 
   /** Taller than this, the panel scrolls instead of growing. */
@@ -24,23 +25,38 @@
   let body = $state<HTMLElement>();
   let content = $state<HTMLElement>();
 
+  /** Sizes the window to the content. The window is sized in screen units, the page in zoomed ones. */
+  function fit() {
+    if (!frame || !body) return;
+    const natural = frame.offsetHeight - body.clientHeight + body.scrollHeight;
+    backend.fitWindow(info.pinWidth * display.scale, Math.min(MAX_HEIGHT, Math.ceil(natural)) * display.scale);
+  }
+
   onMount(() => {
     watchLive();
+    watchSettings();
     if (!content) return;
     // Follow the content: grow and shrink the window as readings change.
-    const observer = new ResizeObserver(() => {
-      if (!frame || !body) return;
-      const natural = frame.offsetHeight - body.clientHeight + body.scrollHeight;
-      backend.fitWindow(info.pinWidth, Math.min(MAX_HEIGHT, Math.ceil(natural)));
-    });
+    const observer = new ResizeObserver(fit);
     observer.observe(content);
     return () => observer.disconnect();
+  });
+
+  // A new size setting changes the zoom but not the page's own measurements.
+  $effect(() => {
+    void display.scale;
+    fit();
   });
 </script>
 
 <svelte:head><title>Leafline · {info.title}</title></svelte:head>
 
-<div class="frame" class:locked={live.status.clickThrough} bind:this={frame}>
+<div
+  class="frame"
+  class:locked={live.status.clickThrough}
+  style:opacity={display.opacity * (live.status.clickThrough ? 0.85 : 1)}
+  bind:this={frame}
+>
   <header data-tauri-drag-region>
     <span class="title" data-tauri-drag-region><Icon size={12} />{info.title}</span>
     <button class="unpin" title="Unpin" onclick={() => backend.unpinPanel(panel)}><PinOff size={12} /></button>
@@ -68,10 +84,6 @@
     border-radius: var(--radius);
     overflow: hidden;
     transition: opacity 0.2s ease;
-  }
-
-  .frame.locked {
-    opacity: 0.85;
   }
 
   header {

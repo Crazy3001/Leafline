@@ -4,6 +4,7 @@
 import type { Backend } from "../api";
 import type {
   Analysis,
+  DisplaySettings,
   PriceEntry,
   PriceLog,
   Guide,
@@ -36,6 +37,8 @@ interface Preview {
   guide?: Guide;
   spots?: TrainingSpots;
   pins?: PinStatus;
+  /** Start with no readings at all, as on first launch. */
+  empty?: boolean;
 }
 const preview = (globalThis as { __LEAFLINE_PREVIEW__?: Preview }).__LEAFLINE_PREVIEW__;
 const sampleAnalysis = preview?.analysis ?? (sample as unknown as Analysis);
@@ -84,6 +87,9 @@ function mockLog(item: string, upgrades: number | null, slots: number | null): P
     likeThis: summary(entries.filter((p) => (p.upgrades ?? 0) === (upgrades ?? 0) && p.slots === slots)),
   };
 }
+
+let displaySettings: DisplaySettings = { opacity: 1, scale: 1 };
+const settingsHandlers: ((settings: DisplaySettings) => void)[] = [];
 
 /** Quest items the mock wiki has been asked about. */
 const lookedUpItems = new Set<string>();
@@ -151,13 +157,14 @@ export const mockBackend: Backend = {
   shortcuts: async () => [
     { action: "toggleOverlay", keys: "Ctrl+Alt+O", label: "Show or hide the overlay" },
     { action: "toggleClickThrough", keys: "Ctrl+Alt+L", label: "Lock the overlay (click-through)" },
+    { action: "togglePins", keys: "Ctrl+Alt+P", label: "Show or hide pinned panels" },
     { action: "showWorkbench", keys: "Ctrl+Alt+W", label: "Open the workbench" },
   ],
   takeLaunchImage: async () => null,
   onOpenImage: async () => () => {},
   async onAnalysis(handler) {
     analysisHandlers.push(handler);
-    setTimeout(() => handler(sampleAnalysis), 200);
+    if (!preview?.empty) setTimeout(() => handler(sampleAnalysis), 200);
     return () => {};
   },
   async onReplayProgress(handler) {
@@ -166,7 +173,7 @@ export const mockBackend: Backend = {
   },
   async onSession(handler) {
     sessionHandlers.push(handler);
-    setTimeout(() => handler(sampleSessionSummary), 200);
+    if (!preview?.empty) setTimeout(() => handler(sampleSessionSummary), 200);
     return () => {};
   },
   onOverlayStatus: async () => () => {},
@@ -228,8 +235,8 @@ export const mockBackend: Backend = {
     prices = prices.filter((p) => p.id !== id);
   },
   currentReadings: async () => ({
-    analysis: sampleAnalysis,
-    session: sampleSessionSummary,
+    analysis: preview?.empty ? null : sampleAnalysis,
+    session: preview?.empty ? null : sampleSessionSummary,
   }),
   pinStatus: async () => pins,
   async pinPanel(panel) {
@@ -246,5 +253,19 @@ export const mockBackend: Backend = {
     pinHandlers.push(handler);
     return () => {};
   },
+  settings: async () => displaySettings,
+  async updateSettings(settings) {
+    displaySettings = { ...settings };
+    settingsHandlers.forEach((h) => h(displaySettings));
+    return displaySettings;
+  },
+  async onSettings(handler) {
+    settingsHandlers.push(handler);
+    return () => {};
+  },
+  async showSettings() {
+    window.open("/settings", "_blank");
+  },
+  version: async () => "dev",
   async fitWindow() {},
 };

@@ -1,6 +1,7 @@
 // Typed access to the Rust commands and events. In a plain browser (UI development with
 // `npm run dev`) a mock backend stands in, so the pages can be designed without Tauri.
 
+import { getVersion } from "@tauri-apps/api/app";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { LogicalSize } from "@tauri-apps/api/dpi";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
@@ -10,6 +11,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import type {
   Analysis,
   Calibration,
+  DisplaySettings,
   Guide,
   HudValues,
   MapDataDownload,
@@ -94,6 +96,12 @@ export interface Backend {
   pinPanel(panel: Panel): Promise<PinStatus>;
   unpinPanel(panel: Panel): Promise<PinStatus>;
   onPins(handler: (status: PinStatus) => void): Promise<UnlistenFn>;
+  settings(): Promise<DisplaySettings>;
+  updateSettings(settings: DisplaySettings): Promise<DisplaySettings>;
+  onSettings(handler: (settings: DisplaySettings) => void): Promise<UnlistenFn>;
+  showSettings(): Promise<void>;
+  /** Leafline's version, for the About section. */
+  version(): Promise<string>;
   /** Sizes the calling window to its content. */
   fitWindow(width: number, height: number): Promise<void>;
 }
@@ -152,6 +160,11 @@ const tauriBackend: Backend = {
   pinPanel: (panel) => invoke("pin_panel", { panel }),
   unpinPanel: (panel) => invoke("unpin_panel", { panel }),
   onPins: (handler) => listen<PinStatus>("pins", (e) => handler(e.payload)),
+  settings: () => invoke("get_settings"),
+  updateSettings: (settings) => invoke("update_settings", { settings }),
+  onSettings: (handler) => listen<DisplaySettings>("settings", (e) => handler(e.payload)),
+  showSettings: () => invoke("show_settings"),
+  version: () => getVersion(),
   fitWindow: (width, height) => getCurrentWindow().setSize(new LogicalSize(width, height)),
 };
 

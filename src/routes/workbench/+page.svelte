@@ -6,6 +6,7 @@
     Play,
     RotateCw,
     ScanText,
+    Settings,
     ShieldCheck,
     Square,
   } from "@lucide/svelte";
@@ -13,7 +14,6 @@
 
   import { backend, fileName } from "$lib/api";
   import Logo from "$lib/components/Logo.svelte";
-  import MapDataPanel from "$lib/components/map/MapDataPanel.svelte";
   import { formatDuration } from "$lib/format";
   import type {
     Analysis,
@@ -22,7 +22,6 @@
     ReplayOrder,
     ReplayProgress,
     SessionSummary,
-    ShortcutInfo,
   } from "$lib/types";
   import ImageViewer from "$lib/workbench/ImageViewer.svelte";
   import ResultsPanel from "$lib/workbench/ResultsPanel.svelte";
@@ -36,7 +35,6 @@
   let error = $state<string | null>(null);
   let showText = $state(false);
   let highlight = $state<Rect | null>(null);
-  let shortcuts = $state<ShortcutInfo[]>([]);
 
   // Session replay: the open folder run as one play session.
   let folder = $state<string | null>(null);
@@ -49,7 +47,6 @@
   const regions = $derived(analysis ? regionsOf(analysis, showText) : []);
 
   onMount(() => {
-    backend.shortcuts().then((s) => (shortcuts = s));
     backend.takeLaunchImage().then((path) => {
       if (path) openPath(path);
     });
@@ -178,6 +175,9 @@
         <input type="checkbox" bind:checked={showText} disabled={!analysis} />
         <ScanText size={15} />Text boxes
       </label>
+      <button class="ghost icon" title="Settings" aria-label="Settings" onclick={() => backend.showSettings()}>
+        <Settings size={15} />
+      </button>
       <button class="primary" onclick={analyze} disabled={!selected || busy || replaying}>
         {#if busy}<span class="spin"><LoaderCircle size={15} /></span>{:else}<RotateCw size={15} />{/if}
         Analyze
@@ -259,25 +259,12 @@
 
     <div class="spacer"></div>
 
-    <section class="map-data">
-      <div class="eyebrow">Map data</div>
-      <MapDataPanel />
-    </section>
-
-    {#if shortcuts.length}
-      <div class="eyebrow">Hotkeys</div>
-      <dl class="shortcuts">
-        {#each shortcuts as shortcut (shortcut.action)}
-          <div><dt>{shortcut.label}</dt><dd>{shortcut.keys}</dd></div>
-        {/each}
-      </dl>
-    {/if}
-
     <div class="policy">
       <ShieldCheck size={16} />
       <p>
         <strong>Offline mode.</strong> Leafline reads saved screenshots only. Live capture stays off until Nexon confirms
-        read-only overlays are allowed.
+        read-only overlays are allowed. Hotkeys, map data and more are in
+        <button class="inline" onclick={() => backend.showSettings()}>Settings</button>.
       </p>
     </div>
   </aside>
@@ -593,40 +580,6 @@
     flex: 1;
   }
 
-  .map-data {
-    display: grid;
-    gap: 8px;
-    margin-bottom: 8px;
-    padding: 0 6px 12px;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .shortcuts {
-    display: grid;
-    gap: 4px;
-    margin: 0 0 6px;
-    padding: 0 6px;
-  }
-
-  .shortcuts div {
-    display: flex;
-    justify-content: space-between;
-    gap: 8px;
-    font-size: 11.5px;
-  }
-
-  .shortcuts dt {
-    color: var(--muted);
-  }
-
-  .shortcuts dd {
-    margin: 0;
-    color: var(--faint);
-    font-family: var(--font-mono);
-    font-size: 10.5px;
-    white-space: nowrap;
-  }
-
   .policy {
     display: flex;
     gap: 9px;
@@ -649,6 +602,21 @@
 
   .policy strong {
     color: var(--good);
+  }
+
+  .inline {
+    height: auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    font-size: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  .ghost.icon {
+    padding: 0 8px;
   }
 
   .canvas {
