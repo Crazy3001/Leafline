@@ -115,7 +115,7 @@ pub fn read(frame: &Frame, panel: Panel, ocr: &Ocr) -> Result<ItemTooltip> {
         preprocess::pad(&preprocess::keep(&preprocess::upscale(crop, scale), is_tooltip_text), 24)
     })?;
 
-    let mut item = parse_pass(&plain).merge(parse_pass(&keyed));
+    let mut item = parse_pass(&plain, panel).merge(parse_pass(&keyed, panel));
     // Prefer whichever pass read the name cleanly; keying helps over busy scenery but can
     // garble the `(+1)` suffix.
     let names = [name_text(&plain, panel), name_text(&keyed, panel)];
@@ -252,11 +252,11 @@ fn frame_top(frame: &Frame, separator: Rect, unit: f32) -> Option<f32> {
     top.map(|y| y as f32)
 }
 
-fn parse_pass(words: &[Word]) -> ItemTooltip {
+fn parse_pass(words: &[Word], panel: Panel) -> ItemTooltip {
     let lines = group_lines(words);
     // Anything below the enhancements line is scenery.
     let end = lines.iter().position(|l| starts_like(&l.text, "Remaining")).map_or(lines.len(), |i| i + 1);
-    parse::parse(&lines[..end])
+    parse::parse(&lines[..end], panel.separator.y)
 }
 
 /// The five job flags always appear in the same order, highlighted orange when the job can
