@@ -32,6 +32,9 @@ pub struct TrainingSpot {
     pub mobs: Vec<MobRow>,
     /// Portals from the current map, when it is known and a route exists.
     pub hops: Option<u32>,
+    /// Whether portals lead here from some town. Party quest stages and other instances
+    /// entered through an NPC are not.
+    pub reachable: bool,
     /// What the player measured here.
     pub measured: Option<Measured>,
 }
@@ -48,6 +51,12 @@ impl Atlas {
     /// the player is on; `measured` the rates the player recorded, matched to maps by name.
     pub fn training_spots(&self, from: Option<u32>, measured: &[MeasuredRate]) -> Vec<TrainingSpot> {
         let hops = from.map(|id| self.hops_from(id)).unwrap_or_default();
+        let mut reachable = std::collections::HashSet::new();
+        for town in self.maps.values().filter(|m| m.is_town) {
+            if !reachable.contains(&town.id) {
+                reachable.extend(self.hops_from(town.id).into_keys());
+            }
+        }
         // Several labels can land on one map (misreads): add their time and weigh their rates.
         let mut rates: std::collections::HashMap<u32, (f64, f64)> = std::collections::HashMap::new();
         for rate in measured.iter().filter(|r| r.active_seconds > 0.0) {
@@ -82,6 +91,7 @@ impl Atlas {
                     exp_per_clear: card.exp_per_clear,
                     mobs: card.mobs,
                     hops: hops.get(&m.id).copied(),
+                    reachable: reachable.contains(&m.id),
                     measured: rates.get(&m.id).map(|&(weighted, seconds)| Measured {
                         exp_per_hour: weighted / seconds,
                         active_seconds: seconds,
@@ -111,6 +121,7 @@ mod tests {
         assert_eq!(meadow.hp_per_clear, 6 * 20 + 4 * 50);
         assert!((meadow.average_level - (6.0 * 2.0 + 4.0 * 5.0) / 10.0).abs() < 1e-9);
         assert_eq!(meadow.hops, Some(1));
+        assert!(spots.iter().all(|s| s.reachable), "every map in the test world is walkable from Mossbank");
         assert!(meadow.measured.is_none());
     }
 

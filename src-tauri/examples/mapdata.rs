@@ -13,6 +13,10 @@
 //! for each objective; add `--lookup` to ask mapleclassic.wiki who drops the quest items.
 //!
 //! `--train <level>` lists maps whose monsters average within a few levels of `level`.
+//!
+//! `--preview <image> <out.json> [--font <hud-font.json>]` writes what the overlay would show for a
+//! screenshot (analysis, map match, quest guide, training spots), for the dev UI's
+//! `window.__LEAFLINE_PREVIEW__`. It holds game data: keep it outside the repo.
 
 use std::path::Path;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -117,7 +121,7 @@ fn main() {
     if let Some(level) = value("--train", 1) {
         let level: f64 = level.parse().expect("level");
         let mut spots = atlas.training_spots(None, &[]);
-        spots.retain(|s| (s.average_level - level).abs() <= 5.0);
+        spots.retain(|s| s.reachable && (s.average_level - level).abs() <= 5.0);
         spots.sort_by_key(|s| std::cmp::Reverse(s.exp_per_clear));
         for s in spots {
             println!(
@@ -131,6 +135,35 @@ fn main() {
                 s.exp_per_clear as f64 * 1000.0 / s.hp_per_clear.max(1) as f64
             );
         }
+    }
+    if let (Some(image), Some(out)) = (value("--preview", 1), value("--preview", 2)) {
+        let font: HudFont = value("--font", 1)
+            .map(|f| serde_json::from_str(&std::fs::read_to_string(f).expect("read font")).expect("parse font"))
+            .unwrap_or_default();
+        let frame = vision::load(Path::new(&image)).expect("load screenshot");
+        let mut analysis = pipeline::analyze(&frame, &Ocr::new().expect("OCR engine"), &font).expect("analyze");
+        analysis.overview.clear();
+        let found = analysis.map.as_ref().and_then(|m| atlas.find(&m.name, m.street.as_deref()));
+        let from = found.as_ref().map(|m| m.card.map.id);
+        let quests: Vec<QuestQuery> = analysis
+            .quest
+            .iter()
+            .flat_map(|q| &q.quests)
+            .map(|q| QuestQuery {
+                title: q.title.clone(),
+                objectives: q.objectives.iter().map(|o| o.target.clone()).collect(),
+            })
+            .collect();
+        let keys: Vec<String> = quests.iter().flat_map(|q| &q.objectives).map(|o| drops::item_key(o)).collect();
+        let sources = store.cached_item_sources(&keys, now - drops::MAX_AGE).expect("cached items").0;
+        let preview = serde_json::json!({
+            "analysis": analysis,
+            "map": found,
+            "guide": { "from": found.as_ref().map(|m| &m.card.map), "quests": atlas.quest_guide(&quests, from, &sources) },
+            "spots": { "from": found.as_ref().map(|m| &m.card.map), "spots": atlas.training_spots(from, &[]) },
+        });
+        std::fs::write(&out, serde_json::to_string(&preview).expect("serialise")).expect("write preview");
+        println!("wrote {out}");
     }
     if let Some(folder) = value("--screens", 1) {
         let ocr = Ocr::new().expect("OCR engine");

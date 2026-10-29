@@ -88,7 +88,7 @@
   const near = (s: TrainingSpot) => level == null || (s.averageLevel >= level - BELOW && s.averageLevel <= level + ABOVE);
 
   const ranked = $derived.by(() => {
-    const spots = (data?.spots ?? []).filter((s) => allLevels || near(s));
+    const spots = (data?.spots ?? []).filter((s) => s.reachable && (allLevels || near(s)));
     const by: Record<Sort, (s: TrainingSpot) => number> = {
       exp: (s) => s.expPerClear,
       efficiency,
@@ -273,7 +273,7 @@
       </div>
       <p class="hedge">
         Base numbers from OSMS map data, before EXP events, party bonus or level differences. Your rate is what Leafline
-        measured in your sessions.
+        measured in your sessions. Maps entered only through an NPC, such as party quests, are left out.
       </p>
     {/if}
   {/if}

@@ -325,6 +325,7 @@ export function sampleSpots(from: number | null): TrainingSpots {
         hpPerClear: card.mobs.reduce((sum, m) => sum + m.hp * m.count, 0),
         mobs: card.mobs,
         hops: route ? route.steps.length : null,
+        reachable: true,
         measured: id === 2 ? { expPerHour: 1840, activeSeconds: 1260 } : null,
       };
     });

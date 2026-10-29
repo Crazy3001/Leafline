@@ -416,6 +416,8 @@ export interface TrainingSpot {
   hpPerClear: number;
   mobs: MobRow[];
   hops: number | null;
+  /** Portals lead here from some town; party quest stages and other instances are not. */
+  reachable: boolean;
   measured: { expPerHour: number; activeSeconds: number } | null;
 }
 
