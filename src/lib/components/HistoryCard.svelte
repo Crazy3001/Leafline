@@ -75,6 +75,7 @@
 
   .maps thead th {
     padding: 0 0 4px 10px;
+    white-space: nowrap;
     color: var(--faint);
     font-size: 10.5px;
     font-weight: 500;

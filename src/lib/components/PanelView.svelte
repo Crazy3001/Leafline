@@ -7,6 +7,7 @@
   import QuestCard from "./QuestCard.svelte";
   import SessionCard from "./SessionCard.svelte";
   import StatsStrip from "./StatsStrip.svelte";
+  import TimersCard from "./TimersCard.svelte";
   import TrainCard from "./TrainCard.svelte";
   import type { Analysis, Panel, SessionSummary } from "$lib/types";
 
@@ -29,6 +30,7 @@
     <CharacterCard hud={analysis?.hud ?? null} mesos={analysis?.mesos ?? null} {session} />
     {#if session}<SessionCard {session} compact />{/if}
     <HistoryCard />
+    <TimersCard />
   {/if}
 {:else if panel === "map"}
   {#if analysis?.map}
