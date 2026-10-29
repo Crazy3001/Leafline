@@ -90,6 +90,8 @@ pub fn run() {
             mapdata::search_maps,
             mapdata::map_route,
             mapdata::monster_drops,
+            mapdata::quest_guide,
+            mapdata::look_up_quest_items,
             mapdata::open_link,
         ])
         .run(tauri::generate_context!())

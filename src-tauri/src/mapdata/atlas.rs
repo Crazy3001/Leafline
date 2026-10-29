@@ -175,22 +175,22 @@ pub struct RouteStep {
 
 /// The cached data, indexed for lookups.
 pub struct Atlas {
-    maps: BTreeMap<u32, MapRecord>,
-    monsters: HashMap<u32, MonsterRecord>,
-    npc_names: HashMap<u32, String>,
-    quests: BTreeMap<u32, QuestRecord>,
+    pub(super) maps: BTreeMap<u32, MapRecord>,
+    pub(super) monsters: HashMap<u32, MonsterRecord>,
+    pub(super) npc_names: HashMap<u32, String>,
+    pub(super) quests: BTreeMap<u32, QuestRecord>,
     /// Map → (monster, count), from the monsters' spawn lists.
-    spawns: HashMap<u32, Vec<(u32, u32)>>,
+    pub(super) spawns: HashMap<u32, Vec<(u32, u32)>>,
     /// Map → NPCs standing there.
-    npcs_on: HashMap<u32, Vec<u32>>,
+    pub(super) npcs_on: HashMap<u32, Vec<u32>>,
     /// Monster → quests that want it.
-    quests_for_mob: HashMap<u32, Vec<u32>>,
+    pub(super) quests_for_mob: HashMap<u32, Vec<u32>>,
     /// NPC → quests they give.
-    quests_from: HashMap<u32, Vec<u32>>,
+    pub(super) quests_from: HashMap<u32, Vec<u32>>,
     /// Map → its exits, in display order.
-    exits: HashMap<u32, Vec<Exit>>,
+    pub(super) exits: HashMap<u32, Vec<Exit>>,
     /// Each map's name, street and town folded for fuzzy matching.
-    keys: Vec<(u32, String, Option<String>)>,
+    pub(super) keys: Vec<(u32, String, Option<String>)>,
 }
 
 impl Atlas {
@@ -400,14 +400,14 @@ impl Atlas {
         Some(Route { from: self.map_ref(from), to: self.map_ref(to), steps })
     }
 
-    fn map_ref(&self, id: u32) -> MapRef {
+    pub(super) fn map_ref(&self, id: u32) -> MapRef {
         match self.maps.get(&id) {
             Some(m) => MapRef { id, name: m.name.clone(), street: m.street_name.clone(), known: true },
             None => MapRef { id, name: "Unknown map".into(), street: None, known: false },
         }
     }
 
-    fn quest_ref(&self, id: u32) -> Option<QuestRef> {
+    pub(super) fn quest_ref(&self, id: u32) -> Option<QuestRef> {
         let q = self.quests.get(&id)?;
         Some(QuestRef { id, name: q.name.clone(), level_min: q.level_min })
     }
@@ -489,7 +489,7 @@ fn links(map: &MapRecord) -> Vec<Link> {
 }
 
 /// Lowercase words with punctuation dropped: `<Area 1>` and `Area 1` compare equal.
-fn fold(text: &str) -> String {
+pub(super) fn fold(text: &str) -> String {
     text.chars()
         .map(|c| if c.is_alphanumeric() { c.to_ascii_lowercase() } else { ' ' })
         .collect::<String>()
@@ -500,14 +500,14 @@ fn fold(text: &str) -> String {
 
 /// Edit similarity, averaged with a pass that forgives the OCR's usual look-alikes
 /// (`l`/`1`/`I`, `0`/`O`, `rn`/`m`), so a misread letter costs less than a different one.
-fn similarity(a: &str, b: &str) -> f64 {
+pub(super) fn similarity(a: &str, b: &str) -> f64 {
     let lookalike =
         |s: &str| s.replace("rn", "m").replace(['l', '1', '|', 'j'], "i").replace('0', "o").replace('5', "s");
     (normalized_levenshtein(a, b) + normalized_levenshtein(&lookalike(a), &lookalike(b))) / 2.0
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::mapdata::osms::{MobRequirement, MonsterRecord, NpcRecord, Portal, QuestRecord, Spawn};
 
@@ -547,7 +547,7 @@ mod tests {
         }
     }
 
-    fn world() -> Atlas {
+    pub(crate) fn world() -> Atlas {
         let mut town =
             map(1, "Mossbank", "Fern Road", vec![portal("east00", 2), portal("in00", 5), portal("sp", NO_MAP)]);
         town.is_town = true;

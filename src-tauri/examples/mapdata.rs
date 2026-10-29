@@ -8,12 +8,17 @@
 //!
 //! `--screens` reads the minimap of every screenshot in the folder and shows which map each
 //! reading matched.
+//!
+//! `--quests <image>` reads the Quest Helper and minimap of one screenshot and prints where to go
+//! for each objective; add `--lookup` to ask mapleclassic.wiki who drops the quest items.
 
 use std::path::Path;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use leafline_lib::mapdata::fetch::{self, Http};
-use leafline_lib::mapdata::{Atlas, MapCard, Store, drops};
+use leafline_lib::mapdata::{Atlas, MapCard, QuestQuery, Store, drops};
+use leafline_lib::pipeline;
+use leafline_lib::readers::hud::HudFont;
 use leafline_lib::readers::map;
 use leafline_lib::vision::{self, Ocr};
 
@@ -65,6 +70,45 @@ fn main() {
             println!("{} ({:?} kills, v{:?})", entry.monster, entry.sample_kills, entry.game_version);
             for d in entry.drops {
                 println!("    {:>6}  {}", d.rate.map_or("?".into(), |r| format!("{r:.1}%")), d.item);
+            }
+        }
+    }
+    if let Some(image) = value("--quests", 1) {
+        let frame = vision::load(Path::new(&image)).expect("load screenshot");
+        let analysis =
+            pipeline::analyze(&frame, &Ocr::new().expect("OCR engine"), &HudFont::default()).expect("analyze");
+        let quests: Vec<QuestQuery> = analysis
+            .quest
+            .iter()
+            .flat_map(|q| &q.quests)
+            .map(|q| QuestQuery {
+                title: q.title.clone(),
+                objectives: q.objectives.iter().map(|o| o.target.clone()).collect(),
+            })
+            .collect();
+        let from = analysis.map.as_ref().and_then(|m| atlas.find(&m.name, m.street.as_deref())).map(|m| m.card.map);
+        println!("on {:?}", from.as_ref().map(|m| &m.name));
+        let items: Vec<String> = quests.iter().flat_map(|q| q.objectives.clone()).collect();
+        let sources = if args.iter().any(|a| a == "--lookup") {
+            drops::sources_for(&mut store, &Http::new(Duration::from_secs(1)), &items, now).expect("look up items")
+        } else {
+            let keys: Vec<String> = items.iter().map(|i| drops::item_key(i)).collect();
+            store.cached_item_sources(&keys, now - drops::MAX_AGE).expect("cached items").0
+        };
+        for guide in atlas.quest_guide(&quests, from.map(|m| m.id), &sources) {
+            println!("{} -> {:?}", guide.title, guide.quest.as_ref().map(|q| (&q.quest.name, &q.giver, &q.giver_maps)));
+            for o in &guide.objectives {
+                println!("    {:?} {:?} item={:?} looked_up={}", o.kind, o.target, o.item, o.looked_up);
+                for h in &o.hunts {
+                    let rate = h.drop.as_ref().and_then(|d| d.rate);
+                    println!(
+                        "        hunt {} Lv {} (known {}, rate {rate:?})",
+                        h.monster.name, h.monster.level, h.monster.known
+                    );
+                    for g in &h.maps {
+                        println!("            {} x{} hops {:?}", g.map.name, g.count, g.hops);
+                    }
+                }
             }
         }
     }

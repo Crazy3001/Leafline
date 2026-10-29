@@ -11,7 +11,10 @@ use tauri_plugin_opener::OpenerExt;
 
 use crate::error::{Error, Result};
 use crate::mapdata::fetch::{self, Http};
-use crate::mapdata::{Atlas, DataStatus, MapCard, MapMatch, MapRef, MonsterDrops, RefreshReport, Route, Store, drops};
+use crate::mapdata::{
+    Atlas, DataStatus, ItemSources, MapCard, MapMatch, MapRef, MonsterDrops, QuestGuide, QuestQuery, RefreshReport,
+    Route, Store, drops,
+};
 
 const FILE_NAME: &str = "map-data.sqlite3";
 
@@ -151,6 +154,45 @@ pub async fn monster_drops(app: AppHandle, monsters: Vec<String>) -> Result<Vec<
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<MapDataState>();
         drops::drops_for(&mut Store::open(&state.path)?, &state.wiki, &monsters, now())
+    })
+    .await
+    .map_err(|err| Error::Invalid(err.to_string()))?
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Guide {
+    /// The map the guide counts portals from, when the minimap was read and matched.
+    from: Option<MapRef>,
+    quests: Vec<QuestGuide>,
+}
+
+/// Where to go for each quest the Quest Helper shows. Item objectives use only drops already
+/// looked up; nothing is fetched here. `None` until map data has been downloaded.
+#[tauri::command]
+pub fn quest_guide(
+    state: State<MapDataState>,
+    quests: Vec<QuestQuery>,
+    map_name: Option<String>,
+    map_street: Option<String>,
+) -> Result<Option<Guide>> {
+    let Some(atlas) = state.atlas() else { return Ok(None) };
+    let from = map_name.and_then(|name| atlas.find(&name, map_street.as_deref())).map(|m| m.card.map);
+    let mut keys: Vec<String> = quests.iter().flat_map(|q| &q.objectives).map(|o| drops::item_key(o)).collect();
+    keys.sort();
+    keys.dedup();
+    let (items, _) = Store::open(&state.path)?.cached_item_sources(&keys, now() - drops::MAX_AGE)?;
+    let quests = atlas.quest_guide(&quests, from.as_ref().map(|m| m.id), &items);
+    Ok(Some(Guide { from, quests }))
+}
+
+/// Asks mapleclassic.wiki which monsters drop each quest item, one request a second, and
+/// caches the answers for a week.
+#[tauri::command]
+pub async fn look_up_quest_items(app: AppHandle, items: Vec<String>) -> Result<Vec<ItemSources>> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<MapDataState>();
+        drops::sources_for(&mut Store::open(&state.path)?, &state.wiki, &items, now())
     })
     .await
     .map_err(|err| Error::Invalid(err.to_string()))?

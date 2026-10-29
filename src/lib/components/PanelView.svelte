@@ -35,7 +35,7 @@
   {/if}
 {:else if panel === "quests"}
   {#if analysis?.quest}
-    <QuestCard quest={analysis.quest} plain={pinned} />
+    <QuestCard quest={analysis.quest} map={analysis.map} plain={pinned} />
   {:else}
     {@render empty("Open the Quest Helper in game to track quest counters here.")}
   {/if}

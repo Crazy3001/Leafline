@@ -1,7 +1,17 @@
 // A small made-up world for designing the map card in a plain browser. None of it is real game
 // data: the repo must never hold extracted map, monster or quest records.
 
-import type { MapDetails, MapRef, MapRoute, MonsterDrops } from "../types";
+import type {
+  Guide,
+  Hunt,
+  HuntingGround,
+  MapDetails,
+  MapRef,
+  MapRoute,
+  MonsterDrops,
+  ObjectiveGuide,
+  QuestQuery,
+} from "../types";
 
 type Place = Omit<MapDetails, "map" | "links" | "returnMap" | "mobTotal" | "expPerClear" | "levelRange"> & {
   name: string;
@@ -236,4 +246,61 @@ export function sampleDrops(monsters: string[]): MonsterDrops[] {
             },
           ],
   }));
+}
+
+/** Item names that look like collected items rather than monsters, for the mock guide. */
+const ITEMISH = /\b(tail|shell|leaf|candies|anthurium|fragment|whisker|wing)\b/i;
+/** Items the mock wiki has no records for, to show that case. */
+const UNLOGGED = /\b(candies|anthurium)\b/i;
+
+function ground(id: number, count: number, from: number | null): HuntingGround {
+  const route = from == null ? null : sampleRoute(from, id);
+  return { map: ref(id), count, hops: route ? route.steps.length : null };
+}
+
+function hunt(id: number, from: number | null, rate: number | null): Hunt {
+  const mob = Object.values(places)
+    .flatMap((p) => p.mobs)
+    .find((m) => m.id === id)!;
+  const maps = Object.entries(places)
+    .flatMap(([mapId, p]) => p.mobs.filter((m) => m.id === id).map((m) => ground(Number(mapId), m.count, from)))
+    .sort((a, b) => b.count - a.count);
+  return {
+    monster: { name: mob.name, known: true, level: mob.level, hp: mob.hp, exp: mob.exp, boss: mob.boss },
+    drop:
+      rate == null
+        ? null
+        : { rate, rateLow: rate * 0.8, rateHigh: rate * 1.2, sampleKills: 240, gameVersion: "0.1.0", quest: true },
+    maps,
+  };
+}
+
+/** A made-up guide in the guide's shape: monsters from the sample world, whatever was read. */
+export function sampleGuide(quests: QuestQuery[], from: number | null, lookedUp: Set<string>): Guide {
+  return {
+    from: from == null ? null : ref(from),
+    quests: quests.map((q, i) => ({
+      title: q.title,
+      quest:
+        i === 0
+          ? {
+              quest: { id: 71, name: q.title, levelMin: 1 },
+              giver: "Innkeeper Bo",
+              giverMaps: [ref(5)],
+            }
+          : null,
+      objectives: q.objectives.map((target): ObjectiveGuide => {
+        if (!ITEMISH.test(target)) return { target, kind: "monster", item: null, lookedUp: false, hunts: [hunt(11, from, null)] };
+        const asked = lookedUp.has(target);
+        const logged = asked && !UNLOGGED.test(target);
+        return {
+          target,
+          kind: "item",
+          item: logged ? target : null,
+          lookedUp: asked,
+          hunts: logged ? [hunt(12, from, 47.5), hunt(11, from, 6.2)] : [],
+        };
+      }),
+    })),
+  };
 }

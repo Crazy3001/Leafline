@@ -3,6 +3,10 @@
 //! The client has no drop tables, so these are counts players logged: each rate comes with
 //! the number of kills it was measured over and the game version. They are fetched only when
 //! the user opens a map's drops, one request for all of that map's monsters, kept for a week.
+//!
+//! Quest items are looked up the other way round, by item: which monsters players saw drop it.
+//! The item's name comes from OCR, so it is sent as a loose `LIKE` pattern and the closest name
+//! in the reply is kept.
 
 use std::collections::BTreeMap;
 
@@ -66,6 +70,117 @@ pub fn drops_for(store: &mut Store, source: &dyn Source, monsters: &[String], no
     Ok(found)
 }
 
+/// The monsters players saw drop one item.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ItemSources {
+    /// The name as read, folded (see [`item_key`]).
+    pub key: String,
+    /// The wiki's name for the item, when it knows one close to what was read.
+    pub item: Option<String>,
+    pub fetched_at: i64,
+    /// Highest observed rate first.
+    pub droppers: Vec<Dropper>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Dropper {
+    pub monster: String,
+    pub rate: Option<f64>,
+    pub rate_low: Option<f64>,
+    pub rate_high: Option<f64>,
+    pub sample_kills: Option<u32>,
+    pub game_version: Option<String>,
+    pub quest: bool,
+}
+
+/// Below this similarity a name in the wiki's reply is not taken for the item that was read.
+const MIN_ITEM_SCORE: f64 = 0.7;
+
+/// An OCR'd item name reduced to lowercase words, so small misreads share a cache entry:
+/// `Evil Eye. Tail` and `Evil Eye Tail` both become `evil eye tail`.
+pub fn item_key(name: &str) -> String {
+    name.chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { ' ' })
+        .collect::<String>()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// Who drops each of `items` (names as read), from the cache when it is under a week old and
+/// from the wiki otherwise, one request per item.
+pub fn sources_for(store: &mut Store, source: &dyn Source, items: &[String], now: i64) -> Result<Vec<ItemSources>> {
+    let mut keys: Vec<String> = Vec::new();
+    for key in items.iter().map(|i| item_key(i)).filter(|k| k.len() >= 3) {
+        if !keys.contains(&key) {
+            keys.push(key);
+        }
+    }
+    let (mut found, missing) = store.cached_item_sources(&keys, now - MAX_AGE)?;
+    for key in missing {
+        let body = source.get(&item_query_url(&key))?;
+        let sources = parse_item_sources(&body, &key, now)?;
+        store.save_item_sources(&sources)?;
+        found.push(sources);
+    }
+    found.sort_by_key(|s| keys.iter().position(|k| *k == s.key));
+    Ok(found)
+}
+
+fn item_query_url(key: &str) -> String {
+    // Only letters, digits and spaces reach the pattern, so nothing in it needs escaping.
+    let pattern = format!("%{}%", key.split(' ').collect::<Vec<_>>().join("%"));
+    let query = [
+        ("action", "cargoquery".to_string()),
+        ("format", "json".to_string()),
+        ("tables", "monster_drops".to_string()),
+        (
+            "fields",
+            "monster_id=monster,item_id=item,drop_rate=rate,rate_low=low,rate_high=high,sample_kills=kills,\
+             game_version=version,quest_flag=quest"
+                .to_string(),
+        ),
+        ("where", format!("item_id LIKE \"{pattern}\"")),
+        ("limit", "200".to_string()),
+    ];
+    let encoded: Vec<String> = query.iter().map(|(k, v)| format!("{k}={}", encode(v))).collect();
+    format!("{WIKI_API}?{}", encoded.join("&"))
+}
+
+fn parse_item_sources(body: &[u8], key: &str, now: i64) -> Result<ItemSources> {
+    let rows = parse_rows(body)?;
+    // The pattern can match several items; keep the one closest to what was read.
+    let item = rows
+        .iter()
+        .filter_map(|r| text(&r.item))
+        .map(|name| (strsim::normalized_levenshtein(&item_key(&name), key), name))
+        .filter(|(score, _)| *score >= MIN_ITEM_SCORE)
+        .max_by(|a, b| a.0.total_cmp(&b.0))
+        .map(|(_, name)| name);
+    let mut droppers: Vec<Dropper> = Vec::new();
+    if let Some(item) = &item {
+        for row in rows.iter().filter(|r| text(&r.item).as_ref() == Some(item)) {
+            let Some(monster) = text(&row.monster) else { continue };
+            if droppers.iter().any(|d| d.monster == monster) {
+                continue;
+            }
+            droppers.push(Dropper {
+                monster,
+                rate: number(&row.rate),
+                rate_low: number(&row.low),
+                rate_high: number(&row.high),
+                sample_kills: number(&row.kills),
+                game_version: text(&row.version),
+                quest: row.quest.as_deref() == Some("1"),
+            });
+        }
+    }
+    droppers.sort_by(|a, b| b.rate.unwrap_or(-1.0).total_cmp(&a.rate.unwrap_or(-1.0)));
+    Ok(ItemSources { key: key.to_string(), item, fetched_at: now, droppers })
+}
+
 /// Names go into the query in double quotes, so a name holding one is never sent.
 fn is_queryable(name: &str) -> bool {
     !name.is_empty() && !name.contains(['"', '\\'])
@@ -101,7 +216,8 @@ fn encode(text: &str) -> String {
         .collect()
 }
 
-/// Cargo returns every value as a string or null, under the aliases chosen in [`query_url`].
+/// Cargo returns every value as a string or null, under the aliases chosen in [`query_url`]
+/// and [`item_query_url`].
 #[derive(Deserialize)]
 struct Row {
     monster: Option<String>,
@@ -118,7 +234,8 @@ struct Row {
     quest: Option<String>,
 }
 
-fn parse(body: &[u8], asked: &[String], now: i64) -> Result<BTreeMap<String, MonsterDrops>> {
+/// The rows of a Cargo reply, or the wiki's error.
+fn parse_rows(body: &[u8]) -> Result<Vec<Row>> {
     #[derive(Deserialize)]
     struct Response {
         cargoquery: Option<Vec<Entry>>,
@@ -136,6 +253,11 @@ fn parse(body: &[u8], asked: &[String], now: i64) -> Result<BTreeMap<String, Mon
             error["info"].as_str().unwrap_or("query failed")
         )));
     }
+    Ok(response.cargoquery.unwrap_or_default().into_iter().map(|e| e.title).collect())
+}
+
+fn parse(body: &[u8], asked: &[String], now: i64) -> Result<BTreeMap<String, MonsterDrops>> {
+    let rows = parse_rows(body)?;
     let mut out: BTreeMap<String, MonsterDrops> = asked
         .iter()
         .map(|m| {
@@ -149,7 +271,7 @@ fn parse(body: &[u8], asked: &[String], now: i64) -> Result<BTreeMap<String, Mon
             (m.clone(), empty)
         })
         .collect();
-    for row in response.cargoquery.unwrap_or_default().into_iter().map(|e| e.title) {
+    for row in rows {
         let Some(entry) = text(&row.monster).and_then(|m| out.get_mut(&m)) else { continue };
         let kills = number(&row.kills);
         entry.sample_kills = entry.sample_kills.max(kills);
@@ -280,6 +402,48 @@ mod tests {
         );
         assert!(url.contains("where=monster_id%20IN%20%28%22Pebble%20Snail%22%2C%22Gloom%27s%20Bat%22%29"), "{url}");
         assert!(!is_queryable("Bad \" name"));
+    }
+
+    // A made-up reply to an item query: the pattern also caught a similar item.
+    const ITEM_REPLY: &str = r#"{"cargoquery": [
+        {"title": {"monster": "Gloom Bat", "item": "Gloom Bat Wing", "rate": "4.5", "kills": "300", "version": "0.1.0", "quest": "1"}},
+        {"title": {"monster": "Elder Gloom Bat", "item": "Gloom Bat Wing", "rate": "9", "kills": "80", "quest": "1"}},
+        {"title": {"monster": "Gloom Bat", "item": "Gloom Bat Wing Fragment", "rate": "30", "kills": "300"}},
+        {"title": {"monster": "Cave Owl", "item": "Gloom Bat Wing", "rate": null}}
+    ]}"#;
+
+    #[test]
+    fn finds_who_drops_a_misread_item() {
+        let mut store = Store::open_in_memory().unwrap();
+        let key = item_key("Gloom Bat. Wing");
+        assert_eq!(key, "gloom bat wing");
+        let url = item_query_url(&key);
+        assert!(url.contains("where=item_id%20LIKE%20%22%25gloom%25bat%25wing%25%22"), "{url}");
+        let mut source = FakeSource::default();
+        source.files.insert(url, ITEM_REPLY.as_bytes().to_vec());
+
+        let found = sources_for(&mut store, &source, &names(&["Gloom Bat. Wing", "Gloom Bat Wing"]), 1000).unwrap();
+        assert_eq!(found.len(), 1, "both readings share one lookup");
+        let wing = &found[0];
+        assert_eq!(wing.item.as_deref(), Some("Gloom Bat Wing"));
+        let droppers: Vec<(&str, Option<f64>)> = wing.droppers.iter().map(|d| (d.monster.as_str(), d.rate)).collect();
+        assert_eq!(droppers, [("Elder Gloom Bat", Some(9.0)), ("Gloom Bat", Some(4.5)), ("Cave Owl", None)]);
+        assert!(wing.droppers[0].quest);
+
+        let again = sources_for(&mut store, &source, &names(&["Gloom Bat Wing"]), 2000).unwrap();
+        assert_eq!(again, found);
+        assert_eq!(source.requests.borrow().len(), 1, "served from the cache");
+    }
+
+    #[test]
+    fn an_unknown_item_is_remembered_as_unknown() {
+        let mut store = Store::open_in_memory().unwrap();
+        let mut source = FakeSource::default();
+        source.files.insert(item_query_url("moon rock"), br#"{"cargoquery": []}"#.to_vec());
+        let found = sources_for(&mut store, &source, &names(&["Moon Rock"]), 1000).unwrap();
+        assert_eq!((found[0].item.as_ref(), found[0].droppers.len()), (None, 0));
+        sources_for(&mut store, &source, &names(&["Moon Rock"]), 1001).unwrap();
+        assert_eq!(source.requests.borrow().len(), 1);
     }
 
     #[test]

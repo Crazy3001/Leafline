@@ -10,6 +10,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import type {
   Analysis,
   Calibration,
+  Guide,
   HudValues,
   MapDataDownload,
   MapDataStatus,
@@ -21,6 +22,7 @@ import type {
   OverlayStatus,
   Panel,
   PinStatus,
+  QuestQuery,
   ReplayOrder,
   ReplayProgress,
   SessionSummary,
@@ -66,6 +68,10 @@ export interface Backend {
   mapRoute(from: number, to: number): Promise<MapRoute | null>;
   /** Player-observed drops from mapleclassic.wiki, cached for a week. */
   monsterDrops(monsters: string[]): Promise<MonsterDrops[]>;
+  /** Where to go for each quest objective, from cached data only. Null until map data is downloaded. */
+  questGuide(quests: QuestQuery[], mapName: string | null, mapStreet: string | null): Promise<Guide | null>;
+  /** Asks mapleclassic.wiki which monsters drop these quest items; cached for a week. */
+  lookUpQuestItems(items: string[]): Promise<void>;
   /** Opens one of the card's link-outs or credits in the browser. */
   openLink(url: string): Promise<void>;
   onMapData(handler: (status: MapDataStatus) => void): Promise<UnlistenFn>;
@@ -120,6 +126,10 @@ const tauriBackend: Backend = {
   searchMaps: (text) => invoke("search_maps", { text }),
   mapRoute: (from, to) => invoke("map_route", { from, to }),
   monsterDrops: (monsters) => invoke("monster_drops", { monsters }),
+  questGuide: (quests, mapName, mapStreet) => invoke("quest_guide", { quests, mapName, mapStreet }),
+  lookUpQuestItems: async (items) => {
+    await invoke("look_up_quest_items", { items });
+  },
   openLink: (url) => invoke("open_link", { url }),
   onMapData: (handler) => listen<MapDataStatus>("map-data", (e) => handler(e.payload)),
   currentReadings: () => invoke("current_readings"),

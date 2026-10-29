@@ -340,3 +340,56 @@ export interface MonsterDrops {
     quest: boolean;
   }[];
 }
+
+// Quest guide (see src-tauri/src/mapdata/guide.rs): where to go for each Quest Helper objective.
+
+/** A quest as the Quest Helper showed it, for the guide. */
+export interface QuestQuery {
+  title: string;
+  objectives: string[];
+}
+
+export interface HuntingGround {
+  map: MapRef;
+  /** How many of the monster the map spawns. */
+  count: number;
+  /** Portals from the current map, when it is known and a route exists. */
+  hops: number | null;
+}
+
+export interface Hunt {
+  monster: { name: string; known: boolean; level: number; hp: number; exp: number; boss: boolean };
+  /** For an item: how often players saw this monster drop it (mapleclassic.wiki). */
+  drop: {
+    rate: number | null;
+    rateLow: number | null;
+    rateHigh: number | null;
+    sampleKills: number | null;
+    gameVersion: string | null;
+    quest: boolean;
+  } | null;
+  /** Most of the monster first. */
+  maps: HuntingGround[];
+}
+
+export interface ObjectiveGuide {
+  target: string;
+  kind: "monster" | "item";
+  /** The wiki's name for an item, once looked up and found. */
+  item: string | null;
+  /** Whether the wiki has been asked who drops this item. */
+  lookedUp: boolean;
+  hunts: Hunt[];
+}
+
+export interface QuestGuide {
+  title: string;
+  quest: { quest: QuestRef; giver: string | null; giverMaps: MapRef[] } | null;
+  objectives: ObjectiveGuide[];
+}
+
+export interface Guide {
+  /** The map portals are counted from, when the minimap was read and matched. */
+  from: MapRef | null;
+  quests: QuestGuide[];
+}

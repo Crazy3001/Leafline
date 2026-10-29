@@ -4,6 +4,7 @@
 import type { Backend } from "../api";
 import type {
   Analysis,
+  Guide,
   MapDataStatus,
   MapMatch,
   OverlayStatus,
@@ -12,7 +13,7 @@ import type {
   SessionSummary,
 } from "../types";
 import sample from "./sample-analysis.json";
-import { sampleCard, sampleDrops, sampleRoute, sampleSearch } from "./sample-map";
+import { sampleCard, sampleDrops, sampleGuide, sampleRoute, sampleSearch } from "./sample-map";
 import sampleSession from "./sample-session.json";
 
 const screenshots = import.meta.glob("/test-screenshots/*.{png,jpg,jpeg,webp}", {
@@ -29,6 +30,7 @@ interface Preview {
   analysis?: Analysis;
   session?: SessionSummary;
   map?: MapMatch;
+  guide?: Guide;
   pins?: PinStatus;
 }
 const preview = (globalThis as { __LEAFLINE_PREVIEW__?: Preview }).__LEAFLINE_PREVIEW__;
@@ -46,6 +48,9 @@ let mapStatus: MapDataStatus = preview?.map
   ? { ready: true, clientBuild: "preview", dataUpdatedAt: null, checkedAt: null, files: [] }
   : { ready: false, clientBuild: null, dataUpdatedAt: null, checkedAt: null, files: [] };
 const mapDataHandlers: ((status: MapDataStatus) => void)[] = [];
+
+/** Quest items the mock wiki has been asked about. */
+const lookedUpItems = new Set<string>();
 
 const pins: PinStatus = preview?.pins ?? { pinned: [], hidden: false };
 const pinHandlers: ((status: PinStatus) => void)[] = [];
@@ -157,6 +162,15 @@ export const mockBackend: Backend = {
   async monsterDrops(monsters) {
     await delay(900);
     return sampleDrops(monsters);
+  },
+  async questGuide(quests) {
+    if (!mapStatus.ready) return null;
+    if (preview?.guide) return preview.guide;
+    return sampleGuide(quests, 2, lookedUpItems);
+  },
+  async lookUpQuestItems(items) {
+    await delay(900);
+    items.forEach((item) => lookedUpItems.add(item));
   },
   async openLink(url) {
     window.open(url, "_blank", "noopener");

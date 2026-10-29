@@ -10,7 +10,7 @@ use std::path::Path;
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use serde::Serialize;
 
-use super::drops::{Drop, MonsterDrops};
+use super::drops::{Drop, Dropper, ItemSources, MonsterDrops};
 use super::osms::{
     Dataset, FILES, FileMeta, MapRecord, Meta, MobRequirement, MonsterRecord, NpcRecord, Portal, QuestRecord, Records,
     Spawn,
@@ -46,6 +46,15 @@ CREATE TABLE drops (
     game_version TEXT, quest INTEGER NOT NULL);
 CREATE INDEX drops_by_monster ON drops (monster);
 CREATE TABLE drop_fetches (monster TEXT PRIMARY KEY, fetched_at INTEGER NOT NULL, sample_kills INTEGER, game_version TEXT);
+";
+
+/// Tables added since cache version 1. They only hold what the wiki was asked, so they are
+/// created alongside an existing cache instead of forcing a new download.
+const ADDITIONS: &str = "
+CREATE TABLE IF NOT EXISTS item_lookups (key TEXT PRIMARY KEY, item TEXT, fetched_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS item_droppers (
+    key TEXT NOT NULL, monster TEXT NOT NULL, rate REAL, rate_low REAL, rate_high REAL,
+    sample_kills INTEGER, game_version TEXT, quest INTEGER NOT NULL);
 ";
 
 /// The tables that hold each OSMS file, cleared before the file is stored again.
@@ -118,6 +127,7 @@ impl Store {
             conn.execute_batch(SCHEMA)?;
             conn.pragma_update(None, "user_version", CACHE_VERSION)?;
         }
+        conn.execute_batch(ADDITIONS)?;
         Ok(Self { conn })
     }
 
@@ -382,6 +392,73 @@ impl Store {
                 params![monster, entry.fetched_at, entry.sample_kills, entry.game_version],
             )?;
         }
+        tx.commit()?;
+        Ok(())
+    }
+}
+
+impl Store {
+    /// Cached droppers for each item key looked up after `since`, and the keys that need asking.
+    pub fn cached_item_sources(&self, keys: &[String], since: i64) -> Result<(Vec<ItemSources>, Vec<String>)> {
+        let mut found = Vec::new();
+        let mut missing = Vec::new();
+        for key in keys {
+            let lookup: Option<(Option<String>, i64)> = self
+                .conn
+                .query_row("SELECT item, fetched_at FROM item_lookups WHERE key = ?1", [key], |row| {
+                    Ok((row.get(0)?, row.get(1)?))
+                })
+                .optional()?;
+            match lookup {
+                Some((item, fetched_at)) if fetched_at > since => {
+                    let mut stmt = self.conn.prepare(
+                        "SELECT monster, rate, rate_low, rate_high, sample_kills, game_version, quest
+                         FROM item_droppers WHERE key = ?1 ORDER BY rowid",
+                    )?;
+                    let droppers = stmt.query_map([key], |row| {
+                        Ok(Dropper {
+                            monster: row.get(0)?,
+                            rate: row.get(1)?,
+                            rate_low: row.get(2)?,
+                            rate_high: row.get(3)?,
+                            sample_kills: row.get(4)?,
+                            game_version: row.get(5)?,
+                            quest: row.get(6)?,
+                        })
+                    })?;
+                    let droppers = droppers.collect::<rusqlite::Result<_>>()?;
+                    found.push(ItemSources { key: key.clone(), item, fetched_at, droppers });
+                }
+                _ => missing.push(key.clone()),
+            }
+        }
+        Ok((found, missing))
+    }
+
+    /// Replaces what is cached for one item lookup, including a lookup that found nothing.
+    pub fn save_item_sources(&mut self, sources: &ItemSources) -> Result<()> {
+        let tx = self.conn.transaction()?;
+        tx.execute("DELETE FROM item_droppers WHERE key = ?1", [&sources.key])?;
+        for d in &sources.droppers {
+            tx.execute(
+                "INSERT INTO item_droppers (key, monster, rate, rate_low, rate_high, sample_kills, game_version, quest)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                params![
+                    sources.key,
+                    d.monster,
+                    d.rate,
+                    d.rate_low,
+                    d.rate_high,
+                    d.sample_kills,
+                    d.game_version,
+                    d.quest
+                ],
+            )?;
+        }
+        tx.execute(
+            "INSERT OR REPLACE INTO item_lookups (key, item, fetched_at) VALUES (?1, ?2, ?3)",
+            params![sources.key, sources.item, sources.fetched_at],
+        )?;
         tx.commit()?;
         Ok(())
     }
