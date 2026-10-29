@@ -1,0 +1,150 @@
+{
+  "width": 2560,
+  "height": 1440,
+  "hud": {
+    "level": 30,
+    "job": "Crossbowman",
+    "name": "Leafling",
+    "hp": {
+      "current": 1112,
+      "max": 1149
+    },
+    "mp": {
+      "current": 953,
+      "max": 953
+    },
+    "exp": {
+      "points": 24331,
+      "percent": 25.42
+    },
+    "needsCalibration": false
+  },
+  "hudLayout": {
+    "hp": {
+      "x": 920.0,
+      "y": 1404.0,
+      "w": 212.80005,
+      "h": 32.0
+    },
+    "mp": {
+      "x": 1136.0,
+      "y": 1404.0,
+      "w": 226.80005,
+      "h": 32.0
+    },
+    "exp": {
+      "x": 1366.0,
+      "y": 1404.0,
+      "w": 228.0,
+      "h": 32.0
+    },
+    "labels": {
+      "x": 916.8,
+      "y": 1376.8,
+      "w": 677.2,
+      "h": 25.599976
+    },
+    "level": {
+      "x": 572.0,
+      "y": 1392.0,
+      "w": 46.0,
+      "h": 26.0
+    },
+    "identity": {
+      "x": 638.4,
+      "y": 1376.8,
+      "w": 259.19995,
+      "h": 51.19995
+    }
+  },
+  "tooltips": [],
+  "quest": {
+    "quests": [
+      {
+        "title": "Cutthroat Manny's Request",
+        "objectives": [
+          {
+            "target": "Evil Eye Tail",
+            "current": 0,
+            "required": 30
+          },
+          {
+            "target": "Evil Eye",
+            "current": 0,
+            "required": 50
+          }
+        ]
+      },
+      {
+        "title": "[Event] Halloween Candies",
+        "objectives": [
+          {
+            "target": "Halloween Candies",
+            "current": 55,
+            "required": 100
+          }
+        ]
+      },
+      {
+        "title": "[Forest of Patience] Sabitrama a...",
+        "objectives": [
+          {
+            "target": "Pink Anthurium",
+            "current": 0,
+            "required": 1
+          }
+        ]
+      },
+      {
+        "title": "A rainbow snail shell that makes...",
+        "objectives": [
+          {
+            "target": "Rainbow-colored Snail Shell",
+            "current": 0,
+            "required": 1
+          }
+        ]
+      },
+      {
+        "title": "[Event] The Journey Begins",
+        "objectives": [
+          {
+            "target": "Maple Leaf",
+            "current": 0,
+            "required": 30
+          }
+        ]
+      }
+    ],
+    "page": [
+      5,
+      5
+    ],
+    "panel": {
+      "x": 2108.0,
+      "y": 32.0,
+      "w": 436.0,
+      "h": 520.0
+    }
+  },
+  "mesos": null,
+  "overview": [],
+  "timings": [
+    {
+      "stage": "HUD",
+      "ms": 30.4299
+    },
+    {
+      "stage": "Overview OCR",
+      "ms": 183.2378
+    },
+    {
+      "stage": "Tooltips",
+      "ms": 6.0674
+    },
+    {
+      "stage": "Quest & mesos",
+      "ms": 152.09421
+    }
+  ]
+}

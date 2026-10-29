@@ -1,0 +1,44 @@
+[package]
+name = "leafline"
+version = "0.1.0"
+description = "An unofficial, read-only overlay for MapleStory Classic"
+edition = "2024"
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "leafline_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["image-png", "tray-icon"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri-plugin-global-shortcut = "2.4.1"
+tauri-plugin-window-state = "2.5.0"
+tauri-plugin-dialog = "2.8.4"
+tauri-plugin-single-instance = "2.5.5"
+thiserror = "2.0.21"
+image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "webp"] }
+regex = "1.13.1"
+strsim = "0.11.1"
+
+
+# Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true
+
+[target."cfg(windows)".dependencies]
+windows = { version = "0.62.2", features = ["Foundation", "Globalization", "Graphics_Imaging", "Media_Ocr", "Storage_Streams"] }
+
+# Image processing is far too slow unoptimised; keep dependencies fast in dev builds.
+[profile.dev.package."*"]
+opt-level = 3
