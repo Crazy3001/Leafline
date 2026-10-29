@@ -1,10 +1,14 @@
 <script lang="ts">
   import Card from "./Card.svelte";
   import Gauge from "./Gauge.svelte";
-  import { formatNumber, formatPercent } from "$lib/format";
-  import type { Gauge as GaugeReading, HudReading, MesoReading } from "$lib/types";
+  import { formatCompact, formatDuration, formatNumber, formatPercent } from "$lib/format";
+  import type { Gauge as GaugeReading, HudReading, MesoReading, SessionSummary } from "$lib/types";
 
-  let { hud, mesos }: { hud: HudReading | null; mesos: MesoReading | null } = $props();
+  let {
+    hud,
+    mesos,
+    session = null,
+  }: { hud: HudReading | null; mesos: MesoReading | null; session?: SessionSummary | null } = $props();
 
   const fraction = (g: GaugeReading | null | undefined) => (g ? g.current / g.max : null);
   const gaugeText = (g: GaugeReading | null | undefined) =>
@@ -45,11 +49,26 @@
     <p class="calibrate">Teach Leafline your HUD in the workbench to read HP, MP and EXP.</p>
   {/if}
 
-  <dl class="rates">
-    <div><dt>EXP / hr</dt><dd>—</dd></div>
-    <div><dt>Mesos / hr</dt><dd>—</dd></div>
-    <div><dt>To level</dt><dd>—</dd></div>
+  <dl class="rates" class:live={session != null}>
+    <div title="EXP gained per hour of active time">
+      <dt>EXP / hr</dt>
+      <dd class="tabular">{formatCompact(session?.expPerHour)}</dd>
+      {#if session?.percentPerHour != null}<dd class="sub tabular">{session.percentPerHour.toFixed(1)}%</dd>{/if}
+    </div>
+    <div title="Mesos gained per hour of active time, leaving out storage and trades">
+      <dt>Mesos / hr</dt>
+      <dd class="tabular">{formatCompact(session?.mesosPerHour)}</dd>
+    </div>
+    <div title="At the current EXP rate">
+      <dt>To level</dt>
+      <dd class="tabular">{formatDuration(session?.secondsToLevel)}</dd>
+    </div>
   </dl>
+  {#if !session}
+    <p class="hint">Rates appear once a session is tracked. Replay a folder in the workbench to try it.</p>
+  {:else if session.expPerHour == null}
+    <p class="hint">Rates need at least 30 s of EXP gains with the HUD in view.</p>
+  {/if}
 </Card>
 
 <style>
@@ -139,5 +158,27 @@
     margin: 0;
     font-weight: 600;
     color: var(--muted);
+  }
+
+  .live dd {
+    color: var(--text);
+  }
+
+  dd.sub {
+    display: inline;
+    margin-left: 5px;
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--muted);
+  }
+
+  .live dt + dd {
+    display: inline;
+  }
+
+  .hint {
+    margin: 8px 0 0;
+    color: var(--faint);
+    font-size: 11.5px;
   }
 </style>

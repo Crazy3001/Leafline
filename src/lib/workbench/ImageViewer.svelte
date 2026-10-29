@@ -115,6 +115,10 @@
     stroke: var(--good);
   }
 
+  .map {
+    stroke: var(--map);
+  }
+
   .text {
     stroke: rgba(255, 255, 255, 0.7);
   }

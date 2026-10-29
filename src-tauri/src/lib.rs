@@ -7,6 +7,8 @@ mod app;
 pub mod error;
 pub mod pipeline;
 pub mod readers;
+pub mod replay;
+pub mod session;
 pub mod vision;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

@@ -1,10 +1,28 @@
 <script lang="ts">
-  import { FolderOpen, Image as ImageIcon, LoaderCircle, RotateCw, ScanText, ShieldCheck } from "@lucide/svelte";
+  import {
+    FolderOpen,
+    Image as ImageIcon,
+    LoaderCircle,
+    Play,
+    RotateCw,
+    ScanText,
+    ShieldCheck,
+    Square,
+  } from "@lucide/svelte";
   import { onMount } from "svelte";
 
   import { backend, fileName } from "$lib/api";
   import Logo from "$lib/components/Logo.svelte";
-  import type { Analysis, HudValues, Rect, ShortcutInfo } from "$lib/types";
+  import { formatDuration } from "$lib/format";
+  import type {
+    Analysis,
+    HudValues,
+    Rect,
+    ReplayOrder,
+    ReplayProgress,
+    SessionSummary,
+    ShortcutInfo,
+  } from "$lib/types";
   import ImageViewer from "$lib/workbench/ImageViewer.svelte";
   import ResultsPanel from "$lib/workbench/ResultsPanel.svelte";
   import { regionsOf } from "$lib/workbench/regions";
@@ -19,6 +37,14 @@
   let highlight = $state<Rect | null>(null);
   let shortcuts = $state<ShortcutInfo[]>([]);
 
+  // Session replay: the open folder run as one play session.
+  let folder = $state<string | null>(null);
+  let order = $state<ReplayOrder["by"]>("modified");
+  let interval = $state(1);
+  let replaying = $state(false);
+  let progress = $state<{ done: number; total: number } | null>(null);
+  let session = $state<SessionSummary | null>(null);
+
   const regions = $derived(analysis ? regionsOf(analysis, showText) : []);
 
   onMount(() => {
@@ -26,8 +52,8 @@
     backend.takeLaunchImage().then((path) => {
       if (path) openPath(path);
     });
-    const unlisten = backend.onOpenImage(openPath);
-    return () => unlisten.then((stop) => stop());
+    const subscriptions = [backend.onOpenImage(openPath), backend.onReplayProgress(showProgress)];
+    return () => subscriptions.forEach((s) => s.then((stop) => stop()));
   });
 
   async function openImage() {
@@ -36,18 +62,56 @@
   }
 
   async function openPath(path: string) {
+    if (replaying) return;
+    folder = null;
+    session = null;
     images = [path];
     await select(path);
   }
 
   async function openFolder() {
-    const folder = await backend.pickFolder();
-    if (!folder) return;
-    images = await backend.listImages(folder);
+    if (replaying) return;
+    const picked = await backend.pickFolder();
+    if (!picked) return;
+    folder = picked;
+    session = null;
+    images = await backend.listImages(picked);
     if (images.length) await select(images[0]);
   }
 
+  async function replay() {
+    if (!folder || replaying) return;
+    replaying = true;
+    error = null;
+    session = null;
+    progress = { done: 0, total: images.length };
+    const replayOrder: ReplayOrder =
+      order === "name" ? { by: "name", intervalSeconds: Math.max(0.1, interval || 1) } : { by: "modified" };
+    try {
+      session = await backend.replaySession(folder, replayOrder);
+    } catch (e) {
+      error = String(e);
+    } finally {
+      replaying = false;
+      progress = null;
+    }
+  }
+
+  /** Shows each replayed frame as it is read, without analysing it again. */
+  async function showProgress(update: ReplayProgress) {
+    progress = { done: update.done, total: update.total };
+    session = update.session;
+    if (selected !== update.path) {
+      selected = update.path;
+      const url = await backend.imageUrl(update.path);
+      if (imageUrl) URL.revokeObjectURL(imageUrl);
+      imageUrl = url;
+    }
+    analysis = update.analysis;
+  }
+
   async function select(path: string) {
+    if (replaying) return;
     selected = path;
     analysis = null;
     error = null;
@@ -86,6 +150,7 @@
   }
 
   function onKeydown(event: KeyboardEvent) {
+    if (replaying || event.target instanceof HTMLInputElement) return;
     if (event.key === "ArrowDown" || event.key === "j") step(1);
     else if (event.key === "ArrowUp" || event.key === "k") step(-1);
     else if (event.key === "r") analyze();
@@ -112,7 +177,7 @@
         <input type="checkbox" bind:checked={showText} disabled={!analysis} />
         <ScanText size={15} />Text boxes
       </label>
-      <button class="primary" onclick={analyze} disabled={!selected || busy}>
+      <button class="primary" onclick={analyze} disabled={!selected || busy || replaying}>
         {#if busy}<span class="spin"><LoaderCircle size={15} /></span>{:else}<RotateCw size={15} />{/if}
         Analyze
       </button>
@@ -125,7 +190,12 @@
       <ul class="files">
         {#each images as path (path)}
           <li>
-            <button class:active={path === selected} onclick={() => select(path)} title={path}>
+            <button
+              class:active={path === selected}
+              onclick={() => select(path)}
+              title={path}
+              disabled={replaying && path !== selected}
+            >
               <ImageIcon size={14} />
               <span>{fileName(path)}</span>
             </button>
@@ -134,6 +204,53 @@
       </ul>
       {#if images.length > 1}
         <p class="hint">Use <kbd>↑</kbd> <kbd>↓</kbd> to step through, <kbd>R</kbd> to re-run.</p>
+      {/if}
+      {#if folder && images.length > 1}
+        <section class="replay">
+          <div class="eyebrow">Session replay</div>
+          <p class="hint">Read the whole folder as one play session to see EXP and meso rates.</p>
+          <div class="segmented" role="radiogroup" aria-label="Frame order">
+            <button
+              role="radio"
+              aria-checked={order === "modified"}
+              disabled={replaying}
+              onclick={() => (order = "modified")}
+              title="Order by when each file was saved, and use that as its time">File time</button
+            >
+            <button
+              role="radio"
+              aria-checked={order === "name"}
+              disabled={replaying}
+              onclick={() => (order = "name")}
+              title="Order by file name, a fixed time apart: for frames taken from a recording">File name</button
+            >
+          </div>
+          {#if order === "name"}
+            <label class="interval">
+              Frames
+              <input type="number" min="0.1" step="0.1" bind:value={interval} disabled={replaying} />
+              s apart
+            </label>
+          {/if}
+          {#if replaying && progress}
+            <div class="meter" role="progressbar" aria-valuenow={progress.done} aria-valuemax={progress.total}>
+              <span style:width="{(progress.done / Math.max(1, progress.total)) * 100}%"></span>
+            </div>
+            <div class="replay-row">
+              <span class="tabular">Frame {progress.done} of {progress.total}</span>
+              <button class="ghost small" onclick={() => backend.cancelReplay()}><Square size={11} />Stop</button>
+            </div>
+          {:else}
+            <button class="ghost wide" onclick={replay}><Play size={14} />Replay as session</button>
+            {#if session}
+              <p class="hint">
+                Last run: {session.frames} frames over {formatDuration(session.elapsedSeconds)}, {formatDuration(
+                  session.activeSeconds,
+                )} active.
+              </p>
+            {/if}
+          {/if}
+        </section>
       {/if}
     {:else}
       <p class="hint">Open a screenshot or a folder of them to test the readers.</p>
@@ -182,7 +299,7 @@
   <aside class="results">
     {#if analysis}
       {#key selected}
-        <ResultsPanel {analysis} {calibrate} bind:highlight />
+        <ResultsPanel {analysis} {session} {calibrate} bind:highlight />
       {/key}
     {:else}
       <div class="results-empty">Readings appear here.</div>
@@ -195,7 +312,9 @@
       <span class="tabular">{analysis.width} × {analysis.height}</span>
       <span>{analysis.tooltips.length} tooltip{analysis.tooltips.length === 1 ? "" : "s"}</span>
       <span>HUD {analysis.hudLayout ? "found" : "not found"}</span>
+      <span>Map {analysis.map ? "found" : "not found"}</span>
     {/if}
+    {#if replaying && progress}<span class="replaying">Replaying {progress.done} / {progress.total}</span>{/if}
     <span class="grow"></span>
     <span>OCR: Windows.Media.Ocr</span>
   </footer>
@@ -372,6 +491,95 @@
     border-radius: 4px;
     font-family: var(--font-sans);
     font-size: 10.5px;
+  }
+
+  .replay {
+    display: grid;
+    gap: 8px;
+    margin-top: 6px;
+    padding: 12px 6px 0;
+    border-top: 1px solid var(--border);
+  }
+
+  .segmented {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    padding: 2px;
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    border: 1px solid var(--border);
+  }
+
+  .segmented button {
+    height: 26px;
+    justify-content: center;
+    padding: 0 6px;
+    border-radius: 4px;
+    background: none;
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  .segmented button[aria-checked="true"] {
+    background: var(--surface-3);
+    color: var(--text);
+  }
+
+  .interval {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  .interval input {
+    width: 56px;
+    height: 26px;
+    padding: 0 6px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    color: var(--text);
+    font: inherit;
+  }
+
+  .wide {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .small {
+    height: 24px;
+    padding: 0 8px;
+    gap: 5px;
+    font-size: 11.5px;
+  }
+
+  .meter {
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    overflow: hidden;
+  }
+
+  .meter span {
+    display: block;
+    height: 100%;
+    background: var(--accent);
+    transition: width 0.2s ease;
+  }
+
+  .replay-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  .replaying {
+    color: var(--accent);
   }
 
   .spacer {

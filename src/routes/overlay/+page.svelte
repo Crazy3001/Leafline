@@ -5,17 +5,21 @@
   import { backend } from "$lib/api";
   import CharacterCard from "$lib/components/CharacterCard.svelte";
   import ItemCard from "$lib/components/ItemCard.svelte";
+  import MapCard from "$lib/components/MapCard.svelte";
   import Logo from "$lib/components/Logo.svelte";
   import QuestCard from "$lib/components/QuestCard.svelte";
-  import type { Analysis, OverlayStatus } from "$lib/types";
+  import SessionCard from "$lib/components/SessionCard.svelte";
+  import type { Analysis, OverlayStatus, SessionSummary } from "$lib/types";
 
   let analysis = $state<Analysis | null>(null);
+  let session = $state<SessionSummary | null>(null);
   let status = $state<OverlayStatus>({ visible: true, clickThrough: false });
 
   onMount(() => {
     backend.overlayStatus().then((s) => (status = s));
     const subscriptions = [
       backend.onAnalysis((a) => (analysis = a)),
+      backend.onSession((s) => (session = s)),
       backend.onOverlayStatus((s) => (status = s)),
     ];
     return () => subscriptions.forEach((s) => s.then((unlisten) => unlisten()));
@@ -55,7 +59,13 @@
 
   <main>
     {#if analysis}
-      <CharacterCard hud={analysis.hud} mesos={analysis.mesos} />
+      <CharacterCard hud={analysis.hud} mesos={analysis.mesos} {session} />
+      {#if analysis.map}
+        <MapCard map={analysis.map} {session} />
+      {/if}
+      {#if session && session.maps.length > 1}
+        <SessionCard {session} compact />
+      {/if}
       {#each analysis.tooltips as item, i}
         <ItemCard {item} title={i === 0 ? "Item" : "Compared item"} />
       {/each}

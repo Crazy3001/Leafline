@@ -67,6 +67,11 @@ fn main() {
         if let Some(mesos) = want.get("mesos") {
             check("mesos".into(), mesos, &got["mesos"]["mesos"]);
         }
+        if let Some(map) = want.get("map") {
+            for field in ["street", "name"] {
+                check(format!("map {field}"), &map[field], &got["map"][field]);
+            }
+        }
         println!("{file}: {}/{}", score.passed - before.passed, score.total - before.total);
     }
     println!("\n{} of {} checks pass ({:.0}%)", score.passed, score.total, score.percent());

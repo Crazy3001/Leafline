@@ -1,0 +1,54 @@
+{
+  "frames": 15,
+  "startedAt": 1793247219.3703146,
+  "updatedAt": 1793252265.291178,
+  "elapsedSeconds": 5045.920863389969,
+  "activeSeconds": 3433.5440323352814,
+  "paused": true,
+  "level": 30,
+  "exp": {
+    "points": 45930,
+    "percent": 47.99
+  },
+  "expNeeded": 95702,
+  "expGained": 21599,
+  "expPerHour": 22646.10538491186,
+  "percentPerHour": 23.663147462865837,
+  "secondsToLevel": 7912.141931450143,
+  "levelUps": 0,
+  "mesos": 42944,
+  "mesosGained": 9904,
+  "mesosPerHour": 10475.668791490958,
+  "mesosExcluded": 0,
+  "map": "Victoria Road : Kerning City",
+  "maps": [
+    {
+      "map": null,
+      "activeSeconds": 3403.5440323352814,
+      "expGained": 21599,
+      "expPerHour": 22845.71589533655,
+      "mesosGained": 9904,
+      "mesosPerHour": 10475.668791490958
+    },
+    {
+      "map": "Victoria Road : Henesys",
+      "activeSeconds": 15.0,
+      "expGained": 0,
+      "expPerHour": null,
+      "mesosGained": 0,
+      "mesosPerHour": null
+    },
+    {
+      "map": "Victoria Road : Kerning City",
+      "activeSeconds": 15.0,
+      "expGained": 0,
+      "expPerHour": null,
+      "mesosGained": 0,
+      "mesosPerHour": null
+    }
+  ],
+  "rejected": {
+    "exp": 0,
+    "mesos": 0
+  }
+}

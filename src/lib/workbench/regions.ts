@@ -1,6 +1,6 @@
 import type { Analysis, Rect } from "$lib/types";
 
-export type RegionKind = "hud" | "tooltip" | "quest" | "mesos" | "text";
+export type RegionKind = "hud" | "tooltip" | "quest" | "mesos" | "map" | "text";
 
 export interface Region {
   label: string;
@@ -27,6 +27,7 @@ export function regionsOf(analysis: Analysis, includeText: boolean): Region[] {
   );
   if (analysis.quest) regions.push({ label: "Quest Helper", kind: "quest", rect: analysis.quest.panel });
   if (analysis.mesos) regions.push({ label: "Mesos", kind: "mesos", rect: analysis.mesos.rect });
+  if (analysis.map) regions.push({ label: `Map: ${analysis.map.name}`, kind: "map", rect: analysis.map.rect });
   if (includeText) {
     for (const line of analysis.overview) regions.push({ label: line.text, kind: "text", rect: line.rect });
   }

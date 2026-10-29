@@ -5,13 +5,26 @@ import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 
-import type { Analysis, Calibration, HudValues, OverlayStatus, ShortcutInfo } from "./types";
+import type {
+  Analysis,
+  Calibration,
+  HudValues,
+  OverlayStatus,
+  ReplayOrder,
+  ReplayProgress,
+  SessionSummary,
+  ShortcutInfo,
+} from "./types";
 
 export interface Backend {
   analyzeImage(path: string): Promise<Analysis>;
   /** Teaches the HUD font from a screenshot whose values the user typed in. */
   calibrateHud(path: string, values: HudValues): Promise<Calibration>;
   listImages(folder: string): Promise<string[]>;
+  /** Runs every screenshot in the folder through the pipeline as one session. */
+  replaySession(folder: string, order: ReplayOrder): Promise<SessionSummary>;
+  /** Stops a running replay after its current frame. */
+  cancelReplay(): Promise<void>;
   /** An object URL for displaying the image; revoke it when done. */
   imageUrl(path: string): Promise<string>;
   pickImage(): Promise<string | null>;
@@ -27,6 +40,8 @@ export interface Backend {
   /** Images passed to later launches while the app is already running. */
   onOpenImage(handler: (path: string) => void): Promise<UnlistenFn>;
   onAnalysis(handler: (analysis: Analysis) => void): Promise<UnlistenFn>;
+  onReplayProgress(handler: (progress: ReplayProgress) => void): Promise<UnlistenFn>;
+  onSession(handler: (session: SessionSummary) => void): Promise<UnlistenFn>;
   onOverlayStatus(handler: (status: OverlayStatus) => void): Promise<UnlistenFn>;
 }
 
@@ -36,6 +51,8 @@ const tauriBackend: Backend = {
   analyzeImage: (path) => invoke("analyze_image", { path }),
   calibrateHud: (path, values) => invoke("calibrate_hud", { path, values }),
   listImages: (folder) => invoke("list_images", { folder }),
+  replaySession: (folder, order) => invoke("replay_session", { folder, order }),
+  cancelReplay: () => invoke("cancel_replay"),
   async imageUrl(path) {
     const bytes = await invoke<ArrayBuffer>("read_image", { path });
     return URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: imageType(path) }));
@@ -57,6 +74,8 @@ const tauriBackend: Backend = {
   takeLaunchImage: () => invoke("take_launch_image"),
   onOpenImage: (handler) => listen<string>("open-image", (e) => handler(e.payload)),
   onAnalysis: (handler) => listen<Analysis>("analysis", (e) => handler(e.payload)),
+  onReplayProgress: (handler) => listen<ReplayProgress>("replay-progress", (e) => handler(e.payload)),
+  onSession: (handler) => listen<SessionSummary>("session", (e) => handler(e.payload)),
   onOverlayStatus: (handler) => listen<OverlayStatus>("overlay-status", (e) => handler(e.payload)),
 };
 

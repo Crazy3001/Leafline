@@ -6,10 +6,11 @@ use serde::Serialize;
 
 use crate::error::Result;
 use crate::readers::hud::{HudFont, HudLayout, HudReading};
+use crate::readers::map::MapReading;
 use crate::readers::mesos::MesoReading;
 use crate::readers::quest::QuestReading;
 use crate::readers::tooltip::ItemTooltip;
-use crate::readers::{hud, mesos, quest, tooltip};
+use crate::readers::{hud, map, mesos, quest, tooltip};
 use crate::vision::{Frame, Line, Ocr, group_lines};
 
 #[derive(Debug, Clone, Serialize)]
@@ -22,6 +23,10 @@ pub struct Analysis {
     pub tooltips: Vec<ItemTooltip>,
     pub quest: Option<QuestReading>,
     pub mesos: Option<MesoReading>,
+    /// Meso boxes on screen, read or not. More than one means a storage or trade window is
+    /// open, where meso changes are not loot.
+    pub meso_boxes: usize,
+    pub map: Option<MapReading>,
     /// Every line from the whole-frame OCR pass, for the workbench's debug view.
     pub overview: Vec<Line>,
     pub timings: Vec<Timing>,
@@ -54,8 +59,12 @@ pub fn analyze(frame: &Frame, ocr: &Ocr, hud_font: &HudFont) -> Result<Analysis>
 
     let started = Instant::now();
     let quest = quest::read(frame, &overview, ocr)?;
-    let mesos = mesos::read(frame, ocr)?;
+    let (mesos, meso_boxes) = mesos::read(frame, ocr)?;
     timed("Quest & mesos", started);
+
+    let started = Instant::now();
+    let map = map::read(frame, ocr)?;
+    timed("Map", started);
 
     Ok(Analysis {
         width: frame.width(),
@@ -65,6 +74,8 @@ pub fn analyze(frame: &Frame, ocr: &Ocr, hud_font: &HudFont) -> Result<Analysis>
         tooltips,
         quest,
         mesos,
+        meso_boxes,
+        map,
         overview,
         timings,
     })

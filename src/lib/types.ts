@@ -114,6 +114,15 @@ export interface MesoReading {
   rect: Rect;
 }
 
+export interface MapReading {
+  /** The street or area above the map's name, such as `Victoria Road`, when it was read. */
+  street: string | null;
+  name: string;
+  /** Read from the collapsed minimap's one-line title. */
+  collapsed: boolean;
+  rect: Rect;
+}
+
 export interface Word {
   text: string;
   rect: Rect;
@@ -138,6 +147,9 @@ export interface Analysis {
   tooltips: ItemTooltip[];
   quest: QuestReading | null;
   mesos: MesoReading | null;
+  /** Meso boxes on screen; more than one means a storage or trade window is open. */
+  mesoBoxes: number;
+  map: MapReading | null;
   overview: Line[];
   timings: Timing[];
 }
@@ -151,4 +163,54 @@ export interface ShortcutInfo {
   action: string;
   keys: string;
   label: string;
+}
+
+export interface MapSummary {
+  /** `null` collects what cannot be placed: before any map was read, or spans across a map change. */
+  map: string | null;
+  activeSeconds: number;
+  expGained: number;
+  expPerHour: number | null;
+  mesosGained: number;
+  mesosPerHour: number | null;
+}
+
+/** What the session tracker has worked out so far (see src-tauri/src/session.rs). */
+export interface SessionSummary {
+  frames: number;
+  startedAt: number | null;
+  updatedAt: number | null;
+  elapsedSeconds: number;
+  /** Time spent gaining EXP, with idle stretches and map changes paused out. */
+  activeSeconds: number;
+  paused: boolean;
+  level: number | null;
+  exp: Exp | null;
+  /** The EXP the current level needs, as measured from the HUD. */
+  expNeeded: number | null;
+  expGained: number;
+  expPerHour: number | null;
+  percentPerHour: number | null;
+  secondsToLevel: number | null;
+  levelUps: number;
+  mesos: number | null;
+  mesosGained: number;
+  mesosPerHour: number | null;
+  /** Net change while a storage or trade window was open, left out of the rates. */
+  mesosExcluded: number;
+  map: string | null;
+  maps: MapSummary[];
+  rejected: { exp: number; mesos: number };
+}
+
+/** How a replay orders frames: by file time, or by name a fixed interval apart. */
+export type ReplayOrder = { by: "modified" } | { by: "name"; intervalSeconds: number };
+
+export interface ReplayProgress {
+  done: number;
+  total: number;
+  path: string;
+  at: number;
+  analysis: Analysis;
+  session: SessionSummary;
 }

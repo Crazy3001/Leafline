@@ -23,11 +23,13 @@ pub struct MesoReading {
 /// A grouped amount such as `36,644`, or a small one such as `500`.
 static AMOUNT: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^(?:\d{1,3}(?:[,.]\d{3})+|\d{1,3})$").unwrap());
 
-/// Reads every meso box on screen. Storage and shop windows show a second box (the storage's
-/// own mesos, for one), so the amount most boxes agree on is taken as the player's.
-pub fn read(frame: &Frame, ocr: &Ocr) -> Result<Option<MesoReading>> {
+/// Reads every meso box on screen. Storage and trade windows show more boxes (the storage's
+/// own mesos, for one), so the amount most boxes agree on is taken as the player's. Also
+/// returns how many boxes there were, read or not.
+pub fn read(frame: &Frame, ocr: &Ocr) -> Result<(Option<MesoReading>, usize)> {
+    let boxes = locate(frame);
     let mut readings = Vec::new();
-    for rect in locate(frame) {
+    for &rect in &boxes {
         // The amount is right-aligned; the empty left of the box only confuses OCR.
         let amount = Rect::from_edges(
             rect.x + 0.4 * rect.w,
@@ -47,7 +49,7 @@ pub fn read(frame: &Frame, ocr: &Ocr) -> Result<Option<MesoReading>> {
             best = Some((*reading, n));
         }
     }
-    Ok(best.map(|(reading, _)| reading))
+    Ok((best.map(|(reading, _)| reading), boxes.len()))
 }
 
 /// OCR of the box's dark digits at several sizes. The pixel font's 6 and 8 are easily

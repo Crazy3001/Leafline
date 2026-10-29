@@ -2,6 +2,7 @@
 //! reads it with OCR and parses the text into structured data.
 
 pub mod hud;
+pub mod map;
 pub mod mesos;
 pub mod quest;
 mod text;

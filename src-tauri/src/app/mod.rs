@@ -4,6 +4,7 @@ mod calibration;
 mod commands;
 mod launch;
 mod overlay;
+mod replay;
 mod shortcuts;
 mod tray;
 
@@ -13,6 +14,7 @@ use tauri_plugin_window_state::StateFlags;
 use calibration::HudFontState;
 use launch::LaunchImage;
 use overlay::{OVERLAY, OverlayState, WORKBENCH};
+use replay::ReplayState;
 
 pub fn run() {
     let args: Vec<String> = std::env::args().collect();
@@ -33,6 +35,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(shortcuts::plugin())
         .manage(OverlayState::default())
+        .manage(ReplayState::default())
         .manage(LaunchImage::new(&args))
         .setup(|app| {
             app.manage(HudFontState::load(app.handle())?);
@@ -54,6 +57,8 @@ pub fn run() {
             calibration::calibrate_hud,
             commands::list_images,
             commands::read_image,
+            replay::replay_session,
+            replay::cancel_replay,
             commands::overlay_status,
             commands::set_click_through,
             commands::hide_overlay,

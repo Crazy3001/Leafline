@@ -1,17 +1,21 @@
 <script lang="ts">
   import CharacterCard from "$lib/components/CharacterCard.svelte";
   import ItemCard from "$lib/components/ItemCard.svelte";
+  import MapCard from "$lib/components/MapCard.svelte";
   import QuestCard from "$lib/components/QuestCard.svelte";
+  import SessionCard from "$lib/components/SessionCard.svelte";
   import { formatMs } from "$lib/format";
-  import type { Analysis, Calibration, HudValues, Rect } from "$lib/types";
+  import type { Analysis, Calibration, HudValues, Rect, SessionSummary } from "$lib/types";
   import HudCalibration from "./HudCalibration.svelte";
 
   let {
     analysis,
+    session = null,
     highlight = $bindable(null),
     calibrate,
   }: {
     analysis: Analysis;
+    session?: SessionSummary | null;
     highlight?: Rect | null;
     calibrate: (values: HudValues) => Promise<Calibration>;
   } = $props();
@@ -31,7 +35,7 @@
 
   <div class="body">
     {#if tab === "readings"}
-      <CharacterCard hud={analysis.hud} mesos={analysis.mesos} />
+      <CharacterCard hud={analysis.hud} mesos={analysis.mesos} {session} />
       {#if analysis.hud}
         {#if analysis.hud.needsCalibration || teaching}
           <HudCalibration hud={analysis.hud} {calibrate} />
@@ -39,6 +43,10 @@
           <button class="link" onclick={() => (teaching = true)}>Teach the HUD again from this screenshot</button>
         {/if}
       {/if}
+      {#if session}
+        <SessionCard {session} />
+      {/if}
+      <MapCard map={analysis.map} {session} />
       {#each analysis.tooltips as item, i}
         <ItemCard {item} title={analysis.tooltips.length > 1 ? `Item ${i + 1}` : "Item"} />
       {:else}

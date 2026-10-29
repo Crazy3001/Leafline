@@ -128,6 +128,18 @@
     }
   },
   "mesos": null,
+  "mesoBoxes": 0,
+  "map": {
+    "street": "Victoria Road",
+    "name": "Subway Ticketing Booth",
+    "collapsed": true,
+    "rect": {
+      "x": 2.0,
+      "y": 2.0,
+      "w": 476.0,
+      "h": 36.0
+    }
+  },
   "overview": [],
   "timings": [
     {
@@ -145,6 +157,10 @@
     {
       "stage": "Quest & mesos",
       "ms": 152.09421
+    },
+    {
+      "stage": "Map",
+      "ms": 37.8395
     }
   ]
 }
