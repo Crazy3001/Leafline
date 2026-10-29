@@ -3,7 +3,10 @@
 mod calibration;
 mod commands;
 mod launch;
+mod mapdata;
 mod overlay;
+mod pins;
+mod readings;
 mod replay;
 mod shortcuts;
 mod tray;
@@ -13,7 +16,10 @@ use tauri_plugin_window_state::StateFlags;
 
 use calibration::HudFontState;
 use launch::LaunchImage;
+use mapdata::MapDataState;
 use overlay::{OVERLAY, OverlayState, WORKBENCH};
+use pins::PinState;
+use readings::Readings;
 use replay::ReplayState;
 
 pub fn run() {
@@ -33,12 +39,18 @@ pub fn run() {
             tauri_plugin_window_state::Builder::new().with_state_flags(StateFlags::POSITION | StateFlags::SIZE).build(),
         )
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         .plugin(shortcuts::plugin())
         .manage(OverlayState::default())
         .manage(ReplayState::default())
+        .manage(Readings::default())
         .manage(LaunchImage::new(&args))
         .setup(|app| {
             app.manage(HudFontState::load(app.handle())?);
+            app.manage(MapDataState::load(app.handle())?);
+            mapdata::check_for_updates(app.handle());
+            app.manage(PinState::load(app.handle())?);
+            pins::restore(app.handle())?;
             tray::create(app)?;
             overlay::fit_workbench(app.handle())?;
             Ok(())
@@ -65,7 +77,20 @@ pub fn run() {
             commands::toggle_overlay,
             commands::show_workbench,
             commands::shortcut_list,
+            readings::current_readings,
+            pins::pin_status,
+            pins::pin_panel,
+            pins::unpin_panel,
+            pins::toggle_pins,
             launch::take_launch_image,
+            mapdata::map_data_status,
+            mapdata::download_map_data,
+            mapdata::find_map,
+            mapdata::map_card,
+            mapdata::search_maps,
+            mapdata::map_route,
+            mapdata::monster_drops,
+            mapdata::open_link,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Leafline");

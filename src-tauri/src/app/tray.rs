@@ -25,6 +25,7 @@ pub fn create(app: &App) -> tauri::Result<()> {
         &[
             &item(Action::ToggleOverlay, "Show / hide overlay")?,
             &click_through,
+            &item(Action::TogglePins, "Show / hide pinned panels")?,
             &item(Action::ShowWorkbench, "Open workbench")?,
             &PredefinedMenuItem::separator(app)?,
             &MenuItem::with_id(app, QUIT, "Quit Leafline", true, None::<&str>)?,

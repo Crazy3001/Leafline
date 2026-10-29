@@ -2,14 +2,25 @@
 // `npm run dev`) a mock backend stands in, so the pages can be designed without Tauri.
 
 import { invoke, isTauri } from "@tauri-apps/api/core";
+import { LogicalSize } from "@tauri-apps/api/dpi";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
 
 import type {
   Analysis,
   Calibration,
   HudValues,
+  MapDataDownload,
+  MapDataStatus,
+  MapDetails,
+  MapMatch,
+  MapRef,
+  MapRoute,
+  MonsterDrops,
   OverlayStatus,
+  Panel,
+  PinStatus,
   ReplayOrder,
   ReplayProgress,
   SessionSummary,
@@ -43,6 +54,31 @@ export interface Backend {
   onReplayProgress(handler: (progress: ReplayProgress) => void): Promise<UnlistenFn>;
   onSession(handler: (session: SessionSummary) => void): Promise<UnlistenFn>;
   onOverlayStatus(handler: (status: OverlayStatus) => void): Promise<UnlistenFn>;
+
+  /** What map data is cached. */
+  mapDataStatus(): Promise<MapDataStatus>;
+  /** The explicit "Download map data" action. Without `force`, skipped if checked in the last day. */
+  downloadMapData(force: boolean): Promise<MapDataDownload>;
+  /** The card for an OCR'd minimap header, or null without a close enough match or any data. */
+  findMap(name: string, street: string | null): Promise<MapMatch | null>;
+  mapCard(id: number): Promise<MapDetails | null>;
+  searchMaps(text: string): Promise<MapRef[]>;
+  mapRoute(from: number, to: number): Promise<MapRoute | null>;
+  /** Player-observed drops from mapleclassic.wiki, cached for a week. */
+  monsterDrops(monsters: string[]): Promise<MonsterDrops[]>;
+  /** Opens one of the card's link-outs or credits in the browser. */
+  openLink(url: string): Promise<void>;
+  onMapData(handler: (status: MapDataStatus) => void): Promise<UnlistenFn>;
+
+  /** The latest analysis and session, for a window opened after they were sent. */
+  currentReadings(): Promise<{ analysis: Analysis | null; session: SessionSummary | null }>;
+  pinStatus(): Promise<PinStatus>;
+  /** Opens a panel in its own window that stays up while the overlay is hidden. */
+  pinPanel(panel: Panel): Promise<PinStatus>;
+  unpinPanel(panel: Panel): Promise<PinStatus>;
+  onPins(handler: (status: PinStatus) => void): Promise<UnlistenFn>;
+  /** Sizes the calling window to its content. */
+  fitWindow(width: number, height: number): Promise<void>;
 }
 
 const IMAGE_FILTER = { name: "Screenshots", extensions: ["png", "jpg", "jpeg", "webp"] };
@@ -77,6 +113,21 @@ const tauriBackend: Backend = {
   onReplayProgress: (handler) => listen<ReplayProgress>("replay-progress", (e) => handler(e.payload)),
   onSession: (handler) => listen<SessionSummary>("session", (e) => handler(e.payload)),
   onOverlayStatus: (handler) => listen<OverlayStatus>("overlay-status", (e) => handler(e.payload)),
+  mapDataStatus: () => invoke("map_data_status"),
+  downloadMapData: (force) => invoke("download_map_data", { force }),
+  findMap: (name, street) => invoke("find_map", { name, street }),
+  mapCard: (id) => invoke("map_card", { id }),
+  searchMaps: (text) => invoke("search_maps", { text }),
+  mapRoute: (from, to) => invoke("map_route", { from, to }),
+  monsterDrops: (monsters) => invoke("monster_drops", { monsters }),
+  openLink: (url) => invoke("open_link", { url }),
+  onMapData: (handler) => listen<MapDataStatus>("map-data", (e) => handler(e.payload)),
+  currentReadings: () => invoke("current_readings"),
+  pinStatus: () => invoke("pin_status"),
+  pinPanel: (panel) => invoke("pin_panel", { panel }),
+  unpinPanel: (panel) => invoke("unpin_panel", { panel }),
+  onPins: (handler) => listen<PinStatus>("pins", (e) => handler(e.payload)),
+  fitWindow: (width, height) => getCurrentWindow().setSize(new LogicalSize(width, height)),
 };
 
 /** The mock is dev-only: production builds must never bundle it or the screenshots it loads. */

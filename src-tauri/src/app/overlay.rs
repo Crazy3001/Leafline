@@ -7,6 +7,7 @@ use serde::Serialize;
 use tauri::menu::CheckMenuItem;
 use tauri::{AppHandle, Emitter, Manager, PhysicalSize, WebviewWindow, Wry};
 
+use super::pins;
 use crate::error::{Error, Result};
 
 pub const OVERLAY: &str = "overlay";
@@ -51,10 +52,13 @@ pub fn hide(app: &AppHandle) -> Result<()> {
     broadcast(app)
 }
 
-/// When on, mouse input passes through the overlay to the game underneath. It can only be
-/// turned off again by hotkey or from the tray.
+/// When on, mouse input passes through the overlay and pinned panels to the game underneath.
+/// It can only be turned off again by hotkey or from the tray.
 pub fn set_click_through(app: &AppHandle, enabled: bool) -> Result<()> {
     window(app, OVERLAY)?.set_ignore_cursor_events(enabled)?;
+    for pinned in pins::windows(app) {
+        pinned.set_ignore_cursor_events(enabled)?;
+    }
     let state = app.state::<OverlayState>();
     state.click_through.store(enabled, Ordering::Relaxed);
     if let Some(item) = state.click_through_item.get() {

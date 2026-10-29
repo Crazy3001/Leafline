@@ -3,7 +3,7 @@
   import { formatSigned, titleCase } from "$lib/format";
   import type { ItemTooltip, Requirements } from "$lib/types";
 
-  let { item, title = "Item" }: { item: ItemTooltip; title?: string } = $props();
+  let { item, title = "Item", plain = false }: { item: ItemTooltip; title?: string; plain?: boolean } = $props();
 
   const requirementKeys: [keyof Requirements, string][] = [
     ["level", "LEV"],
@@ -24,7 +24,7 @@
   );
 </script>
 
-<Card {title}>
+<Card {title} {plain}>
   {#snippet aside()}
     <!-- Upgrades are read from the name's (+N) suffix, so say nothing when the name is unreadable. -->
     {#if item.name}

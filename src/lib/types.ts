@@ -154,6 +154,15 @@ export interface Analysis {
   timings: Timing[];
 }
 
+/** The overlay's tabs, each of which can be pinned into a window of its own. */
+export type Panel = "stats" | "map" | "quests" | "item";
+
+export interface PinStatus {
+  pinned: Panel[];
+  /** Pinned panels are hidden for now, without being unpinned. */
+  hidden: boolean;
+}
+
 export interface OverlayStatus {
   visible: boolean;
   clickThrough: boolean;
@@ -213,4 +222,121 @@ export interface ReplayProgress {
   at: number;
   analysis: Analysis;
   session: SessionSummary;
+}
+
+// Map data (see src-tauri/src/mapdata/). Facts from OSMS Data Explorer, fetched on request.
+
+/** What map data is cached locally. */
+export interface MapDataStatus {
+  /** Every file the map card needs has been downloaded. */
+  ready: boolean;
+  clientBuild: string | null;
+  dataUpdatedAt: string | null;
+  /** When OSMS was last asked for changes, in Unix seconds. */
+  checkedAt: number | null;
+  files: { name: string; records: number; updatedAt: string; fetchedAt: number }[];
+}
+
+export interface MapDataDownload {
+  report: { checked: boolean; downloaded: string[] };
+  status: MapDataStatus;
+}
+
+export interface MapRef {
+  id: number;
+  name: string;
+  street: string | null;
+  /** False for maps the data refers to but does not contain. */
+  known: boolean;
+}
+
+export interface MobRow {
+  id: number;
+  name: string;
+  level: number;
+  hp: number;
+  exp: number;
+  count: number;
+  boss: boolean;
+  undead: boolean;
+}
+
+export interface QuestRef {
+  id: number;
+  name: string;
+  levelMin: number | null;
+}
+
+export interface QuestNeed {
+  quest: QuestRef;
+  giver: string | null;
+  targets: { mobId: number; name: string; count: number }[];
+}
+
+/** Which way a portal leads, judged from its name. */
+export type Direction = "west" | "east" | "in" | "out" | "other";
+
+export interface MapExit {
+  direction: Direction;
+  to: MapRef;
+  portals: string[];
+  hidden: boolean;
+}
+
+export interface MapDetails {
+  map: MapRef;
+  region: string | null;
+  isTown: boolean;
+  returnMap: MapRef | null;
+  levelRange: [number, number] | null;
+  mobs: MobRow[];
+  mobTotal: number;
+  /** Base EXP for killing every monster once. */
+  expPerClear: number;
+  npcs: { id: number; name: string; quests: QuestRef[] }[];
+  quests: QuestNeed[];
+  exits: MapExit[];
+  links: { label: string; url: string }[];
+}
+
+export interface MapMatch {
+  /** How closely the OCR'd name matched, 0 to 1. */
+  score: number;
+  card: MapDetails;
+  alternatives: MapRef[];
+}
+
+export interface RouteStep {
+  from: MapRef;
+  to: MapRef;
+  direction: Direction;
+  portal: string | null;
+  hidden: boolean;
+}
+
+export interface MapRoute {
+  from: MapRef;
+  to: MapRef;
+  steps: RouteStep[];
+}
+
+/** Drops players logged on mapleclassic.wiki. */
+export interface MonsterDrops {
+  monster: string;
+  sampleKills: number | null;
+  gameVersion: string | null;
+  fetchedAt: number;
+  drops: {
+    item: string;
+    category: string | null;
+    rate: number | null;
+    rateLow: number | null;
+    rateHigh: number | null;
+    minQuantity: number | null;
+    maxQuantity: number | null;
+    sampleKills: number | null;
+    sampleDrops: number | null;
+    gameVersion: string | null;
+    quest: boolean;
+  }[];
 }

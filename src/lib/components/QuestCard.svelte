@@ -2,16 +2,16 @@
   import Card from "./Card.svelte";
   import type { QuestReading } from "$lib/types";
 
-  let { quest }: { quest: QuestReading } = $props();
+  let { quest, plain = false }: { quest: QuestReading; plain?: boolean } = $props();
 </script>
 
-<Card title="Quests">
+<Card title="Quests" {plain}>
   {#snippet aside()}
-    {#if quest.page}<span class="tabular">{quest.page[0]} tracked</span>{/if}
+    {#if quest.page && !plain}<span class="tabular">{quest.page[0]} tracked</span>{/if}
   {/snippet}
 
   {#each quest.quests as { title, objectives }}
-    <div class="quest">
+    <div class="quest" class:dense={plain}>
       <h3 class="title">{title || "Untitled quest"}</h3>
       {#if objectives.length}
         <ul>
@@ -89,6 +89,30 @@
 
   .done .fill {
     background: var(--good);
+  }
+
+  /* Pinned: the same layout, packed tighter. */
+  .dense .title {
+    margin-bottom: 4px;
+    font-size: 12.5px;
+  }
+
+  .dense ul {
+    gap: 5px;
+  }
+
+  .dense .row {
+    margin-bottom: 2px;
+    font-size: 12px;
+  }
+
+  .dense .track {
+    height: 3px;
+  }
+
+  .quest.dense + .quest.dense {
+    margin-top: 8px;
+    padding-top: 7px;
   }
 
   .empty {

@@ -7,23 +7,26 @@ use tauri::plugin::TauriPlugin;
 use tauri::{AppHandle, Wry};
 use tauri_plugin_global_shortcut::{Builder, Shortcut, ShortcutState};
 
-use super::overlay;
+use super::{overlay, pins};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Action {
     ToggleOverlay,
     ToggleClickThrough,
+    TogglePins,
     ShowWorkbench,
 }
 
 impl Action {
-    pub const ALL: [Action; 3] = [Action::ToggleOverlay, Action::ToggleClickThrough, Action::ShowWorkbench];
+    pub const ALL: [Action; 4] =
+        [Action::ToggleOverlay, Action::ToggleClickThrough, Action::TogglePins, Action::ShowWorkbench];
 
     pub fn keys(self) -> &'static str {
         match self {
             Action::ToggleOverlay => "Ctrl+Alt+O",
             Action::ToggleClickThrough => "Ctrl+Alt+L",
+            Action::TogglePins => "Ctrl+Alt+P",
             Action::ShowWorkbench => "Ctrl+Alt+W",
         }
     }
@@ -32,6 +35,7 @@ impl Action {
         match self {
             Action::ToggleOverlay => "Show or hide the overlay",
             Action::ToggleClickThrough => "Lock the overlay (click-through)",
+            Action::TogglePins => "Show or hide pinned panels",
             Action::ShowWorkbench => "Open the workbench",
         }
     }
@@ -44,6 +48,7 @@ impl Action {
         match self {
             Action::ToggleOverlay => overlay::toggle_visibility(app),
             Action::ToggleClickThrough => overlay::toggle_click_through(app),
+            Action::TogglePins => pins::toggle_visibility(app),
             Action::ShowWorkbench => overlay::show_workbench(app),
         }
     }

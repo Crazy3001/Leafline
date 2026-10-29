@@ -7,8 +7,8 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
 
 use super::calibration::HudFontState;
-use super::commands::ANALYSIS_EVENT;
-use super::overlay::{OVERLAY, WORKBENCH};
+use super::overlay::WORKBENCH;
+use super::readings;
 use crate::error::{Error, Result};
 use crate::pipeline::Analysis;
 use crate::replay::{self, Order};
@@ -17,8 +17,6 @@ use crate::vision::Ocr;
 
 /// Emitted to the workbench after each replayed frame.
 pub const PROGRESS_EVENT: &str = "replay-progress";
-/// Emitted to the overlay with each new session summary.
-pub const SESSION_EVENT: &str = "session";
 
 #[derive(Default)]
 pub struct ReplayState {
@@ -38,7 +36,7 @@ struct Progress<'a> {
 }
 
 /// Runs every screenshot in `folder` through the pipeline in `order` and tracks them as one
-/// session, showing each frame on the overlay as it goes.
+/// session, showing each frame on the overlay and pinned panels as it goes.
 #[tauri::command]
 pub async fn replay_session(app: AppHandle, folder: PathBuf, order: Order) -> Result<SessionSummary> {
     let state = app.state::<ReplayState>();
@@ -56,8 +54,8 @@ pub async fn replay_session(app: AppHandle, folder: PathBuf, order: Order) -> Re
             let progress = Progress { done: i + 1, total, path: &frame.path, at: frame.at, analysis, session };
             // A closed window just misses the update; the replay carries on.
             let _ = handle.emit_to(WORKBENCH, PROGRESS_EVENT, &progress);
-            let _ = handle.emit_to(OVERLAY, ANALYSIS_EVENT, analysis);
-            let _ = handle.emit_to(OVERLAY, SESSION_EVENT, session);
+            readings::publish_analysis(&handle, analysis);
+            readings::publish_session(&handle, session);
             !handle.state::<ReplayState>().cancel.load(Ordering::SeqCst)
         })
     })

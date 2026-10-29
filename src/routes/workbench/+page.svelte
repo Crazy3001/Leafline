@@ -13,6 +13,7 @@
 
   import { backend, fileName } from "$lib/api";
   import Logo from "$lib/components/Logo.svelte";
+  import MapDataPanel from "$lib/components/map/MapDataPanel.svelte";
   import { formatDuration } from "$lib/format";
   import type {
     Analysis,
@@ -258,6 +259,11 @@
 
     <div class="spacer"></div>
 
+    <section class="map-data">
+      <div class="eyebrow">Map data</div>
+      <MapDataPanel />
+    </section>
+
     {#if shortcuts.length}
       <div class="eyebrow">Hotkeys</div>
       <dl class="shortcuts">
@@ -436,6 +442,7 @@
     flex-direction: column;
     gap: 8px;
     min-height: 0;
+    overflow-y: auto;
     padding: 14px 10px 12px;
     border-right: 1px solid var(--border);
     background: var(--surface);
@@ -584,6 +591,14 @@
 
   .spacer {
     flex: 1;
+  }
+
+  .map-data {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 8px;
+    padding: 0 6px 12px;
+    border-bottom: 1px solid var(--border);
   }
 
   .shortcuts {

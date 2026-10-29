@@ -5,6 +5,7 @@
 
 mod app;
 pub mod error;
+pub mod mapdata;
 pub mod pipeline;
 pub mod readers;
 pub mod replay;
