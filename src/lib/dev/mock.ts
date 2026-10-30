@@ -8,6 +8,8 @@ import type {
   History,
   SavedSession,
   DisplaySettings,
+  TravelFile,
+  TravelInfo,
   PriceEntry,
   PriceLog,
   Guide,
@@ -49,7 +51,13 @@ const preview = (globalThis as { __LEAFLINE_PREVIEW__?: Preview }).__LEAFLINE_PR
 const sampleAnalysis = preview?.analysis ?? (sample as unknown as Analysis);
 const sampleSessionSummary = preview?.session ?? (sampleSession as SessionSummary);
 
-const status: OverlayStatus = { visible: true, clickThrough: false };
+const status: OverlayStatus = {
+  visible: true,
+  clickThrough: false,
+  // A preview can open the compact HUD with `?compact` in the address.
+  compact: typeof location !== "undefined" && new URLSearchParams(location.search).has("compact"),
+};
+const statusHandlers: ((status: OverlayStatus) => void)[] = [];
 const analysisHandlers: ((analysis: Analysis) => void)[] = [];
 const progressHandlers: ((progress: ReplayProgress) => void)[] = [];
 const sessionHandlers: ((session: SessionSummary) => void)[] = [];
@@ -130,7 +138,52 @@ function mockHistory(): History {
   };
 }
 
-let displaySettings: DisplaySettings = { opacity: 1, scale: 1 };
+/** Made-up taxis and scrolls between the sample maps, in the wiki's shape. */
+let travelDownloaded = false;
+const sampleTravel: TravelFile = {
+  about: "",
+  fetchedAt: Date.now() / 1000,
+  services: [
+    {
+      kind: "cab",
+      name: "Ox Cart",
+      note: "Slow ride between the villages.",
+      source: "https://mapleclassic.wiki/wiki/Module:RoutePlanner/config.json",
+      routes: [
+        { from: "Mossbank", to: "Mossbank Meadow II", fare: 120 },
+        { from: "Mossbank Meadow II", to: "Mossbank" },
+      ],
+    },
+    {
+      kind: "scroll",
+      name: "Return Scroll to Mossbank",
+      source: "https://mapleclassic.wiki/wiki/Return_Scroll_to_Mossbank",
+      routes: [{ to: "Mossbank" }],
+    },
+    {
+      kind: "scroll",
+      name: "Return Scroll to Faraway Isle",
+      source: "https://mapleclassic.wiki/wiki/Return_Scroll_to_Faraway_Isle",
+      routes: [{ to: "Faraway Isle" }],
+    },
+  ],
+};
+
+function mockTravelInfo(): TravelInfo {
+  return {
+    file: travelDownloaded ? sampleTravel : null,
+    origin: travelDownloaded ? "wiki" : "none",
+    path: "%APPDATA%\\app.leafline.overlay\\travel.json",
+    error: null,
+    missing: travelDownloaded && mapStatus.ready ? ["Faraway Isle"] : null,
+  };
+}
+
+let displaySettings: DisplaySettings = {
+  opacity: 1,
+  scale: 1,
+  travel: { enabled: false, cabs: true, vipCabs: false, scrolls: true },
+};
 const settingsHandlers: ((settings: DisplaySettings) => void)[] = [];
 
 /** Quest items the mock wiki has been asked about. */
@@ -218,7 +271,10 @@ export const mockBackend: Backend = {
     if (!preview?.empty) setTimeout(() => handler(sampleSessionSummary), 200);
     return () => {};
   },
-  onOverlayStatus: async () => () => {},
+  async onOverlayStatus(handler) {
+    statusHandlers.push(handler);
+    return () => {};
+  },
   mapDataStatus: async () => mapStatus,
   async downloadMapData() {
     await delay(1200);
@@ -340,6 +396,17 @@ export const mockBackend: Backend = {
   async onSettings(handler) {
     settingsHandlers.push(handler);
     return () => {};
+  },
+  travelInfo: async () => mockTravelInfo(),
+  async downloadTravel() {
+    await delay(900);
+    travelDownloaded = true;
+    return mockTravelInfo();
+  },
+  async editTravelFile() {},
+  async setCompact(enabled) {
+    status.compact = enabled;
+    statusHandlers.forEach((h) => h({ ...status }));
   },
   async showSettings() {
     window.open("/settings", "_blank");

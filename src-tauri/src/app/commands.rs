@@ -59,6 +59,11 @@ pub fn set_click_through(app: AppHandle, enabled: bool) -> Result<()> {
 }
 
 #[tauri::command]
+pub fn set_compact(app: AppHandle, enabled: bool) -> Result<()> {
+    overlay::set_compact(&app, enabled)
+}
+
+#[tauri::command]
 pub fn hide_overlay(app: AppHandle) -> Result<()> {
     overlay::hide(&app)
 }

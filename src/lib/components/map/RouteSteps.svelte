@@ -1,7 +1,9 @@
 <script lang="ts">
-  // A route's steps as the player walks them, and how many portals it takes.
-  import { EyeOff } from "@lucide/svelte";
+  // A route's steps as the player takes them, and how many portals it takes. Rides and return
+  // scrolls, when the player turned them on, stand apart from portal steps.
+  import { CarTaxiFront, EyeOff, ScrollText } from "@lucide/svelte";
 
+  import { formatNumber } from "$lib/format";
   import type { Direction, MapRoute } from "$lib/types";
 
   let {
@@ -20,6 +22,9 @@
     out: "Go out",
     other: "Portal",
   };
+
+  const rides = $derived(route.steps.filter((s) => s.travel).length);
+  const portals = $derived(route.steps.length - rides);
 </script>
 
 {#if route.steps.length === 0}
@@ -27,25 +32,45 @@
 {:else}
   <ol class="steps">
     {#each route.steps as step, i}
-      <li>
+      <li class:ride={step.travel}>
         <span class="n tabular">{i + 1}</span>
         <span class="text">
-          <span class="verb">{verbs[step.direction]}</span>
-          {#if step.portal}<code title="Portal name in the map data">{step.portal}</code>{/if}
-          {#if step.hidden}<span class="hidden" title="The portal's name marks it as hidden"><EyeOff size={11} /></span>{/if}
+          {#if step.travel}
+            <span class="service">
+              {#if step.travel.kind === "scroll"}<ScrollText size={12} />{:else}<CarTaxiFront size={12} />{/if}
+              {step.travel.service}
+            </span>
+          {:else}
+            <span class="verb">{verbs[step.direction]}</span>
+            {#if step.portal}<code title="Portal name in the map data">{step.portal}</code>{/if}
+            {#if step.hidden}<span class="hidden" title="The portal's name marks it as hidden"><EyeOff size={11} /></span>{/if}
+          {/if}
           <span class="arrow">→</span>
           {#if onnavigate}
             <button class="map" onclick={() => onnavigate(step.to.id)}>{step.to.name}</button>
           {:else}
             <span class="map">{step.to.name}</span>
           {/if}
+          {#if step.travel?.fare}
+            <span class="fare tabular" title="Fare at level 20 and up, as players recorded it on mapleclassic.wiki"
+              >{formatNumber(step.travel.fare)} mesos</span
+            >
+          {/if}
         </span>
       </li>
     {/each}
   </ol>
-  <p class="note">
-    {route.steps.length} portal{route.steps.length === 1 ? "" : "s"}. Portal level or quest requirements are not checked.
-  </p>
+  {#if rides}
+    <p class="note">
+      {portals} portal{portals === 1 ? "" : "s"} and {rides}
+      {rides === 1 ? "ride or scroll" : "rides or scrolls"}{#if route.walking != null}, instead of {route.walking} portals on foot{:else}; no portals lead
+        there on foot{/if}. Taxis and scrolls are from mapleclassic.wiki: check them in game.
+    </p>
+  {:else}
+    <p class="note">
+      {route.steps.length} portal{route.steps.length === 1 ? "" : "s"}. Portal level or quest requirements are not checked.
+    </p>
+  {/if}
 {/if}
 
 <style>
@@ -88,6 +113,28 @@
 
   .verb {
     color: var(--muted);
+  }
+
+  .ride .n {
+    background: color-mix(in srgb, var(--travel) 18%, transparent);
+    color: var(--travel);
+  }
+
+  .service {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--travel);
+    font-weight: 500;
+  }
+
+  .service :global(svg) {
+    align-self: center;
+  }
+
+  .fare {
+    color: var(--faint);
+    font-size: 11px;
   }
 
   code {

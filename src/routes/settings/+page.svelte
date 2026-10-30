@@ -1,6 +1,18 @@
 <script lang="ts">
-  // Settings: how the overlay looks, the hotkeys, downloaded data, and what Leafline is.
-  import { Check, Download, ExternalLink, ShieldCheck, X } from "@lucide/svelte";
+  // Settings: how the overlay looks, travel in routes, the hotkeys, downloaded data, and what
+  // Leafline is.
+  import {
+    CarTaxiFront,
+    Check,
+    Download,
+    ExternalLink,
+    FilePenLine,
+    LoaderCircle,
+    RefreshCw,
+    ScrollText,
+    ShieldCheck,
+    X,
+  } from "@lucide/svelte";
   import { onMount } from "svelte";
 
   import { backend } from "$lib/api";
@@ -8,10 +20,11 @@
   import MapDataPanel from "$lib/components/map/MapDataPanel.svelte";
   import { OSMS_URL, WIKI_URL } from "$lib/mapdata.svelte";
   import { changeSettings, display, watchSettings } from "$lib/settings.svelte";
-  import type { ShortcutInfo } from "$lib/types";
+  import type { ShortcutInfo, TravelChoice, TravelFile, TravelInfo } from "$lib/types";
 
   const SECTIONS = [
     { id: "overlay", title: "Overlay" },
+    { id: "routes", title: "Routes" },
     { id: "hotkeys", title: "Hotkeys" },
     { id: "data", title: "Data" },
     { id: "about", title: "About" },
@@ -28,6 +41,55 @@
   let opacity = $state(100);
   let saveTimer: ReturnType<typeof setTimeout> | undefined;
   let exported = $state<string | null>(null);
+  let travel = $state<TravelInfo | null>(null);
+  let downloading = $state(false);
+  let travelError = $state<string | null>(null);
+
+  const KINDS: { key: keyof Omit<TravelChoice, "enabled">; kind: TravelFile["services"][number]["kind"]; label: string; help: string }[] = [
+    { key: "cabs", kind: "cab", label: "Taxis", help: "Regular Cab between towns, and Phil out of Lith Harbor" },
+    { key: "vipCabs", kind: "vipCab", label: "VIP Cab", help: "Straight to Ant Tunnel Park, for a much higher fare" },
+    { key: "scrolls", kind: "scroll", label: "Return scrolls", help: "To a town from any map, if you carry one" },
+  ];
+
+  function setTravel(change: Partial<TravelChoice>) {
+    changeSettings({ travel: { ...display.travel, ...change } });
+  }
+
+  function loadTravel() {
+    backend.travelInfo().then((t) => (travel = t));
+  }
+
+  async function editTravel() {
+    await backend.editTravelFile();
+    loadTravel();
+  }
+
+  async function downloadTravel() {
+    downloading = true;
+    travelError = null;
+    try {
+      travel = await backend.downloadTravel();
+    } catch (e) {
+      travelError = `Couldn't download: ${e}`;
+    } finally {
+      downloading = false;
+    }
+  }
+
+  function fetchedOn(seconds: number | undefined) {
+    return seconds ? new Date(seconds * 1000).toLocaleDateString(undefined, { dateStyle: "medium" }) : "";
+  }
+
+  /** A service's routes, grouped by where they leave from: `Henesys → Perion, Ellinia`. */
+  function routeLines(service: TravelFile["services"][number]) {
+    const groups = new Map<string, string[]>();
+    for (const route of service.routes) {
+      const from = route.from ?? "Any map";
+      const fare = route.fare ? ` (${route.fare.toLocaleString()})` : "";
+      groups.set(from, [...(groups.get(from) ?? []), route.to + fare]);
+    }
+    return [...groups].map(([from, to]) => ({ from, to: to.join(", ") }));
+  }
 
   async function exportCsv(what: "prices" | "sessions") {
     try {
@@ -42,6 +104,7 @@
     watchSettings();
     backend.shortcuts().then((s) => (shortcuts = s));
     backend.version().then((v) => (version = v));
+    loadTravel();
   });
 
   $effect(() => {
@@ -75,7 +138,12 @@
       licence: "CC BY 4.0",
       url: OSMS_URL,
     },
-    { what: "Player-observed drop rates", who: "mapleclassic.wiki contributors", licence: "CC BY-NC-SA 4.0", url: WIKI_URL },
+    {
+      what: "Player-observed drop rates, taxi routes and return scrolls",
+      who: "mapleclassic.wiki contributors",
+      licence: "CC BY-NC-SA 4.0",
+      url: WIKI_URL,
+    },
     { what: "Icons", who: "Lucide", licence: "ISC", url: "https://lucide.dev" },
     { what: "App framework", who: "Tauri", licence: "MIT / Apache-2.0", url: "https://tauri.app" },
     { what: "Interface", who: "Svelte", licence: "MIT", url: "https://svelte.dev" },
@@ -136,6 +204,131 @@
         <span class="eyebrow">Preview</span>
         <span class="sample">Lv 30 · 22.6k EXP / hr</span>
       </div>
+    </section>
+
+    <section id="routes">
+      <h2>Routes</h2>
+      <p class="lead">
+        Routes count portals. Turn on travel to count a taxi ride or a return scroll as one step too. Leafline only shows
+        the way; it never moves your character.
+      </p>
+
+      <div class="row">
+        <label for="travel">
+          <span class="name">Taxis and return scrolls</span>
+          <span class="help">Used in the Map tab's routes, training spots and quest hints. Off by default.</span>
+        </label>
+        <div class="control">
+          <input
+            id="travel"
+            class="switch"
+            type="checkbox"
+            role="switch"
+            checked={display.travel.enabled}
+            onchange={(e) => setTravel({ enabled: e.currentTarget.checked })}
+          />
+        </div>
+      </div>
+
+      <fieldset class="kinds" disabled={!display.travel.enabled}>
+        <legend class="sr-only">Kinds of travel</legend>
+        {#each KINDS as kind (kind.key)}
+          <label class="kind">
+            <input
+              type="checkbox"
+              checked={display.travel[kind.key]}
+              onchange={(e) => setTravel({ [kind.key]: e.currentTarget.checked })}
+            />
+            <span class="kind-icon">{#if kind.kind === "scroll"}<ScrollText size={13} />{:else}<CarTaxiFront size={13} />{/if}</span>
+            <span>
+              <span class="name">{kind.label}</span>
+              <span class="help">{kind.help}</span>
+            </span>
+          </label>
+        {/each}
+      </fieldset>
+
+      {#if travel}
+        <div class="row">
+          <div class="label">
+            <span class="name">Taxi routes and scrolls</span>
+            <span class="help">
+              {#if travel.origin === "custom"}
+                Your own copy is in use.
+              {:else if travel.origin === "wiki"}
+                Downloaded from mapleclassic.wiki{travel.file?.fetchedAt ? ` on ${fetchedOn(travel.file.fetchedAt)}` : ""}.
+              {:else}
+                Not downloaded yet. They come from what players recorded on mapleclassic.wiki, fetched only when you ask.
+              {/if}
+            </span>
+          </div>
+          <div class="control">
+            <button class="button" onclick={downloadTravel} disabled={downloading}>
+              {#if downloading}<span class="spin"><LoaderCircle size={13} /></span>{:else if travel.origin === "none"}<Download
+                  size={13}
+                />{:else}<RefreshCw size={13} />{/if}
+              {travel.origin === "none" ? "Download" : "Update"}
+            </button>
+          </div>
+        </div>
+        {#if travelError}<p class="note warn">{travelError}</p>{/if}
+        {#if travel.origin === "custom"}
+          <p class="note">Update refreshes the download, but your own copy stays in use until you delete it.</p>
+        {/if}
+      {/if}
+
+      {#if travel?.file}
+        <details class="connections">
+          <summary>
+            The connections ({travel.file.services.length}){#if travel.origin === "custom"}<span class="tag">your copy</span>{/if}
+          </summary>
+          <ul>
+            {#each travel.file.services as service (service.name)}
+              <li>
+                <div class="service-head">
+                  <span class="kind-icon"
+                    >{#if service.kind === "scroll"}<ScrollText size={12} />{:else}<CarTaxiFront size={12} />{/if}</span
+                  >
+                  <span class="name">{service.name}</span>
+                  <button class="link source" onclick={() => backend.openLink(service.source)} title={service.source}>
+                    Source<ExternalLink size={11} />
+                  </button>
+                </div>
+                {#if service.note}<p class="help">{service.note}</p>{/if}
+                {#each routeLines(service) as line (line.from)}
+                  <p class="route-line"><span class="from">{line.from}</span> → {line.to}</p>
+                {/each}
+              </li>
+            {/each}
+          </ul>
+          {#if travel.missing?.length}
+            <p class="note warn">
+              Not found in the map data, so left out of routes: {travel.missing.join(", ")}.
+            </p>
+          {/if}
+        </details>
+      {/if}
+      {#if travel}
+        {#if travel.error}
+          <p class="note warn">Your travel file couldn't be read, so it isn't used: {travel.error}</p>
+        {/if}
+        <div class="row">
+          <div class="label">
+            <span class="name">Edit the connections</span>
+            <span class="help">
+              Opens your own copy{travel.origin === "wiki" ? ", made from the download" : ""}, which then replaces it.
+              Fares are in mesos at level 20 and up. Delete your copy to go back to the download.
+            </span>
+          </div>
+          <div class="control">
+            <button class="button" onclick={editTravel}><FilePenLine size={13} />Edit file</button>
+          </div>
+        </div>
+        <p class="note">
+          Taxi routes, fares and scrolls are what players recorded on mapleclassic.wiki (CC BY-NC-SA 4.0), not the game's
+          data, and may change. Check them in game.
+        </p>
+      {/if}
     </section>
 
     <section id="hotkeys">
@@ -376,6 +569,167 @@
   .link:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 1px;
+  }
+
+  .switch {
+    appearance: none;
+    position: relative;
+    width: 34px;
+    height: 19px;
+    margin: 0;
+    border-radius: 999px;
+    background: var(--surface-3, rgba(255, 255, 255, 0.12));
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+
+  .switch::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 15px;
+    height: 15px;
+    border-radius: 999px;
+    background: var(--text);
+    transition: transform 0.15s ease;
+  }
+
+  .switch:checked {
+    background: var(--travel);
+  }
+
+  .switch:checked::after {
+    transform: translateX(15px);
+  }
+
+  .switch:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .kinds {
+    display: grid;
+    gap: 2px;
+    margin: 0 0 6px;
+    padding: 0;
+    border: 0;
+  }
+
+  .kinds:disabled {
+    opacity: 0.45;
+  }
+
+  .kind {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    padding: 6px 0;
+    cursor: pointer;
+  }
+
+  .kind input {
+    margin: 2px 0 0;
+    accent-color: var(--travel);
+  }
+
+  .kind > span:last-child {
+    display: grid;
+    gap: 1px;
+  }
+
+  .kind-icon {
+    display: inline-grid;
+    flex: none;
+    margin-top: 1px;
+    color: var(--travel);
+  }
+
+  .connections {
+    margin: 4px 0 2px;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+  }
+
+  .connections summary {
+    color: var(--muted);
+    cursor: pointer;
+  }
+
+  .connections ul {
+    display: grid;
+    gap: 10px;
+    margin: 10px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .connections li {
+    display: block;
+    color: var(--text);
+  }
+
+  .service-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .source {
+    margin-left: auto;
+    font-size: 11.5px;
+  }
+
+  .connections .help,
+  .route-line {
+    margin: 2px 0 0 18px;
+  }
+
+  .route-line {
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  .route-line .from {
+    color: var(--text);
+  }
+
+  .tag {
+    margin-left: 8px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--travel) 16%, transparent);
+    color: var(--travel);
+    font-size: 11px;
+  }
+
+  .note.warn {
+    color: var(--warn);
+  }
+
+  .spin {
+    display: inline-grid;
+    animation: spin 0.9s linear infinite;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .button:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
   }
 
   .exports {

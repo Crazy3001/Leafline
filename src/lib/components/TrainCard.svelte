@@ -10,6 +10,7 @@
   import { formatCompact, formatDuration } from "$lib/format";
   import { measuredRates, watchHistory } from "$lib/history.svelte";
   import { mapData, watchMapData } from "$lib/mapdata.svelte";
+  import { travelKey } from "$lib/settings.svelte";
   import type { MapReading, MapRoute, SessionSummary, TrainingSpot, TrainingSpots } from "$lib/types";
 
   let {
@@ -36,9 +37,12 @@
   const BELOW = 8;
   const ABOVE = 3;
   const SHOWN = 8;
+  /** Maps scoring within this share of each other are a close call, listed nearest first. */
+  const CLOSE_CALL = 0.1;
 
   const SORT_KEY = "leafline.train.sort";
   const LEVEL_KEY = "leafline.train.level";
+  const NEARBY_KEY = "leafline.train.nearbyFirst";
 
   watchMapData();
   const ready = $derived(mapData.status?.ready ?? false);
@@ -46,6 +50,7 @@
   let sort = $state<Sort>(stored(SORT_KEY, "exp") as Sort);
   let manualLevel = $state<number | null>(Number(stored(LEVEL_KEY, "")) || null);
   let allLevels = $state(false);
+  let nearbyFirst = $state(stored(NEARBY_KEY, "true") === "true");
   let more = $state(false);
   let data = $state<TrainingSpots | null>(null);
   let open = $state<number | null>(null);
@@ -56,7 +61,7 @@
   watchHistory();
   // Saved sessions and the current one, so maps can be compared across play sessions.
   const measured = $derived(measuredRates(session));
-  const queryKey = $derived(JSON.stringify([map?.name, map?.street, measured]));
+  const queryKey = $derived(JSON.stringify([map?.name, map?.street, measured, travelKey()]));
 
   $effect(() => {
     const key = queryKey;
@@ -76,6 +81,7 @@
   $effect(() => {
     const id = open;
     const from = data?.from?.id;
+    void travelKey();
     route = null;
     if (id == null || from == null) return;
     backend.mapRoute(from, id).then((r) => {
@@ -84,6 +90,8 @@
   });
 
   const efficiency = (s: TrainingSpot) => (s.hpPerClear ? (s.expPerClear * 1000) / s.hpPerClear : 0);
+  /** Steps away: fewer with travel, when the player turned it on and it helps. */
+  const steps = (s: TrainingSpot) => s.travel?.hops ?? s.hops;
   const near = (s: TrainingSpot) => level == null || (s.averageLevel >= level - BELOW && s.averageLevel <= level + ABOVE);
 
   const ranked = $derived.by(() => {
@@ -92,9 +100,25 @@
       exp: (s) => s.expPerClear,
       efficiency,
       measured: (s) => s.measured?.expPerHour ?? -1,
-      near: (s) => -(s.hops ?? 9999),
+      near: (s) => -(steps(s) ?? 9999),
     };
-    return [...spots].sort((a, b) => by[sort](b) - by[sort](a) || b.expPerClear - a.expPerClear);
+    const value = by[sort];
+    const sorted = [...spots].sort((a, b) => value(b) - value(a) || b.expPerClear - a.expPerClear);
+    if (!nearbyFirst || sort === "near") return sorted;
+    // Walk down the list in bands of close calls (each within CLOSE_CALL of the band's best)
+    // and order each band by portals, so a slightly smaller map next door isn't buried.
+    const out: TrainingSpot[] = [];
+    let band: TrainingSpot[] = [];
+    const flush = () => out.push(...band.sort((a, b) => (steps(a) ?? Infinity) - (steps(b) ?? Infinity)));
+    for (const spot of sorted) {
+      if (band.length && value(spot) < value(band[0]) - Math.abs(value(band[0])) * CLOSE_CALL) {
+        flush();
+        band = [];
+      }
+      band.push(spot);
+    }
+    flush();
+    return out;
   });
   const shown = $derived(ranked.slice(0, plain ? 5 : more ? 30 : SHOWN));
   const anyMeasured = $derived(data?.spots.some((s) => s.measured) ?? false);
@@ -140,6 +164,7 @@
           ? { value: formatCompact(spot.measured.expPerHour), unit: "your EXP / hr" }
           : { value: "—", unit: "not measured" };
       case "near":
+        if (spot.travel) return { value: String(spot.travel.hops), unit: "with travel" };
         return spot.hops == null
           ? { value: "—", unit: "no route" }
           : { value: String(spot.hops), unit: spot.hops === 1 ? "portal" : "portals" };
@@ -205,7 +230,13 @@
               <span class="name">{spot.map.name}</span>
               <span class="meta">
                 <span class="lv {levelTone(spot)}">Lv {spot.levelRange[0]}{spot.levelRange[1] !== spot.levelRange[0] ? `–${spot.levelRange[1]}` : ""}</span>
-                · {spot.mobTotal} mobs{#if spot.hops != null && sort !== "near"}{" · "}{spot.hops === 0 ? "here" : `${spot.hops} portal${spot.hops === 1 ? "" : "s"}`}{/if}
+                · {spot.mobTotal} mobs{#if spot.hops != null && (sort !== "near" || spot.travel)}{" · "}{spot.hops === 0
+                    ? "here"
+                    : `${spot.hops} portal${spot.hops === 1 ? "" : "s"}`}{/if}{#if spot.travel && sort !== "near"}<span
+                    class="shortcut"
+                    title="With the travel you turned on in Settings, via {spot.travel.via.name}"
+                    >{" "}({spot.travel.hops} with travel)</span
+                  >{/if}
               </span>
             </span>
             <span class="metric">
@@ -262,17 +293,34 @@
 
     {#if !plain}
       <div class="footer">
-        <label class="check">
-          <input type="checkbox" bind:checked={allLevels} />
-          Every level
-        </label>
+        <span class="checks">
+          <label class="check">
+            <input type="checkbox" bind:checked={allLevels} />
+            Every level
+          </label>
+          {#if sort !== "near"}
+            <label class="check" title="When maps score within 10% of each other, list the one fewer portals away first">
+              <input
+                type="checkbox"
+                checked={nearbyFirst}
+                onchange={(e) => {
+                  nearbyFirst = e.currentTarget.checked;
+                  remember(NEARBY_KEY, String(nearbyFirst));
+                }}
+              />
+              Nearby first
+            </label>
+          {/if}
+        </span>
         {#if ranked.length > SHOWN}
           <button class="link" onclick={() => (more = !more)}>{more ? "Fewer" : `Show ${Math.min(30, ranked.length) - SHOWN} more`}</button>
         {/if}
       </div>
       <p class="hedge">
         Base numbers from OSMS map data, before EXP events, party bonus or level differences. Your rate is what Leafline
-        measured in your sessions. Maps entered only through an NPC, such as party quests, are left out.
+        measured in your sessions.{#if nearbyFirst && sort !== "near" && data.from}{" "}Maps within 10% of each other are
+          listed nearest first.{/if}
+        Maps entered only through an NPC, such as party quests, are left out.
       </p>
     {/if}
   {/if}
@@ -412,6 +460,10 @@
     color: var(--muted);
   }
 
+  .shortcut {
+    color: var(--travel);
+  }
+
   .lv.above {
     color: var(--warn);
   }
@@ -500,6 +552,11 @@
     margin-top: 8px;
     font-size: 11.5px;
     color: var(--muted);
+  }
+
+  .checks {
+    display: inline-flex;
+    gap: 10px;
   }
 
   .check {

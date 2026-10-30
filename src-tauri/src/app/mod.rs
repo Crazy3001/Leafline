@@ -56,6 +56,7 @@ pub fn run() {
             mapdata::check_for_updates(app.handle());
             app.manage(SettingsState::load(app.handle())?);
             settings::apply(app.handle())?;
+            overlay::restore_mode(app.handle())?;
             app.manage(PinState::load(app.handle())?);
             pins::restore(app.handle())?;
             tray::create(app)?;
@@ -80,6 +81,7 @@ pub fn run() {
             replay::cancel_replay,
             commands::overlay_status,
             commands::set_click_through,
+            commands::set_compact,
             commands::hide_overlay,
             commands::toggle_overlay,
             commands::show_workbench,
@@ -96,6 +98,9 @@ pub fn run() {
             mapdata::map_card,
             mapdata::search_maps,
             mapdata::map_route,
+            mapdata::travel_info,
+            mapdata::download_travel,
+            mapdata::edit_travel_file,
             mapdata::monster_drops,
             mapdata::quest_guide,
             mapdata::look_up_quest_items,

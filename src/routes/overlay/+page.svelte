@@ -1,8 +1,9 @@
 <script lang="ts">
-  import { Lock, LockOpen, PanelsTopLeft, Pin, PinOff, Settings, X } from "@lucide/svelte";
+  import { Lock, LockOpen, Minimize2, PanelsTopLeft, Pin, PinOff, Settings, X } from "@lucide/svelte";
   import { onMount } from "svelte";
 
   import { backend } from "$lib/api";
+  import CompactHud from "$lib/components/CompactHud.svelte";
   import Logo from "$lib/components/Logo.svelte";
   import PanelView from "$lib/components/PanelView.svelte";
   import { PANELS, panelInfo, signature } from "$lib/panels";
@@ -76,105 +77,120 @@
 
 <svelte:head><title>Leafline</title></svelte:head>
 
-<div class="shell" style:opacity={display.opacity * (live.status.clickThrough ? 0.85 : 1)}>
-  <header data-tauri-drag-region>
-    <span class="brand" data-tauri-drag-region>
-      <Logo size={16} />
-      <span data-tauri-drag-region>Leafline</span>
-      <span class="mode" data-tauri-drag-region>Offline</span>
-    </span>
-    <span class="actions">
-      <button title="Open workbench (Ctrl+Alt+W)" aria-label="Open workbench" onclick={() => backend.showWorkbench()}>
-        <PanelsTopLeft size={14} />
-      </button>
-      <button title="Settings" aria-label="Settings" onclick={() => backend.showSettings()}>
-        <Settings size={14} />
-      </button>
-      <button
-        title={live.status.clickThrough
-          ? "Unlock with Ctrl+Alt+L"
-          : "Lock: clicks pass through to the game (Ctrl+Alt+L)"}
-        class:active={live.status.clickThrough}
-        onclick={toggleLock}
-      >
-        {#if live.status.clickThrough}<Lock size={14} />{:else}<LockOpen size={14} />{/if}
-      </button>
-      <button title="Hide (Ctrl+Alt+O). Pinned panels stay." aria-label="Hide overlay" onclick={() => backend.hideOverlay()}>
-        <X size={14} />
-      </button>
-    </span>
-  </header>
-
-  <nav class="tabs">
-    <div class="tablist" role="tablist" aria-label="Panels" tabindex="-1" onkeydown={onTabKey}>
-      {#each PANELS as panel (panel.id)}
-        {@const Icon = panel.icon}
-        <button
-          role="tab"
-          id="tab-{panel.id}"
-          aria-selected={tab === panel.id}
-          aria-controls="panel"
-          tabindex={tab === panel.id ? 0 : -1}
-          class:empty={signatures[panel.id] == null}
-          class:pinned={live.pins.pinned.includes(panel.id)}
-          title={live.pins.pinned.includes(panel.id) ? `${panel.title} (also pinned)` : undefined}
-          onclick={() => select(panel.id)}
-        >
-          <span class="icon">
-            <Icon size={14} />
-            {#if fresh(panel.id)}<span class="dot" aria-label="Updated"></span>{/if}
-          </span>
-          <span>{panel.title}</span>
+<div
+  class="shell"
+  class:compact={live.status.compact}
+  style:opacity={display.opacity * (live.status.clickThrough ? 0.85 : 1)}
+>
+  {#if live.status.compact}
+    <CompactHud />
+  {:else}
+    <header data-tauri-drag-region>
+      <span class="brand" data-tauri-drag-region>
+        <Logo size={16} />
+        <span data-tauri-drag-region>Leafline</span>
+        <span class="mode" data-tauri-drag-region>Offline</span>
+      </span>
+      <span class="actions">
+        <button title="Open workbench (Ctrl+Alt+W)" aria-label="Open workbench" onclick={() => backend.showWorkbench()}>
+          <PanelsTopLeft size={14} />
         </button>
-      {/each}
-    </div>
-    <button
-      class="pin"
-      class:active={pinned}
-      title={pinned
-        ? `Unpin ${panelInfo(tab).title}`
-        : `Pin ${panelInfo(tab).title}: keep it on screen in its own window, even when the overlay is hidden`}
-      onclick={togglePin}
-    >
-      {#if pinned}<PinOff size={14} />{:else}<Pin size={14} />{/if}
-    </button>
-  </nav>
+        <button title="Settings" aria-label="Settings" onclick={() => backend.showSettings()}>
+          <Settings size={14} />
+        </button>
+        <button
+          title="Compact HUD: only EXP per hour and quest counters (Ctrl+Alt+H)"
+          aria-label="Compact HUD"
+          onclick={() => backend.setCompact(true)}
+        >
+          <Minimize2 size={14} />
+        </button>
+        <button
+          title={live.status.clickThrough
+            ? "Unlock with Ctrl+Alt+L"
+            : "Lock: clicks pass through to the game (Ctrl+Alt+L)"}
+          class:active={live.status.clickThrough}
+          onclick={toggleLock}
+        >
+          {#if live.status.clickThrough}<Lock size={14} />{:else}<LockOpen size={14} />{/if}
+        </button>
+        <button title="Hide (Ctrl+Alt+O). Pinned panels stay." aria-label="Hide overlay" onclick={() => backend.hideOverlay()}>
+          <X size={14} />
+        </button>
+      </span>
+    </header>
 
-  <div class="main" id="panel" role="tabpanel" aria-labelledby="tab-{tab}">
-    {#if live.analysis || live.session}
-      {#key tab}
-        <div class="panel"><PanelView panel={tab} analysis={live.analysis} session={live.session} /></div>
-      {/key}
-    {:else}
-      <div class="welcome">
-        <Logo size={28} />
-        <h1>Welcome to Leafline</h1>
-        <p class="hint">It reads what your game screen shows and puts useful facts beside it.</p>
-        <ol class="steps">
-          <li>
-            <span class="n">1</span>
-            <span
-              >Open the <button class="inline" onclick={() => backend.showWorkbench()}>workbench</button> and load a
-              screenshot. Its readings appear here, as they will during play.</span
-            >
-          </li>
-          <li>
-            <span class="n">2</span>
-            <span>Download map data in the Map tab for routes, training spots and quest help.</span>
-          </li>
-          <li>
-            <span class="n">3</span>
-            <span
-              ><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>O</kbd> shows or hides this window; <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd
-                >L</kbd
-              > lets clicks pass through it.</span
-            >
-          </li>
-        </ol>
-        <button class="inline small" onclick={() => backend.showSettings()}>Settings and what Leafline does</button>
+    <nav class="tabs">
+      <div class="tablist" role="tablist" aria-label="Panels" tabindex="-1" onkeydown={onTabKey}>
+        {#each PANELS as panel (panel.id)}
+          {@const Icon = panel.icon}
+          <button
+            role="tab"
+            id="tab-{panel.id}"
+            aria-selected={tab === panel.id}
+            aria-controls="panel"
+            tabindex={tab === panel.id ? 0 : -1}
+            class:empty={signatures[panel.id] == null}
+            class:pinned={live.pins.pinned.includes(panel.id)}
+            title={live.pins.pinned.includes(panel.id) ? `${panel.title} (also pinned)` : undefined}
+            onclick={() => select(panel.id)}
+          >
+            <span class="icon">
+              <Icon size={14} />
+              {#if fresh(panel.id)}<span class="dot" aria-label="Updated"></span>{/if}
+            </span>
+            <span>{panel.title}</span>
+          </button>
+        {/each}
       </div>
-    {/if}
-  </div>
+      <button
+        class="pin"
+        class:active={pinned}
+        title={pinned
+          ? `Unpin ${panelInfo(tab).title}`
+          : `Pin ${panelInfo(tab).title}: keep it on screen in its own window, even when the overlay is hidden`}
+        onclick={togglePin}
+      >
+        {#if pinned}<PinOff size={14} />{:else}<Pin size={14} />{/if}
+      </button>
+    </nav>
+
+    <div class="main" id="panel" role="tabpanel" aria-labelledby="tab-{tab}">
+      {#if live.analysis || live.session}
+        {#key tab}
+          <div class="panel"><PanelView panel={tab} analysis={live.analysis} session={live.session} /></div>
+        {/key}
+      {:else}
+        <div class="welcome">
+          <Logo size={28} />
+          <h1>Welcome to Leafline</h1>
+          <p class="hint">It reads what your game screen shows and puts useful facts beside it.</p>
+          <ol class="steps">
+            <li>
+              <span class="n">1</span>
+              <span
+                >Open the <button class="inline" onclick={() => backend.showWorkbench()}>workbench</button> and load a
+                screenshot. Its readings appear here, as they will during play.</span
+              >
+            </li>
+            <li>
+              <span class="n">2</span>
+              <span>Download map data in the Map tab for routes, training spots and quest help.</span>
+            </li>
+            <li>
+              <span class="n">3</span>
+              <span
+                ><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>O</kbd> shows or hides this window; <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd
+                  >L</kbd
+                > lets clicks pass through it.</span
+              >
+            </li>
+          </ol>
+          <button class="inline small" onclick={() => backend.showSettings()}>Settings and what Leafline does</button>
+        </div>
+      {/if}
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -193,6 +209,12 @@
     border-radius: var(--radius-lg);
     overflow: hidden;
     transition: opacity 0.2s ease;
+  }
+
+  .shell.compact {
+    height: auto;
+    max-height: 100vh;
+    border-radius: var(--radius);
   }
 
   header {

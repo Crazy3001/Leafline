@@ -47,6 +47,16 @@
       "mesosPerHour": null
     }
   ],
+  "counters": [
+    {
+      "target": "Halloween Candies",
+      "required": 100,
+      "map": "Victoria Road : Kerning City",
+      "gained": 9,
+      "activeSeconds": 840.0,
+      "perHour": 38.57
+    }
+  ],
   "rejected": {
     "exp": 0,
     "mesos": 0

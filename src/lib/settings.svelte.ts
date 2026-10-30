@@ -3,7 +3,17 @@
 import { backend } from "./api";
 import type { DisplaySettings } from "./types";
 
-export const display = $state<DisplaySettings>({ opacity: 1, scale: 1 });
+export const display = $state<DisplaySettings>({
+  opacity: 1,
+  scale: 1,
+  travel: { enabled: false, cabs: true, vipCabs: false, scrolls: true },
+});
+
+/** Changes whenever the travel routes may use changes, for effects that ask for routes. */
+export function travelKey(): string {
+  const t = display.travel;
+  return t.enabled ? `${t.cabs}${t.vipCabs}${t.scrolls}` : "off";
+}
 
 let watching = false;
 

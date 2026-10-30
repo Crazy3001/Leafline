@@ -42,7 +42,7 @@
   <TrainCard level={analysis?.hud?.level ?? session?.level ?? null} map={analysis?.map ?? null} {session} plain={pinned} />
 {:else if panel === "quests"}
   {#if analysis?.quest}
-    <QuestCard quest={analysis.quest} map={analysis.map} plain={pinned} />
+    <QuestCard quest={analysis.quest} map={analysis.map} {session} plain={pinned} />
   {:else}
     {@render empty("Open the Quest Helper in game to track quest counters here.")}
   {/if}

@@ -12,6 +12,7 @@ import type {
   Analysis,
   Calibration,
   DisplaySettings,
+  TravelInfo,
   Guide,
   History,
   HudValues,
@@ -52,6 +53,8 @@ export interface Backend {
   overlayStatus(): Promise<OverlayStatus>;
   setClickThrough(enabled: boolean): Promise<void>;
   hideOverlay(): Promise<void>;
+  /** Switches the overlay between the full panels and the compact HUD. */
+  setCompact(enabled: boolean): Promise<void>;
   toggleOverlay(): Promise<void>;
   showWorkbench(): Promise<void>;
   shortcuts(): Promise<ShortcutInfo[]>;
@@ -76,7 +79,12 @@ export interface Backend {
   /** Player-observed drops from mapleclassic.wiki, cached for a week. */
   monsterDrops(monsters: string[]): Promise<MonsterDrops[]>;
   /** Where to go for each quest objective, from cached data only. Null until map data is downloaded. */
-  questGuide(quests: QuestQuery[], mapName: string | null, mapStreet: string | null): Promise<Guide | null>;
+  questGuide(
+    quests: QuestQuery[],
+    mapName: string | null,
+    mapStreet: string | null,
+    measured: MeasuredRate[],
+  ): Promise<Guide | null>;
   /** Asks mapleclassic.wiki which monsters drop these quest items; cached for a week. */
   lookUpQuestItems(items: string[]): Promise<void>;
   /** Every map with monsters to hunt, with the rates the player measured. Null until map data is downloaded. */
@@ -111,6 +119,12 @@ export interface Backend {
   showSettings(): Promise<void>;
   /** Leafline's version, for the About section. */
   version(): Promise<string>;
+  /** The travel connections routes can use, and which file they come from. */
+  travelInfo(): Promise<TravelInfo>;
+  /** Downloads the taxis and return scrolls players recorded on mapleclassic.wiki. */
+  downloadTravel(): Promise<TravelInfo>;
+  /** Opens the player's copy of the travel file in their editor, made from the downloaded one if missing. */
+  editTravelFile(): Promise<void>;
   /** Sizes the calling window to its content. */
   fitWindow(width: number, height: number): Promise<void>;
 }
@@ -138,6 +152,7 @@ const tauriBackend: Backend = {
   overlayStatus: () => invoke("overlay_status"),
   setClickThrough: (enabled) => invoke("set_click_through", { enabled }),
   hideOverlay: () => invoke("hide_overlay"),
+  setCompact: (enabled) => invoke("set_compact", { enabled }),
   toggleOverlay: () => invoke("toggle_overlay"),
   showWorkbench: () => invoke("show_workbench"),
   shortcuts: () => invoke("shortcut_list"),
@@ -154,7 +169,7 @@ const tauriBackend: Backend = {
   searchMaps: (text) => invoke("search_maps", { text }),
   mapRoute: (from, to) => invoke("map_route", { from, to }),
   monsterDrops: (monsters) => invoke("monster_drops", { monsters }),
-  questGuide: (quests, mapName, mapStreet) => invoke("quest_guide", { quests, mapName, mapStreet }),
+  questGuide: (quests, mapName, mapStreet, measured) => invoke("quest_guide", { quests, mapName, mapStreet, measured }),
   lookUpQuestItems: async (items) => {
     await invoke("look_up_quest_items", { items });
   },
@@ -185,6 +200,9 @@ const tauriBackend: Backend = {
   updateSettings: (settings) => invoke("update_settings", { settings }),
   onSettings: (handler) => listen<DisplaySettings>("settings", (e) => handler(e.payload)),
   showSettings: () => invoke("show_settings"),
+  travelInfo: () => invoke("travel_info"),
+  downloadTravel: () => invoke("download_travel"),
+  editTravelFile: () => invoke("edit_travel_file"),
   version: () => getVersion(),
   fitWindow: (width, height) => getCurrentWindow().setSize(new LogicalSize(width, height)),
 };

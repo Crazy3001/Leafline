@@ -177,10 +177,10 @@ export function sampleRoute(from: number, to: number): MapRoute | null {
   const steps: MapRoute["steps"] = [];
   for (let at = to; cameFrom.has(at); ) {
     const [f, direction, t, portal, hidden] = cameFrom.get(at)!;
-    steps.unshift({ from: ref(f), to: ref(t), direction, portal, hidden });
+    steps.unshift({ from: ref(f), to: ref(t), direction, portal, hidden, travel: null });
     at = f;
   }
-  return { from: ref(from), to: ref(to), steps };
+  return { from: ref(from), to: ref(to), steps, walking: null };
 }
 
 export function sampleDrops(monsters: string[]): MonsterDrops[] {
@@ -256,7 +256,10 @@ const UNLOGGED = /\b(candies|anthurium)\b/i;
 
 function ground(id: number, count: number, from: number | null): HuntingGround {
   const route = from == null ? null : sampleRoute(from, id);
-  return { map: ref(id), count, hops: route ? route.steps.length : null };
+  // The sample spots' measured rate on map 2, as kills of this monster.
+  const perClear = sampleCard(id)?.expPerClear ?? 0;
+  const pace = id === 2 && perClear ? { expPerHour: 1840, activeSeconds: 1260, killsPerHour: (1840 * count) / perClear } : null;
+  return { map: ref(id), count, hops: route ? route.steps.length : null, travel: null, pace };
 }
 
 function hunt(id: number, from: number | null, rate: number | null): Hunt {
@@ -325,6 +328,7 @@ export function sampleSpots(from: number | null): TrainingSpots {
         hpPerClear: card.mobs.reduce((sum, m) => sum + m.hp * m.count, 0),
         mobs: card.mobs,
         hops: route ? route.steps.length : null,
+        travel: null,
         reachable: true,
         measured: id === 2 ? { expPerHour: 1840, activeSeconds: 1260 } : null,
       };
