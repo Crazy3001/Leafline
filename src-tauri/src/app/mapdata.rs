@@ -18,8 +18,10 @@ use crate::mapdata::{
 };
 
 const FILE_NAME: &str = "map-data.sqlite3";
-/// The player's copy of the travel connections, which replaces the bundled one when present.
+/// The player's copy of the travel connections, which replaces the downloaded one when present.
 const TRAVEL_FILE: &str = "travel.json";
+/// The travel connections downloaded from mapleclassic.wiki.
+const TRAVEL_CACHE: &str = "travel-wiki.json";
 
 /// Emitted to every window when the cached map data changes.
 pub const MAP_DATA_EVENT: &str = "map-data";
@@ -161,36 +163,50 @@ pub fn map_route(app: AppHandle, state: State<MapDataState>, from: u32, to: u32)
     atlas.route_with(from, to, &travel(&app, &atlas))
 }
 
-/// The travel connections in use: the player's file in the app data folder if there is one
-/// (and it reads), otherwise the bundled one. Also says which it is, and why a file was not used.
-fn travel_file(app: &AppHandle) -> (TravelFile, Option<PathBuf>, Option<String>) {
-    let Ok(path) = app.path().app_data_dir().map(|dir| dir.join(TRAVEL_FILE)) else {
-        return (TravelFile::default_file(), None, None);
+/// Where the travel connections in use come from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum TravelOrigin {
+    /// The player's own copy.
+    Custom,
+    /// Downloaded from mapleclassic.wiki.
+    Wiki,
+    /// Nothing yet: the player hasn't downloaded or written any.
+    None,
+}
+
+/// The travel connections in use: the player's own copy in the app data folder if there is one
+/// and it reads, otherwise the copy downloaded from the wiki, if any. Also says why the
+/// player's copy could not be used.
+fn travel_file(app: &AppHandle) -> (Option<TravelFile>, TravelOrigin, Option<String>) {
+    let Ok(dir) = app.path().app_data_dir() else { return (None, TravelOrigin::None, None) };
+    let read = |name: &str| std::fs::read_to_string(dir.join(name)).ok().map(|json| TravelFile::parse(&json));
+    let error = match read(TRAVEL_FILE) {
+        Some(Ok(file)) => return (Some(file), TravelOrigin::Custom, None),
+        Some(Err(err)) => Some(err),
+        None => None,
     };
-    match std::fs::read_to_string(&path) {
-        Ok(json) => match TravelFile::parse(&json) {
-            Ok(file) => (file, Some(path), None),
-            Err(err) => (TravelFile::default_file(), Some(path), Some(err)),
-        },
-        Err(_) => (TravelFile::default_file(), Some(path), None),
+    match read(TRAVEL_CACHE) {
+        Some(Ok(file)) => (Some(file), TravelOrigin::Wiki, error),
+        _ => (None, TravelOrigin::None, error),
     }
 }
 
 /// The rides and scrolls the player turned on in Settings, found in the map data.
 fn travel(app: &AppHandle, atlas: &Atlas) -> Travel {
     let choice = app.state::<SettingsState>().get().travel;
-    if !choice.enabled {
-        return Travel::none();
+    match travel_file(app).0 {
+        Some(file) if choice.enabled => atlas.travel(&file, choice).0,
+        _ => Travel::none(),
     }
-    atlas.travel(&travel_file(app).0, choice).0
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TravelInfo {
-    file: TravelFile,
-    /// The player's own copy is in use.
-    custom: bool,
+    file: Option<TravelFile>,
+    origin: TravelOrigin,
+    /// The player's own copy, whether or not it exists yet.
     path: Option<String>,
     /// Why the player's copy could not be used, if it could not.
     error: Option<String>,
@@ -201,22 +217,45 @@ pub struct TravelInfo {
 /// The travel connections, for the Settings window.
 #[tauri::command]
 pub fn travel_info(app: AppHandle, state: State<MapDataState>) -> TravelInfo {
-    let (file, path, error) = travel_file(&app);
-    let custom = error.is_none() && path.as_ref().is_some_and(|p| p.exists());
-    let missing = state.atlas().map(|atlas| atlas.travel(&file, Default::default()).1);
-    TravelInfo { file, custom, path: path.map(|p| p.display().to_string()), error, missing }
+    let (file, origin, error) = travel_file(&app);
+    let missing = file.as_ref().and_then(|file| Some(state.atlas()?.travel(file, Default::default()).1));
+    let path = app.path().app_data_dir().ok().map(|dir| dir.join(TRAVEL_FILE).display().to_string());
+    TravelInfo { file, origin, path, error, missing }
 }
 
-/// Opens the player's copy of the travel connections in their editor, making it from the
-/// bundled one first if there is none.
+/// Downloads the taxis and return scrolls players recorded on mapleclassic.wiki and keeps them
+/// in the app data folder. Only on the player's request.
+#[tauri::command]
+pub async fn download_travel(app: AppHandle) -> Result<TravelInfo> {
+    let fetch_app = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = fetch_app.state::<MapDataState>();
+        let file = TravelFile::fetch(&state.wiki, now())?;
+        let dir = fetch_app.path().app_data_dir()?;
+        std::fs::create_dir_all(&dir)?;
+        let json = serde_json::to_string_pretty(&file).map_err(|err| Error::Invalid(err.to_string()))?;
+        std::fs::write(dir.join(TRAVEL_CACHE), json)?;
+        Ok::<(), Error>(())
+    })
+    .await
+    .map_err(|err| Error::Invalid(err.to_string()))??;
+    Ok(travel_info(app.clone(), app.state::<MapDataState>()))
+}
+
+/// Opens the player's copy of the travel connections in their editor, making it first from the
+/// downloaded connections, or empty if there are none.
 #[tauri::command]
 pub fn edit_travel_file(app: AppHandle) -> Result<()> {
-    let path = app.path().app_data_dir()?.join(TRAVEL_FILE);
+    let dir = app.path().app_data_dir()?;
+    let path = dir.join(TRAVEL_FILE);
     if !path.exists() {
-        if let Some(dir) = path.parent() {
-            std::fs::create_dir_all(dir)?;
-        }
-        std::fs::write(&path, crate::mapdata::travel::DEFAULT_FILE)?;
+        std::fs::create_dir_all(&dir)?;
+        let start = match travel_file(&app) {
+            (Some(file), TravelOrigin::Wiki, _) => file,
+            _ => TravelFile::empty(),
+        };
+        let json = serde_json::to_string_pretty(&start).map_err(|err| Error::Invalid(err.to_string()))?;
+        std::fs::write(&path, json)?;
     }
     app.opener().open_path(path.display().to_string(), None::<&str>).map_err(|err| Error::Invalid(err.to_string()))
 }

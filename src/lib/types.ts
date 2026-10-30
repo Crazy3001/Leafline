@@ -358,10 +358,11 @@ export interface Shortcut {
   via: MapRef;
 }
 
-/** The travel file: connections the map data lacks, from mapleclassic.wiki, editable by the player. */
+/** The travel file: connections the map data lacks, downloaded from mapleclassic.wiki or written by the player. */
 export interface TravelFile {
   about: string;
-  checked: string | null;
+  /** When they were downloaded, in Unix seconds. */
+  fetchedAt?: number;
   services: {
     kind: TravelKind;
     name: string;
@@ -373,9 +374,11 @@ export interface TravelFile {
 }
 
 export interface TravelInfo {
-  file: TravelFile;
-  /** The player's own copy is in use. */
-  custom: boolean;
+  /** Null until downloaded or written. */
+  file: TravelFile | null;
+  /** The player's own copy, the wiki's, or nothing yet. */
+  origin: "custom" | "wiki" | "none";
+  /** Where the player's own copy is, or would be. */
   path: string | null;
   /** Why the player's copy could not be used. */
   error: string | null;

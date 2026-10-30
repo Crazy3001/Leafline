@@ -16,8 +16,8 @@
 //!
 //! `--preview <image> <out.json> [--font <hud-font.json>] [--travel]` writes what the overlay would
 //! show for a screenshot (analysis, map match, quest guide, training spots), for the dev UI's
-//! `window.__LEAFLINE_PREVIEW__`. `--travel` turns on every ride and scroll in the bundled travel
-//! file. It holds game data: keep it outside the repo.
+//! `window.__LEAFLINE_PREVIEW__`. `--travel` fetches the taxis and return scrolls from
+//! mapleclassic.wiki and turns them all on. It holds game data: keep it outside the repo.
 
 use std::path::Path;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -159,7 +159,8 @@ fn main() {
         let sources = store.cached_item_sources(&keys, now - drops::MAX_AGE).expect("cached items").0;
         let travel = if args.iter().any(|a| a == "--travel") {
             let all = TravelChoice { enabled: true, cabs: true, vip_cabs: true, scrolls: true };
-            atlas.travel(&TravelFile::default_file(), all).0
+            let file = TravelFile::fetch(&Http::new(Duration::from_secs(1)), now).expect("fetch travel from the wiki");
+            atlas.travel(&file, all).0
         } else {
             Travel::none()
         };

@@ -1,7 +1,18 @@
 <script lang="ts">
   // Settings: how the overlay looks, travel in routes, the hotkeys, downloaded data, and what
   // Leafline is.
-  import { CarTaxiFront, Check, Download, ExternalLink, FilePenLine, ScrollText, ShieldCheck, X } from "@lucide/svelte";
+  import {
+    CarTaxiFront,
+    Check,
+    Download,
+    ExternalLink,
+    FilePenLine,
+    LoaderCircle,
+    RefreshCw,
+    ScrollText,
+    ShieldCheck,
+    X,
+  } from "@lucide/svelte";
   import { onMount } from "svelte";
 
   import { backend } from "$lib/api";
@@ -31,6 +42,8 @@
   let saveTimer: ReturnType<typeof setTimeout> | undefined;
   let exported = $state<string | null>(null);
   let travel = $state<TravelInfo | null>(null);
+  let downloading = $state(false);
+  let travelError = $state<string | null>(null);
 
   const KINDS: { key: keyof Omit<TravelChoice, "enabled">; kind: TravelFile["services"][number]["kind"]; label: string; help: string }[] = [
     { key: "cabs", kind: "cab", label: "Taxis", help: "Regular Cab between towns, and Phil out of Lith Harbor" },
@@ -49,6 +62,22 @@
   async function editTravel() {
     await backend.editTravelFile();
     loadTravel();
+  }
+
+  async function downloadTravel() {
+    downloading = true;
+    travelError = null;
+    try {
+      travel = await backend.downloadTravel();
+    } catch (e) {
+      travelError = `Couldn't download: ${e}`;
+    } finally {
+      downloading = false;
+    }
+  }
+
+  function fetchedOn(seconds: number | undefined) {
+    return seconds ? new Date(seconds * 1000).toLocaleDateString(undefined, { dateStyle: "medium" }) : "";
   }
 
   /** A service's routes, grouped by where they leave from: `Henesys → Perion, Ellinia`. */
@@ -220,9 +249,38 @@
       </fieldset>
 
       {#if travel}
+        <div class="row">
+          <div class="label">
+            <span class="name">Taxi routes and scrolls</span>
+            <span class="help">
+              {#if travel.origin === "custom"}
+                Your own copy is in use.
+              {:else if travel.origin === "wiki"}
+                Downloaded from mapleclassic.wiki{travel.file?.fetchedAt ? ` on ${fetchedOn(travel.file.fetchedAt)}` : ""}.
+              {:else}
+                Not downloaded yet. They come from what players recorded on mapleclassic.wiki, fetched only when you ask.
+              {/if}
+            </span>
+          </div>
+          <div class="control">
+            <button class="button" onclick={downloadTravel} disabled={downloading}>
+              {#if downloading}<span class="spin"><LoaderCircle size={13} /></span>{:else if travel.origin === "none"}<Download
+                  size={13}
+                />{:else}<RefreshCw size={13} />{/if}
+              {travel.origin === "none" ? "Download" : "Update"}
+            </button>
+          </div>
+        </div>
+        {#if travelError}<p class="note warn">{travelError}</p>{/if}
+        {#if travel.origin === "custom"}
+          <p class="note">Update refreshes the download, but your own copy stays in use until you delete it.</p>
+        {/if}
+      {/if}
+
+      {#if travel?.file}
         <details class="connections">
           <summary>
-            The connections ({travel.file.services.length}){#if travel.custom}<span class="tag">your copy</span>{/if}
+            The connections ({travel.file.services.length}){#if travel.origin === "custom"}<span class="tag">your copy</span>{/if}
           </summary>
           <ul>
             {#each travel.file.services as service (service.name)}
@@ -249,14 +307,17 @@
             </p>
           {/if}
         </details>
-        {#if travel.error}<p class="note warn">Your travel file couldn't be read, so Leafline's own list is used: {travel.error}</p>{/if}
+      {/if}
+      {#if travel}
+        {#if travel.error}
+          <p class="note warn">Your travel file couldn't be read, so it isn't used: {travel.error}</p>
+        {/if}
         <div class="row">
           <div class="label">
             <span class="name">Edit the connections</span>
             <span class="help">
-              {travel.custom ? "Your copy is in use" : "Leafline's list is in use"}{travel.file.checked
-                ? `, checked against mapleclassic.wiki on ${travel.file.checked}`
-                : ""}. Fares are in mesos at level 20 and up. Delete your copy to go back to Leafline's list.
+              Opens your own copy{travel.origin === "wiki" ? ", made from the download" : ""}, which then replaces it.
+              Fares are in mesos at level 20 and up. Delete your copy to go back to the download.
             </span>
           </div>
           <div class="control">
@@ -645,6 +706,22 @@
 
   .note.warn {
     color: var(--warn);
+  }
+
+  .spin {
+    display: inline-grid;
+    animation: spin 0.9s linear infinite;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .button:disabled {
+    opacity: 0.6;
+    cursor: default;
   }
 
   .sr-only {

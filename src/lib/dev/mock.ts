@@ -9,6 +9,7 @@ import type {
   SavedSession,
   DisplaySettings,
   TravelFile,
+  TravelInfo,
   PriceEntry,
   PriceLog,
   Guide,
@@ -21,7 +22,6 @@ import type {
   SessionSummary,
 } from "../types";
 import sample from "./sample-analysis.json";
-import travelFile from "../../../src-tauri/src/mapdata/travel.json";
 import { sampleCard, sampleDrops, sampleGuide, sampleRoute, sampleSearch, sampleSpots } from "./sample-map";
 import sampleSession from "./sample-session.json";
 
@@ -135,6 +135,47 @@ function mockHistory(): History {
   return {
     sessions: [...savedSessions].sort((a, b) => (b.startedAt ?? b.savedAt) - (a.startedAt ?? a.savedAt)),
     maps: [...byMap].map(([map, r]) => ({ map, sessions: r.sessions, activeSeconds: r.seconds, expPerHour: (r.exp * 3600) / r.seconds, mesosPerHour: (r.mesos * 3600) / r.seconds })).sort((a, b) => b.activeSeconds - a.activeSeconds),
+  };
+}
+
+/** Made-up taxis and scrolls between the sample maps, in the wiki's shape. */
+let travelDownloaded = false;
+const sampleTravel: TravelFile = {
+  about: "",
+  fetchedAt: Date.now() / 1000,
+  services: [
+    {
+      kind: "cab",
+      name: "Ox Cart",
+      note: "Slow ride between the villages.",
+      source: "https://mapleclassic.wiki/wiki/Module:RoutePlanner/config.json",
+      routes: [
+        { from: "Mossbank", to: "Mossbank Meadow II", fare: 120 },
+        { from: "Mossbank Meadow II", to: "Mossbank" },
+      ],
+    },
+    {
+      kind: "scroll",
+      name: "Return Scroll to Mossbank",
+      source: "https://mapleclassic.wiki/wiki/Return_Scroll_to_Mossbank",
+      routes: [{ to: "Mossbank" }],
+    },
+    {
+      kind: "scroll",
+      name: "Return Scroll to Faraway Isle",
+      source: "https://mapleclassic.wiki/wiki/Return_Scroll_to_Faraway_Isle",
+      routes: [{ to: "Faraway Isle" }],
+    },
+  ],
+};
+
+function mockTravelInfo(): TravelInfo {
+  return {
+    file: travelDownloaded ? sampleTravel : null,
+    origin: travelDownloaded ? "wiki" : "none",
+    path: "%APPDATA%\\app.leafline.overlay\\travel.json",
+    error: null,
+    missing: travelDownloaded && mapStatus.ready ? ["Faraway Isle"] : null,
   };
 }
 
@@ -356,13 +397,12 @@ export const mockBackend: Backend = {
     settingsHandlers.push(handler);
     return () => {};
   },
-  travelInfo: async () => ({
-    file: travelFile as TravelFile,
-    custom: false,
-    path: "%APPDATA%\\app.leafline.overlay\\travel.json",
-    error: null,
-    missing: mapStatus.ready ? [] : null,
-  }),
+  travelInfo: async () => mockTravelInfo(),
+  async downloadTravel() {
+    await delay(900);
+    travelDownloaded = true;
+    return mockTravelInfo();
+  },
   async editTravelFile() {},
   async setCompact(enabled) {
     status.compact = enabled;

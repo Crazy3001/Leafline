@@ -121,7 +121,9 @@ export interface Backend {
   version(): Promise<string>;
   /** The travel connections routes can use, and which file they come from. */
   travelInfo(): Promise<TravelInfo>;
-  /** Opens the player's copy of the travel file in their editor, made from Leafline's if missing. */
+  /** Downloads the taxis and return scrolls players recorded on mapleclassic.wiki. */
+  downloadTravel(): Promise<TravelInfo>;
+  /** Opens the player's copy of the travel file in their editor, made from the downloaded one if missing. */
   editTravelFile(): Promise<void>;
   /** Sizes the calling window to its content. */
   fitWindow(width: number, height: number): Promise<void>;
@@ -199,6 +201,7 @@ const tauriBackend: Backend = {
   onSettings: (handler) => listen<DisplaySettings>("settings", (e) => handler(e.payload)),
   showSettings: () => invoke("show_settings"),
   travelInfo: () => invoke("travel_info"),
+  downloadTravel: () => invoke("download_travel"),
   editTravelFile: () => invoke("edit_travel_file"),
   version: () => getVersion(),
   fitWindow: (width, height) => getCurrentWindow().setSize(new LogicalSize(width, height)),
