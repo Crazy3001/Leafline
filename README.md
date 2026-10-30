@@ -142,3 +142,7 @@ Leafline ships no game data. Map details are downloaded on your machine when you
 - Player-observed drop rates, taxi routes and return scrolls: [mapleclassic.wiki](https://mapleclassic.wiki) contributors, CC BY-NC-SA 4.0.
 
 Game content belongs to Nexon. Leafline is unofficial and not affiliated with or endorsed by Nexon.
+
+## Licence
+
+Leafline's code is under the [MIT licence](LICENSE). It does not cover game content or the downloaded data above, which keep their own terms.
