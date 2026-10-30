@@ -4,9 +4,9 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, LogicalSize, Manager, State, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
 
-use super::overlay::OVERLAY;
+use super::overlay::{self, OVERLAY};
 use super::pins;
 use crate::error::{Error, Result};
 use crate::mapdata::TravelChoice;
@@ -96,9 +96,7 @@ pub fn update_settings(app: AppHandle, state: State<SettingsState>, settings: Se
         // fit themselves to their contents once redrawn.
         if let Some(overlay) = app.get_webview_window(OVERLAY) {
             overlay.set_zoom(settings.scale)?;
-            let ratio = settings.scale / old.scale;
-            let size: LogicalSize<f64> = overlay.inner_size()?.to_logical(overlay.scale_factor()?);
-            overlay.set_size(LogicalSize::new(size.width * ratio, size.height * ratio))?;
+            overlay::rescale(&app, settings.scale / old.scale)?;
         }
         for window in pins::windows(&app) {
             window.set_zoom(settings.scale)?;

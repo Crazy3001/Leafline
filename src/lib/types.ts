@@ -166,6 +166,8 @@ export interface PinStatus {
 export interface OverlayStatus {
   visible: boolean;
   clickThrough: boolean;
+  /** Showing only EXP per hour and the quest counters, in a small window. */
+  compact: boolean;
 }
 
 export interface ShortcutInfo {

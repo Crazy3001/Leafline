@@ -51,7 +51,13 @@ const preview = (globalThis as { __LEAFLINE_PREVIEW__?: Preview }).__LEAFLINE_PR
 const sampleAnalysis = preview?.analysis ?? (sample as unknown as Analysis);
 const sampleSessionSummary = preview?.session ?? (sampleSession as SessionSummary);
 
-const status: OverlayStatus = { visible: true, clickThrough: false };
+const status: OverlayStatus = {
+  visible: true,
+  clickThrough: false,
+  // A preview can open the compact HUD with `?compact` in the address.
+  compact: typeof location !== "undefined" && new URLSearchParams(location.search).has("compact"),
+};
+const statusHandlers: ((status: OverlayStatus) => void)[] = [];
 const analysisHandlers: ((analysis: Analysis) => void)[] = [];
 const progressHandlers: ((progress: ReplayProgress) => void)[] = [];
 const sessionHandlers: ((session: SessionSummary) => void)[] = [];
@@ -224,7 +230,10 @@ export const mockBackend: Backend = {
     if (!preview?.empty) setTimeout(() => handler(sampleSessionSummary), 200);
     return () => {};
   },
-  onOverlayStatus: async () => () => {},
+  async onOverlayStatus(handler) {
+    statusHandlers.push(handler);
+    return () => {};
+  },
   mapDataStatus: async () => mapStatus,
   async downloadMapData() {
     await delay(1200);
@@ -355,6 +364,10 @@ export const mockBackend: Backend = {
     missing: mapStatus.ready ? [] : null,
   }),
   async editTravelFile() {},
+  async setCompact(enabled) {
+    status.compact = enabled;
+    statusHandlers.forEach((h) => h({ ...status }));
+  },
   async showSettings() {
     window.open("/settings", "_blank");
   },

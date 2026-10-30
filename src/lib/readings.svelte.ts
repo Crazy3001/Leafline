@@ -12,7 +12,7 @@ export const live = $state<{
 }>({
   analysis: null,
   session: null,
-  status: { visible: true, clickThrough: false },
+  status: { visible: true, clickThrough: false, compact: false },
   pins: { pinned: [], hidden: false },
 });
 

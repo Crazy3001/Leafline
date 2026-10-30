@@ -15,18 +15,25 @@ pub enum Action {
     ToggleOverlay,
     ToggleClickThrough,
     TogglePins,
+    ToggleCompact,
     ShowWorkbench,
 }
 
 impl Action {
-    pub const ALL: [Action; 4] =
-        [Action::ToggleOverlay, Action::ToggleClickThrough, Action::TogglePins, Action::ShowWorkbench];
+    pub const ALL: [Action; 5] = [
+        Action::ToggleOverlay,
+        Action::ToggleClickThrough,
+        Action::TogglePins,
+        Action::ToggleCompact,
+        Action::ShowWorkbench,
+    ];
 
     pub fn keys(self) -> &'static str {
         match self {
             Action::ToggleOverlay => "Ctrl+Alt+O",
             Action::ToggleClickThrough => "Ctrl+Alt+L",
             Action::TogglePins => "Ctrl+Alt+P",
+            Action::ToggleCompact => "Ctrl+Alt+H",
             Action::ShowWorkbench => "Ctrl+Alt+W",
         }
     }
@@ -36,6 +43,7 @@ impl Action {
             Action::ToggleOverlay => "Show or hide the overlay",
             Action::ToggleClickThrough => "Lock the overlay (click-through)",
             Action::TogglePins => "Show or hide pinned panels",
+            Action::ToggleCompact => "Compact HUD: only EXP per hour and quest counters",
             Action::ShowWorkbench => "Open the workbench",
         }
     }
@@ -49,6 +57,7 @@ impl Action {
             Action::ToggleOverlay => overlay::toggle_visibility(app),
             Action::ToggleClickThrough => overlay::toggle_click_through(app),
             Action::TogglePins => pins::toggle_visibility(app),
+            Action::ToggleCompact => overlay::toggle_compact(app),
             Action::ShowWorkbench => overlay::show_workbench(app),
         }
     }

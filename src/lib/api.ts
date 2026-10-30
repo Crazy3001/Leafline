@@ -53,6 +53,8 @@ export interface Backend {
   overlayStatus(): Promise<OverlayStatus>;
   setClickThrough(enabled: boolean): Promise<void>;
   hideOverlay(): Promise<void>;
+  /** Switches the overlay between the full panels and the compact HUD. */
+  setCompact(enabled: boolean): Promise<void>;
   toggleOverlay(): Promise<void>;
   showWorkbench(): Promise<void>;
   shortcuts(): Promise<ShortcutInfo[]>;
@@ -148,6 +150,7 @@ const tauriBackend: Backend = {
   overlayStatus: () => invoke("overlay_status"),
   setClickThrough: (enabled) => invoke("set_click_through", { enabled }),
   hideOverlay: () => invoke("hide_overlay"),
+  setCompact: (enabled) => invoke("set_compact", { enabled }),
   toggleOverlay: () => invoke("toggle_overlay"),
   showWorkbench: () => invoke("show_workbench"),
   shortcuts: () => invoke("shortcut_list"),
