@@ -82,7 +82,10 @@
     {@const info = guide?.quests[i]}
     {@const finished = objectives.length > 0 && objectives.every((o) => o.current >= o.required)}
     <div class="quest" class:dense={plain}>
-      <h3 class="title">{title || "Untitled quest"}</h3>
+      <!-- The map data's spelling, once the title matched a quest there: OCR garbles some letters. -->
+      <h3 class="title" title={info?.quest ? `Read on screen as "${title}"` : undefined}>
+        {info?.quest?.quest.name || title || "Untitled quest"}
+      </h3>
       {#if info?.quest?.giver}
         <p class="giver" class:finished>
           <UserRound size={11} />

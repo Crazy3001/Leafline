@@ -12,6 +12,7 @@ use serde::Serialize;
 
 use super::text::parse_grouped;
 use crate::error::Result;
+use crate::vision::glyphs::{MIN_SIMILARITY, Mask, ink_columns, ink_rows};
 use crate::vision::{Frame, Ocr, Rect, color, preprocess};
 
 #[derive(Debug, Clone, Copy, Serialize)]
@@ -30,13 +31,8 @@ pub fn read(frame: &Frame, ocr: &Ocr) -> Result<(Option<MesoReading>, usize)> {
     let boxes = locate(frame);
     let mut readings = Vec::new();
     for &rect in &boxes {
-        // The amount is right-aligned; the empty left of the box only confuses OCR.
-        let amount = Rect::from_edges(
-            rect.x + 0.4 * rect.w,
-            rect.y - 0.15 * rect.h,
-            rect.right(),
-            rect.bottom() + 0.15 * rect.h,
-        );
+        // The amount is right-aligned; the empty left of the box and its border only confuse OCR.
+        let amount = Rect::from_edges(rect.x + 0.4 * rect.w, rect.y, rect.right(), rect.bottom());
         if let Some(mesos) = read_amount(frame, amount, ocr)? {
             readings.push(MesoReading { mesos, rect });
         }
@@ -53,10 +49,11 @@ pub fn read(frame: &Frame, ocr: &Ocr) -> Result<(Option<MesoReading>, usize)> {
 }
 
 /// OCR of the box's dark digits at several sizes. The pixel font's 6 and 8 are easily
-/// confused, so an amount counts only when at least two readings agree on it and no other
-/// amount is read as often.
+/// confused, so an amount counts only when at least two readings agree on it, no other
+/// amount is read as often, and it fits the digits' shapes.
 fn read_amount(frame: &Frame, rect: Rect, ocr: &Ocr) -> Result<Option<u64>> {
     use imageops::FilterType::{CatmullRom, Triangle};
+    let glyphs = glyphs(frame, rect);
     let mut readings = Vec::new();
     for (scale, filter) in [(1, Triangle), (2, Triangle), (2, CatmullRom), (3, Triangle), (3, CatmullRom)] {
         let words = ocr.words_in(frame, rect, scale as f32, |crop| {
@@ -66,6 +63,7 @@ fn read_amount(frame: &Frame, rect: Rect, ocr: &Ocr) -> Result<Option<u64>> {
         })?;
         let text: String = words.iter().map(|w| w.text.as_str()).collect();
         if AMOUNT.is_match(&text)
+            && fits_shapes(&text, &glyphs)
             && let Some(amount) = parse_grouped(&text)
         {
             readings.push(amount);
@@ -75,6 +73,31 @@ fn read_amount(frame: &Frame, rect: Rect, ocr: &Ocr) -> Result<Option<u64>> {
     let most = readings.iter().map(|&r| votes(r)).max().unwrap_or(0);
     let winners: Vec<u64> = readings.iter().copied().filter(|&r| votes(r) == most).collect();
     Ok((most >= 2 && winners.iter().all(|&w| w == winners[0])).then(|| winners[0]))
+}
+
+/// The amount's characters (digits and separators), cut out by shape.
+fn glyphs(frame: &Frame, rect: Rect) -> Vec<Mask> {
+    let Some(rows) = ink_rows(frame, rect, is_digit) else { return Vec::new() };
+    ink_columns(frame, rect, is_digit).into_iter().map(|cols| Mask::new(frame, cols, rows, is_digit)).collect()
+}
+
+fn is_digit(px: &Rgba<u8>) -> bool {
+    preprocess::luminance(px) <= 80
+}
+
+/// Whether a reading agrees with the drawn characters: one per glyph, and since the pixel
+/// font draws each character the same way every time, the same character wherever two
+/// glyphs match and different ones wherever they do not. This catches a 6 read as 8 when the
+/// amount shows both.
+fn fits_shapes(text: &str, glyphs: &[Mask]) -> bool {
+    let chars: Vec<char> = text.chars().filter(|c| !c.is_whitespace()).collect();
+    if chars.len() != glyphs.len() {
+        return false;
+    }
+    let digits: Vec<(char, &Mask)> = chars.into_iter().zip(glyphs).filter(|(c, _)| c.is_ascii_digit()).collect();
+    digits.iter().enumerate().all(|(i, (a, first))| {
+        digits[i + 1..].iter().all(|(b, second)| (first.similarity(second) >= MIN_SIMILARITY) == (a == b))
+    })
 }
 
 /// White boxes about one text line tall with a gold coin just to their left.
@@ -113,6 +136,40 @@ mod tests {
         for bad in ["36,64", "1234", "", "12,3456"] {
             assert!(!AMOUNT.is_match(bad), "{bad}");
         }
+    }
+
+    /// A strip with made-up 3×5 glyphs drawn dark on white, one blank column apart.
+    fn amount(text: &str) -> (Frame, Rect) {
+        let glyph = |c: char| match c {
+            '6' => ["#..", "#..", "###", "#.#", "###"],
+            '8' => ["###", "#.#", "###", "#.#", "###"],
+            '4' => ["#.#", "#.#", "###", "..#", "..#"],
+            _ => [".#.", ".#.", ".#.", ".#.", "##."],
+        };
+        let columns: Vec<[bool; 5]> = text
+            .chars()
+            .flat_map(|c| {
+                let rows = glyph(c);
+                (0..4).map(move |x| std::array::from_fn(|y| x < 3 && rows[y].as_bytes()[x] == b'#'))
+            })
+            .collect();
+        let frame = Frame::from_fn(columns.len() as u32 + 4, 9, |x, y| {
+            let (col, row) = ((x as usize).wrapping_sub(2), (y as usize).wrapping_sub(2));
+            if col < columns.len() && row < 5 && columns[col][row] { Rgba([20, 20, 20, 255]) } else { Rgba([255; 4]) }
+        });
+        (frame, Rect::new(0.0, 0.0, columns.len() as f32 + 4.0, 9.0))
+    }
+
+    #[test]
+    fn readings_must_fit_the_digit_shapes() {
+        let (frame, rect) = amount("8,646");
+        let shapes = glyphs(&frame, rect);
+        assert_eq!(shapes.len(), 5);
+        assert!(fits_shapes("8,646", &shapes));
+        // A 6 read as 8: the two 6s no longer agree with each other, or the 8 with the 6.
+        assert!(!fits_shapes("8,846", &shapes));
+        assert!(!fits_shapes("6,646", &shapes));
+        assert!(!fits_shapes("8,64", &shapes));
     }
 
     #[test]

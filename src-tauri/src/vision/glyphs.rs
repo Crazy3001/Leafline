@@ -34,11 +34,16 @@ impl Mask {
         Self { width: right - left, height: bottom - top, ink: ink.collect() }
     }
 
+    pub fn width(&self) -> u32 {
+        self.width
+    }
+
     pub fn height(&self) -> u32 {
         self.height
     }
 
-    fn get(&self, x: u32, y: u32) -> bool {
+    /// Whether pixel `(x, y)` is ink; false outside the mask.
+    pub fn get(&self, x: u32, y: u32) -> bool {
         x < self.width && y < self.height && self.ink[(y * self.width + x) as usize]
     }
 
