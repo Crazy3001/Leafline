@@ -13,6 +13,7 @@ pub mod guide;
 pub mod osms;
 pub mod store;
 pub mod training;
+pub mod travel;
 
 pub use atlas::{Atlas, MapCard, MapMatch, MapRef, Route};
 pub use drops::{ItemSources, MonsterDrops};
@@ -20,6 +21,7 @@ pub use fetch::RefreshReport;
 pub use guide::{QuestGuide, QuestQuery};
 pub use store::{DataStatus, Store};
 pub use training::{MeasuredRate, TrainingSpot};
+pub use travel::{Travel, TravelChoice, TravelFile};
 
 /// The credit OSMS asks for, shown with any data from it.
 pub const OSMS_CREDIT: &str = "Data from OSMS Data Explorer (https://osmsdataexplorer.com), CC BY 4.0";

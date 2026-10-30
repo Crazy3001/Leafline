@@ -12,6 +12,7 @@ import type {
   Analysis,
   Calibration,
   DisplaySettings,
+  TravelInfo,
   Guide,
   History,
   HudValues,
@@ -116,6 +117,10 @@ export interface Backend {
   showSettings(): Promise<void>;
   /** Leafline's version, for the About section. */
   version(): Promise<string>;
+  /** The travel connections routes can use, and which file they come from. */
+  travelInfo(): Promise<TravelInfo>;
+  /** Opens the player's copy of the travel file in their editor, made from Leafline's if missing. */
+  editTravelFile(): Promise<void>;
   /** Sizes the calling window to its content. */
   fitWindow(width: number, height: number): Promise<void>;
 }
@@ -190,6 +195,8 @@ const tauriBackend: Backend = {
   updateSettings: (settings) => invoke("update_settings", { settings }),
   onSettings: (handler) => listen<DisplaySettings>("settings", (e) => handler(e.payload)),
   showSettings: () => invoke("show_settings"),
+  travelInfo: () => invoke("travel_info"),
+  editTravelFile: () => invoke("edit_travel_file"),
   version: () => getVersion(),
   fitWindow: (width, height) => getCurrentWindow().setSize(new LogicalSize(width, height)),
 };

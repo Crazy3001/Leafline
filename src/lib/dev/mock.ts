@@ -8,6 +8,7 @@ import type {
   History,
   SavedSession,
   DisplaySettings,
+  TravelFile,
   PriceEntry,
   PriceLog,
   Guide,
@@ -20,6 +21,7 @@ import type {
   SessionSummary,
 } from "../types";
 import sample from "./sample-analysis.json";
+import travelFile from "../../../src-tauri/src/mapdata/travel.json";
 import { sampleCard, sampleDrops, sampleGuide, sampleRoute, sampleSearch, sampleSpots } from "./sample-map";
 import sampleSession from "./sample-session.json";
 
@@ -130,7 +132,11 @@ function mockHistory(): History {
   };
 }
 
-let displaySettings: DisplaySettings = { opacity: 1, scale: 1 };
+let displaySettings: DisplaySettings = {
+  opacity: 1,
+  scale: 1,
+  travel: { enabled: false, cabs: true, vipCabs: false, scrolls: true },
+};
 const settingsHandlers: ((settings: DisplaySettings) => void)[] = [];
 
 /** Quest items the mock wiki has been asked about. */
@@ -341,6 +347,14 @@ export const mockBackend: Backend = {
     settingsHandlers.push(handler);
     return () => {};
   },
+  travelInfo: async () => ({
+    file: travelFile as TravelFile,
+    custom: false,
+    path: "%APPDATA%\\app.leafline.overlay\\travel.json",
+    error: null,
+    missing: mapStatus.ready ? [] : null,
+  }),
+  async editTravelFile() {},
   async showSettings() {
     window.open("/settings", "_blank");
   },

@@ -3,6 +3,7 @@
   import { Flag, X } from "@lucide/svelte";
 
   import { backend } from "$lib/api";
+  import { display, travelKey } from "$lib/settings.svelte";
   import type { MapRef, MapRoute } from "$lib/types";
   import MapPicker from "./MapPicker.svelte";
   import RouteSteps from "./RouteSteps.svelte";
@@ -17,6 +18,7 @@
   $effect(() => {
     const start = from.id;
     const to = target;
+    void travelKey();
     route = null;
     if (!to) return;
     loading = true;
@@ -39,7 +41,12 @@
     <RouteSteps {route} {onnavigate} />
   {:else if !loading}
     <p class="note">
-      No route through portals is known. Some trips need a ship, taxi or return scroll, which the data doesn't list.
+      {#if display.travel.enabled}
+        No route is known, even with the travel you turned on. Some trips need a ship or an NPC the data doesn't list.
+      {:else}
+        No route through portals is known. Some trips need a ship, taxi or return scroll: turn on travel in Settings to
+        count taxis and scrolls.
+      {/if}
     </p>
   {/if}
 {:else}

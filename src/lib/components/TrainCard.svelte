@@ -10,6 +10,7 @@
   import { formatCompact, formatDuration } from "$lib/format";
   import { measuredRates, watchHistory } from "$lib/history.svelte";
   import { mapData, watchMapData } from "$lib/mapdata.svelte";
+  import { travelKey } from "$lib/settings.svelte";
   import type { MapReading, MapRoute, SessionSummary, TrainingSpot, TrainingSpots } from "$lib/types";
 
   let {
@@ -60,7 +61,7 @@
   watchHistory();
   // Saved sessions and the current one, so maps can be compared across play sessions.
   const measured = $derived(measuredRates(session));
-  const queryKey = $derived(JSON.stringify([map?.name, map?.street, measured]));
+  const queryKey = $derived(JSON.stringify([map?.name, map?.street, measured, travelKey()]));
 
   $effect(() => {
     const key = queryKey;
@@ -80,6 +81,7 @@
   $effect(() => {
     const id = open;
     const from = data?.from?.id;
+    void travelKey();
     route = null;
     if (id == null || from == null) return;
     backend.mapRoute(from, id).then((r) => {
@@ -88,6 +90,8 @@
   });
 
   const efficiency = (s: TrainingSpot) => (s.hpPerClear ? (s.expPerClear * 1000) / s.hpPerClear : 0);
+  /** Steps away: fewer with travel, when the player turned it on and it helps. */
+  const steps = (s: TrainingSpot) => s.travel?.hops ?? s.hops;
   const near = (s: TrainingSpot) => level == null || (s.averageLevel >= level - BELOW && s.averageLevel <= level + ABOVE);
 
   const ranked = $derived.by(() => {
@@ -96,7 +100,7 @@
       exp: (s) => s.expPerClear,
       efficiency,
       measured: (s) => s.measured?.expPerHour ?? -1,
-      near: (s) => -(s.hops ?? 9999),
+      near: (s) => -(steps(s) ?? 9999),
     };
     const value = by[sort];
     const sorted = [...spots].sort((a, b) => value(b) - value(a) || b.expPerClear - a.expPerClear);
@@ -105,7 +109,7 @@
     // and order each band by portals, so a slightly smaller map next door isn't buried.
     const out: TrainingSpot[] = [];
     let band: TrainingSpot[] = [];
-    const flush = () => out.push(...band.sort((a, b) => (a.hops ?? Infinity) - (b.hops ?? Infinity)));
+    const flush = () => out.push(...band.sort((a, b) => (steps(a) ?? Infinity) - (steps(b) ?? Infinity)));
     for (const spot of sorted) {
       if (band.length && value(spot) < value(band[0]) - Math.abs(value(band[0])) * CLOSE_CALL) {
         flush();
@@ -160,6 +164,7 @@
           ? { value: formatCompact(spot.measured.expPerHour), unit: "your EXP / hr" }
           : { value: "—", unit: "not measured" };
       case "near":
+        if (spot.travel) return { value: String(spot.travel.hops), unit: "with travel" };
         return spot.hops == null
           ? { value: "—", unit: "no route" }
           : { value: String(spot.hops), unit: spot.hops === 1 ? "portal" : "portals" };
@@ -225,7 +230,13 @@
               <span class="name">{spot.map.name}</span>
               <span class="meta">
                 <span class="lv {levelTone(spot)}">Lv {spot.levelRange[0]}{spot.levelRange[1] !== spot.levelRange[0] ? `–${spot.levelRange[1]}` : ""}</span>
-                · {spot.mobTotal} mobs{#if spot.hops != null && sort !== "near"}{" · "}{spot.hops === 0 ? "here" : `${spot.hops} portal${spot.hops === 1 ? "" : "s"}`}{/if}
+                · {spot.mobTotal} mobs{#if spot.hops != null && (sort !== "near" || spot.travel)}{" · "}{spot.hops === 0
+                    ? "here"
+                    : `${spot.hops} portal${spot.hops === 1 ? "" : "s"}`}{/if}{#if spot.travel && sort !== "near"}<span
+                    class="shortcut"
+                    title="With the travel you turned on in Settings, via {spot.travel.via.name}"
+                    >{" "}({spot.travel.hops} with travel)</span
+                  >{/if}
               </span>
             </span>
             <span class="metric">
@@ -447,6 +458,10 @@
 
   .lv {
     color: var(--muted);
+  }
+
+  .shortcut {
+    color: var(--travel);
   }
 
   .lv.above {

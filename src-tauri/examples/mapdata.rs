@@ -14,15 +14,16 @@
 //!
 //! `--train <level>` lists maps whose monsters average within a few levels of `level`.
 //!
-//! `--preview <image> <out.json> [--font <hud-font.json>]` writes what the overlay would show for a
-//! screenshot (analysis, map match, quest guide, training spots), for the dev UI's
-//! `window.__LEAFLINE_PREVIEW__`. It holds game data: keep it outside the repo.
+//! `--preview <image> <out.json> [--font <hud-font.json>] [--travel]` writes what the overlay would
+//! show for a screenshot (analysis, map match, quest guide, training spots), for the dev UI's
+//! `window.__LEAFLINE_PREVIEW__`. `--travel` turns on every ride and scroll in the bundled travel
+//! file. It holds game data: keep it outside the repo.
 
 use std::path::Path;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use leafline_lib::mapdata::fetch::{self, Http};
-use leafline_lib::mapdata::{Atlas, MapCard, QuestQuery, Store, drops};
+use leafline_lib::mapdata::{Atlas, MapCard, QuestQuery, Store, Travel, TravelChoice, TravelFile, drops};
 use leafline_lib::pipeline;
 use leafline_lib::readers::hud::HudFont;
 use leafline_lib::readers::map;
@@ -101,7 +102,7 @@ fn main() {
             let keys: Vec<String> = items.iter().map(|i| drops::item_key(i)).collect();
             store.cached_item_sources(&keys, now - drops::MAX_AGE).expect("cached items").0
         };
-        for guide in atlas.quest_guide(&quests, from.map(|m| m.id), &sources, &[]) {
+        for guide in atlas.quest_guide(&quests, from.map(|m| m.id), &sources, &[], &Travel::none()) {
             println!("{} -> {:?}", guide.title, guide.quest.as_ref().map(|q| (&q.quest.name, &q.giver, &q.giver_maps)));
             for o in &guide.objectives {
                 println!("    {:?} {:?} item={:?} looked_up={}", o.kind, o.target, o.item, o.looked_up);
@@ -120,7 +121,7 @@ fn main() {
     }
     if let Some(level) = value("--train", 1) {
         let level: f64 = level.parse().expect("level");
-        let mut spots = atlas.training_spots(None, &[]);
+        let mut spots = atlas.training_spots(None, &[], &Travel::none());
         spots.retain(|s| s.reachable && (s.average_level - level).abs() <= 5.0);
         spots.sort_by_key(|s| std::cmp::Reverse(s.exp_per_clear));
         for s in spots {
@@ -156,7 +157,13 @@ fn main() {
             .collect();
         let keys: Vec<String> = quests.iter().flat_map(|q| &q.objectives).map(|o| drops::item_key(o)).collect();
         let sources = store.cached_item_sources(&keys, now - drops::MAX_AGE).expect("cached items").0;
-        let guide = atlas.quest_guide(&quests, from, &sources, &[]);
+        let travel = if args.iter().any(|a| a == "--travel") {
+            let all = TravelChoice { enabled: true, cabs: true, vip_cabs: true, scrolls: true };
+            atlas.travel(&TravelFile::default_file(), all).0
+        } else {
+            Travel::none()
+        };
+        let guide = atlas.quest_guide(&quests, from, &sources, &[], &travel);
         // Routes to every map the guide names, so the dev UI can show them.
         let routes: Vec<_> = from
             .map(|start| {
@@ -169,7 +176,7 @@ fn main() {
                     .collect();
                 ids.sort_unstable();
                 ids.dedup();
-                ids.into_iter().filter_map(|to| atlas.route(start, to)).collect()
+                ids.into_iter().filter_map(|to| atlas.route_with(start, to, &travel)).collect()
             })
             .unwrap_or_default();
         let preview = serde_json::json!({
@@ -177,7 +184,7 @@ fn main() {
             "map": found,
             "routes": routes,
             "guide": { "from": found.as_ref().map(|m| &m.card.map), "quests": guide },
-            "spots": { "from": found.as_ref().map(|m| &m.card.map), "spots": atlas.training_spots(from, &[]) },
+            "spots": { "from": found.as_ref().map(|m| &m.card.map), "spots": atlas.training_spots(from, &[], &travel) },
         });
         std::fs::write(&out, serde_json::to_string(&preview).expect("serialise")).expect("write preview");
         println!("wrote {out}");

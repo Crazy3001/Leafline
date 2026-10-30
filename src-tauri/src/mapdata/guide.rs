@@ -5,13 +5,14 @@
 //! monster when it reads like one in the data; otherwise it is an item, and the monsters that
 //! drop it come from players' logs on mapleclassic.wiki, looked up separately.
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use super::atlas::{Atlas, MapRef, QuestRef, fold, similarity};
+use super::atlas::{Atlas, MapRef, QuestRef, Shortcut, fold, similarity};
 use super::drops::{ItemSources, item_key};
 use super::training::{Measured, MeasuredRate};
+use super::travel::Travel;
 
 /// How closely an objective must match a monster's name to be taken for that monster.
 const MIN_MONSTER_SCORE: f64 = 0.85;
@@ -113,6 +114,8 @@ pub struct HuntingGround {
     pub count: u32,
     /// Portals from the current map, when it is known and a route exists.
     pub hops: Option<u32>,
+    /// Fewer steps with the travel the player turned on, when that is shorter.
+    pub travel: Option<Shortcut>,
     /// The player's EXP rate measured here, as kills of this monster.
     pub pace: Option<Pace>,
 }
@@ -132,24 +135,25 @@ pub struct Pace {
 #[derive(Debug, Default)]
 struct Context {
     hops: HashMap<u32, u32>,
+    shortcuts: HashMap<u32, Shortcut>,
     measured: HashMap<u32, Measured>,
 }
 
 impl Atlas {
     /// A guide for each quest. `from` is the map the player is on, for portal counts; `items`
     /// holds the wiki lookups made so far for item objectives; `measured` the EXP rates the
-    /// player recorded, matched to maps by name.
+    /// player recorded, matched to maps by name; `travel` the rides and scrolls turned on.
     pub fn quest_guide(
         &self,
         quests: &[QuestQuery],
         from: Option<u32>,
         items: &[ItemSources],
         measured: &[MeasuredRate],
+        travel: &Travel,
     ) -> Vec<QuestGuide> {
-        let context = Context {
-            hops: from.map(|id| self.hops_from(id)).unwrap_or_default(),
-            measured: self.measured_by_map(measured),
-        };
+        let hops = from.map(|id| self.hops_from(id)).unwrap_or_default();
+        let shortcuts = from.map(|id| self.shortcuts_from(id, travel, &hops)).unwrap_or_default();
+        let context = Context { hops, shortcuts, measured: self.measured_by_map(measured) };
         quests
             .iter()
             .map(|query| {
@@ -263,6 +267,7 @@ impl Atlas {
                 map: self.map_ref(id),
                 count,
                 hops: context.hops.get(&id).copied(),
+                travel: context.shortcuts.get(&id).cloned(),
                 pace: self.pace(id, count, context),
             })
             .collect();
@@ -340,22 +345,6 @@ impl Atlas {
             giver_maps,
         })
     }
-
-    /// Portals from `from` to every map reachable through them.
-    pub(super) fn hops_from(&self, from: u32) -> HashMap<u32, u32> {
-        let mut hops = HashMap::from([(from, 0)]);
-        let mut queue = VecDeque::from([from]);
-        while let Some(at) = queue.pop_front() {
-            let next = hops[&at] + 1;
-            for exit in self.exits.get(&at).into_iter().flatten().filter(|e| e.to.known) {
-                hops.entry(exit.to.id).or_insert_with(|| {
-                    queue.push_back(exit.to.id);
-                    next
-                });
-            }
-        }
-        hops
-    }
 }
 
 #[cfg(test)]
@@ -390,7 +379,7 @@ mod tests {
     fn monster_objectives_list_the_best_maps_and_portals_away() {
         let atlas = world();
         // From the inn: out to Mossbank, east to Meadow I, east again to Meadow II.
-        let guide = atlas.quest_guide(&[query("Shell Sortng", &["Pebble Snai1"])], Some(5), &[], &[]);
+        let guide = atlas.quest_guide(&[query("Shell Sortng", &["Pebble Snai1"])], Some(5), &[], &[], &Travel::none());
         let quest = guide[0].quest.as_ref().unwrap();
         assert_eq!(quest.quest.name, "Shell Sorting");
         assert_eq!(quest.giver.as_deref(), Some("Warden Ilse"));
@@ -413,7 +402,8 @@ mod tests {
             exp_per_hour: 600.0,
             active_seconds: 900.0,
         }];
-        let guide = atlas.quest_guide(&[query("Shell Sorting", &["Pebble Snail"])], Some(1), &[], &measured);
+        let guide =
+            atlas.quest_guide(&[query("Shell Sorting", &["Pebble Snail"])], Some(1), &[], &measured, &Travel::none());
         let grounds = &guide[0].objectives[0].hunts[0].maps;
         // A clear of Meadow I is worth 60 base EXP and has 6 Pebble Snails: 10 clears an hour.
         let pace = grounds[0].pace.as_ref().unwrap();
@@ -427,12 +417,12 @@ mod tests {
         let atlas = world();
         let quests = [query("[Event] Whisker Hunt", &["Rat Whisker"])];
 
-        let before = &atlas.quest_guide(&quests, None, &[], &[])[0];
+        let before = &atlas.quest_guide(&quests, None, &[], &[], &Travel::none())[0];
         assert!(before.quest.is_none());
         let objective = &before.objectives[0];
         assert_eq!((objective.kind, objective.looked_up, objective.hunts.len()), (TargetKind::Item, false, 0));
 
-        let after = &atlas.quest_guide(&quests, Some(1), &[wing_sources()], &[])[0].objectives[0];
+        let after = &atlas.quest_guide(&quests, Some(1), &[wing_sources()], &[], &Travel::none())[0].objectives[0];
         assert!(after.looked_up);
         assert_eq!(after.item.as_deref(), Some("Rat Whisker"));
         let rat = &after.hunts[0];
@@ -446,7 +436,13 @@ mod tests {
     #[test]
     fn an_item_named_after_its_monster_is_not_the_monster() {
         let atlas = world();
-        let guide = atlas.quest_guide(&[query("Untracked", &["Moss Slime Jelly", "Moss Slime"])], None, &[], &[]);
+        let guide = atlas.quest_guide(
+            &[query("Untracked", &["Moss Slime Jelly", "Moss Slime"])],
+            None,
+            &[],
+            &[],
+            &Travel::none(),
+        );
         let kinds: Vec<TargetKind> = guide[0].objectives.iter().map(|o| o.kind).collect();
         assert_eq!(kinds, [TargetKind::Item, TargetKind::Monster]);
     }
@@ -454,8 +450,8 @@ mod tests {
     #[test]
     fn truncated_titles_match_the_start_of_a_name() {
         let atlas = world();
-        let guide = atlas.quest_guide(&[query("Slime Sam...", &[])], None, &[], &[]);
+        let guide = atlas.quest_guide(&[query("Slime Sam...", &[])], None, &[], &[], &Travel::none());
         assert_eq!(guide[0].quest.as_ref().map(|q| q.quest.id), Some(71));
-        assert!(atlas.quest_guide(&[query("Slime", &[])], None, &[], &[])[0].quest.is_none());
+        assert!(atlas.quest_guide(&[query("Slime", &[])], None, &[], &[], &Travel::none())[0].quest.is_none());
     }
 }

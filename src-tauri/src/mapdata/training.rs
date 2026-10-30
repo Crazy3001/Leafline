@@ -6,7 +6,8 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use super::atlas::{Atlas, MapRef, MobRow};
+use super::atlas::{Atlas, MapRef, MobRow, Shortcut};
+use super::travel::Travel;
 
 /// EXP per hour the session tracker measured on a map, keyed by the minimap label it read.
 #[derive(Debug, Clone, Deserialize)]
@@ -34,6 +35,8 @@ pub struct TrainingSpot {
     pub mobs: Vec<MobRow>,
     /// Portals from the current map, when it is known and a route exists.
     pub hops: Option<u32>,
+    /// Fewer steps with the travel the player turned on, when that is shorter.
+    pub travel: Option<Shortcut>,
     /// Whether portals lead here from some town. Party quest stages and other instances
     /// entered through an NPC are not.
     pub reachable: bool,
@@ -50,9 +53,11 @@ pub struct Measured {
 
 impl Atlas {
     /// Every map outside town with at least one monster that isn't a boss. `from` is the map
-    /// the player is on; `measured` the rates the player recorded, matched to maps by name.
-    pub fn training_spots(&self, from: Option<u32>, measured: &[MeasuredRate]) -> Vec<TrainingSpot> {
+    /// the player is on; `measured` the rates the player recorded, matched to maps by name;
+    /// `travel` the rides and scrolls turned on.
+    pub fn training_spots(&self, from: Option<u32>, measured: &[MeasuredRate], travel: &Travel) -> Vec<TrainingSpot> {
         let hops = from.map(|id| self.hops_from(id)).unwrap_or_default();
+        let shortcuts = from.map(|id| self.shortcuts_from(id, travel, &hops)).unwrap_or_default();
         let mut reachable = std::collections::HashSet::new();
         for town in self.maps.values().filter(|m| m.is_town) {
             if !reachable.contains(&town.id) {
@@ -82,6 +87,7 @@ impl Atlas {
                     exp_per_clear: card.exp_per_clear,
                     mobs: card.mobs,
                     hops: hops.get(&m.id).copied(),
+                    travel: shortcuts.get(&m.id).cloned(),
                     reachable: reachable.contains(&m.id),
                     measured: rates.get(&m.id).cloned(),
                 })
@@ -119,7 +125,7 @@ mod tests {
     #[test]
     fn lists_hunting_maps_with_base_numbers() {
         let atlas = world();
-        let spots = atlas.training_spots(Some(1), &[]);
+        let spots = atlas.training_spots(Some(1), &[], &Travel::none());
         let names: Vec<&str> = spots.iter().map(|s| s.map.name.as_str()).collect();
         assert_eq!(names, ["Mossbank Meadow I", "Mossbank Meadow II", "Burrow Den"]);
 
@@ -147,7 +153,7 @@ mod tests {
             },
             MeasuredRate { label: "Nowhere".into(), exp_per_hour: 9.0, active_seconds: 60.0 },
         ];
-        let spots = atlas.training_spots(None, &measured);
+        let spots = atlas.training_spots(None, &measured, &Travel::none());
         let meadow = spots.iter().find(|s| s.map.id == 2).unwrap();
         let rate = meadow.measured.as_ref().unwrap();
         assert_eq!(rate.active_seconds, 2400.0);

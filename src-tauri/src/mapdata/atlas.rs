@@ -1,12 +1,14 @@
 //! The cached data indexed for the map card: finding a map from OCR'd text, gathering what is
 //! known about it, and text routes between maps.
 
-use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
+use std::collections::hash_map::Entry;
+use std::collections::{BTreeMap, HashMap, VecDeque};
 
 use serde::Serialize;
 use strsim::normalized_levenshtein;
 
 use super::osms::{Dataset, MapRecord, MonsterRecord, NO_MAP, QuestRecord};
+use super::travel::{Travel, TravelKind, TravelLink};
 
 /// Below this similarity an OCR'd name is not taken for any map.
 const MIN_SCORE: f64 = 0.72;
@@ -161,6 +163,9 @@ pub struct Route {
     pub from: MapRef,
     pub to: MapRef,
     pub steps: Vec<RouteStep>,
+    /// For a route that takes a ride or scroll: the portals the walk alone takes, or `None`
+    /// when no portals lead there.
+    pub walking: Option<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -171,6 +176,41 @@ pub struct RouteStep {
     pub direction: Direction,
     pub portal: Option<String>,
     pub hidden: bool,
+    /// Set when the step is a ride or scroll rather than a portal.
+    pub travel: Option<TravelStep>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TravelStep {
+    pub kind: TravelKind,
+    pub service: String,
+    pub fare: Option<u32>,
+}
+
+/// A trip that rides or scrolls part of the way, shorter than walking.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Shortcut {
+    /// Steps, counting each ride or scroll as one.
+    pub hops: u32,
+    /// Where the first ride or scroll goes.
+    pub via: MapRef,
+}
+
+/// A way from one map to the next: a portal, or travel the player turned on.
+#[derive(Clone, Copy)]
+enum Edge<'a> {
+    Portal(&'a Exit),
+    Travel(&'a TravelLink),
+}
+
+/// A map reached in a breadth-first search: in how many steps, from where, and where the
+/// first ride or scroll on the way went.
+struct Visit<'a> {
+    hops: u32,
+    prev: Option<(u32, Edge<'a>)>,
+    via: Option<u32>,
 }
 
 /// The cached data, indexed for lookups.
@@ -364,40 +404,97 @@ impl Atlas {
     /// The fewest portals from one map to another, by breadth-first search over the portals'
     /// destinations. `None` when no path is known.
     pub fn route(&self, from: u32, to: u32) -> Option<Route> {
+        self.route_with(from, to, &Travel::none())
+    }
+
+    /// The fewest steps from one map to another, where a ride or scroll in `travel` is one
+    /// step like a portal. Between routes of the same length, walking wins. A route that
+    /// takes travel also says how many portals the walk alone takes.
+    pub fn route_with(&self, from: u32, to: u32, travel: &Travel) -> Option<Route> {
         if !self.maps.contains_key(&from) || !self.maps.contains_key(&to) {
             return None;
         }
-        let mut came_from: HashMap<u32, (u32, &Exit)> = HashMap::new();
-        let mut seen = HashSet::from([from]);
-        let mut queue = VecDeque::from([from]);
-        while let Some(at) = queue.pop_front() {
-            if at == to {
-                break;
-            }
-            for exit in self.exits.get(&at).into_iter().flatten() {
-                if exit.to.known && seen.insert(exit.to.id) {
-                    came_from.insert(exit.to.id, (at, exit));
-                    queue.push_back(exit.to.id);
-                }
-            }
-        }
-        if from != to && !came_from.contains_key(&to) {
-            return None;
-        }
+        let visits = self.explore(from, travel, Some(to));
+        visits.get(&to)?;
         let mut steps = Vec::new();
         let mut at = to;
-        while let Some(&(prev, exit)) = came_from.get(&at) {
-            steps.push(RouteStep {
-                from: self.map_ref(prev),
-                to: exit.to.clone(),
-                direction: exit.direction,
-                portal: exit.portals.first().cloned(),
-                hidden: exit.hidden,
+        while let Some((prev, edge)) = visits.get(&at).and_then(|v| v.prev) {
+            steps.push(match edge {
+                Edge::Portal(exit) => RouteStep {
+                    from: self.map_ref(prev),
+                    to: exit.to.clone(),
+                    direction: exit.direction,
+                    portal: exit.portals.first().cloned(),
+                    hidden: exit.hidden,
+                    travel: None,
+                },
+                Edge::Travel(link) => RouteStep {
+                    from: self.map_ref(prev),
+                    to: self.map_ref(link.to),
+                    direction: Direction::Other,
+                    portal: None,
+                    hidden: false,
+                    travel: Some(TravelStep { kind: link.kind, service: link.service.clone(), fare: link.fare }),
+                },
             });
             at = prev;
         }
         steps.reverse();
-        Some(Route { from: self.map_ref(from), to: self.map_ref(to), steps })
+        let walking = if steps.iter().any(|s| s.travel.is_some()) {
+            self.explore(from, &Travel::none(), Some(to)).get(&to).map(|v| v.hops)
+        } else {
+            None
+        };
+        Some(Route { from: self.map_ref(from), to: self.map_ref(to), steps, walking })
+    }
+
+    /// Portals from `from` to every map reachable through them.
+    pub(super) fn hops_from(&self, from: u32) -> HashMap<u32, u32> {
+        self.explore(from, &Travel::none(), None).into_iter().map(|(id, v)| (id, v.hops)).collect()
+    }
+
+    /// The maps `travel` brings closer than walking does from `from`, with the steps it takes.
+    pub(super) fn shortcuts_from(
+        &self,
+        from: u32,
+        travel: &Travel,
+        walking: &HashMap<u32, u32>,
+    ) -> HashMap<u32, Shortcut> {
+        if travel.is_empty() {
+            return HashMap::new();
+        }
+        self.explore(from, travel, None)
+            .into_iter()
+            .filter_map(|(id, visit)| {
+                let via = visit.via?;
+                let shorter = walking.get(&id).is_none_or(|&walk| visit.hops < walk);
+                shorter.then(|| (id, Shortcut { hops: visit.hops, via: self.map_ref(via) }))
+            })
+            .collect()
+    }
+
+    /// Breadth-first search from `from` over portals and travel, stopping once `stop` is
+    /// reached. Portals are tried first, so a walk wins over a ride of the same length.
+    fn explore<'a>(&'a self, from: u32, travel: &'a Travel, stop: Option<u32>) -> HashMap<u32, Visit<'a>> {
+        let mut visits = HashMap::from([(from, Visit { hops: 0, prev: None, via: None })]);
+        let mut queue = VecDeque::from([from]);
+        while let Some(at) = queue.pop_front() {
+            if stop == Some(at) {
+                break;
+            }
+            let (hops, via) = (visits[&at].hops + 1, visits[&at].via);
+            let portals =
+                self.exits.get(&at).into_iter().flatten().filter(|e| e.to.known).map(|e| (e.to.id, Edge::Portal(e)));
+            let rides = travel.leaving(at).filter(|l| self.maps.contains_key(&l.to)).map(|l| (l.to, Edge::Travel(l)));
+            for (next, edge) in portals.chain(rides) {
+                if let Entry::Vacant(entry) = visits.entry(next) {
+                    let via = via.or(matches!(edge, Edge::Travel(_)).then_some(next));
+                    entry.insert(Visit { hops, prev: Some((at, edge)), via });
+                    queue.push_back(next);
+                }
+            }
+        }
+        visits
     }
 
     pub(super) fn map_ref(&self, id: u32) -> MapRef {
@@ -705,6 +802,42 @@ pub(crate) mod tests {
         assert!(atlas.route(3, 3).unwrap().steps.is_empty());
         assert!(atlas.route(1, 6).is_none(), "no portal reaches the other Mossbank");
         assert!(atlas.route(1, 77).is_none());
+        assert_eq!(route.walking, None, "a walk says nothing about walking");
+    }
+
+    #[test]
+    fn travel_counts_a_ride_as_one_step() {
+        use crate::mapdata::travel::{TravelChoice, TravelFile};
+        let atlas = world();
+        let file = TravelFile::parse(
+            r#"{"services": [
+                {"kind": "cab", "name": "Cart", "source": "x", "routes": [{"from": "Mossbank Inn", "to": "Mossbank Meadow II", "fare": 50}]},
+                {"kind": "scroll", "name": "Scroll to Mossbank", "source": "x", "routes": [{"to": "Mossbank"}]}
+            ]}"#,
+        )
+        .unwrap();
+        let (travel, _) = atlas.travel(&file, TravelChoice { enabled: true, ..TravelChoice::default() });
+
+        // Inn to Meadow II: three portals on foot, one cart ride.
+        let route = atlas.route_with(5, 3, &travel).unwrap();
+        assert_eq!(route.steps.len(), 1);
+        let ride = route.steps[0].travel.as_ref().unwrap();
+        assert_eq!((ride.service.as_str(), ride.fare), ("Cart", Some(50)));
+        assert_eq!(route.walking, Some(3));
+
+        // Meadow I to Mossbank: one portal west ties with the scroll, and walking wins.
+        let route = atlas.route_with(2, 1, &travel).unwrap();
+        assert!(route.steps[0].travel.is_none());
+        assert_eq!(route.walking, None);
+
+        // Burrow Den to the Inn: out, west, in on foot; scroll home, then in.
+        let walking = atlas.hops_from(4);
+        assert_eq!(walking[&5], 3);
+        let shortcuts = atlas.shortcuts_from(4, &travel, &walking);
+        assert_eq!(shortcuts[&5].hops, 2);
+        assert_eq!(shortcuts[&5].via.name, "Mossbank");
+        assert!(!shortcuts.contains_key(&2), "the walk to Meadow I is already one portal");
+        assert!(atlas.shortcuts_from(4, &Travel::none(), &walking).is_empty());
     }
 
     #[test]

@@ -9,14 +9,17 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State, Url};
 use tauri_plugin_opener::OpenerExt;
 
+use super::settings::SettingsState;
 use crate::error::{Error, Result};
 use crate::mapdata::fetch::{self, Http};
 use crate::mapdata::{
     Atlas, DataStatus, ItemSources, MapCard, MapMatch, MapRef, MeasuredRate, MonsterDrops, QuestGuide, QuestQuery,
-    RefreshReport, Route, Store, TrainingSpot, drops,
+    RefreshReport, Route, Store, TrainingSpot, Travel, TravelFile, drops,
 };
 
 const FILE_NAME: &str = "map-data.sqlite3";
+/// The player's copy of the travel connections, which replaces the bundled one when present.
+const TRAVEL_FILE: &str = "travel.json";
 
 /// Emitted to every window when the cached map data changes.
 pub const MAP_DATA_EVENT: &str = "map-data";
@@ -151,9 +154,71 @@ pub fn search_maps(state: State<MapDataState>, text: String) -> Vec<MapRef> {
     state.atlas().map(|atlas| atlas.search(&text, 8)).unwrap_or_default()
 }
 
+/// The fewest steps between two maps, through portals and any travel the player turned on.
 #[tauri::command]
-pub fn map_route(state: State<MapDataState>, from: u32, to: u32) -> Option<Route> {
-    state.atlas()?.route(from, to)
+pub fn map_route(app: AppHandle, state: State<MapDataState>, from: u32, to: u32) -> Option<Route> {
+    let atlas = state.atlas()?;
+    atlas.route_with(from, to, &travel(&app, &atlas))
+}
+
+/// The travel connections in use: the player's file in the app data folder if there is one
+/// (and it reads), otherwise the bundled one. Also says which it is, and why a file was not used.
+fn travel_file(app: &AppHandle) -> (TravelFile, Option<PathBuf>, Option<String>) {
+    let Ok(path) = app.path().app_data_dir().map(|dir| dir.join(TRAVEL_FILE)) else {
+        return (TravelFile::default_file(), None, None);
+    };
+    match std::fs::read_to_string(&path) {
+        Ok(json) => match TravelFile::parse(&json) {
+            Ok(file) => (file, Some(path), None),
+            Err(err) => (TravelFile::default_file(), Some(path), Some(err)),
+        },
+        Err(_) => (TravelFile::default_file(), Some(path), None),
+    }
+}
+
+/// The rides and scrolls the player turned on in Settings, found in the map data.
+fn travel(app: &AppHandle, atlas: &Atlas) -> Travel {
+    let choice = app.state::<SettingsState>().get().travel;
+    if !choice.enabled {
+        return Travel::none();
+    }
+    atlas.travel(&travel_file(app).0, choice).0
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TravelInfo {
+    file: TravelFile,
+    /// The player's own copy is in use.
+    custom: bool,
+    path: Option<String>,
+    /// Why the player's copy could not be used, if it could not.
+    error: Option<String>,
+    /// Map names the map data has no map for; `None` before map data is downloaded.
+    missing: Option<Vec<String>>,
+}
+
+/// The travel connections, for the Settings window.
+#[tauri::command]
+pub fn travel_info(app: AppHandle, state: State<MapDataState>) -> TravelInfo {
+    let (file, path, error) = travel_file(&app);
+    let custom = error.is_none() && path.as_ref().is_some_and(|p| p.exists());
+    let missing = state.atlas().map(|atlas| atlas.travel(&file, Default::default()).1);
+    TravelInfo { file, custom, path: path.map(|p| p.display().to_string()), error, missing }
+}
+
+/// Opens the player's copy of the travel connections in their editor, making it from the
+/// bundled one first if there is none.
+#[tauri::command]
+pub fn edit_travel_file(app: AppHandle) -> Result<()> {
+    let path = app.path().app_data_dir()?.join(TRAVEL_FILE);
+    if !path.exists() {
+        if let Some(dir) = path.parent() {
+            std::fs::create_dir_all(dir)?;
+        }
+        std::fs::write(&path, crate::mapdata::travel::DEFAULT_FILE)?;
+    }
+    app.opener().open_path(path.display().to_string(), None::<&str>).map_err(|err| Error::Invalid(err.to_string()))
 }
 
 /// Player-observed drops for the named monsters, from mapleclassic.wiki or the week-long cache.
@@ -179,6 +244,7 @@ pub struct Guide {
 /// looked up; nothing is fetched here. `None` until map data has been downloaded.
 #[tauri::command]
 pub fn quest_guide(
+    app: AppHandle,
     state: State<MapDataState>,
     quests: Vec<QuestQuery>,
     map_name: Option<String>,
@@ -191,7 +257,7 @@ pub fn quest_guide(
     keys.sort();
     keys.dedup();
     let (items, _) = Store::open(&state.path)?.cached_item_sources(&keys, now() - drops::MAX_AGE)?;
-    let quests = atlas.quest_guide(&quests, from.as_ref().map(|m| m.id), &items, &measured);
+    let quests = atlas.quest_guide(&quests, from.as_ref().map(|m| m.id), &items, &measured, &travel(&app, &atlas));
     Ok(Some(Guide { from, quests }))
 }
 
@@ -219,6 +285,7 @@ pub struct Spots {
 /// player measured on each. `None` until map data has been downloaded.
 #[tauri::command]
 pub fn training_spots(
+    app: AppHandle,
     state: State<MapDataState>,
     map_name: Option<String>,
     map_street: Option<String>,
@@ -226,7 +293,7 @@ pub fn training_spots(
 ) -> Option<Spots> {
     let atlas = state.atlas()?;
     let from = map_name.and_then(|name| atlas.find(&name, map_street.as_deref())).map(|m| m.card.map);
-    let spots = atlas.training_spots(from.as_ref().map(|m| m.id), &measured);
+    let spots = atlas.training_spots(from.as_ref().map(|m| m.id), &measured, &travel(&app, &atlas));
     Some(Spots { from, spots })
 }
 

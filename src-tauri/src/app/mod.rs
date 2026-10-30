@@ -96,6 +96,8 @@ pub fn run() {
             mapdata::map_card,
             mapdata::search_maps,
             mapdata::map_route,
+            mapdata::travel_info,
+            mapdata::edit_travel_file,
             mapdata::monster_drops,
             mapdata::quest_guide,
             mapdata::look_up_quest_items,

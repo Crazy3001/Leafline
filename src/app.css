@@ -27,6 +27,8 @@
   --mp: #3d9bff;
   --exp: #e8cd3a;
   --map: #a78bfa;
+  /* Rides and return scrolls in routes, apart from portal steps. */
+  --travel: #3cc8b4;
   --good: #4fd18b;
   --good-soft: rgba(79, 209, 139, 0.13);
   --warn: #f0a33a;

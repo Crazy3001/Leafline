@@ -4,6 +4,7 @@
   import { ChevronRight, Crosshair } from "@lucide/svelte";
 
   import { backend } from "$lib/api";
+  import { travelKey } from "$lib/settings.svelte";
   import RouteSteps from "$lib/components/map/RouteSteps.svelte";
   import type { HuntingGround, MapRef, MapRoute, ObjectiveGuide } from "$lib/types";
 
@@ -23,6 +24,7 @@
   $effect(() => {
     const to = target;
     const start = from?.id;
+    void travelKey();
     route = null;
     if (!open || to == null || start == null) return;
     routing = true;
@@ -48,9 +50,10 @@
   }
 
   function distance(ground: HuntingGround) {
-    if (ground.hops == null) return from ? "no portal route" : "";
     if (ground.hops === 0) return "you're here";
-    return `${ground.hops} portal${ground.hops === 1 ? "" : "s"}`;
+    const walk = ground.hops == null ? "no portal route" : `${ground.hops} portal${ground.hops === 1 ? "" : "s"}`;
+    if (ground.travel) return `${walk} · ${ground.travel.hops} with travel`;
+    return ground.hops == null && !from ? "" : walk;
   }
 </script>
 
@@ -65,7 +68,11 @@
       {/if}
       <span class="where">{best.map.name}</span>
     </span>
-    {#if best.hops != null}<span class="far tabular">{distance(best)}</span>{/if}
+    {#if best.travel}
+      <span class="far tabular shortcut" title="{distance(best)}, via {best.travel.via.name}">{best.travel.hops} with travel</span>
+    {:else if best.hops != null}
+      <span class="far tabular">{distance(best)}</span>
+    {/if}
     <span class="chevron" class:open><ChevronRight size={11} /></span>
   </button>
 
@@ -91,7 +98,12 @@
                 >
                   <span class="map">{ground.map.name}</span>
                   <span class="count tabular" title="How many spawn on the map">×{ground.count}</span>
-                  <span class="dist tabular">{distance(ground)}</span>
+                  <span
+                    class="dist tabular"
+                    class:shortcut={ground.travel}
+                    title={ground.travel ? `With the travel you turned on in Settings, via ${ground.travel.via.name}` : undefined}
+                    >{distance(ground)}</span
+                  >
                 </button>
               </li>
             {/each}
@@ -276,6 +288,11 @@
   .dist {
     min-width: 56px;
     text-align: right;
+  }
+
+  .far.shortcut,
+  .dist.shortcut {
+    color: var(--travel);
   }
 
   .route {

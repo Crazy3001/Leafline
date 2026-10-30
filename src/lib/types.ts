@@ -326,12 +326,67 @@ export interface RouteStep {
   direction: Direction;
   portal: string | null;
   hidden: boolean;
+  /** Set when the step is a ride or scroll rather than a portal. */
+  travel: TravelStep | null;
 }
 
 export interface MapRoute {
   from: MapRef;
   to: MapRef;
   steps: RouteStep[];
+  /** For a route that rides or scrolls: the portals the walk alone takes, or null when no portals lead there. */
+  walking: number | null;
+}
+
+/** Taxis and return scrolls (see src-tauri/src/mapdata/travel.rs). */
+export type TravelKind = "cab" | "vipCab" | "scroll";
+
+export interface TravelStep {
+  kind: TravelKind;
+  service: string;
+  /** Mesos at level 20 and up, as the wiki records it. */
+  fare: number | null;
+}
+
+/** A trip that rides or scrolls part of the way, shorter than walking. */
+export interface Shortcut {
+  /** Steps, counting each ride or scroll as one. */
+  hops: number;
+  /** Where the first ride or scroll goes. */
+  via: MapRef;
+}
+
+/** The travel file: connections the map data lacks, from mapleclassic.wiki, editable by the player. */
+export interface TravelFile {
+  about: string;
+  checked: string | null;
+  services: {
+    kind: TravelKind;
+    name: string;
+    operator?: string;
+    note?: string;
+    source: string;
+    routes: { from?: string; to: string; fare?: number }[];
+  }[];
+}
+
+export interface TravelInfo {
+  file: TravelFile;
+  /** The player's own copy is in use. */
+  custom: boolean;
+  path: string | null;
+  /** Why the player's copy could not be used. */
+  error: string | null;
+  /** Map names the map data has no map for; null before map data is downloaded. */
+  missing: string[] | null;
+}
+
+/** Which travel the player turned on. */
+export interface TravelChoice {
+  enabled: boolean;
+  cabs: boolean;
+  vipCabs: boolean;
+  scrolls: boolean;
 }
 
 /** Drops players logged on mapleclassic.wiki. */
@@ -369,6 +424,8 @@ export interface HuntingGround {
   count: number;
   /** Portals from the current map, when it is known and a route exists. */
   hops: number | null;
+  /** Fewer steps with the travel the player turned on, when that is shorter. */
+  travel: Shortcut | null;
   /** The player's EXP rate measured here, as kills of this monster. */
   pace: Pace | null;
 }
@@ -442,6 +499,8 @@ export interface TrainingSpot {
   hpPerClear: number;
   mobs: MobRow[];
   hops: number | null;
+  /** Fewer steps with the travel the player turned on, when that is shorter. */
+  travel: Shortcut | null;
   /** Portals lead here from some town; party quest stages and other instances are not. */
   reachable: boolean;
   measured: { expPerHour: number; activeSeconds: number } | null;
@@ -497,6 +556,8 @@ export interface DisplaySettings {
   opacity: number;
   /** 0.85 to 1.3. */
   scale: number;
+  /** Taxis and return scrolls in routes; off by default. */
+  travel: TravelChoice;
 }
 
 // Session history (see src-tauri/src/userdata/sessions.rs).
