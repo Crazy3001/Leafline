@@ -1,5 +1,6 @@
 //! Generic image handling and text recognition, independent of the game's UI.
 
+pub mod blobs;
 pub mod color;
 mod frame;
 mod geometry;

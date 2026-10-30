@@ -5,7 +5,7 @@
 
   let { hud, session }: { hud: HudReading | null; session: SessionSummary | null } = $props();
 
-  const percent = $derived(hud?.exp?.percent ?? null);
+  const percent = $derived(hud?.exp?.percent ?? hud?.expPercent ?? null);
 </script>
 
 <div class="strip">
@@ -22,10 +22,17 @@
   </div>
 
   <dl class="rates">
-    <div title="EXP gained per hour of active time">
-      <dt>EXP / hr</dt>
-      <dd class="tabular">{formatCompact(session?.expPerHour)}</dd>
-    </div>
+    {#if session?.percentOnly}
+      <div title="Percent of a level per hour of active time">
+        <dt>% / hr</dt>
+        <dd class="tabular">{session.percentPerHour?.toFixed(1) ?? "—"}%</dd>
+      </div>
+    {:else}
+      <div title="EXP gained per hour of active time; the last five minutes in brackets">
+        <dt>EXP / hr</dt>
+        <dd class="tabular">{formatCompact(session?.expPerHour)}</dd>
+      </div>
+    {/if}
     <div title="At the current EXP rate">
       <dt>To level</dt>
       <dd class="tabular">{formatDuration(session?.secondsToLevel)}</dd>
@@ -35,7 +42,11 @@
       <dd class="tabular">{formatCompact(session?.mesosPerHour)}</dd>
     </div>
   </dl>
-  {#if session?.paused}<p class="paused">Paused: waiting for the next EXP gain</p>{/if}
+  {#if session?.held}
+    <p class="paused">Paused</p>
+  {:else if session?.paused}
+    <p class="paused">Paused: waiting for the next EXP gain</p>
+  {/if}
 </div>
 
 <style>
@@ -56,7 +67,7 @@
     align-items: baseline;
     gap: 3px;
     padding: 1px 7px;
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     background: var(--accent-soft);
     color: var(--accent-strong);
     font-family: var(--font-display);
@@ -66,7 +77,6 @@
 
   .lv {
     font-size: 8.5px;
-    letter-spacing: 0.1em;
     opacity: 0.8;
   }
 
@@ -95,7 +105,7 @@
   .track {
     flex: 1;
     height: 6px;
-    border-radius: 999px;
+    border-radius: var(--radius-sm);
     background: rgba(255, 255, 255, 0.07);
     overflow: hidden;
   }
@@ -103,7 +113,7 @@
   .fill {
     height: 100%;
     border-radius: inherit;
-    background: linear-gradient(90deg, color-mix(in srgb, var(--exp) 70%, transparent), var(--exp));
+    background: var(--exp);
   }
 
   .pct {

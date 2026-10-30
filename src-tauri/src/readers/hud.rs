@@ -15,6 +15,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 use super::text::{best_match, digitize, parse_grouped};
+use super::ui::{self, CANONICAL_SCALE, Canonical};
 use crate::error::{Error, Result};
 use crate::vision::glyphs::{GlyphSet, MIN_SIMILARITY, Mask, ink_columns, ink_rows};
 use crate::vision::{Frame, Ocr, Rect, color, group_lines, preprocess};
@@ -28,6 +29,9 @@ pub struct HudReading {
     pub hp: Option<Gauge>,
     pub mp: Option<Gauge>,
     pub exp: Option<Exp>,
+    /// The EXP percentage, when the HUD shows it with no points beside it, as it does at high
+    /// levels.
+    pub exp_percent: Option<f32>,
     /// The numbers could not all be read because the HUD font has not been learned at this
     /// size, or shows a character not seen yet. Calibrating fixes it.
     pub needs_calibration: bool,
@@ -102,9 +106,21 @@ pub struct Calibration {
     pub failed: Vec<&'static str>,
 }
 
+/// The HUD as glyphs are read from it: the frame itself when the UI is at the size fonts are
+/// learned at, otherwise put back on the design grid at that size.
+fn canonical(frame: &Frame, layout: HudLayout) -> Option<(Glyphs, HudLayout)> {
+    let scale = ui::hud_scale(frame, &layout);
+    if (scale - CANONICAL_SCALE).abs() <= 0.005 {
+        return Some((Glyphs::extract(frame, &layout), layout));
+    }
+    let view = Canonical::new(frame, scale);
+    let found = locate(&view.frame)?;
+    Some((Glyphs::extract(&view.frame, &found), view.layout_to_window(&found)))
+}
+
 pub fn read(frame: &Frame, ocr: &Ocr, font: &HudFont) -> Result<Option<(HudLayout, HudReading)>> {
-    let Some(layout) = locate(frame) else { return Ok(None) };
-    let glyphs = Glyphs::extract(frame, &layout);
+    let Some(located) = locate(frame) else { return Ok(None) };
+    let Some((glyphs, layout)) = canonical(frame, located) else { return Ok(None) };
     let mut reading = HudReading::default();
 
     reading.hp = font.values.read(&glyphs.hp).and_then(|t| parse_gauge(&t));
@@ -112,10 +128,13 @@ pub fn read(frame: &Frame, ocr: &Ocr, font: &HudFont) -> Result<Option<(HudLayou
     reading.exp = exp_points(&font.values, &glyphs.before_percent)
         .zip(font.values.read(&glyphs.percent))
         .and_then(|(points, percent)| parse_exp(&points, &percent));
+    if glyphs.before_percent.is_empty() {
+        reading.exp_percent = font.values.read(&glyphs.percent).and_then(|t| parse_percent(&t));
+    }
     reading.level = font.level.read(&glyphs.level).and_then(|t| parse_level(&t));
     reading.needs_calibration = reading.hp.is_none()
         || reading.mp.is_none()
-        || reading.exp.is_none()
+        || (reading.exp.is_none() && reading.exp_percent.is_none())
         || (!glyphs.level.is_empty() && reading.level.is_none());
 
     // Job and name use a plainer font that OCR handles once enlarged and keyed.
@@ -138,8 +157,8 @@ pub fn read(frame: &Frame, ocr: &Ocr, font: &HudFont) -> Result<Option<(HudLayou
 /// Learns the HUD font from a frame whose values the user has typed in. Fields that cannot be
 /// matched to the screen (a typo, or something covering the HUD) are reported, not learned.
 pub fn calibrate(frame: &Frame, font: &mut HudFont, values: &HudValues) -> Result<Calibration> {
-    let layout = locate(frame).ok_or_else(|| Error::Invalid("no HUD found in this image".into()))?;
-    let glyphs = Glyphs::extract(frame, &layout);
+    let no_hud = || Error::Invalid("no HUD found in this image".into());
+    let (glyphs, _) = canonical(frame, locate(frame).ok_or_else(no_hud)?).ok_or_else(no_hud)?;
     let mut report = Calibration::default();
     let mut record =
         |field, learned: bool| if learned { report.learned.push(field) } else { report.failed.push(field) };
@@ -253,11 +272,12 @@ fn glyphs_in(frame: &Frame, area: Rect, is_ink: fn(&Rgba<u8>) -> bool) -> Vec<Ma
 pub fn locate(frame: &Frame) -> Option<HudLayout> {
     let (width, height) = (frame.width() as f32, frame.height() as f32);
     let search = Rect::new(0.0, height * 0.65, width, height * 0.35);
-    let min_run = (width * 0.02).max(8.0) as u32;
+    // Low on HP or MP a gauge's fill is short, so short ones count.
+    let min_run = (width * 0.002).max(3.0) as u32;
     let bars = |matches: fn(&Rgba<u8>) -> bool| -> Vec<Rect> {
         color::find_blocks(frame, search, min_run, matches)
             .into_iter()
-            .filter(|b| b.h >= 3.0 && b.w >= 3.0 * b.h)
+            .filter(|b| b.h >= 3.0 && b.w >= 0.5 * b.h)
             .collect()
     };
     let reds = bars(is_hp_red);
@@ -268,19 +288,28 @@ pub fn locate(frame: &Frame) -> Option<HudLayout> {
     // start at the left of their slots, so the distance between their starts is the slot pitch
     // whatever the gauges hold; a slot is about 15 times as wide as its fill is tall. Other red
     // and blue UI (buttons, party HP) rarely forms that sequence; prefer the thickest.
-    let (hp_bar, mp_bar, exp_bar) = reds
-        .iter()
-        .flat_map(|r| blues.iter().map(move |b| (*r, *b)))
-        .filter(|(r, b)| beside(r, b) && b.x - r.x <= 20.0 * r.h)
-        .map(|(r, b)| {
-            let pitch = b.x - r.x;
-            let exp = yellows
-                .iter()
-                .filter(|y| beside(&b, y) && y.x > b.x && y.x - b.x <= 1.3 * pitch)
-                .min_by(|a, c| a.x.total_cmp(&c.x));
-            (r, b, exp.copied())
-        })
-        .max_by(|a, b| score(a).total_cmp(&score(b)))?;
+    let gauges = |fits: &dyn Fn(&Rect, &Rect) -> bool| {
+        reds.iter()
+            .flat_map(|r| blues.iter().map(move |b| (*r, *b)))
+            .filter(|(r, b)| beside(r, b) && b.x - r.x <= 20.0 * r.h && fits(r, b))
+            .map(|(r, b)| {
+                let pitch = b.x - r.x;
+                let exp = yellows
+                    .iter()
+                    .filter(|y| beside(&b, y) && y.x > b.x && y.x - b.x <= 1.3 * pitch)
+                    .min_by(|a, c| a.x.total_cmp(&c.x));
+                (r, b, exp.copied())
+            })
+            .collect::<Vec<_>>()
+    };
+    // Short fills are fine when the gauges stand exactly the UI's spacing apart. The red and blue
+    // menu buttons can do that by chance, but they are to the right of the gauges. At a size not
+    // known, only long fills are trusted.
+    let long = |bar: &Rect| bar.w >= 3.0 * bar.h && bar.w >= width * 0.02;
+    let leftmost =
+        gauges(&|r, b| ui::fits_gauge_pitch(frame, b.x - r.x)).into_iter().min_by(|a, b| a.0.x.total_cmp(&b.0.x));
+    let thickest = || gauges(&|r, b| long(r) && long(b)).into_iter().max_by(|a, b| score(a).total_cmp(&score(b)));
+    let (hp_bar, mp_bar, exp_bar) = leftmost.or_else(thickest)?;
 
     // The gauges sit in white-framed slots; the slot height is the unit for everything else.
     let (top, bottom) = slot_edges(frame, &hp_bar);
@@ -361,8 +390,9 @@ fn is_exp_yellow(px: &Rgba<u8>) -> bool {
     r >= 180 && g >= 180 && b <= 90
 }
 
+/// The gauge's white frame. A HUD drawn at an uneven scale softens it and tints it with the fill.
 fn is_slot_frame(px: &Rgba<u8>) -> bool {
-    preprocess::luminance(px) >= 225 && preprocess::saturation(px) <= 40
+    preprocess::luminance(px) >= 170 && preprocess::saturation(px) <= 80
 }
 
 /// The orange tiles behind the level digits.
@@ -384,6 +414,11 @@ fn is_light_text(px: &Rgba<u8>) -> bool {
 fn is_bracket(px: &Rgba<u8>) -> bool {
     let [r, g, b, _] = px.0.map(i16::from);
     g >= 130 && g >= b + 70 && r < g
+}
+
+/// Whether `job` is a job the game has, not a misread.
+pub fn is_known_job(job: &str) -> bool {
+    JOBS.contains(&job)
 }
 
 /// Job names as the HUD shows them, for correcting OCR. Taken from the original game; Classic
@@ -444,9 +479,14 @@ pub fn parse_gauge(text: &str) -> Option<Gauge> {
 /// Parses the points (`24,331`) and percentage (`25.42%`) shown next to the EXP gauge.
 pub fn parse_exp(points: &str, percent: &str) -> Option<Exp> {
     let points = parse_grouped(points)?;
+    Some(Exp { points, percent: parse_percent(percent)? })
+}
+
+/// Parses a percentage such as `25.42%`.
+pub fn parse_percent(percent: &str) -> Option<f32> {
     let caps = PERCENT.captures(percent)?;
     let percent: f32 = caps[1].replace(',', ".").parse().ok()?;
-    (percent <= 100.0).then_some(Exp { points, percent })
+    (percent <= 100.0).then_some(percent)
 }
 
 pub fn parse_level(text: &str) -> Option<u32> {
@@ -472,6 +512,7 @@ mod tests {
         assert_eq!(parse_exp("24.331", "25,42%"), Some(Exp { points: 24331, percent: 25.42 }));
         assert_eq!(parse_exp("24,331", "25.42"), None);
         assert_eq!(parse_exp("1", "100.01%"), None);
+        assert_eq!(parse_percent("58.47%"), Some(58.47));
     }
 
     #[test]

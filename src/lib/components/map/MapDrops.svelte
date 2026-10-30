@@ -188,7 +188,7 @@
   .tag {
     margin-left: 4px;
     padding: 0 4px;
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     background: var(--accent-soft);
     color: var(--accent);
     font-size: 9.5px;

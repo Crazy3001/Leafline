@@ -1,55 +1,103 @@
 <script lang="ts">
-  // The current map in the middle with its neighbours around it, placed by portal name:
-  // west and east to the sides, "in" above and "out" below. No coordinates or map images.
+  // A map in the middle with its neighbours around it. Portals on the left and right of the map
+  // stack in those columns, highest first, and those in the middle go above or below it. Their
+  // place is the coarse side and height from the map data; a portal without one is placed by its
+  // name. Never drawn at real positions, and no map images. The pin only ever marks the map the
+  // player is on.
   import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ArrowUpRight, EyeOff, MapPin } from "@lucide/svelte";
 
-  import type { Direction, MapExit } from "$lib/types";
+  import type { MapExit, MapRef, Side } from "$lib/types";
 
-  let { exits, onnavigate }: { exits: MapExit[]; onnavigate: (id: number) => void } = $props();
+  let {
+    exits,
+    map,
+    current = null,
+    onnavigate,
+  }: {
+    exits: MapExit[];
+    /** The map being shown. */
+    map: MapRef;
+    /** The map the player is on, when known. */
+    current?: MapRef | null;
+    onnavigate: (id: number) => void;
+  } = $props();
 
-  const by = (direction: Direction) => exits.filter((e) => e.direction === direction);
-  const west = $derived(by("west"));
-  const east = $derived(by("east"));
-  const up = $derived(by("in"));
-  const down = $derived(by("out"));
+  const here = $derived(current?.id === map.id);
+
+  type Slot = "left" | "right" | "above" | "below" | "other";
+
+  const sideByName: Record<MapExit["direction"], Side | null> = {
+    west: "left",
+    east: "right",
+    in: "centre",
+    out: "centre",
+    other: null,
+  };
+
+  function slotOf(exit: MapExit): Slot {
+    const side = exit.side ?? sideByName[exit.direction];
+    if (side === null) return "other";
+    if (side !== "centre") return side;
+    const high = exit.height ? exit.height === "high" : exit.direction === "in";
+    return high ? "above" : "below";
+  }
+
+  const top = { high: 0, middle: 1, low: 2 };
+  const by = (slot: Slot) =>
+    exits
+      .filter((e) => slotOf(e) === slot)
+      .sort((a, b) => top[a.height ?? "middle"] - top[b.height ?? "middle"]);
+  const left = $derived(by("left"));
+  const right = $derived(by("right"));
+  const up = $derived(by("above"));
+  const down = $derived(by("below"));
   const other = $derived(by("other"));
 
-  /** More neighbours than this in one direction fold behind a "+N more" chip. */
+  /** More neighbours than this in one slot fold behind a "+N more" chip. */
   const SHOWN = 3;
-  let expanded = $state<Partial<Record<Direction, boolean>>>({});
+  let expanded = $state<Partial<Record<Slot, boolean>>>({});
 
-  const icons = { west: ArrowLeft, east: ArrowRight, in: ArrowUp, out: ArrowDown, other: ArrowUpRight };
-  const words = { west: "West", east: "East", in: "In", out: "Out", other: "Portal" };
+  const icons = { left: ArrowLeft, right: ArrowRight, above: ArrowUp, below: ArrowDown, other: ArrowUpRight };
+  const nameWords = { west: "West", east: "East", in: "In", out: "Out", other: "Portal" };
+  const sideWords = { left: "Left", centre: "Middle", right: "Right" };
+
+  function word(exit: MapExit) {
+    if (!exit.side) return nameWords[exit.direction];
+    const height = exit.height === "high" ? " · high" : exit.height === "low" ? " · low" : "";
+    return sideWords[exit.side] + height;
+  }
 
   function title(exit: MapExit) {
-    const portals = exit.portals.length ? ` (portal ${exit.portals.join(", ")})` : "";
     const street = exit.to.street ? `${exit.to.street} : ` : "";
     const hidden = exit.hidden ? "\nThe portal's name marks it as hidden." : "";
+    const yours = exit.to.id === current?.id ? "\nYou are on this map." : "";
     return exit.to.known
-      ? `${words[exit.direction]} to ${street}${exit.to.name}${portals}${hidden}`
-      : `Leads to map ${exit.to.id}, which the data does not include${portals}`;
+      ? `${word(exit)} to ${street}${exit.to.name}${hidden}${yours}`
+      : "Leads to a map the data does not include";
   }
 </script>
 
-{#snippet group(direction: Direction, list: MapExit[])}
-  {#each expanded[direction] || list.length <= SHOWN ? list : list.slice(0, SHOWN - 1) as exit}{@render node(exit)}{/each}
+{#snippet group(slot: Slot, list: MapExit[])}
+  {#each expanded[slot] || list.length <= SHOWN ? list : list.slice(0, SHOWN - 1) as exit}{@render node(exit)}{/each}
   {#if list.length > SHOWN}
-    <button class="more" onclick={() => (expanded[direction] = !expanded[direction])}>
-      {expanded[direction] ? "Show fewer" : `+${list.length - SHOWN + 1} more`}
+    <button class="more" onclick={() => (expanded[slot] = !expanded[slot])}>
+      {expanded[slot] ? "Show fewer" : `+${list.length - SHOWN + 1} more`}
     </button>
   {/if}
 {/snippet}
 
 {#snippet node(exit: MapExit)}
-  {@const Icon = icons[exit.direction]}
+  {@const yours = exit.to.id === current?.id}
+  {@const Icon = yours ? MapPin : icons[slotOf(exit)]}
   <button
     class="node {exit.direction}"
+    class:yours
     class:unknown={!exit.to.known}
     disabled={!exit.to.known}
     title={title(exit)}
     onclick={() => onnavigate(exit.to.id)}
   >
-    <span class="dir"><Icon size={11} />{words[exit.direction]}</span>
+    <span class="dir"><Icon size={10} />{word(exit)}</span>
     <span class="label">{exit.to.name}</span>
     {#if exit.hidden}<span class="hidden" aria-label="Hidden portal"><EyeOff size={11} /></span>{/if}
   </button>
@@ -58,19 +106,22 @@
 {#if exits.length}
   <div class="compass" class:has-up={up.length} class:has-down={down.length}>
     {#if up.length}
-      <div class="slot up">{@render group("in", up)}</div>
+      <div class="slot up">{@render group("above", up)}</div>
       <span class="wire v top"></span>
     {/if}
 
-    <div class="slot west">{@render group("west", west)}</div>
-    {#if west.length}<span class="wire h left"></span>{/if}
-    <div class="here" title="You are here"><MapPin size={13} /><span>Here</span></div>
-    {#if east.length}<span class="wire h right"></span>{/if}
-    <div class="slot east">{@render group("east", east)}</div>
+    <div class="slot west">{@render group("left", left)}</div>
+    {#if left.length}<span class="wire h left"></span>{/if}
+    <div class="here" class:away={!here} title={here ? `You are on ${map.name}` : `Looking at ${map.name}`}>
+      {#if here}<MapPin size={13} />{/if}
+      <span>{map.name}</span>
+    </div>
+    {#if right.length}<span class="wire h right"></span>{/if}
+    <div class="slot east">{@render group("right", right)}</div>
 
     {#if down.length}
       <span class="wire v bottom"></span>
-      <div class="slot down">{@render group("out", down)}</div>
+      <div class="slot down">{@render group("below", down)}</div>
     {/if}
   </div>
 
@@ -184,17 +235,28 @@
 
   .here {
     grid-area: here;
-    display: inline-flex;
+    display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 4px;
-    padding: 5px 9px;
-    border-radius: 999px;
+    justify-self: center;
+    gap: 2px;
+    max-width: 84px;
+    padding: 5px 6px;
+    border-radius: var(--radius-sm);
     border: 1px solid color-mix(in srgb, var(--map) 45%, transparent);
     background: color-mix(in srgb, var(--map) 16%, transparent);
     color: var(--map);
     font-size: 11px;
     font-weight: 600;
-    white-space: nowrap;
+    line-height: 1.25;
+    text-align: center;
+    overflow-wrap: anywhere;
+  }
+
+  .here.away {
+    border-color: var(--border-strong);
+    background: transparent;
+    color: var(--text);
   }
 
   .node {
@@ -203,7 +265,7 @@
     gap: 1px;
     max-width: 100%;
     min-width: 0;
-    padding: 4px 8px 5px;
+    padding: 4px 6px 5px;
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--surface-3);
@@ -246,11 +308,10 @@
   .dir {
     display: flex;
     align-items: center;
-    gap: 3px;
-    font-size: 9.5px;
+    gap: 2px;
+    font-size: 9px;
     font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+    white-space: nowrap;
     color: var(--faint);
   }
 
@@ -282,7 +343,7 @@
     align-self: center;
     padding: 3px 8px;
     border: 1px dashed var(--border-strong);
-    border-radius: 999px;
+    border-radius: var(--radius-sm);
     background: transparent;
     color: var(--muted);
     font-size: 10.5px;
@@ -292,6 +353,15 @@
   .more:hover {
     color: var(--text);
     border-color: color-mix(in srgb, var(--map) 55%, transparent);
+  }
+
+  .node.yours {
+    border-color: color-mix(in srgb, var(--map) 45%, transparent);
+    background: color-mix(in srgb, var(--map) 16%, transparent);
+  }
+
+  .node.yours .dir {
+    color: var(--map);
   }
 
   .node.unknown {

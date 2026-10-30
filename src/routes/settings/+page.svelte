@@ -4,9 +4,11 @@
   import {
     CarTaxiFront,
     Check,
+    ClipboardCopy,
     Download,
     ExternalLink,
     FilePenLine,
+    FolderOpen,
     LoaderCircle,
     RefreshCw,
     ScrollText,
@@ -24,7 +26,16 @@
   import { OSMS_URL, WIKI_URL } from "$lib/mapdata.svelte";
   import { live, watchLive } from "$lib/readings.svelte";
   import { changeSettings, display, watchSettings } from "$lib/settings.svelte";
-  import type { GameWindow, LiveChoice, ShortcutInfo, TravelChoice, TravelFile, TravelInfo } from "$lib/types";
+  import type {
+    CompactShape,
+    GameWindow,
+    HotkeyChoice,
+    LiveChoice,
+    ShortcutInfo,
+    TravelChoice,
+    TravelFile,
+    TravelInfo,
+  } from "$lib/types";
 
   const SECTIONS = [
     { id: "live", title: "Live reading" },
@@ -34,17 +45,23 @@
     { id: "data", title: "Data" },
     { id: "about", title: "About" },
   ];
-  const SIZES = [
-    { scale: 0.9, label: "Small" },
-    { scale: 1, label: "Normal" },
-    { scale: 1.15, label: "Large" },
-    { scale: 1.3, label: "Larger" },
+  const SHAPES: { shape: CompactShape; label: string }[] = [
+    { shape: "card", label: "Card" },
+    { shape: "wide", label: "Wide" },
+    { shape: "bar", label: "Bar" },
   ];
+  const PAUSE_AFTER = [10, 15, 30, 60, 120];
 
   let shortcuts = $state<ShortcutInfo[]>([]);
   let version = $state("");
   let opacity = $state(100);
+  let size = $state(100);
   let saveTimer: ReturnType<typeof setTimeout> | undefined;
+  let sizeTimer: ReturnType<typeof setTimeout> | undefined;
+  /** The hotkey waiting for keys, by action. */
+  let listening = $state<string | null>(null);
+  let hotkeyError = $state<string | null>(null);
+  let copiedReport = $state<string | null>(null);
   let exported = $state<string | null>(null);
   let travel = $state<TravelInfo | null>(null);
   let downloading = $state(false);
@@ -155,7 +172,64 @@
 
   $effect(() => {
     opacity = Math.round(display.opacity * 100);
+    size = Math.round(display.scale * 100);
   });
+
+  function slideSize(value: number) {
+    size = value;
+    clearTimeout(sizeTimer);
+    sizeTimer = setTimeout(() => changeSettings({ scale: value / 100 }), 200);
+  }
+
+  async function setHotkeys(change: Partial<HotkeyChoice>) {
+    hotkeyError = null;
+    try {
+      await changeSettings({ hotkeys: { ...display.hotkeys, ...change } });
+    } catch (e) {
+      hotkeyError = String(e);
+      Object.assign(display, await backend.settings());
+    }
+    shortcuts = await backend.shortcuts();
+  }
+
+  /** A pressed key as Leafline writes it: `Ctrl+Alt+K`, `F5`. Null for a modifier alone. */
+  function keysOf(event: KeyboardEvent): string | null {
+    const code = event.code;
+    const key = code.startsWith("Key")
+      ? code.slice(3)
+      : code.startsWith("Digit")
+        ? code.slice(5)
+        : /^(F\d{1,2}|Space|Home|End|Insert|Delete|PageUp|PageDown|Arrow(Up|Down|Left|Right))$/.test(code)
+          ? code
+          : null;
+    if (!key) return null;
+    const held = [event.ctrlKey && "Ctrl", event.altKey && "Alt", event.shiftKey && "Shift", event.metaKey && "Super"];
+    return [...held.filter(Boolean), key].join("+");
+  }
+
+  function onHotkey(event: KeyboardEvent, action: string) {
+    event.preventDefault();
+    if (event.key === "Escape") {
+      listening = null;
+    } else if (event.key === "Backspace") {
+      listening = null;
+      setHotkeys({ keys: { ...display.hotkeys.keys, [action]: "" } });
+    } else {
+      const keys = keysOf(event);
+      if (!keys) return;
+      listening = null;
+      setHotkeys({ keys: { ...display.hotkeys.keys, [action]: keys } });
+    }
+  }
+
+  async function copyReport() {
+    try {
+      await navigator.clipboard.writeText(await backend.diagnostics());
+      copiedReport = "Copied. It holds no names, chat or file paths; paste it into your bug report.";
+    } catch (e) {
+      copiedReport = `Couldn't copy: ${e}`;
+    }
+  }
 
   /** Saves the slider a moment after it stops moving; every window follows. */
   function slide(value: number) {
@@ -297,6 +371,22 @@
         </div>
 
         <div class="row">
+          <div class="label" id="pause-label">
+            <span class="name">Pause tracking after</span>
+            <span class="help">How long without EXP before the clock stops, so breaks don't lower your rates.</span>
+          </div>
+          <div class="control segmented" role="radiogroup" aria-labelledby="pause-label">
+            {#each PAUSE_AFTER as seconds (seconds)}
+              <button
+                role="radio"
+                aria-checked={display.live.pauseAfter === seconds}
+                onclick={() => setLive({ pauseAfter: seconds })}>{seconds} s</button
+              >
+            {/each}
+          </div>
+        </div>
+
+        <div class="row">
           <div class="label">
             <span class="name">
               {#if live.liveStatus.state === "reading"}
@@ -366,16 +456,52 @@
       </div>
 
       <div class="row">
-        <div class="label" id="size-label">
+        <label for="size">
           <span class="name">Size</span>
           <span class="help">Text and controls in the overlay and pinned panels.</span>
+        </label>
+        <div class="control slider">
+          <input
+            id="size"
+            type="range"
+            min="60"
+            max="200"
+            step="5"
+            value={size}
+            oninput={(e) => slideSize(Number(e.currentTarget.value))}
+          />
+          <span class="value tabular">{size}%</span>
         </div>
-        <div class="control segmented" role="radiogroup" aria-labelledby="size-label">
-          {#each SIZES as size (size.scale)}
+      </div>
+
+      <div class="row">
+        <label for="on-top">
+          <span class="name">Always on top</span>
+          <span class="help">Keep the overlay and pinned panels above the game.</span>
+        </label>
+        <div class="control">
+          <input
+            id="on-top"
+            class="switch"
+            type="checkbox"
+            role="switch"
+            checked={display.alwaysOnTop}
+            onchange={(e) => changeSettings({ alwaysOnTop: e.currentTarget.checked })}
+          />
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="label" id="shape-label">
+          <span class="name">Compact shape</span>
+          <span class="help">Card has your quest counters. Wide is a row of four numbers. Bar is one thin strip.</span>
+        </div>
+        <div class="control segmented" role="radiogroup" aria-labelledby="shape-label">
+          {#each SHAPES as { shape, label } (shape)}
             <button
               role="radio"
-              aria-checked={Math.abs(display.scale - size.scale) < 0.01}
-              onclick={() => changeSettings({ scale: size.scale })}>{size.label}</button
+              aria-checked={display.compactShape === shape}
+              onclick={() => changeSettings({ compactShape: shape })}>{label}</button
             >
           {/each}
         </div>
@@ -515,15 +641,55 @@
     <section id="hotkeys">
       <h2>Hotkeys</h2>
       <p class="lead">They work while the game has focus. Leafline never sends keys to the game.</p>
+      <div class="row">
+        <label for="hotkeys">
+          <span class="name">Hotkeys</span>
+          <span class="help">Click one to change it, then press the keys. Esc cancels; Backspace turns it off.</span>
+        </label>
+        <div class="control">
+          <input
+            id="hotkeys"
+            class="switch"
+            type="checkbox"
+            role="switch"
+            checked={display.hotkeys.enabled}
+            onchange={(e) => setHotkeys({ enabled: e.currentTarget.checked })}
+          />
+        </div>
+      </div>
       <dl class="keys">
         {#each shortcuts as shortcut (shortcut.action)}
           <div>
             <dt>{shortcut.label}</dt>
-            <dd>{#each shortcut.keys.split("+") as key, i}{#if i}<span class="plus">+</span>{/if}<kbd>{key}</kbd>{/each}</dd>
+            <dd>
+              <button
+                class="hotkey"
+                class:listening={listening === shortcut.action}
+                disabled={!display.hotkeys.enabled}
+                onclick={() => (listening = listening === shortcut.action ? null : shortcut.action)}
+                onblur={() => {
+                  if (listening === shortcut.action) listening = null;
+                }}
+                onkeydown={(e) => {
+                  if (listening === shortcut.action) onHotkey(e, shortcut.action);
+                }}
+              >
+                {#if listening === shortcut.action}
+                  Press keys…
+                {:else if shortcut.keys}
+                  {#each shortcut.keys.split("+") as key, i}{#if i}<span class="plus">+</span>{/if}<kbd>{key}</kbd>{/each}
+                {:else}
+                  Off
+                {/if}
+              </button>
+            </dd>
           </div>
         {/each}
       </dl>
-      <p class="note">Hotkeys can't be changed yet.</p>
+      {#if hotkeyError}<p class="note warn">{hotkeyError}</p>{/if}
+      {#if Object.keys(display.hotkeys.keys).length}
+        <button class="button reset-keys" onclick={() => setHotkeys({ keys: {} })}>Back to the defaults</button>
+      {/if}
     </section>
 
     <section id="data">
@@ -545,6 +711,29 @@
         </div>
       </div>
       {#if exported}<p class="note">{exported}</p>{/if}
+
+      <div class="row">
+        <div class="label">
+          <span class="name">Data folder</span>
+          <span class="help">Your records, settings and the last 7 daily backups of your records.</span>
+        </div>
+        <div class="control">
+          <button class="button" onclick={() => backend.openDataFolder()}><FolderOpen size={13} />Open</button>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="label">
+          <span class="name">Bug report details</span>
+          <span class="help">
+            Copies how Leafline is doing, for a bug report. Sent nowhere, and no names, chat or file paths.
+          </span>
+        </div>
+        <div class="control">
+          <button class="button" onclick={copyReport}><ClipboardCopy size={13} />Copy</button>
+        </div>
+      </div>
+      {#if copiedReport}<p class="note">{copiedReport}</p>{/if}
     </section>
 
     <section id="about">
@@ -604,6 +793,38 @@
 <style>
   :global(body) {
     background: var(--bg);
+  }
+
+  .hotkey {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px 6px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--muted);
+    font: inherit;
+    font-size: 11.5px;
+    cursor: pointer;
+  }
+
+  .hotkey:hover:enabled {
+    border-color: var(--border-strong);
+  }
+
+  .hotkey:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  .hotkey.listening {
+    border-color: var(--accent);
+    color: var(--accent-strong);
+  }
+
+  .reset-keys {
+    margin-top: 8px;
   }
 
   .page {
@@ -735,7 +956,7 @@
   .segmented button {
     padding: 5px 12px;
     border: 0;
-    border-radius: 5px;
+    border-radius: var(--radius-sm);
     background: transparent;
     color: var(--muted);
     cursor: pointer;
@@ -758,7 +979,7 @@
     width: 34px;
     height: 19px;
     margin: 0;
-    border-radius: 999px;
+    border-radius: var(--radius-sm);
     background: var(--surface-3, rgba(255, 255, 255, 0.12));
     cursor: pointer;
     transition: background 0.15s ease;
@@ -771,7 +992,7 @@
     left: 2px;
     width: 15px;
     height: 15px;
-    border-radius: 999px;
+    border-radius: var(--radius-sm);
     background: var(--text);
     transition: transform 0.15s ease;
   }
@@ -879,7 +1100,7 @@
   .tag {
     margin-left: 8px;
     padding: 1px 6px;
-    border-radius: 999px;
+    border-radius: var(--radius-sm);
     background: color-mix(in srgb, var(--travel) 16%, transparent);
     color: var(--travel);
     font-size: 11px;
@@ -987,7 +1208,7 @@
     padding: 1px 6px;
     border: 1px solid var(--border-strong);
     border-bottom-width: 2px;
-    border-radius: 5px;
+    border-radius: var(--radius-sm);
     background: var(--surface-2);
     color: var(--muted);
     font-family: var(--font-sans);
@@ -1103,7 +1324,7 @@
     display: inline-block;
     margin-right: 6px;
     padding: 0 7px;
-    border-radius: 999px;
+    border-radius: var(--radius-sm);
     background: rgba(255, 255, 255, 0.06);
     color: var(--muted);
     font-size: 11px;
@@ -1147,7 +1368,7 @@
     place-items: center;
     width: 18px;
     height: 18px;
-    border-radius: 50%;
+    border-radius: var(--radius-sm);
   }
 
   .mark.good {

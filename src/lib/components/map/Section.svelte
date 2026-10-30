@@ -1,19 +1,41 @@
 <script lang="ts">
-  // A collapsible part of the map card.
+  // A collapsible part of the map card. Opening or closing one is remembered by its title;
+  // until then `open` decides.
   import { ChevronRight } from "@lucide/svelte";
   import type { Snippet } from "svelte";
 
   let {
     title,
     count,
-    open = $bindable(true),
+    open: startOpen = true,
     aside,
     children,
   }: { title: string; count?: number | string; open?: boolean; aside?: Snippet; children: Snippet } = $props();
+
+  function remembered() {
+    try {
+      const value = localStorage.getItem(`leafline.section.${title}`);
+      return value === null ? null : value === "true";
+    } catch {
+      return null;
+    }
+  }
+
+  // svelte-ignore state_referenced_locally
+  let open = $state(remembered() ?? startOpen);
+
+  function toggle() {
+    open = !open;
+    try {
+      localStorage.setItem(`leafline.section.${title}`, String(open));
+    } catch {
+      // A convenience only.
+    }
+  }
 </script>
 
 <section class="section">
-  <button class="head" aria-expanded={open} onclick={() => (open = !open)}>
+  <button class="head" aria-expanded={open} onclick={toggle}>
     <span class="chevron" class:open><ChevronRight size={12} /></span>
     <span class="title">{title}</span>
     {#if count != null}<span class="count tabular">{count}</span>{/if}
@@ -54,16 +76,15 @@
   }
 
   .title {
-    font-size: 10.5px;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    font-family: var(--font-display);
+    font-size: 12.5px;
+    font-weight: 400;
     color: var(--muted);
   }
 
   .count {
     padding: 0 5px;
-    border-radius: 999px;
+    border-radius: var(--radius-sm);
     background: rgba(255, 255, 255, 0.06);
     font-size: 10px;
     color: var(--faint);

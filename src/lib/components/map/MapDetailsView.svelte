@@ -5,21 +5,32 @@
   import { backend } from "$lib/api";
   import { formatCompact, formatNumber } from "$lib/format";
   import { OSMS_CREDIT, OSMS_URL } from "$lib/mapdata.svelte";
-  import type { MapDetails } from "$lib/types";
+  import type { MapDetails, MapRef } from "$lib/types";
   import ConnectionCompass from "./ConnectionCompass.svelte";
   import MapDrops from "./MapDrops.svelte";
+  import RouteFromHere from "./RouteFromHere.svelte";
   import RoutePlanner from "./RoutePlanner.svelte";
   import Section from "./Section.svelte";
 
   let {
     details,
+    current = null,
     variant = "full",
     onnavigate,
-  }: { details: MapDetails; variant?: "full" | "compact" | "pin"; onnavigate: (id: number) => void } = $props();
+  }: {
+    details: MapDetails;
+    /** The map the player is on, when known. */
+    current?: MapRef | null;
+    variant?: "full" | "compact" | "pin";
+    onnavigate: (id: number) => void;
+  } = $props();
 
   const compact = $derived(variant !== "full");
   /** A pinned window keeps to the essentials: where you can go and what lives here. */
   const pin = $derived(variant === "pin");
+  /** The player's map, while they look at another. */
+  const away = $derived(current && current.id !== details.map.id ? current : null);
+  const placed = $derived(details.exits.some((e) => e.side));
 
   const facts = $derived(
     [
@@ -47,8 +58,17 @@
   </div>
 {/if}
 
+{#if away}
+  <Section title="Route from your map">
+    <RouteFromHere from={away} to={details.map} {onnavigate} />
+  </Section>
+{/if}
+
 <Section title="Exits" count={details.exits.length}>
-  <ConnectionCompass exits={details.exits} {onnavigate} />
+  {#snippet aside()}
+    {#if placed}<span title="Roughly which part of the map each portal is in, from the map data">rough positions</span>{/if}
+  {/snippet}
+  <ConnectionCompass exits={details.exits} map={details.map} {current} {onnavigate} />
 </Section>
 
 {#if details.mobs.length}
@@ -115,7 +135,7 @@
   </Section>
 {/if}
 
-{#if !pin}
+{#if !pin && !away}
   <Section title="Route" open={!compact}>
     <RoutePlanner from={details.map} region={details.region} {onnavigate} />
   </Section>
@@ -147,14 +167,17 @@
   }
 
   .fact {
-    padding: 1px 7px;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.05);
     color: var(--muted);
   }
 
+  .fact + .fact::before,
+  .fact + .return::before {
+    content: "·";
+    margin-right: 6px;
+    color: var(--faint);
+  }
+
   .fact.town {
-    background: var(--good-soft);
     color: var(--good);
   }
 
@@ -224,7 +247,7 @@
   .tag {
     margin-left: 3px;
     padding: 0 4px;
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     background: rgba(255, 255, 255, 0.06);
     font-size: 9.5px;
     color: var(--faint);
@@ -295,7 +318,7 @@
     height: 24px;
     padding: 0 8px;
     border: 1px solid var(--border);
-    border-radius: 999px;
+    border-radius: var(--radius-sm);
     background: transparent;
     color: var(--muted);
     font-size: 11px;

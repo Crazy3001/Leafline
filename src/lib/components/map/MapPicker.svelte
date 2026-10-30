@@ -132,7 +132,7 @@
     width: 100%;
     padding: 5px 8px;
     border: 0;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     background: transparent;
     text-align: left;
     cursor: pointer;

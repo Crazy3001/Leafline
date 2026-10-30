@@ -13,6 +13,7 @@ use crate::userdata::prices::{NewPrice, PriceLog};
 use crate::userdata::sessions::{MapRate, SavedSession};
 
 const FILE_NAME: &str = "leafline.sqlite3";
+const BACKUP_FOLDER: &str = "backups";
 
 /// Emitted to every window when a session is saved or deleted.
 pub const HISTORY_EVENT: &str = "history";
@@ -28,6 +29,13 @@ impl UserDataState {
             eprintln!("user data unreadable: {err}");
             format!("Your saved records ({}) could not be opened: {err}", path.display())
         });
+        if let (Ok(db), Some(dir)) = (&opened, path.parent()) {
+            let day = date(now() as f64);
+            let day = day.split(' ').next().unwrap_or_default();
+            if let Err(err) = db.back_up(&dir.join(BACKUP_FOLDER), day) {
+                eprintln!("no backup of the records today: {err}");
+            }
+        }
         Ok(Self(Mutex::new(opened)))
     }
 
@@ -65,7 +73,8 @@ pub fn delete_price(state: State<UserDataState>, id: i64) -> Result<()> {
     state.with(|db| db.delete_price(id))
 }
 
-/// Saves the session the overlay is showing (from the last replay) to the history.
+/// Saves the session the overlay is showing to the history. Live sessions save themselves; this
+/// is for the last replay.
 #[tauri::command]
 pub fn save_session(app: AppHandle, state: State<UserDataState>, label: String) -> Result<i64> {
     let session = super::readings::current_session(&app).ok_or_else(|| {
@@ -92,6 +101,21 @@ pub fn session_history(state: State<UserDataState>) -> Result<History> {
 #[tauri::command]
 pub fn delete_session(app: AppHandle, state: State<UserDataState>, id: i64) -> Result<()> {
     state.with(|db| db.delete_session(id))?;
+    app.emit(HISTORY_EVENT, ())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn set_session_note(app: AppHandle, state: State<UserDataState>, id: i64, note: String) -> Result<()> {
+    state.with(|db| db.set_session_note(id, &note))?;
+    app.emit(HISTORY_EVENT, ())?;
+    Ok(())
+}
+
+/// Corrects a misread map name, in what is saved and whenever it is read that way again.
+#[tauri::command]
+pub fn rename_map(app: AppHandle, state: State<UserDataState>, from: String, to: String) -> Result<()> {
+    state.with(|db| db.rename_map(&from, &to))?;
     app.emit(HISTORY_EVENT, ())?;
     Ok(())
 }
@@ -123,8 +147,21 @@ pub fn export_csv(state: State<UserDataState>, what: Export, path: std::path::Pa
 }
 
 const PRICE_COLUMNS: &[&str] = &["date", "item", "upgrades", "slots_left", "stats", "price", "kind", "note"];
-const SESSION_COLUMNS: &[&str] =
-    &["started", "label", "map", "active_minutes", "exp_gained", "exp_per_hour", "mesos_gained", "mesos_per_hour"];
+const SESSION_COLUMNS: &[&str] = &[
+    "started",
+    "label",
+    "map",
+    "level",
+    "party",
+    "class",
+    "active_minutes",
+    "exp_gained",
+    "exp_per_hour",
+    "percent_gained",
+    "mesos_gained",
+    "mesos_per_hour",
+    "note",
+];
 
 fn price_row(p: crate::userdata::prices::PriceEntry) -> Vec<String> {
     vec![
@@ -139,7 +176,7 @@ fn price_row(p: crate::userdata::prices::PriceEntry) -> Vec<String> {
     ]
 }
 
-/// A row for the whole session, then one per map.
+/// A row for the whole session, then one for each map, level, party size and class.
 fn session_rows(s: SavedSession) -> Vec<Vec<String>> {
     let started = date(s.started_at.unwrap_or(s.saved_at as f64));
     let rate = |rate: Option<f64>| rate.map(|r| format!("{r:.0}")).unwrap_or_default();
@@ -147,23 +184,34 @@ fn session_rows(s: SavedSession) -> Vec<Vec<String>> {
         started.clone(),
         s.label.clone(),
         "(all maps)".into(),
+        opt(s.level),
+        String::new(),
+        s.job.clone().unwrap_or_default(),
         format!("{:.1}", s.active_seconds / 60.0),
         s.exp_gained.to_string(),
         rate(s.exp_per_hour),
+        String::new(),
         s.mesos_gained.to_string(),
         rate(s.mesos_per_hour),
+        s.note.clone(),
     ]];
-    for m in s.maps {
-        let hours = m.active_seconds / 3600.0;
+    for line in s.lines {
+        let hours = line.active_seconds / 3600.0;
+        let mesos_hours = line.mesos_seconds / 3600.0;
         rows.push(vec![
             started.clone(),
             s.label.clone(),
-            m.map,
-            format!("{:.1}", m.active_seconds / 60.0),
-            m.exp_gained.to_string(),
-            format!("{:.0}", m.exp_gained as f64 / hours),
-            m.mesos_gained.to_string(),
-            format!("{:.0}", m.mesos_gained as f64 / hours),
+            line.map.unwrap_or_else(|| "(between maps)".into()),
+            opt(line.level),
+            opt(line.party),
+            line.job.unwrap_or_default(),
+            format!("{:.1}", line.active_seconds / 60.0),
+            line.exp_gained.to_string(),
+            if hours > 0.0 { format!("{:.0}", line.exp_gained as f64 / hours) } else { String::new() },
+            format!("{:.2}", line.percent_gained),
+            line.mesos_gained.to_string(),
+            if mesos_hours > 0.0 { format!("{:.0}", line.mesos_gained as f64 / mesos_hours) } else { String::new() },
+            String::new(),
         ]);
     }
     rows

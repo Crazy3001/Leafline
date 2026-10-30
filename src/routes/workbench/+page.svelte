@@ -508,7 +508,7 @@
     padding: 0 4px;
     border: 1px solid var(--border-strong);
     border-bottom-width: 2px;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     font-family: var(--font-sans);
     font-size: 10.5px;
   }
@@ -534,7 +534,7 @@
     height: 26px;
     justify-content: center;
     padding: 0 6px;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     background: none;
     color: var(--muted);
     font-size: 12px;
@@ -578,7 +578,7 @@
 
   .meter {
     height: 4px;
-    border-radius: 999px;
+    border-radius: var(--radius-sm);
     background: rgba(255, 255, 255, 0.06);
     overflow: hidden;
   }
@@ -657,9 +657,7 @@
     position: relative;
     min-width: 0;
     min-height: 0;
-    background:
-      radial-gradient(circle at 50% 40%, rgba(243, 177, 63, 0.04), transparent 60%),
-      var(--bg);
+    background: var(--bg);
   }
 
   .placeholder {

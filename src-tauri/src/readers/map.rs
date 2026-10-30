@@ -45,6 +45,9 @@ const BUTTON_FILL: f32 = 0.5;
 /// How far left of the button a header can reach, in button heights. Wide enough for any
 /// name that fits on screen at 2x UI.
 const MAX_WIDTH: f32 = 60.0;
+/// A row of the name band is at least this share of band blue, even through the name's letters
+/// (0.15 at worst under `Mushroom Town - West Entrance`); the frame below it has none.
+const BAND_ROW: f32 = 0.1;
 
 pub fn read(frame: &Frame, ocr: &Ocr) -> Result<Option<MapReading>> {
     for button in world_buttons(frame) {
@@ -78,8 +81,7 @@ fn world_buttons(frame: &Frame) -> Vec<Rect> {
 /// where the blue gives way to the emblem (or the frame, for maps without one).
 fn expanded_band(frame: &Frame, button: Rect) -> Option<Rect> {
     let h = button.h;
-    let x = (button.x + 0.9 * button.w) as u32;
-    let (top, bottom) = vertical_run(frame, x, button.bottom(), 1.0 * h, 8.0 * h, is_panel_blue)?;
+    let (top, bottom) = band_rows(frame, button, 1.0 * h, 8.0 * h)?;
     if bottom - top < 2.5 * h {
         return None;
     }
@@ -190,24 +192,16 @@ fn clean(text: &str) -> String {
     trimmed.split_whitespace().collect::<Vec<_>>().join(" ").replace("< ", "<").replace(" >", ">")
 }
 
-/// The run of `matches` pixels down column `x`, starting within `search` of `from` and lasting
-/// at most `max`. Returns its top and bottom.
-fn vertical_run(
-    frame: &Frame,
-    x: u32,
-    from: f32,
-    search: f32,
-    max: f32,
-    matches: impl Fn(&Rgba<u8>) -> bool,
-) -> Option<(f32, f32)> {
-    if x >= frame.width() {
-        return None;
-    }
+/// The rows of the name band under `button`, starting within `search` of it and lasting at most
+/// `max`. Rows are judged across the button's width because a long name reaches under the
+/// button: letters cover most of a row but never all of it, while the frame covers all of it.
+fn band_rows(frame: &Frame, button: Rect, search: f32, max: f32) -> Option<(f32, f32)> {
     let height = frame.height();
-    let from = from.max(0.0) as u32;
-    let top = (from..(from + search as u32).min(height)).find(|&y| matches(frame.get_pixel(x, y)))?;
+    let is_band = |y: u32| share(frame, Rect::new(button.x, y as f32, button.w, 1.0), is_panel_blue) >= BAND_ROW;
+    let from = button.bottom().max(0.0) as u32;
+    let top = (from..(from + search as u32).min(height)).find(|&y| is_band(y))?;
     let limit = (top + max as u32).min(height);
-    let bottom = (top..limit).find(|&y| !matches(frame.get_pixel(x, y))).unwrap_or(limit);
+    let bottom = (top..limit).find(|&y| !is_band(y)).unwrap_or(limit);
     Some((top as f32, bottom as f32))
 }
 
@@ -335,6 +329,19 @@ mod tests {
         assert_eq!(buttons, vec![Rect::new(300.0, 20.0, 68.0, 20.0)]);
         assert_eq!(expanded_band(&frame, buttons[0]), Some(Rect::from_edges(6.0, 46.0, 368.0, 130.0)));
         assert_eq!(collapsed_bar(&frame, buttons[0]), None);
+    }
+
+    #[test]
+    fn a_long_name_under_the_button_keeps_the_whole_band() {
+        let mut frame = minimap(false);
+        // Letters reaching under the button: most of each row, as on `Mushroom Town - West Entrance`.
+        for y in 88..108 {
+            for x in 300..360 {
+                frame.put_pixel(x, y, Rgba([255, 255, 255, 255]));
+            }
+        }
+        let button = world_buttons(&frame)[0];
+        assert_eq!(expanded_band(&frame, button), Some(Rect::from_edges(6.0, 46.0, 368.0, 130.0)));
     }
 
     #[test]

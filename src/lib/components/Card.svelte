@@ -32,9 +32,9 @@
 
 <style>
   .card {
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
+    background: transparent;
+    border-bottom: 1px solid var(--border);
+    border-radius: 0;
     padding: 10px 12px 12px;
   }
 

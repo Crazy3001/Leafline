@@ -3,6 +3,7 @@
 mod calibration;
 mod commands;
 mod launch;
+mod layout;
 mod live;
 mod mapdata;
 mod overlay;
@@ -10,12 +11,13 @@ mod pins;
 mod readings;
 mod records;
 mod replay;
+mod report;
 mod settings;
 mod shortcuts;
+mod snap;
 mod tray;
 
 use tauri::{Manager, WindowEvent};
-use tauri_plugin_window_state::StateFlags;
 
 use calibration::HudFontState;
 use launch::LaunchImage;
@@ -27,6 +29,7 @@ use readings::Readings;
 use records::UserDataState;
 use replay::ReplayState;
 use settings::SettingsState;
+use shortcuts::Bindings;
 
 pub fn run() {
     let args: Vec<String> = std::env::args().collect();
@@ -41,9 +44,7 @@ pub fn run() {
                 shortcuts::log_error(&err);
             }
         }))
-        .plugin(
-            tauri_plugin_window_state::Builder::new().with_state_flags(StateFlags::POSITION | StateFlags::SIZE).build(),
-        )
+        .plugin(tauri_plugin_window_state::Builder::new().with_state_flags(layout::SAVED).build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(shortcuts::plugin())
@@ -51,6 +52,7 @@ pub fn run() {
         .manage(ReplayState::default())
         .manage(LiveState::default())
         .manage(Readings::default())
+        .manage(Bindings::default())
         .manage(LaunchImage::new(&args))
         .setup(|app| {
             app.manage(HudFontState::load(app.handle())?);
@@ -60,20 +62,23 @@ pub fn run() {
             app.manage(SettingsState::load(app.handle())?);
             settings::apply(app.handle())?;
             overlay::restore_mode(app.handle())?;
+            if let Some(overlay) = app.get_webview_window(OVERLAY) {
+                snap::attach(&overlay)?;
+            }
             app.manage(PinState::load(app.handle())?);
             pins::restore(app.handle())?;
             tray::create(app)?;
             overlay::fit_workbench(app.handle())?;
             Ok(())
         })
-        .on_window_event(|window, event| {
+        .on_window_event(|window, event| match event {
             // Closing a window hides it; the app keeps running in the tray until Quit.
-            if let WindowEvent::CloseRequested { api, .. } = event
-                && matches!(window.label(), OVERLAY | WORKBENCH)
-            {
+            WindowEvent::CloseRequested { api, .. } if matches!(window.label(), OVERLAY | WORKBENCH) => {
                 api.prevent_close();
                 let _ = window.hide();
             }
+            WindowEvent::Moved(_) | WindowEvent::Resized(_) => layout::changed(window.app_handle()),
+            _ => {}
         })
         .invoke_handler(tauri::generate_handler![
             commands::analyze_image,
@@ -87,6 +92,9 @@ pub fn run() {
             live::stop_live,
             live::live_windows,
             live::save_live_frame,
+            live::set_live_held,
+            live::reset_session,
+            live::set_live_logging,
             commands::overlay_status,
             commands::set_click_through,
             commands::set_compact,
@@ -94,6 +102,8 @@ pub fn run() {
             commands::toggle_overlay,
             commands::show_workbench,
             commands::shortcut_list,
+            commands::open_data_folder,
+            report::diagnostics,
             readings::current_readings,
             pins::pin_status,
             pins::pin_panel,
@@ -119,6 +129,8 @@ pub fn run() {
             records::save_session,
             records::session_history,
             records::delete_session,
+            records::set_session_note,
+            records::rename_map,
             records::export_csv,
             settings::get_settings,
             settings::update_settings,

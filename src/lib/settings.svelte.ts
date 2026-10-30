@@ -6,8 +6,11 @@ import type { DisplaySettings } from "./types";
 export const display = $state<DisplaySettings>({
   opacity: 1,
   scale: 1,
+  alwaysOnTop: true,
+  compactShape: "card",
+  hotkeys: { enabled: true, keys: {} },
   travel: { enabled: false, cabs: true, vipCabs: false, scrolls: true },
-  live: { enabled: false, interval: 2, window: null },
+  live: { enabled: false, interval: 2, pauseAfter: 15, window: null },
 });
 
 /** Changes whenever the travel routes may use changes, for effects that ask for routes. */

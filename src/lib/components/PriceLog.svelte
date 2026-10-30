@@ -2,6 +2,7 @@
   // The player's own price records for the hovered item, and a form to add one. There is no
   // market data: every number here is something the player logged.
   import { Plus, X } from "@lucide/svelte";
+  import { untrack } from "svelte";
 
   import { backend } from "$lib/api";
   import { formatDay, formatMesos, formatNumber, parsePrice } from "$lib/format";
@@ -30,17 +31,20 @@
   );
   const parsed = $derived(parsePrice(priceText));
 
+  // Follows the key alone: a live reading of the same item must not close the form being typed in.
   $effect(() => {
     const asked = key;
     log = null;
     adding = false;
-    if (!item.name) return;
-    backend
-      .priceLog(item.name, item.upgrades, item.remainingEnhancements)
-      .then((result) => {
-        if (asked === key) log = result;
-      })
-      .catch((e) => (error = String(e)));
+    untrack(() => {
+      if (!item.name) return;
+      backend
+        .priceLog(item.name, item.upgrades, item.remainingEnhancements)
+        .then((result) => {
+          if (asked === key) log = result;
+        })
+        .catch((e) => (error = String(e)));
+    });
   });
 
   $effect(() => {
@@ -316,7 +320,7 @@
     height: 18px;
     padding: 0;
     border: 0;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     background: transparent;
     color: var(--faint);
     opacity: 0;
@@ -372,7 +376,7 @@
     width: 100%;
     padding: 5px 8px;
     border: 1px solid var(--border-strong);
-    border-radius: 5px;
+    border-radius: var(--radius-sm);
     background: var(--bg);
     color: var(--text);
     font: inherit;
@@ -403,14 +407,14 @@
     display: flex;
     flex: none;
     padding: 2px;
-    border-radius: 5px;
+    border-radius: var(--radius-sm);
     background: rgba(255, 255, 255, 0.04);
   }
 
   .kinds button {
     padding: 2px 8px;
     border: 0;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     background: transparent;
     color: var(--muted);
     font-size: 11.5px;
@@ -445,7 +449,7 @@
   .save {
     padding: 4px 14px;
     border: 0;
-    border-radius: 5px;
+    border-radius: var(--radius-sm);
     background: var(--accent);
     color: #1a1204;
     font-size: 12px;

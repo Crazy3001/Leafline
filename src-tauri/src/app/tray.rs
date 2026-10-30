@@ -12,14 +12,14 @@ const QUIT: &str = "quit";
 const SETTINGS: &str = "settings";
 
 pub fn create(app: &App) -> tauri::Result<()> {
-    let item = |action: Action, text: &str| MenuItem::with_id(app, action_id(action), text, true, Some(action.keys()));
+    let item = |action: Action, text: &str| MenuItem::with_id(app, action_id(action), text, true, None::<&str>);
     let click_through = CheckMenuItem::with_id(
         app,
         action_id(Action::ToggleClickThrough),
         "Click-through",
         true,
-        false,
-        Some(Action::ToggleClickThrough.keys()),
+        app.state::<OverlayState>().click_through(),
+        None::<&str>,
     )?;
     let menu = Menu::with_items(
         app,

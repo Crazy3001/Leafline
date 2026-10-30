@@ -20,10 +20,12 @@
   const top = $derived(hunts[0] ?? null);
   const best = $derived(top?.maps[0] ?? null);
   const target = $derived(picked ?? best?.map.id ?? null);
+  // Each guide brings a new `from`: the route follows the map, not the object.
+  const fromId = $derived(from?.id);
 
   $effect(() => {
     const to = target;
-    const start = from?.id;
+    const start = fromId;
     void travelKey();
     route = null;
     if (!open || to == null || start == null) return;
@@ -31,7 +33,7 @@
     backend
       .mapRoute(start, to)
       .then((r) => {
-        if (target === to && from?.id === start) route = r;
+        if (target === to && fromId === start) route = r;
       })
       .finally(() => (routing = false));
   });
@@ -253,7 +255,7 @@
     width: 100%;
     padding: 3px 6px;
     border: 0;
-    border-radius: 5px;
+    border-radius: var(--radius-sm);
     background: transparent;
     color: var(--muted);
     font-size: 11.5px;

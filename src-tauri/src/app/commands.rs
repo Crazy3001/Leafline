@@ -4,10 +4,12 @@ use std::path::PathBuf;
 
 use tauri::ipc::Response;
 use tauri::{AppHandle, Manager};
+use tauri_plugin_opener::OpenerExt;
 
 use super::calibration::HudFontState;
 use super::overlay::{self, OverlayStatus};
 use super::readings;
+use super::settings::SettingsState;
 use super::shortcuts::{self, ShortcutInfo};
 use crate::error::{Error, Result};
 use crate::pipeline::{self, Analysis};
@@ -79,6 +81,13 @@ pub fn show_workbench(app: AppHandle) -> Result<()> {
 }
 
 #[tauri::command]
-pub fn shortcut_list() -> Vec<ShortcutInfo> {
-    shortcuts::list()
+pub fn shortcut_list(app: AppHandle) -> Vec<ShortcutInfo> {
+    shortcuts::list(&app.state::<SettingsState>().get().hotkeys)
+}
+
+/// Opens the folder that holds the player's records, settings and backups.
+#[tauri::command]
+pub fn open_data_folder(app: AppHandle) -> Result<()> {
+    let folder = app.path().app_data_dir()?;
+    app.opener().open_path(folder.to_string_lossy(), None::<&str>).map_err(|err| Error::Invalid(err.to_string()))
 }

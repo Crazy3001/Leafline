@@ -118,6 +118,24 @@ let savedSessions: SavedSession[] = [
     expPerHour: 21_771,
     mesosGained: 11_200,
     mesosPerHour: 9_600,
+    percentPerHour: 22.4,
+    job: "Bandit",
+    deaths: 1,
+    note: "",
+    lines: [
+      {
+        map: "Fern Road : Mossbank Meadow II",
+        town: false,
+        level: 29,
+        party: 1,
+        job: "Bandit",
+        activeSeconds: 3000,
+        expGained: 19_600,
+        percentGained: 18.4,
+        mesosGained: 8_100,
+        mesosSeconds: 3000,
+      },
+    ],
     maps: [
       { map: "Fern Road : Mossbank Meadow II", activeSeconds: 3000, expGained: 19_600, mesosGained: 8_100 },
       { map: "Fern Road : Burrow Den", activeSeconds: 1200, expGained: 5_800, mesosGained: 3_100 },
@@ -184,8 +202,11 @@ function mockTravelInfo(): TravelInfo {
 let displaySettings: DisplaySettings = {
   opacity: 1,
   scale: 1,
+  alwaysOnTop: true,
+  compactShape: "card",
+  hotkeys: { enabled: true, keys: {} },
   travel: { enabled: false, cabs: true, vipCabs: false, scrolls: true },
-  live: { enabled: false, interval: 2, window: null },
+  live: { enabled: false, interval: 2, pauseAfter: 15, window: null },
 };
 
 let liveStatus: LiveStatus = { state: "off" };
@@ -265,14 +286,25 @@ export const mockBackend: Backend = {
   async toggleOverlay() {},
   async showWorkbench() {},
   shortcuts: async () => [
-    { action: "toggleOverlay", keys: "Ctrl+Alt+O", label: "Show or hide the overlay" },
-    { action: "toggleClickThrough", keys: "Ctrl+Alt+L", label: "Lock the overlay (click-through)" },
-    { action: "togglePins", keys: "Ctrl+Alt+P", label: "Show or hide pinned panels" },
-    { action: "toggleLive", keys: "Ctrl+Alt+R", label: "Start or stop live reading" },
-    { action: "saveFrame", keys: "Ctrl+Alt+F", label: "Save the picture live reading last read, to Pictures\\Leafline" },
-    { action: "showWorkbench", keys: "Ctrl+Alt+W", label: "Open the workbench" },
+    { action: "ToggleOverlay", keys: "Ctrl+Alt+O", defaultKeys: "Ctrl+Alt+O", label: "Show or hide the overlay" },
+    { action: "ToggleClickThrough", keys: "Ctrl+Alt+L", defaultKeys: "Ctrl+Alt+L", label: "Lock the overlay (click-through)" },
+    { action: "TogglePins", keys: "Ctrl+Alt+P", defaultKeys: "Ctrl+Alt+P", label: "Show or hide pinned panels" },
+    { action: "ToggleCompact", keys: "Ctrl+Alt+H", defaultKeys: "Ctrl+Alt+H", label: "Compact HUD" },
+    { action: "ToggleLive", keys: "Ctrl+Alt+R", defaultKeys: "Ctrl+Alt+R", label: "Start or stop live reading" },
+    { action: "PauseTracking", keys: "Ctrl+Alt+K", defaultKeys: "Ctrl+Alt+K", label: "Pause or resume tracking" },
+    { action: "NewSession", keys: "Ctrl+Alt+N", defaultKeys: "Ctrl+Alt+N", label: "Start a new session" },
+    { action: "ToggleLogging", keys: "Ctrl+Alt+J", defaultKeys: "Ctrl+Alt+J", label: "Log this run or not" },
+    { action: "SaveFrame", keys: "Ctrl+Alt+F", defaultKeys: "Ctrl+Alt+F", label: "Save the picture live reading last read, to Pictures\\Leafline" },
+    { action: "ShowWorkbench", keys: "Ctrl+Alt+W", defaultKeys: "Ctrl+Alt+W", label: "Open the workbench" },
   ],
   liveStatus: async () => liveStatus,
+  async setLiveHeld(held) {
+    if (liveStatus.state === "reading") setLive({ ...liveStatus, held });
+  },
+  async resetSession() {},
+  async setLiveLogging(logging) {
+    if (liveStatus.state === "reading") setLive({ ...liveStatus, logging });
+  },
   async startLive() {
     if (!displaySettings.live.enabled) throw "Turn on live reading in Settings first.";
     setLive({ state: "waiting", reason: "Starting…" });
@@ -280,7 +312,7 @@ export const mockBackend: Backend = {
     clearInterval(liveTimer);
     liveTimer = setInterval(() => {
       frames += 1;
-      setLive({ state: "reading", window: "MapleStory", width: 2560, height: 1440, frames, readMs: 412, hdr: false, hudTaught: frames > 3 });
+      setLive({ state: "reading", window: "MapleStory", width: 2560, height: 1440, frames, readMs: 412, hdr: false, hudTaught: frames > 3, held: false, logging: true });
       analysisHandlers.forEach((h) => h(sampleAnalysis));
     }, displaySettings.live.interval * 1000);
   },
@@ -389,6 +421,11 @@ export const mockBackend: Backend = {
       expPerHour: s.expPerHour,
       mesosGained: s.mesosGained,
       mesosPerHour: s.mesosPerHour,
+      percentPerHour: s.percentPerHour,
+      job: s.job,
+      deaths: s.deaths,
+      note: "",
+      lines: s.lines,
       maps: s.maps
         .filter((m) => m.map && m.activeSeconds > 0)
         .map((m) => ({ map: m.map!, activeSeconds: m.activeSeconds, expGained: m.expGained, mesosGained: m.mesosGained })),
@@ -397,6 +434,20 @@ export const mockBackend: Backend = {
     return id;
   },
   sessionHistory: async () => mockHistory(),
+  async setSessionNote(id, note) {
+    savedSessions = savedSessions.map((s) => (s.id === id ? { ...s, note } : s));
+    historyHandlers.forEach((h) => h());
+  },
+  async renameMap(from, to) {
+    savedSessions = savedSessions.map((s) => ({
+      ...s,
+      maps: s.maps.map((m) => (m.map === from ? { ...m, map: to } : m)),
+      lines: s.lines.map((l) => (l.map === from ? { ...l, map: to } : l)),
+    }));
+    historyHandlers.forEach((h) => h());
+  },
+  async openDataFolder() {},
+  diagnostics: async () => "Leafline dev (mock)",
   async deleteSession(id) {
     savedSessions = savedSessions.filter((s) => s.id !== id);
     historyHandlers.forEach((h) => h());

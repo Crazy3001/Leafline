@@ -250,6 +250,7 @@ fn print_card(card: &MapCard) {
         );
     }
     for e in &card.exits {
-        println!("    exit {:?} {} {:?}{}", e.direction, e.to.name, e.portals, if e.hidden { " hidden" } else { "" });
+        let hidden = if e.hidden { " hidden" } else { "" };
+        println!("    exit {:?} {:?} {:?} {} {:?}{hidden}", e.side, e.height, e.direction, e.to.name, e.portals);
     }
 }

@@ -4,7 +4,7 @@
   import { CarTaxiFront, EyeOff, ScrollText } from "@lucide/svelte";
 
   import { formatNumber } from "$lib/format";
-  import type { Direction, MapRoute } from "$lib/types";
+  import type { Direction, MapRoute, RouteStep, Side } from "$lib/types";
 
   let {
     route,
@@ -22,8 +22,10 @@
     out: "Go out",
     other: "Portal",
   };
+  const sides: Record<Side, string> = { left: "Left portal", centre: "Middle portal", right: "Right portal" };
+  const verb = (step: RouteStep) => (step.side ? sides[step.side] : verbs[step.direction]);
 
-  const rides = $derived(route.steps.filter((s) => s.travel).length);
+  const rides =$derived(route.steps.filter((s) => s.travel).length);
   const portals = $derived(route.steps.length - rides);
 </script>
 
@@ -41,8 +43,7 @@
               {step.travel.service}
             </span>
           {:else}
-            <span class="verb">{verbs[step.direction]}</span>
-            {#if step.portal}<code title="Portal name in the map data">{step.portal}</code>{/if}
+            <span class="verb">{verb(step)}</span>
             {#if step.hidden}<span class="hidden" title="The portal's name marks it as hidden"><EyeOff size={11} /></span>{/if}
           {/if}
           <span class="arrow">→</span>
@@ -96,7 +97,7 @@
     place-items: center;
     width: 17px;
     height: 17px;
-    border-radius: 999px;
+    border-radius: var(--radius-sm);
     background: color-mix(in srgb, var(--map) 16%, transparent);
     color: var(--map);
     font-size: 10px;
@@ -135,12 +136,6 @@
   .fare {
     color: var(--faint);
     font-size: 11px;
-  }
-
-  code {
-    font-family: var(--font-mono);
-    font-size: 10.5px;
-    color: var(--faint);
   }
 
   .hidden {

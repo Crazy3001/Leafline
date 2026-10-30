@@ -1,23 +1,39 @@
 <script lang="ts">
-  // The compact HUD: EXP per hour and the Quest Helper's counters, in a small window that fits
-  // what it shows. Everything else stays in the full overlay.
-  import { Check, Maximize2 } from "@lucide/svelte";
+  // The compact HUD: the session's main numbers in a small window that fits what it shows, in the
+  // shape chosen in Settings. Everything else stays in the full overlay.
+  import { Check, Maximize2, Pause, Play } from "@lucide/svelte";
   import { onMount } from "svelte";
 
   import { backend } from "$lib/api";
   import Logo from "$lib/components/Logo.svelte";
-  import { formatCompact } from "$lib/format";
+  import { formatCompact, formatDuration } from "$lib/format";
   import { live } from "$lib/readings.svelte";
   import { display } from "$lib/settings.svelte";
 
   /** Width in screen units at Normal size; the window grows with the Size setting. */
-  const WIDTH = 236;
+  const WIDTHS = { card: 248, wide: 400, bar: 460 };
   /** More counters than this scroll instead of growing the window. */
   const MAX_HEIGHT = 320;
 
   let frame = $state<HTMLElement>();
 
   const session = $derived(live.session);
+  const shape = $derived(display.compactShape);
+  const reading = $derived(live.liveStatus.state === "reading" ? live.liveStatus : null);
+  const percent = $derived(
+    live.analysis?.hud?.exp?.percent ?? live.analysis?.hud?.expPercent ?? session?.percent ?? null,
+  );
+  const percentOnly = $derived(session?.percentOnly ?? false);
+  const stats = $derived([
+    {
+      label: "Last 5 min",
+      value: percentOnly
+        ? `${session?.recentPercentPerHour?.toFixed(1) ?? "—"}%`
+        : formatCompact(session?.recentExpPerHour),
+    },
+    { label: "Mesos / hr", value: formatCompact(session?.mesosPerHour) },
+    { label: "To level", value: formatDuration(session?.secondsToLevel) },
+  ]);
   const objectives = $derived(
     (live.analysis?.quest?.quests ?? []).flatMap((q) => q.objectives.map((o) => ({ ...o, quest: q.title }))),
   );
@@ -31,7 +47,7 @@
    */
   function fit() {
     if (!frame) return;
-    const size = [WIDTH * display.scale, Math.min(MAX_HEIGHT, Math.ceil(frame.scrollHeight)) * display.scale];
+    const size = [WIDTHS[shape] * display.scale, Math.min(MAX_HEIGHT, Math.ceil(frame.scrollHeight)) * display.scale];
     if (size.join() === asked) return;
     asked = size.join();
     backend.fitWindow(size[0], size[1]);
@@ -46,25 +62,53 @@
 
   $effect(() => {
     void display.scale;
+    void shape;
     fit();
   });
 </script>
 
-<div class="hud" bind:this={frame}>
+{#snippet tiles()}
+  {#each stats as stat (stat.label)}
+    <span class="stat" title={stat.label} data-tauri-drag-region>
+      <span class="stat-label" data-tauri-drag-region>{stat.label}</span>
+      <span class="stat-value tabular" data-tauri-drag-region>{stat.value}</span>
+    </span>
+  {/each}
+{/snippet}
+
+<div class="hud {shape}" bind:this={frame}>
+  <div class="level-track" title="Toward the next level">
+    <span class="level-fill" style:width="{Math.min(100, percent ?? 0)}%"></span>
+  </div>
   <div class="bar" data-tauri-drag-region>
     <span class="logo" data-tauri-drag-region><Logo size={13} /></span>
     <span class="rate" data-tauri-drag-region>
       {#if session?.expPerHour != null}
         <span class="value tabular" data-tauri-drag-region>{formatCompact(session.expPerHour)}</span>
         <span class="unit" data-tauri-drag-region>EXP / hr</span>
-        {#if session.percentPerHour != null}
+        {#if session.percentPerHour != null && shape === "card"}
           <span class="sub tabular" data-tauri-drag-region>{session.percentPerHour.toFixed(1)}%</span>
         {/if}
+        {#if session.paused}<span class="sub" data-tauri-drag-region>· paused</span>{/if}
+      {:else if percentOnly && session?.percentPerHour != null}
+        <span class="value tabular" data-tauri-drag-region>{session.percentPerHour.toFixed(1)}%</span>
+        <span class="unit" data-tauri-drag-region>/ hr</span>
         {#if session.paused}<span class="sub" data-tauri-drag-region>· paused</span>{/if}
       {:else}
         <span class="unit" data-tauri-drag-region>{session ? "Measuring EXP / hr…" : "No EXP readings yet"}</span>
       {/if}
     </span>
+    {#if shape === "bar"}{@render tiles()}{/if}
+    {#if reading}
+      <button
+        class="expand"
+        title="{reading.held ? 'Resume' : 'Pause'} tracking (Ctrl+Alt+K)"
+        aria-label={reading.held ? "Resume tracking" : "Pause tracking"}
+        onclick={() => backend.setLiveHeld(!reading.held)}
+      >
+        {#if reading.held}<Play size={12} />{:else}<Pause size={12} />{/if}
+      </button>
+    {/if}
     <button
       class="expand"
       title="Full overlay (Ctrl+Alt+H)"
@@ -75,7 +119,11 @@
     </button>
   </div>
 
-  {#if objectives.length}
+  {#if shape !== "bar"}<div class="stats" data-tauri-drag-region>{@render tiles()}</div>{/if}
+
+  {#if shape !== "card"}
+    <!-- Wide and Bar are for the numbers alone. -->
+  {:else if objectives.length}
     <ul class="counters">
       {#each objectives as objective, i (i)}
         {@const done = objective.current >= objective.required}
@@ -100,6 +148,53 @@
   .hud {
     max-height: 100vh;
     overflow-y: auto;
+  }
+
+  .level-track {
+    height: 2px;
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  .level-fill {
+    display: block;
+    height: 100%;
+    background: var(--exp);
+  }
+
+  .stats {
+    display: flex;
+    gap: 12px;
+    padding: 2px 10px 7px;
+    user-select: none;
+    cursor: grab;
+  }
+
+  .stat {
+    display: grid;
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+  }
+
+  .stat-label {
+    color: var(--faint);
+    font-size: 10px;
+  }
+
+  .stat-value {
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .hud.bar .stat {
+    flex: none;
+    display: inline-flex;
+    align-items: baseline;
+    gap: 4px;
+  }
+
+  .hud.bar .stat-label {
+    display: none;
   }
 
   .bar {
@@ -196,7 +291,7 @@
   .track {
     grid-column: 1 / -1;
     height: 2px;
-    border-radius: 999px;
+    border-radius: var(--radius-sm);
     background: rgba(255, 255, 255, 0.06);
     overflow: hidden;
   }

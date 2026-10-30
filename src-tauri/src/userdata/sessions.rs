@@ -6,7 +6,7 @@ use serde::Serialize;
 
 use super::UserData;
 use crate::error::{Error, Result};
-use crate::session::SessionSummary;
+use crate::session::{SessionLine, SessionSummary};
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -25,8 +25,15 @@ pub struct SavedSession {
     pub exp_per_hour: Option<f64>,
     pub mesos_gained: i64,
     pub mesos_per_hour: Option<f64>,
+    pub percent_per_hour: Option<f64>,
+    pub job: Option<String>,
+    pub deaths: u32,
+    /// The player's own note. It stays on this PC.
+    pub note: String,
     /// Per map, most active time first. Time that couldn't be placed on a map is left out.
     pub maps: Vec<SavedMap>,
+    /// Per map, level, party size and job, most active time first.
+    pub lines: Vec<SessionLine>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -56,40 +63,46 @@ impl UserData {
             return Err(Error::Invalid("This session has no active time to save yet.".into()));
         }
         let tx = self.conn.transaction()?;
-        tx.execute(
-            "INSERT INTO sessions (label, saved_at, started_at, level, level_ups, active_seconds, elapsed_seconds,
-                                   exp_gained, exp_per_hour, mesos_gained, mesos_per_hour)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
-            params![
-                label.trim(),
-                now,
-                session.started_at,
-                session.level,
-                session.level_ups,
-                session.active_seconds,
-                session.elapsed_seconds,
-                session.exp_gained,
-                session.exp_per_hour,
-                session.mesos_gained,
-                session.mesos_per_hour
-            ],
-        )?;
+        tx.execute("INSERT INTO sessions (label, saved_at, level_ups, active_seconds, elapsed_seconds, exp_gained, mesos_gained)
+                    VALUES (?1, ?2, 0, 0, 0, 0, 0)", params![label.trim(), now])?;
         let id = tx.last_insert_rowid();
-        for map in session.maps.iter().filter(|m| m.active_seconds > 0.0) {
-            let Some(name) = &map.map else { continue };
-            tx.execute(
-                "INSERT INTO session_maps (session_id, map, active_seconds, exp_gained, mesos_gained)
-                 VALUES (?1, ?2, ?3, ?4, ?5)",
-                params![id, name, map.active_seconds, map.exp_gained, map.mesos_gained],
-            )?;
-        }
+        write_session(&tx, id, session, now)?;
         tx.commit()?;
         Ok(id)
+    }
+
+    /// Brings a saved session up to date as it goes on. Its label and note stay as they are.
+    pub fn update_session(&mut self, id: i64, session: &SessionSummary, now: i64) -> Result<()> {
+        let tx = self.conn.transaction()?;
+        write_session(&tx, id, session, now)?;
+        tx.commit()?;
+        Ok(())
+    }
+
+    pub fn set_session_note(&mut self, id: i64, note: &str) -> Result<()> {
+        self.conn.execute("UPDATE sessions SET note = ?2 WHERE id = ?1", params![id, note.trim()])?;
+        Ok(())
+    }
+
+    /// Corrects a map name everywhere it was saved, and from now on when it is read that way.
+    pub fn rename_map(&mut self, from: &str, to: &str) -> Result<()> {
+        let to = to.trim();
+        if to.is_empty() {
+            return Err(Error::Invalid("A map needs a name.".into()));
+        }
+        let tx = self.conn.transaction()?;
+        tx.execute("UPDATE session_maps SET map = ?2 WHERE map = ?1", params![from, to])?;
+        tx.execute("UPDATE session_lines SET map = ?2 WHERE map = ?1", params![from, to])?;
+        tx.execute("UPDATE map_renames SET name = ?2 WHERE name = ?1", params![from, to])?;
+        tx.execute("INSERT OR REPLACE INTO map_renames (read_as, name) VALUES (?1, ?2)", params![from, to])?;
+        tx.commit()?;
+        Ok(())
     }
 
     pub fn delete_session(&mut self, id: i64) -> Result<()> {
         let tx = self.conn.transaction()?;
         tx.execute("DELETE FROM session_maps WHERE session_id = ?1", [id])?;
+        tx.execute("DELETE FROM session_lines WHERE session_id = ?1", [id])?;
         tx.execute("DELETE FROM sessions WHERE id = ?1", [id])?;
         tx.commit()?;
         Ok(())
@@ -99,7 +112,7 @@ impl UserData {
     pub fn sessions(&self) -> Result<Vec<SavedSession>> {
         let mut stmt = self.conn.prepare(
             "SELECT id, label, saved_at, started_at, level, level_ups, active_seconds, elapsed_seconds, exp_gained,
-                    exp_per_hour, mesos_gained, mesos_per_hour
+                    exp_per_hour, mesos_gained, mesos_per_hour, percent_per_hour, job, deaths, note
              FROM sessions ORDER BY COALESCE(started_at, saved_at) DESC, id DESC",
         )?;
         let mut sessions: Vec<SavedSession> = stmt
@@ -117,7 +130,12 @@ impl UserData {
                     exp_per_hour: row.get(9)?,
                     mesos_gained: row.get(10)?,
                     mesos_per_hour: row.get(11)?,
+                    percent_per_hour: row.get(12)?,
+                    job: row.get(13)?,
+                    deaths: row.get(14)?,
+                    note: row.get(15)?,
                     maps: Vec::new(),
+                    lines: Vec::new(),
                 })
             })?
             .collect::<rusqlite::Result<_>>()?;
@@ -125,7 +143,27 @@ impl UserData {
             "SELECT map, active_seconds, exp_gained, mesos_gained FROM session_maps
              WHERE session_id = ?1 ORDER BY active_seconds DESC",
         )?;
+        let mut lines = self.conn.prepare(
+            "SELECT map, level, party, job, active_seconds, exp_gained, percent_gained, mesos_gained, mesos_seconds
+             FROM session_lines WHERE session_id = ?1 ORDER BY active_seconds DESC",
+        )?;
         for session in &mut sessions {
+            session.lines = lines
+                .query_map([session.id], |row| {
+                    Ok(SessionLine {
+                        map: row.get(0)?,
+                        town: false,
+                        level: row.get(1)?,
+                        party: row.get(2)?,
+                        job: row.get(3)?,
+                        active_seconds: row.get(4)?,
+                        exp_gained: row.get(5)?,
+                        percent_gained: row.get(6)?,
+                        mesos_gained: row.get(7)?,
+                        mesos_seconds: row.get(8)?,
+                    })
+                })?
+                .collect::<rusqlite::Result<_>>()?;
             session.maps = maps
                 .query_map([session.id], |row| {
                     Ok(SavedMap {
@@ -145,7 +183,8 @@ impl UserData {
     pub fn map_rates(&self) -> Result<Vec<MapRate>> {
         let mut stmt = self.conn.prepare(
             "SELECT map, COUNT(DISTINCT session_id), SUM(active_seconds), SUM(exp_gained), SUM(mesos_gained)
-             FROM session_maps GROUP BY map HAVING SUM(active_seconds) > 0 ORDER BY SUM(active_seconds) DESC",
+             FROM session_maps GROUP BY map HAVING SUM(active_seconds) > 0 AND SUM(exp_gained) > 0
+             ORDER BY SUM(active_seconds) DESC",
         )?;
         let rates = stmt.query_map([], |row| {
             let seconds: f64 = row.get(2)?;
@@ -159,6 +198,70 @@ impl UserData {
         })?;
         Ok(rates.collect::<rusqlite::Result<_>>()?)
     }
+}
+
+/// Writes what `session` holds to the row `id`, replacing what was there. Towns aren't logged.
+fn write_session(tx: &rusqlite::Transaction, id: i64, session: &SessionSummary, now: i64) -> Result<()> {
+    tx.execute(
+        "UPDATE sessions SET saved_at = ?2, started_at = ?3, level = ?4, level_ups = ?5, active_seconds = ?6,
+                             elapsed_seconds = ?7, exp_gained = ?8, exp_per_hour = ?9, mesos_gained = ?10,
+                             mesos_per_hour = ?11, percent_per_hour = ?12, job = ?13, deaths = ?14
+         WHERE id = ?1",
+        params![
+            id,
+            now,
+            session.started_at,
+            session.level,
+            session.level_ups,
+            session.active_seconds,
+            session.elapsed_seconds,
+            session.exp_gained,
+            session.exp_per_hour,
+            session.mesos_gained,
+            session.mesos_per_hour,
+            session.percent_per_hour,
+            session.job,
+            session.deaths
+        ],
+    )?;
+    tx.execute("DELETE FROM session_maps WHERE session_id = ?1", [id])?;
+    tx.execute("DELETE FROM session_lines WHERE session_id = ?1", [id])?;
+    let renamed = |map: &str| -> rusqlite::Result<String> {
+        match tx.query_row("SELECT name FROM map_renames WHERE read_as = ?1", [map], |row| row.get(0)) {
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(map.to_string()),
+            found => found,
+        }
+    };
+    let town = |map: &str| session.lines.iter().any(|l| l.town && l.map.as_deref() == Some(map));
+    for map in session.maps.iter().filter(|m| m.active_seconds > 0.0) {
+        let Some(name) = map.map.as_deref().filter(|name| !town(name)) else { continue };
+        tx.execute(
+            "INSERT INTO session_maps (session_id, map, active_seconds, exp_gained, mesos_gained)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![id, renamed(name)?, map.active_seconds, map.exp_gained, map.mesos_gained],
+        )?;
+    }
+    for line in session.lines.iter().filter(|l| !l.town && l.active_seconds > 0.0) {
+        let map = line.map.as_deref().map(renamed).transpose()?;
+        tx.execute(
+            "INSERT INTO session_lines (session_id, map, level, party, job, active_seconds, exp_gained,
+                                        percent_gained, mesos_gained, mesos_seconds)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            params![
+                id,
+                map,
+                line.level,
+                line.party,
+                line.job,
+                line.active_seconds,
+                line.exp_gained,
+                line.percent_gained,
+                line.mesos_gained,
+                line.mesos_seconds
+            ],
+        )?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -211,6 +314,44 @@ mod tests {
 
         db.delete_session(sessions[0].id).unwrap();
         assert_eq!(db.map_rates().unwrap()[0].active_seconds, 1200.0);
+    }
+
+    #[test]
+    fn a_session_saved_as_it_goes_keeps_its_note() {
+        let mut db = UserData::open_in_memory().unwrap();
+        let meadow = "Fern Road : Mossbank Meadow I";
+        let id = db.save_session(&session(10.0, 1000, &[(Some(meadow), 10.0, 1000)]), "", 1).unwrap();
+        db.set_session_note(id, " Good spot ").unwrap();
+        db.update_session(id, &session(20.0, 2000, &[(Some(meadow), 20.0, 2000)]), 2).unwrap();
+        let saved = &db.sessions().unwrap()[0];
+        assert_eq!(saved.note, "Good spot");
+        assert_eq!(saved.exp_gained, 2000);
+        assert_eq!(saved.maps.len(), 1);
+        assert_eq!(saved.maps[0].active_seconds, 1200.0);
+    }
+
+    #[test]
+    fn a_renamed_map_stays_renamed() {
+        let mut db = UserData::open_in_memory().unwrap();
+        let (wrong, right) = ("Fern Road : Mossbank Meadovv", "Fern Road : Mossbank Meadow");
+        let id = db.save_session(&session(10.0, 1000, &[(Some(wrong), 10.0, 1000)]), "", 1).unwrap();
+        db.rename_map(wrong, right).unwrap();
+        assert_eq!(db.sessions().unwrap()[0].maps[0].map, right);
+        db.update_session(id, &session(20.0, 2000, &[(Some(wrong), 20.0, 2000)]), 2).unwrap();
+        assert_eq!(db.sessions().unwrap()[0].maps[0].map, right, "the same misread later on is corrected too");
+        assert!(db.rename_map(right, "  ").is_err());
+    }
+
+    #[test]
+    fn towns_are_not_logged() {
+        let mut db = UserData::open_in_memory().unwrap();
+        let town = "Fern Road : Mossbank";
+        let mut summary = session(10.0, 1000, &[(Some(town), 10.0, 1000)]);
+        summary.lines =
+            vec![SessionLine { map: Some(town.into()), town: true, active_seconds: 600.0, ..SessionLine::default() }];
+        db.save_session(&summary, "", 1).unwrap();
+        let saved = &db.sessions().unwrap()[0];
+        assert!(saved.maps.is_empty() && saved.lines.is_empty());
     }
 
     #[test]

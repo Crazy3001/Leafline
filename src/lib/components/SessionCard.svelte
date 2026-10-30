@@ -1,6 +1,7 @@
 <script lang="ts">
   import Card from "./Card.svelte";
-  import { formatCompact, formatDuration, formatNumber, splitMapLabel } from "$lib/format";
+  import SessionControls from "./SessionControls.svelte";
+  import { formatCompact, formatDuration, formatNumber, partyLabel, splitMapLabel } from "$lib/format";
   import type { SessionSummary } from "$lib/types";
 
   let { session, compact = false }: { session: SessionSummary; compact?: boolean } = $props();
@@ -8,11 +9,18 @@
   const signed = (value: number) => (value > 0 ? `+${formatNumber(value)}` : formatNumber(value));
   const maps = $derived(session.maps.filter((m) => m.activeSeconds > 0 || m.expGained !== 0 || m.mesosGained !== 0));
   const dropped = $derived(session.rejected.exp + session.rejected.mesos);
+  /** How long the mesos can stay out of sight before the player is reminded. */
+  const MESOS_STALE = 300;
+  const mesosStale = $derived(!session.paused && (session.mesosAge ?? 0) >= MESOS_STALE);
+  const hasNotes = $derived(session.deaths > 0 || session.mapHidden || mesosStale);
 </script>
 
 <Card title="Session">
   {#snippet aside()}
-    {#if session.paused}
+    {#if session.party != null && session.party > 1}<span class="party tabular">{partyLabel(session.party)}</span>{/if}
+    {#if session.held}
+      <span class="state paused" title="Paused by hand">Paused</span>
+    {:else if session.paused}
       <span class="state paused" title="No EXP for a while, or the map changed: the clock waits for the next gain">
         Paused
       </span>
@@ -20,6 +28,8 @@
       <span class="state running">Tracking</span>
     {/if}
   {/snippet}
+
+  <SessionControls />
 
   <dl class="totals" class:compact>
     <div>
@@ -80,10 +90,26 @@
     </table>
   {/if}
 
+  {#if hasNotes}
+    <ul class="notes">
+      {#if session.mapHidden}
+        <li class="attention">Can't see the minimap's name, so new gains may not go to the right map.</li>
+      {/if}
+      {#if mesosStale}<li class="attention">Open your inventory now and then so mesos stay up to date.</li>{/if}
+      {#if session.deaths > 0}
+        <li>
+          {session.deaths} death{session.deaths === 1 ? "" : "s"}, {session.percentOnly
+            ? `${session.percentLost.toFixed(2)}% of a level`
+            : `${formatNumber(session.expLost)} EXP`} lost. Left out of the rates.
+        </li>
+      {/if}
+    </ul>
+  {/if}
+
   {#if !compact && (session.mesosExcluded !== 0 || dropped > 0)}
     <ul class="notes">
       {#if session.mesosExcluded !== 0}
-        <li>{signed(session.mesosExcluded)} mesos changed hands in storage or trade windows and are left out.</li>
+        <li>{signed(session.mesosExcluded)} mesos changed hands in shop, storage or trade windows and are left out.</li>
       {/if}
       {#if dropped > 0}
         <li>
@@ -98,9 +124,19 @@
 </Card>
 
 <style>
+  .party {
+    margin-right: 6px;
+    color: var(--muted);
+    font-size: 11px;
+  }
+
+  .attention {
+    color: var(--warn);
+  }
+
   .state {
     padding: 1px 7px;
-    border-radius: 999px;
+    border-radius: var(--radius-sm);
     font-size: 10.5px;
     font-weight: 600;
   }
@@ -206,7 +242,7 @@
     width: 6px;
     height: 6px;
     margin: 0 6px 1px 0;
-    border-radius: 50%;
+    border-radius: var(--radius-sm);
     background: var(--map);
   }
 

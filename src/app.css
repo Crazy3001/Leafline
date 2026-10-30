@@ -3,42 +3,42 @@
 :root {
   color-scheme: dark;
 
-  --font-sans: "Segoe UI Variable Text", "Segoe UI", Inter, system-ui, -apple-system, sans-serif;
-  --font-display: "Segoe UI Variable Display", "Segoe UI", Inter, system-ui, sans-serif;
+  --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-display: Bahnschrift, "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
   --font-mono: "Cascadia Mono", "Cascadia Code", Consolas, ui-monospace, monospace;
 
-  --bg: #0b0e14;
-  --surface: #11151d;
-  --surface-2: #171c26;
-  --surface-3: #1f2532;
-  --glass: rgba(13, 16, 23, 0.88);
-  --border: rgba(255, 255, 255, 0.07);
-  --border-strong: rgba(255, 255, 255, 0.13);
+  --bg: #141412;
+  --surface: #1a1917;
+  --surface-2: #201f1c;
+  --surface-3: #2a2824;
+  --glass: rgba(20, 20, 18, 0.95);
+  --border: rgba(236, 230, 216, 0.1);
+  --border-strong: rgba(236, 230, 216, 0.2);
 
-  --text: #e7eaf0;
-  --muted: #8e96a9;
-  --faint: #5d6579;
+  --text: #ece6d8;
+  --muted: #a8a193;
+  --faint: #767064;
 
-  --accent: #f3b13f;
-  --accent-strong: #ffc65c;
-  --accent-soft: rgba(243, 177, 63, 0.14);
+  --accent: #e0a030;
+  --accent-strong: #f0b848;
+  --accent-soft: rgba(224, 160, 48, 0.14);
 
-  --hp: #ef4f5a;
-  --mp: #3d9bff;
-  --exp: #e8cd3a;
-  --map: #a78bfa;
+  --hp: #d9534f;
+  --mp: #4a90d9;
+  --exp: #d9c036;
+  --map: #e0a030;
   /* Rides and return scrolls in routes, apart from portal steps. */
-  --travel: #3cc8b4;
-  --good: #4fd18b;
-  --good-soft: rgba(79, 209, 139, 0.13);
-  --warn: #f0a33a;
-  --warn-soft: rgba(240, 163, 58, 0.14);
-  --bad: #ef4f5a;
+  --travel: #4fb3a3;
+  --good: #6fbf73;
+  --good-soft: rgba(111, 191, 115, 0.14);
+  --warn: #e8893a;
+  --warn-soft: rgba(232, 137, 58, 0.14);
+  --bad: #d9534f;
 
-  --radius-sm: 6px;
-  --radius: 10px;
-  --radius-lg: 14px;
-  --shadow: 0 10px 30px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.35);
+  --radius-sm: 2px;
+  --radius: 2px;
+  --radius-lg: 3px;
+  --shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
 
   font-family: var(--font-sans);
   font-size: 13px;
@@ -70,11 +70,10 @@ button {
 }
 
 .eyebrow {
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--faint);
+  font-family: var(--font-display);
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--muted);
 }
 
 ::-webkit-scrollbar {
@@ -85,7 +84,7 @@ button {
 ::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.08);
   border: 3px solid transparent;
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   background-clip: padding-box;
 }
 

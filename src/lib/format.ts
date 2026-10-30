@@ -45,6 +45,12 @@ export function mapLabel(map: { street: string | null; name: string }): string {
   return map.street ? `${map.street} : ${map.name}` : map.name;
 }
 
+/** A party size as the log shows it: `Solo`, `4 ppl`. Null when it wasn't read. */
+export function partyLabel(size: number | null | undefined): string | null {
+  if (size == null) return null;
+  return size <= 1 ? "Solo" : `${size} ppl`;
+}
+
 /** The street and name of a map label, for two-line display. */
 export function splitMapLabel(label: string): { street: string | null; name: string } {
   const at = label.indexOf(" : ");

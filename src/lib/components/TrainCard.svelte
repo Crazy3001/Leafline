@@ -2,6 +2,7 @@
   // Training spots for the character's level: maps ranked by the map data's base numbers, or
   // by the EXP per hour the player measured there. No game formulas are modelled.
   import { ChevronRight, Gauge, Minus, Plus } from "@lucide/svelte";
+  import { untrack } from "svelte";
 
   import Card from "./Card.svelte";
   import MapDataPanel from "./map/MapDataPanel.svelte";
@@ -43,13 +44,14 @@
   const SORT_KEY = "leafline.train.sort";
   const LEVEL_KEY = "leafline.train.level";
   const NEARBY_KEY = "leafline.train.nearbyFirst";
+  const ALL_LEVELS_KEY = "leafline.train.allLevels";
 
   watchMapData();
   const ready = $derived(mapData.status?.ready ?? false);
 
   let sort = $state<Sort>(stored(SORT_KEY, "exp") as Sort);
   let manualLevel = $state<number | null>(Number(stored(LEVEL_KEY, "")) || null);
-  let allLevels = $state(false);
+  let allLevels = $state(stored(ALL_LEVELS_KEY, "false") === "true");
   let nearbyFirst = $state(stored(NEARBY_KEY, "true") === "true");
   let more = $state(false);
   let data = $state<TrainingSpots | null>(null);
@@ -62,7 +64,11 @@
   // Saved sessions and the current one, so maps can be compared across play sessions.
   const measured = $derived(measuredRates(session));
   const queryKey = $derived(JSON.stringify([map?.name, map?.street, measured, travelKey()]));
+  // Each list is a new object: the route follows where it starts from, not the list.
+  const fromId = $derived(data?.from?.id);
 
+  // Follows the key alone: every live reading brings new objects with the same content, and
+  // asking again for each would rebuild the list.
   $effect(() => {
     const key = queryKey;
     void mapData.status?.dataUpdatedAt;
@@ -70,8 +76,7 @@
       data = null;
       return;
     }
-    backend
-      .trainingSpots(map?.name ?? null, map?.street ?? null, measured)
+    untrack(() => backend.trainingSpots(map?.name ?? null, map?.street ?? null, measured))
       .then((result) => {
         if (key === queryKey) data = result;
       })
@@ -80,7 +85,7 @@
 
   $effect(() => {
     const id = open;
-    const from = data?.from?.id;
+    const from = fromId;
     void travelKey();
     route = null;
     if (id == null || from == null) return;
@@ -295,7 +300,14 @@
       <div class="footer">
         <span class="checks">
           <label class="check">
-            <input type="checkbox" bind:checked={allLevels} />
+            <input
+              type="checkbox"
+              checked={allLevels}
+              onchange={(e) => {
+                allLevels = e.currentTarget.checked;
+                remember(ALL_LEVELS_KEY, String(allLevels));
+              }}
+            />
             Every level
           </label>
           {#if sort !== "near"}
@@ -340,7 +352,7 @@
     height: 18px;
     padding: 0;
     border: 1px solid var(--border);
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     background: transparent;
     color: var(--muted);
     cursor: pointer;
@@ -350,7 +362,7 @@
     width: 34px;
     padding: 1px 2px;
     border: 1px solid var(--border-strong);
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     background: var(--surface);
     color: var(--text);
     font: inherit;
@@ -376,7 +388,7 @@
     flex: 1;
     padding: 3px 4px;
     border: 0;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     background: transparent;
     color: var(--muted);
     font-size: 11px;

@@ -22,13 +22,9 @@ function refresh() {
     .catch(() => (history.value = null));
 }
 
-/** Whether this session is already in the history (saved from the same replay). */
+/** Whether this session is already in the history. A live session is saved as it goes. */
 export function isSaved(session: SessionSummary | null): boolean {
-  return (
-    session?.startedAt != null &&
-    (history.value?.sessions.some((s) => s.startedAt === session.startedAt && s.activeSeconds === session.activeSeconds) ??
-      false)
-  );
+  return session?.startedAt != null && (history.value?.sessions.some((s) => s.startedAt === session.startedAt) ?? false);
 }
 
 /**

@@ -10,7 +10,7 @@ use image::{Rgba, imageops};
 use regex::Regex;
 use serde::Serialize;
 
-use super::text::parse_grouped;
+use super::text::{digitize, parse_grouped};
 use crate::error::Result;
 use crate::vision::glyphs::{MIN_SIMILARITY, Mask, ink_columns, ink_rows};
 use crate::vision::{Frame, Ocr, Rect, color, preprocess};
@@ -23,6 +23,13 @@ pub struct MesoReading {
 
 /// A grouped amount such as `36,644`, or a small one such as `500`.
 static AMOUNT: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^(?:\d{1,3}(?:[,.]\d{3})+|\d{1,3})$").unwrap());
+
+/// Amounts of up to this many characters get a second try when OCR finds nothing.
+const SHORT_AMOUNT: usize = 3;
+/// How many times a short amount is drawn, and the pixels between copies. Tried on the game's
+/// own `0`: OCR read fewer copies only some of the time, and these every time.
+const COPIES: usize = 5;
+const COPY_GAP: u32 = 2;
 
 /// Reads every meso box on screen. Storage and trade windows show more boxes (the storage's
 /// own mesos, for one), so the amount most boxes agree on is taken as the player's. Also
@@ -62,6 +69,7 @@ fn read_amount(frame: &Frame, rect: Rect, ocr: &Ocr) -> Result<Option<u64>> {
             preprocess::pad(&imageops::resize(&keyed, w, h, filter), 40)
         })?;
         let text: String = words.iter().map(|w| w.text.as_str()).collect();
+        let text = settle_sixes(&text, &glyphs);
         if AMOUNT.is_match(&text)
             && fits_shapes(&text, &glyphs)
             && let Some(amount) = parse_grouped(&text)
@@ -69,10 +77,90 @@ fn read_amount(frame: &Frame, rect: Rect, ocr: &Ocr) -> Result<Option<u64>> {
             readings.push(amount);
         }
     }
+    if readings.is_empty() && (1..=SHORT_AMOUNT).contains(&glyphs.len()) {
+        readings = read_repeated(frame, rect, &glyphs, ocr)?;
+    }
     let votes = |amount: u64| readings.iter().filter(|&&r| r == amount).count();
     let most = readings.iter().map(|&r| votes(r)).max().unwrap_or(0);
     let winners: Vec<u64> = readings.iter().copied().filter(|&r| votes(r) == most).collect();
     Ok((most >= 2 && winners.iter().all(|&w| w == winners[0])).then(|| winners[0]))
+}
+
+/// OCR of a short amount drawn several times over, since OCR skips a lone digit as not being
+/// text. Every copy must read the same.
+fn read_repeated(frame: &Frame, rect: Rect, glyphs: &[Mask], ocr: &Ocr) -> Result<Vec<u64>> {
+    use imageops::FilterType::Triangle;
+    let columns = ink_columns(frame, rect, is_digit);
+    let (Some(rows), Some(first), Some(last)) = (ink_rows(frame, rect, is_digit), columns.first(), columns.last())
+    else {
+        return Ok(Vec::new());
+    };
+    let (left, width) = (first.0, last.1 - first.0);
+    let pitch = width + COPY_GAP;
+    let copies = Frame::from_fn(COPIES as u32 * pitch, rows.1 - rows.0, |x, y| {
+        let column = x % pitch;
+        let ink = column < width && is_digit(frame.get_pixel(left + column, rows.0 + y));
+        if ink { Rgba([0, 0, 0, 255]) } else { Rgba([255, 255, 255, 255]) }
+    });
+    let whole = Rect::new(0.0, 0.0, copies.width() as f32, copies.height() as f32);
+    let mut readings = Vec::new();
+    for scale in [1, 2, 3] {
+        let words = ocr.words_in(&copies, whole, scale as f32, |crop| {
+            let (w, h) = (crop.width() * scale, crop.height() * scale);
+            preprocess::pad(&imageops::resize(crop, w, h, Triangle), 40)
+        })?;
+        let text: String = words.iter().map(|w| w.text.as_str()).collect();
+        if let Some(amount) = one_copy(&text).map(|t| settle_sixes(&t, glyphs))
+            && AMOUNT.is_match(&amount)
+            && fits_shapes(&amount, glyphs)
+            && let Some(amount) = parse_grouped(&amount)
+        {
+            readings.push(amount);
+        }
+    }
+    Ok(readings)
+}
+
+/// Whether a digit has ink at its upper right. An 8 does and a 6 doesn't, which is what OCR
+/// misses when it confuses them.
+fn inked_upper_right(glyph: &Mask) -> bool {
+    let height = (0..glyph.height()).rev().find(|&y| (0..glyph.width()).any(|x| glyph.get(x, y))).map_or(0, |y| y + 1);
+    let (from, to) = (height * 2 / 16, height * 5 / 16);
+    let right = glyph.width().saturating_sub(glyph.width() / 5).min(glyph.width().saturating_sub(1));
+    (from..to).any(|y| (right..glyph.width()).any(|x| glyph.get(x, y)))
+}
+
+/// Corrects every 6 and 8 in `text` to the one its glyph's shape shows. `text` must have one
+/// character per glyph, or it is returned as it is.
+fn settle_sixes(text: &str, glyphs: &[Mask]) -> String {
+    let chars: Vec<char> = text.chars().filter(|c| !c.is_whitespace()).collect();
+    if chars.len() != glyphs.len() {
+        return text.to_string();
+    }
+    chars
+        .into_iter()
+        .zip(glyphs)
+        .map(|(c, glyph)| match c {
+            '6' | '8' if inked_upper_right(glyph) => '8',
+            '6' | '8' => '6',
+            other => other,
+        })
+        .collect()
+}
+
+/// The text of one copy, if `text` is [`COPIES`] copies of the same thing. OCR takes a row of
+/// digits for letters as readily as digits: `ggggg` for 9s, `aaaaa` for 8s.
+fn one_copy(text: &str) -> Option<String> {
+    let digits = digitize(text);
+    let as_digit = |c| match c {
+        'g' | 'q' => '9',
+        'a' => '8',
+        other => other,
+    };
+    let chars: Vec<char> = digits.chars().filter(|c| !c.is_whitespace()).map(as_digit).collect();
+    let size = chars.len() / COPIES;
+    let whole = size > 0 && chars.len() % COPIES == 0;
+    (whole && chars.chunks(size).all(|copy| copy == &chars[..size])).then(|| chars[..size].iter().collect())
 }
 
 /// The amount's characters (digits and separators), cut out by shape.
@@ -158,6 +246,38 @@ mod tests {
             if col < columns.len() && row < 5 && columns[col][row] { Rgba([20, 20, 20, 255]) } else { Rgba([255; 4]) }
         });
         (frame, Rect::new(0.0, 0.0, columns.len() as f32 + 4.0, 9.0))
+    }
+
+    #[test]
+    fn a_digits_shape_settles_six_or_eight() {
+        // Made-up glyphs shaped like the real thing: a 6 is open at the upper right.
+        let six = ["....####..", "..##......", "##........", "########..", "##......##", "##......##", "..######.."];
+        let eight = ["..######..", "##......##", "##......##", "..######..", "##......##", "##......##", "..######.."];
+        let mask = |rows: &[&str]| Mask::try_from(rows.iter().flat_map(|r| [r.to_string(), r.to_string()]).collect::<Vec<_>>()).unwrap();
+        let (six, eight) = (mask(&six), mask(&eight));
+        assert!(!inked_upper_right(&six));
+        assert!(inked_upper_right(&eight));
+        assert_eq!(settle_sixes("6", &[eight.clone()]), "8");
+        assert_eq!(settle_sixes("8", &[six.clone()]), "6");
+        assert_eq!(settle_sixes("68", &[eight.clone(), six.clone()]), "86");
+        // Anything else, or a reading that doesn't line up with the glyphs, is left alone.
+        assert_eq!(settle_sixes("3", &[six.clone()]), "3");
+        assert_eq!(settle_sixes("66", &[six]), "66");
+    }
+
+    #[test]
+    fn repeated_amounts_must_agree_in_every_copy() {
+        assert_eq!(one_copy("00000"), Some("0".into()));
+        assert_eq!(one_copy("OOOOO"), Some("0".into()));
+        assert_eq!(one_copy("O0o0O"), Some("0".into()));
+        assert_eq!(one_copy("77777"), Some("7".into()));
+        assert_eq!(one_copy("ggggg"), Some("9".into()));
+        assert_eq!(one_copy("aaaaaaaaaa"), Some("88".into()));
+        assert_eq!(one_copy("25 25 25 25 25"), Some("25".into()));
+        assert_eq!(one_copy("0000"), None);
+        assert_eq!(one_copy("00800"), None);
+        assert_eq!(one_copy("oooor-l"), None);
+        assert_eq!(one_copy(""), None);
     }
 
     #[test]

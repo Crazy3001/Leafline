@@ -12,13 +12,13 @@ use serde::Serialize;
 
 use super::drops::{Drop, Dropper, ItemSources, MonsterDrops};
 use super::osms::{
-    Dataset, FILES, FileMeta, MapRecord, Meta, MobRequirement, MonsterRecord, NpcRecord, Portal, QuestRecord, Records,
-    Spawn,
+    Dataset, FILES, FileMeta, Height, MapRecord, Meta, MobRequirement, MonsterRecord, NpcRecord, Portal, QuestRecord,
+    Records, Side, Spawn,
 };
 use crate::error::Result;
 
 /// Bump when the tables change; an older cache is then dropped and downloaded again.
-const CACHE_VERSION: i32 = 1;
+const CACHE_VERSION: i32 = 2;
 
 const SCHEMA: &str = "
 CREATE TABLE source_files (
@@ -31,7 +31,7 @@ CREATE TABLE maps (
 CREATE TABLE map_exits (map_id INTEGER NOT NULL, dest_map_id INTEGER NOT NULL, PRIMARY KEY (map_id, dest_map_id));
 CREATE TABLE portals (
     map_id INTEGER NOT NULL, seq INTEGER NOT NULL, name TEXT NOT NULL,
-    dest_map_id INTEGER, dest_portal TEXT, PRIMARY KEY (map_id, seq));
+    dest_map_id INTEGER, dest_portal TEXT, side INTEGER, height INTEGER, PRIMARY KEY (map_id, seq));
 CREATE TABLE monsters (
     id INTEGER PRIMARY KEY, name TEXT NOT NULL, level INTEGER NOT NULL, hp INTEGER NOT NULL,
     exp INTEGER NOT NULL, is_boss INTEGER NOT NULL, undead INTEGER NOT NULL);
@@ -217,10 +217,19 @@ impl Store {
             exits.entry(map).or_default().push(dest);
         }
         let mut portals: HashMap<u32, Vec<Portal>> = HashMap::new();
-        let mut stmt =
-            self.conn.prepare("SELECT map_id, name, dest_map_id, dest_portal FROM portals ORDER BY map_id, seq")?;
+        let mut stmt = self
+            .conn
+            .prepare("SELECT map_id, name, dest_map_id, dest_portal, side, height FROM portals ORDER BY map_id, seq")?;
         for row in stmt.query_map([], |row| {
-            Ok((row.get(0)?, Portal { name: row.get(1)?, dest_map_id: row.get(2)?, dest_portal: row.get(3)? }))
+            let (side, height): (Option<u32>, Option<u32>) = (row.get(4)?, row.get(5)?);
+            let portal = Portal {
+                name: row.get(1)?,
+                dest_map_id: row.get(2)?,
+                dest_portal: row.get(3)?,
+                side: side.and_then(|i| Side::ALL.get(i as usize).copied()),
+                height: height.and_then(|i| Height::ALL.get(i as usize).copied()),
+            };
+            Ok((row.get(0)?, portal))
         })? {
             let (map, portal) = row?;
             portals.entry(map).or_default().push(portal);
@@ -470,8 +479,10 @@ fn insert_maps(tx: &Transaction, maps: &[MapRecord]) -> Result<()> {
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
     )?;
     let mut exit = tx.prepare("INSERT OR IGNORE INTO map_exits (map_id, dest_map_id) VALUES (?1, ?2)")?;
-    let mut portal =
-        tx.prepare("INSERT INTO portals (map_id, seq, name, dest_map_id, dest_portal) VALUES (?1, ?2, ?3, ?4, ?5)")?;
+    let mut portal = tx.prepare(
+        "INSERT INTO portals (map_id, seq, name, dest_map_id, dest_portal, side, height)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+    )?;
     for m in maps {
         map.execute(params![m.id, m.name, m.street_name, m.region, m.is_town, m.return_map_id, m.map_mark])?;
         for dest in &m.exits {
@@ -479,7 +490,8 @@ fn insert_maps(tx: &Transaction, maps: &[MapRecord]) -> Result<()> {
         }
         // Portals that lead nowhere (spawn points, scripted ones) say nothing about the way out.
         for (seq, p) in m.portals.iter().filter(|p| p.dest_map_id.is_some()).enumerate() {
-            portal.execute(params![m.id, seq as i64, p.name, p.dest_map_id, p.dest_portal])?;
+            let (side, height) = (p.side.map(|s| s as i64), p.height.map(|h| h as i64));
+            portal.execute(params![m.id, seq as i64, p.name, p.dest_map_id, p.dest_portal, side, height])?;
         }
     }
     Ok(())

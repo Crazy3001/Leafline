@@ -24,6 +24,8 @@ export interface HudReading {
   hp: Gauge | null;
   mp: Gauge | null;
   exp: Exp | null;
+  /** The EXP percentage, when the HUD shows it with no points beside it, as it does at high levels. */
+  expPercent: number | null;
   /** The HUD font has not been learned at this size, or shows a character not seen yet. */
   needsCalibration: boolean;
 }
@@ -149,9 +151,15 @@ export interface Analysis {
   mesos: MesoReading | null;
   /** Meso boxes on screen; more than one means a storage or trade window is open. */
   mesoBoxes: number;
+  /** An NPC shop, storage or trade window is open, going by its buttons. */
+  shopOpen: boolean;
+  /** How many are in the party, the player included; 1 with no party list in view. */
+  partySize: number;
   map: MapReading | null;
   overview: Line[];
   timings: Timing[];
+  /** Parts that hit an error this time. The rest were still read. */
+  failed: string[];
 }
 
 /** The overlay's tabs, each of which can be pinned into a window of its own. */
@@ -187,6 +195,10 @@ export type LiveStatus =
       hdr: boolean;
       /** Without a taught HUD font, EXP, HP and MP aren't read. */
       hudTaught: boolean;
+      /** Tracking is paused by hand. */
+      held: boolean;
+      /** This run goes to the log. */
+      logging: boolean;
     }
   | { state: "failed"; message: string };
 
@@ -209,13 +221,31 @@ export interface LiveChoice {
   enabled: boolean;
   /** Seconds between readings, 1 to 10. */
   interval: number;
+  /** Seconds without EXP before the clock pauses, 5 to 300. */
+  pauseAfter: number;
   window: WindowChoice | null;
 }
 
 export interface ShortcutInfo {
   action: string;
+  /** Empty when this hotkey is turned off. */
   keys: string;
+  defaultKeys: string;
   label: string;
+}
+
+/** A stretch of play on one map at one level, party size and job. */
+export interface SessionLine {
+  map: string | null;
+  town: boolean;
+  level: number | null;
+  party: number | null;
+  job: string | null;
+  activeSeconds: number;
+  expGained: number;
+  percentGained: number;
+  mesosGained: number;
+  mesosSeconds: number;
 }
 
 export interface MapSummary {
@@ -237,22 +267,47 @@ export interface SessionSummary {
   /** Time spent gaining EXP, with idle stretches and map changes paused out. */
   activeSeconds: number;
   paused: boolean;
+  /** The player paused tracking by hand. */
+  held: boolean;
   level: number | null;
   exp: Exp | null;
+  /** The latest EXP percentage, read with or without points. */
+  percent: number | null;
+  /** The HUD shows only a percentage, so EXP amounts are unknown. */
+  percentOnly: boolean;
   /** The EXP the current level needs, as measured from the HUD. */
   expNeeded: number | null;
   expGained: number;
   expPerHour: number | null;
   percentPerHour: number | null;
   secondsToLevel: number | null;
+  /** Rates over the last five minutes of active time. */
+  recentExpPerHour: number | null;
+  recentPercentPerHour: number | null;
+  recentMesosPerHour: number | null;
+  /** The recent EXP rate (or percent rate at high levels) over time, oldest first. */
+  trend: number[];
   levelUps: number;
+  deaths: number;
+  /** EXP lost to deaths, left out of the rates. */
+  expLost: number;
+  /** Percent of a level lost to deaths. */
+  percentLost: number;
   mesos: number | null;
+  /** Seconds since the mesos were last on screen. */
+  mesosAge: number | null;
   mesosGained: number;
   mesosPerHour: number | null;
-  /** Net change while a storage or trade window was open, left out of the rates. */
+  /** Net change while a shop, storage or trade window was open, left out of the rates. */
   mesosExcluded: number;
   map: string | null;
+  /** The minimap's name has not been seen for a while, so the map may be out of date. */
+  mapHidden: boolean;
+  job: string | null;
+  party: number | null;
   maps: MapSummary[];
+  /** Per map, level, party size and job, most active time first. */
+  lines: SessionLine[];
   /** Quest counter gains per objective and map, most active time first. */
   counters: CounterRate[];
   rejected: { exp: number; mesos: number };
@@ -333,9 +388,15 @@ export interface QuestNeed {
 
 /** Which way a portal leads, judged from its name. */
 export type Direction = "west" | "east" | "in" | "out" | "other";
+/** Which third of its map a portal stands in, across and down. */
+export type Side = "left" | "centre" | "right";
+export type Height = "high" | "middle" | "low";
 
 export interface MapExit {
+  /** A guess from the portal's name; `side` and `height` outrank it when known. */
   direction: Direction;
+  side: Side | null;
+  height: Height | null;
   to: MapRef;
   portals: string[];
   hidden: boolean;
@@ -368,6 +429,7 @@ export interface RouteStep {
   from: MapRef;
   to: MapRef;
   direction: Direction;
+  side: Side | null;
   portal: string | null;
   hidden: boolean;
   /** Set when the step is a ride or scroll rather than a portal. */
@@ -597,12 +659,24 @@ export interface PriceLog {
   likeThis: PriceStats | null;
 }
 
+export type CompactShape = "card" | "wide" | "bar";
+
+export interface HotkeyChoice {
+  enabled: boolean;
+  /** Keys the player changed, by action. Empty turns that hotkey off. */
+  keys: Record<string, string>;
+}
+
 /** Display settings for the overlay and pinned panels (see src-tauri/src/app/settings.rs). */
 export interface DisplaySettings {
   /** 0.4 to 1. */
   opacity: number;
-  /** 0.85 to 1.3. */
+  /** 0.6 to 2. */
   scale: number;
+  /** Keep the overlay and pinned panels above the game. */
+  alwaysOnTop: boolean;
+  compactShape: CompactShape;
+  hotkeys: HotkeyChoice;
   /** Taxis and return scrolls in routes; off by default. */
   travel: TravelChoice;
   live: LiveChoice;
@@ -624,6 +698,13 @@ export interface SavedSession {
   expPerHour: number | null;
   mesosGained: number;
   mesosPerHour: number | null;
+  percentPerHour: number | null;
+  job: string | null;
+  deaths: number;
+  /** The player's own note. It stays on this PC. */
+  note: string;
+  /** Per map, level, party size and job, most active time first. */
+  lines: SessionLine[];
   /** Most active time first; time that couldn't be placed on a map is left out. */
   maps: { map: string; activeSeconds: number; expGained: number; mesosGained: number }[];
 }

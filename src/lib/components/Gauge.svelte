@@ -36,12 +36,12 @@
   .label {
     font-size: 11px;
     font-weight: 700;
-    letter-spacing: 0.06em;
     color: var(--muted);
   }
 
   .value {
-    font-size: 12px;
+    font-family: var(--font-display);
+    font-size: 13px;
     color: var(--text);
   }
 
@@ -50,8 +50,8 @@
   }
 
   .track {
-    height: 6px;
-    border-radius: 999px;
+    height: 8px;
+    border-radius: var(--radius-sm);
     background: rgba(255, 255, 255, 0.06);
     overflow: hidden;
   }
@@ -59,8 +59,7 @@
   .fill {
     height: 100%;
     border-radius: inherit;
-    background: linear-gradient(90deg, color-mix(in srgb, var(--color) 70%, black), var(--color));
-    box-shadow: 0 0 10px color-mix(in srgb, var(--color) 45%, transparent);
+    background: var(--color);
     transition: width 0.4s ease;
   }
 </style>

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ArrowLeft, MapPin } from "@lucide/svelte";
+  import { Map as MapIcon, MapPin } from "@lucide/svelte";
 
   import Card from "./Card.svelte";
   import MapDataPanel from "./map/MapDataPanel.svelte";
@@ -34,18 +34,22 @@
   /** Another map opened from the card (a neighbour, a route step, a search), if any. */
   let browsing = $state<MapDetails | null>(null);
 
+  // Each live reading is a new object, so the effect follows the text: the same header read
+  // again must not look the map up, which would blank the card and shrink a pinned window.
+  const name = $derived(map?.name);
+  const street = $derived(map?.street ?? null);
+
   $effect(() => {
-    const name = map?.name;
-    const street = map?.street ?? null;
+    const asked = name;
     void mapData.status?.dataUpdatedAt;
     browsing = null;
     found = null;
-    if (!name || !ready) return;
+    if (!asked || !ready) return;
     looking = true;
     backend
-      .findMap(name, street)
+      .findMap(asked, street)
       .then((match) => {
-        if (map?.name === name) found = match;
+        if (name === asked) found = match;
       })
       .finally(() => (looking = false));
   });
@@ -59,10 +63,12 @@
   }
 
   const shown = $derived(browsing ?? found?.card ?? null);
-  // A close but inexact match, or another map with the same name: let the user correct it.
-  const doubtful = $derived(
-    !!found && !browsing && (found.score < 0.97 || found.alternatives.some((a) => a.name === found!.card.map.name)),
-  );
+  /** The map the player is on. */
+  const current = $derived(found?.card.map ?? null);
+  const currentName = $derived(current?.name ?? map?.name ?? null);
+  // A poor match, or other maps nearly as close: let the user correct it. OCR slips a letter
+  // often, so a lone good match isn't worth a warning.
+  const doubtful = $derived(!!found && !browsing && (found.score < 0.85 || found.alternatives.length > 0));
 </script>
 
 <Card title="Map" plain={variant === "pin"}>
@@ -71,15 +77,17 @@
   {/snippet}
 
   {#if browsing}
-    <button class="back" onclick={() => (browsing = null)}>
-      <ArrowLeft size={12} />
-      {found ? `Back to ${found.card.map.name}` : map ? `Back to ${map.name}` : "Back"}
+    <button class="back" title="Go back to the map you are on" onclick={() => (browsing = null)}>
+      <MapPin size={13} />
+      <span class="back-to">{#if currentName}Back to <strong>{currentName}</strong>{:else}Back{/if}</span>
     </button>
   {/if}
 
   {#if map || shown}
     <div class="where" class:elsewhere={!!browsing}>
-      <span class="pin" aria-hidden="true"><MapPin size={15} /></span>
+      <span class="pin" aria-hidden="true">
+        {#if browsing}<MapIcon size={15} />{:else}<MapPin size={15} />{/if}
+      </span>
       <div class="names">
         {#if browsing}
           {#if browsing.map.street}<div class="street">{browsing.map.street}</div>{/if}
@@ -118,7 +126,7 @@
 
   {#if shown}
     {#key shown.map.id}
-      <MapDetailsView details={shown} {variant} onnavigate={navigate} />
+      <MapDetailsView details={shown} {current} {variant} onnavigate={navigate} />
     {/key}
   {:else if !ready}
     {#if mapData.status}
@@ -148,7 +156,7 @@
     place-items: center;
     width: 32px;
     height: 32px;
-    border-radius: 9px;
+    border-radius: var(--radius-sm);
     background: color-mix(in srgb, var(--map) 16%, transparent);
     border: 1px solid color-mix(in srgb, var(--map) 30%, transparent);
     color: var(--map);
@@ -210,23 +218,54 @@
     margin-top: 8px;
   }
 
+  /* Stays in view while a long map scrolls under it. */
   .back {
-    display: inline-flex;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
     align-items: center;
-    gap: 5px;
-    margin: -2px 0 8px;
-    padding: 2px 8px 2px 6px;
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    background: transparent;
-    color: var(--muted);
-    font-size: 11px;
+    gap: 6px;
+    width: 100%;
+    margin: -2px 0 10px;
+    padding: 6px 9px;
+    border: 1px solid color-mix(in srgb, var(--map) 45%, transparent);
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--map) 16%, var(--surface-3));
+    color: var(--map);
+    font-size: 11.5px;
+    text-align: left;
     cursor: pointer;
+    transition:
+      border-color 0.12s ease,
+      background 0.12s ease;
   }
 
   .back:hover {
-    border-color: var(--border-strong);
+    border-color: var(--map);
+    background: color-mix(in srgb, var(--map) 26%, var(--surface-3));
+  }
+
+  .back:focus-visible {
+    outline: 2px solid var(--map);
+    outline-offset: 1px;
+  }
+
+  .back :global(svg) {
+    flex: none;
+  }
+
+  .back-to {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .back-to strong {
     color: var(--text);
+    font-weight: 600;
   }
 
   .doubt {
@@ -242,7 +281,7 @@
     margin: 2px 2px 0 0;
     padding: 0 6px;
     border: 1px solid var(--border-strong);
-    border-radius: 999px;
+    border-radius: var(--radius-sm);
     background: transparent;
     font-size: 11px;
     cursor: pointer;

@@ -13,21 +13,29 @@
 //!   screen, so a new character's are often unknown. EXP is followed anyway: two readings in a
 //!   row that agree with each other but imply a different amount for the level are a level-up,
 //!   and the first level actually read lines the count up.
-//! - **Mesos count once several readings in a row agree.** Changes while a storage or trade
-//!   window is open (a second meso box on screen) are kept apart, since they are not loot.
+//! - **Mesos count once several readings in a row agree**, and a big jump needs more of them.
+//!   Changes while a shop, storage or trade window is open are kept apart, since they are not
+//!   loot.
 //! - **Quest counters count the same way**, and only going up: a counter that drops (a quest
 //!   handed in and taken again) starts afresh. Their gains over active time give the player's
 //!   own pace on each objective, per map.
 //! - **The clock pauses** after [`TrackerConfig::idle_after`] seconds without EXP, and at once
 //!   on a map change without EXP, so time in town or away does not dilute the rates.
+//! - **EXP lost to a death is left out of the rates.** A drop that two readings agree on is
+//!   counted as a death and tracking carries on from the new amount.
+//! - **Past a certain level the HUD shows only a percentage.** Progress is then followed in
+//!   percent of a level, which needs no EXP table: EXP per hour stays blank, while percent per
+//!   hour and the time to the next level keep working.
 //!
 //! A missing reading is skipped, never guessed. No EXP table is built in: the EXP each level
 //! needs is measured from the HUD itself, since Classic's table may differ from old GMS.
 
+use std::collections::VecDeque;
+
 use serde::Serialize;
 
 use crate::pipeline::Analysis;
-use crate::readers::hud::Exp;
+use crate::readers::hud::{self, Exp};
 use crate::readers::map::MapReading;
 
 /// What one frame says, at one moment.
@@ -37,10 +45,18 @@ pub struct Sample {
     pub at: f64,
     pub level: Option<u32>,
     pub exp: Option<Exp>,
+    /// The EXP percentage, when the HUD shows no points beside it.
+    pub percent: Option<f32>,
     pub mesos: Option<u64>,
-    /// A storage or trade window is open, so meso changes are not loot.
+    /// A shop, storage or trade window is open, so meso changes are not loot.
     pub exchange: bool,
     pub map: Option<String>,
+    /// The map is a town, where nothing is worth logging.
+    pub town: bool,
+    pub name: Option<String>,
+    pub job: Option<String>,
+    /// How many are in the party, the player included.
+    pub party: Option<u32>,
     /// The Quest Helper's counters.
     pub counters: Vec<Counter>,
 }
@@ -60,9 +76,14 @@ impl Sample {
             at,
             level: hud.and_then(|h| h.level),
             exp: hud.and_then(|h| h.exp),
+            percent: hud.and_then(|h| h.exp_percent),
             mesos: analysis.mesos.map(|m| m.mesos),
-            exchange: analysis.meso_boxes >= 2,
+            exchange: analysis.meso_boxes >= 2 || analysis.shop_open,
             map: analysis.map.as_ref().map(MapReading::label),
+            town: false,
+            name: hud.and_then(|h| h.name.clone()),
+            job: hud.and_then(|h| h.job.clone()).filter(|job| hud::is_known_job(job)),
+            party: Some(analysis.party_size),
             counters: analysis
                 .quest
                 .iter()
@@ -92,6 +113,54 @@ impl Default for TrackerConfig {
     }
 }
 
+/// Active seconds behind the "last 5 minutes" rates.
+const RECENT_SECONDS: f64 = 300.0;
+/// Active seconds between points on the trend line, and how many it keeps.
+const TREND_STEP: f64 = 15.0;
+const TREND_POINTS: usize = 60;
+/// Seconds without a look at the mesos after which a big change is believed at the usual count.
+const MESO_GAP: f64 = 120.0;
+/// Seconds without the minimap's name before gains stop going to the last map read.
+const MAP_BLIND_SECONDS: f64 = 45.0;
+/// ...and before the player is told.
+const MAP_HIDDEN_SECONDS: f64 = 6.0;
+/// Readings in a row that must say the same before the party size or job changes.
+const STEADY_READS: usize = 2;
+/// Readings in a row of a lower level or another name that mean another character.
+const OTHER_CHARACTER_READS: usize = 3;
+
+/// A value that changes only once several readings in a row agree on the new one.
+#[derive(Debug, Clone)]
+struct Steady<T> {
+    value: Option<T>,
+    candidate: Option<(T, usize)>,
+}
+
+impl<T> Default for Steady<T> {
+    fn default() -> Self {
+        Self { value: None, candidate: None }
+    }
+}
+
+impl<T: Clone + PartialEq> Steady<T> {
+    fn see(&mut self, reading: T, needed: usize) {
+        if self.value.as_ref() == Some(&reading) {
+            self.candidate = None;
+            return;
+        }
+        let count = match &self.candidate {
+            Some((value, count)) if *value == reading => count + 1,
+            _ => 1,
+        };
+        if count >= needed {
+            self.value = Some(reading);
+            self.candidate = None;
+        } else {
+            self.candidate = Some((reading, count));
+        }
+    }
+}
+
 /// Everything the tracker has worked out so far.
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -105,26 +174,51 @@ pub struct SessionSummary {
     pub active_seconds: f64,
     /// The clock is paused now.
     pub paused: bool,
+    /// The player paused tracking by hand.
+    pub held: bool,
     pub level: Option<u32>,
     pub exp: Option<Exp>,
+    /// The latest EXP percentage, read with or without points.
+    pub percent: Option<f32>,
+    /// The HUD shows only a percentage, so EXP amounts are unknown.
+    pub percent_only: bool,
     /// The EXP the current level needs, as measured from the HUD.
     pub exp_needed: Option<u64>,
-    /// Net EXP gained; EXP lost (on death, for example) is subtracted.
+    /// EXP gained; EXP lost to deaths is counted apart.
     pub exp_gained: i64,
     pub exp_per_hour: Option<f64>,
     pub percent_per_hour: Option<f64>,
     pub seconds_to_level: Option<f64>,
+    /// Rates over the last five minutes of active time.
+    pub recent_exp_per_hour: Option<f64>,
+    pub recent_percent_per_hour: Option<f64>,
+    pub recent_mesos_per_hour: Option<f64>,
+    /// The recent EXP rate (or percent rate at high levels) over time, oldest first.
+    pub trend: Vec<f64>,
     pub level_ups: u32,
+    pub deaths: u32,
+    /// EXP lost to deaths, left out of the rates.
+    pub exp_lost: u64,
+    /// Percent of a level lost to deaths.
+    pub percent_lost: f64,
     /// The latest confirmed amount.
     pub mesos: Option<u64>,
-    /// Net mesos gained outside storage and trade windows.
+    /// Seconds since the mesos were last on screen.
+    pub mesos_age: Option<f64>,
+    /// Net mesos gained outside shop, storage and trade windows.
     pub mesos_gained: i64,
     pub mesos_per_hour: Option<f64>,
-    /// Net change while a storage or trade window was open, left out of the rates.
+    /// Net change while one of those windows was open, left out of the rates.
     pub mesos_excluded: i64,
     pub map: Option<String>,
+    /// The minimap's name has not been seen for a while, so the map may be out of date.
+    pub map_hidden: bool,
+    pub job: Option<String>,
+    pub party: Option<u32>,
     /// Per map, most active time first.
     pub maps: Vec<MapSummary>,
+    /// Per map, level, party size and job, most active time first.
+    pub lines: Vec<SessionLine>,
     /// Quest counter gains per objective and map, most active time first.
     pub counters: Vec<CounterRate>,
     /// Readings dropped as misreads.
@@ -142,6 +236,22 @@ pub struct MapSummary {
     pub exp_per_hour: Option<f64>,
     pub mesos_gained: i64,
     pub mesos_per_hour: Option<f64>,
+}
+
+/// A stretch of play on one map at one level, party size and job.
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionLine {
+    pub map: Option<String>,
+    pub town: bool,
+    pub level: Option<u32>,
+    pub party: Option<u32>,
+    pub job: Option<String>,
+    pub active_seconds: f64,
+    pub exp_gained: i64,
+    pub percent_gained: f64,
+    pub mesos_gained: i64,
+    pub mesos_seconds: f64,
 }
 
 /// How fast one quest counter went up on one map.
@@ -217,6 +327,24 @@ struct ExpPoint {
     map: Option<String>,
 }
 
+/// Progress when the HUD shows only a percentage.
+#[derive(Debug, Clone)]
+struct PercentPoint {
+    at: f64,
+    level: u32,
+    percent: f32,
+    map: Option<String>,
+}
+
+/// Running totals at one moment of active time, for the recent rates.
+#[derive(Debug, Clone, Copy)]
+struct Mark {
+    clock: f64,
+    exp: i64,
+    percent: f64,
+    mesos: i64,
+}
+
 #[derive(Debug, Clone)]
 struct MesoPoint {
     mesos: u64,
@@ -270,17 +398,47 @@ pub struct SessionTracker {
     idle_for: f64,
     exp_gained: i64,
     level_ups: u32,
+    deaths: u32,
+    exp_lost: u64,
+    percent_lost: f64,
+    /// Percent of a level gained, across levels.
+    percent_gained: f64,
+    /// The last percentage-only reading. Set once the HUD stops showing points.
+    percent_point: Option<PercentPoint>,
+    /// A percentage that does not fit yet, kept in case the next one agrees with it.
+    percent_pending: Option<PercentPoint>,
+    /// Tracking was paused by hand: the time since the last reading doesn't count.
+    held: bool,
+    skip_gap: bool,
+
+    /// When the map's name was last seen, and the same for the mesos.
+    map_seen_at: Option<f64>,
+    mesos_seen_at: Option<f64>,
+    town: bool,
+    party: Steady<u32>,
+    job: Steady<String>,
+    name: Steady<String>,
+    /// Readings in a row that looked like another character.
+    other_character: usize,
+    /// The name read last, if it wasn't this character's.
+    stranger: Option<String>,
+
+    /// Running totals, newest last, reaching a little past the recent window.
+    marks: VecDeque<Mark>,
+    trend: VecDeque<f64>,
+    trend_clock: f64,
 
     /// The amount being read and how many readings in a row agree on it.
     meso_run: Option<(MesoPoint, usize)>,
     mesos: Option<MesoPoint>,
-    /// A storage or trade window was seen since the last confirmed amount.
+    /// A shop, storage or trade window was seen since the last confirmed amount.
     exchange_seen: bool,
     mesos_gained: i64,
     meso_seconds: f64,
     mesos_excluded: i64,
 
     maps: Vec<MapTotals>,
+    lines: Vec<SessionLine>,
     counters: Vec<CounterTrack>,
     counter_totals: Vec<CounterRate>,
     rejected: Rejected,
@@ -295,18 +453,75 @@ impl SessionTracker {
         self.frames += 1;
         // A frame where nothing was read may not show the game at all; it does not stretch
         // the session.
-        let read_any = sample.exp.is_some() || sample.level.is_some() || sample.mesos.is_some() || sample.map.is_some();
+        let read_any = sample.exp.is_some()
+            || sample.percent.is_some()
+            || sample.level.is_some()
+            || sample.mesos.is_some()
+            || sample.map.is_some();
         if read_any {
             self.started_at = Some(self.started_at.map_or(sample.at, |s| s.min(sample.at)));
             self.updated_at = Some(self.updated_at.map_or(sample.at, |u| u.max(sample.at)));
         }
         if sample.map.is_some() {
             self.map.clone_from(&sample.map);
+            self.map_seen_at = Some(sample.at);
+            self.town = sample.town;
+        } else if self.map_seen_at.is_some_and(|seen| sample.at - seen >= MAP_BLIND_SECONDS) {
+            // The player may have moved on: gains stop going to the old map.
+            self.map = None;
+        }
+        if let Some(party) = sample.party {
+            self.party.see(party, STEADY_READS);
+        }
+        if let Some(job) = &sample.job {
+            self.job.see(job.clone(), STEADY_READS);
+        }
+        if let Some(name) = &sample.name {
+            self.name.see(name.clone(), OTHER_CHARACTER_READS);
         }
         self.exchange_seen |= sample.exchange;
         self.push_exp(sample);
+        if let Some(percent) = sample.percent {
+            self.push_percent(sample, percent);
+        }
         self.push_mesos(sample);
         self.push_counters(sample);
+    }
+
+    /// Takes a new "seconds without EXP" setting.
+    pub fn set_idle_after(&mut self, seconds: f64) {
+        self.config.idle_after = seconds;
+    }
+
+    /// Stops or restarts tracking by hand. Readings are not pushed while held, and the time
+    /// held doesn't count once they come back.
+    pub fn set_held(&mut self, held: bool) {
+        self.held = held;
+        self.skip_gap = true;
+    }
+
+    /// Whether this reading, with the ones before it, shows another character: a lower level or
+    /// a different name, several readings in a row. Levels never go down and names never
+    /// change, so the session belongs to someone else from here on.
+    pub fn is_other_character(&mut self, sample: &Sample) -> bool {
+        let tracked = self.level().filter(|_| self.level_known);
+        let lower = sample.level.zip(tracked).is_some_and(|(level, tracked)| level < tracked);
+        let renamed = sample.name.as_deref().zip(self.name.value.as_deref()).is_some_and(|(read, known)| {
+            strsim::normalized_levenshtein(&read.to_lowercase(), &known.to_lowercase()) < 0.5
+        });
+        // OCR can garble a name once, but not the same way each time.
+        let same_stranger = renamed && self.stranger == sample.name;
+        self.stranger = sample.name.clone().filter(|_| renamed);
+        if lower || same_stranger {
+            self.other_character += 1;
+        } else if sample.level.is_some() || sample.name.is_some() {
+            self.other_character = 0;
+        }
+        self.other_character >= OTHER_CHARACTER_READS
+    }
+
+    fn level(&self) -> Option<u32> {
+        self.percent_point.as_ref().map(|p| p.level).or_else(|| self.exp.as_ref().map(|e| e.level))
     }
 
     fn push_exp(&mut self, sample: &Sample) {
@@ -344,11 +559,25 @@ impl SessionTracker {
 
         let implied = Requirement::implied(point.exp);
         if point.level == last.level {
-            if agree(self.requirement(level), implied) {
+            if !agree(self.requirement(level), implied) {
+                self.rejected.exp += 1;
+            } else if point.exp.points < last.exp.points {
+                // Less EXP than before: a death, once a second reading agrees.
+                match self.pending.take() {
+                    Some(first)
+                        if first.level == point.level && (first.exp.percent - point.exp.percent).abs() <= 1.0 =>
+                    {
+                        self.lose(&last, first.clone());
+                        self.accept(&first, point);
+                    }
+                    dropped => {
+                        self.rejected.exp += usize::from(dropped.is_some());
+                        self.pending = Some(point);
+                    }
+                }
+            } else {
                 self.rejected.exp += usize::from(self.pending.take().is_some());
                 self.accept(&last, point);
-            } else {
-                self.rejected.exp += 1;
             }
         } else if point.level > last.level {
             let wrapped = point.level == last.level + 1 && point.exp.percent < last.exp.percent;
@@ -419,42 +648,209 @@ impl SessionTracker {
             None
         };
 
+        let percent = if next.level == last.level {
+            f64::from(next.exp.percent - last.exp.percent).max(0.0)
+        } else if next.level == last.level + 1 {
+            100.0 - f64::from(last.exp.percent) + f64::from(next.exp.percent)
+        } else {
+            0.0
+        };
+
         let dt = (next.at - last.at).max(0.0);
         let moved = matches!((&last.map, &next.map), (Some(a), Some(b)) if a != b);
-        let counted = match gain {
+        let counted = self.run_clock(gain.map(|g| g > 0), dt, moved);
+        self.exp_gained += gain.unwrap_or(0);
+        self.percent_gained += percent;
+        self.level_ups += next.level - last.level;
+
+        if counted > 0.0 || gain.is_some_and(|g| g != 0) {
+            let map = if moved { None } else { last.map.clone().or_else(|| next.map.clone()) };
+            let totals = self.totals(map.clone());
+            totals.active_seconds += counted;
+            totals.exp_gained += gain.unwrap_or(0);
+            let level = self.level_known.then_some(next.level);
+            let line = self.line(map, level);
+            line.active_seconds += counted;
+            line.exp_gained += gain.unwrap_or(0);
+            line.percent_gained += percent;
+        }
+
+        let implied = Requirement::implied(next.exp);
+        self.set_requirement(next.level, implied);
+        self.exp = Some(next);
+        self.mark();
+    }
+
+    /// EXP went down: the loss is noted and left out of the rates.
+    fn lose(&mut self, last: &ExpPoint, next: ExpPoint) {
+        let dt = (next.at - last.at).max(0.0);
+        self.run_clock(Some(false), dt, false);
+        self.deaths += 1;
+        self.exp_lost += last.exp.points.saturating_sub(next.exp.points);
+        self.percent_lost += f64::from(last.exp.percent - next.exp.percent).max(0.0);
+        self.exp = Some(next);
+    }
+
+    /// Moves the active clock on by `dt` seconds. `gained` says whether EXP went up, or is `None`
+    /// when that can't be told. Returns the seconds counted.
+    fn run_clock(&mut self, gained: Option<bool>, dt: f64, moved: bool) -> f64 {
+        let dt = if std::mem::take(&mut self.skip_gap) { 0.0 } else { dt };
+        let counted = match gained {
             None => 0.0,
-            Some(g) if g > 0 => {
+            Some(true) => {
                 self.idle_for = 0.0;
                 dt
             }
-            Some(_) if moved => {
+            Some(false) if moved => {
                 self.idle_for = self.config.idle_after;
                 0.0
             }
-            Some(_) => {
+            Some(false) => {
                 let counted = (self.config.idle_after - self.idle_for).clamp(0.0, dt);
                 self.idle_for += dt;
                 counted
             }
         };
         self.clock += counted;
-        self.exp_gained += gain.unwrap_or(0);
-        self.level_ups += next.level - last.level;
+        counted
+    }
 
-        if counted > 0.0 || gain.is_some_and(|g| g != 0) {
-            let map = if moved { None } else { last.map.clone().or_else(|| next.map.clone()) };
-            let totals = self.totals(map);
-            totals.active_seconds += counted;
-            totals.exp_gained += gain.unwrap_or(0);
+    /// Follows a HUD that shows only a percentage. Each level is 100, so nothing else is needed.
+    fn push_percent(&mut self, sample: &Sample, percent: f32) {
+        if !(0.0..100.0).contains(&percent) {
+            self.rejected.exp += 1;
+            return;
         }
+        // Coming from a level that showed points, they are where this picks up from.
+        let seeded = self.exp.as_ref().map(|e| PercentPoint {
+            at: e.at,
+            level: e.level,
+            percent: e.exp.percent,
+            map: e.map.clone(),
+        });
+        let last = self.percent_point.clone().or(seeded);
+        let level = sample.level.or(last.as_ref().map(|l| l.level)).unwrap_or(0);
+        self.level_known |= sample.level.is_some();
+        let point = PercentPoint { at: sample.at, level, percent, map: self.map.clone() };
+        let Some(last) = last else {
+            match self.percent_pending.take() {
+                Some(first) if first.level == point.level && (first.percent - percent).abs() <= 5.0 => {
+                    self.percent_point = Some(first.clone());
+                    self.advance_percent(&first, point);
+                }
+                dropped => {
+                    self.rejected.exp += usize::from(dropped.is_some());
+                    self.percent_pending = Some(point);
+                }
+            }
+            return;
+        };
 
-        let implied = Requirement::implied(next.exp);
-        self.set_requirement(next.level, implied);
-        self.exp = Some(next);
+        let confirmed = self
+            .percent_pending
+            .as_ref()
+            .is_some_and(|first| first.level == point.level && (first.percent - percent).abs() <= 1.0);
+        let wrapped = point.level == last.level + 1 && percent < last.percent;
+        let steady = point.level == last.level && (0.0..=20.0).contains(&(percent - last.percent));
+        if wrapped || steady {
+            self.percent_pending = None;
+            self.advance_percent(&last, point);
+        } else if point.level < last.level {
+            self.rejected.exp += 1;
+        } else if confirmed {
+            self.percent_pending = None;
+            if point.level == last.level && percent < last.percent {
+                self.deaths += 1;
+                self.percent_lost += f64::from(last.percent - percent);
+                self.run_clock(Some(false), (point.at - last.at).max(0.0), false);
+                self.percent_point = Some(point);
+            } else {
+                self.advance_percent(&last, point);
+            }
+        } else {
+            self.percent_pending = Some(point);
+        }
+    }
+
+    fn advance_percent(&mut self, last: &PercentPoint, next: PercentPoint) {
+        let gain = if next.level == last.level {
+            f64::from(next.percent - last.percent).max(0.0)
+        } else if next.level == last.level + 1 {
+            100.0 - f64::from(last.percent) + f64::from(next.percent)
+        } else {
+            0.0
+        };
+        let dt = (next.at - last.at).max(0.0);
+        let moved = matches!((&last.map, &next.map), (Some(a), Some(b)) if a != b);
+        let counted = self.run_clock(Some(gain > 0.0), dt, moved);
+        self.percent_gained += gain;
+        self.level_ups += next.level.saturating_sub(last.level);
+        if counted > 0.0 || gain > 0.0 {
+            let map = if moved { None } else { last.map.clone().or_else(|| next.map.clone()) };
+            self.totals(map.clone()).active_seconds += counted;
+            let level = self.level_known.then_some(next.level);
+            let line = self.line(map, level);
+            line.active_seconds += counted;
+            line.percent_gained += gain;
+        }
+        self.percent_point = Some(next);
+        self.mark();
+    }
+
+    /// Notes the running totals, for the recent rates and the trend line.
+    fn mark(&mut self) {
+        let mark =
+            Mark { clock: self.clock, exp: self.exp_gained, percent: self.percent_gained, mesos: self.mesos_gained };
+        self.marks.push_back(mark);
+        while self.marks.front().is_some_and(|m| m.clock < self.clock - RECENT_SECONDS - TREND_STEP) {
+            self.marks.pop_front();
+        }
+        if self.clock - self.trend_clock >= TREND_STEP {
+            let rate = if self.percent_point.is_some() {
+                self.recent_rate(|m| m.percent)
+            } else {
+                self.recent_rate(|m| m.exp as f64)
+            };
+            if let Some(rate) = rate {
+                self.trend_clock = self.clock;
+                self.trend.push_back(rate);
+                if self.trend.len() > TREND_POINTS {
+                    self.trend.pop_front();
+                }
+            }
+        }
+    }
+
+    /// The rate of a running total over the last five minutes of active time.
+    fn recent_rate(&self, total: impl Fn(&Mark) -> f64) -> Option<f64> {
+        let last = self.marks.back()?;
+        let first = self.marks.iter().find(|m| m.clock >= last.clock - RECENT_SECONDS)?;
+        let seconds = last.clock - first.clock;
+        (seconds >= self.config.min_rate_seconds).then(|| (total(last) - total(first)) * 3600.0 / seconds)
+    }
+
+    /// How many readings in a row a new amount needs. A big change is usually a digit misread,
+    /// and a tenfold one nearly always is, unless the mesos have been out of sight for a while.
+    fn meso_confirmations(&self, mesos: u64, at: f64) -> usize {
+        let base = self.config.confirmations.max(1);
+        let Some(last) = self.mesos.as_ref().filter(|_| base >= 2) else { return base };
+        if self.mesos_seen_at.is_none_or(|seen| at - seen > MESO_GAP) {
+            return base;
+        }
+        let (old, new) = (last.mesos as f64, mesos as f64);
+        let ratio = if old > 0.0 { new / old } else { 1.0 };
+        if (9.0..=11.0).contains(&ratio) || (0.09..=0.11).contains(&ratio) {
+            8
+        } else if (new - old).abs() > 10_000f64.max(0.05 * old.max(new)) {
+            base.max(3)
+        } else {
+            base
+        }
     }
 
     fn push_mesos(&mut self, sample: &Sample) {
         let Some(mesos) = sample.mesos else { return };
+        let needed = self.meso_confirmations(mesos, sample.at);
         let count = match &mut self.meso_run {
             Some((run, count)) if run.mesos == mesos => {
                 *count += 1;
@@ -469,15 +865,18 @@ impl SessionTracker {
                 1
             }
         };
-        if count != self.config.confirmations.max(1) {
-            // The confirmed amount seen again: any window open before has closed without
-            // changing it, unless it is still open.
-            if self.mesos.as_ref().is_some_and(|m| m.mesos == mesos) {
-                self.exchange_seen = sample.exchange;
-            }
+        // The confirmed amount seen again: any window open before has closed without changing
+        // it, unless it is still open.
+        if self.mesos.as_ref().is_some_and(|m| m.mesos == mesos) {
+            self.mesos_seen_at = Some(sample.at);
+            self.exchange_seen = sample.exchange;
+            return;
+        }
+        if count < needed {
             return;
         }
         let run = self.meso_run.as_ref().map(|(run, _)| run.clone()).expect("a run was just updated");
+        self.mesos_seen_at = Some(sample.at);
         if let Some(previous) = self.mesos.replace(run.clone()) {
             let delta = run.mesos as i64 - previous.mesos as i64;
             if self.exchange_seen {
@@ -487,9 +886,14 @@ impl SessionTracker {
                 self.mesos_gained += delta;
                 self.meso_seconds += seconds;
                 let map = if previous.map == run.map { previous.map } else { None };
-                let totals = self.totals(map);
+                let totals = self.totals(map.clone());
                 totals.mesos_gained += delta;
                 totals.meso_seconds += seconds;
+                let level = self.level().filter(|_| self.level_known);
+                let line = self.line(map, level);
+                line.mesos_gained += delta;
+                line.mesos_seconds += seconds;
+                self.mark();
             }
         }
         // A window still open now also covers the next change.
@@ -572,17 +976,36 @@ impl SessionTracker {
         &mut self.maps[index]
     }
 
+    fn line(&mut self, map: Option<String>, level: Option<u32>) -> &mut SessionLine {
+        let (party, job, town) = (self.party.value, self.job.value.clone(), self.town);
+        let index =
+            self.lines.iter().position(|l| l.map == map && l.level == level && l.party == party && l.job == job);
+        let index = index.unwrap_or_else(|| {
+            self.lines.push(SessionLine { map, town, level, party, job, ..SessionLine::default() });
+            self.lines.len() - 1
+        });
+        &mut self.lines[index]
+    }
+
     pub fn summary(&self) -> SessionSummary {
         let rate = |amount: i64, seconds: f64| {
             (seconds >= self.config.min_rate_seconds).then(|| amount as f64 * 3600.0 / seconds)
         };
-        let exp_per_hour = rate(self.exp_gained, self.clock);
+        let percent_only = self.percent_point.is_some();
+        let exp_per_hour = rate(self.exp_gained, self.clock).filter(|_| !percent_only);
         let exp_needed = self.exp.as_ref().and_then(|e| self.requirement(e.level)).and_then(Requirement::estimate);
+        let percent = self.percent_point.as_ref().map(|p| p.percent).or(self.exp.as_ref().map(|e| e.exp.percent));
+        let percent_per_hour =
+            exp_per_hour.zip(exp_needed).map(|(per_hour, needed)| per_hour * 100.0 / needed as f64).or_else(|| {
+                (self.clock >= self.config.min_rate_seconds).then(|| self.percent_gained * 3600.0 / self.clock)
+            });
         let seconds_to_level = match (exp_per_hour, exp_needed, &self.exp) {
-            (Some(per_hour), Some(needed), Some(last)) if per_hour > 0.0 => {
+            (Some(per_hour), Some(needed), Some(last)) if per_hour > 0.0 && !percent_only => {
                 Some(needed.saturating_sub(last.exp.points) as f64 / per_hour * 3600.0)
             }
-            _ => None,
+            _ => percent
+                .zip(percent_per_hour.filter(|&p| p > 0.0 && percent_only))
+                .map(|(percent, per_hour)| (100.0 - f64::from(percent)) / per_hour * 3600.0),
         };
         let mut maps: Vec<MapSummary> = self
             .maps
@@ -591,7 +1014,7 @@ impl SessionTracker {
                 map: t.map.clone(),
                 active_seconds: t.active_seconds,
                 exp_gained: t.exp_gained,
-                exp_per_hour: rate(t.exp_gained, t.active_seconds),
+                exp_per_hour: rate(t.exp_gained, t.active_seconds).filter(|_| t.exp_gained != 0 || !percent_only),
                 mesos_gained: t.mesos_gained,
                 mesos_per_hour: rate(t.mesos_gained, t.meso_seconds),
             })
@@ -606,6 +1029,8 @@ impl SessionTracker {
             })
             .collect();
         counters.sort_by(|a, b| b.active_seconds.total_cmp(&a.active_seconds));
+        let mut lines = self.lines.clone();
+        lines.sort_by(|a, b| b.active_seconds.total_cmp(&a.active_seconds));
 
         SessionSummary {
             frames: self.frames,
@@ -613,21 +1038,39 @@ impl SessionTracker {
             updated_at: self.updated_at,
             elapsed_seconds: self.started_at.zip(self.updated_at).map_or(0.0, |(s, u)| u - s),
             active_seconds: self.clock,
-            paused: self.exp.is_some() && self.idle_for >= self.config.idle_after,
-            level: self.exp.as_ref().filter(|_| self.level_known).map(|e| e.level),
-            exp: self.exp.as_ref().map(|e| e.exp),
-            exp_needed,
+            paused: self.held || (self.level().is_some() && self.idle_for >= self.config.idle_after),
+            held: self.held,
+            level: self.level().filter(|_| self.level_known),
+            exp: self.exp.as_ref().filter(|_| !percent_only).map(|e| e.exp),
+            percent,
+            percent_only,
+            exp_needed: exp_needed.filter(|_| !percent_only),
             exp_gained: self.exp_gained,
             exp_per_hour,
-            percent_per_hour: exp_per_hour.zip(exp_needed).map(|(per_hour, needed)| per_hour * 100.0 / needed as f64),
+            percent_per_hour,
             seconds_to_level,
+            recent_exp_per_hour: self.recent_rate(|m| m.exp as f64).filter(|_| !percent_only),
+            recent_percent_per_hour: self.recent_rate(|m| m.percent),
+            recent_mesos_per_hour: self.recent_rate(|m| m.mesos as f64),
+            trend: self.trend.iter().copied().collect(),
             level_ups: self.level_ups,
+            deaths: self.deaths,
+            exp_lost: self.exp_lost,
+            percent_lost: self.percent_lost,
             mesos: self.mesos.as_ref().map(|m| m.mesos),
+            mesos_age: self.mesos_seen_at.zip(self.updated_at).map(|(seen, now)| (now - seen).max(0.0)),
             mesos_gained: self.mesos_gained,
             mesos_per_hour: rate(self.mesos_gained, self.meso_seconds),
             mesos_excluded: self.mesos_excluded,
             map: self.map.clone(),
+            map_hidden: self
+                .map_seen_at
+                .zip(self.updated_at)
+                .is_some_and(|(seen, now)| now - seen >= MAP_HIDDEN_SECONDS),
+            job: self.job.value.clone(),
+            party: self.party.value,
             maps,
+            lines,
             counters,
             rejected: self.rejected,
         }
@@ -669,6 +1112,186 @@ mod tests {
 
     fn close(actual: Option<f64>, expected: f64, tolerance: f64) -> bool {
         actual.is_some_and(|a| (a - expected).abs() <= tolerance)
+    }
+
+    #[test]
+    fn a_death_is_noted_and_left_out_of_the_rates() {
+        let summary = track(&[
+            sample(0.0, 30, 10_000, 10.0),
+            sample(60.0, 30, 20_000, 20.0),
+            // Dying costs 5%, seen on two readings.
+            sample(70.0, 30, 15_000, 15.0),
+            sample(75.0, 30, 15_000, 15.0),
+            sample(135.0, 30, 25_000, 25.0),
+        ]);
+        assert_eq!(summary.deaths, 1);
+        assert_eq!(summary.exp_lost, 5_000);
+        assert_eq!(summary.exp_gained, 20_000);
+    }
+
+    #[test]
+    fn a_single_low_reading_is_no_death() {
+        let summary = track(&[
+            sample(0.0, 30, 10_000, 10.0),
+            sample(60.0, 30, 20_000, 20.0),
+            sample(65.0, 30, 15_000, 15.0),
+            sample(70.0, 30, 21_000, 21.0),
+        ]);
+        assert_eq!(summary.deaths, 0);
+        assert_eq!(summary.exp_gained, 11_000);
+        assert_eq!(summary.rejected.exp, 1);
+    }
+
+    #[test]
+    fn recent_rates_follow_the_last_five_minutes() {
+        let mut samples = vec![sample(0.0, 30, 100, 0.01)];
+        // 10 minutes slow, then 10 minutes twice as fast.
+        let mut points = 100;
+        for minute in 1..=20u32 {
+            points += if minute <= 10 { 1_000 } else { 2_000 };
+            samples.push(sample(f64::from(minute) * 60.0, 30, points, points as f32 / 10_000.0));
+        }
+        let summary = track(&samples);
+        assert!(close(summary.exp_per_hour, 90_000.0, 1.0), "{:?}", summary.exp_per_hour);
+        assert!(close(summary.recent_exp_per_hour, 120_000.0, 1.0), "{:?}", summary.recent_exp_per_hour);
+        assert!(summary.trend.len() >= 2 && summary.trend.last() > summary.trend.first(), "{:?}", summary.trend);
+    }
+
+    fn percent_sample(at: f64, level: u32, percent: f32) -> Sample {
+        Sample { at, level: Some(level), percent: Some(percent), map: Some(KERNING.into()), ..Sample::default() }
+    }
+
+    #[test]
+    fn a_percent_only_hud_gives_percent_rates_and_time_to_level() {
+        let summary = track(&[
+            percent_sample(0.0, 60, 40.0),
+            percent_sample(5.0, 60, 40.0),
+            percent_sample(1805.0, 60, 50.0),
+            percent_sample(3605.0, 60, 60.0),
+        ]);
+        assert!(summary.percent_only);
+        assert_eq!(summary.exp_per_hour, None);
+        assert!(close(summary.percent_per_hour, 20.0, 0.1), "{:?}", summary.percent_per_hour);
+        assert!(close(summary.seconds_to_level, 7200.0, 40.0), "{:?}", summary.seconds_to_level);
+        assert_eq!(summary.level, Some(60));
+    }
+
+    #[test]
+    fn a_percent_only_hud_counts_level_ups_and_deaths() {
+        let summary = track(&[
+            percent_sample(0.0, 60, 95.0),
+            percent_sample(5.0, 60, 95.0),
+            percent_sample(60.0, 61, 1.0),
+            percent_sample(120.0, 61, 3.0),
+            percent_sample(130.0, 61, 1.0),
+            percent_sample(135.0, 61, 1.0),
+        ]);
+        assert_eq!(summary.level_ups, 1);
+        assert_eq!(summary.deaths, 1);
+        assert!((summary.percent_lost - 2.0).abs() < 0.01, "{}", summary.percent_lost);
+    }
+
+    #[test]
+    fn the_hud_can_stop_showing_points_at_a_level_up() {
+        let summary = track(&[
+            sample(0.0, 56, 900_000, 90.0),
+            sample(60.0, 56, 950_000, 95.0),
+            percent_sample(120.0, 57, 1.0),
+            percent_sample(180.0, 57, 3.0),
+        ]);
+        assert_eq!(summary.level_ups, 1);
+        assert_eq!(summary.level, Some(57));
+        assert!(summary.percent_only);
+    }
+
+    #[test]
+    fn lines_split_by_party_and_level() {
+        let party = |mut s: Sample, n| {
+            s.party = Some(n);
+            s
+        };
+        let summary = track(&[
+            party(sample(0.0, 30, 1_000, 1.0), 1),
+            party(sample(60.0, 30, 2_000, 2.0), 1),
+            party(sample(120.0, 30, 3_000, 3.0), 1),
+            party(sample(180.0, 30, 4_000, 4.0), 3),
+            party(sample(240.0, 30, 5_000, 5.0), 3),
+            party(sample(300.0, 30, 6_000, 6.0), 3),
+        ]);
+        assert_eq!(summary.party, Some(3));
+        assert_eq!(summary.lines.len(), 2);
+        assert!(summary.lines.iter().any(|l| l.party == Some(1)));
+        assert!(summary.lines.iter().any(|l| l.party == Some(3)));
+    }
+
+    #[test]
+    fn a_hidden_minimap_stops_gains_going_to_the_old_map() {
+        let hidden = |mut s: Sample| {
+            s.map = None;
+            s
+        };
+        let summary = track(&[
+            sample(0.0, 30, 1_000, 1.0),
+            sample(30.0, 30, 2_000, 2.0),
+            hidden(sample(40.0, 30, 3_000, 3.0)),
+            hidden(sample(90.0, 30, 4_000, 4.0)),
+            hidden(sample(120.0, 30, 5_000, 5.0)),
+        ]);
+        assert!(summary.map_hidden);
+        assert_eq!(summary.map, None);
+        assert!(summary.maps.iter().any(|m| m.map.is_none() && m.exp_gained > 0), "{:?}", summary.maps);
+    }
+
+    #[test]
+    fn big_meso_changes_need_more_readings_while_in_sight() {
+        let m = |at, mesos| with_mesos(sample(at, 30, 1_000, 1.0), mesos);
+        let summary = track(&[m(0.0, 12_345), m(2.0, 12_345), m(4.0, 123_450), m(6.0, 123_450), m(8.0, 12_345)]);
+        assert_eq!(summary.mesos, Some(12_345), "a tenfold misread is not believed");
+        assert_eq!(summary.mesos_gained, 0);
+    }
+
+    #[test]
+    fn pausing_by_hand_leaves_out_the_time_paused() {
+        let mut tracker = SessionTracker::new(TrackerConfig::default());
+        tracker.push(&sample(0.0, 30, 1_000, 1.0));
+        tracker.push(&sample(60.0, 30, 2_000, 2.0));
+        tracker.set_held(true);
+        assert!(tracker.summary().paused);
+        tracker.set_held(false);
+        tracker.push(&sample(3600.0, 30, 3_000, 3.0));
+        assert!(close(Some(tracker.summary().active_seconds), 60.0, 0.1));
+    }
+
+    #[test]
+    fn another_character_is_noticed_after_a_few_readings() {
+        let mut tracker = SessionTracker::new(TrackerConfig::default());
+        tracker.push(&sample(0.0, 30, 1_000, 1.0));
+        tracker.push(&sample(60.0, 30, 2_000, 2.0));
+        let low = sample(120.0, 12, 100, 1.0);
+        assert!(!tracker.is_other_character(&low));
+        assert!(!tracker.is_other_character(&low));
+        assert!(tracker.is_other_character(&low));
+        let mut same = SessionTracker::new(TrackerConfig::default());
+        same.push(&sample(0.0, 30, 1_000, 1.0));
+        same.push(&sample(60.0, 30, 2_000, 2.0));
+        assert!(!same.is_other_character(&sample(120.0, 30, 3_000, 3.0)));
+    }
+
+    #[test]
+    fn a_garbled_name_is_not_another_character() {
+        let named = |at, name: &str| Sample { name: Some(name.into()), ..sample(at, 30, 1_000, 1.0) };
+        let mut tracker = SessionTracker::new(TrackerConfig::default());
+        for i in 0..3 {
+            tracker.push(&named(f64::from(i), "PebbleThief"));
+        }
+        for garbled in ["xq3", "7y#", "w0!", "pz%", "m2~"] {
+            assert!(!tracker.is_other_character(&named(9.0, garbled)));
+        }
+        let mut stable = 0;
+        for _ in 0..5 {
+            stable += usize::from(tracker.is_other_character(&named(9.0, "Mossbank")));
+        }
+        assert!(stable > 0, "the same other name again and again is another character");
     }
 
     /// Numbers from real play: 24,331 EXP (25.42%) to 45,930 (47.99%) and 28,640 to 42,944 mesos,

@@ -189,7 +189,7 @@
 
   .track {
     height: 3px;
-    border-radius: 999px;
+    border-radius: var(--radius-sm);
     background: rgba(255, 255, 255, 0.06);
     overflow: hidden;
   }
@@ -207,7 +207,7 @@
     height: 20px;
     padding: 0;
     border: 0;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     background: transparent;
     color: var(--faint);
     cursor: pointer;
@@ -246,7 +246,7 @@
   input {
     padding: 4px 8px;
     border: 1px solid var(--border-strong);
-    border-radius: 5px;
+    border-radius: var(--radius-sm);
     background: var(--bg);
     color: var(--text);
     font: inherit;
@@ -266,7 +266,7 @@
   .presets button {
     padding: 3px 8px;
     border: 1px solid var(--border);
-    border-radius: 5px;
+    border-radius: var(--radius-sm);
     background: transparent;
     color: var(--muted);
     font-size: 11.5px;
@@ -302,7 +302,7 @@
   .go {
     padding: 4px 14px;
     border: 0;
-    border-radius: 5px;
+    border-radius: var(--radius-sm);
     background: var(--accent);
     color: #1a1204;
     font-size: 12px;

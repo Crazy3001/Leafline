@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Hourglass, LoaderCircle, Search, UserRound } from "@lucide/svelte";
+  import { untrack } from "svelte";
 
   import Card from "./Card.svelte";
   import ObjectiveHint from "./quest/ObjectiveHint.svelte";
@@ -88,6 +89,7 @@
     };
   }
 
+  // Follows the key alone: every live reading brings new objects with the same content.
   $effect(() => {
     void queryKey;
     void mapData.status?.dataUpdatedAt;
@@ -95,7 +97,7 @@
       guide = null;
       return;
     }
-    refresh().catch(() => (guide = null));
+    untrack(refresh).catch(() => (guide = null));
   });
 
   /** Unfinished item objectives nobody has asked the wiki about yet. */
@@ -264,7 +266,7 @@
 
   .track {
     height: 4px;
-    border-radius: 999px;
+    border-radius: var(--radius-sm);
     background: rgba(255, 255, 255, 0.06);
     overflow: hidden;
   }

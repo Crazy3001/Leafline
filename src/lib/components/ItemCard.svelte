@@ -104,7 +104,7 @@
 
   .verdict {
     padding: 2px 8px;
-    border-radius: 999px;
+    border-radius: var(--radius-sm);
     font-size: 11px;
     font-weight: 600;
     color: var(--good);

@@ -12,6 +12,7 @@ use tauri::{
 
 use super::overlay::{self, OVERLAY};
 use super::settings::SettingsState;
+use super::snap;
 use crate::error::{Error, Result};
 
 const FILE_NAME: &str = "pins.json";
@@ -139,13 +140,14 @@ fn open(app: &AppHandle, panel: Panel, slot: usize) -> Result<()> {
         .transparent(true)
         .decorations(false)
         .shadow(false)
-        .always_on_top(true)
+        .always_on_top(app.state::<SettingsState>().get().always_on_top)
         .skip_taskbar(true)
         .resizable(false)
         .focused(false)
         .visible(!app.state::<PinState>().hidden.load(Ordering::Relaxed))
         .build()?;
     window.set_zoom(app.state::<SettingsState>().get().scale)?;
+    snap::attach(&window)?;
     if overlay::status(app)?.click_through {
         window.set_ignore_cursor_events(true)?;
     }

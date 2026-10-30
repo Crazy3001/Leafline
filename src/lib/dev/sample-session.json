@@ -60,5 +60,40 @@
   "rejected": {
     "exp": 0,
     "mesos": 0
-  }
+  },
+  "held": false,
+  "percent": 47.99,
+  "percentOnly": false,
+  "recentExpPerHour": 25130.0,
+  "recentPercentPerHour": 26.3,
+  "recentMesosPerHour": 11800.0,
+  "trend": [
+    21000,
+    21800,
+    22400,
+    23900,
+    24600,
+    25130
+  ],
+  "deaths": 1,
+  "expLost": 2300,
+  "percentLost": 2.4,
+  "mesosAge": 12.0,
+  "mapHidden": false,
+  "job": "Bandit",
+  "party": 1,
+  "lines": [
+    {
+      "map": "Victoria Road : Kerning City",
+      "town": false,
+      "level": 30,
+      "party": 1,
+      "job": "Bandit",
+      "activeSeconds": 3403.5,
+      "expGained": 21599,
+      "percentGained": 22.57,
+      "mesosGained": 9904,
+      "mesosSeconds": 3403.5
+    }
+  ]
 }

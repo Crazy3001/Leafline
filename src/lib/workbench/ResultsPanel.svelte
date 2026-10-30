@@ -116,7 +116,7 @@
   .count {
     margin-left: 4px;
     padding: 0 5px;
-    border-radius: 999px;
+    border-radius: var(--radius-sm);
     background: var(--surface-3);
     font-size: 10.5px;
     color: var(--muted);
@@ -177,7 +177,7 @@
 
   .bar {
     height: 4px;
-    border-radius: 999px;
+    border-radius: var(--radius-sm);
     background: rgba(255, 255, 255, 0.05);
     overflow: hidden;
   }

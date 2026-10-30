@@ -1,6 +1,7 @@
 //! Live reading: the game window captured every few seconds and run through the same pipeline
 //! and session tracker as the workbench's replays. It stays off until the player turns it on in
-//! Settings, and only ever looks at the window; see [`crate::capture`].
+//! Settings, and only ever looks at the window; see [`crate::capture`]. Each session saves itself
+//! as it goes, so a crash or a closed window costs half a minute of it at most.
 
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -11,13 +12,16 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
 
 use super::calibration::HudFontState;
+use super::mapdata::MapDataState;
 use super::readings;
+use super::records::{self, HISTORY_EVENT, UserDataState};
 use super::replay;
+use super::report;
 use super::settings::{self, SettingsState};
 use crate::capture::{self, Capturer, GameWindow, Grab};
 use crate::error::{Error, Result};
 use crate::pipeline;
-use crate::session::{Sample, SessionTracker, TrackerConfig};
+use crate::session::{Sample, SessionSummary, SessionTracker, TrackerConfig};
 use crate::vision::{Frame, Ocr};
 
 /// Emitted to every window when the live status changes.
@@ -29,6 +33,9 @@ pub const FRAME_SAVED_EVENT: &str = "frame-saved";
 const FRESH_FRAME_WAIT: Duration = Duration::from_millis(300);
 /// How often HDR is checked again, in readings, in case the game moves to another display.
 const HDR_CHECK_EVERY: u64 = 30;
+/// Active seconds before a session is worth keeping, and how often it is saved from then on.
+const SAVE_AFTER_ACTIVE: f64 = 60.0;
+const SAVE_EVERY: Duration = Duration::from_secs(30);
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", rename_all_fields = "camelCase", tag = "state")]
@@ -49,6 +56,10 @@ pub enum LiveStatus {
         hdr: bool,
         /// Whether the HUD font has been taught; without it EXP, HP and MP aren't read.
         hud_taught: bool,
+        /// Tracking is paused by hand.
+        held: bool,
+        /// This run goes to the log.
+        logging: bool,
     },
     /// Stopped by an error.
     Failed { message: String },
@@ -58,6 +69,12 @@ pub enum LiveStatus {
 pub struct LiveState {
     running: AtomicBool,
     stop: AtomicBool,
+    /// Tracking is paused by hand; pictures are still read.
+    held: AtomicBool,
+    /// A new session was asked for.
+    reset: AtomicBool,
+    /// This run stays out of the log. It ends with the session.
+    log_off: AtomicBool,
     status: Mutex<LiveStatus>,
     /// The last picture read, kept in memory only, for "Save frame".
     frame: Mutex<Option<Arc<Frame>>>,
@@ -110,6 +127,82 @@ pub fn toggle(app: &AppHandle) -> Result<()> {
     }
 }
 
+pub fn status(app: &AppHandle) -> LiveStatus {
+    app.state::<LiveState>().status.lock().expect("live lock").clone()
+}
+
+/// Pauses or resumes tracking. Paused time doesn't count.
+pub fn set_held(app: &AppHandle, held: bool) {
+    app.state::<LiveState>().held.store(held, Ordering::SeqCst);
+    show_controls(app);
+}
+
+pub fn toggle_held(app: &AppHandle) {
+    set_held(app, !app.state::<LiveState>().held.load(Ordering::SeqCst));
+}
+
+/// Starts a new session. The one before it stays in the log.
+pub fn reset(app: &AppHandle) {
+    if running(app) {
+        app.state::<LiveState>().reset.store(true, Ordering::SeqCst);
+    } else {
+        readings::publish_session(app, &SessionSummary::default());
+    }
+}
+
+/// Keeps this run in or out of the log.
+pub fn set_logging(app: &AppHandle, logging: bool) {
+    app.state::<LiveState>().log_off.store(!logging, Ordering::SeqCst);
+    show_controls(app);
+}
+
+pub fn toggle_logging(app: &AppHandle) {
+    set_logging(app, app.state::<LiveState>().log_off.load(Ordering::SeqCst));
+}
+
+/// Shows a change of the controls right away, without waiting for a new picture.
+fn show_controls(app: &AppHandle) {
+    let state = app.state::<LiveState>();
+    let mut current = state.status.lock().expect("live lock");
+    if let LiveStatus::Reading { held, logging, .. } = &mut *current {
+        *held = state.held.load(Ordering::SeqCst);
+        *logging = !state.log_off.load(Ordering::SeqCst);
+        let _ = app.emit(LIVE_EVENT, &*current);
+    }
+}
+
+/// Keeps the session in the log as it goes.
+#[derive(Default)]
+struct Keeper {
+    id: Option<i64>,
+    saved_at: Option<Instant>,
+}
+
+impl Keeper {
+    fn due(&self) -> bool {
+        self.saved_at.is_none_or(|at| at.elapsed() >= SAVE_EVERY)
+    }
+
+    fn save(&mut self, app: &AppHandle, session: &SessionSummary) {
+        if session.active_seconds < SAVE_AFTER_ACTIVE || app.state::<LiveState>().log_off.load(Ordering::SeqCst) {
+            return;
+        }
+        self.saved_at = Some(Instant::now());
+        let now = records::now();
+        let saved = app.state::<UserDataState>().with(|db| match self.id {
+            Some(id) => db.update_session(id, session, now).map(|()| id),
+            None => db.save_session(session, "", now),
+        });
+        match saved {
+            Ok(id) => {
+                self.id = Some(id);
+                let _ = app.emit(HISTORY_EVENT, ());
+            }
+            Err(err) => report::note(format!("Couldn't save the session: {err}")),
+        }
+    }
+}
+
 /// Saves the last picture read as a PNG in Pictures\Leafline, for the workbench or a bug report.
 pub fn save_frame(app: &AppHandle) -> Result<PathBuf> {
     let frame = app.state::<LiveState>().frame.lock().expect("live lock").clone();
@@ -126,9 +219,15 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
     let state = app.state::<LiveState>();
     let ocr = Ocr::new()?;
     // Live frames are plentiful, so a meso amount or quest counter must be read the same twice.
-    let mut tracker = SessionTracker::new(TrackerConfig { confirmations: 2, ..TrackerConfig::default() });
+    let fresh_tracker =
+        |idle_after| SessionTracker::new(TrackerConfig { confirmations: 2, idle_after, ..TrackerConfig::default() });
+    let mut tracker = fresh_tracker(app.state::<SettingsState>().get().live.pause_after);
+    let mut keeper = Keeper::default();
+    let mut held = false;
     let mut game: Option<(Capturer, GameWindow, bool)> = None;
     let mut frames = 0u64;
+    state.held.store(false, Ordering::SeqCst);
+    state.log_off.store(false, Ordering::SeqCst);
 
     while !state.stop.load(Ordering::SeqCst) {
         let tick = Instant::now();
@@ -136,15 +235,48 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
         if !choice.enabled {
             break;
         }
+        tracker.set_idle_after(choice.pause_after);
+
+        if state.reset.swap(false, Ordering::SeqCst) {
+            keeper.save(app, &tracker.summary());
+            keeper = Keeper::default();
+            tracker = fresh_tracker(choice.pause_after);
+            state.log_off.store(false, Ordering::SeqCst);
+            held = false;
+            state.held.store(false, Ordering::SeqCst);
+            readings::publish_session(app, &tracker.summary());
+            show_controls(app);
+        }
+        let now_held = state.held.load(Ordering::SeqCst);
+        if now_held != held {
+            held = now_held;
+            tracker.set_held(held);
+            readings::publish_session(app, &tracker.summary());
+        }
 
         if game.is_none() {
-            match capture::find(choice.window.as_ref())? {
-                Some(window) => {
-                    let capturer = Capturer::new(&window)?;
-                    let hdr = capturer.hdr();
-                    game = Some((capturer, window, hdr));
+            // Windows sometimes refuses a capture for a moment, so a failure is tried again.
+            let found = capture::find(choice.window.as_ref()).and_then(|window| {
+                window
+                    .map(|window| {
+                        let capturer = Capturer::new(&window)?;
+                        let hdr = capturer.hdr();
+                        Ok((capturer, window, hdr))
+                    })
+                    .transpose()
+            });
+            match found {
+                Ok(Some(opened)) => game = Some(opened),
+                Err(err) => {
+                    report::note(format!("Couldn't open the game window: {err}"));
+                    set_status(
+                        app,
+                        LiveStatus::Waiting { reason: format!("Couldn't open the game window, retrying: {err}") },
+                    );
+                    pause(&state, tick, choice.interval);
+                    continue;
                 }
-                None => {
+                Ok(None) => {
                     let reason = if choice.window.is_some() {
                         "Looking for the game window you picked. Is the game running?"
                     } else {
@@ -158,15 +290,57 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
         }
         let (capturer, window, hdr) = game.as_mut().expect("game window found above");
 
-        match capturer.grab(FRESH_FRAME_WAIT)? {
+        let grabbed = match capturer.grab(FRESH_FRAME_WAIT) {
+            Ok(grabbed) => grabbed,
+            Err(err) => {
+                report::note(format!("Couldn't capture the game window: {err}"));
+                set_status(app, LiveStatus::Waiting { reason: format!("Couldn't capture the game, retrying: {err}") });
+                game = None;
+                pause(&state, tick, choice.interval);
+                continue;
+            }
+        };
+        match grabbed {
             Grab::Frame(frame) => {
                 let font = app.state::<HudFontState>().current();
                 let started = Instant::now();
-                let analysis = pipeline::analyze(&frame, &ocr, &font)?;
+                let mut analysis = match pipeline::analyze(&frame, &ocr, &font) {
+                    Ok(analysis) => analysis,
+                    Err(err) => {
+                        report::note(format!("Couldn't read a picture: {err}"));
+                        pause(&state, tick, choice.interval);
+                        continue;
+                    }
+                };
+                for part in &analysis.failed {
+                    report::note(format!("Couldn't read the {part}"));
+                }
+                let mut town = false;
+                if let Some(map) = analysis.map.as_mut()
+                    && let Some(atlas) = app.state::<MapDataState>().atlas()
+                    && let Some(known) = atlas.settled(&map.name, map.street.as_deref())
+                {
+                    town = atlas.is_town(known.id);
+                    map.name = known.name;
+                    map.street = known.street;
+                }
                 let read_ms = started.elapsed().as_secs_f32() * 1000.0;
-                tracker.push(&Sample::from_analysis(unix_seconds(SystemTime::now()), &analysis));
+                let mut sample = Sample::from_analysis(unix_seconds(SystemTime::now()), &analysis);
+                sample.town = town;
+                if !held {
+                    if tracker.is_other_character(&sample) {
+                        keeper.save(app, &tracker.summary());
+                        keeper = Keeper::default();
+                        tracker = fresh_tracker(choice.pause_after);
+                    }
+                    tracker.push(&sample);
+                }
+                let session = tracker.summary();
                 readings::publish_analysis(app, &analysis);
-                readings::publish_session(app, &tracker.summary());
+                readings::publish_session(app, &session);
+                if keeper.due() {
+                    keeper.save(app, &session);
+                }
 
                 frames += 1;
                 if frames.is_multiple_of(HDR_CHECK_EVERY) {
@@ -182,6 +356,8 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
                         read_ms,
                         hdr: *hdr,
                         hud_taught: !font.values.is_empty(),
+                        held,
+                        logging: !state.log_off.load(Ordering::SeqCst),
                     },
                 );
                 *state.frame.lock().expect("live lock") = Some(Arc::new(frame));
@@ -198,6 +374,7 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
         }
         pause(&state, tick, choice.interval);
     }
+    keeper.save(app, &tracker.summary());
     Ok(())
 }
 
@@ -245,12 +422,27 @@ fn file_stamp(time: SystemTime) -> String {
 
 #[tauri::command]
 pub fn live_status(app: AppHandle) -> LiveStatus {
-    app.state::<LiveState>().status.lock().expect("live lock").clone()
+    status(&app)
 }
 
 #[tauri::command]
 pub fn start_live(app: AppHandle) -> Result<()> {
     start(&app)
+}
+
+#[tauri::command]
+pub fn set_live_held(app: AppHandle, held: bool) {
+    set_held(&app, held);
+}
+
+#[tauri::command]
+pub fn reset_session(app: AppHandle) {
+    reset(&app);
+}
+
+#[tauri::command]
+pub fn set_live_logging(app: AppHandle, logging: bool) {
+    set_logging(&app, logging);
 }
 
 #[tauri::command]

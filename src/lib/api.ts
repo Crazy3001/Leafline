@@ -61,6 +61,12 @@ export interface Backend {
   showWorkbench(): Promise<void>;
   shortcuts(): Promise<ShortcutInfo[]>;
   liveStatus(): Promise<LiveStatus>;
+  /** Pauses or resumes tracking; paused time doesn't count. */
+  setLiveHeld(held: boolean): Promise<void>;
+  /** Starts a new session. The one before stays in the history. */
+  resetSession(): Promise<void>;
+  /** Keeps this run in or out of the history. */
+  setLiveLogging(logging: boolean): Promise<void>;
   /** Starts reading the game window; a new session starts with it. */
   startLive(): Promise<void>;
   /** Stops after the reading in progress; the session stays, ready to save. */
@@ -115,6 +121,13 @@ export interface Backend {
   saveSession(label: string): Promise<number>;
   sessionHistory(): Promise<History>;
   deleteSession(id: number): Promise<void>;
+  setSessionNote(id: number, note: string): Promise<void>;
+  /** Corrects a misread map name, in what is saved and whenever it is read that way again. */
+  renameMap(from: string, to: string): Promise<void>;
+  /** Opens the folder that holds the player's records, settings and backups. */
+  openDataFolder(): Promise<void>;
+  /** How Leafline is doing, for a bug report. Holds no names, chat or file paths. */
+  diagnostics(): Promise<string>;
   onHistory(handler: () => void): Promise<UnlistenFn>;
   /** Asks where to save, then writes the price log or session history as CSV. Null if cancelled. */
   exportCsv(what: "prices" | "sessions"): Promise<number | null>;
@@ -170,6 +183,9 @@ const tauriBackend: Backend = {
   showWorkbench: () => invoke("show_workbench"),
   shortcuts: () => invoke("shortcut_list"),
   liveStatus: () => invoke("live_status"),
+  setLiveHeld: (held) => invoke("set_live_held", { held }),
+  resetSession: () => invoke("reset_session"),
+  setLiveLogging: (logging) => invoke("set_live_logging", { logging }),
   startLive: () => invoke("start_live"),
   stopLive: () => invoke("stop_live"),
   liveWindows: () => invoke("live_windows"),
@@ -200,6 +216,10 @@ const tauriBackend: Backend = {
   recordPrice: (price) => invoke("record_price", { price }),
   deletePrice: (id) => invoke("delete_price", { id }),
   saveSession: (label) => invoke("save_session", { label }),
+  setSessionNote: (id, note) => invoke("set_session_note", { id, note }),
+  renameMap: (from, to) => invoke("rename_map", { from, to }),
+  openDataFolder: () => invoke("open_data_folder"),
+  diagnostics: () => invoke("diagnostics"),
   sessionHistory: () => invoke("session_history"),
   deleteSession: (id) => invoke("delete_session", { id }),
   onHistory: (handler) => listen("history", () => handler()),

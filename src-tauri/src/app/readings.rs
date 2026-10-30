@@ -32,6 +32,11 @@ pub fn publish_analysis(app: &AppHandle, analysis: &Analysis) {
     let _ = app.emit(ANALYSIS_EVENT, analysis);
 }
 
+/// The latest analysis, if any.
+pub fn current_analysis(app: &AppHandle) -> Option<Analysis> {
+    app.state::<Readings>().analysis.lock().expect("readings lock").clone()
+}
+
 /// The session the overlay is showing, if any.
 pub fn current_session(app: &AppHandle) -> Option<SessionSummary> {
     app.state::<Readings>().session.lock().expect("readings lock").clone()

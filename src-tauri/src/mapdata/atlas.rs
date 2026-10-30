@@ -7,13 +7,15 @@ use std::collections::{BTreeMap, HashMap, VecDeque};
 use serde::Serialize;
 use strsim::normalized_levenshtein;
 
-use super::osms::{Dataset, MapRecord, MonsterRecord, NO_MAP, QuestRecord};
+use super::osms::{Dataset, Height, MapRecord, MonsterRecord, NO_MAP, QuestRecord, Side};
 use super::travel::{Travel, TravelKind, TravelLink};
 
 /// Below this similarity an OCR'd name is not taken for any map.
 const MIN_SCORE: f64 = 0.72;
 /// Other maps scoring this close to the best are offered as alternatives.
 const NEAR: f64 = 0.08;
+/// At or above this similarity, with no alternatives, an OCR'd name is taken for the map.
+const SETTLED_SCORE: f64 = 0.85;
 
 /// Which way a portal leads, judged from its name in the map data (`west00`, `in01`, ...).
 /// Names follow the client's conventions, so this is a good guess rather than a certainty.
@@ -148,6 +150,10 @@ pub struct QuestTarget {
 #[serde(rename_all = "camelCase")]
 pub struct Exit {
     pub direction: Direction,
+    /// Roughly where the portal stands, when the data can tell. This outranks `direction`,
+    /// which only guesses from the name: an `out00` can stand at either end of a map.
+    pub side: Option<Side>,
+    pub height: Option<Height>,
     pub to: MapRef,
     /// Portal names, empty when the data lists the exit without a portal.
     pub portals: Vec<String>,
@@ -178,6 +184,8 @@ pub struct RouteStep {
     pub from: MapRef,
     pub to: MapRef,
     pub direction: Direction,
+    /// Roughly where the portal stands, when the data can tell.
+    pub side: Option<Side>,
     pub portal: Option<String>,
     pub hidden: bool,
     /// Set when the step is a ride or scroll rather than a portal.
@@ -313,6 +321,19 @@ impl Atlas {
         Some(MapMatch { score, card: self.card(best)?, alternatives })
     }
 
+    /// The map an OCR'd header can only mean, to replace the reading with its real name. OCR
+    /// can spell one header differently from one moment to the next, which would split a
+    /// session's per-map numbers. Near matches are left as read for the player to settle.
+    pub fn settled(&self, name: &str, street: Option<&str>) -> Option<MapRef> {
+        self.find(name, street)
+            .filter(|found| found.score >= SETTLED_SCORE && found.alternatives.is_empty())
+            .map(|found| found.card.map)
+    }
+
+    pub fn is_town(&self, id: u32) -> bool {
+        self.maps.get(&id).is_some_and(|map| map.is_town)
+    }
+
     /// Maps whose name or street contains `text`, then close fuzzy matches, for a picker.
     pub fn search(&self, text: &str, limit: usize) -> Vec<MapRef> {
         let query = fold(text);
@@ -428,6 +449,7 @@ impl Atlas {
                     from: self.map_ref(prev),
                     to: exit.to.clone(),
                     direction: exit.direction,
+                    side: exit.side,
                     portal: exit.portals.first().cloned(),
                     hidden: exit.hidden,
                     travel: None,
@@ -436,6 +458,7 @@ impl Atlas {
                     from: self.map_ref(prev),
                     to: self.map_ref(link.to),
                     direction: Direction::Other,
+                    side: None,
                     portal: None,
                     hidden: false,
                     travel: Some(TravelStep { kind: link.kind, service: link.service.clone(), fare: link.fare }),
@@ -546,28 +569,39 @@ impl Atlas {
         needs
     }
 
-    /// Exits grouped by destination and direction, from the portals first and then any exit
-    /// listed without a portal.
+    /// Exits grouped by destination and where they stand, from the portals first and then any
+    /// exit listed without a portal. Two portals to one map stay apart if they are far apart.
     fn exits_of(&self, map: &MapRecord) -> Vec<Exit> {
         let leads_out = |dest: u32| dest != map.id && dest != NO_MAP;
         let mut exits: Vec<Exit> = Vec::new();
         for portal in &map.portals {
             let Some(dest) = portal.dest_map_id.filter(|d| leads_out(*d)) else { continue };
             let (direction, hidden) = Direction::of_portal(&portal.name);
-            match exits.iter_mut().find(|e| e.to.id == dest && e.direction == direction) {
+            let (side, height) = (portal.side, portal.height);
+            let same = |e: &&mut Exit| {
+                e.to.id == dest && e.direction == direction && e.side == side && e.height == height
+            };
+            match exits.iter_mut().find(same) {
                 Some(exit) => {
                     exit.portals.push(portal.name.clone());
                     exit.hidden &= hidden;
                 }
-                None => {
-                    exits.push(Exit { direction, to: self.map_ref(dest), portals: vec![portal.name.clone()], hidden })
-                }
+                None => exits.push(Exit {
+                    direction,
+                    side,
+                    height,
+                    to: self.map_ref(dest),
+                    portals: vec![portal.name.clone()],
+                    hidden,
+                }),
             }
         }
         for &dest in &map.exits {
             if leads_out(dest) && !exits.iter().any(|e| e.to.id == dest) {
                 exits.push(Exit {
                     direction: Direction::Other,
+                    side: None,
+                    height: None,
                     to: self.map_ref(dest),
                     portals: vec![],
                     hidden: false,
@@ -629,7 +663,48 @@ pub(crate) mod tests {
     //        |  in                     | in (hidden)
     //   Mossbank Inn             Burrow Den
     fn portal(name: &str, dest: u32) -> Portal {
-        Portal { name: name.into(), dest_map_id: Some(dest), dest_portal: None }
+        Portal { name: name.into(), dest_map_id: Some(dest), dest_portal: None, side: None, height: None }
+    }
+
+    #[test]
+    fn settles_a_misread_name_only_when_it_can_mean_one_map() {
+        let atlas = world();
+        let settled = |name| atlas.settled(name, None).map(|m| m.name);
+        assert_eq!(settled("Burrow Den").as_deref(), Some("Burrow Den"));
+        // One slipped letter, with no other map close by.
+        assert_eq!(settled("Burrow Dem").as_deref(), Some("Burrow Den"));
+        assert_eq!(settled("Mossbanh Inn").as_deref(), Some("Mossbank Inn"));
+        // Two maps share this name, and Meadow I and II are too close to tell: the reading stands.
+        assert_eq!(settled("Mossbank"), None);
+        assert_eq!(settled("Mossbank Meadow"), None);
+        assert_eq!(settled("Nowhere At All"), None);
+    }
+
+    #[test]
+    fn portals_to_one_map_stay_apart_when_far_apart() {
+        let placed = |name: &str, side, height| Portal { side: Some(side), height: Some(height), ..portal(name, 2) };
+        let town = map(
+            1,
+            "Mossbank",
+            "Fern Road",
+            vec![
+                placed("east00", Side::Right, Height::Low),
+                placed("east01", Side::Right, Height::Low),
+                placed("east02", Side::Right, Height::High),
+                placed("out00", Side::Left, Height::Low),
+            ],
+        );
+        let atlas = Atlas::new(Dataset { maps: vec![town.clone()], ..Dataset::default() });
+        let places: Vec<(Option<Side>, Option<Height>, usize)> =
+            atlas.exits_of(&town).iter().map(|e| (e.side, e.height, e.portals.len())).collect();
+        assert_eq!(
+            places,
+            [
+                (Some(Side::Right), Some(Height::Low), 2),
+                (Some(Side::Right), Some(Height::High), 1),
+                (Some(Side::Left), Some(Height::Low), 1),
+            ]
+        );
     }
 
     fn map(id: u32, name: &str, street: &str, portals: Vec<Portal>) -> MapRecord {

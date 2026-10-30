@@ -17,7 +17,8 @@
       "points": 24331,
       "percent": 25.42
     },
-    "needsCalibration": false
+    "needsCalibration": false,
+    "expPercent": null
   },
   "hudLayout": {
     "hp": {
@@ -162,5 +163,8 @@
       "stage": "Map",
       "ms": 37.8395
     }
-  ]
+  ],
+  "shopOpen": false,
+  "partySize": 1,
+  "failed": []
 }

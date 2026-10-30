@@ -102,8 +102,6 @@
     gap: 5px;
     font-size: 10px;
     font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
     color: var(--faint);
   }
 
@@ -113,7 +111,7 @@
     width: 20px;
     height: 20px;
     border: 0;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     background: transparent;
     color: var(--faint);
     opacity: 0;

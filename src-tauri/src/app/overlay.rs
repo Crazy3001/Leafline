@@ -17,7 +17,8 @@ pub const WORKBENCH: &str = "workbench";
 /// Emitted to all windows whenever the overlay's status changes.
 pub const STATUS_EVENT: &str = "overlay-status";
 
-/// Whether the overlay is compact, kept across restarts with the full size to go back to.
+/// Whether the overlay is compact, with the full size to go back to, and whether it is locked,
+/// kept across restarts.
 const MODE_FILE: &str = "overlay.json";
 /// The full overlay's size and smallest size, as in tauri.conf.json.
 const FULL_SIZE: (f64, f64) = (340.0, 560.0);
@@ -47,6 +48,14 @@ pub struct OverlayStatus {
 struct SavedMode {
     compact: bool,
     full_size: Option<(f64, f64)>,
+    click_through: bool,
+}
+
+impl OverlayState {
+    /// Whether clicks pass through the overlay and pinned panels.
+    pub fn click_through(&self) -> bool {
+        self.click_through.load(Ordering::Relaxed)
+    }
 }
 
 pub fn status(app: &AppHandle) -> Result<OverlayStatus> {
@@ -58,11 +67,16 @@ pub fn status(app: &AppHandle) -> Result<OverlayStatus> {
     })
 }
 
-/// Starts compact if the overlay was compact when the app last closed. Called once at startup.
+/// Starts compact or locked if the overlay was when the app last closed. Called once at startup,
+/// before pinned panels reopen, since they take the lock from here.
 pub fn restore_mode(app: &AppHandle) -> Result<()> {
     let path = app.path().app_data_dir()?.join(MODE_FILE);
     let saved: SavedMode =
         std::fs::read_to_string(path).ok().and_then(|json| serde_json::from_str(&json).ok()).unwrap_or_default();
+    if saved.click_through {
+        app.state::<OverlayState>().click_through.store(true, Ordering::Relaxed);
+        window(app, OVERLAY)?.set_ignore_cursor_events(true)?;
+    }
     if saved.compact {
         let state = app.state::<OverlayState>();
         state.compact.store(true, Ordering::Relaxed);
@@ -77,6 +91,7 @@ fn save_mode(app: &AppHandle) -> Result<()> {
     let saved = SavedMode {
         compact: state.compact.load(Ordering::Relaxed),
         full_size: *state.full_size.lock().expect("overlay lock"),
+        click_through: state.click_through.load(Ordering::Relaxed),
     };
     let path = app.path().app_data_dir()?.join(MODE_FILE);
     if let Some(dir) = path.parent() {
@@ -164,6 +179,7 @@ pub fn set_click_through(app: &AppHandle, enabled: bool) -> Result<()> {
     if let Some(item) = state.click_through_item.get() {
         item.set_checked(enabled)?;
     }
+    save_mode(app)?;
     broadcast(app)
 }
 

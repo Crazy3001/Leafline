@@ -141,7 +141,14 @@ export function sampleCard(id: number): MapDetails | null {
     expPerClear: place.mobs.reduce((sum, m) => sum + m.exp * m.count, 0),
     exits: links
       .filter(([from]) => from === id)
-      .map(([, direction, to, portal, hidden]) => ({ direction, to: ref(to), portals: [portal], hidden })),
+      .map(([, direction, to, portal, hidden]) => ({
+        direction,
+        side: null,
+        height: null,
+        to: ref(to),
+        portals: [portal],
+        hidden,
+      })),
     links: [
       { label: "mapleclassic.wiki", url: "https://mapleclassic.wiki" },
       { label: "MeowDB", url: "https://meowdb.com/msclassic/maps" },
@@ -177,7 +184,7 @@ export function sampleRoute(from: number, to: number): MapRoute | null {
   const steps: MapRoute["steps"] = [];
   for (let at = to; cameFrom.has(at); ) {
     const [f, direction, t, portal, hidden] = cameFrom.get(at)!;
-    steps.unshift({ from: ref(f), to: ref(t), direction, portal, hidden, travel: null });
+    steps.unshift({ from: ref(f), to: ref(t), direction, side: null, portal, hidden, travel: null });
     at = f;
   }
   return { from: ref(from), to: ref(to), steps, walking: null };

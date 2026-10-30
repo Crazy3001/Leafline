@@ -85,7 +85,7 @@
     width: 22px;
     height: 22px;
     border: 0;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     background: transparent;
     color: var(--faint);
     cursor: pointer;

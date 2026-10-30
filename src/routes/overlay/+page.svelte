@@ -88,6 +88,7 @@
       return { tone: "warn", text: "Windows HDR is on for the game's display, so readings will be off. Turn HDR off, then restart the game." };
     if (s.state === "reading" && !s.hudTaught)
       return { tone: "warn", text: "EXP, HP and MP need the HUD taught once. Save a frame (Ctrl+Alt+F), then teach it in the", teach: true };
+    if (live.analysis?.failed.length) return { tone: "warn", text: `Can't read the ${live.analysis.failed.join(", ")} right now.` };
     return null;
   });
 
@@ -161,7 +162,7 @@
           <Settings size={14} />
         </button>
         <button
-          title="Compact HUD: only EXP per hour and quest counters (Ctrl+Alt+H)"
+          title="Compact HUD (Ctrl+Alt+H)"
           aria-label="Compact HUD"
           onclick={() => backend.setCompact(true)}
         >
@@ -307,7 +308,6 @@
     gap: 7px;
     font-family: var(--font-display);
     font-weight: 600;
-    letter-spacing: 0.01em;
   }
 
   .mode {
@@ -316,11 +316,10 @@
     gap: 5px;
     padding: 1px 7px;
     border: 0;
-    border-radius: 999px;
+    border-radius: var(--radius-sm);
     font-family: var(--font-sans);
     font-size: 10px;
     font-weight: 600;
-    letter-spacing: 0.04em;
     color: var(--accent);
     background: var(--accent-soft);
     cursor: pointer;
@@ -349,7 +348,7 @@
   .live-dot {
     width: 6px;
     height: 6px;
-    border-radius: 50%;
+    border-radius: var(--radius-sm);
     background: currentColor;
   }
 
@@ -412,7 +411,7 @@
     height: 18px;
     padding: 0;
     border: 0;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     background: transparent;
     color: inherit;
     cursor: pointer;
@@ -501,7 +500,7 @@
   [role="tab"]:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: -2px;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
   }
 
   .icon {
@@ -520,7 +519,7 @@
     width: 6px;
     height: 6px;
     border: 1px solid var(--surface);
-    border-radius: 50%;
+    border-radius: var(--radius-sm);
     background: var(--accent);
   }
 
@@ -533,9 +532,7 @@
   .panel {
     display: grid;
     align-content: start;
-    gap: 8px;
-    padding: 8px;
-    animation: enter 0.16s ease-out;
+    gap: 0;
   }
 
   @keyframes enter {
@@ -593,7 +590,7 @@
     place-items: center;
     width: 18px;
     height: 18px;
-    border-radius: 50%;
+    border-radius: var(--radius-sm);
     background: var(--accent-soft);
     color: var(--accent);
     font-size: 10.5px;
@@ -624,7 +621,7 @@
     padding: 0 4px;
     border: 1px solid var(--border-strong);
     border-bottom-width: 2px;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     font-family: var(--font-sans);
     font-size: 10.5px;
     color: var(--muted);

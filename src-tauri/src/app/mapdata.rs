@@ -68,7 +68,7 @@ impl MapDataState {
         })
     }
 
-    fn atlas(&self) -> Option<Arc<Atlas>> {
+    pub(super) fn atlas(&self) -> Option<Arc<Atlas>> {
         self.atlas.read().expect("atlas lock").clone()
     }
 
