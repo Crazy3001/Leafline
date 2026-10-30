@@ -4,6 +4,7 @@
 import type { Backend } from "../api";
 import type {
   Analysis,
+  MapRoute,
   History,
   SavedSession,
   DisplaySettings,
@@ -38,6 +39,8 @@ interface Preview {
   map?: MapMatch;
   guide?: Guide;
   spots?: TrainingSpots;
+  /** Real routes for the maps the preview's guide names. */
+  routes?: MapRoute[];
   pins?: PinStatus;
   /** Start with no readings at all, as on first launch. */
   empty?: boolean;
@@ -240,7 +243,8 @@ export const mockBackend: Backend = {
   mapCard: async (id) =>
     preview?.map ? (preview.map.card.map.id === id ? preview.map.card : null) : mapStatus.ready ? sampleCard(id) : null,
   searchMaps: async (text) => (mapStatus.ready ? sampleSearch(text) : []),
-  mapRoute: async (from, to) => sampleRoute(from, to),
+  mapRoute: async (from, to) =>
+    preview?.routes ? (preview.routes.find((r) => r.from.id === from && r.to.id === to) ?? null) : sampleRoute(from, to),
   async monsterDrops(monsters) {
     await delay(900);
     return sampleDrops(monsters);

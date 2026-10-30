@@ -156,10 +156,27 @@ fn main() {
             .collect();
         let keys: Vec<String> = quests.iter().flat_map(|q| &q.objectives).map(|o| drops::item_key(o)).collect();
         let sources = store.cached_item_sources(&keys, now - drops::MAX_AGE).expect("cached items").0;
+        let guide = atlas.quest_guide(&quests, from, &sources);
+        // Routes to every map the guide names, so the dev UI can show them.
+        let routes: Vec<_> = from
+            .map(|start| {
+                let mut ids: Vec<u32> = guide
+                    .iter()
+                    .flat_map(|q| &q.objectives)
+                    .flat_map(|o| &o.hunts)
+                    .flat_map(|h| &h.maps)
+                    .map(|g| g.map.id)
+                    .collect();
+                ids.sort_unstable();
+                ids.dedup();
+                ids.into_iter().filter_map(|to| atlas.route(start, to)).collect()
+            })
+            .unwrap_or_default();
         let preview = serde_json::json!({
             "analysis": analysis,
             "map": found,
-            "guide": { "from": found.as_ref().map(|m| &m.card.map), "quests": atlas.quest_guide(&quests, from, &sources) },
+            "routes": routes,
+            "guide": { "from": found.as_ref().map(|m| &m.card.map), "quests": guide },
             "spots": { "from": found.as_ref().map(|m| &m.card.map), "spots": atlas.training_spots(from, &[]) },
         });
         std::fs::write(&out, serde_json::to_string(&preview).expect("serialise")).expect("write preview");
