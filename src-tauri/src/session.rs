@@ -11,6 +11,9 @@
 //!   two readings in a row agree on the new level.
 //! - **Mesos count once several readings in a row agree.** Changes while a storage or trade
 //!   window is open (a second meso box on screen) are kept apart, since they are not loot.
+//! - **Quest counters count the same way**, and only going up: a counter that drops (a quest
+//!   handed in and taken again) starts afresh. Their gains over active time give the player's
+//!   own pace on each objective, per map.
 //! - **The clock pauses** after [`TrackerConfig::idle_after`] seconds without EXP, and at once
 //!   on a map change without EXP, so time in town or away does not dilute the rates.
 //!
@@ -34,6 +37,16 @@ pub struct Sample {
     /// A storage or trade window is open, so meso changes are not loot.
     pub exchange: bool,
     pub map: Option<String>,
+    /// The Quest Helper's counters.
+    pub counters: Vec<Counter>,
+}
+
+/// A quest counter as read: what it counts and how far along it is.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Counter {
+    pub target: String,
+    pub current: u32,
+    pub required: u32,
 }
 
 impl Sample {
@@ -46,6 +59,13 @@ impl Sample {
             mesos: analysis.mesos.map(|m| m.mesos),
             exchange: analysis.meso_boxes >= 2,
             map: analysis.map.as_ref().map(MapReading::label),
+            counters: analysis
+                .quest
+                .iter()
+                .flat_map(|q| &q.quests)
+                .flat_map(|q| &q.objectives)
+                .map(|o| Counter { target: o.target.clone(), current: o.current, required: o.required })
+                .collect(),
         }
     }
 }
@@ -54,9 +74,9 @@ impl Sample {
 pub struct TrackerConfig {
     /// Seconds without EXP after which the clock pauses until the next gain.
     pub idle_after: f64,
-    /// Meso readings in a row that must agree before an amount counts. Live capture should use
-    /// 2 or more; a folder of hand-taken screenshots, 1.
-    pub meso_confirmations: usize,
+    /// Readings in a row that must agree before a meso amount or quest counter counts. Live
+    /// capture should use 2 or more; a folder of hand-taken screenshots, 1.
+    pub confirmations: usize,
     /// Rates are shown only after this much active time, so one early kill does not read as a
     /// huge hourly rate.
     pub min_rate_seconds: f64,
@@ -64,7 +84,7 @@ pub struct TrackerConfig {
 
 impl Default for TrackerConfig {
     fn default() -> Self {
-        Self { idle_after: 15.0, meso_confirmations: 2, min_rate_seconds: 30.0 }
+        Self { idle_after: 15.0, confirmations: 2, min_rate_seconds: 30.0 }
     }
 }
 
@@ -101,6 +121,8 @@ pub struct SessionSummary {
     pub map: Option<String>,
     /// Per map, most active time first.
     pub maps: Vec<MapSummary>,
+    /// Quest counter gains per objective and map, most active time first.
+    pub counters: Vec<CounterRate>,
     /// Readings dropped as misreads.
     pub rejected: Rejected,
 }
@@ -116,6 +138,20 @@ pub struct MapSummary {
     pub exp_per_hour: Option<f64>,
     pub mesos_gained: i64,
     pub mesos_per_hour: Option<f64>,
+}
+
+/// How fast one quest counter went up on one map.
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CounterRate {
+    pub target: String,
+    pub required: u32,
+    /// `None` for gains that spanned a map change.
+    pub map: Option<String>,
+    pub gained: u32,
+    pub active_seconds: f64,
+    /// Shown once the counter went up at least twice over enough active time.
+    pub per_hour: Option<f64>,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize)]
@@ -194,6 +230,19 @@ struct MapTotals {
     meso_seconds: f64,
 }
 
+/// One quest counter as tracked: the value being read, and the last confirmed one.
+#[derive(Debug, Clone)]
+struct CounterTrack {
+    target: String,
+    required: u32,
+    /// The value being read and how many readings in a row agree on it.
+    run: (u32, usize),
+    /// The last confirmed value, the active clock then, and the map.
+    confirmed: Option<(u32, f64, Option<String>)>,
+    /// Seen in the latest frame that showed the Quest Helper.
+    seen: bool,
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct SessionTracker {
     config: TrackerConfig,
@@ -226,6 +275,8 @@ pub struct SessionTracker {
     mesos_excluded: i64,
 
     maps: Vec<MapTotals>,
+    counters: Vec<CounterTrack>,
+    counter_totals: Vec<CounterRate>,
     rejected: Rejected,
 }
 
@@ -249,6 +300,7 @@ impl SessionTracker {
         self.exchange_seen |= sample.exchange;
         self.push_exp(sample);
         self.push_mesos(sample);
+        self.push_counters(sample);
     }
 
     fn push_exp(&mut self, sample: &Sample) {
@@ -362,14 +414,14 @@ impl SessionTracker {
             }
             run => {
                 // An amount that never got enough agreeing readings was a misread.
-                if run.as_ref().is_some_and(|(_, count)| *count < self.config.meso_confirmations) {
+                if run.as_ref().is_some_and(|(_, count)| *count < self.config.confirmations) {
                     self.rejected.mesos += 1;
                 }
                 *run = Some((MesoPoint { mesos, clock: self.clock, map: self.map.clone() }, 1));
                 1
             }
         };
-        if count != self.config.meso_confirmations.max(1) {
+        if count != self.config.confirmations.max(1) {
             // The confirmed amount seen again: any window open before has closed without
             // changing it, unless it is still open.
             if self.mesos.as_ref().is_some_and(|m| m.mesos == mesos) {
@@ -394,6 +446,59 @@ impl SessionTracker {
         }
         // A window still open now also covers the next change.
         self.exchange_seen = sample.exchange;
+    }
+
+    /// Counts each quest counter's rises, once enough readings in a row agree on the new value.
+    /// A counter is known by its target and the amount it needs.
+    fn push_counters(&mut self, sample: &Sample) {
+        if sample.counters.is_empty() {
+            return;
+        }
+        for track in &mut self.counters {
+            track.seen = false;
+        }
+        let needed = self.config.confirmations.max(1);
+        for counter in &sample.counters {
+            let known = self.counters.iter().position(|t| t.target == counter.target && t.required == counter.required);
+            let index = known.unwrap_or_else(|| {
+                self.counters.push(CounterTrack {
+                    target: counter.target.clone(),
+                    required: counter.required,
+                    run: (counter.current, 0),
+                    confirmed: None,
+                    seen: false,
+                });
+                self.counters.len() - 1
+            });
+            let track = &mut self.counters[index];
+            track.seen = true;
+            let agreeing = if track.run.0 == counter.current { track.run.1 + 1 } else { 1 };
+            track.run = (counter.current, agreeing);
+            if agreeing != needed {
+                continue;
+            }
+            let next = (counter.current, self.clock, self.map.clone());
+            let Some((value, clock, map)) = track.confirmed.replace(next) else { continue };
+            if counter.current <= value {
+                continue;
+            }
+            let (target, required) = (track.target.clone(), track.required);
+            let map = if map == self.map { map } else { None };
+            let (gained, seconds) = (counter.current - value, self.clock - clock);
+            let index =
+                self.counter_totals.iter().position(|t| t.target == target && t.required == required && t.map == map);
+            let totals = match index {
+                Some(index) => &mut self.counter_totals[index],
+                None => {
+                    self.counter_totals.push(CounterRate { target, required, map, ..CounterRate::default() });
+                    self.counter_totals.last_mut().expect("just pushed")
+                }
+            };
+            totals.gained += gained;
+            totals.active_seconds += seconds;
+        }
+        // Quests no longer shown were handed in or dropped; taking one again starts afresh.
+        self.counters.retain(|t| t.seen);
     }
 
     fn requirement(&self, level: u32) -> Option<Requirement> {
@@ -444,6 +549,15 @@ impl SessionTracker {
             })
             .collect();
         maps.sort_by(|a, b| b.active_seconds.total_cmp(&a.active_seconds));
+        let mut counters: Vec<CounterRate> = self
+            .counter_totals
+            .iter()
+            .map(|t| CounterRate {
+                per_hour: if t.gained >= 2 { rate(i64::from(t.gained), t.active_seconds) } else { None },
+                ..t.clone()
+            })
+            .collect();
+        counters.sort_by(|a, b| b.active_seconds.total_cmp(&a.active_seconds));
 
         SessionSummary {
             frames: self.frames,
@@ -466,6 +580,7 @@ impl SessionTracker {
             mesos_excluded: self.mesos_excluded,
             map: self.map.clone(),
             maps,
+            counters,
             rejected: self.rejected,
         }
     }
@@ -669,9 +784,54 @@ mod tests {
         assert_eq!(summary.rejected.mesos, 1);
     }
 
+    fn with_counter(mut sample: Sample, current: u32) -> Sample {
+        sample.counters = vec![Counter { target: "Evil Eye Tail".into(), current, required: 30 }];
+        sample
+    }
+
+    #[test]
+    fn quest_counters_give_a_pace_per_map() {
+        let mut samples = Vec::new();
+        // Ten minutes, a kill every 30 s and a counter tick every minute, two frames each.
+        for i in 0..=20u32 {
+            let at = f64::from(i) * 30.0;
+            let points = 24_331 + u64::from(i) * 100;
+            let s = with_counter(sample(at, 30, points, (points as f64 * 100.0 / 95_710.0) as f32), i / 2);
+            samples.push(s.clone());
+            samples.push(Sample { at: at + 0.5, ..s });
+        }
+        let summary = track(&samples);
+        assert_eq!(summary.counters.len(), 1);
+        let rate = &summary.counters[0];
+        assert_eq!((rate.target.as_str(), rate.required, rate.map.as_deref()), ("Evil Eye Tail", 30, Some(KERNING)));
+        assert_eq!(rate.gained, 10);
+        assert!(close(rate.per_hour, 60.0, 4.0), "{:?} over {}", rate.per_hour, rate.active_seconds);
+    }
+
+    #[test]
+    fn quest_counters_ignore_misreads_and_hand_ins() {
+        let summary = track(&[
+            with_counter(sample(0.0, 30, 24_331, 25.42), 4),
+            with_counter(sample(1.0, 30, 24_331, 25.42), 4),
+            // A 5 misread as 9 once.
+            with_counter(sample(30.0, 30, 24_431, 25.53), 9),
+            with_counter(sample(31.0, 30, 24_431, 25.53), 5),
+            with_counter(sample(32.0, 30, 24_431, 25.53), 5),
+            // Handed in and taken again: it starts from 0, which is no gain.
+            with_counter(sample(60.0, 30, 24_531, 25.63), 0),
+            with_counter(sample(61.0, 30, 24_531, 25.63), 0),
+            with_counter(sample(90.0, 30, 24_631, 25.74), 1),
+            with_counter(sample(91.0, 30, 24_631, 25.74), 1),
+        ]);
+        // 4 to 5 over 31 s, and 0 to 1 over 30 s.
+        let rate = &summary.counters[0];
+        assert_eq!((rate.gained, rate.active_seconds), (2, 61.0));
+        assert!(close(rate.per_hour, 118.0, 0.1), "{:?}", rate.per_hour);
+    }
+
     #[test]
     fn a_single_screenshot_per_amount_can_be_trusted_when_asked() {
-        let config = TrackerConfig { meso_confirmations: 1, ..TrackerConfig::default() };
+        let config = TrackerConfig { confirmations: 1, ..TrackerConfig::default() };
         let mut tracker = SessionTracker::new(config);
         for s in [
             with_mesos(sample(0.0, 30, 24_331, 25.42), 33_040),

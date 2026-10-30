@@ -2,6 +2,8 @@
 //! them by. Nothing here models the game's EXP or damage formulas; the numbers are the map
 //! data's base values, plus the EXP per hour the player measured there themselves.
 
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 
 use super::atlas::{Atlas, MapRef, MobRow};
@@ -57,18 +59,7 @@ impl Atlas {
                 reachable.extend(self.hops_from(town.id).into_keys());
             }
         }
-        // Several labels can land on one map (misreads): add their time and weigh their rates.
-        let mut rates: std::collections::HashMap<u32, (f64, f64)> = std::collections::HashMap::new();
-        for rate in measured.iter().filter(|r| r.active_seconds > 0.0) {
-            let (street, name) =
-                rate.label.split_once(" : ").map_or((None, rate.label.as_str()), |(s, n)| (Some(s), n));
-            if let Some(found) = self.find(name, street) {
-                let entry = rates.entry(found.card.map.id).or_default();
-                entry.0 += rate.exp_per_hour * rate.active_seconds;
-                entry.1 += rate.active_seconds;
-            }
-        }
-
+        let rates = self.measured_by_map(measured);
         self.maps
             .values()
             .filter(|m| !m.is_town)
@@ -92,11 +83,29 @@ impl Atlas {
                     mobs: card.mobs,
                     hops: hops.get(&m.id).copied(),
                     reachable: reachable.contains(&m.id),
-                    measured: rates.get(&m.id).map(|&(weighted, seconds)| Measured {
-                        exp_per_hour: weighted / seconds,
-                        active_seconds: seconds,
-                    }),
+                    measured: rates.get(&m.id).cloned(),
                 })
+            })
+            .collect()
+    }
+
+    /// The measured rates by map ID. Several labels can land on one map (misreads): their
+    /// time adds up and their rates are weighed by it.
+    pub(super) fn measured_by_map(&self, measured: &[MeasuredRate]) -> HashMap<u32, Measured> {
+        let mut totals: HashMap<u32, (f64, f64)> = HashMap::new();
+        for rate in measured.iter().filter(|r| r.active_seconds > 0.0) {
+            let (street, name) =
+                rate.label.split_once(" : ").map_or((None, rate.label.as_str()), |(s, n)| (Some(s), n));
+            if let Some(found) = self.find(name, street) {
+                let entry = totals.entry(found.card.map.id).or_default();
+                entry.0 += rate.exp_per_hour * rate.active_seconds;
+                entry.1 += rate.active_seconds;
+            }
+        }
+        totals
+            .into_iter()
+            .map(|(id, (weighted, seconds))| {
+                (id, Measured { exp_per_hour: weighted / seconds, active_seconds: seconds })
             })
             .collect()
     }

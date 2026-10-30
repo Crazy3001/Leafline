@@ -76,7 +76,12 @@ export interface Backend {
   /** Player-observed drops from mapleclassic.wiki, cached for a week. */
   monsterDrops(monsters: string[]): Promise<MonsterDrops[]>;
   /** Where to go for each quest objective, from cached data only. Null until map data is downloaded. */
-  questGuide(quests: QuestQuery[], mapName: string | null, mapStreet: string | null): Promise<Guide | null>;
+  questGuide(
+    quests: QuestQuery[],
+    mapName: string | null,
+    mapStreet: string | null,
+    measured: MeasuredRate[],
+  ): Promise<Guide | null>;
   /** Asks mapleclassic.wiki which monsters drop these quest items; cached for a week. */
   lookUpQuestItems(items: string[]): Promise<void>;
   /** Every map with monsters to hunt, with the rates the player measured. Null until map data is downloaded. */
@@ -154,7 +159,7 @@ const tauriBackend: Backend = {
   searchMaps: (text) => invoke("search_maps", { text }),
   mapRoute: (from, to) => invoke("map_route", { from, to }),
   monsterDrops: (monsters) => invoke("monster_drops", { monsters }),
-  questGuide: (quests, mapName, mapStreet) => invoke("quest_guide", { quests, mapName, mapStreet }),
+  questGuide: (quests, mapName, mapStreet, measured) => invoke("quest_guide", { quests, mapName, mapStreet, measured }),
   lookUpQuestItems: async (items) => {
     await invoke("look_up_quest_items", { items });
   },

@@ -183,6 +183,7 @@ pub fn quest_guide(
     quests: Vec<QuestQuery>,
     map_name: Option<String>,
     map_street: Option<String>,
+    measured: Vec<MeasuredRate>,
 ) -> Result<Option<Guide>> {
     let Some(atlas) = state.atlas() else { return Ok(None) };
     let from = map_name.and_then(|name| atlas.find(&name, map_street.as_deref())).map(|m| m.card.map);
@@ -190,7 +191,7 @@ pub fn quest_guide(
     keys.sort();
     keys.dedup();
     let (items, _) = Store::open(&state.path)?.cached_item_sources(&keys, now() - drops::MAX_AGE)?;
-    let quests = atlas.quest_guide(&quests, from.as_ref().map(|m| m.id), &items);
+    let quests = atlas.quest_guide(&quests, from.as_ref().map(|m| m.id), &items, &measured);
     Ok(Some(Guide { from, quests }))
 }
 

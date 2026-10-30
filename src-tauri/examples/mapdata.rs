@@ -101,7 +101,7 @@ fn main() {
             let keys: Vec<String> = items.iter().map(|i| drops::item_key(i)).collect();
             store.cached_item_sources(&keys, now - drops::MAX_AGE).expect("cached items").0
         };
-        for guide in atlas.quest_guide(&quests, from.map(|m| m.id), &sources) {
+        for guide in atlas.quest_guide(&quests, from.map(|m| m.id), &sources, &[]) {
             println!("{} -> {:?}", guide.title, guide.quest.as_ref().map(|q| (&q.quest.name, &q.giver, &q.giver_maps)));
             for o in &guide.objectives {
                 println!("    {:?} {:?} item={:?} looked_up={}", o.kind, o.target, o.item, o.looked_up);
@@ -156,7 +156,7 @@ fn main() {
             .collect();
         let keys: Vec<String> = quests.iter().flat_map(|q| &q.objectives).map(|o| drops::item_key(o)).collect();
         let sources = store.cached_item_sources(&keys, now - drops::MAX_AGE).expect("cached items").0;
-        let guide = atlas.quest_guide(&quests, from, &sources);
+        let guide = atlas.quest_guide(&quests, from, &sources, &[]);
         // Routes to every map the guide names, so the dev UI can show them.
         let routes: Vec<_> = from
             .map(|start| {

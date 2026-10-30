@@ -25,14 +25,14 @@ pub enum Order {
 }
 
 impl Order {
-    /// Hand-taken screenshots are few and far between, so a single meso reading has to do;
-    /// a recording has plenty of frames to agree.
+    /// Hand-taken screenshots are few and far between, so a single meso or counter reading has
+    /// to do; a recording has plenty of frames to agree.
     pub fn tracker_config(self) -> TrackerConfig {
-        let meso_confirmations = match self {
+        let confirmations = match self {
             Order::Modified => 1,
             Order::Name { .. } => 2,
         };
-        TrackerConfig { meso_confirmations, ..TrackerConfig::default() }
+        TrackerConfig { confirmations, ..TrackerConfig::default() }
     }
 }
 

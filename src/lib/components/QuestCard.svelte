@@ -1,20 +1,25 @@
 <script lang="ts">
-  import { LoaderCircle, Search, UserRound } from "@lucide/svelte";
+  import { Hourglass, LoaderCircle, Search, UserRound } from "@lucide/svelte";
 
   import Card from "./Card.svelte";
   import ObjectiveHint from "./quest/ObjectiveHint.svelte";
   import { backend } from "$lib/api";
+  import { formatCompact, formatDuration, splitMapLabel } from "$lib/format";
+  import { measuredRates, watchHistory } from "$lib/history.svelte";
   import { OSMS_URL, WIKI_URL, mapData, watchMapData } from "$lib/mapdata.svelte";
-  import type { Guide, MapReading, QuestReading } from "$lib/types";
+  import type { Guide, MapReading, ObjectiveGuide, Objective, QuestReading, SessionSummary } from "$lib/types";
 
   let {
     quest,
     map = null,
+    session = null,
     plain = false,
   }: {
     quest: QuestReading;
     /** The minimap reading, so routes can start from the current map. */
     map?: MapReading | null;
+    /** The session so far, for the player's own pace on each objective. */
+    session?: SessionSummary | null;
     plain?: boolean;
   } = $props();
 
@@ -25,15 +30,62 @@
   let lookingUp = $state(false);
   let lookupError = $state<string | null>(null);
 
+  watchHistory();
+  // EXP rates from saved sessions and this one, for a rough pace where no counter was timed.
+  const measured = $derived(measuredRates(session));
+
   const queries = $derived(
     quest.quests.map((q) => ({ title: q.title, objectives: q.objectives.map((o) => o.target) })),
   );
-  const queryKey = $derived(JSON.stringify([queries, map?.name, map?.street]));
+  const queryKey = $derived(JSON.stringify([queries, map?.name, map?.street, measured]));
 
   async function refresh() {
     const key = queryKey;
-    const result = await backend.questGuide(queries, map?.name ?? null, map?.street ?? null);
+    const result = await backend.questGuide(queries, map?.name ?? null, map?.street ?? null, measured);
     if (key === queryKey) guide = result;
+  }
+
+  /** Below this many kills or items an hour, an estimate says more about luck than pace. */
+  const MIN_PER_HOUR = 1;
+
+  /**
+   * Time left on an objective at the player's measured pace, or null when nothing was measured.
+   * Best is the counter's own rise, timed by the session tracker (on this map if it was timed
+   * here); otherwise, for a monster, the EXP rate measured on one of its maps turned into kills.
+   */
+  function timeLeft(read: Objective, hint: ObjectiveGuide | undefined) {
+    const left = read.required - read.current;
+    if (left <= 0) return null;
+    const timed = (session?.counters ?? [])
+      .filter((c) => c.target === read.target && c.required === read.required && (c.perHour ?? 0) >= MIN_PER_HOUR)
+      .sort((a, b) => Number(b.map === session?.map) - Number(a.map === session?.map) || b.activeSeconds - a.activeSeconds);
+    const counter = timed[0];
+    if (counter?.perHour) {
+      const where = counter.map && counter.map !== session?.map ? ` on ${splitMapLabel(counter.map).name}` : "";
+      return {
+        seconds: (left / counter.perHour) * 3600,
+        where,
+        basis: "counter" as const,
+        title:
+          `Your counter rose by ${counter.gained} in ${formatDuration(counter.activeSeconds)} of active play` +
+          `${counter.map ? ` on ${splitMapLabel(counter.map).name}` : ""}. A guide only: pace varies.`,
+      };
+    }
+    if (hint?.kind !== "monster") return null;
+    const grounds = hint.hunts[0]?.maps.filter((g) => g.pace && g.pace.killsPerHour >= MIN_PER_HOUR) ?? [];
+    const ground =
+      grounds.find((g) => g.map.id === guide?.from?.id) ??
+      [...grounds].sort((a, b) => b.pace!.activeSeconds - a.pace!.activeSeconds)[0];
+    if (!ground?.pace) return null;
+    return {
+      seconds: (left / ground.pace.killsPerHour) * 3600,
+      where: ground.map.id === guide?.from?.id ? "" : ` on ${ground.map.name}`,
+      basis: "exp" as const,
+      title:
+        `Estimated from the ${formatCompact(ground.pace.expPerHour)} EXP/hr you measured on ${ground.map.name} ` +
+        `over ${formatDuration(ground.pace.activeSeconds)}, assuming you defeat its monsters in proportion to how many ` +
+        `spawn, at the map data's base EXP. EXP events make it read short; skipping other monsters makes it read long.`,
+    };
   }
 
   $effect(() => {
@@ -102,6 +154,7 @@
           {#each objectives as objective, j}
             {@const done = objective.current >= objective.required}
             {@const hint = info?.objectives[j]}
+            {@const eta = timeLeft(objective, hint)}
             <li class:done>
               <div class="row">
                 <span>{objective.target}</span>
@@ -110,6 +163,15 @@
               <div class="track">
                 <div class="fill" style:width="{Math.min(1, objective.current / objective.required) * 100}%"></div>
               </div>
+              {#if eta}
+                <p class="eta" title={eta.title}>
+                  <Hourglass size={10} />
+                  <span>
+                    About {formatDuration(Math.max(60, eta.seconds))} left{eta.where}
+                    <span class="faint">· {eta.basis === "counter" ? "your pace" : "rough"}</span>
+                  </span>
+                </p>
+              {/if}
               {#if hint && !done}<ObjectiveHint guide={hint} from={guide?.from ?? null} />{/if}
             </li>
           {/each}
@@ -210,6 +272,24 @@
   .fill {
     height: 100%;
     background: var(--accent);
+  }
+
+  .eta {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin: 4px 0 0;
+    color: var(--muted);
+    font-size: 11px;
+  }
+
+  .eta :global(svg) {
+    flex: none;
+    color: var(--faint);
+  }
+
+  .eta .faint {
+    color: var(--faint);
   }
 
   .done .fill {

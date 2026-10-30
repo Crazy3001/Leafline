@@ -209,7 +209,21 @@ export interface SessionSummary {
   mesosExcluded: number;
   map: string | null;
   maps: MapSummary[];
+  /** Quest counter gains per objective and map, most active time first. */
+  counters: CounterRate[];
   rejected: { exp: number; mesos: number };
+}
+
+/** How fast one quest counter went up on one map (see src-tauri/src/session.rs). */
+export interface CounterRate {
+  target: string;
+  required: number;
+  /** `null` for gains that spanned a map change. */
+  map: string | null;
+  gained: number;
+  activeSeconds: number;
+  /** Shown once the counter went up at least twice over enough active time. */
+  perHour: number | null;
 }
 
 /** How a replay orders frames: by file time, or by name a fixed interval apart. */
@@ -355,6 +369,18 @@ export interface HuntingGround {
   count: number;
   /** Portals from the current map, when it is known and a route exists. */
   hops: number | null;
+  /** The player's EXP rate measured here, as kills of this monster. */
+  pace: Pace | null;
+}
+
+/**
+ * A rough kill rate from the EXP per hour the player measured on a map, assuming they defeat its
+ * monsters in proportion to how many of each spawn, at the map data's base EXP.
+ */
+export interface Pace {
+  expPerHour: number;
+  activeSeconds: number;
+  killsPerHour: number;
 }
 
 export interface Hunt {
