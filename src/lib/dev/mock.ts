@@ -8,6 +8,8 @@ import type {
   History,
   SavedSession,
   DisplaySettings,
+  GameWindow,
+  LiveStatus,
   TravelFile,
   TravelInfo,
   PriceEntry,
@@ -183,7 +185,20 @@ let displaySettings: DisplaySettings = {
   opacity: 1,
   scale: 1,
   travel: { enabled: false, cabs: true, vipCabs: false, scrolls: true },
+  live: { enabled: false, interval: 2, window: null },
 };
+
+let liveStatus: LiveStatus = { state: "off" };
+let liveTimer: ReturnType<typeof setInterval> | undefined;
+const liveHandlers: ((status: LiveStatus) => void)[] = [];
+const setLive = (status: LiveStatus) => {
+  liveStatus = status;
+  liveHandlers.forEach((h) => h(status));
+};
+const mockWindows: GameWindow[] = [
+  { id: 1, title: "MapleStory", class: "MapleStoryClass", width: 2560, height: 1440, likelyGame: true },
+  { id: 2, title: "Inbox - Mail", class: "ApplicationFrameWindow", width: 1280, height: 900, likelyGame: false },
+];
 const settingsHandlers: ((settings: DisplaySettings) => void)[] = [];
 
 /** Quest items the mock wiki has been asked about. */
@@ -253,8 +268,33 @@ export const mockBackend: Backend = {
     { action: "toggleOverlay", keys: "Ctrl+Alt+O", label: "Show or hide the overlay" },
     { action: "toggleClickThrough", keys: "Ctrl+Alt+L", label: "Lock the overlay (click-through)" },
     { action: "togglePins", keys: "Ctrl+Alt+P", label: "Show or hide pinned panels" },
+    { action: "toggleLive", keys: "Ctrl+Alt+R", label: "Start or stop live reading" },
+    { action: "saveFrame", keys: "Ctrl+Alt+F", label: "Save the picture live reading last read, to Pictures\\Leafline" },
     { action: "showWorkbench", keys: "Ctrl+Alt+W", label: "Open the workbench" },
   ],
+  liveStatus: async () => liveStatus,
+  async startLive() {
+    if (!displaySettings.live.enabled) throw "Turn on live reading in Settings first.";
+    setLive({ state: "waiting", reason: "Starting…" });
+    let frames = 0;
+    clearInterval(liveTimer);
+    liveTimer = setInterval(() => {
+      frames += 1;
+      setLive({ state: "reading", window: "MapleStory", width: 2560, height: 1440, frames, readMs: 412, hdr: false, hudTaught: frames > 3 });
+      analysisHandlers.forEach((h) => h(sampleAnalysis));
+    }, displaySettings.live.interval * 1000);
+  },
+  async stopLive() {
+    clearInterval(liveTimer);
+    setLive({ state: "off" });
+  },
+  liveWindows: async () => mockWindows,
+  saveLiveFrame: async () => "C:\\Users\\you\\Pictures\\Leafline\\leafline-2026-10-30_13-05-09.png",
+  async onLive(handler) {
+    liveHandlers.push(handler);
+    return () => {};
+  },
+  onFrameSaved: async () => () => {},
   takeLaunchImage: async () => null,
   onOpenImage: async () => () => {},
   async onAnalysis(handler) {

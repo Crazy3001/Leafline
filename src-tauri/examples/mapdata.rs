@@ -12,7 +12,10 @@
 //! `--quests <image>` reads the Quest Helper and minimap of one screenshot and prints where to go
 //! for each objective; add `--lookup` to ask mapleclassic.wiki who drops the quest items.
 //!
-//! `--train <level>` lists maps whose monsters average within a few levels of `level`.
+//! `--train <level> [--from <map-id>]` lists maps whose monsters average within a few levels of
+//! `level`, and that can be reached from the map given.
+//!
+//! `--hunt <monster> --from <map-id>` lists where the quest guide sends a player for that monster.
 //!
 //! `--preview <image> <out.json> [--font <hud-font.json>] [--travel]` writes what the overlay would
 //! show for a screenshot (analysis, map match, quest guide, training spots), for the dev UI's
@@ -121,7 +124,8 @@ fn main() {
     }
     if let Some(level) = value("--train", 1) {
         let level: f64 = level.parse().expect("level");
-        let mut spots = atlas.training_spots(None, &[], &Travel::none());
+        let from = value("--from", 1).map(|id| id.parse().expect("map id"));
+        let mut spots = atlas.training_spots(from, &[], &Travel::none());
         spots.retain(|s| s.reachable && (s.average_level - level).abs() <= 5.0);
         spots.sort_by_key(|s| std::cmp::Reverse(s.exp_per_clear));
         for s in spots {
@@ -135,6 +139,19 @@ fn main() {
                 s.exp_per_clear,
                 s.exp_per_clear as f64 * 1000.0 / s.hp_per_clear.max(1) as f64
             );
+        }
+    }
+    if let Some(monster) = value("--hunt", 1) {
+        let from = value("--from", 1).map(|id| id.parse().expect("map id"));
+        let query = QuestQuery { title: String::new(), objectives: vec![monster] };
+        let guide = atlas.quest_guide(&[query], from, &[], &[], &Travel::none());
+        for hunt in guide.iter().flat_map(|g| &g.objectives).flat_map(|o| &o.hunts) {
+            for ground in &hunt.maps {
+                println!(
+                    "{:<20} {:<36} x{:<3} {:?} portals",
+                    hunt.monster.name, ground.map.name, ground.count, ground.hops
+                );
+            }
         }
     }
     if let (Some(image), Some(out)) = (value("--preview", 1), value("--preview", 2)) {

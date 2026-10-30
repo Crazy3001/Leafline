@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { Lock, LockOpen, Minimize2, PanelsTopLeft, Pin, PinOff, Settings, X } from "@lucide/svelte";
+  import { Camera, Lock, LockOpen, Minimize2, PanelsTopLeft, Pin, PinOff, Settings, X } from "@lucide/svelte";
   import { onMount } from "svelte";
 
-  import { backend } from "$lib/api";
+  import { backend, fileName } from "$lib/api";
   import CompactHud from "$lib/components/CompactHud.svelte";
   import Logo from "$lib/components/Logo.svelte";
   import PanelView from "$lib/components/PanelView.svelte";
@@ -66,6 +66,51 @@
     live.status.clickThrough = !live.status.clickThrough;
   }
 
+  const liveOn = $derived(live.liveStatus.state === "reading" || live.liveStatus.state === "waiting");
+  let liveError = $state<string | null>(null);
+
+  const liveTitle = $derived.by(() => {
+    const s = live.liveStatus;
+    if (s.state === "reading") return `Reading ${s.window} every ${display.live.interval} s. Click to stop (Ctrl+Alt+R).`;
+    if (s.state === "waiting") return `${s.reason} Click to stop (Ctrl+Alt+R).`;
+    if (!display.live.enabled) return "Reading saved screenshots only. Live reading is off; turn it on in Settings.";
+    return "Start reading the game window (Ctrl+Alt+R)";
+  });
+
+  /** One line under the header for what needs the player's attention, most urgent first. */
+  const notice = $derived.by((): { tone: "bad" | "warn" | "good" | "quiet"; text: string; teach?: boolean } | null => {
+    const s = live.liveStatus;
+    if (liveError) return { tone: "bad", text: liveError };
+    if (s.state === "failed") return { tone: "bad", text: `Live reading stopped: ${s.message}` };
+    if (live.savedFrame) return { tone: "good", text: `Saved ${fileName(live.savedFrame)} to Pictures\\Leafline.` };
+    if (s.state === "waiting") return { tone: "quiet", text: s.reason };
+    if (s.state === "reading" && s.hdr)
+      return { tone: "warn", text: "Windows HDR is on for the game's display, so readings will be off. Turn HDR off, then restart the game." };
+    if (s.state === "reading" && !s.hudTaught)
+      return { tone: "warn", text: "EXP, HP and MP need the HUD taught once. Save a frame (Ctrl+Alt+F), then teach it in the", teach: true };
+    return null;
+  });
+
+  async function toggleLive() {
+    liveError = null;
+    try {
+      if (liveOn) await backend.stopLive();
+      else if (!display.live.enabled) await backend.showSettings();
+      else await backend.startLive();
+    } catch (e) {
+      liveError = String(e);
+    }
+  }
+
+  async function saveFrame() {
+    liveError = null;
+    try {
+      await backend.saveLiveFrame();
+    } catch (e) {
+      liveError = String(e);
+    }
+  }
+
   function onTabKey(event: KeyboardEvent) {
     const i = PANELS.findIndex((p) => p.id === tab);
     if (event.key === "ArrowRight") select(PANELS[(i + 1) % PANELS.length].id);
@@ -89,9 +134,26 @@
       <span class="brand" data-tauri-drag-region>
         <Logo size={16} />
         <span data-tauri-drag-region>Leafline</span>
-        <span class="mode" data-tauri-drag-region>Offline</span>
+        <button
+          class="mode"
+          class:on={live.liveStatus.state === "reading"}
+          class:waiting={live.liveStatus.state === "waiting"}
+          title={liveTitle}
+          onclick={toggleLive}
+        >
+          {#if liveOn}<span class="live-dot" aria-hidden="true"></span>Live{:else}Offline{/if}
+        </button>
       </span>
       <span class="actions">
+        {#if live.liveStatus.state === "reading"}
+          <button
+            title="Save this game picture to Pictures\Leafline, to teach the HUD or report a misread (Ctrl+Alt+F)"
+            aria-label="Save game picture"
+            onclick={saveFrame}
+          >
+            <Camera size={14} />
+          </button>
+        {/if}
         <button title="Open workbench (Ctrl+Alt+W)" aria-label="Open workbench" onclick={() => backend.showWorkbench()}>
           <PanelsTopLeft size={14} />
         </button>
@@ -119,6 +181,17 @@
         </button>
       </span>
     </header>
+
+    {#if notice}
+      <div class="notice {notice.tone}" role="status">
+        <span
+          >{notice.text}{#if notice.teach}{" "}<button class="inline" onclick={() => backend.showWorkbench()}>workbench</button>.{/if}</span
+        >
+        {#if notice.tone === "bad"}
+          <button class="dismiss" aria-label="Dismiss" onclick={() => (liveError = null)}><X size={12} /></button>
+        {/if}
+      </div>
+    {/if}
 
     <nav class="tabs">
       <div class="tablist" role="tablist" aria-label="Panels" tabindex="-1" onkeydown={onTabKey}>
@@ -169,8 +242,9 @@
             <li>
               <span class="n">1</span>
               <span
-                >Open the <button class="inline" onclick={() => backend.showWorkbench()}>workbench</button> and load a
-                screenshot. Its readings appear here, as they will during play.</span
+                >Turn on <button class="inline" onclick={() => backend.showSettings()}>live reading</button> to read the
+                game as you play, or load a screenshot in the
+                <button class="inline" onclick={() => backend.showWorkbench()}>workbench</button>.</span
               >
             </li>
             <li>
@@ -237,7 +311,11 @@
   }
 
   .mode {
-    padding: 1px 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 1px 7px;
+    border: 0;
     border-radius: 999px;
     font-family: var(--font-sans);
     font-size: 10px;
@@ -245,6 +323,99 @@
     letter-spacing: 0.04em;
     color: var(--accent);
     background: var(--accent-soft);
+    cursor: pointer;
+    transition: filter 0.12s ease;
+  }
+
+  .mode:hover {
+    filter: brightness(1.25);
+  }
+
+  .mode:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+
+  .mode.on {
+    color: var(--good);
+    background: var(--good-soft);
+  }
+
+  .mode.waiting {
+    color: var(--warn);
+    background: var(--warn-soft);
+  }
+
+  .live-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+
+  .mode.on .live-dot {
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    50% {
+      opacity: 0.35;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mode.on .live-dot {
+      animation: none;
+    }
+  }
+
+  .notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 6px 10px 6px 12px;
+    border-top: 1px solid var(--border);
+    font-size: 11.5px;
+    line-height: 1.4;
+    color: var(--muted);
+  }
+
+  .notice > span {
+    flex: 1;
+  }
+
+  .notice.warn {
+    color: var(--warn);
+    background: var(--warn-soft);
+  }
+
+  .notice.bad {
+    color: var(--bad);
+    background: color-mix(in srgb, var(--bad) 12%, transparent);
+  }
+
+  .notice.good {
+    color: var(--good);
+    background: var(--good-soft);
+  }
+
+  .notice .inline {
+    color: inherit;
+    text-decoration: underline;
+  }
+
+  .dismiss {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
   }
 
   .actions {

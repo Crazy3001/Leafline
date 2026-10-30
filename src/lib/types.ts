@@ -170,6 +170,48 @@ export interface OverlayStatus {
   compact: boolean;
 }
 
+// Live reading (see src-tauri/src/app/live.rs and src-tauri/src/capture).
+
+export type LiveStatus =
+  | { state: "off" }
+  /** Running, with nothing to read right now. */
+  | { state: "waiting"; reason: string }
+  | {
+      state: "reading";
+      window: string;
+      width: number;
+      height: number;
+      frames: number;
+      readMs: number;
+      /** Windows HDR is on for the game's display, which washes the picture out. */
+      hdr: boolean;
+      /** Without a taught HUD font, EXP, HP and MP aren't read. */
+      hudTaught: boolean;
+    }
+  | { state: "failed"; message: string };
+
+/** How the chosen game window is recognised again. */
+export interface WindowChoice {
+  title: string;
+  class: string;
+}
+
+export interface GameWindow extends WindowChoice {
+  id: number;
+  width: number;
+  height: number;
+  /** Looks like the MapleStory client. */
+  likelyGame: boolean;
+}
+
+export interface LiveChoice {
+  /** Off until the player has read the warning and turned it on. */
+  enabled: boolean;
+  /** Seconds between readings, 1 to 10. */
+  interval: number;
+  window: WindowChoice | null;
+}
+
 export interface ShortcutInfo {
   action: string;
   keys: string;
@@ -563,6 +605,7 @@ export interface DisplaySettings {
   scale: number;
   /** Taxis and return scrolls in routes; off by default. */
   travel: TravelChoice;
+  live: LiveChoice;
 }
 
 // Session history (see src-tauri/src/userdata/sessions.rs).

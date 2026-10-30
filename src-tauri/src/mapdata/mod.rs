@@ -4,7 +4,7 @@
 //! Classic client. Leafline downloads it only after the user asks, keeps it in a local SQLite
 //! cache and credits it wherever it is shown; none of it ships in the repo or the installer.
 //! Image fields and map coordinates are never read. Drops come separately from
-//! mapleclassic.wiki, where players log them. See `docs/map-data-sources.md`.
+//! mapleclassic.wiki, where players log them.
 
 pub mod atlas;
 pub mod drops;

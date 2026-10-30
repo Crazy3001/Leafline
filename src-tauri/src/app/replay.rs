@@ -39,6 +39,9 @@ struct Progress<'a> {
 /// session, showing each frame on the overlay and pinned panels as it goes.
 #[tauri::command]
 pub async fn replay_session(app: AppHandle, folder: PathBuf, order: Order) -> Result<SessionSummary> {
+    if super::live::running(&app) {
+        return Err(Error::Invalid("Live reading is on. Stop it before replaying a folder.".into()));
+    }
     let state = app.state::<ReplayState>();
     if state.running.swap(true, Ordering::SeqCst) {
         return Err(Error::Invalid("A replay is already running.".into()));
@@ -63,6 +66,10 @@ pub async fn replay_session(app: AppHandle, folder: PathBuf, order: Order) -> Re
     .map_err(|err| Error::Invalid(err.to_string()));
     state.running.store(false, Ordering::SeqCst);
     result?
+}
+
+pub fn running(app: &AppHandle) -> bool {
+    app.state::<ReplayState>().running.load(Ordering::SeqCst)
 }
 
 /// Stops a running replay after the frame it is on.

@@ -11,7 +11,7 @@
 <div class="strip">
   {#if !hud}<p class="paused">The HUD isn't in view, so level and EXP aren't read.</p>{/if}
   <div class="who">
-    <span class="level tabular"><span class="lv">LV</span>{hud?.level ?? "—"}</span>
+    <span class="level tabular"><span class="lv">LV</span>{hud?.level ?? session?.level ?? "—"}</span>
     <span class="name">{hud?.name ?? "Unknown character"}</span>
     {#if hud?.job}<span class="job">{hud.job}</span>{/if}
   </div>

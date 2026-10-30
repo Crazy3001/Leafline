@@ -15,3 +15,18 @@ vite.config.ts.timestamp-*
 # Claude Code files stay local: they are not part of the project.
 /CLAUDE.md
 /.claude/
+
+# Working notes stay local: research, drafts and permission messages.
+/docs/
+
+# Data taken from the game or the wikis belongs in app data, never here.
+*.sqlite3
+*.sqlite3-*
+hud-font.json
+travel-wiki.json
+
+# Editors, OS and logs.
+.idea/
+.vscode/
+Thumbs.db
+*.log

@@ -3,6 +3,7 @@
 mod calibration;
 mod commands;
 mod launch;
+mod live;
 mod mapdata;
 mod overlay;
 mod pins;
@@ -18,6 +19,7 @@ use tauri_plugin_window_state::StateFlags;
 
 use calibration::HudFontState;
 use launch::LaunchImage;
+use live::LiveState;
 use mapdata::MapDataState;
 use overlay::{OVERLAY, OverlayState, WORKBENCH};
 use pins::PinState;
@@ -47,6 +49,7 @@ pub fn run() {
         .plugin(shortcuts::plugin())
         .manage(OverlayState::default())
         .manage(ReplayState::default())
+        .manage(LiveState::default())
         .manage(Readings::default())
         .manage(LaunchImage::new(&args))
         .setup(|app| {
@@ -79,6 +82,11 @@ pub fn run() {
             commands::read_image,
             replay::replay_session,
             replay::cancel_replay,
+            live::live_status,
+            live::start_live,
+            live::stop_live,
+            live::live_windows,
+            live::save_live_frame,
             commands::overlay_status,
             commands::set_click_through,
             commands::set_compact,

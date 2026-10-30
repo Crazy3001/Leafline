@@ -8,7 +8,11 @@
   import MapPicker from "./MapPicker.svelte";
   import RouteSteps from "./RouteSteps.svelte";
 
-  let { from, onnavigate }: { from: MapRef; onnavigate: (id: number) => void } = $props();
+  let {
+    from,
+    region = null,
+    onnavigate,
+  }: { from: MapRef; region?: string | null; onnavigate: (id: number) => void } = $props();
 
   let target = $state<MapRef | null>(null);
   let route = $state<MapRoute | null>(null);
@@ -41,7 +45,10 @@
     <RouteSteps {route} {onnavigate} />
   {:else if !loading}
     <p class="note">
-      {#if display.travel.enabled}
+      {#if region === "Maple Island"}
+        No portal leaves Maple Island. To reach Victoria Island, talk to Shanks in Southperry. That trip is one way, so
+        finish what you want to do here first.
+      {:else if display.travel.enabled}
         No route is known, even with the travel you turned on. Some trips need a ship or an NPC the data doesn't list.
       {:else}
         No route through portals is known. Some trips need a ship, taxi or return scroll: turn on travel in Settings to

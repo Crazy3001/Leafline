@@ -7,6 +7,7 @@ export const display = $state<DisplaySettings>({
   opacity: 1,
   scale: 1,
   travel: { enabled: false, cabs: true, vipCabs: false, scrolls: true },
+  live: { enabled: false, interval: 2, window: null },
 });
 
 /** Changes whenever the travel routes may use changes, for effects that ask for routes. */

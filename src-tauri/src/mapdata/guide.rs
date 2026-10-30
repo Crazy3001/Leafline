@@ -271,9 +271,13 @@ impl Atlas {
                 pace: self.pace(id, count, context),
             })
             .collect();
+        // Maps the player can get to come first, however rich the others are. Without a known
+        // position none has a route, and count alone decides.
+        let stranded = |m: &HuntingGround| m.hops.is_none() && m.travel.is_none();
         maps.sort_by(|a, b| {
-            b.count
-                .cmp(&a.count)
+            stranded(a)
+                .cmp(&stranded(b))
+                .then(b.count.cmp(&a.count))
                 .then(a.hops.unwrap_or(u32::MAX).cmp(&b.hops.unwrap_or(u32::MAX)))
                 .then_with(|| a.map.name.cmp(&b.map.name))
         });
@@ -350,7 +354,7 @@ impl Atlas {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mapdata::atlas::tests::world;
+    use crate::mapdata::atlas::tests::{island_world, world};
     use crate::mapdata::drops::Dropper;
 
     fn query(title: &str, objectives: &[&str]) -> QuestQuery {
@@ -392,6 +396,18 @@ mod tests {
         let maps: Vec<(&str, u32, Option<u32>)> =
             hunt.maps.iter().map(|g| (g.map.name.as_str(), g.count, g.hops)).collect();
         assert_eq!(maps, [("Mossbank Meadow I", 6, Some(2)), ("Mossbank Meadow II", 2, Some(3))]);
+    }
+
+    #[test]
+    fn maps_the_player_can_reach_come_before_richer_ones() {
+        let atlas = island_world();
+        let hunting = |from| {
+            let guide =
+                atlas.quest_guide(&[query("Shell Sorting", &["Pebble Snail"])], from, &[], &[], &Travel::none());
+            guide[0].objectives[0].hunts[0].maps.iter().map(|g| g.map.name.clone()).collect::<Vec<_>>()
+        };
+        assert_eq!(hunting(Some(21)), ["Cove Shore", "Harbor Field"]);
+        assert_eq!(hunting(None), ["Harbor Field", "Cove Shore"]);
     }
 
     #[test]

@@ -61,6 +61,10 @@ pub struct MapRef {
     pub known: bool,
 }
 
+/// Where new characters start. An NPC takes them off it for good, so no portal leads out and
+/// none leads back.
+pub(super) const STARTING_REGION: &str = "Maple Island";
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MapMatch {
@@ -449,6 +453,10 @@ impl Atlas {
     }
 
     /// Portals from `from` to every map reachable through them.
+    pub(super) fn on_starting_island(&self, id: u32) -> bool {
+        self.maps.get(&id).is_some_and(|m| m.region.as_deref() == Some(STARTING_REGION))
+    }
+
     pub(super) fn hops_from(&self, from: u32) -> HashMap<u32, u32> {
         self.explore(from, &Travel::none(), None).into_iter().map(|(id, v)| (id, v.hops)).collect()
     }
@@ -485,7 +493,14 @@ impl Atlas {
             let (hops, via) = (visits[&at].hops + 1, visits[&at].via);
             let portals =
                 self.exits.get(&at).into_iter().flatten().filter(|e| e.to.known).map(|e| (e.to.id, Edge::Portal(e)));
-            let rides = travel.leaving(at).filter(|l| self.maps.contains_key(&l.to)).map(|l| (l.to, Edge::Travel(l)));
+            // Leaving the island can't be undone, so a scroll is never suggested as a shortcut off it.
+            let stays =
+                |l: &&TravelLink| l.from.is_some() || !self.on_starting_island(at) || self.on_starting_island(l.to);
+            let rides = travel
+                .leaving(at)
+                .filter(|l| self.maps.contains_key(&l.to))
+                .filter(stays)
+                .map(|l| (l.to, Edge::Travel(l)));
             for (next, edge) in portals.chain(rides) {
                 if let Entry::Vacant(entry) = visits.entry(next) {
                     let via = via.or(matches!(edge, Edge::Travel(_)).then_some(next));
@@ -693,6 +708,36 @@ pub(crate) mod tests {
                     requirements: vec![MobRequirement { mob_id: 11, count: 5 }],
                 },
             ],
+        })
+    }
+
+    // A made-up starting island and the mainland beyond it. No portal joins the two.
+    pub(crate) fn island_world() -> Atlas {
+        let island = |mut m: MapRecord| {
+            m.region = Some(STARTING_REGION.into());
+            m
+        };
+        let mut port = island(map(20, "Cove", "Sand Road", vec![portal("east00", 21)]));
+        port.is_town = true;
+        let mut harbor = map(30, "Harbor", "Main Road", vec![portal("east00", 31)]);
+        harbor.is_town = true;
+        Atlas::new(Dataset {
+            maps: vec![
+                port,
+                island(map(21, "Cove Shore", "Sand Road", vec![portal("west00", 20)])),
+                harbor,
+                map(31, "Harbor Field", "Main Road", vec![portal("west00", 30)]),
+            ],
+            // The mainland has more of the same monster, and better EXP.
+            monsters: vec![mob(10, "Pebble Snail", 1, 3, &[(21, 5), (31, 9)]), mob(11, "Moss Slime", 2, 9, &[(31, 5)])],
+            npcs: vec![],
+            quests: vec![QuestRecord {
+                id: 70,
+                name: "Shell Sorting".into(),
+                npc_id: None,
+                level_min: Some(1),
+                requirements: vec![MobRequirement { mob_id: 10, count: 8 }],
+            }],
         })
     }
 

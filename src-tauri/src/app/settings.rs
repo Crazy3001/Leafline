@@ -8,6 +8,7 @@ use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder
 
 use super::overlay::{self, OVERLAY};
 use super::pins;
+use crate::capture::WindowChoice;
 use crate::error::{Error, Result};
 use crate::mapdata::TravelChoice;
 
@@ -17,7 +18,7 @@ pub const SETTINGS: &str = "settings";
 /// Emitted to every window when the settings change.
 pub const SETTINGS_EVENT: &str = "settings";
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Settings {
     /// How opaque the overlay and pinned panels are, 0.4 to 1.
@@ -26,11 +27,29 @@ pub struct Settings {
     pub scale: f64,
     /// Taxis and return scrolls in routes. Off until the player turns it on.
     pub travel: TravelChoice,
+    pub live: LiveChoice,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Self { opacity: 1.0, scale: 1.0, travel: TravelChoice::default() }
+        Self { opacity: 1.0, scale: 1.0, travel: TravelChoice::default(), live: LiveChoice::default() }
+    }
+}
+
+/// Live reading of the game window. Off until the player has read the warning and turned it on.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct LiveChoice {
+    pub enabled: bool,
+    /// Seconds between readings, 1 to 10.
+    pub interval: f64,
+    /// The window the player picked, for when Leafline can't tell which one is the game.
+    pub window: Option<WindowChoice>,
+}
+
+impl Default for LiveChoice {
+    fn default() -> Self {
+        Self { enabled: false, interval: 2.0, window: None }
     }
 }
 
@@ -40,6 +59,7 @@ impl Settings {
         Self {
             opacity: finite(self.opacity, 1.0).clamp(0.4, 1.0),
             scale: finite(self.scale, 1.0).clamp(0.85, 1.3),
+            live: LiveChoice { interval: finite(self.live.interval, 2.0).clamp(1.0, 10.0), ..self.live },
             ..self
         }
     }
@@ -63,7 +83,7 @@ impl SettingsState {
     }
 
     pub fn get(&self) -> Settings {
-        *self.current.lock().expect("settings lock")
+        self.current.lock().expect("settings lock").clone()
     }
 }
 
@@ -84,7 +104,7 @@ pub fn get_settings(state: State<SettingsState>) -> Settings {
 #[tauri::command]
 pub fn update_settings(app: AppHandle, state: State<SettingsState>, settings: Settings) -> Result<Settings> {
     let settings = settings.clamped();
-    let old = std::mem::replace(&mut *state.current.lock().expect("settings lock"), settings);
+    let old = std::mem::replace(&mut *state.current.lock().expect("settings lock"), settings.clone());
     if let Some(dir) = state.path.parent() {
         std::fs::create_dir_all(dir)?;
     }
@@ -102,7 +122,10 @@ pub fn update_settings(app: AppHandle, state: State<SettingsState>, settings: Se
             window.set_zoom(settings.scale)?;
         }
     }
-    app.emit(SETTINGS_EVENT, settings)?;
+    if old.live.enabled && !settings.live.enabled {
+        super::live::stop(&app);
+    }
+    app.emit(SETTINGS_EVENT, &settings)?;
     Ok(settings)
 }
 

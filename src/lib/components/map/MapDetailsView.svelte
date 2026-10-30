@@ -117,7 +117,7 @@
 
 {#if !pin}
   <Section title="Route" open={!compact}>
-    <RoutePlanner from={details.map} {onnavigate} />
+    <RoutePlanner from={details.map} region={details.region} {onnavigate} />
   </Section>
 {/if}
 

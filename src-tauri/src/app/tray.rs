@@ -27,6 +27,7 @@ pub fn create(app: &App) -> tauri::Result<()> {
             &item(Action::ToggleOverlay, "Show / hide overlay")?,
             &click_through,
             &item(Action::TogglePins, "Show / hide pinned panels")?,
+            &item(Action::ToggleLive, "Start / stop live reading")?,
             &item(Action::ShowWorkbench, "Open workbench")?,
             &MenuItem::with_id(app, SETTINGS, "Settings…", true, None::<&str>)?,
             &PredefinedMenuItem::separator(app)?,

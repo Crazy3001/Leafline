@@ -288,8 +288,8 @@
     <div class="policy">
       <ShieldCheck size={16} />
       <p>
-        <strong>Offline mode.</strong> Leafline reads saved screenshots only. Live capture stays off until Nexon confirms
-        read-only overlays are allowed. Hotkeys, map data and more are in
+        <strong>Offline mode.</strong> The workbench reads saved screenshots. Live reading is opt-in, at your own risk,
+        and with hotkeys, map data and more is in
         <button class="inline" onclick={() => backend.showSettings()}>Settings</button>.
       </p>
     </div>

@@ -64,6 +64,10 @@ impl Atlas {
                 reachable.extend(self.hops_from(town.id).into_keys());
             }
         }
+        // Nobody walks off the starting island or back to it, so where the player is decides
+        // which side of the water counts.
+        let on_island = from.is_some_and(|id| self.on_starting_island(id));
+        let left_island = from.is_some() && !on_island;
         let rates = self.measured_by_map(measured);
         self.maps
             .values()
@@ -88,7 +92,11 @@ impl Atlas {
                     mobs: card.mobs,
                     hops: hops.get(&m.id).copied(),
                     travel: shortcuts.get(&m.id).cloned(),
-                    reachable: reachable.contains(&m.id),
+                    reachable: if on_island {
+                        hops.contains_key(&m.id) || shortcuts.contains_key(&m.id)
+                    } else {
+                        reachable.contains(&m.id) && !(left_island && self.on_starting_island(m.id))
+                    },
                     measured: rates.get(&m.id).cloned(),
                 })
             })
@@ -120,7 +128,22 @@ impl Atlas {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mapdata::atlas::tests::world;
+    use crate::mapdata::atlas::tests::{island_world, world};
+
+    fn reachable(atlas: &Atlas, from: Option<u32>) -> Vec<String> {
+        let spots = atlas.training_spots(from, &[], &Travel::none());
+        let mut names: Vec<String> = spots.into_iter().filter(|s| s.reachable).map(|s| s.map.name).collect();
+        names.sort();
+        names
+    }
+
+    #[test]
+    fn the_starting_island_and_the_mainland_are_kept_apart() {
+        let atlas = island_world();
+        assert_eq!(reachable(&atlas, Some(20)), ["Cove Shore"]);
+        assert_eq!(reachable(&atlas, Some(30)), ["Harbor Field"]);
+        assert_eq!(reachable(&atlas, None), ["Cove Shore", "Harbor Field"]);
+    }
 
     #[test]
     fn lists_hunting_maps_with_base_numbers() {

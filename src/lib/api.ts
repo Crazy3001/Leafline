@@ -12,6 +12,8 @@ import type {
   Analysis,
   Calibration,
   DisplaySettings,
+  GameWindow,
+  LiveStatus,
   TravelInfo,
   Guide,
   History,
@@ -58,6 +60,17 @@ export interface Backend {
   toggleOverlay(): Promise<void>;
   showWorkbench(): Promise<void>;
   shortcuts(): Promise<ShortcutInfo[]>;
+  liveStatus(): Promise<LiveStatus>;
+  /** Starts reading the game window; a new session starts with it. */
+  startLive(): Promise<void>;
+  /** Stops after the reading in progress; the session stays, ready to save. */
+  stopLive(): Promise<void>;
+  /** Windows that could be the game, likely ones first. */
+  liveWindows(): Promise<GameWindow[]>;
+  /** Saves the last live picture to Pictures\Leafline and returns its path. */
+  saveLiveFrame(): Promise<string>;
+  onLive(handler: (status: LiveStatus) => void): Promise<UnlistenFn>;
+  onFrameSaved(handler: (path: string) => void): Promise<UnlistenFn>;
   /** An image passed on the command line at startup, once. */
   takeLaunchImage(): Promise<string | null>;
   /** Images passed to later launches while the app is already running. */
@@ -156,6 +169,13 @@ const tauriBackend: Backend = {
   toggleOverlay: () => invoke("toggle_overlay"),
   showWorkbench: () => invoke("show_workbench"),
   shortcuts: () => invoke("shortcut_list"),
+  liveStatus: () => invoke("live_status"),
+  startLive: () => invoke("start_live"),
+  stopLive: () => invoke("stop_live"),
+  liveWindows: () => invoke("live_windows"),
+  saveLiveFrame: () => invoke("save_live_frame"),
+  onLive: (handler) => listen<LiveStatus>("live", (e) => handler(e.payload)),
+  onFrameSaved: (handler) => listen<string>("frame-saved", (e) => handler(e.payload)),
   takeLaunchImage: () => invoke("take_launch_image"),
   onOpenImage: (handler) => listen<string>("open-image", (e) => handler(e.payload)),
   onAnalysis: (handler) => listen<Analysis>("analysis", (e) => handler(e.payload)),

@@ -23,7 +23,7 @@
   <div class="identity">
     <div class="level">
       <span class="lv">LV</span>
-      <span class="tabular">{hud?.level ?? "—"}</span>
+      <span class="tabular">{hud?.level ?? session?.level ?? "—"}</span>
     </div>
     <div class="who">
       <div class="name">{hud?.name ?? "Unknown character"}</div>

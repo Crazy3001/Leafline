@@ -7,7 +7,7 @@ use tauri::plugin::TauriPlugin;
 use tauri::{AppHandle, Wry};
 use tauri_plugin_global_shortcut::{Builder, Shortcut, ShortcutState};
 
-use super::{overlay, pins};
+use super::{live, overlay, pins};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -16,15 +16,19 @@ pub enum Action {
     ToggleClickThrough,
     TogglePins,
     ToggleCompact,
+    ToggleLive,
+    SaveFrame,
     ShowWorkbench,
 }
 
 impl Action {
-    pub const ALL: [Action; 5] = [
+    pub const ALL: [Action; 7] = [
         Action::ToggleOverlay,
         Action::ToggleClickThrough,
         Action::TogglePins,
         Action::ToggleCompact,
+        Action::ToggleLive,
+        Action::SaveFrame,
         Action::ShowWorkbench,
     ];
 
@@ -34,6 +38,8 @@ impl Action {
             Action::ToggleClickThrough => "Ctrl+Alt+L",
             Action::TogglePins => "Ctrl+Alt+P",
             Action::ToggleCompact => "Ctrl+Alt+H",
+            Action::ToggleLive => "Ctrl+Alt+R",
+            Action::SaveFrame => "Ctrl+Alt+F",
             Action::ShowWorkbench => "Ctrl+Alt+W",
         }
     }
@@ -44,6 +50,8 @@ impl Action {
             Action::ToggleClickThrough => "Lock the overlay (click-through)",
             Action::TogglePins => "Show or hide pinned panels",
             Action::ToggleCompact => "Compact HUD: only EXP per hour and quest counters",
+            Action::ToggleLive => "Start or stop live reading",
+            Action::SaveFrame => "Save the picture live reading last read, to Pictures\\Leafline",
             Action::ShowWorkbench => "Open the workbench",
         }
     }
@@ -58,6 +66,8 @@ impl Action {
             Action::ToggleClickThrough => overlay::toggle_click_through(app),
             Action::TogglePins => pins::toggle_visibility(app),
             Action::ToggleCompact => overlay::toggle_compact(app),
+            Action::ToggleLive => live::toggle(app),
+            Action::SaveFrame => live::save_frame(app).map(|_| ()),
             Action::ShowWorkbench => overlay::show_workbench(app),
         }
     }

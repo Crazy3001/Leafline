@@ -10,7 +10,10 @@
     LoaderCircle,
     RefreshCw,
     ScrollText,
+    Play,
     ShieldCheck,
+    Square,
+    TriangleAlert,
     X,
   } from "@lucide/svelte";
   import { onMount } from "svelte";
@@ -19,10 +22,12 @@
   import Logo from "$lib/components/Logo.svelte";
   import MapDataPanel from "$lib/components/map/MapDataPanel.svelte";
   import { OSMS_URL, WIKI_URL } from "$lib/mapdata.svelte";
+  import { live, watchLive } from "$lib/readings.svelte";
   import { changeSettings, display, watchSettings } from "$lib/settings.svelte";
-  import type { ShortcutInfo, TravelChoice, TravelFile, TravelInfo } from "$lib/types";
+  import type { GameWindow, LiveChoice, ShortcutInfo, TravelChoice, TravelFile, TravelInfo } from "$lib/types";
 
   const SECTIONS = [
+    { id: "live", title: "Live reading" },
     { id: "overlay", title: "Overlay" },
     { id: "routes", title: "Routes" },
     { id: "hotkeys", title: "Hotkeys" },
@@ -50,6 +55,45 @@
     { key: "vipCabs", kind: "vipCab", label: "VIP Cab", help: "Straight to Ant Tunnel Park, for a much higher fare" },
     { key: "scrolls", kind: "scroll", label: "Return scrolls", help: "To a town from any map, if you carry one" },
   ];
+
+  const INTERVALS = [1, 2, 3, 5];
+  let windows = $state<GameWindow[]>([]);
+  let liveError = $state<string | null>(null);
+
+  function setLive(change: Partial<LiveChoice>) {
+    changeSettings({ live: { ...display.live, ...change } });
+  }
+
+  async function loadWindows() {
+    windows = await backend.liveWindows();
+  }
+
+  /** "" is automatic, "saved" a picked window that isn't open, otherwise an index into `windows`. */
+  const pickedWindow = $derived.by(() => {
+    const w = display.live.window;
+    if (!w) return "";
+    const i = windows.findIndex((c) => c.title === w.title && c.class === w.class);
+    return i >= 0 ? String(i) : "saved";
+  });
+  const autoWindow = $derived(windows.filter((w) => w.likelyGame));
+
+  function pickWindow(value: string) {
+    if (value === "saved") return;
+    const w = value === "" ? null : windows[Number(value)];
+    setLive({ window: w ? { title: w.title, class: w.class } : null });
+  }
+
+  const liveRunning = $derived(live.liveStatus.state === "reading" || live.liveStatus.state === "waiting");
+
+  async function toggleLive() {
+    liveError = null;
+    try {
+      if (liveRunning) await backend.stopLive();
+      else await backend.startLive();
+    } catch (e) {
+      liveError = String(e);
+    }
+  }
 
   function setTravel(change: Partial<TravelChoice>) {
     changeSettings({ travel: { ...display.travel, ...change } });
@@ -102,6 +146,8 @@
 
   onMount(() => {
     watchSettings();
+    watchLive();
+    loadWindows();
     backend.shortcuts().then((s) => (shortcuts = s));
     backend.version().then((v) => (version = v));
     loadTravel();
@@ -119,7 +165,7 @@
   }
 
   const does = [
-    "Reads what your screen shows, from screenshots, with the OCR built into Windows on this PC.",
+    "Reads what the game shows, from saved screenshots or, once you turn it on, the game window, with the OCR built into Windows on this PC.",
     "Shows map, monster and quest facts from community data, downloaded only when you ask.",
     "Looks up player-logged drops on mapleclassic.wiki when you ask, a request a second at most.",
     "Keeps your settings, sessions and price log on this PC.",
@@ -129,7 +175,7 @@
     "Read, block or change the game's network traffic.",
     "Inject into the game or draw inside it. The overlay is a separate window.",
     "Press keys or click for you. Nothing is automated: no botting, macros or auto-potions.",
-    "Upload your screenshots, readings or records anywhere.",
+    "Save pictures of your game unless you press Save frame, or upload screenshots, readings or records anywhere.",
   ];
   const credits = [
     {
@@ -161,6 +207,141 @@
   </nav>
 
   <main>
+    <section id="live">
+      <h2>Live reading</h2>
+      <p class="lead">
+        Reads the game window every few seconds, the way OBS or Discord capture it, and keeps the overlay up to date as
+        you play. Leafline only looks: it sends the game no keys, clicks or messages, and never touches its memory, files
+        or network traffic.
+      </p>
+
+      <div class="risk">
+        <TriangleAlert size={16} />
+        <p>
+          <strong>Use at your own risk.</strong> Nexon hasn't said whether overlays like this are allowed. Its support
+          replies quote the rule against unauthorised third-party software, and one player reported a two-week ban while
+          running a similar screen-reading overlay (unconfirmed). Play with live reading on a character you can afford to
+          lose, ideally on a separate Nexon account.
+        </p>
+      </div>
+
+      <div class="row">
+        <label for="live">
+          <span class="name">Live reading</span>
+          <span class="help">I understand the risk. Off until you turn it on.</span>
+        </label>
+        <div class="control">
+          <input
+            id="live"
+            class="switch"
+            type="checkbox"
+            role="switch"
+            checked={display.live.enabled}
+            onchange={(e) => setLive({ enabled: e.currentTarget.checked })}
+          />
+        </div>
+      </div>
+
+      <fieldset class="live-options" disabled={!display.live.enabled}>
+        <legend class="sr-only">Live reading options</legend>
+        <div class="row">
+          <label for="window">
+            <span class="name">Game window</span>
+            <span class="help">
+              {#if display.live.window}
+                Your pick is remembered, even after the game restarts.
+              {:else if autoWindow.length === 1}
+                Found: {autoWindow[0].title}, {autoWindow[0].width}×{autoWindow[0].height}.
+              {:else if autoWindow.length > 1}
+                More than one window looks like the game. Pick one.
+              {:else}
+                The game isn't running, or its window has an unusual name. Pick it once it's open.
+              {/if}
+            </span>
+          </label>
+          <div class="control picker">
+            <select id="window" value={pickedWindow} onchange={(e) => pickWindow(e.currentTarget.value)}>
+              <option value="">Find it automatically</option>
+              {#if pickedWindow === "saved" && display.live.window}
+                <option value="saved">{display.live.window.title} (not open)</option>
+              {/if}
+              {#each windows as w, i (w.id)}
+                <option value={String(i)}>{w.title} · {w.width}×{w.height}</option>
+              {/each}
+            </select>
+            <button
+              class="button icon-only"
+              title="Look for windows again"
+              aria-label="Look for windows again"
+              onclick={loadWindows}
+            >
+              <RefreshCw size={13} />
+            </button>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="label" id="interval-label">
+            <span class="name">Read every</span>
+            <span class="help">Shorter catches quick changes; longer uses less CPU.</span>
+          </div>
+          <div class="control segmented" role="radiogroup" aria-labelledby="interval-label">
+            {#each INTERVALS as seconds (seconds)}
+              <button
+                role="radio"
+                aria-checked={display.live.interval === seconds}
+                onclick={() => setLive({ interval: seconds })}>{seconds} s</button
+              >
+            {/each}
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="label">
+            <span class="name">
+              {#if live.liveStatus.state === "reading"}
+                <span class="status on">Reading</span>{live.liveStatus.window}, {live.liveStatus.width}×{live.liveStatus
+                  .height}
+              {:else if live.liveStatus.state === "waiting"}
+                <span class="status waiting">Waiting</span>
+              {:else}
+                <span class="status">Stopped</span>
+              {/if}
+            </span>
+            <span class="help">
+              {#if live.liveStatus.state === "reading"}
+                {live.liveStatus.frames} reading{live.liveStatus.frames === 1 ? "" : "s"}, the last in {Math.round(
+                  live.liveStatus.readMs,
+                )} ms.
+              {:else if live.liveStatus.state === "waiting"}
+                {live.liveStatus.reason}
+              {:else if live.liveStatus.state === "failed"}
+                Stopped by an error: {live.liveStatus.message}
+              {:else}
+                Starting begins a new session. Ctrl+Alt+R starts and stops it from the game.
+              {/if}
+            </span>
+          </div>
+          <div class="control">
+            <button class="button" onclick={toggleLive}>
+              {#if liveRunning}<Square size={13} />Stop{:else}<Play size={13} />Start{/if}
+            </button>
+          </div>
+        </div>
+      </fieldset>
+      {#if liveError}<p class="note warn">{liveError}</p>{/if}
+      {#if live.liveStatus.state === "reading" && live.liveStatus.hdr}
+        <p class="note warn">
+          Windows HDR is on for the game's display, which washes the picture out and spoils readings. Turn HDR off in
+          Windows display settings, then restart the game.
+        </p>
+      {/if}
+      <p class="note">
+        Works in windowed mode, and in Full Screen as long as the overlay shows above the game. Pictures stay in memory
+        and are never saved, unless you press Save frame (Ctrl+Alt+F) to keep one for the workbench.
+      </p>
+    </section>
+
     <section id="overlay">
       <h2>Overlay</h2>
       <p class="lead">How the overlay and pinned panels look over the game.</p>
@@ -376,8 +557,8 @@
       <div class="policy">
         <ShieldCheck size={16} />
         <p>
-          <strong>Offline mode.</strong> Leafline reads saved screenshots only. Live screen capture stays off until Nexon
-          says whether read-only overlays are allowed; until then, use Leafline at your own risk.
+          <strong>Read-only.</strong> Leafline reads saved screenshots, and the game window only if you turn on live
+          reading. Nexon hasn't said whether read-only overlays are allowed; use Leafline at your own risk.
         </p>
       </div>
 
@@ -855,6 +1036,88 @@
 
   .policy strong {
     color: var(--good);
+  }
+
+  .risk {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 4px;
+    padding: 12px;
+    border: 1px solid color-mix(in srgb, var(--warn) 32%, transparent);
+    border-radius: var(--radius);
+    background: var(--warn-soft);
+    color: var(--muted);
+  }
+
+  .risk :global(svg) {
+    flex: none;
+    margin-top: 2px;
+    color: var(--warn);
+  }
+
+  .risk p {
+    margin: 0;
+  }
+
+  .risk strong {
+    color: var(--warn);
+  }
+
+  .live-options {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-top: 1px solid var(--border);
+    transition: opacity 0.15s ease;
+  }
+
+  .live-options:disabled {
+    opacity: 0.45;
+  }
+
+  .picker {
+    display: flex;
+    gap: 6px;
+  }
+
+  .picker select {
+    width: 260px;
+    padding: 5px 8px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    color: var(--text);
+    font: inherit;
+  }
+
+  .picker select:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+
+  .icon-only {
+    padding: 5px 8px;
+  }
+
+  .status {
+    display: inline-block;
+    margin-right: 6px;
+    padding: 0 7px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .status.on {
+    background: var(--good-soft);
+    color: var(--good);
+  }
+
+  .status.waiting {
+    background: var(--warn-soft);
+    color: var(--warn);
   }
 
   .lists {

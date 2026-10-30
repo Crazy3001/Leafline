@@ -338,10 +338,21 @@ impl Atlas {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mapdata::atlas::tests::world;
+    use crate::mapdata::atlas::tests::{island_world, world};
 
     fn file(json: &str) -> TravelFile {
         TravelFile::parse(json).unwrap()
+    }
+
+    #[test]
+    fn scrolls_are_not_a_way_off_the_starting_island() {
+        let atlas = island_world();
+        let scroll =
+            |to| TravelLink { kind: TravelKind::Scroll, service: "Return Scroll".into(), from: None, to, fare: None };
+        let travel = Travel { links: vec![scroll(30), scroll(20)] };
+        assert!(atlas.route_with(21, 30, &travel).is_none(), "the scroll to the mainland is not offered");
+        assert!(atlas.route_with(21, 20, &travel).is_some(), "the scroll home is");
+        assert!(atlas.route_with(31, 30, &travel).is_some(), "and scrolls still work on the mainland");
     }
 
     #[test]

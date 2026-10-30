@@ -181,7 +181,7 @@
     {:else}
       <span class="stepper" title="The HUD isn't in view: set your level">
         Lv
-        <button aria-label="Lower level" onclick={() => setLevel((manualLevel ?? 10) - 1)}><Minus size={10} /></button>
+        <button aria-label="Lower level" onclick={() => setLevel((manualLevel ?? 2) - 1)}><Minus size={10} /></button>
         <input
           type="number"
           min="1"
@@ -191,7 +191,7 @@
           placeholder="?"
           onchange={(e) => setLevel(Number(e.currentTarget.value) || 1)}
         />
-        <button aria-label="Raise level" onclick={() => setLevel((manualLevel ?? 9) + 1)}><Plus size={10} /></button>
+        <button aria-label="Raise level" onclick={() => setLevel((manualLevel ?? 0) + 1)}><Plus size={10} /></button>
       </span>
     {/if}
   {/snippet}

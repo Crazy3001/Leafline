@@ -10,7 +10,7 @@ Leafline only looks at your screen. It captures what is visible, reads it with O
 
 It never reads or writes game memory or files, never touches network traffic, never injects into or draws inside the game client, and never sends keyboard or mouse input to the game. There is no automation of any kind. No Nexon assets are included.
 
-**Current status: offline mode only.** Until Nexon confirms that read-only overlays are allowed, Leafline reads saved screenshots and never runs alongside the live game.
+**Current status: live reading is opt-in, and at your own risk.** Leafline reads saved screenshots by default. Nexon has not said whether read-only overlays are allowed, and one player reported a two-week ban while running a similar overlay (unconfirmed), so live reading stays off until you turn it on in Settings. If you do, use a character you can afford to lose, ideally on a separate Nexon account.
 
 ## Getting started (Windows)
 
@@ -24,7 +24,7 @@ npm run tauri dev
 Two windows open:
 
 - **Overlay**: the compact, transparent, always-on-top panel. Drag it by its title bar.
-- **Workbench**: offline test mode. Open a screenshot or a folder of them; the pipeline runs on each, outlines what it found and shows the readings. The overlay updates too, as it would during play. With a folder open, **Replay as session** reads every frame in order as one play session and shows EXP/hour, mesos/hour and time to level, overall and per map (see below).
+- **Workbench**: offline mode. Open a screenshot or a folder of them; the pipeline runs on each, outlines what it found and shows the readings. The overlay updates too, as it would during play. With a folder open, **Replay as session** reads every frame in order as one play session and shows EXP/hour, mesos/hour and time to level, overall and per map (see below).
 
 You can also pass an image on the command line (`leafline.exe shot.png`), or use *Open with*.
 
@@ -32,9 +32,19 @@ You can also pass an image on the command line (`leafline.exe shot.png`), or use
 |---|---|
 | `Ctrl+Alt+O` | Show or hide the overlay |
 | `Ctrl+Alt+L` | Lock the overlay (clicks pass through to whatever is underneath) |
+| `Ctrl+Alt+R` | Start or stop live reading |
+| `Ctrl+Alt+F` | Save the picture live reading last read, to `Pictures\Leafline` |
 | `Ctrl+Alt+W` | Open the workbench |
 
 Closing a window hides it. Leafline keeps running in the tray until you choose **Quit**.
+
+### Live reading
+
+Turn it on under **Settings → Live reading**, then press `Ctrl+Alt+R` or the **Offline** badge on the overlay. Every few seconds Leafline takes a picture of the game window with Windows Graphics Capture, the API OBS and Discord use, and runs it through the same pipeline and session tracker as the workbench. The picture comes from the window itself, so the overlay and anything else in front of it are never in it, and a covered game is still read.
+
+It only looks at the window. It asks Windows for the window's title, class, position and size, and never sends the game a message or opens its process. Pictures stay in memory unless you press **Save frame**. A picture that hasn't changed isn't read again.
+
+The window is found by its title or class. If Leafline can't tell which window is the game, pick it in Settings; the choice is remembered. If Windows HDR is on for the game's display, the overlay warns you, because readings are unreliable until HDR is off and the game restarted.
 
 ### Teaching it your HUD
 
@@ -100,6 +110,7 @@ src/                     Svelte frontend
   routes/workbench/        workbench window
 src-tauri/src/
   app/                     Tauri wiring: windows, tray, hotkeys, commands
+  capture/                 live pictures of the game window (Windows Graphics Capture)
   vision/                  image handling, colour blocks, OCR (Windows.Media.Ocr)
   readers/                 one module per game UI element: locate, read, parse
   pipeline.rs              frame → readings, shared by live capture and offline mode
@@ -110,14 +121,24 @@ src-tauri/src/
 ## Known limitations
 
 - Tuned on 2560×1440 screenshots at the default UI size. Other resolutions and UI sizes are untested.
-- **Windows HDR washes out screen captures** (the game itself looks fine). Readers expect HDR off; live capture will need to detect it.
+- **Windows HDR washes out screen captures** (the game itself looks fine). Readers expect HDR off; live reading warns when it is on.
+- Live reading has been tested on saved screenshots shown in a window, not yet on the running game.
+- Windows only. macOS capture and OCR are not built yet.
 - The Quest Helper is translucent with black text: it reads well over dark maps and poorly over bright, busy ones such as Henesys.
 - Meso amounts are skipped when OCR readings disagree (the pixel font's 6 and 8 look alike). When a storage window shows a second box, the amount most boxes agree on wins.
 - Tooltip `REQ` values sometimes go unread when OCR saw no clean digit to learn from, and the `(+N)` on wrapped item names can be garbled.
-- Map names are read as shown, not matched against a list of known maps (there is no data source yet), so an OCR slip shows up as a separate map.
+- The session tracker keeps map names as read, so an OCR slip shows up as a separate map.
 - NPC shop windows show only one meso box, so selling and buying in a shop still count as meso gains and losses. Storage and trade windows are recognised.
 - When two readings are far apart and on different maps, the tracker cannot tell where the EXP was earned and lists it under *Between maps*. Frequent screenshots or a recording fix this.
 - A jump of several levels between two readings adds no EXP, because the levels in between were never measured.
 - Session rates have been checked on 14 hand-taken screenshots and synthetic tests, not yet on a continuous recording of real play.
-- The price log and routes are not built yet.
 - macOS OCR (Apple Vision) and the Tesseract fallback are not built yet.
+
+## Data and credits
+
+Leafline ships no game data. Map details are downloaded on your machine when you ask for them, kept in a local cache and credited in the app:
+
+- Map, monster, NPC and quest data: [OSMS Data Explorer](https://osmsdataexplorer.com), CC BY 4.0.
+- Player-observed drop rates, taxi routes and return scrolls: [mapleclassic.wiki](https://mapleclassic.wiki) contributors, CC BY-NC-SA 4.0.
+
+Game content belongs to Nexon. Leafline is unofficial and not affiliated with or endorsed by Nexon.

@@ -160,6 +160,11 @@ impl GlyphSet {
         masks.iter().map(|m| self.recognize(m)).collect()
     }
 
+    /// Whether nothing has been learned yet.
+    pub fn is_empty(&self) -> bool {
+        self.glyphs.is_empty()
+    }
+
     /// Whether any glyph was learned at text height `height` (give or take a pixel).
     pub fn knows_size(&self, height: u32) -> bool {
         self.glyphs.iter().any(|g| g.mask.height.abs_diff(height) <= 1)

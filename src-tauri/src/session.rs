@@ -9,6 +9,10 @@
 //!   agree on it, and the tracker only starts then.
 //! - **Levels only go up**, and a level-up counts once the EXP percent has wrapped round, or
 //!   two readings in a row agree on the new level.
+//! - **The level need not be readable.** Its digits are learned one by one from the player's
+//!   screen, so a new character's are often unknown. EXP is followed anyway: two readings in a
+//!   row that agree with each other but imply a different amount for the level are a level-up,
+//!   and the first level actually read lines the count up.
 //! - **Mesos count once several readings in a row agree.** Changes while a storage or trade
 //!   window is open (a second meso box on screen) are kept apart, since they are not loot.
 //! - **Quest counters count the same way**, and only going up: a counter that drops (a quest
@@ -252,6 +256,8 @@ pub struct SessionTracker {
     /// The last map read, carried over frames where the minimap is hidden.
     map: Option<String>,
 
+    /// A level has been read. Until then, levels are only counted from 0 and not reported.
+    level_known: bool,
     /// The last accepted EXP reading.
     exp: Option<ExpPoint>,
     /// A reading that does not fit yet, kept in case the next one agrees with it.
@@ -304,11 +310,18 @@ impl SessionTracker {
     }
 
     fn push_exp(&mut self, sample: &Sample) {
-        let (Some(level), Some(exp)) = (sample.level, sample.exp) else { return };
+        let Some(exp) = sample.exp else { return };
         if !(0.0..100.0).contains(&exp.percent) {
             self.rejected.exp += 1;
             return;
         }
+        let level = match sample.level {
+            Some(level) => {
+                self.line_up_levels(level, exp);
+                level
+            }
+            None => self.expected_level(exp),
+        };
         let point = ExpPoint { at: sample.at, level, exp, map: self.map.clone() };
         let Some(last) = self.exp.clone() else {
             // Nothing to check the first reading against: wait for a second that agrees.
@@ -341,7 +354,8 @@ impl SessionTracker {
             let wrapped = point.level == last.level + 1 && point.exp.percent < last.exp.percent;
             let fits = agree(self.requirement(level), implied);
             match self.pending.take() {
-                _ if wrapped && fits => self.accept(&last, point),
+                // A level that was only inferred needs a second reading, like any other surprise.
+                _ if wrapped && fits && sample.level.is_some() => self.accept(&last, point),
                 Some(first) if first.level == point.level && agree(Requirement::implied(first.exp), implied) => {
                     self.accept(&last, first.clone());
                     self.accept(&first, point);
@@ -354,6 +368,40 @@ impl SessionTracker {
         } else {
             // Levels never go down.
             self.rejected.exp += 1;
+        }
+    }
+
+    /// The level `exp` belongs to when none could be read.
+    fn expected_level(&self, exp: Exp) -> u32 {
+        match (&self.exp, &self.pending) {
+            (Some(last), _) => {
+                // 0 points implies no amount for the level, but only a new level starts there.
+                let restarted = exp.points == 0 && last.exp.points > 0;
+                let fits = agree(self.requirement(last.level), Requirement::implied(exp));
+                if fits && !restarted { last.level } else { last.level + 1 }
+            }
+            (None, Some(first)) => first.level,
+            (None, None) => 0,
+        }
+    }
+
+    /// The first level read gives the levels counted so far their real numbers.
+    fn line_up_levels(&mut self, level: u32, exp: Exp) {
+        if std::mem::replace(&mut self.level_known, true) {
+            return;
+        }
+        let Some(base) = self.exp.as_ref().or(self.pending.as_ref()).map(|p| p.level) else { return };
+        let fits = self.exp.is_none() || agree(self.requirement(base), Requirement::implied(exp));
+        let anchor = if fits { level } else { level.saturating_sub(1) };
+        let shift = |counted: u32| (i64::from(counted) + i64::from(anchor) - i64::from(base)).max(0) as u32;
+        if let Some(point) = &mut self.exp {
+            point.level = shift(point.level);
+        }
+        if let Some(point) = &mut self.pending {
+            point.level = shift(point.level);
+        }
+        for (counted, _) in &mut self.requirements {
+            *counted = shift(*counted);
         }
     }
 
@@ -566,7 +614,7 @@ impl SessionTracker {
             elapsed_seconds: self.started_at.zip(self.updated_at).map_or(0.0, |(s, u)| u - s),
             active_seconds: self.clock,
             paused: self.exp.is_some() && self.idle_for >= self.config.idle_after,
-            level: self.exp.as_ref().map(|e| e.level),
+            level: self.exp.as_ref().filter(|_| self.level_known).map(|e| e.level),
             exp: self.exp.as_ref().map(|e| e.exp),
             exp_needed,
             exp_gained: self.exp_gained,
@@ -623,7 +671,7 @@ mod tests {
         actual.is_some_and(|a| (a - expected).abs() <= tolerance)
     }
 
-    /// Real numbers: 24,331 EXP (25.42%) to 45,930 (47.99%) and 28,640 to 42,944 mesos,
+    /// Numbers from real play: 24,331 EXP (25.42%) to 45,930 (47.99%) and 28,640 to 42,944 mesos,
     /// taken here as 30 minutes of steady grinding.
     #[test]
     fn half_an_hour_of_grinding() {
@@ -648,6 +696,86 @@ mod tests {
         assert_eq!(summary.maps.len(), 1);
         assert_eq!(summary.maps[0].map.as_deref(), Some(KERNING));
         assert_eq!(summary.maps[0].exp_gained, 21_599);
+    }
+
+    /// A level digit the HUD font has not learned yet.
+    fn unread_level(sample: Sample) -> Sample {
+        Sample { level: None, ..sample }
+    }
+
+    #[test]
+    fn follows_exp_when_the_level_cannot_be_read() {
+        let summary = track(&[
+            unread_level(sample(0.0, 0, 10, 10.0)),
+            unread_level(sample(1.0, 0, 20, 20.0)),
+            unread_level(sample(2.0, 0, 50, 50.0)),
+            unread_level(sample(3.0, 0, 90, 90.0)),
+            // A new level, needing 200: one reading could be a misread, two agree.
+            unread_level(sample(4.0, 0, 10, 5.0)),
+            unread_level(sample(5.0, 0, 20, 10.0)),
+            unread_level(sample(6.0, 0, 30, 15.0)),
+        ]);
+        assert_eq!(summary.exp_gained, 120);
+        assert_eq!(summary.level_ups, 1);
+        assert_eq!(summary.level, None);
+        assert_eq!(summary.exp_needed, Some(200));
+        assert_eq!(summary.rejected, Rejected::default());
+    }
+
+    #[test]
+    fn a_misread_is_not_a_level_up_when_the_level_cannot_be_read() {
+        let summary = track(&[
+            unread_level(sample(0.0, 0, 10, 10.0)),
+            unread_level(sample(1.0, 0, 20, 20.0)),
+            unread_level(sample(2.0, 0, 70, 5.0)),
+            unread_level(sample(3.0, 0, 30, 30.0)),
+        ]);
+        assert_eq!(summary.level_ups, 0);
+        assert_eq!(summary.exp_gained, 20);
+        assert_eq!(summary.rejected.exp, 1);
+    }
+
+    #[test]
+    fn a_new_level_can_start_at_zero_exp() {
+        let summary = track(&[
+            sample(0.0, 2, 10, 10.0),
+            sample(1.0, 2, 90, 90.0),
+            unread_level(sample(2.0, 0, 0, 0.0)),
+            unread_level(sample(3.0, 0, 20, 10.0)),
+            unread_level(sample(4.0, 0, 40, 20.0)),
+        ]);
+        assert_eq!(summary.level_ups, 1);
+        assert_eq!(summary.level, Some(3));
+        assert_eq!(summary.exp_gained, 130);
+    }
+
+    #[test]
+    fn levels_keep_counting_past_digits_the_font_lacks() {
+        let summary = track(&[
+            sample(0.0, 1, 3, 20.0),
+            sample(1.0, 1, 6, 40.0),
+            unread_level(sample(2.0, 0, 2, 5.0)),
+            unread_level(sample(3.0, 0, 4, 10.0)),
+        ]);
+        assert_eq!(summary.level, Some(2));
+        assert_eq!(summary.level_ups, 1);
+    }
+
+    #[test]
+    fn the_first_level_read_lines_the_count_up() {
+        let summary = track(&[
+            unread_level(sample(0.0, 0, 10, 10.0)),
+            unread_level(sample(1.0, 0, 20, 20.0)),
+            unread_level(sample(2.0, 0, 90, 90.0)),
+            unread_level(sample(3.0, 0, 10, 5.0)),
+            unread_level(sample(4.0, 0, 20, 10.0)),
+            sample(5.0, 3, 30, 15.0),
+            sample(6.0, 3, 40, 20.0),
+        ]);
+        assert_eq!(summary.level, Some(3));
+        assert_eq!(summary.level_ups, 1);
+        assert_eq!(summary.exp_needed, Some(200));
+        assert_eq!(summary.rejected, Rejected::default());
     }
 
     #[test]
