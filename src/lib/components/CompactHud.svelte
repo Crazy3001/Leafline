@@ -22,10 +22,19 @@
     (live.analysis?.quest?.quests ?? []).flatMap((q) => q.objectives.map((o) => ({ ...o, quest: q.title }))),
   );
 
-  /** Sizes the window to the content. The window is sized in screen units, the page in zoomed ones. */
+  let asked = "";
+
+  /**
+   * Sizes the window to the content. The window is sized in screen units, the page in zoomed ones.
+   * Only a change in what the content needs asks again: the window being resized from outside
+   * (going back to the full overlay) must not be undone.
+   */
   function fit() {
     if (!frame) return;
-    backend.fitWindow(WIDTH * display.scale, Math.min(MAX_HEIGHT, Math.ceil(frame.scrollHeight)) * display.scale);
+    const size = [WIDTH * display.scale, Math.min(MAX_HEIGHT, Math.ceil(frame.scrollHeight)) * display.scale];
+    if (size.join() === asked) return;
+    asked = size.join();
+    backend.fitWindow(size[0], size[1]);
   }
 
   onMount(() => {
