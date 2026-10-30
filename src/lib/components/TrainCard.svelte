@@ -36,9 +36,12 @@
   const BELOW = 8;
   const ABOVE = 3;
   const SHOWN = 8;
+  /** Maps scoring within this share of each other are a close call, listed nearest first. */
+  const CLOSE_CALL = 0.1;
 
   const SORT_KEY = "leafline.train.sort";
   const LEVEL_KEY = "leafline.train.level";
+  const NEARBY_KEY = "leafline.train.nearbyFirst";
 
   watchMapData();
   const ready = $derived(mapData.status?.ready ?? false);
@@ -46,6 +49,7 @@
   let sort = $state<Sort>(stored(SORT_KEY, "exp") as Sort);
   let manualLevel = $state<number | null>(Number(stored(LEVEL_KEY, "")) || null);
   let allLevels = $state(false);
+  let nearbyFirst = $state(stored(NEARBY_KEY, "true") === "true");
   let more = $state(false);
   let data = $state<TrainingSpots | null>(null);
   let open = $state<number | null>(null);
@@ -94,7 +98,23 @@
       measured: (s) => s.measured?.expPerHour ?? -1,
       near: (s) => -(s.hops ?? 9999),
     };
-    return [...spots].sort((a, b) => by[sort](b) - by[sort](a) || b.expPerClear - a.expPerClear);
+    const value = by[sort];
+    const sorted = [...spots].sort((a, b) => value(b) - value(a) || b.expPerClear - a.expPerClear);
+    if (!nearbyFirst || sort === "near") return sorted;
+    // Walk down the list in bands of close calls (each within CLOSE_CALL of the band's best)
+    // and order each band by portals, so a slightly smaller map next door isn't buried.
+    const out: TrainingSpot[] = [];
+    let band: TrainingSpot[] = [];
+    const flush = () => out.push(...band.sort((a, b) => (a.hops ?? Infinity) - (b.hops ?? Infinity)));
+    for (const spot of sorted) {
+      if (band.length && value(spot) < value(band[0]) - Math.abs(value(band[0])) * CLOSE_CALL) {
+        flush();
+        band = [];
+      }
+      band.push(spot);
+    }
+    flush();
+    return out;
   });
   const shown = $derived(ranked.slice(0, plain ? 5 : more ? 30 : SHOWN));
   const anyMeasured = $derived(data?.spots.some((s) => s.measured) ?? false);
@@ -262,17 +282,34 @@
 
     {#if !plain}
       <div class="footer">
-        <label class="check">
-          <input type="checkbox" bind:checked={allLevels} />
-          Every level
-        </label>
+        <span class="checks">
+          <label class="check">
+            <input type="checkbox" bind:checked={allLevels} />
+            Every level
+          </label>
+          {#if sort !== "near"}
+            <label class="check" title="When maps score within 10% of each other, list the one fewer portals away first">
+              <input
+                type="checkbox"
+                checked={nearbyFirst}
+                onchange={(e) => {
+                  nearbyFirst = e.currentTarget.checked;
+                  remember(NEARBY_KEY, String(nearbyFirst));
+                }}
+              />
+              Nearby first
+            </label>
+          {/if}
+        </span>
         {#if ranked.length > SHOWN}
           <button class="link" onclick={() => (more = !more)}>{more ? "Fewer" : `Show ${Math.min(30, ranked.length) - SHOWN} more`}</button>
         {/if}
       </div>
       <p class="hedge">
         Base numbers from OSMS map data, before EXP events, party bonus or level differences. Your rate is what Leafline
-        measured in your sessions. Maps entered only through an NPC, such as party quests, are left out.
+        measured in your sessions.{#if nearbyFirst && sort !== "near" && data.from}{" "}Maps within 10% of each other are
+          listed nearest first.{/if}
+        Maps entered only through an NPC, such as party quests, are left out.
       </p>
     {/if}
   {/if}
@@ -500,6 +537,11 @@
     margin-top: 8px;
     font-size: 11.5px;
     color: var(--muted);
+  }
+
+  .checks {
+    display: inline-flex;
+    gap: 10px;
   }
 
   .check {
