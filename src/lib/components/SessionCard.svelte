@@ -25,7 +25,8 @@
     <div>
       <dt>EXP gained</dt>
       <dd class="tabular">{signed(session.expGained)}</dd>
-      {#if session.percentPerHour != null}<dd class="sub tabular">{session.percentPerHour.toFixed(1)}% / hr</dd>{/if}
+      <!-- In the overlay the character card above already shows the rate. -->
+      {#if session.percentPerHour != null && !compact}<dd class="sub tabular">{session.percentPerHour.toFixed(1)}% / hr</dd>{/if}
     </div>
     <div>
       <dt>Mesos gained</dt>

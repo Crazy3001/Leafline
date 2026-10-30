@@ -50,3 +50,24 @@ export function splitMapLabel(label: string): { street: string | null; name: str
   const at = label.indexOf(" : ");
   return at < 0 ? { street: null, name: label } : { street: label.slice(0, at), name: label.slice(at + 3) };
 }
+
+/**
+ * A price as typed: `120000`, `120,000`, `120k`, `1.2m`. Null when it isn't one.
+ */
+export function parsePrice(text: string): number | null {
+  const match = text.trim().toLowerCase().replace(/[,\s_]/g, "").match(/^(\d+(?:\.\d+)?)([kmb]?)$/);
+  if (!match) return null;
+  const scale = { "": 1, k: 1e3, m: 1e6, b: 1e9 }[match[2] as "" | "k" | "m" | "b"];
+  const value = Math.round(Number(match[1]) * scale);
+  return value > 0 && Number.isSafeInteger(value) ? value : null;
+}
+
+/** A day as `29 Oct`, for logged records. */
+export function formatDay(unixSeconds: number): string {
+  return new Date(unixSeconds * 1000).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+}
+
+/** Mesos in short form without a trailing `.0`: `85k`, `1.2M`, `950`. */
+export function formatMesos(value: number | null | undefined): string {
+  return formatCompact(value).replace(/\.0(?=[kM])/, "");
+}

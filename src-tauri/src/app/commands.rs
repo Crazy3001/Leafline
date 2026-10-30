@@ -3,20 +3,18 @@
 use std::path::PathBuf;
 
 use tauri::ipc::Response;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Manager};
 
 use super::calibration::HudFontState;
-use super::overlay::{self, OVERLAY, OverlayStatus};
+use super::overlay::{self, OverlayStatus};
+use super::readings;
 use super::shortcuts::{self, ShortcutInfo};
 use crate::error::{Error, Result};
 use crate::pipeline::{self, Analysis};
 use crate::vision::{self, Ocr};
 
-/// Emitted to the overlay with each new analysis.
-pub const ANALYSIS_EVENT: &str = "analysis";
-
 /// Runs the pipeline on a saved screenshot (offline test mode) and shows the result on the
-/// overlay as it would appear live.
+/// overlay and pinned panels as it would appear live.
 #[tauri::command]
 pub async fn analyze_image(app: AppHandle, path: PathBuf) -> Result<Analysis> {
     let hud_font = app.state::<HudFontState>().current();
@@ -26,7 +24,7 @@ pub async fn analyze_image(app: AppHandle, path: PathBuf) -> Result<Analysis> {
     })
     .await
     .map_err(|err| Error::Invalid(err.to_string()))??;
-    app.emit_to(OVERLAY, ANALYSIS_EVENT, &analysis)?;
+    readings::publish_analysis(&app, &analysis);
     Ok(analysis)
 }
 

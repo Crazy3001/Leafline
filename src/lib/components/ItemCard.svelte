@@ -1,9 +1,10 @@
 <script lang="ts">
   import Card from "./Card.svelte";
+  import PriceLog from "./PriceLog.svelte";
   import { formatSigned, titleCase } from "$lib/format";
   import type { ItemTooltip, Requirements } from "$lib/types";
 
-  let { item, title = "Item" }: { item: ItemTooltip; title?: string } = $props();
+  let { item, title = "Item", plain = false }: { item: ItemTooltip; title?: string; plain?: boolean } = $props();
 
   const requirementKeys: [keyof Requirements, string][] = [
     ["level", "LEV"],
@@ -24,7 +25,7 @@
   );
 </script>
 
-<Card {title}>
+<Card {title} {plain}>
   {#snippet aside()}
     <!-- Upgrades are read from the name's (+N) suffix, so say nothing when the name is unreadable. -->
     {#if item.name}
@@ -79,10 +80,7 @@
     </div>
   {/if}
 
-  <div class="price">
-    <span class="eyebrow">Price</span>
-    <span class="muted">No prices logged for this item yet</span>
-  </div>
+  <PriceLog {item} compact={plain} />
 </Card>
 
 <style>
@@ -209,20 +207,5 @@
     color: var(--accent-strong);
     border-color: rgba(243, 177, 63, 0.35);
     background: var(--accent-soft);
-  }
-
-  .price {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 8px;
-    margin-top: 12px;
-    padding-top: 10px;
-    border-top: 1px solid var(--border);
-  }
-
-  .muted {
-    color: var(--faint);
-    font-size: 12px;
   }
 </style>

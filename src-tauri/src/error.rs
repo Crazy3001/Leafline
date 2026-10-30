@@ -12,6 +12,10 @@ pub enum Error {
     Invalid(String),
     #[error(transparent)]
     Tauri(#[from] tauri::Error),
+    #[error("local database: {0}")]
+    Database(#[from] rusqlite::Error),
+    #[error("download failed: {0}")]
+    Download(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

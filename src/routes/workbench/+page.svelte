@@ -1,11 +1,14 @@
 <script lang="ts">
   import {
+    Check,
     FolderOpen,
+    History,
     Image as ImageIcon,
     LoaderCircle,
     Play,
     RotateCw,
     ScanText,
+    Settings,
     ShieldCheck,
     Square,
   } from "@lucide/svelte";
@@ -14,6 +17,7 @@
   import { backend, fileName } from "$lib/api";
   import Logo from "$lib/components/Logo.svelte";
   import { formatDuration } from "$lib/format";
+  import { isSaved, watchHistory } from "$lib/history.svelte";
   import type {
     Analysis,
     HudValues,
@@ -21,7 +25,6 @@
     ReplayOrder,
     ReplayProgress,
     SessionSummary,
-    ShortcutInfo,
   } from "$lib/types";
   import ImageViewer from "$lib/workbench/ImageViewer.svelte";
   import ResultsPanel from "$lib/workbench/ResultsPanel.svelte";
@@ -35,7 +38,6 @@
   let error = $state<string | null>(null);
   let showText = $state(false);
   let highlight = $state<Rect | null>(null);
-  let shortcuts = $state<ShortcutInfo[]>([]);
 
   // Session replay: the open folder run as one play session.
   let folder = $state<string | null>(null);
@@ -46,9 +48,22 @@
   let session = $state<SessionSummary | null>(null);
 
   const regions = $derived(analysis ? regionsOf(analysis, showText) : []);
+  let saving = $state(false);
+
+  /** Keeps the replayed session, so the Train tab can compare maps across sessions. */
+  async function saveSession() {
+    saving = true;
+    try {
+      await backend.saveSession(folder ? fileName(folder) : "");
+    } catch (e) {
+      error = String(e);
+    } finally {
+      saving = false;
+    }
+  }
 
   onMount(() => {
-    backend.shortcuts().then((s) => (shortcuts = s));
+    watchHistory();
     backend.takeLaunchImage().then((path) => {
       if (path) openPath(path);
     });
@@ -177,6 +192,9 @@
         <input type="checkbox" bind:checked={showText} disabled={!analysis} />
         <ScanText size={15} />Text boxes
       </label>
+      <button class="ghost icon" title="Settings" aria-label="Settings" onclick={() => backend.showSettings()}>
+        <Settings size={15} />
+      </button>
       <button class="primary" onclick={analyze} disabled={!selected || busy || replaying}>
         {#if busy}<span class="spin"><LoaderCircle size={15} /></span>{:else}<RotateCw size={15} />{/if}
         Analyze
@@ -248,6 +266,15 @@
                   session.activeSeconds,
                 )} active.
               </p>
+              {#if session.activeSeconds > 0}
+                {#if isSaved(session)}
+                  <p class="hint saved"><Check size={12} /> Saved to your history.</p>
+                {:else}
+                  <button class="ghost wide" onclick={saveSession} disabled={saving}
+                    ><History size={14} />Save to history</button
+                  >
+                {/if}
+              {/if}
             {/if}
           {/if}
         </section>
@@ -258,20 +285,12 @@
 
     <div class="spacer"></div>
 
-    {#if shortcuts.length}
-      <div class="eyebrow">Hotkeys</div>
-      <dl class="shortcuts">
-        {#each shortcuts as shortcut (shortcut.action)}
-          <div><dt>{shortcut.label}</dt><dd>{shortcut.keys}</dd></div>
-        {/each}
-      </dl>
-    {/if}
-
     <div class="policy">
       <ShieldCheck size={16} />
       <p>
         <strong>Offline mode.</strong> Leafline reads saved screenshots only. Live capture stays off until Nexon confirms
-        read-only overlays are allowed.
+        read-only overlays are allowed. Hotkeys, map data and more are in
+        <button class="inline" onclick={() => backend.showSettings()}>Settings</button>.
       </p>
     </div>
   </aside>
@@ -436,6 +455,7 @@
     flex-direction: column;
     gap: 8px;
     min-height: 0;
+    overflow-y: auto;
     padding: 14px 10px 12px;
     border-right: 1px solid var(--border);
     background: var(--surface);
@@ -586,32 +606,6 @@
     flex: 1;
   }
 
-  .shortcuts {
-    display: grid;
-    gap: 4px;
-    margin: 0 0 6px;
-    padding: 0 6px;
-  }
-
-  .shortcuts div {
-    display: flex;
-    justify-content: space-between;
-    gap: 8px;
-    font-size: 11.5px;
-  }
-
-  .shortcuts dt {
-    color: var(--muted);
-  }
-
-  .shortcuts dd {
-    margin: 0;
-    color: var(--faint);
-    font-family: var(--font-mono);
-    font-size: 10.5px;
-    white-space: nowrap;
-  }
-
   .policy {
     display: flex;
     gap: 9px;
@@ -634,6 +628,28 @@
 
   .policy strong {
     color: var(--good);
+  }
+
+  .saved {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--good);
+  }
+
+  .inline {
+    height: auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    font-size: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  .ghost.icon {
+    padding: 0 8px;
   }
 
   .canvas {

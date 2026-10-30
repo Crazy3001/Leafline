@@ -102,12 +102,15 @@ const STAT_LABELS: &[&str] = &[
 const REQ_KEYS: [&str; 6] = ["LEV", "STR", "DEX", "INT", "LUK", "FAM"];
 
 static UPGRADES: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\(\s*\+\s*([0-9OoIlSB]{1,2})\s*\)?\s*$").unwrap());
+/// `REQ LEV : 25`. Keying often loses the grey `REQ`, so it is optional.
 static REQUIREMENT: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^\S{2,4}\s*([A-Za-z]{2,4})\W*([0-9OoIlSB]{1,3})?\s*$").unwrap());
+    LazyLock::new(|| Regex::new(r"^(?:(\S{2,4})\s*)?([A-Za-z]{2,4})\W*([0-9OoIlSB]{1,3})?\s*$").unwrap());
 static STAT: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^(.+?)\s*[:;.•·]+\s*([+-])\s*([0-9OoIlSB]{1,4})(?:\s*[\(\[]\s*([0-9OoIlSB]{1,4})\s*([+-])\s*([0-9OoIlSB]{1,4}))?").unwrap()
 });
 static PROPERTY: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^([A-Za-z][A-Za-z .'-]+?)\s*:\s*(.+)$").unwrap());
+/// OCR often splits a capital H into two strokes: `Maxi-IP`.
+static SPLIT_H: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[Il1|i]-[Il1|i]").unwrap());
 static TRAILING_NUMBER: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"([0-9OoIlSB]{1,3})\s*$").unwrap());
 
 impl ItemTooltip {
@@ -137,8 +140,11 @@ impl ItemTooltip {
     }
 }
 
-/// Parses a tooltip from its lines, ordered top to bottom.
-pub fn parse(lines: &[Line]) -> ItemTooltip {
+/// Parses a tooltip from its lines, ordered top to bottom. `separator_y` is the rule under the
+/// job flags: the name and `REQ` block sit above it, and type, stats and other lines below.
+/// Keeping the two apart stops misread `REQ` rows from passing as properties, and stat lines
+/// such as `DEX: +2` from passing as requirements.
+pub fn parse(lines: &[Line], separator_y: f32) -> ItemTooltip {
     let mut item = ItemTooltip::default();
     let mut first_req_y = None;
     let mut unclaimed = Vec::new();
@@ -148,19 +154,23 @@ pub fn parse(lines: &[Line]) -> ItemTooltip {
         if text.is_empty() {
             continue;
         }
-        if let Some((key, value)) = parse_requirement(text, lines, i) {
-            first_req_y.get_or_insert(line.rect.y);
-            set_requirement(&mut item.requirements, key, value);
-        } else if starts_like(text, "Type") {
-            item.item_type = text.split_once(':').map(|(_, v)| v.trim().to_string()).filter(|v| !v.is_empty());
+        if line.rect.center_y() < separator_y {
+            match parse_requirement(text, lines, i) {
+                Some((key, value)) => {
+                    first_req_y.get_or_insert(line.rect.y);
+                    set_requirement(&mut item.requirements, key, value);
+                }
+                None => unclaimed.push(line),
+            }
+        } else if is_type_line(text) {
+            let value = text.split_once(':').map(|(_, v)| v.trim().to_string()).filter(|v| !v.is_empty());
+            item.item_type = item.item_type.or(value);
         } else if starts_like(text, "Remaining") {
             item.remaining_enhancements = TRAILING_NUMBER.captures(text).and_then(|c| digitize(&c[1]).parse().ok());
         } else if let Some(stat) = parse_stat(text) {
             item.stats.push(stat);
-        } else if let Some(caps) = PROPERTY.captures(text) {
+        } else if let Some(caps) = PROPERTY.captures(text).filter(|c| is_label(&c[1])) {
             item.properties.push(Property { label: caps[1].trim().to_string(), value: caps[2].trim().to_string() });
-        } else {
-            unclaimed.push(line);
         }
     }
 
@@ -187,11 +197,11 @@ pub fn split_name(text: &str) -> (String, Option<u32>) {
 /// the right on the same row supplies it.
 fn parse_requirement(text: &str, lines: &[Line], index: usize) -> Option<(&'static str, Option<u32>)> {
     let caps = REQUIREMENT.captures(text)?;
-    if similarity(&text[..caps.get(1)?.start()], "REQ") < 0.6 {
+    if caps.get(1).is_some_and(|prefix| similarity(prefix.as_str(), "REQ") < 0.6) {
         return None;
     }
-    let key = best_match(&caps[1], &REQ_KEYS, 0.6)?;
-    let value = caps.get(2).map(|m| m.as_str().to_string()).or_else(|| {
+    let key = best_match(&caps[2], &REQ_KEYS, 0.6)?;
+    let value = caps.get(3).map(|m| m.as_str().to_string()).or_else(|| {
         let line = &lines[index];
         lines
             .iter()
@@ -213,13 +223,33 @@ fn set_requirement(req: &mut Requirements, key: &str, value: Option<u32>) {
         "LUK" => &mut req.luk,
         _ => &mut req.fam,
     };
-    *slot = value;
+    // A row read twice, once without its value, keeps the value.
+    if value.is_some() {
+        *slot = value;
+    }
+}
+
+/// `Type: Hat`, also behind a stray mark OCR made of the bullet (`II Type: Crossbow`).
+fn is_type_line(text: &str) -> bool {
+    let mut words = text.split_whitespace();
+    match words.next() {
+        Some(first) if first.len() <= 2 && !starts_like(first, "Type") => {
+            words.next().is_some_and(|w| starts_like(w, "Type"))
+        }
+        Some(_) => starts_like(text, "Type"),
+        None => false,
+    }
+}
+
+/// A property label is words, not the stray marks OCR makes of scenery.
+fn is_label(label: &str) -> bool {
+    label.chars().filter(char::is_ascii_alphabetic).count() >= 3
 }
 
 fn parse_stat(text: &str) -> Option<Stat> {
     let caps = STAT.captures(text)?;
-    let raw_label = caps[1].trim();
-    let label = best_match(raw_label, STAT_LABELS, 0.6).map_or_else(|| raw_label.to_string(), str::to_string);
+    let raw_label = SPLIT_H.replace_all(caps[1].trim(), "H");
+    let label = best_match(&raw_label, STAT_LABELS, 0.6).map_or_else(|| raw_label.to_string(), str::to_string);
     let sign = if &caps[2] == "-" { -1 } else { 1 };
     let value = sign * digitize(&caps[3]).parse::<i32>().ok()?;
     let base = caps.get(4).and_then(|m| digitize(m.as_str()).parse().ok());
@@ -255,21 +285,24 @@ mod tests {
 
     #[test]
     fn brown_bamboo_hat() {
-        let item = parse(&lines(&[
-            ("Brown Bamboo Hat", 47.0, 326.0, 18.0),
-            ("REQ LEV : 25", 134.0, 350.0, 10.0),
-            ("REQ STR : 0", 134.0, 364.0, 10.0),
-            ("REQ DEX : 10", 134.0, 377.0, 10.0),
-            ("REQ INT : 0", 134.0, 391.0, 10.0),
-            ("REQ LUK : 0", 134.0, 405.0, 10.0),
-            ("REQ FAM : 0", 134.0, 418.0, 10.0),
-            ("BEGINNER WARRIOR MAGICIAN BOWMAN THIEF", 42.0, 440.0, 9.0),
-            ("Type: Hat", 45.0, 472.0, 12.0),
-            ("· MaxHP: +10", 45.0, 490.0, 12.0),
-            ("· Weapon Def.: +26 (24 +2)", 45.0, 508.0, 12.0),
-            ("· Accuracy: +1", 45.0, 526.0, 12.0),
-            ("Remaining Enhancements: 7", 45.0, 544.0, 12.0),
-        ]));
+        let item = parse(
+            &lines(&[
+                ("Brown Bamboo Hat", 47.0, 326.0, 18.0),
+                ("REQ LEV : 25", 134.0, 350.0, 10.0),
+                ("REQ STR : 0", 134.0, 364.0, 10.0),
+                ("REQ DEX : 10", 134.0, 377.0, 10.0),
+                ("REQ INT : 0", 134.0, 391.0, 10.0),
+                ("REQ LUK : 0", 134.0, 405.0, 10.0),
+                ("REQ FAM : 0", 134.0, 418.0, 10.0),
+                ("BEGINNER WARRIOR MAGICIAN BOWMAN THIEF", 42.0, 440.0, 9.0),
+                ("Type: Hat", 45.0, 472.0, 12.0),
+                ("· MaxHP: +10", 45.0, 490.0, 12.0),
+                ("· Weapon Def.: +26 (24 +2)", 45.0, 508.0, 12.0),
+                ("· Accuracy: +1", 45.0, 526.0, 12.0),
+                ("Remaining Enhancements: 7", 45.0, 544.0, 12.0),
+            ]),
+            460.0,
+        );
         assert_eq!(item.name, "Brown Bamboo Hat");
         assert_eq!(item.upgrades, None);
         assert_eq!(item.item_type.as_deref(), Some("Hat"));
@@ -284,16 +317,19 @@ mod tests {
 
     #[test]
     fn upgraded_name_and_noisy_ocr() {
-        let item = parse(&lines(&[
-            ("Green Robin Hat (+1)", 318.0, 326.0, 18.0),
-            ("PEQ LEV • 20", 405.0, 349.0, 10.0),
-            ("REQ DEX :", 405.0, 377.0, 10.0),
-            ("3O", 470.0, 377.0, 10.0),
-            ("Type: Hat", 316.0, 472.0, 12.0),
-            ("OEX: +2", 317.0, 490.0, 12.0),
-            ("Accuracy: +2 (0 +2)", 316.0, 526.0, 12.0),
-            ("• «Remaning Enhancements: 6", 300.0, 544.0, 12.0),
-        ]));
+        let item = parse(
+            &lines(&[
+                ("Green Robin Hat (+1)", 318.0, 326.0, 18.0),
+                ("PEQ LEV • 20", 405.0, 349.0, 10.0),
+                ("REQ DEX :", 405.0, 377.0, 10.0),
+                ("3O", 470.0, 377.0, 10.0),
+                ("Type: Hat", 316.0, 472.0, 12.0),
+                ("OEX: +2", 317.0, 490.0, 12.0),
+                ("Accuracy: +2 (0 +2)", 316.0, 526.0, 12.0),
+                ("• «Remaning Enhancements: 6", 300.0, 544.0, 12.0),
+            ]),
+            460.0,
+        );
         assert_eq!(item.name, "Green Robin Hat");
         assert_eq!(item.upgrades, Some(1));
         assert_eq!(item.requirements.level, Some(20));
@@ -305,7 +341,40 @@ mod tests {
 
     #[test]
     fn properties_are_kept() {
-        let item = parse(&lines(&[("Some Sword", 0.0, 0.0, 18.0), ("Attack Speed: Fast", 0.0, 100.0, 12.0)]));
+        let item = parse(&lines(&[("Some Sword", 0.0, 0.0, 18.0), ("Attack Speed: Fast", 0.0, 100.0, 12.0)]), 50.0);
         assert_eq!(item.properties, vec![Property { label: "Attack Speed".into(), value: "Fast".into() }]);
+    }
+
+    /// Readings like those of a tooltip drawn over an inventory window: garbled `REQ` rows,
+    /// a value-only row and a capital H split in two.
+    #[test]
+    fn junk_rows_and_split_letters() {
+        let item = parse(
+            &lines(&[
+                ("Fernleaf Cap", 47.0, 326.0, 18.0),
+                ("LEW • 25", 160.0, 350.0, 10.0),
+                ("r-:EEJ. ETA", 134.0, 364.0, 10.0),
+                ("OEX", 160.0, 377.0, 10.0),
+                ("10", 200.0, 377.0, 10.0),
+                ("r-:EEJ. INT", 134.0, 391.0, 10.0),
+                ("II Type: Hat", 45.0, 472.0, 12.0),
+                ("Maxi-IP: +10", 45.0, 490.0, 12.0),
+                ("Remaining Enhancements: 7", 45.0, 544.0, 12.0),
+            ]),
+            460.0,
+        );
+        assert_eq!(item.name, "Fernleaf Cap");
+        assert_eq!(item.item_type.as_deref(), Some("Hat"));
+        assert_eq!(item.requirements.level, Some(25));
+        assert_eq!(item.requirements.dex, Some(10));
+        assert!(item.properties.is_empty(), "{:?}", item.properties);
+        assert_eq!(item.stats, vec![Stat { label: "MaxHP".into(), value: 10, base: None, bonus: None }]);
+    }
+
+    #[test]
+    fn stat_lines_below_the_rule_are_not_requirements() {
+        let item = parse(&lines(&[("DEX: +2", 45.0, 490.0, 12.0)]), 460.0);
+        assert_eq!(item.requirements.dex, None);
+        assert_eq!(item.stats[0].label, "DEX");
     }
 }

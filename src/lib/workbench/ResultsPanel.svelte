@@ -53,7 +53,7 @@
         <p class="none">No item tooltip found.</p>
       {/each}
       {#if analysis.quest}
-        <QuestCard quest={analysis.quest} />
+        <QuestCard quest={analysis.quest} map={analysis.map} />
       {:else}
         <p class="none">No Quest Helper found.</p>
       {/if}

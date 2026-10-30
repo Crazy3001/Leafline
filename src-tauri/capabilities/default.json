@@ -1,12 +1,14 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Permissions for the overlay and workbench windows",
-  "windows": ["overlay", "workbench"],
+  "description": "Permissions for the overlay, workbench, settings and pinned panel windows",
+  "windows": ["overlay", "workbench", "settings", "pin-*"],
   "permissions": [
     "core:default",
     "core:window:allow-start-dragging",
     "core:window:allow-hide",
-    "dialog:allow-open"
+    "core:window:allow-set-size",
+    "dialog:allow-open",
+    "dialog:allow-save"
   ]
 }

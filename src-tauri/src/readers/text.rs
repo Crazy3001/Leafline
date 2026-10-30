@@ -30,10 +30,12 @@ pub fn similarity(a: &str, b: &str) -> f64 {
     strsim::normalized_levenshtein(&squash(a), &squash(b))
 }
 
-/// The entry of `options` most similar to `s`, if it clears `threshold`.
+/// The entry of `options` most similar to `s`, if it clears `threshold`. Ties go to the
+/// earlier entry.
 pub fn best_match<'a>(s: &str, options: &[&'a str], threshold: f64) -> Option<&'a str> {
     options
         .iter()
+        .rev()
         .map(|&option| (similarity(s, option), option))
         .max_by(|a, b| a.0.total_cmp(&b.0))
         .filter(|(score, _)| *score >= threshold)
