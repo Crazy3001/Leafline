@@ -810,6 +810,8 @@ export interface LevelStep {
   sp: SkillGain[];
   /** Goal gear this level can first wear. */
   gear: string[];
+  /** Goal gear worn by now whose stats count toward other gear's requirements. */
+  worn: { slot: string; bonus: BaseStats }[];
   /** Base stats after this level's AP. */
   stats: BaseStats;
   apLeft: number;
@@ -890,12 +892,17 @@ export interface BuildCatalog {
 
 export interface BuildRules {
   apPerLevel: number;
+  /** As a first or second job. The level of an advancement counts as the job before. */
   spPerLevel: number;
-  /** AP before this level goes in by itself. */
-  manualApLevel: number;
-  /** The first level that gives SP, by branch. The level before it is the 1st job advancement. */
-  firstSp: { warrior: number; magician: number; bowman: number; thief: number };
+  beginnerSpPerLevel: number;
+  /** SP from each job advancement. */
+  advancementSp: number;
+  firstJobLevel: number;
   secondJobLevel: number;
+  /** Whether 2nd-job SP can buy 1st-job skills. */
+  secondSpBuysFirst: boolean;
+  /** Whether stats from other worn gear count toward a requirement. */
+  gearCounts: boolean;
 }
 
 /** How a hovered item suits the build. */

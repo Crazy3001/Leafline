@@ -62,6 +62,15 @@ impl Stats {
             Stat::Luk => self.luk += amount,
         }
     }
+
+    pub fn plus(self, other: Stats) -> Stats {
+        Stats {
+            str: self.str + other.str,
+            dex: self.dex + other.dex,
+            int: self.int + other.int,
+            luk: self.luk + other.luk,
+        }
+    }
 }
 
 /// A skill and a level: a goal, or what a character already has.
@@ -162,11 +171,20 @@ pub struct LevelStep {
     pub sp: Vec<SkillGain>,
     /// Goal gear this level can first wear.
     pub gear: Vec<String>,
+    /// Goal gear worn by now whose stats count toward other gear's requirements.
+    pub worn: Vec<Worn>,
     /// Base stats after this level's AP.
     pub stats: Stats,
     /// Points left with nothing to go on.
     pub ap_left: u32,
     pub sp_left: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Worn {
+    pub slot: String,
+    pub bonus: Stats,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -230,24 +248,35 @@ struct SkillGoal {
     tier: u32,
 }
 
-/// SP waiting to be spent. First-job SP goes only on first-job skills; second-job SP on either.
+/// SP waiting to be spent. Each kind buys only its own tier's skills, unless the rules let
+/// 2nd-job SP buy 1st-job skills too.
 #[derive(Default)]
 struct SkillPoints {
+    beginner: u32,
     first: u32,
     second: u32,
+    second_buys_first: bool,
 }
 
 impl SkillPoints {
     fn can_buy(&self, tier: u32) -> bool {
-        self.second > 0 || (tier == 1 && self.first > 0)
+        match tier {
+            0 => self.beginner > 0,
+            1 => self.first > 0 || (self.second_buys_first && self.second > 0),
+            _ => self.second > 0,
+        }
     }
 
     fn spend(&mut self, tier: u32) {
-        if tier == 1 && self.first > 0 { self.first -= 1 } else { self.second -= 1 }
+        match tier {
+            0 => self.beginner -= 1,
+            1 if self.first > 0 => self.first -= 1,
+            _ => self.second -= 1,
+        }
     }
 
     fn left(&self) -> u32 {
-        self.first + self.second
+        self.beginner + self.first + self.second
     }
 }
 
@@ -257,22 +286,24 @@ pub fn expand(build: &Build, rules: &Rules, catalog: &Catalog) -> Expansion {
     let branch = Branch::of_job(build.plan.job);
     let start = build.start.level.clamp(1, MAX_LEVEL);
     let end = build.plan.plan_to.clamp(start, MAX_LEVEL);
-    let first_sp = branch.map(|b| rules.first_sp_level(b));
+    let first_job = rules.first_job_level;
     let second_job = rules.second_job_level;
     let path = path_of(build.plan.job);
 
     let mut skills: HashMap<u32, u32> = build.start.skills.iter().map(|s| (s.skill_id, s.level)).collect();
     let goals = skill_goals(build, catalog, &path, &mut problems);
     check_order(&goals, &skills, catalog, &mut problems);
-    problems.extend(start_notes(build, branch, rules, start));
+    problems.extend(start_notes(build, branch, rules));
 
     let mut stats = build.start.stats.unwrap_or_default();
     let mut ap = build.start.ap;
-    let mut sp = SkillPoints::default();
+    let mut sp = SkillPoints { second_buys_first: rules.second_sp_buys_first, ..SkillPoints::default() };
     if start >= second_job {
         sp.second = build.start.sp;
-    } else {
+    } else if start >= first_job {
         sp.first = build.start.sp;
+    } else {
+        sp.beginner = build.start.sp;
     }
 
     let mut steps = Vec::with_capacity((end - start + 1) as usize);
@@ -280,48 +311,53 @@ pub fn expand(build: &Build, rules: &Rules, catalog: &Catalog) -> Expansion {
         let new_level = level > start;
         let mut advance = None;
         if new_level {
-            if first_sp.is_some_and(|l| l == level + 1) {
+            ap += rules.ap_per_level;
+            if level <= first_job {
+                sp.beginner += rules.beginner_sp_per_level;
+            } else if branch.is_some() && level <= second_job {
+                sp.first += rules.sp_per_level;
+            } else if branch.is_some() {
+                sp.second += rules.sp_per_level;
+            }
+            if level == first_job {
                 advance = Some(format!("1st job: {}", job_name(catalog, path.first().copied())));
-            }
-            if level == second_job {
-                advance = Some(match path.get(1) {
-                    Some(&job) => format!("2nd job: {}", job_name(catalog, Some(job))),
-                    None => "2nd job: not chosen yet".to_string(),
-                });
-                if sp.first > 0 {
-                    problems.push(Problem::warning(
-                        Some(level),
-                        format!("{} 1st-job SP would be lost at Lv {level}: no goal can use them.", sp.first),
-                    ));
-                    sp.first = 0;
-                }
-            }
-            if level >= rules.manual_ap_level {
-                ap += rules.ap_per_level;
-            }
-            if first_sp.is_some_and(|l| level >= l) {
-                if level >= second_job {
-                    sp.second += rules.sp_per_level;
-                } else {
-                    sp.first += rules.sp_per_level;
+                if branch.is_some() {
+                    sp.first += rules.advancement_sp;
                 }
             }
         }
         let ap_gains = spend_ap(&mut ap, &mut stats, &build.plan.stats, level);
-        let sp_gains = spend_sp(&mut sp, &mut skills, &goals, catalog);
+        let mut sp_gains = Vec::new();
+        spend_sp(&mut sp, &mut skills, &goals, catalog, &mut sp_gains);
+        // This level's SP goes on the old job first, then the advancement leaves it behind.
+        if new_level && level == second_job {
+            advance = Some(format!("2nd job: {}", job_name(catalog, path.get(1).copied())));
+            if sp.first > 0 {
+                problems.push(Problem::warning(
+                    Some(level),
+                    format!("{} 1st-job SP would be lost at Lv {level}: no goal can use them.", sp.first),
+                ));
+                sp.first = 0;
+            }
+            if branch.is_some() {
+                sp.second += rules.advancement_sp;
+                spend_sp(&mut sp, &mut skills, &goals, catalog, &mut sp_gains);
+            }
+        }
         steps.push(LevelStep {
             level,
             advance,
             ap: ap_gains,
             sp: sp_gains,
             gear: Vec::new(),
+            worn: Vec::new(),
             stats,
             ap_left: ap,
             sp_left: sp.left(),
         });
     }
 
-    let gear = check_gear(build, catalog, branch, &mut steps, &mut problems);
+    let gear = check_gear(build, catalog, rules, branch, &mut steps, &mut problems);
     problems.extend(end_notes(build, &goals, &skills, &stats, catalog, end, ap, sp.left()));
     let mut skills: Vec<SkillLevel> = skills.into_iter().map(|(skill_id, level)| SkillLevel { skill_id, level }).collect();
     skills.sort_by_key(|s| s.skill_id);
@@ -340,7 +376,7 @@ fn skill_goals(build: &Build, catalog: &Catalog, path: &[u32], problems: &mut Ve
             problems.push(Problem::warning(None, format!("A goal names a skill Leafline doesn't know ({}).", goal.skill_id)));
             continue;
         };
-        if !path.contains(&skill.job_id) {
+        if tier_of(skill.job_id) > 0 && !path.contains(&skill.job_id) {
             problems.push(Problem::warning(None, format!("{} isn't a skill of this job path.", skill.name)));
             continue;
         }
@@ -383,7 +419,7 @@ fn check_order(goals: &[SkillGoal], have: &HashMap<u32, u32>, catalog: &Catalog,
     }
 }
 
-fn start_notes(build: &Build, branch: Option<Branch>, rules: &Rules, start: u32) -> Vec<Problem> {
+fn start_notes(build: &Build, branch: Option<Branch>, rules: &Rules) -> Vec<Problem> {
     let mut notes = Vec::new();
     if branch.is_none() {
         notes.push(Problem::note(None, "Choose a job to plan its skills.".into()));
@@ -392,15 +428,6 @@ fn start_notes(build: &Build, branch: Option<Branch>, rules: &Rules, start: u32)
     }
     if build.start.stats.is_none() {
         notes.push(Problem::warning(None, "Enter your stats from the Character Stat window, so the totals are right.".into()));
-    }
-    if start + 1 < rules.manual_ap_level {
-        notes.push(Problem::note(
-            None,
-            format!(
-                "AP before Lv {0} goes in by itself and isn't counted here. Update your stats at Lv {0} for exact totals.",
-                rules.manual_ap_level
-            ),
-        ));
     }
     notes
 }
@@ -438,14 +465,19 @@ fn spend_ap(ap: &mut u32, stats: &mut Stats, goals: &[StatGoal], level: u32) -> 
 
 /// Spends one SP at a time on the first goal that can take it: one with points of its tier
 /// left and its prerequisites met. So a goal that has to wait doesn't hold up those after it.
-fn spend_sp(sp: &mut SkillPoints, skills: &mut HashMap<u32, u32>, goals: &[SkillGoal], catalog: &Catalog) -> Vec<SkillGain> {
-    let mut gains: Vec<SkillGain> = Vec::new();
+fn spend_sp(
+    sp: &mut SkillPoints,
+    skills: &mut HashMap<u32, u32>,
+    goals: &[SkillGoal],
+    catalog: &Catalog,
+    gains: &mut Vec<SkillGain>,
+) {
     loop {
         let next = goals.iter().find(|goal| {
             let have = skills.get(&goal.id).copied().unwrap_or(0);
             have < goal.level && sp.can_buy(goal.tier) && needs_met(goal.id, skills, catalog)
         });
-        let Some(goal) = next else { return gains };
+        let Some(goal) = next else { return };
         sp.spend(goal.tier);
         let level = skills.entry(goal.id).or_default();
         *level += 1;
@@ -466,11 +498,29 @@ fn needs_met(skill: u32, have: &HashMap<u32, u32>, catalog: &Catalog) -> bool {
     })
 }
 
-/// Marks the level each goal item comes within reach. Only base stats are compared: whether
-/// bonuses from other gear count toward a requirement isn't confirmed for Classic.
+/// What an item adds to the four base stats.
+fn bonus_of(item: &ItemRecord) -> Stats {
+    let mut bonus = Stats::default();
+    for stat in &item.stats {
+        let target = match stat.label.as_str() {
+            "STR" => Stat::Str,
+            "DEX" => Stat::Dex,
+            "INT" => Stat::Int,
+            "LUK" => Stat::Luk,
+            _ => continue,
+        };
+        bonus.add(target, stat.value.max(0) as u32);
+    }
+    bonus
+}
+
+/// Marks the level each goal item comes within reach, walking up the levels so gear already
+/// worn can help with the next piece. A new piece replaces what was in its slot, and an item's
+/// own stats never count toward its requirements.
 fn check_gear(
     build: &Build,
     catalog: &Catalog,
+    rules: &Rules,
     branch: Option<Branch>,
     steps: &mut [LevelStep],
     problems: &mut Vec<Problem>,
@@ -485,14 +535,33 @@ fn check_gear(
         if !usable {
             problems.push(Problem::warning(None, format!("{} isn't usable by this job.", item.name)));
         }
-        let reachable = steps.iter().position(|s| meets(item, s.level, &s.stats, build.start.stats.is_some()));
-        if let (Some(i), true) = (reachable, usable) {
-            steps[i].gear.push(item.name.clone());
-        } else if reachable.is_none() {
-            let end = steps.last().map_or(0, |s| s.level);
-            problems.push(Problem::warning(None, format!("{} is out of reach by Lv {end} on this plan.", item.name)));
+        gear.push(GearCheck { item: item.clone(), level: None, usable });
+    }
+
+    let known = build.start.stats.is_some();
+    let mut worn: Vec<Worn> = Vec::new();
+    for step in steps.iter_mut() {
+        loop {
+            let wearable = gear.iter().position(|check: &GearCheck| {
+                let others = worn.iter().filter(|w| w.slot != check.item.slot);
+                let stats = others.fold(step.stats, |total, w| total.plus(w.bonus));
+                check.usable && check.level.is_none() && meets(&check.item, step.level, &stats, known)
+            });
+            let Some(i) = wearable else { break };
+            let check = &mut gear[i];
+            check.level = Some(step.level);
+            step.gear.push(check.item.name.clone());
+            if rules.gear_counts {
+                worn.retain(|w| w.slot != check.item.slot);
+                worn.push(Worn { slot: check.item.slot.clone(), bonus: bonus_of(&check.item) });
+            }
         }
-        gear.push(GearCheck { item: item.clone(), level: reachable.map(|i| steps[i].level), usable });
+        step.worn = worn.clone();
+    }
+
+    let end = steps.last().map_or(0, |s| s.level);
+    for check in gear.iter().filter(|c| c.usable && c.level.is_none()) {
+        problems.push(Problem::warning(None, format!("{} is out of reach by Lv {end} on this plan.", check.item.name)));
     }
     gear
 }
@@ -555,6 +624,7 @@ fn end_notes(
 mod tests {
     use super::super::catalog::tests::{item, skill};
     use super::*;
+    use crate::mapdata::osms::ItemStat;
 
     const FIRST: u32 = 400;
     const SECOND: u32 = 420;
@@ -562,6 +632,7 @@ mod tests {
     const DODGE: u32 = 2;
     const THROW: u32 = 3;
     const STAB: u32 = 4;
+    const FLICK: u32 = 6;
 
     fn catalog() -> Catalog {
         Catalog::new(
@@ -571,6 +642,7 @@ mod tests {
                 skill(THROW, "Twin Throw", FIRST, 20, &[(TOSS, 3)]),
                 skill(STAB, "Fern Stab", SECOND, 30, &[]),
                 skill(5, "Thorn Whirl", 410, 30, &[]),
+                skill(FLICK, "Snail Flick", 0, 3, &[]),
             ],
             vec![item(70, "Fern Dagger", 15, &["Thief"]), item(71, "Twig Wand", 5, &["Magician"])],
         )
@@ -634,20 +706,64 @@ mod tests {
     }
 
     #[test]
-    fn second_job_sp_can_buy_first_job_skills() {
-        let mut plan = build(vec![goal(THROW, 20)], vec![stat(Stat::Luk, None)], 30);
+    fn second_job_sp_buys_first_job_skills_only_if_the_rules_say_so() {
+        let mut plan = build(vec![goal(THROW, 20)], vec![stat(Stat::Luk, None)], 31);
         plan.start.level = 29;
         plan.start.skills = vec![goal(TOSS, 3)];
         let e = run(&plan);
-        assert_eq!(step(&e, 30).sp.iter().map(|s| (s.skill_id, s.to)).collect::<Vec<_>>(), [(THROW, 3)]);
+        assert_eq!(step(&e, 30).sp.iter().map(|s| (s.skill_id, s.to)).collect::<Vec<_>>(), [(THROW, 3)], "Lv 30's own SP is 1st-job");
+        assert!(step(&e, 31).sp.is_empty());
+
+        let rules = Rules { second_sp_buys_first: true, ..Rules::default() };
+        let e = expand(&plan, &rules, &catalog());
+        assert_eq!(step(&e, 31).sp[0].to, 7, "the advancement's point and Lv 31's three");
+    }
+
+    #[test]
+    fn first_job_sp_runs_to_the_second_job_with_a_point_from_the_advancement() {
+        // 1 from the advancement at Lv 10, then 3 a level through Lv 30.
+        let mut plan = build(Vec::new(), vec![stat(Stat::Luk, None)], 30);
+        plan.start.level = 9;
+        let e = run(&plan);
+        assert!(messages(&e).contains(&"61 1st-job SP would be lost at Lv 30: no goal can use them."), "{:?}", e.problems);
+    }
+
+    #[test]
+    fn each_advancement_gives_a_point_at_its_level() {
+        let mut plan = build(vec![goal(TOSS, 1), goal(STAB, 1)], vec![stat(Stat::Luk, None)], 30);
+        plan.start.level = 9;
+        let e = run(&plan);
+        assert_eq!(step(&e, 10).sp.iter().map(|s| s.skill_id).collect::<Vec<_>>(), [TOSS]);
+        assert_eq!(step(&e, 30).sp.iter().map(|s| s.skill_id).collect::<Vec<_>>(), [STAB]);
+    }
+
+    #[test]
+    fn beginners_earn_their_own_sp() {
+        let mut plan = build(vec![goal(FLICK, 3), goal(TOSS, 1)], vec![stat(Stat::Luk, None)], 10);
+        plan.start.level = 1;
+        let e = run(&plan);
+        assert_eq!(step(&e, 2).sp.iter().map(|s| (s.skill_id, s.to)).collect::<Vec<_>>(), [(FLICK, 1)]);
+        assert_eq!(step(&e, 4).sp[0].to, 3);
+        assert!(step(&e, 5).sp.is_empty(), "Beginner SP doesn't buy job skills");
+        assert_eq!(step(&e, 10).sp_left, 6, "9 by Lv 10, 3 spent");
+        assert_eq!(step(&e, 10).sp[0].skill_id, TOSS, "the advancement's point does");
+    }
+
+    #[test]
+    fn beginner_skills_can_be_planned_before_a_job_is_chosen() {
+        let mut plan = build(vec![goal(FLICK, 1)], vec![stat(Stat::Luk, None)], 2);
+        plan.start.level = 1;
+        plan.plan.job = 0;
+        let e = run(&plan);
+        assert_eq!(step(&e, 2).sp[0].skill_id, FLICK);
     }
 
     #[test]
     fn warns_when_first_job_sp_would_be_lost() {
         let e = run(&build(vec![goal(DODGE, 2)], vec![stat(Stat::Luk, None)], 31));
-        assert!(messages(&e).contains(&"55 1st-job SP would be lost at Lv 30: no goal can use them."), "{:?}", e.problems);
+        assert!(messages(&e).contains(&"58 1st-job SP would be lost at Lv 30: no goal can use them."), "{:?}", e.problems);
         assert_eq!(e.problems.iter().find(|p| p.message.contains("lost")).unwrap().level, Some(30));
-        assert_eq!(step(&e, 30).sp_left, 3, "only this level's SP is left");
+        assert_eq!(step(&e, 30).sp_left, 1, "only the advancement's SP is left");
     }
 
     #[test]
@@ -721,13 +837,11 @@ mod tests {
     }
 
     #[test]
-    fn automatic_ap_is_left_out_and_said_so() {
-        let mut plan = build(Vec::new(), vec![stat(Stat::Luk, None)], 11);
+    fn ap_is_the_players_from_the_first_level_up() {
+        let mut plan = build(Vec::new(), vec![stat(Stat::Luk, None)], 2);
         plan.start.level = 1;
         let e = run(&plan);
-        assert!(step(&e, 10).ap.is_empty());
-        assert_eq!(step(&e, 11).ap[0].amount, 5);
-        assert!(e.problems.iter().any(|p| p.message.starts_with("AP before Lv 11 goes in by itself")));
+        assert_eq!(step(&e, 2).ap, [StatGain { stat: Stat::Luk, amount: 5, total: 45 }]);
     }
 
     #[test]
@@ -748,6 +862,57 @@ mod tests {
         let e = run(&plan);
         assert!(messages(&e).contains(&"Enter your stats from the Character Stat window, so the totals are right."));
         assert_eq!(e.gear[0].level, Some(15));
+    }
+
+    /// A hat that gives 10 DEX, and a dagger needing 50 DEX. The build has 25 and adds none.
+    fn hat_and_dagger(hat_dex: u32) -> (Build, Catalog) {
+        let mut hat = item(70, "Fern Hat", 1, &["Thief"]);
+        hat.stats = vec![ItemStat { label: "DEX".into(), value: 10 }];
+        hat.req_dex = hat_dex;
+        let mut dagger = item(71, "Fern Dagger", 1, &["Thief"]);
+        dagger.slot = "Weapon".into();
+        dagger.req_dex = 35;
+        let mut plan = build(Vec::new(), vec![stat(Stat::Luk, None)], 12);
+        plan.plan.gear = vec![71, 70];
+        (plan, Catalog::new(vec![skill(TOSS, "Pebble Toss", FIRST, 20, &[])], vec![hat, dagger]))
+    }
+
+    #[test]
+    fn other_gear_counts_toward_a_requirement_and_its_own_doesnt() {
+        let (plan, catalog) = hat_and_dagger(0);
+        let e = expand(&plan, &Rules::default(), &catalog);
+        assert_eq!((e.gear[0].level, e.gear[1].level), (Some(10), Some(10)), "the hat brings the dagger in reach");
+        assert_eq!(step(&e, 10).gear, ["Fern Hat", "Fern Dagger"]);
+
+        // Needing more than base stats, the hat can't lift itself.
+        let (plan, catalog) = hat_and_dagger(30);
+        let e = expand(&plan, &Rules::default(), &catalog);
+        assert_eq!(e.gear[1].level, None);
+        assert_eq!(e.gear[0].level, None);
+    }
+
+    #[test]
+    fn gear_can_be_left_out_of_requirements_by_the_rules() {
+        let (plan, catalog) = hat_and_dagger(0);
+        let rules = Rules { gear_counts: false, ..Rules::default() };
+        let e = expand(&plan, &rules, &catalog);
+        assert_eq!((e.gear[0].level, e.gear[1].level), (None, Some(10)));
+        assert!(step(&e, 12).worn.is_empty());
+    }
+
+    #[test]
+    fn a_new_piece_replaces_what_was_in_its_slot() {
+        let (mut plan, _) = hat_and_dagger(0);
+        let mut old = item(70, "Old Hat", 1, &["Thief"]);
+        old.stats = vec![ItemStat { label: "DEX".into(), value: 10 }];
+        let mut new = item(72, "New Hat", 11, &["Thief"]);
+        new.stats = vec![ItemStat { label: "DEX".into(), value: 2 }];
+        plan.plan.gear = vec![70, 72];
+        let catalog = Catalog::new(Vec::new(), vec![old, new]);
+        let e = expand(&plan, &Rules::default(), &catalog);
+        assert_eq!(step(&e, 10).worn[0].bonus.dex, 10);
+        assert_eq!(step(&e, 11).worn.len(), 1);
+        assert_eq!(step(&e, 11).worn[0].bonus.dex, 2);
     }
 
     #[test]

@@ -219,11 +219,12 @@
   }
 
   const pathSkills = $derived(
-    catalog?.skills.filter((s) => s.jobId === firstJob || (secondJob !== 0 && s.jobId === secondJob)) ?? [],
+    catalog?.skills.filter((s) => s.jobId === 0 || s.jobId === firstJob || (secondJob !== 0 && s.jobId === secondJob)) ?? [],
   );
-  const beginnerSkills = $derived(catalog?.skills.filter((s) => s.jobId === 0) ?? []);
   const groups = $derived(
-    [firstJob, secondJob].filter(Boolean).map((id) => ({ name: jobName(id), skills: pathSkills.filter((s) => s.jobId === id) })),
+    [0, firstJob, secondJob]
+      .filter((id, i) => i === 0 || id !== 0)
+      .map((id) => ({ name: id ? jobName(id) : "Beginner", skills: pathSkills.filter((s) => s.jobId === id) })),
   );
   const skillOf = (id: number) => catalog?.skills.find((s) => s.id === id);
 
@@ -290,9 +291,6 @@
     clearTimeout(rulesTimer);
     rulesTimer = setTimeout(() => changeSettings({ buildRules: rules }), SAVE_DELAY);
   }
-
-  const setFirstSp = (branch: keyof BuildRules["firstSp"], value: string) =>
-    setRules({ firstSp: { ...display.buildRules.firstSp, [branch]: whole(value) } });
 
   const rulesChanged = $derived(JSON.stringify(display.buildRules) !== JSON.stringify(DEFAULT_RULES));
 
@@ -467,36 +465,24 @@
             {/each}
           </ol>
         {/if}
-        {#if groups.length}
-          <label class="add">
-            <span>Add a skill</span>
-            <select
-              value=""
-              onchange={(e) => {
-                addSkill(Number(e.currentTarget.value));
-                e.currentTarget.value = "";
-              }}
-            >
-              <option value="" disabled>Choose a skill</option>
-              {#each groups as group (group.name)}
-                <optgroup label={group.name}>
-                  {#each group.skills as skill (skill.id)}<option value={skill.id}>{skill.name}</option>{/each}
-                </optgroup>
-              {/each}
-            </select>
-          </label>
-        {:else}
-          <p class="help">Choose a job to see its skills.</p>
-        {/if}
-        {#if beginnerSkills.length}
-          <details>
-            <summary>Beginner skills</summary>
-            <p class="help">
-              {beginnerSkills.map((s) => s.name).join(", ")}. These aren't planned here: the wiki doesn't say how many SP
-              Beginners get.
-            </p>
-          </details>
-        {/if}
+        <label class="add">
+          <span>Add a skill</span>
+          <select
+            value=""
+            onchange={(e) => {
+              addSkill(Number(e.currentTarget.value));
+              e.currentTarget.value = "";
+            }}
+          >
+            <option value="" disabled>Choose a skill</option>
+            {#each groups as group (group.name)}
+              <optgroup label={group.name}>
+                {#each group.skills as skill (skill.id)}<option value={skill.id}>{skill.name}</option>{/each}
+              </optgroup>
+            {/each}
+          </select>
+        </label>
+        {#if !firstJob}<p class="help">Choose a job to add its skills.</p>{/if}
       </section>
 
       <section>
@@ -547,7 +533,7 @@
 
       <section>
         <h2>Gear to aim for</h2>
-        <p class="help">Shows the first level this plan can wear it, going by base stats only.</p>
+        <p class="help">Shows the first level this plan can wear it, counting the stats on earlier gear goals.</p>
         {#if expansion?.gear.length}
           <ol class="goals">
             {#each expansion.gear as check (check.item.id)}
@@ -605,25 +591,27 @@
         <details>
           <summary>How points are counted</summary>
           <p class="help">
-            These come from mapleclassic.wiki, checked before launch at best, and are unverified in Classic. If your game
-            shows something else, change them here. They apply to every build.
+            AP and Beginner SP at Lv 2 were seen in game. The rest come from community guides and aren't confirmed by
+            Nexon. If your game shows something else, change them here. They apply to every build.
           </p>
           <div class="fields">
             <label><span>AP per level</span><input class="number" type="number" min="0" value={display.buildRules.apPerLevel} oninput={(e) => setRules({ apPerLevel: whole(e.currentTarget.value) })} /></label>
             <label><span>SP per level</span><input class="number" type="number" min="0" value={display.buildRules.spPerLevel} oninput={(e) => setRules({ spPerLevel: whole(e.currentTarget.value) })} /></label>
-            <label title="AP before this level goes in by itself."><span>You choose AP from Lv</span><input class="number" type="number" min="1" value={display.buildRules.manualApLevel} oninput={(e) => setRules({ manualApLevel: whole(e.currentTarget.value) })} /></label>
+            <label><span>Beginner SP per level</span><input class="number" type="number" min="0" value={display.buildRules.beginnerSpPerLevel} oninput={(e) => setRules({ beginnerSpPerLevel: whole(e.currentTarget.value) })} /></label>
+            <label><span>SP per advancement</span><input class="number" type="number" min="0" value={display.buildRules.advancementSp} oninput={(e) => setRules({ advancementSp: whole(e.currentTarget.value) })} /></label>
+            <label><span>1st job at Lv</span><input class="number" type="number" min="2" value={display.buildRules.firstJobLevel} oninput={(e) => setRules({ firstJobLevel: whole(e.currentTarget.value) })} /></label>
             <label><span>2nd job at Lv</span><input class="number" type="number" min="2" value={display.buildRules.secondJobLevel} oninput={(e) => setRules({ secondJobLevel: whole(e.currentTarget.value) })} /></label>
           </div>
-          <h3>First level that gives SP</h3>
-          <p class="help">The level before it is the 1st job advancement. The wiki disagrees with itself on Magicians: Lv 8 or Lv 10.</p>
-          <div class="fields">
-            <label><span>Warrior</span><input class="number" type="number" min="2" value={display.buildRules.firstSp.warrior} oninput={(e) => setFirstSp("warrior", e.currentTarget.value)} /></label>
-            <label><span>Magician</span><input class="number" type="number" min="2" value={display.buildRules.firstSp.magician} oninput={(e) => setFirstSp("magician", e.currentTarget.value)} /></label>
-            <label><span>Bowman</span><input class="number" type="number" min="2" value={display.buildRules.firstSp.bowman} oninput={(e) => setFirstSp("bowman", e.currentTarget.value)} /></label>
-            <label><span>Thief</span><input class="number" type="number" min="2" value={display.buildRules.firstSp.thief} oninput={(e) => setFirstSp("thief", e.currentTarget.value)} /></label>
-          </div>
+          <label class="check">
+            <input type="checkbox" checked={display.buildRules.secondSpBuysFirst} onchange={(e) => setRules({ secondSpBuysFirst: e.currentTarget.checked })} />
+            <span>2nd-job SP can buy 1st-job skills</span>
+          </label>
+          <label class="check">
+            <input type="checkbox" checked={display.buildRules.gearCounts} onchange={(e) => setRules({ gearCounts: e.currentTarget.checked })} />
+            <span>Stats from other worn gear count toward requirements</span>
+          </label>
           {#if rulesChanged}
-            <button class="plain" onclick={() => setRules(DEFAULT_RULES)}><RotateCcw size={13} />Back to the wiki's numbers</button>
+            <button class="plain" onclick={() => setRules(DEFAULT_RULES)}><RotateCcw size={13} />Back to the defaults</button>
           {/if}
         </details>
       </section>
@@ -835,12 +823,6 @@
     font-weight: 600;
   }
 
-  h3 {
-    margin: 14px 0 3px;
-    font-size: 12.5px;
-    font-weight: 600;
-  }
-
   .help {
     margin: 0 0 8px;
     color: var(--faint);
@@ -859,6 +841,17 @@
     gap: 3px;
     color: var(--muted);
     font-size: 11.5px;
+  }
+
+  label.check {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-top: 8px;
+  }
+
+  label.check input {
+    accent-color: var(--accent);
   }
 
   label.inline {

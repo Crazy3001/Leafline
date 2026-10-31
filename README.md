@@ -88,7 +88,7 @@ A build is a job and a list of goals in order, the way written guides put them: 
 
 Leafline ships no guides or recommended builds. If you follow a guide, keep its link on the build. **Copy plan** turns a build's goals into a line of text you can pass on, and **Paste a code** adds one. It holds goals only, not your character, stats or link.
 
-The planner counts points. It doesn't model damage, accuracy or HP, because those are unsettled for Classic. The numbers it counts by come from mapleclassic.wiki, checked before launch at best, so each can be changed under **How points are counted**. Your stats have to be typed in, because they differ by character. Everything is a plan you follow by hand: nothing is spent for you, and Leafline can't yet tell whether you followed it.
+The planner counts points. It doesn't model damage, accuracy or HP, because those are unsettled for Classic. The numbers it counts by come from community guides and in-game checks, not from Nexon, so each can be changed under **How points are counted**. Your stats have to be typed in, because they differ by character. Everything is a plan you follow by hand: nothing is spent for you, and Leafline can't yet tell whether you followed it.
 
 ## Testing the readers
 
@@ -160,8 +160,8 @@ src-tauri/src/
 - A jump of several levels between two readings adds no EXP, because the levels in between were never measured.
 - Session rates have been checked on 14 hand-taken screenshots and synthetic tests, not yet on a continuous recording of real play.
 - macOS OCR (Apple Vision) and the Tesseract fallback are not built yet.
-- The build planner's item checks use base stats only: whether bonuses from other gear count toward a requirement isn't confirmed for Classic.
-- AP before Lv 11 is assigned by the game, so a plan's stats are low until you update your starting point at Lv 11.
+- The build planner's item checks count your base stats and earlier gear goals, not what you really have on.
+- An SP reset can't be planned yet, so a route that resets SP at a job advancement needs a second build from that point.
 
 ## Data and credits
 

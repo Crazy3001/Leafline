@@ -1,5 +1,5 @@
-//! How many points a character earns and when. The defaults come from mapleclassic.wiki, whose
-//! pages were last checked before launch and disagree in places, so the player can change each.
+//! How many points a character earns and when. No source is official: AP and Beginner SP at
+//! Lv 2 were seen in game, and the rest come from community guides, so the player can change each.
 
 use serde::{Deserialize, Serialize};
 
@@ -50,59 +50,47 @@ impl Branch {
 #[serde(rename_all = "camelCase", default)]
 pub struct Rules {
     pub ap_per_level: u32,
+    /// SP each level as a first or second job. The level of an advancement counts as the job before.
     pub sp_per_level: u32,
-    /// AP before this level goes in by itself; from it the player chooses.
-    pub manual_ap_level: u32,
-    /// The first level that gives SP, by branch. The level before it is the 1st job advancement.
-    pub first_sp: FirstSp,
+    /// SP each level as a Beginner, for Beginner skills only.
+    pub beginner_sp_per_level: u32,
+    /// SP from each job advancement, for that job's skills.
+    pub advancement_sp: u32,
+    pub first_job_level: u32,
     pub second_job_level: u32,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(default)]
-pub struct FirstSp {
-    pub warrior: u32,
-    pub magician: u32,
-    pub bowman: u32,
-    pub thief: u32,
-}
-
-impl Default for FirstSp {
-    fn default() -> Self {
-        Self { warrior: 11, magician: 9, bowman: 11, thief: 11 }
-    }
+    /// Whether 2nd-job SP can buy 1st-job skills.
+    pub second_sp_buys_first: bool,
+    /// Whether stats from other worn gear count toward a requirement. An item's own never do.
+    pub gear_counts: bool,
 }
 
 impl Default for Rules {
     fn default() -> Self {
-        Self { ap_per_level: 5, sp_per_level: 3, manual_ap_level: 11, first_sp: FirstSp::default(), second_job_level: 30 }
+        Self {
+            ap_per_level: 5,
+            sp_per_level: 3,
+            beginner_sp_per_level: 1,
+            advancement_sp: 1,
+            first_job_level: 10,
+            second_job_level: 30,
+            second_sp_buys_first: false,
+            gear_counts: true,
+        }
     }
 }
 
 impl Rules {
-    pub fn first_sp_level(&self, branch: Branch) -> u32 {
-        match branch {
-            Branch::Warrior => self.first_sp.warrior,
-            Branch::Magician => self.first_sp.magician,
-            Branch::Bowman => self.first_sp.bowman,
-            Branch::Thief => self.first_sp.thief,
-        }
-    }
-
     /// The same rules within what a hand-edited file or a mistyped field can sensibly mean.
     pub fn clamped(self) -> Self {
         let level = |v: u32| v.clamp(2, 200);
         Self {
             ap_per_level: self.ap_per_level.min(50),
             sp_per_level: self.sp_per_level.min(50),
-            manual_ap_level: self.manual_ap_level.clamp(1, 200),
-            first_sp: FirstSp {
-                warrior: level(self.first_sp.warrior),
-                magician: level(self.first_sp.magician),
-                bowman: level(self.first_sp.bowman),
-                thief: level(self.first_sp.thief),
-            },
+            beginner_sp_per_level: self.beginner_sp_per_level.min(50),
+            advancement_sp: self.advancement_sp.min(50),
+            first_job_level: level(self.first_job_level),
             second_job_level: level(self.second_job_level),
+            ..self
         }
     }
 }
@@ -123,11 +111,11 @@ mod tests {
 
     #[test]
     fn a_saved_file_missing_new_rules_keeps_the_defaults() {
-        let rules: Rules = serde_json::from_str(r#"{"apPerLevel": 4, "firstSp": {"magician": 10}}"#).unwrap();
+        let rules: Rules = serde_json::from_str(r#"{"apPerLevel": 4, "manualApLevel": 11}"#).unwrap();
         assert_eq!(rules.ap_per_level, 4);
         assert_eq!(rules.sp_per_level, 3);
-        assert_eq!(rules.first_sp_level(Branch::Magician), 10);
-        assert_eq!(rules.first_sp_level(Branch::Thief), 11);
+        assert_eq!(rules.first_job_level, 10);
+        assert!(rules.gear_counts && !rules.second_sp_buys_first);
     }
 
     #[test]

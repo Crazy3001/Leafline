@@ -3,13 +3,16 @@
 import { backend } from "./api";
 import type { BuildRules, DisplaySettings } from "./types";
 
-/** The wiki's numbers, as in src-tauri/src/build/rules.rs. */
+/** As in src-tauri/src/build/rules.rs, in the same order. */
 export const DEFAULT_RULES: BuildRules = {
   apPerLevel: 5,
   spPerLevel: 3,
-  manualApLevel: 11,
-  firstSp: { warrior: 11, magician: 9, bowman: 11, thief: 11 },
+  beginnerSpPerLevel: 1,
+  advancementSp: 1,
+  firstJobLevel: 10,
   secondJobLevel: 30,
+  secondSpBuysFirst: false,
+  gearCounts: true,
 };
 
 export const display = $state<DisplaySettings>({

@@ -281,7 +281,7 @@ const tauriBackend: Backend = {
   exportBuild: (id) => invoke("export_build", { id }),
   importBuild: (code, character) => invoke("import_build", { code, character }),
   buildItemFit: (item, level, character) =>
-    invoke("build_item_fit", { requirements: item.requirements, jobs: item.jobs, level, character }),
+    invoke("build_item_fit", { requirements: item.requirements, jobs: item.jobs, itemType: item.itemType, level, character }),
   openGuide: (url) => invoke("open_guide", { url }),
   showBuild: () => invoke("show_build"),
   onBuilds: (handler) => listen("builds", () => handler()),

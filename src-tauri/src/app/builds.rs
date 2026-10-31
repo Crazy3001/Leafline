@@ -144,13 +144,14 @@ pub fn build_item_fit(
     state: State<UserDataState>,
     requirements: Requirements,
     jobs: Vec<ItemJob>,
+    item_type: Option<String>,
     level: Option<u32>,
     character: Option<String>,
 ) -> Result<Option<ItemFit>> {
     let Some(catalog) = app.state::<MapDataState>().catalog() else { return Ok(None) };
     let Some(build) = state.with(|db| db.active_build(character.as_deref()))? else { return Ok(None) };
     let expansion = expand(&build, &rules(&app), &catalog);
-    Ok(fit::check(&requirements, &jobs, &expansion, Branch::of_job(build.plan.job), level))
+    Ok(fit::check(&requirements, &jobs, item_type.as_deref(), &expansion, Branch::of_job(build.plan.job), level))
 }
 
 /// Opens the guide link the player typed for a build. It is theirs, so any web address will do.

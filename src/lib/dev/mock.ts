@@ -214,7 +214,7 @@ let displaySettings: DisplaySettings = {
   hotkeys: { enabled: true, keys: {} },
   travel: { enabled: false, cabs: true, vipCabs: false, scrolls: true },
   live: { enabled: false, interval: 2, pauseAfter: 15, window: null },
-  buildRules: { apPerLevel: 5, spPerLevel: 3, manualApLevel: 11, firstSp: { warrior: 11, magician: 9, bowman: 11, thief: 11 }, secondJobLevel: 30 },
+  buildRules: { apPerLevel: 5, spPerLevel: 3, beginnerSpPerLevel: 1, advancementSp: 1, firstJobLevel: 10, secondJobLevel: 30, secondSpBuysFirst: false, gearCounts: true },
 };
 
 /** A made-up job tree and equipment, in the shapes the real data has. None of it is game data. */
@@ -282,7 +282,7 @@ function mockExpand(build: Build): Expansion {
   const skills = new Map(build.start.skills.map((s) => [s.skillId, s.level]));
   const steps: LevelStep[] = [];
   for (let level = build.start.level; level <= build.plan.planTo; level++) {
-    const step: LevelStep = { level, advance: level === rules.secondJobLevel ? "2nd job: Fernblade" : null, ap: [], sp: [], gear: [], stats, apLeft: 0, spLeft: 0 };
+    const step: LevelStep = { level, advance: level === rules.secondJobLevel ? "2nd job: Fernblade" : null, ap: [], sp: [], gear: [], worn: [], stats, apLeft: 0, spLeft: 0 };
     let ap = level > build.start.level ? rules.apPerLevel : 0;
     for (const goal of build.plan.stats) {
       const amount = goal.target == null ? ap : Math.min(ap, Math.max(0, goal.target - stats[goal.stat]));
