@@ -13,7 +13,7 @@ use crate::readers::tooltip::ItemTooltip;
 use crate::readers::{hud, map, mesos, party, quest, shop, tooltip};
 use crate::vision::{Frame, Line, Ocr, group_lines};
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Analysis {
     pub width: u32,
@@ -45,13 +45,36 @@ pub struct Timing {
     pub ms: f32,
 }
 
+impl Analysis {
+    /// Just these items, for a price check with nothing else read yet.
+    pub fn of_items(width: u32, height: u32, tooltips: Vec<ItemTooltip>) -> Self {
+        Self { width, height, tooltips, party_size: 1, ..Self::default() }
+    }
+}
+
 /// The result of reading one part, or `None` with the part noted: one part failing must not cost
 /// the others.
 fn kept<T>(failed: &mut Vec<&'static str>, part: &'static str, result: Result<T>) -> Option<T> {
     result.map_err(|err| eprintln!("leafline: {part}: {err}")).inspect_err(|()| failed.push(part)).ok()
 }
 
+/// Reads everything in a saved screenshot.
 pub fn analyze(frame: &Frame, ocr: &Ocr, hud_font: &HudFont) -> Result<Analysis> {
+    read(frame, ocr, hud_font, true)
+}
+
+/// Reads a live picture. Item tooltips are left out: [`read_items`] reads those once, when the
+/// player asks.
+pub fn analyze_live(frame: &Frame, ocr: &Ocr, hud_font: &HudFont) -> Result<Analysis> {
+    read(frame, ocr, hud_font, false)
+}
+
+/// Reads only the item tooltips in `frame`.
+pub fn read_items(frame: &Frame, ocr: &Ocr) -> Result<Vec<ItemTooltip>> {
+    tooltip::read_all(frame, &overview(frame, ocr)?, ocr)
+}
+
+fn read(frame: &Frame, ocr: &Ocr, hud_font: &HudFont, items: bool) -> Result<Analysis> {
     let mut failed = Vec::new();
     let mut timings = Vec::new();
     let mut timed = |stage: &'static str, started: Instant| {
@@ -66,9 +89,12 @@ pub fn analyze(frame: &Frame, ocr: &Ocr, hud_font: &HudFont) -> Result<Analysis>
     let overview = kept(&mut failed, "text", overview(frame, ocr)).unwrap_or_default();
     timed("Overview OCR", started);
 
-    let started = Instant::now();
-    let tooltips = kept(&mut failed, "item tooltip", tooltip::read_all(frame, &overview, ocr)).unwrap_or_default();
-    timed("Tooltips", started);
+    let mut tooltips = Vec::new();
+    if items {
+        let started = Instant::now();
+        tooltips = kept(&mut failed, "item tooltip", tooltip::read_all(frame, &overview, ocr)).unwrap_or_default();
+        timed("Tooltips", started);
+    }
 
     let started = Instant::now();
     let quest = kept(&mut failed, "Quest Helper", quest::read(frame, &overview, ocr)).flatten();

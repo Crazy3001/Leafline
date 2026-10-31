@@ -283,7 +283,12 @@ fn objective(texts: &[String]) -> Option<(String, Vec<(u32, u32)>)> {
     let parsed: Vec<(Vec<(u32, u32)>, String)> = texts
         .iter()
         .filter_map(|t| OBJECTIVE.captures(trim_noise(t)))
-        .map(|caps| (counter_readings(&caps[1]), clean_target(&caps[2])))
+        .filter_map(|caps| {
+            let counts = counter_readings(&caps[1]);
+            // `B ringing a Mirror` is a title with its first letter split off, not a counter.
+            let counter = !counts.is_empty() || caps[1].contains(|c: char| c.is_ascii_digit());
+            counter.then(|| (counts, clean_target(&caps[2])))
+        })
         .collect();
     let targets: Vec<String> = parsed.iter().map(|(_, target)| target.clone()).collect();
     let target = consensus(&targets)?.clone();
@@ -303,6 +308,10 @@ fn objective(texts: &[String]) -> Option<(String, Vec<(u32, u32)>)> {
 /// the slash as `!`, `$`, `|`, `r` or `1`, or drops it, and a `0` as `Cl` or `CI`.
 fn counter_readings(counter: &str) -> Vec<(u32, u32)> {
     let counter = counter.replace("Cl", "0").replace("CI", "0");
+    const SLASHES: [char; 6] = ['/', '!', '|', '\\', '$', 'r'];
+    // Items to use up count down to a target of 0: `1 / 0 Roger's Apple`, then `0 / 0`. Only a
+    // clear slash vouches for that, since a lost digit can look the same.
+    let slashed = counter.contains(SLASHES);
     let mut readings = Vec::new();
     let mut push = |current: &str, required: &str| {
         let (current, required) = (digitize(current).replace(' ', ""), digitize(required).replace(' ', ""));
@@ -312,15 +321,14 @@ fn counter_readings(counter: &str) -> Vec<(u32, u32)> {
             return;
         }
         if let (Ok(c), Ok(r)) = (current.parse::<u32>(), required.parse::<u32>())
-            && r > 0
-            && c <= r
+            && ((r > 0 && c <= r) || (r == 0 && slashed))
             && !readings.contains(&(c, r))
         {
             readings.push((c, r));
         }
     };
 
-    if let Some((current, required)) = counter.split_once(['/', '!', '|', '\\', '$', 'r']) {
+    if let Some((current, required)) = counter.split_once(SLASHES) {
         push(current, required);
         return readings;
     }
@@ -525,6 +533,21 @@ mod tests {
     }
 
     #[test]
+    fn a_title_starting_like_a_digit_stays_a_title() {
+        let plain = vec![line("Bringing a Mirror to Heena", 50.0), line("1 $1 Sera's Mirror", 82.0)];
+        let split = vec![line("B ringing a Mirror to Heena", 50.0)];
+        assert_eq!(
+            parse(&[plain, split], 30.0, 32.0),
+            [Quest {
+                title: "Bringing a Mirror to Heena".into(),
+                objectives: vec![objective("Sera's Mirror", 1, 1)]
+            }]
+        );
+        // A counter OCR read past its target is still a counter, for the shapes to settle.
+        assert_eq!(parse(&[vec![line("31 / 30 Evil Eye", 50.0)]], 30.0, 32.0), [Quest::default(); 0]);
+    }
+
+    #[test]
     fn counters() {
         assert_eq!(counter_readings("0 / 30"), [(0, 30)]);
         assert_eq!(counter_readings("O ! 30"), [(0, 30)]);
@@ -537,6 +560,21 @@ mod tests {
         assert_eq!(counter_readings("0130"), [(0, 30)]);
         assert_eq!(counter_readings("12150"), [(12, 50)]);
         assert!(counter_readings("31 / 30").is_empty());
+    }
+
+    #[test]
+    fn a_counter_can_count_down_to_zero() {
+        assert_eq!(counter_readings("1 / 0"), [(1, 0)]);
+        assert_eq!(counter_readings("0 / 0"), [(0, 0)]);
+        assert_eq!(counter_readings("O ! O"), [(0, 0)]);
+        // Without a slash, `1 0` may be a counter that lost one.
+        assert!(!counter_readings("1 0").contains(&(1, 0)));
+
+        let rows = [line("Roger's Apple", 50.0), line("O / O Roger's Apple", 82.0)];
+        assert_eq!(
+            parse(&[rows.to_vec()], 30.0, 32.0),
+            [Quest { title: "Roger's Apple".into(), objectives: vec![objective("Roger's Apple", 0, 0)] }]
+        );
     }
 
     #[test]

@@ -1,5 +1,13 @@
 const grouped = new Intl.NumberFormat("en-US");
 
+/**
+ * How far along a quest objective is, from 0 to 1. Items to use up count down to a target of 0
+ * (`1 / 0 Roger's Apple`, then `0 / 0`), so those are done at 0.
+ */
+export function objectiveProgress({ current, required }: { current: number; required: number }): number {
+  return required === 0 ? Number(current === 0) : Math.min(1, current / required);
+}
+
 export function formatNumber(value: number | null | undefined): string {
   return value == null ? "—" : grouped.format(value);
 }

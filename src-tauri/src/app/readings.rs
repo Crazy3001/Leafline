@@ -7,6 +7,7 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::pipeline::Analysis;
+use crate::readers::tooltip::ItemTooltip;
 use crate::session::SessionSummary;
 
 /// Emitted to every window with each new analysis.
@@ -30,6 +31,31 @@ pub struct Current {
 pub fn publish_analysis(app: &AppHandle, analysis: &Analysis) {
     *app.state::<Readings>().analysis.lock().expect("readings lock") = Some(analysis.clone());
     let _ = app.emit(ANALYSIS_EVENT, analysis);
+}
+
+/// Shares a live analysis. Those read no items, so the last item read stays on show.
+pub fn publish_live_analysis(app: &AppHandle, mut analysis: Analysis) {
+    let state = app.state::<Readings>();
+    let mut current = state.analysis.lock().expect("readings lock");
+    if let Some(previous) = current.as_mut() {
+        analysis.tooltips = std::mem::take(&mut previous.tooltips);
+    }
+    let _ = app.emit(ANALYSIS_EVENT, &analysis);
+    *current = Some(analysis);
+}
+
+/// Shows the items a price check read, in place of the ones before.
+pub fn publish_items(app: &AppHandle, width: u32, height: u32, items: Vec<ItemTooltip>) {
+    let state = app.state::<Readings>();
+    let mut current = state.analysis.lock().expect("readings lock");
+    let analysis = match current.as_mut() {
+        Some(analysis) => {
+            analysis.tooltips = items;
+            analysis
+        }
+        None => current.insert(Analysis::of_items(width, height, items)),
+    };
+    let _ = app.emit(ANALYSIS_EVENT, &*analysis);
 }
 
 /// The latest analysis, if any.

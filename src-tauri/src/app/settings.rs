@@ -172,7 +172,7 @@ pub fn update_settings(app: AppHandle, state: State<SettingsState>, settings: Se
             overlay::rescale(&app, settings.scale / old.scale)?;
         }
         for window in pins::windows(&app) {
-            window.set_zoom(settings.scale)?;
+            pins::zoom(&window, settings.scale)?;
         }
     }
     if old.always_on_top != settings.always_on_top {

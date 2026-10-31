@@ -21,13 +21,11 @@
     details: MapDetails;
     /** The map the player is on, when known. */
     current?: MapRef | null;
-    variant?: "full" | "compact" | "pin";
+    variant?: "full" | "compact";
     onnavigate: (id: number) => void;
   } = $props();
 
   const compact = $derived(variant !== "full");
-  /** A pinned window keeps to the essentials: where you can go and what lives here. */
-  const pin = $derived(variant === "pin");
   /** The player's map, while they look at another. */
   const away = $derived(current && current.id !== details.map.id ? current : null);
   const placed = $derived(details.exits.some((e) => e.side));
@@ -99,7 +97,13 @@
   </Section>
 {/if}
 
-{#if details.quests.length && !pin}
+{#if monsterNames.length}
+  <Section title="Drops">
+    <MapDrops monsters={monsterNames} />
+  </Section>
+{/if}
+
+{#if details.quests.length}
   <Section title="Quests hunting here" count={details.quests.length} open={!compact && details.quests.length <= 4}>
     <ul class="quests">
       {#each details.quests as need (need.quest.id)}
@@ -118,7 +122,7 @@
   </Section>
 {/if}
 
-{#if details.npcs.length && !pin}
+{#if details.npcs.length}
   <Section title="NPCs" count={details.npcs.length} open={!compact}>
     <ul class="npcs">
       {#each details.npcs as npc (npc.id)}
@@ -135,25 +139,19 @@
   </Section>
 {/if}
 
-{#if !pin && !away}
+{#if !away}
   <Section title="Route" open={!compact}>
     <RoutePlanner from={details.map} region={details.region} {onnavigate} />
   </Section>
 {/if}
 
-{#if monsterNames.length && !pin}
-  <Section title="Drops" open={false}>
-    <MapDrops monsters={monsterNames} />
-  </Section>
-{/if}
-
-{#if !pin}<div class="links">
+<div class="links">
   {#each details.links as link}
     <button class="out" onclick={() => backend.openLink(link.url)} title={link.url}>
       {link.label}<ExternalLink size={11} />
     </button>
   {/each}
-</div>{/if}
+</div>
 <button class="credit" onclick={() => backend.openLink(OSMS_URL)}>{OSMS_CREDIT}</button>
 
 <style>

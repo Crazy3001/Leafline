@@ -1,16 +1,21 @@
 <script lang="ts">
   // The player's own price records for the hovered item, and a form to add one. There is no
-  // market data: every number here is something the player logged.
-  import { Plus, X } from "@lucide/svelte";
+  // market data: every number here is something the player logged. Market sites only open in
+  // the browser. Their terms bar reading their prices into an app without written permission.
+  import { ExternalLink, Plus, X } from "@lucide/svelte";
   import { untrack } from "svelte";
 
   import { backend } from "$lib/api";
   import { formatDay, formatMesos, formatNumber, parsePrice } from "$lib/format";
   import type { ItemTooltip, PriceKind, PriceLog, PriceStats } from "$lib/types";
 
-  let { item, compact = false }: { item: ItemTooltip; compact?: boolean } = $props();
+  let { item }: { item: ItemTooltip } = $props();
 
   const SHOWN = 3;
+  const MARKETS = [
+    { label: "MeowDB", url: "https://meowdb.com/msclassic/price-check" },
+    { label: "meso.watch", url: "https://meso.watch" },
+  ];
 
   let log = $state<PriceLog | null>(null);
   let adding = $state(false);
@@ -25,7 +30,10 @@
   const key = $derived(`${item.name}|${item.upgrades}|${item.remainingEnhancements}`);
   const stats = $derived(item.stats.map((s) => `${s.label} ${s.value >= 0 ? "+" : ""}${s.value}`).join(", "));
   const variant = $derived(
-    [(item.upgrades ?? 0) > 0 ? `+${item.upgrades}` : "no upgrades", slotsText(item.remainingEnhancements)]
+    [
+      (item.upgrades ?? 0) > 0 ? `+${item.upgrades}` : item.plain ? null : "no upgrades",
+      slotsText(item.remainingEnhancements),
+    ]
       .filter(Boolean)
       .join(", "),
   );
@@ -50,6 +58,16 @@
   $effect(() => {
     if (adding) input?.focus();
   });
+
+  /** Opens a market site with the item's name ready to paste into its search. */
+  async function openMarket(url: string) {
+    try {
+      await navigator.clipboard.writeText(item.name);
+    } catch {
+      // The site still opens; the name can be typed in.
+    }
+    await backend.openLink(url);
+  }
 
   function slotsText(slots: number | null) {
     return slots == null ? "" : `${slots} slot${slots === 1 ? "" : "s"} left`;
@@ -112,7 +130,7 @@
 <div class="price">
   <div class="head">
     <span class="eyebrow">Your prices</span>
-    {#if item.name && !adding && !compact}
+    {#if item.name && !adding}
       <button class="add" onclick={open}><Plus size={12} /> Log a price</button>
     {/if}
   </div>
@@ -140,28 +158,38 @@
       <p class="like muted">None logged with {variant}.</p>
     {/if}
 
-    {#if !compact}
-      <ul class="history">
-        {#each all ? log.entries : log.entries.slice(0, SHOWN) as entry (entry.id)}
-          <li>
-            <span class="day tabular">{formatDay(entry.recordedAt)}</span>
-            <span class="amount tabular">{formatNumber(entry.price)}</span>
-            <span class="kind" class:asking={entry.kind === "asking"}>{entry.kind === "traded" ? "traded" : "asking"}</span>
-            <span class="what" title={[entry.stats, entry.note].filter(Boolean).join(" · ")}>
-              {[(entry.upgrades ?? 0) > 0 ? `+${entry.upgrades}` : null, slotsText(entry.slots), entry.note].filter(Boolean).join(" · ")}
-            </span>
-            <button class="remove" title="Delete this record" aria-label="Delete this record" onclick={() => remove(entry.id)}
-              ><X size={11} /></button
-            >
-          </li>
-        {/each}
-      </ul>
-      {#if log.entries.length > SHOWN}
-        <button class="link" onclick={() => (all = !all)}>{all ? "Show fewer" : `Show all ${log.entries.length}`}</button>
-      {/if}
+    <ul class="history">
+      {#each all ? log.entries : log.entries.slice(0, SHOWN) as entry (entry.id)}
+        <li>
+          <span class="day tabular">{formatDay(entry.recordedAt)}</span>
+          <span class="amount tabular">{formatNumber(entry.price)}</span>
+          <span class="kind" class:asking={entry.kind === "asking"}>{entry.kind === "traded" ? "traded" : "asking"}</span>
+          <span class="what" title={[entry.stats, entry.note].filter(Boolean).join(" · ")}>
+            {[(entry.upgrades ?? 0) > 0 ? `+${entry.upgrades}` : null, slotsText(entry.slots), entry.note].filter(Boolean).join(" · ")}
+          </span>
+          <button class="remove" title="Delete this record" aria-label="Delete this record" onclick={() => remove(entry.id)}
+            ><X size={11} /></button
+          >
+        </li>
+      {/each}
+    </ul>
+    {#if log.entries.length > SHOWN}
+      <button class="link" onclick={() => (all = !all)}>{all ? "Show fewer" : `Show all ${log.entries.length}`}</button>
     {/if}
   {:else if log}
     <p class="muted">No prices logged for this item yet.</p>
+  {/if}
+
+  {#if item.name}
+    <div class="markets">
+      <span class="muted">Market prices</span>
+      {#each MARKETS as market (market.label)}
+        <button
+          title="Opens {market.label} in your browser and copies the item's name, ready to paste"
+          onclick={() => openMarket(market.url)}>{market.label}<ExternalLink size={11} /></button
+        >
+      {/each}
+    </div>
   {/if}
 
   {#if adding}
@@ -235,6 +263,33 @@
     display: flex;
     align-items: baseline;
     gap: 6px;
+  }
+
+  .markets {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .markets button {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 22px;
+    padding: 0 7px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--muted);
+    font-size: 11px;
+    cursor: pointer;
+  }
+
+  .markets button:hover {
+    border-color: var(--border-strong);
+    color: var(--text);
   }
 
   .median {

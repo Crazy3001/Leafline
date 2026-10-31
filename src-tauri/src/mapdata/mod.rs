@@ -18,7 +18,7 @@ pub mod travel;
 pub use atlas::{Atlas, MapCard, MapMatch, MapRef, Route};
 pub use drops::{ItemSources, MonsterDrops};
 pub use fetch::RefreshReport;
-pub use guide::{QuestGuide, QuestQuery};
+pub use guide::{QuestGuide, QuestQuery, QuestTitles};
 pub use store::{DataStatus, Store};
 pub use training::{MeasuredRate, TrainingSpot};
 pub use travel::{Travel, TravelChoice, TravelFile};

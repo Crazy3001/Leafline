@@ -2,6 +2,8 @@
 //! and session tracker as the workbench's replays. It stays off until the player turns it on in
 //! Settings, and only ever looks at the window; see [`crate::capture`]. Each session saves itself
 //! as it goes, so a crash or a closed window costs half a minute of it at most.
+//!
+//! Item tooltips are not part of this. A price check is one picture on the player's hotkey.
 
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -13,14 +15,17 @@ use tauri::{AppHandle, Emitter, Manager};
 
 use super::calibration::HudFontState;
 use super::mapdata::MapDataState;
-use super::readings;
 use super::records::{self, HISTORY_EVENT, UserDataState};
 use super::replay;
 use super::report;
 use super::settings::{self, SettingsState};
+use super::{overlay, pins, readings};
 use crate::capture::{self, Capturer, GameWindow, Grab};
 use crate::error::{Error, Result};
+use crate::mapdata::QuestTitles;
 use crate::pipeline;
+use crate::readers::npc;
+use crate::readers::tooltip::ItemTooltip;
 use crate::session::{Sample, SessionSummary, SessionTracker, TrackerConfig};
 use crate::vision::{Frame, Ocr};
 
@@ -28,9 +33,16 @@ use crate::vision::{Frame, Ocr};
 pub const LIVE_EVENT: &str = "live";
 /// Emitted with the path when a live picture is saved.
 pub const FRAME_SAVED_EVENT: &str = "frame-saved";
+/// Emitted to every window when a price check ends.
+pub const ITEM_READ_EVENT: &str = "item-read";
 
 /// How long a grab waits for the game to draw a fresh picture.
 const FRESH_FRAME_WAIT: Duration = Duration::from_millis(300);
+/// The least time between two pictures of the game, live or for a price check.
+const MIN_PICTURE_GAP: Duration = Duration::from_secs(1);
+/// How long a save takes the price check's picture over the last live one, so a tooltip that
+/// read badly can be kept: live pictures come seconds apart and rarely catch one.
+const ITEM_PICTURE_KEPT: Duration = Duration::from_secs(15);
 /// How often HDR is checked again, in readings, in case the game moves to another display.
 const HDR_CHECK_EVERY: u64 = 30;
 /// Active seconds before a session is worth keeping, and how often it is saved from then on.
@@ -65,10 +77,26 @@ pub enum LiveStatus {
     Failed { message: String },
 }
 
+/// How a price check went.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ItemRead {
+    /// Item tooltips found, the compared item included.
+    found: usize,
+    /// Why no picture could be read.
+    problem: Option<String>,
+}
+
 #[derive(Default)]
 pub struct LiveState {
     running: AtomicBool,
     stop: AtomicBool,
+    /// A price check is under way.
+    reading_item: AtomicBool,
+    /// The last price check's picture, and when it was taken.
+    item_picture: Mutex<Option<(Instant, Arc<Frame>)>>,
+    /// When the last picture was taken, for [`MIN_PICTURE_GAP`].
+    last_picture: Mutex<Option<Instant>>,
     /// Tracking is paused by hand; pictures are still read.
     held: AtomicBool,
     /// A new session was asked for.
@@ -129,6 +157,64 @@ pub fn toggle(app: &AppHandle) -> Result<()> {
 
 pub fn status(app: &AppHandle) -> LiveStatus {
     app.state::<LiveState>().status.lock().expect("live lock").clone()
+}
+
+/// The hotkey: reads the hovered item from one picture of the game, whether live reading is
+/// running or not. The Settings switch covers this too, so it opens Settings while that is off.
+pub fn read_item(app: &AppHandle) -> Result<()> {
+    if !app.state::<SettingsState>().get().live.enabled {
+        return settings::open(app);
+    }
+    if app.state::<LiveState>().reading_item.swap(true, Ordering::SeqCst) {
+        return Ok(());
+    }
+    let handle = app.clone();
+    std::thread::Builder::new().name("item-read".into()).spawn(move || {
+        let read = read_item_once(&handle);
+        handle.state::<LiveState>().reading_item.store(false, Ordering::SeqCst);
+        let outcome = match read {
+            Ok((width, height, items)) => {
+                let found = items.len();
+                readings::publish_items(&handle, width, height, items);
+                ItemRead { found, problem: None }
+            }
+            Err(err) => {
+                report::note(format!("Couldn't read the item: {err}"));
+                ItemRead { found: 0, problem: Some(err.to_string()) }
+            }
+        };
+        // A pinned Item panel shows the result itself; otherwise the overlay has to.
+        if !pins::shows_item(&handle)
+            && let Err(err) = overlay::show_full(&handle)
+        {
+            report::note(err.to_string());
+        }
+        let _ = handle.emit(ITEM_READ_EVENT, &outcome);
+    })?;
+    Ok(())
+}
+
+fn read_item_once(app: &AppHandle) -> Result<(u32, u32, Vec<ItemTooltip>)> {
+    let choice = app.state::<SettingsState>().get().live;
+    let window = capture::find(choice.window.as_ref())?
+        .ok_or_else(|| Error::Invalid("Leafline can't find the game window. Pick it in Settings.".into()))?;
+    let state = app.state::<LiveState>();
+    wait_for_picture(&state);
+    let frame = Arc::new(capture::picture(&window)?);
+    *state.item_picture.lock().expect("live lock") = Some((Instant::now(), frame.clone()));
+    let items = pipeline::read_items(&frame, &Ocr::new()?)?;
+    Ok((frame.width(), frame.height(), items))
+}
+
+/// Holds a new picture back until [`MIN_PICTURE_GAP`] has passed, and claims this moment for it.
+fn wait_for_picture(state: &LiveState) {
+    let mut last = state.last_picture.lock().expect("live lock");
+    std::thread::sleep(gap_left(*last, Instant::now()));
+    *last = Some(Instant::now());
+}
+
+fn gap_left(last: Option<Instant>, now: Instant) -> Duration {
+    last.map_or(Duration::ZERO, |at| MIN_PICTURE_GAP.saturating_sub(now.saturating_duration_since(at)))
 }
 
 /// Pauses or resumes tracking. Paused time doesn't count.
@@ -203,9 +289,13 @@ impl Keeper {
     }
 }
 
-/// Saves the last picture read as a PNG in Pictures\Leafline, for the workbench or a bug report.
+/// Saves the last picture read as a PNG in Pictures\Leafline, for the workbench or a bug report:
+/// a price check's for a moment after it, or else the last live one.
 pub fn save_frame(app: &AppHandle) -> Result<PathBuf> {
-    let frame = app.state::<LiveState>().frame.lock().expect("live lock").clone();
+    let state = app.state::<LiveState>();
+    let item = state.item_picture.lock().expect("live lock").clone();
+    let item = item.filter(|(at, _)| at.elapsed() < ITEM_PICTURE_KEPT).map(|(_, frame)| frame);
+    let frame = item.or_else(|| state.frame.lock().expect("live lock").clone());
     let frame = frame.ok_or_else(|| Error::Invalid("There is no live picture yet.".into()))?;
     let folder = app.path().picture_dir()?.join("Leafline");
     std::fs::create_dir_all(&folder)?;
@@ -223,6 +313,8 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
         |idle_after| SessionTracker::new(TrackerConfig { confirmations: 2, idle_after, ..TrackerConfig::default() });
     let mut tracker = fresh_tracker(app.state::<SettingsState>().get().live.pause_after);
     let mut keeper = Keeper::default();
+    let mut titles = QuestTitles::default();
+    let mut twin = None;
     let mut held = false;
     let mut game: Option<(Capturer, GameWindow, bool)> = None;
     let mut frames = 0u64;
@@ -290,6 +382,7 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
         }
         let (capturer, window, hdr) = game.as_mut().expect("game window found above");
 
+        wait_for_picture(&state);
         let grabbed = match capturer.grab(FRESH_FRAME_WAIT) {
             Ok(grabbed) => grabbed,
             Err(err) => {
@@ -304,7 +397,7 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
             Grab::Frame(frame) => {
                 let font = app.state::<HudFontState>().current();
                 let started = Instant::now();
-                let mut analysis = match pipeline::analyze(&frame, &ocr, &font) {
+                let mut analysis = match pipeline::analyze_live(&frame, &ocr, &font) {
                     Ok(analysis) => analysis,
                     Err(err) => {
                         report::note(format!("Couldn't read a picture: {err}"));
@@ -318,11 +411,29 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
                 let mut town = false;
                 if let Some(map) = analysis.map.as_mut()
                     && let Some(atlas) = app.state::<MapDataState>().atlas()
-                    && let Some(known) = atlas.settled(&map.name, map.street.as_deref())
                 {
-                    town = atlas.is_town(known.id);
-                    map.name = known.name;
-                    map.street = known.street;
+                    let street = map.street.as_deref();
+                    let tags = if atlas.has_twin(&map.name, street) {
+                        npc::names(&frame, &ocr).unwrap_or_else(|err| {
+                            report::note(format!("Couldn't read the NPC names: {err}"));
+                            Vec::new()
+                        })
+                    } else {
+                        Vec::new()
+                    };
+                    let seen: Vec<&str> = tags.iter().map(String::as_str).collect();
+                    twin = atlas.twin(&map.name, street, &seen, twin);
+                    map.twin = twin;
+                    if let Some(known) = atlas.settled(&map.name, map.street.as_deref()) {
+                        town = atlas.is_town(known.id);
+                        map.name = known.name;
+                        map.street = known.street;
+                    }
+                }
+                if let Some(quest) = analysis.quest.as_mut()
+                    && let Some(atlas) = app.state::<MapDataState>().atlas()
+                {
+                    titles.settle(&atlas, &mut quest.quests);
                 }
                 let read_ms = started.elapsed().as_secs_f32() * 1000.0;
                 let mut sample = Sample::from_analysis(unix_seconds(SystemTime::now()), &analysis);
@@ -336,7 +447,7 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
                     tracker.push(&sample);
                 }
                 let session = tracker.summary();
-                readings::publish_analysis(app, &analysis);
+                readings::publish_live_analysis(app, analysis);
                 readings::publish_session(app, &session);
                 if keeper.due() {
                     keeper.save(app, &session);
@@ -463,9 +574,18 @@ pub fn save_live_frame(app: AppHandle) -> Result<PathBuf> {
 
 #[cfg(test)]
 mod tests {
-    use std::time::{Duration, UNIX_EPOCH};
+    use std::time::{Duration, Instant, UNIX_EPOCH};
 
-    use super::file_stamp;
+    use super::{MIN_PICTURE_GAP, file_stamp, gap_left};
+
+    #[test]
+    fn pictures_stay_a_second_apart() {
+        let now = Instant::now();
+        assert_eq!(gap_left(None, now), Duration::ZERO, "the first picture needn't wait");
+        assert_eq!(gap_left(Some(now), now), MIN_PICTURE_GAP);
+        assert_eq!(gap_left(Some(now), now + Duration::from_millis(400)), Duration::from_millis(600));
+        assert_eq!(gap_left(Some(now), now + Duration::from_secs(5)), Duration::ZERO);
+    }
 
     #[test]
     fn stamps_files_in_utc() {

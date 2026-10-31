@@ -1,13 +1,15 @@
 //! Runs the analysis pipeline on saved screenshots and prints the readings as JSON.
 //!
-//! `cargo run --example analyze -- <image or folder> [--overview] [--font hud-font.json]`
+//! `cargo run --example analyze -- <image or folder> [--overview] [--font hud-font.json] [--npcs]`
 //!
 //! `--font` loads a HUD font saved by the app's calibration; without it HUD numbers are not read.
+//! `--npcs` prints only the NPC name tags, which live reading reads on maps sharing a header.
 
 use std::path::{Path, PathBuf};
 
 use leafline_lib::pipeline;
 use leafline_lib::readers::hud::HudFont;
+use leafline_lib::readers::npc;
 use leafline_lib::vision::{self, Ocr};
 
 fn main() {
@@ -24,6 +26,10 @@ fn main() {
 
     for path in images(&target) {
         let frame = vision::load(&path).expect("load image");
+        if args.iter().any(|a| a == "--npcs") {
+            println!("# {}\n{:?}", path.display(), npc::names(&frame, &ocr).expect("read name tags"));
+            continue;
+        }
         let mut analysis = pipeline::analyze(&frame, &ocr, &font).expect("analyze");
         if !show_overview {
             analysis.overview.clear();

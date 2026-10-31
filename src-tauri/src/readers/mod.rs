@@ -4,6 +4,7 @@
 pub mod hud;
 pub mod map;
 pub mod mesos;
+pub mod npc;
 pub mod party;
 pub mod quest;
 pub mod shop;

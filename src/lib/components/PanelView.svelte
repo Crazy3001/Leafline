@@ -1,12 +1,12 @@
 <script lang="ts">
-  // What one panel shows: as a tab of the overlay, or slimmed down in its own pinned window.
+  // What one panel shows, the same as a tab of the overlay or pinned into its own window. A
+  // pinned window names the panel itself, so single cards drop their frame there.
   import CharacterCard from "./CharacterCard.svelte";
   import HistoryCard from "./HistoryCard.svelte";
   import ItemCard from "./ItemCard.svelte";
   import MapCard from "./MapCard.svelte";
   import QuestCard from "./QuestCard.svelte";
   import SessionCard from "./SessionCard.svelte";
-  import StatsStrip from "./StatsStrip.svelte";
   import TimersCard from "./TimersCard.svelte";
   import TrainCard from "./TrainCard.svelte";
   import type { Analysis, Panel, SessionSummary } from "$lib/types";
@@ -24,17 +24,13 @@
 {/snippet}
 
 {#if panel === "stats"}
-  {#if pinned}
-    <StatsStrip hud={analysis?.hud ?? null} {session} />
-  {:else}
-    <CharacterCard hud={analysis?.hud ?? null} mesos={analysis?.mesos ?? null} {session} />
-    {#if session}<SessionCard {session} compact />{/if}
-    <HistoryCard />
-    <TimersCard />
-  {/if}
+  <CharacterCard hud={analysis?.hud ?? null} mesos={analysis?.mesos ?? null} {session} />
+  {#if session}<SessionCard {session} compact />{/if}
+  <HistoryCard />
+  <TimersCard />
 {:else if panel === "map"}
   {#if analysis?.map}
-    <MapCard map={analysis.map} {session} variant={pinned ? "pin" : "compact"} />
+    <MapCard map={analysis.map} {session} variant="compact" plain={pinned} />
   {:else}
     {@render empty("The minimap isn't in view. Its map's details show here when it is.")}
   {/if}
@@ -50,7 +46,7 @@
   {#each analysis?.tooltips ?? [] as item, i}
     <ItemCard {item} title={i === 0 ? "Item" : "Compared item"} plain={pinned && i === 0} />
   {:else}
-    {@render empty("Hover an item in game to see its stats and whether it has been scrolled.")}
+    {@render empty("Hover a piece of equipment in game and press Ctrl+Alt+I to see its stats and whether it has been scrolled.")}
   {/each}
 {/if}
 

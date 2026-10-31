@@ -2,7 +2,7 @@
 //! another of these windows, a window jumps to it. Holding Shift places it freely. Only Leafline's
 //! own windows are involved.
 
-use tauri::WebviewWindow;
+use tauri::{WebviewWindow, Window};
 
 use crate::error::Result;
 
@@ -70,12 +70,18 @@ pub fn attach(window: &WebviewWindow) -> Result<()> {
     platform::attach(window)
 }
 
+/// Whether the player is resizing `window` by dragging an edge, as opposed to code resizing it.
+pub fn sizing(window: &Window) -> bool {
+    platform::sizing(window)
+}
+
 #[cfg(windows)]
 mod platform {
     use std::ffi::c_void;
     use std::sync::Mutex;
+    use std::sync::atomic::{AtomicIsize, Ordering};
 
-    use tauri::WebviewWindow;
+    use tauri::{WebviewWindow, Window};
     use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, RECT, WPARAM};
     use windows::Win32::Graphics::Gdi::{GetMonitorInfoW, MONITOR_DEFAULTTONEAREST, MONITORINFO, MonitorFromRect};
     use windows::Win32::UI::HiDpi::GetDpiForWindow;
@@ -83,6 +89,7 @@ mod platform {
     use windows::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass};
     use windows::Win32::UI::WindowsAndMessaging::{
         GetCursorPos, GetWindowRect, IsWindowVisible, WM_ENTERSIZEMOVE, WM_EXITSIZEMOVE, WM_MOVING, WM_NCDESTROY,
+        WM_SIZING,
     };
 
     use super::{Edges, GAP, REACH, dragged, offset};
@@ -94,6 +101,13 @@ mod platform {
     static WINDOWS: Mutex<Vec<isize>> = Mutex::new(Vec::new());
     /// Where the cursor holds the window being dragged, from its top left.
     static GRAB: Mutex<Option<(i32, i32)>> = Mutex::new(None);
+    /// The window being resized by hand, or 0. Windows sends `WM_SIZING` only for a drag, never
+    /// for a size set from code.
+    static SIZING: AtomicIsize = AtomicIsize::new(0);
+
+    pub fn sizing(window: &Window) -> bool {
+        window.hwnd().is_ok_and(|hwnd| hwnd.0 as isize == SIZING.load(Ordering::Relaxed))
+    }
 
     pub fn attach(window: &WebviewWindow) -> Result<()> {
         let hwnd = window.hwnd()?.0 as isize;
@@ -173,7 +187,11 @@ mod platform {
         unsafe {
             match message {
                 WM_ENTERSIZEMOVE => hold(hwnd),
-                WM_EXITSIZEMOVE => *GRAB.lock().expect("snap lock") = None,
+                WM_EXITSIZEMOVE => {
+                    *GRAB.lock().expect("snap lock") = None;
+                    SIZING.store(0, Ordering::Relaxed);
+                }
+                WM_SIZING => SIZING.store(hwnd.0 as isize, Ordering::Relaxed),
                 WM_MOVING => {
                     // The high bit says the key is down.
                     place(hwnd, &mut *(lparam.0 as *mut RECT), GetKeyState(i32::from(VK_SHIFT.0)) >= 0);
@@ -192,12 +210,16 @@ mod platform {
 
 #[cfg(not(windows))]
 mod platform {
-    use tauri::WebviewWindow;
+    use tauri::{WebviewWindow, Window};
 
     use crate::error::Result;
 
     pub fn attach(_window: &WebviewWindow) -> Result<()> {
         Ok(())
+    }
+
+    pub fn sizing(_window: &Window) -> bool {
+        false
     }
 }
 

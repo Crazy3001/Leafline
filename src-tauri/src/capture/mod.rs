@@ -15,12 +15,16 @@ mod unsupported;
 #[cfg(not(windows))]
 use self::unsupported as platform;
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::vision::Frame;
+
+/// How long a single picture may take to arrive, and how long each try waits.
+const SINGLE_PICTURE_WAIT: Duration = Duration::from_secs(2);
+const SINGLE_PICTURE_TRY: Duration = Duration::from_millis(300);
 
 /// A top-level window that could be the game.
 #[derive(Debug, Clone, Serialize)]
@@ -98,6 +102,23 @@ pub enum Grab {
     Nothing,
     /// The window was closed.
     Closed,
+}
+
+/// One picture of `window`, with the capture closed again afterwards.
+pub fn picture(window: &GameWindow) -> Result<Frame> {
+    let mut capturer = Capturer::new(window)?;
+    let deadline = Instant::now() + SINGLE_PICTURE_WAIT;
+    loop {
+        match capturer.grab(SINGLE_PICTURE_TRY)? {
+            Grab::Frame(frame) => return Ok(frame),
+            Grab::Minimized => return Err(Error::Invalid("The game is minimised.".into())),
+            Grab::Closed => return Err(Error::Invalid("The game window closed.".into())),
+            Grab::Unchanged | Grab::Nothing if Instant::now() < deadline => {}
+            Grab::Unchanged | Grab::Nothing => {
+                return Err(Error::Invalid("The game window hasn't drawn a picture yet.".into()));
+            }
+        }
+    }
 }
 
 /// A capture of one window, kept open between pictures.

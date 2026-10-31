@@ -37,7 +37,7 @@
     {#if tab === "readings"}
       <CharacterCard hud={analysis.hud} mesos={analysis.mesos} {session} />
       {#if analysis.hud}
-        {#if analysis.hud.needsCalibration || teaching}
+        {#if analysis.hud.needsCalibration || analysis.hud.levelUnread || teaching}
           <HudCalibration hud={analysis.hud} {calibrate} />
         {:else}
           <button class="link" onclick={() => (teaching = true)}>Teach the HUD again from this screenshot</button>

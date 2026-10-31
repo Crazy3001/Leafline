@@ -58,6 +58,8 @@
 
   {#if hud?.needsCalibration}
     <p class="calibrate">Teach Leafline your HUD in the workbench to read HP, MP and EXP.</p>
+  {:else if hud?.levelUnread}
+    <p class="calibrate">New level digit: your level is worked out from EXP until you teach it in the workbench.</p>
   {/if}
 
   <dl class="rates" class:live={session != null}>

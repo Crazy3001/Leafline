@@ -32,9 +32,12 @@ pub struct HudReading {
     /// The EXP percentage, when the HUD shows it with no points beside it, as it does at high
     /// levels.
     pub exp_percent: Option<f32>,
-    /// The numbers could not all be read because the HUD font has not been learned at this
-    /// size, or shows a character not seen yet. Calibrating fixes it.
+    /// The gauges could not all be read because the HUD font has not been learned at this size,
+    /// or shows a character not seen yet. Calibrating fixes it.
     pub needs_calibration: bool,
+    /// The level shows a digit not learned yet, which a new level often does. The session
+    /// tracker follows the level from the EXP meanwhile, so nothing is lost.
+    pub level_unread: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
@@ -132,10 +135,9 @@ pub fn read(frame: &Frame, ocr: &Ocr, font: &HudFont) -> Result<Option<(HudLayou
         reading.exp_percent = font.values.read(&glyphs.percent).and_then(|t| parse_percent(&t));
     }
     reading.level = font.level.read(&glyphs.level).and_then(|t| parse_level(&t));
-    reading.needs_calibration = reading.hp.is_none()
-        || reading.mp.is_none()
-        || (reading.exp.is_none() && reading.exp_percent.is_none())
-        || (!glyphs.level.is_empty() && reading.level.is_none());
+    reading.needs_calibration =
+        reading.hp.is_none() || reading.mp.is_none() || (reading.exp.is_none() && reading.exp_percent.is_none());
+    reading.level_unread = !glyphs.level.is_empty() && reading.level.is_none();
 
     // Job and name use a plainer font that OCR handles once enlarged and keyed.
     const IDENTITY_SCALE: f32 = 3.0;
@@ -302,12 +304,13 @@ pub fn locate(frame: &Frame) -> Option<HudLayout> {
             })
             .collect::<Vec<_>>()
     };
-    // Short fills are fine when the gauges stand exactly the UI's spacing apart. The red and blue
-    // menu buttons can do that by chance, but they are to the right of the gauges. At a size not
-    // known, only long fills are trusted.
+    // Short fills are fine when the gauges stand exactly where and as far apart as the UI puts
+    // them. The red and blue menu buttons can too, but they are to the right of the gauges. At a
+    // size not known, only long fills are trusted.
     let long = |bar: &Rect| bar.w >= 3.0 * bar.h && bar.w >= width * 0.02;
-    let leftmost =
-        gauges(&|r, b| ui::fits_gauge_pitch(frame, b.x - r.x)).into_iter().min_by(|a, b| a.0.x.total_cmp(&b.0.x));
+    let leftmost = gauges(&|r, b| ui::fits_gauges(frame, b.x - r.x, r.bottom()))
+        .into_iter()
+        .min_by(|a, b| a.0.x.total_cmp(&b.0.x));
     let thickest = || gauges(&|r, b| long(r) && long(b)).into_iter().max_by(|a, b| score(a).total_cmp(&score(b)));
     let (hp_bar, mp_bar, exp_bar) = leftmost.or_else(thickest)?;
 
@@ -496,6 +499,42 @@ pub fn parse_level(text: &str) -> Option<u32> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const RED: [u8; 3] = [220, 40, 40];
+    const BLUE: [u8; 3] = [40, 60, 220];
+    const YELLOW: [u8; 3] = [220, 220, 40];
+
+    /// A made-up 1440p picture with these (x, y, width, colour) bars on it, each 14 tall.
+    fn picture(bars: &[(u32, u32, u32, [u8; 3])]) -> Frame {
+        Frame::from_fn(2560, 1440, |x, y| {
+            let bar = bars.iter().find(|b| (b.0..b.0 + b.2).contains(&x) && (b.1..b.1 + 14).contains(&y));
+            let [r, g, b] = bar.map_or([10, 10, 10], |b| b.3);
+            Rgba([r, g, b, 255])
+        })
+    }
+
+    #[test]
+    fn scenery_spaced_like_the_gauges_is_not_the_hud() {
+        let frame = picture(&[
+            (396, 936, 160, RED),
+            (617, 936, 160, BLUE),
+            (920, 1412, 150, RED),
+            (1136, 1412, 150, BLUE),
+            (1366, 1412, 150, YELLOW),
+        ]);
+        assert_eq!(locate(&frame).map(|hud| hud.hp.x), Some(920.0));
+    }
+
+    #[test]
+    fn nearly_empty_gauges_are_still_found() {
+        let frame = picture(&[(920, 1412, 10, RED), (1136, 1412, 10, BLUE), (1366, 1412, 150, YELLOW)]);
+        assert_eq!(locate(&frame).map(|hud| hud.hp.x), Some(920.0));
+    }
+
+    #[test]
+    fn short_scenery_alone_is_not_the_hud() {
+        assert!(locate(&picture(&[(396, 936, 10, RED), (612, 936, 10, BLUE)])).is_none());
+    }
 
     #[test]
     fn gauges() {

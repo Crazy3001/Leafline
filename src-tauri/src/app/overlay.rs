@@ -135,6 +135,12 @@ pub fn toggle_compact(app: &AppHandle) -> Result<()> {
     set_compact(app, !enabled)
 }
 
+/// Brings up the full overlay, for something the compact HUD has no room for.
+pub fn show_full(app: &AppHandle) -> Result<()> {
+    window(app, OVERLAY)?.show()?;
+    set_compact(app, false)
+}
+
 /// Grows or shrinks the overlay with a new size setting, so the same amount stays in view. A
 /// compact overlay fits itself; its saved full size is scaled instead.
 pub fn rescale(app: &AppHandle, ratio: f64) -> Result<()> {

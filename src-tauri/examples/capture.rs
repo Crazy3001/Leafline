@@ -7,6 +7,7 @@
 //! `cargo run --example capture -- --auto [--font hud-font.json] [--frames 3] [--compare image]`
 //! finds the game window on its own and runs each picture through the pipeline. `--compare`
 //! counts how many pixels differ from a saved screenshot.
+//! `cargo run --example capture -- --item` reads the items in one picture, like a price check.
 
 use std::path::Path;
 use std::time::{Duration, Instant};
@@ -28,6 +29,9 @@ fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.first().is_some_and(|a| a == "--auto") {
         return read_live(&args);
+    }
+    if args.first().is_some_and(|a| a == "--item") {
+        return read_item();
     }
 
     let windows = capture::windows().expect("list windows");
@@ -59,6 +63,15 @@ fn main() {
     }
 }
 
+fn read_item() {
+    let window = capture::find(None).expect("list windows").expect("no window looks like the game");
+    let started = Instant::now();
+    let frame = capture::picture(&window).expect("picture");
+    let items = pipeline::read_items(&frame, &Ocr::new().expect("OCR engine")).expect("read items");
+    let names: Vec<&String> = items.iter().map(|i| &i.name).collect();
+    println!("{}x{} in {:?}: {names:?}", frame.width(), frame.height(), started.elapsed());
+}
+
 fn read_live(args: &[String]) {
     let value = |flag: &str| args.iter().position(|a| a == flag).and_then(|i| args.get(i + 1));
     let font: HudFont = value("--font")
@@ -88,12 +101,12 @@ fn read_live(args: &[String]) {
             }
         };
         let reading = Instant::now();
-        let analysis = pipeline::analyze(&frame, &ocr, &font).expect("analyze");
+        let analysis = pipeline::analyze_live(&frame, &ocr, &font).expect("analyze");
         let read_ms = reading.elapsed().as_millis();
         tracker.push(&Sample::from_analysis(started.elapsed().as_secs_f64(), &analysis));
         let hud = analysis.hud.as_ref();
         println!(
-            "frame {i}: {}x{} in {read_ms} ms; level {:?}, exp {:?}, mesos {:?}, map {:?}, quests {}, tooltips {}",
+            "frame {i}: {}x{} in {read_ms} ms; level {:?}, exp {:?}, mesos {:?}, map {:?}, quests {}",
             frame.width(),
             frame.height(),
             hud.and_then(|h| h.level),
@@ -101,7 +114,6 @@ fn read_live(args: &[String]) {
             analysis.mesos.map(|m| m.mesos),
             analysis.map.as_ref().map(|m| m.label()),
             analysis.quest.as_ref().map_or(0, |q| q.quests.len()),
-            analysis.tooltips.len(),
         );
         if let Some(reference) = &reference {
             println!("  {} pixels differ from the saved image", differing(&frame, reference));

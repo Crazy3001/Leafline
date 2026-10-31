@@ -7,7 +7,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use serde::{Deserialize, Serialize};
 use tauri::{
-    AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
+    AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, PhysicalSize, State, WebviewUrl, WebviewWindow,
+    WebviewWindowBuilder, Window,
 };
 
 use super::overlay::{self, OVERLAY};
@@ -19,6 +20,9 @@ const FILE_NAME: &str = "pins.json";
 
 /// Emitted to every window when panels are pinned, unpinned, shown or hidden.
 pub const PINS_EVENT: &str = "pins";
+
+/// Emitted to a pinned panel when the player resizes it, with its logical width and height.
+const RESIZED_EVENT: &str = "pin-resized";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -56,16 +60,16 @@ impl Panel {
     fn label(self) -> String {
         format!("{PREFIX}{}", self.id())
     }
-
-    /// Logical width. The page sets the height to fit what it shows.
-    fn width(self) -> f64 {
-        match self {
-            Panel::Stats => 264.0,
-            Panel::Map | Panel::Item | Panel::Train => 300.0,
-            Panel::Quests => 280.0,
-        }
-    }
 }
+
+/// Logical width of a pinned panel, the overlay's own, so it fits as it does in a tab. The page
+/// sets the height to fit what it shows, until the player resizes it by hand. Matches `PIN_WIDTH`
+/// in src/lib/panels.ts.
+const WIDTH: f64 = 340.0;
+
+/// The smallest a pinned panel goes, before the size setting. Any narrower and the session
+/// history in Stats runs off the side.
+const MIN_SIZE: (f64, f64) = (320.0, 60.0);
 
 /// Space between the overlay and pinned panels placed beside it.
 const GAP: f64 = 12.0;
@@ -113,6 +117,12 @@ impl PinState {
     }
 }
 
+/// Whether a pinned Item panel is on screen.
+pub fn shows_item(app: &AppHandle) -> bool {
+    let status = app.state::<PinState>().status();
+    !status.hidden && status.pinned.contains(&Panel::Item)
+}
+
 /// Reopens the panels that were pinned when Leafline last closed.
 pub fn restore(app: &AppHandle) -> Result<()> {
     let pinned = app.state::<PinState>().status().pinned;
@@ -135,18 +145,19 @@ fn open(app: &AppHandle, panel: Panel, slot: usize) -> Result<()> {
     let (x, y) = default_position(app, slot);
     let window = WebviewWindowBuilder::new(app, panel.label(), WebviewUrl::App(format!("pin/{}", panel.id()).into()))
         .title(format!("Leafline · {}", panel.title()))
-        .inner_size(panel.width(), 120.0)
+        .inner_size(WIDTH, 120.0)
         .position(x, y)
         .transparent(true)
         .decorations(false)
         .shadow(false)
         .always_on_top(app.state::<SettingsState>().get().always_on_top)
         .skip_taskbar(true)
-        .resizable(false)
+        // Double-clicking the header would otherwise fill the screen.
+        .maximizable(false)
         .focused(false)
         .visible(!app.state::<PinState>().hidden.load(Ordering::Relaxed))
         .build()?;
-    window.set_zoom(app.state::<SettingsState>().get().scale)?;
+    zoom(&window, app.state::<SettingsState>().get().scale)?;
     snap::attach(&window)?;
     if overlay::status(app)?.click_through {
         window.set_ignore_cursor_events(true)?;
@@ -154,9 +165,26 @@ fn open(app: &AppHandle, panel: Panel, slot: usize) -> Result<()> {
     Ok(())
 }
 
-/// In a row to the right of the overlay, in pin order. Widths are fixed and heights are not,
-/// so a row never overlaps. A position the user dragged it to is restored over this once the
-/// window is ready.
+/// Applies the size setting to a pinned panel. The page fits the window to it.
+pub fn zoom(window: &WebviewWindow, scale: f64) -> Result<()> {
+    window.set_zoom(scale)?;
+    window.set_min_size(Some(LogicalSize::new(MIN_SIZE.0 * scale, MIN_SIZE.1 * scale)))?;
+    Ok(())
+}
+
+/// Tells a pinned panel when the player resizes it, so it keeps that size.
+pub fn resized(window: &Window, size: PhysicalSize<u32>) {
+    if !window.label().starts_with(PREFIX) || !snap::sizing(window) {
+        return;
+    }
+    if let Ok(scale) = window.scale_factor() {
+        let size: LogicalSize<f64> = size.to_logical(scale);
+        let _ = window.emit_to(window.label(), RESIZED_EVENT, (size.width, size.height));
+    }
+}
+
+/// In a row to the right of the overlay, in pin order. All start the same width, so a row never
+/// overlaps. A position the user dragged it to is restored over this once the window is ready.
 fn default_position(app: &AppHandle, slot: usize) -> (f64, f64) {
     let anchor = app.get_webview_window(OVERLAY).and_then(|w| {
         let scale = w.scale_factor().ok()?;
@@ -165,9 +193,7 @@ fn default_position(app: &AppHandle, slot: usize) -> (f64, f64) {
         Some((position.x + size.width + GAP, position.y))
     });
     let (x, y) = anchor.unwrap_or((400.0, 120.0));
-    let pinned = app.state::<PinState>().status().pinned;
-    let before: f64 = pinned.iter().take(slot).map(|p| p.width() + GAP).sum();
-    (x + before, y)
+    (x + slot as f64 * (WIDTH + GAP), y)
 }
 
 fn changed(app: &AppHandle) -> Result<PinStatus> {

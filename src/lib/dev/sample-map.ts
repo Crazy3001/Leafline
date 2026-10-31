@@ -287,7 +287,7 @@ function hunt(id: number, from: number | null, rate: number | null): Hunt {
 }
 
 /** A made-up guide in the guide's shape: monsters from the sample world, whatever was read. */
-export function sampleGuide(quests: QuestQuery[], from: number | null, lookedUp: Set<string>): Guide {
+export function sampleGuide(quests: QuestQuery[], from: number | null, hasDrops: boolean): Guide {
   return {
     from: from == null ? null : ref(from),
     quests: quests.map((q, i) => ({
@@ -298,17 +298,18 @@ export function sampleGuide(quests: QuestQuery[], from: number | null, lookedUp:
               quest: { id: 71, name: q.title, levelMin: 1 },
               giver: "Innkeeper Bo",
               giverMaps: [ref(5)],
+              turnIn: null,
+              turnInMaps: [],
             }
           : null,
       objectives: q.objectives.map((target): ObjectiveGuide => {
         if (!ITEMISH.test(target)) return { target, kind: "monster", item: null, lookedUp: false, hunts: [hunt(11, from, null)] };
-        const asked = lookedUp.has(target);
-        const logged = asked && !UNLOGGED.test(target);
+        const logged = hasDrops && !UNLOGGED.test(target);
         return {
           target,
           kind: "item",
           item: logged ? target : null,
-          lookedUp: asked,
+          lookedUp: hasDrops,
           hunts: logged ? [hunt(12, from, 47.5), hunt(11, from, 6.2)] : [],
         };
       }),

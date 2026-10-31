@@ -241,7 +241,7 @@
   const does = [
     "Reads what the game shows, from saved screenshots or, once you turn it on, the game window, with the OCR built into Windows on this PC.",
     "Shows map, monster and quest facts from community data, downloaded only when you ask.",
-    "Looks up player-logged drops on mapleclassic.wiki when you ask, a request a second at most.",
+    "Downloads the player-logged drop table from mapleclassic.wiki when you first need it, renews it weekly, and looks drops up on this PC.",
     "Keeps your settings, sessions and price log on this PC.",
   ];
   const doesNot = [
@@ -428,7 +428,9 @@
       {/if}
       <p class="note">
         Works in windowed mode, and in Full Screen as long as the overlay shows above the game. Pictures stay in memory
-        and are never saved, unless you press Save frame (Ctrl+Alt+F) to keep one for the workbench.
+        and are never saved, unless you press Save frame (Ctrl+Alt+F) to keep one for the workbench. Items are read one
+        at a time when you hover one and press Ctrl+Alt+I, whether live reading is running or not. This switch has to be
+        on for that too.
       </p>
     </section>
 

@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::Serialize;
@@ -13,8 +13,8 @@ use super::settings::SettingsState;
 use crate::error::{Error, Result};
 use crate::mapdata::fetch::{self, Http};
 use crate::mapdata::{
-    Atlas, DataStatus, ItemSources, MapCard, MapMatch, MapRef, MeasuredRate, MonsterDrops, QuestGuide, QuestQuery,
-    RefreshReport, Route, Store, TrainingSpot, Travel, TravelFile, drops,
+    Atlas, DataStatus, MapCard, MapMatch, MapRef, MeasuredRate, MonsterDrops, QuestGuide, QuestQuery, RefreshReport,
+    Route, Store, TrainingSpot, Travel, TravelFile, drops,
 };
 
 const FILE_NAME: &str = "map-data.sqlite3";
@@ -26,10 +26,11 @@ const TRAVEL_CACHE: &str = "travel-wiki.json";
 /// Emitted to every window when the cached map data changes.
 pub const MAP_DATA_EVENT: &str = "map-data";
 
-/// Sites Leafline may open in the browser: the map card's link-outs and the credits.
-const LINK_HOSTS: [&str; 8] = [
+/// Sites Leafline may open in the browser: the link-outs and the credits.
+const LINK_HOSTS: [&str; 9] = [
     "mapleclassic.wiki",
     "meowdb.com",
+    "meso.watch",
     "henesys.gg",
     "osmsdataexplorer.com",
     "creativecommons.org",
@@ -43,8 +44,10 @@ pub struct MapDataState {
     atlas: RwLock<Option<Arc<Atlas>>>,
     downloading: AtomicBool,
     osms: Http,
-    /// Shared so every drops request keeps to the wiki's one-a-second pace.
+    /// Shared so every wiki request keeps to its one-a-second pace.
     wiki: Http,
+    /// One drop table download at a time; whoever waits then finds the table fresh.
+    drops_refresh: Mutex<()>,
 }
 
 impl MapDataState {
@@ -65,6 +68,7 @@ impl MapDataState {
             downloading: AtomicBool::new(false),
             osms: Http::new(Duration::from_millis(250)),
             wiki: Http::new(Duration::from_secs(1)),
+            drops_refresh: Mutex::new(()),
         })
     }
 
@@ -88,12 +92,20 @@ impl MapDataState {
         self.downloading.store(false, Ordering::SeqCst);
         result
     }
+
+    fn refresh_drops(&self) -> Result<()> {
+        let _turn = self.drops_refresh.lock().expect("drops refresh lock");
+        drops::refresh(&mut Store::open(&self.path)?, &self.wiki, now())
+    }
 }
 
 /// Once the user has downloaded map data, checks OSMS for changes in the background, at most
-/// once a day.
+/// once a day, and renews the drop table once it is a week old, if it was ever downloaded. An
+/// update of Leafline that replaced the cache gets back what the user had the same way.
 pub fn check_for_updates(app: &AppHandle) {
-    if app.state::<MapDataState>().atlas().is_none() {
+    let state = app.state::<MapDataState>();
+    let wanted = Store::open(&state.path).and_then(|s| s.wants_maps()).unwrap_or(false);
+    if state.atlas().is_none() && !wanted {
         return;
     }
     let app = app.clone();
@@ -108,6 +120,10 @@ pub fn check_for_updates(app: &AppHandle) {
             Ok(_) => {}
             // Offline or OSMS unavailable: the cache keeps working, and the user can retry.
             Err(err) => eprintln!("map data update check failed: {err}"),
+        }
+        let has_drops = Store::open(&state.path).and_then(|s| s.wants_drops()).unwrap_or(false);
+        if has_drops && let Err(err) = state.refresh_drops() {
+            eprintln!("drop table update failed: {err}");
         }
     });
 }
@@ -142,8 +158,13 @@ pub async fn download_map_data(app: AppHandle, force: bool) -> Result<Downloaded
 
 /// The card for the map a minimap header names, matched fuzzily against the cached names.
 #[tauri::command]
-pub fn find_map(state: State<MapDataState>, name: String, street: Option<String>) -> Option<MapMatch> {
-    state.atlas()?.find(&name, street.as_deref())
+pub fn find_map(
+    state: State<MapDataState>,
+    name: String,
+    street: Option<String>,
+    twin: Option<u32>,
+) -> Option<MapMatch> {
+    state.atlas()?.find_twin(&name, street.as_deref(), twin)
 }
 
 #[tauri::command]
@@ -260,12 +281,14 @@ pub fn edit_travel_file(app: AppHandle) -> Result<()> {
     app.opener().open_path(path.display().to_string(), None::<&str>).map_err(|err| Error::Invalid(err.to_string()))
 }
 
-/// Player-observed drops for the named monsters, from mapleclassic.wiki or the week-long cache.
+/// Player-observed drops for the named monsters, from the downloaded table. The first call
+/// downloads the table; the names are never sent.
 #[tauri::command]
 pub async fn monster_drops(app: AppHandle, monsters: Vec<String>) -> Result<Vec<MonsterDrops>> {
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<MapDataState>();
-        drops::drops_for(&mut Store::open(&state.path)?, &state.wiki, &monsters, now())
+        state.refresh_drops()?;
+        Store::open(&state.path)?.drops(&monsters)
     })
     .await
     .map_err(|err| Error::Invalid(err.to_string()))?
@@ -279,8 +302,8 @@ pub struct Guide {
     quests: Vec<QuestGuide>,
 }
 
-/// Where to go for each quest the Quest Helper shows. Item objectives use only drops already
-/// looked up; nothing is fetched here. `None` until map data has been downloaded.
+/// Where to go for each quest the Quest Helper shows. Item objectives use the downloaded drop
+/// table; nothing is fetched here. `None` until map data has been downloaded.
 #[tauri::command]
 pub fn quest_guide(
     app: AppHandle,
@@ -288,28 +311,24 @@ pub fn quest_guide(
     quests: Vec<QuestQuery>,
     map_name: Option<String>,
     map_street: Option<String>,
+    map_twin: Option<u32>,
     measured: Vec<MeasuredRate>,
 ) -> Result<Option<Guide>> {
     let Some(atlas) = state.atlas() else { return Ok(None) };
-    let from = map_name.and_then(|name| atlas.find(&name, map_street.as_deref())).map(|m| m.card.map);
-    let mut keys: Vec<String> = quests.iter().flat_map(|q| &q.objectives).map(|o| drops::item_key(o)).collect();
-    keys.sort();
-    keys.dedup();
-    let (items, _) = Store::open(&state.path)?.cached_item_sources(&keys, now() - drops::MAX_AGE)?;
+    let from = map_name.and_then(|name| atlas.find_twin(&name, map_street.as_deref(), map_twin)).map(|m| m.card.map);
+    let objectives: Vec<String> = quests.iter().flat_map(|q| q.objectives.iter().cloned()).collect();
+    let items = drops::sources_for(&Store::open(&state.path)?, &objectives)?;
     let quests = atlas.quest_guide(&quests, from.as_ref().map(|m| m.id), &items, &measured, &travel(&app, &atlas));
     Ok(Some(Guide { from, quests }))
 }
 
-/// Asks mapleclassic.wiki which monsters drop each quest item, one request a second, and
-/// caches the answers for a week.
+/// Downloads the drop table from mapleclassic.wiki, for finding who drops a quest item. Only on
+/// the player's request.
 #[tauri::command]
-pub async fn look_up_quest_items(app: AppHandle, items: Vec<String>) -> Result<Vec<ItemSources>> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let state = app.state::<MapDataState>();
-        drops::sources_for(&mut Store::open(&state.path)?, &state.wiki, &items, now())
-    })
-    .await
-    .map_err(|err| Error::Invalid(err.to_string()))?
+pub async fn download_drops(app: AppHandle) -> Result<()> {
+    tauri::async_runtime::spawn_blocking(move || app.state::<MapDataState>().refresh_drops())
+        .await
+        .map_err(|err| Error::Invalid(err.to_string()))?
 }
 
 #[derive(Serialize)]
@@ -328,10 +347,11 @@ pub fn training_spots(
     state: State<MapDataState>,
     map_name: Option<String>,
     map_street: Option<String>,
+    map_twin: Option<u32>,
     measured: Vec<MeasuredRate>,
 ) -> Option<Spots> {
     let atlas = state.atlas()?;
-    let from = map_name.and_then(|name| atlas.find(&name, map_street.as_deref())).map(|m| m.card.map);
+    let from = map_name.and_then(|name| atlas.find_twin(&name, map_street.as_deref(), map_twin)).map(|m| m.card.map);
     let spots = atlas.training_spots(from.as_ref().map(|m| m.id), &measured, &travel(&app, &atlas));
     Some(Spots { from, spots })
 }

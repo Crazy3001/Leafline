@@ -35,6 +35,11 @@
     seen[tab] = current;
   });
 
+  // A price check is asked for by hotkey, so its result opens by itself.
+  $effect(() => {
+    if (live.itemRead?.found) select("item");
+  });
+
   const fresh = (panel: Panel) => panel !== tab && signatures[panel] != null && signatures[panel] !== seen[panel];
   const pinned = $derived(live.pins.pinned.includes(tab));
 
@@ -82,6 +87,9 @@
     const s = live.liveStatus;
     if (liveError) return { tone: "bad", text: liveError };
     if (s.state === "failed") return { tone: "bad", text: `Live reading stopped: ${s.message}` };
+    if (live.itemRead?.problem) return { tone: "warn", text: `Couldn't read the item: ${live.itemRead.problem}` };
+    if (live.itemRead?.found === 0)
+      return { tone: "quiet", text: "No equipment tooltip found. Hover a piece of equipment in game, then press Ctrl+Alt+I." };
     if (live.savedFrame) return { tone: "good", text: `Saved ${fileName(live.savedFrame)} to Pictures\\Leafline.` };
     if (s.state === "waiting") return { tone: "quiet", text: s.reason };
     if (s.state === "reading" && s.hdr)

@@ -5,7 +5,7 @@
   import Card from "./Card.svelte";
   import ObjectiveHint from "./quest/ObjectiveHint.svelte";
   import { backend } from "$lib/api";
-  import { formatCompact, formatDuration, splitMapLabel } from "$lib/format";
+  import { formatCompact, formatDuration, objectiveProgress, splitMapLabel } from "$lib/format";
   import { measuredRates, watchHistory } from "$lib/history.svelte";
   import { OSMS_URL, WIKI_URL, mapData, watchMapData } from "$lib/mapdata.svelte";
   import type { Guide, MapReading, ObjectiveGuide, Objective, QuestReading, SessionSummary } from "$lib/types";
@@ -38,11 +38,11 @@
   const queries = $derived(
     quest.quests.map((q) => ({ title: q.title, objectives: q.objectives.map((o) => o.target) })),
   );
-  const queryKey = $derived(JSON.stringify([queries, map?.name, map?.street, measured]));
+  const queryKey = $derived(JSON.stringify([queries, map?.name, map?.street, map?.twin, measured]));
 
   async function refresh() {
     const key = queryKey;
-    const result = await backend.questGuide(queries, map?.name ?? null, map?.street ?? null, measured);
+    const result = await backend.questGuide(queries, map?.name ?? null, map?.street ?? null, map?.twin ?? null, measured);
     if (key === queryKey) guide = result;
   }
 
@@ -100,7 +100,7 @@
     untrack(refresh).catch(() => (guide = null));
   });
 
-  /** Unfinished item objectives nobody has asked the wiki about yet. */
+  /** Unfinished item objectives, which wait for the drop table to be downloaded. */
   const unknownItems = $derived(
     guide
       ? guide.quests.flatMap((g, i) =>
@@ -117,7 +117,7 @@
     lookingUp = true;
     lookupError = null;
     try {
-      await backend.lookUpQuestItems([...new Set(unknownItems.map((o) => o.target))]);
+      await backend.downloadDrops();
       await refresh();
     } catch (e) {
       lookupError = String(e);
@@ -129,32 +129,36 @@
 
 <Card title="Quests" {plain}>
   {#snippet aside()}
-    {#if quest.page && !plain}<span class="tabular">{quest.page[0]} tracked</span>{/if}
+    {#if quest.page}<span class="tabular">{quest.page[0]} tracked</span>{/if}
   {/snippet}
 
   {#each quest.quests as { title, objectives }, i}
     {@const info = guide?.quests[i]}
-    {@const finished = objectives.length > 0 && objectives.every((o) => o.current >= o.required)}
+    {@const finished = objectives.length > 0 && objectives.every((o) => objectiveProgress(o) >= 1)}
     <div class="quest" class:dense={plain}>
       <!-- The map data's spelling, once the title matched a quest there: OCR garbles some letters. -->
       <h3 class="title" title={info?.quest ? `Read on screen as "${title}"` : undefined}>
         {info?.quest?.quest.name || title || "Untitled quest"}
       </h3>
-      {#if info?.quest?.giver}
-        <p class="giver" class:finished>
-          <UserRound size={11} />
-          <span>
-            {finished ? "Turn in to" : "From"}
-            {info.quest.giver}{#if info.quest.giverMaps.length}<span class="faint"
-                >{" · "}{info.quest.giverMaps.map((m) => m.name).join(", ")}</span
-              >{/if}
-          </span>
-        </p>
+      {#if info?.quest}
+        {@const turnIn = finished ? info.quest.turnIn : null}
+        {@const person = turnIn ?? info.quest.giver}
+        {@const maps = turnIn ? info.quest.turnInMaps : info.quest.giverMaps}
+        {#if person}
+          <p class="giver" class:finished>
+            <UserRound size={11} />
+            <span>
+              {turnIn ? "Turn in to" : finished ? "Done · from" : "From"}
+              {person}{#if maps.length}<span class="faint">{" · "}{maps.map((m) => m.name).join(", ")}</span>{/if}
+            </span>
+          </p>
+        {/if}
       {/if}
       {#if objectives.length}
         <ul>
           {#each objectives as objective, j}
-            {@const done = objective.current >= objective.required}
+            {@const progress = objectiveProgress(objective)}
+            {@const done = progress >= 1}
             {@const hint = info?.objectives[j]}
             {@const eta = timeLeft(objective, hint)}
             <li class:done>
@@ -163,7 +167,7 @@
                 <span class="count tabular">{objective.current} / {objective.required}</span>
               </div>
               <div class="track">
-                <div class="fill" style:width="{Math.min(1, objective.current / objective.required) * 100}%"></div>
+                <div class="fill" style:width="{progress * 100}%"></div>
               </div>
               {#if eta}
                 <p class="eta" title={eta.title}>
@@ -183,25 +187,25 @@
       {/if}
     </div>
   {:else}
-    <p class="empty">The Quest Helper was found, but its text could not be read.</p>
+    <p class="empty">
+      {quest.page?.[0] === 0 ? "No quests tracked." : "The Quest Helper was found, but its text could not be read."}
+    </p>
   {/each}
 
   {#if quest.quests.length}
     {#if !ready}
-      {#if !plain}
-        <p class="footer">Download map data from the Map tab to see where to hunt for each objective.</p>
-      {/if}
+      <p class="footer">Download map data from the Map tab to see where to hunt for each objective.</p>
     {:else if unknownItems.length}
       <div class="footer lookup">
         <button onclick={lookUp} disabled={lookingUp}>
           {#if lookingUp}<span class="spin"><LoaderCircle size={12} /></span>{:else}<Search size={12} />{/if}
           Find who drops {unknownItems.length === 1 ? "the quest item" : `${unknownItems.length} quest items`}
         </button>
-        <span class="faint">Asks mapleclassic.wiki</span>
+        <span class="faint">Downloads mapleclassic.wiki's drop table</span>
       </div>
       {#if lookupError}<p class="footer error">{lookupError}</p>{/if}
     {/if}
-    {#if guide && !plain}
+    {#if guide}
       <p class="credit">
         Maps: <button onclick={() => backend.openLink(OSMS_URL)}>OSMS</button> (CC BY 4.0){#if showsDrops}{" · "}Drop rates players logged on <button onclick={() => backend.openLink(WIKI_URL)}>mapleclassic.wiki</button>{/if}
       </p>

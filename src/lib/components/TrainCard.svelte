@@ -63,7 +63,7 @@
   watchHistory();
   // Saved sessions and the current one, so maps can be compared across play sessions.
   const measured = $derived(measuredRates(session));
-  const queryKey = $derived(JSON.stringify([map?.name, map?.street, measured, travelKey()]));
+  const queryKey = $derived(JSON.stringify([map?.name, map?.street, map?.twin, measured, travelKey()]));
   // Each list is a new object: the route follows where it starts from, not the list.
   const fromId = $derived(data?.from?.id);
 
@@ -76,7 +76,7 @@
       data = null;
       return;
     }
-    untrack(() => backend.trainingSpots(map?.name ?? null, map?.street ?? null, measured))
+    untrack(() => backend.trainingSpots(map?.name ?? null, map?.street ?? null, map?.twin ?? null, measured))
       .then((result) => {
         if (key === queryKey) data = result;
       })
@@ -125,7 +125,7 @@
     flush();
     return out;
   });
-  const shown = $derived(ranked.slice(0, plain ? 5 : more ? 30 : SHOWN));
+  const shown = $derived(ranked.slice(0, more ? 30 : SHOWN));
   const anyMeasured = $derived(data?.spots.some((s) => s.measured) ?? false);
 
   function stored(key: string, fallback: string) {
@@ -206,19 +206,17 @@
   {:else if !data}
     <p class="empty">Loading maps…</p>
   {:else}
-    {#if !plain}
-      <div class="sorts" role="radiogroup" aria-label="Rank by">
-        {#each SORTS as option (option.id)}
-          <button
-            role="radio"
-            aria-checked={sort === option.id}
-            title={option.title}
-            disabled={option.id === "measured" && !anyMeasured}
-            onclick={() => pickSort(option.id)}>{option.label}</button
-          >
-        {/each}
-      </div>
-    {/if}
+    <div class="sorts" role="radiogroup" aria-label="Rank by">
+      {#each SORTS as option (option.id)}
+        <button
+          role="radio"
+          aria-checked={sort === option.id}
+          title={option.title}
+          disabled={option.id === "measured" && !anyMeasured}
+          onclick={() => pickSort(option.id)}>{option.label}</button
+        >
+      {/each}
+    </div>
 
     {#if level == null && !allLevels}
       <p class="empty">Showing every level. Set your level above to see maps that suit it.</p>
@@ -248,7 +246,7 @@
               <span class="value tabular">{m.value}</span>
               <span class="unit">{m.unit}</span>
             </span>
-            {#if !plain}<span class="chevron" class:open={expanded}><ChevronRight size={11} /></span>{/if}
+            <span class="chevron" class:open={expanded}><ChevronRight size={11} /></span>
           </button>
 
           {#if expanded}
@@ -296,45 +294,43 @@
       {/each}
     </ol>
 
-    {#if !plain}
-      <div class="footer">
-        <span class="checks">
-          <label class="check">
+    <div class="footer">
+      <span class="checks">
+        <label class="check">
+          <input
+            type="checkbox"
+            checked={allLevels}
+            onchange={(e) => {
+              allLevels = e.currentTarget.checked;
+              remember(ALL_LEVELS_KEY, String(allLevels));
+            }}
+          />
+          Every level
+        </label>
+        {#if sort !== "near"}
+          <label class="check" title="When maps score within 10% of each other, list the one fewer portals away first">
             <input
               type="checkbox"
-              checked={allLevels}
+              checked={nearbyFirst}
               onchange={(e) => {
-                allLevels = e.currentTarget.checked;
-                remember(ALL_LEVELS_KEY, String(allLevels));
+                nearbyFirst = e.currentTarget.checked;
+                remember(NEARBY_KEY, String(nearbyFirst));
               }}
             />
-            Every level
+            Nearby first
           </label>
-          {#if sort !== "near"}
-            <label class="check" title="When maps score within 10% of each other, list the one fewer portals away first">
-              <input
-                type="checkbox"
-                checked={nearbyFirst}
-                onchange={(e) => {
-                  nearbyFirst = e.currentTarget.checked;
-                  remember(NEARBY_KEY, String(nearbyFirst));
-                }}
-              />
-              Nearby first
-            </label>
-          {/if}
-        </span>
-        {#if ranked.length > SHOWN}
-          <button class="link" onclick={() => (more = !more)}>{more ? "Fewer" : `Show ${Math.min(30, ranked.length) - SHOWN} more`}</button>
         {/if}
-      </div>
-      <p class="hedge">
-        Base numbers from OSMS map data, before EXP events, party bonus or level differences. Your rate is what Leafline
-        measured in your sessions.{#if nearbyFirst && sort !== "near" && data.from}{" "}Maps within 10% of each other are
-          listed nearest first.{/if}
-        Maps entered only through an NPC, such as party quests, are left out.
-      </p>
-    {/if}
+      </span>
+      {#if ranked.length > SHOWN}
+        <button class="link" onclick={() => (more = !more)}>{more ? "Fewer" : `Show ${Math.min(30, ranked.length) - SHOWN} more`}</button>
+      {/if}
+    </div>
+    <p class="hedge">
+      Base numbers from OSMS map data, before EXP events, party bonus or level differences. Your rate is what Leafline
+      measured in your sessions.{#if nearbyFirst && sort !== "near" && data.from}{" "}Maps within 10% of each other are
+        listed nearest first.{/if}
+      Maps entered only through an NPC, such as party quests, are left out.
+    </p>
   {/if}
 </Card>
 

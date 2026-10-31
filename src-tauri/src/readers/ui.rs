@@ -16,6 +16,8 @@ pub const DESIGN_HEIGHT: f32 = 768.0;
 pub const CANONICAL_SCALE: f32 = 2.0;
 /// Gauge starts stand this many design pixels apart.
 const GAUGE_PITCH: f32 = 108.0;
+/// Gauge fills end within this many design pixels of the window's bottom edge.
+const GAUGE_REACH: f32 = 20.0;
 /// Two scales this close are the same scale.
 const SAME: f32 = 0.03;
 
@@ -31,9 +33,13 @@ pub fn scales(frame: &Frame, hud: Option<&HudLayout>) -> Vec<f32> {
     scales
 }
 
-/// Whether gauges this far apart could be the HUD's at a size the game draws in this frame.
-pub fn fits_gauge_pitch(frame: &Frame, pitch: f32) -> bool {
-    scales(frame, None).iter().any(|scale| (pitch / GAUGE_PITCH - scale).abs() <= SAME * scale)
+/// Whether fills `pitch` apart, the first ending at `bottom`, could be the HUD's at a size the
+/// game draws in this frame. Scenery can match the spacing by chance, but not on the bottom edge.
+pub fn fits_gauges(frame: &Frame, pitch: f32, bottom: f32) -> bool {
+    let above_edge = frame.height() as f32 - bottom;
+    scales(frame, None)
+        .iter()
+        .any(|scale| (pitch / GAUGE_PITCH - scale).abs() <= SAME * scale && above_edge <= GAUGE_REACH * scale)
 }
 
 fn measured(hud: &HudLayout) -> f32 {

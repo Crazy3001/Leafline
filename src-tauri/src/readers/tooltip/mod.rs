@@ -8,8 +8,11 @@
 //! as is and with the text colour-keyed out of the background, and the passes are merged. The
 //! `REQ` block uses a pixel font: its six rows are read by position, and digits OCR is unsure
 //! of are matched against ones it read cleanly elsewhere in the frame.
+//!
+//! Items with no stats have no separator, so [`plain`] finds those.
 
 mod parse;
+mod plain;
 
 use std::sync::LazyLock;
 
@@ -21,7 +24,7 @@ pub use parse::{ItemTooltip, JOBS, JobFlag, Property, Requirements, Stat};
 
 use super::text::{best_match, starts_like, trim_noise};
 use crate::error::Result;
-use crate::vision::glyphs::{GlyphSet, Mask, ink_columns};
+use crate::vision::glyphs::{GlyphSet, MIN_SIMILARITY, Mask, ink_columns};
 use crate::vision::{Frame, Line, Ocr, Rect, Word, color, group_lines, preprocess};
 
 /// A tooltip panel found in the frame.
@@ -62,15 +65,19 @@ pub fn read_all(frame: &Frame, overview: &[Line], ocr: &Ocr) -> Result<Vec<ItemT
             digits.learn(&row.glyphs, text);
         }
     }
-    panels
-        .into_iter()
-        .zip(requirements)
-        .map(|(panel, requirements)| {
-            let mut item = read(frame, panel, ocr)?;
+    let (mut items, mut kept) = (Vec::new(), Vec::new());
+    for (panel, requirements) in panels.into_iter().zip(requirements) {
+        let mut item = read(frame, panel, ocr)?;
+        // The Equip window's lines and slot labels can pass for a tooltip, but nothing there
+        // reads as a type, a stat or enhancement slots.
+        if item.item_type.is_some() || item.remaining_enhancements.is_some() || !item.stats.is_empty() {
             item.requirements = requirements.resolve(&digits).or(item.requirements);
-            Ok(item)
-        })
-        .collect()
+            items.push(item);
+            kept.push(panel);
+        }
+    }
+    items.extend(plain::read_all(frame, overview, &kept, ocr)?);
+    Ok(items)
 }
 
 /// Finds tooltip panels using the separator rules in `frame` and the text in `overview`
@@ -203,9 +210,24 @@ impl RequirementRows {
         Ok(Self { rows })
     }
 
+    /// Whether every row shows one lone digit, the same one, which can only be 0: an item with
+    /// no requirements. OCR reads nothing for a lone digit, so nothing else would settle these.
+    fn all_zero(&self) -> bool {
+        let Some(first) = self.rows.first().and_then(|row| row.glyphs.first()) else { return false };
+        self.rows.iter().all(|row| {
+            row.ocr.as_deref().is_none_or(|text| text == "0")
+                && row.glyphs.len() == 1
+                && first.similarity(&row.glyphs[0]) >= MIN_SIMILARITY
+        })
+    }
+
     /// Each row's value: OCR's when it agrees with the glyph count, otherwise the glyphs
     /// matched against `digits`.
     fn resolve(&self, digits: &GlyphSet) -> Requirements {
+        if self.all_zero() {
+            let zero = Some(0);
+            return Requirements { level: zero, str: zero, dex: zero, int: zero, luk: zero, fam: zero };
+        }
         let values: Vec<Option<u32>> = self
             .rows
             .iter()

@@ -10,7 +10,7 @@
 //! reading matched.
 //!
 //! `--quests <image>` reads the Quest Helper and minimap of one screenshot and prints where to go
-//! for each objective; add `--lookup` to ask mapleclassic.wiki who drops the quest items.
+//! for each objective; add `--lookup` to download mapleclassic.wiki's drop table first.
 //!
 //! `--train <level> [--from <map-id>]` lists maps whose monsters average within a few levels of
 //! `level`, and that can be reached from the map given.
@@ -75,8 +75,8 @@ fn main() {
     if let Some(id) = value("--drops", 1) {
         let card = atlas.card(id.parse().expect("map id")).expect("unknown map");
         let names: Vec<String> = card.mobs.iter().map(|m| m.name.clone()).collect();
-        let wiki = Http::new(Duration::from_secs(1));
-        for entry in drops::drops_for(&mut store, &wiki, &names, now).expect("drops") {
+        drops::refresh(&mut store, &Http::new(Duration::from_secs(1)), now).expect("download drops");
+        for entry in store.drops(&names).expect("drops") {
             println!("{} ({:?} kills, v{:?})", entry.monster, entry.sample_kills, entry.game_version);
             for d in entry.drops {
                 println!("    {:>6}  {}", d.rate.map_or("?".into(), |r| format!("{r:.1}%")), d.item);
@@ -99,12 +99,10 @@ fn main() {
         let from = analysis.map.as_ref().and_then(|m| atlas.find(&m.name, m.street.as_deref())).map(|m| m.card.map);
         println!("on {:?}", from.as_ref().map(|m| &m.name));
         let items: Vec<String> = quests.iter().flat_map(|q| q.objectives.clone()).collect();
-        let sources = if args.iter().any(|a| a == "--lookup") {
-            drops::sources_for(&mut store, &Http::new(Duration::from_secs(1)), &items, now).expect("look up items")
-        } else {
-            let keys: Vec<String> = items.iter().map(|i| drops::item_key(i)).collect();
-            store.cached_item_sources(&keys, now - drops::MAX_AGE).expect("cached items").0
-        };
+        if args.iter().any(|a| a == "--lookup") {
+            drops::refresh(&mut store, &Http::new(Duration::from_secs(1)), now).expect("download drops");
+        }
+        let sources = drops::sources_for(&store, &items).expect("look up items");
         for guide in atlas.quest_guide(&quests, from.map(|m| m.id), &sources, &[], &Travel::none()) {
             println!("{} -> {:?}", guide.title, guide.quest.as_ref().map(|q| (&q.quest.name, &q.giver, &q.giver_maps)));
             for o in &guide.objectives {
@@ -172,8 +170,8 @@ fn main() {
                 objectives: q.objectives.iter().map(|o| o.target.clone()).collect(),
             })
             .collect();
-        let keys: Vec<String> = quests.iter().flat_map(|q| &q.objectives).map(|o| drops::item_key(o)).collect();
-        let sources = store.cached_item_sources(&keys, now - drops::MAX_AGE).expect("cached items").0;
+        let objectives: Vec<String> = quests.iter().flat_map(|q| q.objectives.clone()).collect();
+        let sources = drops::sources_for(&store, &objectives).expect("look up items");
         let travel = if args.iter().any(|a| a == "--travel") {
             let all = TravelChoice { enabled: true, cabs: true, vip_cabs: true, scrolls: true };
             let file = TravelFile::fetch(&Http::new(Duration::from_secs(1)), now).expect("fetch travel from the wiki");

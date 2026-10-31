@@ -24,6 +24,8 @@ pub struct MapReading {
     pub collapsed: bool,
     /// The text area that was read.
     pub rect: Rect,
+    /// Which map this is, when the header alone can't say and the live loop worked it out.
+    pub twin: Option<u32>,
 }
 
 impl MapReading {
@@ -112,9 +114,9 @@ fn read_expanded(frame: &Frame, ocr: &Ocr, band: Rect) -> Result<Option<MapReadi
     let texts: Vec<String> = lines.iter().map(|l| clean(&l.text)).filter(|t| t.len() >= 2).collect();
     let reading = match texts.as_slice() {
         [] => return Ok(None),
-        [name] => MapReading { street: None, name: name.clone(), collapsed: false, rect: band },
+        [name] => MapReading { street: None, name: name.clone(), collapsed: false, rect: band, twin: None },
         [street, rest @ ..] => {
-            MapReading { street: Some(street.clone()), name: rest.join(" "), collapsed: false, rect: band }
+            MapReading { street: Some(street.clone()), name: rest.join(" "), collapsed: false, rect: band, twin: None }
         }
     };
     Ok(Some(reading))
@@ -123,7 +125,7 @@ fn read_expanded(frame: &Frame, ocr: &Ocr, band: Rect) -> Result<Option<MapReadi
 fn read_collapsed(frame: &Frame, ocr: &Ocr, bar: Rect) -> Result<Option<MapReading>> {
     let lines = read_text(frame, ocr, bar, |p| preprocess::luminance(p) <= 90)?;
     let text = lines.iter().map(|l| l.text.as_str()).collect::<Vec<_>>().join(" ");
-    Ok(split_title(&text).map(|(street, name)| MapReading { street, name, collapsed: true, rect: bar }))
+    Ok(split_title(&text).map(|(street, name)| MapReading { street, name, collapsed: true, rect: bar, twin: None }))
 }
 
 /// OCR of the text `is_text` keeps inside `rect`, read at several sizes and merged word by

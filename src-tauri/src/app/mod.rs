@@ -77,7 +77,11 @@ pub fn run() {
                 api.prevent_close();
                 let _ = window.hide();
             }
-            WindowEvent::Moved(_) | WindowEvent::Resized(_) => layout::changed(window.app_handle()),
+            WindowEvent::Moved(_) => layout::changed(window.app_handle()),
+            WindowEvent::Resized(size) => {
+                pins::resized(window, *size);
+                layout::changed(window.app_handle());
+            }
             _ => {}
         })
         .invoke_handler(tauri::generate_handler![
@@ -121,7 +125,7 @@ pub fn run() {
             mapdata::edit_travel_file,
             mapdata::monster_drops,
             mapdata::quest_guide,
-            mapdata::look_up_quest_items,
+            mapdata::download_drops,
             mapdata::training_spots,
             records::price_log,
             records::record_price,

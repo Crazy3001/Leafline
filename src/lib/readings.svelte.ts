@@ -2,7 +2,7 @@
 // window asks for the current state once and then follows the backend's events.
 
 import { backend } from "./api";
-import type { Analysis, LiveStatus, OverlayStatus, PinStatus, SessionSummary } from "./types";
+import type { Analysis, ItemRead, LiveStatus, OverlayStatus, PinStatus, SessionSummary } from "./types";
 
 export const live = $state<{
   analysis: Analysis | null;
@@ -12,6 +12,8 @@ export const live = $state<{
   liveStatus: LiveStatus;
   /** The last picture saved with "Save frame", shown briefly. */
   savedFrame: string | null;
+  /** How the last price check went, shown briefly. */
+  itemRead: ItemRead | null;
 }>({
   analysis: null,
   session: null,
@@ -19,9 +21,11 @@ export const live = $state<{
   pins: { pinned: [], hidden: false },
   liveStatus: { state: "off" },
   savedFrame: null,
+  itemRead: null,
 });
 
 let savedTimer: ReturnType<typeof setTimeout> | undefined;
+let itemTimer: ReturnType<typeof setTimeout> | undefined;
 
 let watching = false;
 
@@ -60,5 +64,10 @@ export function watchLive() {
     live.savedFrame = path;
     clearTimeout(savedTimer);
     savedTimer = setTimeout(() => (live.savedFrame = null), 4000);
+  });
+  backend.onItemRead((read) => {
+    live.itemRead = read;
+    clearTimeout(itemTimer);
+    itemTimer = setTimeout(() => (live.itemRead = null), 4000);
   });
 }

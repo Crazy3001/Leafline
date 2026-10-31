@@ -323,11 +323,52 @@ impl Atlas {
 
     /// The map an OCR'd header can only mean, to replace the reading with its real name. OCR
     /// can spell one header differently from one moment to the next, which would split a
-    /// session's per-map numbers. Near matches are left as read for the player to settle.
+    /// session's per-map numbers. Near matches are left as read for the player to settle; maps
+    /// sharing the name and street exactly read the same either way.
     pub fn settled(&self, name: &str, street: Option<&str>) -> Option<MapRef> {
         self.find(name, street)
-            .filter(|found| found.score >= SETTLED_SCORE && found.alternatives.is_empty())
+            .filter(|found| found.score >= SETTLED_SCORE && self.twins(found).len() > found.alternatives.len())
             .map(|found| found.card.map)
+    }
+
+    /// The best match and the maps sharing its name and street exactly. A header can't tell
+    /// these apart, such as the two Mushroom Towns on Maple Road.
+    fn twins(&self, found: &MapMatch) -> Vec<u32> {
+        let place = &found.card.map;
+        let same = found.alternatives.iter().filter(|m| m.name == place.name && m.street == place.street);
+        std::iter::once(place.id).chain(same.map(|m| m.id)).collect()
+    }
+
+    /// Whether another map shares this header exactly.
+    pub fn has_twin(&self, name: &str, street: Option<&str>) -> bool {
+        self.find(name, street).is_some_and(|found| self.twins(&found).len() > 1)
+    }
+
+    /// Which of the maps sharing a header the player is on, given the text `seen` on screen: an
+    /// NPC only one of them has settles it, and `held`, the last answer, stands until another
+    /// does. `None` for a header that only one map has, or until an NPC shows.
+    pub fn twin(&self, name: &str, street: Option<&str>, seen: &[&str], held: Option<u32>) -> Option<u32> {
+        let twins = self.twins(&self.find(name, street)?);
+        if twins.len() < 2 {
+            return None;
+        }
+        let npcs = |id: &u32| self.npcs_on.get(id).into_iter().flatten().filter_map(|npc| self.npc_names.get(npc));
+        let only_on =
+            |id: &u32, npc: &String| twins.iter().filter(|&other| other != id).all(|o| !npcs(o).any(|n| n == npc));
+        let shown = |npc: &String| seen.iter().any(|text| similarity(&fold(text), &fold(npc)) >= SETTLED_SCORE);
+        let on_screen = twins.iter().copied().find(|id| npcs(id).any(|npc| only_on(id, npc) && shown(npc)));
+        on_screen.or(held.filter(|id| twins.contains(id)))
+    }
+
+    /// [`Self::find`], with the answer of [`Self::twin`] if there is one.
+    pub fn find_twin(&self, name: &str, street: Option<&str>, twin: Option<u32>) -> Option<MapMatch> {
+        let mut found = self.find(name, street)?;
+        if let Some(id) = twin.filter(|id| self.twins(&found).contains(id)) {
+            let place = found.card.map.clone();
+            found.alternatives.retain(|m| m.name != place.name || m.street != place.street);
+            found.card = self.card(id)?;
+        }
+        Some(found)
     }
 
     pub fn is_town(&self, id: u32) -> bool {
@@ -578,9 +619,8 @@ impl Atlas {
             let Some(dest) = portal.dest_map_id.filter(|d| leads_out(*d)) else { continue };
             let (direction, hidden) = Direction::of_portal(&portal.name);
             let (side, height) = (portal.side, portal.height);
-            let same = |e: &&mut Exit| {
-                e.to.id == dest && e.direction == direction && e.side == side && e.height == height
-            };
+            let same =
+                |e: &&mut Exit| e.to.id == dest && e.direction == direction && e.side == side && e.height == height;
             match exits.iter_mut().find(same) {
                 Some(exit) => {
                     exit.portals.push(portal.name.clone());
@@ -770,6 +810,7 @@ pub(crate) mod tests {
                     name: "Shell Sorting".into(),
                     npc_id: Some(50),
                     level_min: Some(3),
+                    next_quest_id: None,
                     requirements: vec![
                         MobRequirement { mob_id: 10, count: 8 },
                         MobRequirement { mob_id: 12, count: 2 },
@@ -780,6 +821,7 @@ pub(crate) mod tests {
                     name: "Slime Samples".into(),
                     npc_id: Some(51),
                     level_min: Some(1),
+                    next_quest_id: None,
                     requirements: vec![MobRequirement { mob_id: 11, count: 5 }],
                 },
             ],
@@ -811,9 +853,40 @@ pub(crate) mod tests {
                 name: "Shell Sorting".into(),
                 npc_id: None,
                 level_min: Some(1),
+                next_quest_id: None,
                 requirements: vec![MobRequirement { mob_id: 10, count: 8 }],
             }],
         })
+    }
+
+    #[test]
+    fn npcs_tell_maps_with_one_header_apart() {
+        let town = |id| map(id, "Mushroom Town", "Maple Road", vec![]);
+        let atlas = Atlas::new(Dataset {
+            maps: vec![town(10), town(20), map(30, "Harbor", "Main Road", vec![])],
+            monsters: vec![],
+            npcs: vec![
+                NpcRecord { id: 1, name: "Roger".into(), maps: vec![10] },
+                NpcRecord { id: 2, name: "Nina".into(), maps: vec![20] },
+            ],
+            quests: vec![],
+        });
+        let (name, street) = ("Mushrooun Town", Some("Maple Road"));
+
+        assert_eq!(atlas.twin(name, street, &["PebbleThief", "Nina"], None), Some(20));
+        assert_eq!(atlas.twin(name, street, &["Roger"], Some(20)), Some(10));
+        assert_eq!(atlas.twin(name, street, &["PebbleThief"], Some(20)), Some(20), "the last answer stands");
+        assert_eq!(atlas.twin(name, street, &[], None), None);
+        assert_eq!(atlas.twin("Harbor", Some("Main Road"), &["Nina"], Some(20)), None, "leaving lets it go");
+
+        let known = atlas.find_twin(name, street, Some(20)).unwrap();
+        assert_eq!(known.card.map.id, 20);
+        assert!(known.alternatives.is_empty(), "nothing left to ask the player");
+        let unsure = atlas.find_twin(name, street, None).unwrap();
+        assert_eq!((unsure.card.map.id, unsure.alternatives.len()), (10, 1));
+        assert_eq!(atlas.find_twin("Harbor", Some("Main Road"), Some(20)).unwrap().card.map.id, 30);
+
+        assert_eq!(atlas.settled(name, street).unwrap().name, "Mushroom Town", "the spelling at least is certain");
     }
 
     #[test]

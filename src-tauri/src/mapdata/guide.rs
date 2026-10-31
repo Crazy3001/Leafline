@@ -11,8 +11,10 @@ use serde::{Deserialize, Serialize};
 
 use super::atlas::{Atlas, MapRef, QuestRef, Shortcut, fold, similarity};
 use super::drops::{ItemSources, item_key};
+use super::osms::QuestRecord;
 use super::training::{Measured, MeasuredRate};
 use super::travel::Travel;
+use crate::readers::quest::Quest;
 
 /// How closely an objective must match a monster's name to be taken for that monster.
 const MIN_MONSTER_SCORE: f64 = 0.85;
@@ -21,8 +23,48 @@ const MIN_QUEST_MONSTER_SCORE: f64 = 0.7;
 /// How closely a dropper's name on the wiki must match a monster in the map data.
 const MIN_DROPPER_SCORE: f64 = 0.9;
 const MIN_QUEST_SCORE: f64 = 0.8;
+/// Below this a title is another quest, not a bad reading of one already known.
+const MIN_HELD_SCORE: f64 = 0.6;
 const MAPS_PER_MONSTER: usize = 4;
 const DROPPERS_PER_ITEM: usize = 4;
+
+/// The quests matched so far in a live run, with what each one counts. OCR can read one title
+/// differently from one moment to the next as the scenery moves behind the panel, so a reading
+/// too rough to match keeps the quest it most resembles rather than losing the match.
+#[derive(Default)]
+pub struct QuestTitles {
+    known: Vec<(String, Vec<String>)>,
+}
+
+impl QuestTitles {
+    /// Gives each quest the data's name, from its title or the known quest it most resembles.
+    pub fn settle(&mut self, atlas: &Atlas, quests: &mut [Quest]) {
+        for quest in quests {
+            let targets: Vec<String> = quest.objectives.iter().map(|o| o.target.clone()).collect();
+            if let Some(id) = atlas.find_quest(&quest.title) {
+                quest.title = atlas.quests[&id].name.clone();
+                self.known.retain(|(name, _)| *name != quest.title);
+                self.known.push((quest.title.clone(), targets));
+            } else if let Some(name) = self.closest(&quest.title, &targets) {
+                quest.title = name.to_string();
+            }
+        }
+    }
+
+    /// The known quest counting the same things, or else with the most similar name.
+    fn closest(&self, title: &str, targets: &[String]) -> Option<&str> {
+        let query = fold(title);
+        self.known
+            .iter()
+            .map(|(name, known)| {
+                let same = !targets.is_empty() && known == targets;
+                (if same { 1.0 } else { similarity(&query, &fold(name)) }, name.as_str())
+            })
+            .filter(|(score, _)| *score >= MIN_HELD_SCORE)
+            .max_by(|a, b| a.0.total_cmp(&b.0))
+            .map(|(_, name)| name)
+    }
+}
 
 /// One quest as the Quest Helper showed it.
 #[derive(Debug, Clone, Deserialize)]
@@ -48,6 +90,10 @@ pub struct QuestInfo {
     pub giver: Option<String>,
     /// Where the quest giver stands.
     pub giver_maps: Vec<MapRef>,
+    /// Who takes the quest in, when something shows it. Not always the giver.
+    pub turn_in: Option<String>,
+    /// Where they stand.
+    pub turn_in_maps: Vec<MapRef>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -141,7 +187,7 @@ struct Context {
 
 impl Atlas {
     /// A guide for each quest. `from` is the map the player is on, for portal counts; `items`
-    /// holds the wiki lookups made so far for item objectives; `measured` the EXP rates the
+    /// holds the drop table's answers for item objectives; `measured` the EXP rates the
     /// player recorded, matched to maps by name; `travel` the rides and scrolls turned on.
     pub fn quest_guide(
         &self,
@@ -332,21 +378,44 @@ impl Atlas {
 
     fn quest_info(&self, id: u32) -> Option<QuestInfo> {
         let quest = self.quests.get(&id)?;
-        let mut giver_maps: Vec<MapRef> = match quest.npc_id {
-            Some(npc) => self
-                .npcs_on
-                .iter()
-                .filter(|(_, npcs)| npcs.contains(&npc))
-                .map(|(map, _)| self.map_ref(*map))
-                .filter(|m| m.known)
-                .collect(),
-            None => Vec::new(),
-        };
-        giver_maps.sort_by_key(|m| m.id);
+        let name = |npc: Option<u32>| npc.and_then(|n| self.npc_names.get(&n).cloned());
+        let maps = |npc: Option<u32>| npc.map(|n| self.npc_maps(n)).unwrap_or_default();
+        let turn_in = self.turn_in(quest);
         Some(QuestInfo {
             quest: self.quest_ref(id)?,
-            giver: quest.npc_id.and_then(|n| self.npc_names.get(&n).cloned()),
-            giver_maps,
+            giver: name(quest.npc_id),
+            giver_maps: maps(quest.npc_id),
+            turn_in: name(turn_in),
+            turn_in_maps: maps(turn_in),
+        })
+    }
+
+    /// Where an NPC stands.
+    fn npc_maps(&self, npc: u32) -> Vec<MapRef> {
+        let mut maps: Vec<MapRef> = self
+            .npcs_on
+            .iter()
+            .filter(|(_, npcs)| npcs.contains(&npc))
+            .map(|(map, _)| self.map_ref(*map))
+            .filter(|m| m.known)
+            .collect();
+        maps.sort_by_key(|m| m.id);
+        maps
+    }
+
+    /// Who a quest is handed in to. The data has no field for it, so this goes by what shows
+    /// it: the next quest of a chain starts with them, or the title ends `to Heena`. Otherwise
+    /// it stays unknown: the giver is not a safe guess, being someone else on over half the
+    /// chained quests.
+    fn turn_in(&self, quest: &QuestRecord) -> Option<u32> {
+        let next = quest.next_quest_id.and_then(|id| self.quests.get(&id)).and_then(|q| q.npc_id);
+        next.or_else(|| {
+            let (_, name) = quest.name.rsplit_once(" to ")?;
+            let name = name.trim_end_matches(['.', '!', '?']);
+            let mut named: Vec<u32> =
+                self.npc_names.iter().filter(|(_, n)| n.as_str() == name).map(|(id, _)| *id).collect();
+            named.sort_unstable();
+            named.into_iter().find(|&id| !self.npc_maps(id).is_empty())
         })
     }
 }
@@ -356,6 +425,7 @@ mod tests {
     use super::*;
     use crate::mapdata::atlas::tests::{island_world, world};
     use crate::mapdata::drops::Dropper;
+    use crate::readers::quest::Objective;
 
     fn query(title: &str, objectives: &[&str]) -> QuestQuery {
         QuestQuery { title: title.into(), objectives: objectives.iter().map(|o| o.to_string()).collect() }
@@ -396,6 +466,60 @@ mod tests {
         let maps: Vec<(&str, u32, Option<u32>)> =
             hunt.maps.iter().map(|g| (g.map.name.as_str(), g.count, g.hops)).collect();
         assert_eq!(maps, [("Mossbank Meadow I", 6, Some(2)), ("Mossbank Meadow II", 2, Some(3))]);
+    }
+
+    #[test]
+    fn a_garbled_title_keeps_the_quest_read_before_it() {
+        let atlas = world();
+        let mut titles = QuestTitles::default();
+        let mut settle = |title: &str, target: &str| {
+            let objectives = vec![Objective { target: target.into(), current: 0, required: 8 }];
+            let mut quests = [Quest { title: title.into(), objectives }];
+            titles.settle(&atlas, &mut quests);
+            quests[0].title.clone()
+        };
+        const GARBLED: &str = "Sheli Sor 101ng";
+        assert_eq!(settle(GARBLED, "Pebble Snail"), GARBLED, "nothing to hold on to yet");
+        assert_eq!(settle("Shell Sortng", "Pebble Snail"), "Shell Sorting");
+        assert_eq!(settle(GARBLED, "Pebble Snail"), "Shell Sorting");
+        assert_eq!(settle(GARBLED, "Pebb1e Snail"), "Shell Sorting", "resembles it, counter or not");
+        assert_eq!(settle("", "Pebble Snail"), "Shell Sorting", "the title lost, the same counter");
+        assert_eq!(settle("Another Errand", "Moss Slime"), "Another Errand");
+        assert_eq!(settle("", "Moss Slime"), "");
+    }
+
+    #[test]
+    fn a_title_garbled_live_is_too_rough_to_match_but_close_enough_to_hold() {
+        let score = similarity(&fold("Blinging a Mil 101 to Heena"), &fold("Bringing a Mirror to Heena"));
+        assert!((MIN_HELD_SCORE..MIN_QUEST_SCORE).contains(&score), "scored {score}");
+    }
+
+    #[test]
+    fn a_quest_is_turned_in_only_where_something_shows_it() {
+        let mut atlas = world();
+        let mut add = |id, name: &str, npc_id, next_quest_id| {
+            let name = name.into();
+            let quest =
+                QuestRecord { id, name, npc_id: Some(npc_id), level_min: None, next_quest_id, requirements: vec![] };
+            atlas.quests.insert(id, quest);
+        };
+        add(80, "Borrowing a Lamp", 50, Some(81));
+        add(81, "Bringing a Lamp to Warden Ilse", 51, None);
+        add(82, "Lamp Oil", 51, None);
+        add(83, "A Trip to Town", 51, None);
+
+        let chained = atlas.quest_info(80).unwrap();
+        assert_eq!(chained.giver.as_deref(), Some("Warden Ilse"));
+        assert_eq!(chained.turn_in.as_deref(), Some("Innkeeper Bo"));
+        assert_eq!(chained.turn_in_maps.iter().map(|m| m.id).collect::<Vec<_>>(), [5]);
+
+        let titled = atlas.quest_info(81).unwrap();
+        assert_eq!(titled.giver.as_deref(), Some("Innkeeper Bo"));
+        assert_eq!(titled.turn_in.as_deref(), Some("Warden Ilse"));
+        assert_eq!(titled.turn_in_maps.iter().map(|m| m.id).collect::<Vec<_>>(), [1]);
+
+        assert_eq!(atlas.quest_info(82).unwrap().turn_in, None);
+        assert_eq!(atlas.quest_info(83).unwrap().turn_in, None, "`to` followed by no NPC");
     }
 
     #[test]

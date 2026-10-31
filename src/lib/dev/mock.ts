@@ -222,8 +222,8 @@ const mockWindows: GameWindow[] = [
 ];
 const settingsHandlers: ((settings: DisplaySettings) => void)[] = [];
 
-/** Quest items the mock wiki has been asked about. */
-const lookedUpItems = new Set<string>();
+/** Whether the mock drop table has been downloaded. */
+let dropsDownloaded = false;
 
 const pins: PinStatus = preview?.pins ?? { pinned: [], hidden: false };
 const pinHandlers: ((status: PinStatus) => void)[] = [];
@@ -291,10 +291,11 @@ export const mockBackend: Backend = {
     { action: "TogglePins", keys: "Ctrl+Alt+P", defaultKeys: "Ctrl+Alt+P", label: "Show or hide pinned panels" },
     { action: "ToggleCompact", keys: "Ctrl+Alt+H", defaultKeys: "Ctrl+Alt+H", label: "Compact HUD" },
     { action: "ToggleLive", keys: "Ctrl+Alt+R", defaultKeys: "Ctrl+Alt+R", label: "Start or stop live reading" },
+    { action: "ReadItem", keys: "Ctrl+Alt+I", defaultKeys: "Ctrl+Alt+I", label: "Read the item you're hovering, for a price check" },
     { action: "PauseTracking", keys: "Ctrl+Alt+K", defaultKeys: "Ctrl+Alt+K", label: "Pause or resume tracking" },
     { action: "NewSession", keys: "Ctrl+Alt+N", defaultKeys: "Ctrl+Alt+N", label: "Start a new session" },
     { action: "ToggleLogging", keys: "Ctrl+Alt+J", defaultKeys: "Ctrl+Alt+J", label: "Log this run or not" },
-    { action: "SaveFrame", keys: "Ctrl+Alt+F", defaultKeys: "Ctrl+Alt+F", label: "Save the picture live reading last read, to Pictures\\Leafline" },
+    { action: "SaveFrame", keys: "Ctrl+Alt+F", defaultKeys: "Ctrl+Alt+F", label: "Save the picture last read, to Pictures\\Leafline" },
     { action: "ShowWorkbench", keys: "Ctrl+Alt+W", defaultKeys: "Ctrl+Alt+W", label: "Open the workbench" },
   ],
   liveStatus: async () => liveStatus,
@@ -327,6 +328,7 @@ export const mockBackend: Backend = {
     return () => {};
   },
   onFrameSaved: async () => () => {},
+  onItemRead: async () => () => {},
   takeLaunchImage: async () => null,
   onOpenImage: async () => () => {},
   async onAnalysis(handler) {
@@ -380,11 +382,11 @@ export const mockBackend: Backend = {
   async questGuide(quests) {
     if (!mapStatus.ready) return null;
     if (preview?.guide) return preview.guide;
-    return sampleGuide(quests, 2, lookedUpItems);
+    return sampleGuide(quests, 2, dropsDownloaded);
   },
-  async lookUpQuestItems(items) {
+  async downloadDrops() {
     await delay(900);
-    items.forEach((item) => lookedUpItems.add(item));
+    dropsDownloaded = true;
   },
   async trainingSpots() {
     if (!mapStatus.ready) return null;
@@ -478,6 +480,7 @@ export const mockBackend: Backend = {
     pinHandlers.push(handler);
     return () => {};
   },
+  onPinResized: async () => () => {},
   settings: async () => displaySettings,
   async updateSettings(settings) {
     displaySettings = { ...settings };

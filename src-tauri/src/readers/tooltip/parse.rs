@@ -27,6 +27,8 @@ pub struct ItemTooltip {
     pub remaining_enhancements: Option<u32>,
     /// Where the tooltip panel was found, in frame pixels.
     pub panel: Rect,
+    /// An item with no stats: only the name and `item_type`, which holds any tags, are read.
+    pub plain: bool,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
@@ -102,6 +104,9 @@ const STAT_LABELS: &[&str] = &[
 const REQ_KEYS: [&str; 6] = ["LEV", "STR", "DEX", "INT", "LUK", "FAM"];
 
 static UPGRADES: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\(\s*\+\s*([0-9OoIlSB]{1,2})\s*\)?\s*$").unwrap());
+/// The `(M)` of `White Undershirt (M)`, with OCR's usual brackets, and any `(+N)` after it.
+static SIZE_TAG: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\s*[({\[]\s*([MFU])\s*[)}\]|lI1]?(\s*\(\s*\+.*)?$").unwrap());
 /// `REQ LEV : 25`. Keying often loses the grey `REQ`, so it is optional.
 static REQUIREMENT: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^(?:(\S{2,4})\s*)?([A-Za-z]{2,4})\W*([0-9OoIlSB]{1,3})?\s*$").unwrap());
@@ -185,12 +190,17 @@ pub fn parse(lines: &[Line], separator_y: f32) -> ItemTooltip {
     item
 }
 
-/// Splits `Green Robin Hat (+1)` into the name and the upgrade count.
+/// Splits `Green Robin Hat (+1)` into the name and the upgrade count, and mends the small tag
+/// clothes end with, which OCR can read as `{MI`. Names start with a capital, whatever OCR says.
 pub fn split_name(text: &str) -> (String, Option<u32>) {
-    match UPGRADES.captures(text) {
-        Some(caps) => (text[..caps.get(0).unwrap().start()].trim().to_string(), digitize(&caps[1]).parse().ok()),
-        None => (text.trim().to_string(), None),
-    }
+    let text = SIZE_TAG.replace(text, " ($1)$2");
+    let (name, upgrades) = match UPGRADES.captures(&text) {
+        Some(caps) => (text[..caps.get(0).unwrap().start()].trim(), digitize(&caps[1]).parse().ok()),
+        None => (text.trim(), None),
+    };
+    let mut letters = name.chars();
+    let name = letters.next().map_or(String::new(), |first| first.to_uppercase().chain(letters).collect());
+    (name, upgrades)
 }
 
 /// Matches `REQ LEV : 25`. When OCR split the value onto its own line, the nearest line to
@@ -313,6 +323,17 @@ mod tests {
         assert_eq!(item.stats.len(), 3);
         assert_eq!(item.stats[1], Stat { label: "Weapon Def.".into(), value: 26, base: Some(24), bonus: Some(2) });
         assert_eq!(item.remaining_enhancements, Some(7));
+    }
+
+    #[test]
+    fn a_size_tag_comes_back_whole() {
+        let split = |text| split_name(text);
+        assert_eq!(split("Blue Jean Shorts {MI"), ("Blue Jean Shorts (M)".to_string(), None));
+        assert_eq!(split("White Undershirt (M)"), ("White Undershirt (M)".to_string(), None));
+        assert_eq!(split("Blue Jean Shorts [F) (+2)"), ("Blue Jean Shorts (F)".to_string(), Some(2)));
+        assert_eq!(split("Green Robin Hat (+1)"), ("Green Robin Hat".to_string(), Some(1)));
+        assert_eq!(split("Sera's Mirror"), ("Sera's Mirror".to_string(), None));
+        assert_eq!(split("wooden Club"), ("Wooden Club".to_string(), None));
     }
 
     #[test]

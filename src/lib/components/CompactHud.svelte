@@ -6,7 +6,7 @@
 
   import { backend } from "$lib/api";
   import Logo from "$lib/components/Logo.svelte";
-  import { formatCompact, formatDuration } from "$lib/format";
+  import { formatCompact, formatDuration, objectiveProgress } from "$lib/format";
   import { live } from "$lib/readings.svelte";
   import { display } from "$lib/settings.svelte";
 
@@ -126,16 +126,15 @@
   {:else if objectives.length}
     <ul class="counters">
       {#each objectives as objective, i (i)}
-        {@const done = objective.current >= objective.required}
+        {@const progress = objectiveProgress(objective)}
+        {@const done = progress >= 1}
         <li class:done title={objective.quest}>
           <span class="target">
             {#if done}<Check size={10} />{/if}
             {objective.target}
           </span>
           <span class="count tabular">{objective.current}/{objective.required}</span>
-          <span class="track"
-            ><span class="fill" style:width="{Math.min(1, objective.current / objective.required) * 100}%"></span></span
-          >
+          <span class="track"><span class="fill" style:width="{progress * 100}%"></span></span>
         </li>
       {/each}
     </ul>

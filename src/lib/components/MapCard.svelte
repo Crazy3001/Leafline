@@ -14,11 +14,13 @@
     map,
     session = null,
     variant = "full",
+    plain = false,
   }: {
     map: MapReading | null;
     session?: SessionSummary | null;
-    /** `full` in the workbench, `compact` in the overlay, `pin` in a pinned window. */
-    variant?: "full" | "compact" | "pin";
+    /** `full` in the workbench, `compact` in the overlay and pinned windows. */
+    variant?: "full" | "compact";
+    plain?: boolean;
   } = $props();
 
   const compact = $derived(variant !== "full");
@@ -38,18 +40,20 @@
   // again must not look the map up, which would blank the card and shrink a pinned window.
   const name = $derived(map?.name);
   const street = $derived(map?.street ?? null);
+  const twin = $derived(map?.twin ?? null);
 
   $effect(() => {
     const asked = name;
+    const askedTwin = twin;
     void mapData.status?.dataUpdatedAt;
     browsing = null;
     found = null;
     if (!asked || !ready) return;
     looking = true;
     backend
-      .findMap(asked, street)
+      .findMap(asked, street, askedTwin)
       .then((match) => {
-        if (name === asked) found = match;
+        if (name === asked && twin === askedTwin) found = match;
       })
       .finally(() => (looking = false));
   });
@@ -71,9 +75,9 @@
   const doubtful = $derived(!!found && !browsing && (found.score < 0.85 || found.alternatives.length > 0));
 </script>
 
-<Card title="Map" plain={variant === "pin"}>
+<Card title="Map" {plain}>
   {#snippet aside()}
-    {#if map?.collapsed && !browsing && variant !== "pin"}<span title="Read from the collapsed minimap's title bar">Minimap title</span>{/if}
+    {#if map?.collapsed && !browsing}<span title="Read from the collapsed minimap's title bar">Minimap title</span>{/if}
   {/snippet}
 
   {#if browsing}
@@ -101,7 +105,7 @@
         {/if}
       </div>
     </div>
-    {#if here && !browsing && variant !== "pin"}
+    {#if here && !browsing}
       <dl class="here">
         <div><dt>Time here</dt><dd class="tabular">{formatDuration(here.activeSeconds)}</dd></div>
         <div><dt>EXP / hr</dt><dd class="tabular">{formatCompact(here.expPerHour)}</dd></div>

@@ -35,6 +35,7 @@ You can also pass an image on the command line (`leafline.exe shot.png`), or use
 | `Ctrl+Alt+P` | Show or hide pinned panels |
 | `Ctrl+Alt+H` | Compact HUD |
 | `Ctrl+Alt+R` | Start or stop live reading |
+| `Ctrl+Alt+I` | Read the item you're hovering, for a price check |
 | `Ctrl+Alt+K` | Pause or resume tracking |
 | `Ctrl+Alt+N` | Start a new session |
 | `Ctrl+Alt+J` | Keep this run in the history or out of it |
@@ -51,7 +52,9 @@ On Windows, the overlay and pinned panels snap to the edges of the screen and to
 
 Turn it on under **Settings → Live reading**, then press `Ctrl+Alt+R` or the **Offline** badge on the overlay. Every few seconds Leafline takes a picture of the game window with Windows Graphics Capture, the API OBS and Discord use, and runs it through the same pipeline and session tracker as the workbench. The picture comes from the window itself, so the overlay and anything else in front of it are never in it, and a covered game is still read.
 
-It only looks at the window. It asks Windows for the window's title, class, position and size, and never sends the game a message or opens its process. Pictures stay in memory unless you press **Save frame**. A picture that hasn't changed isn't read again.
+It only looks at the window. It asks Windows for the window's title, class, position and size, and never sends the game a message or opens its process. Pictures stay in memory unless you press **Save frame**. A picture that hasn't changed isn't read again, and pictures are always at least a second apart.
+
+Item tooltips aren't read as you play. Hover an item and press `Ctrl+Alt+I`, and Leafline reads it from a single picture, whether live reading is running or not. The **Live reading** switch in Settings has to be on for this too.
 
 The window is found by its title or class. If Leafline can't tell which window is the game, pick it in Settings; the choice is remembered. If Windows HDR is on for the game's display, the overlay warns you, because readings are unreliable until HDR is off and the game restarted.
 

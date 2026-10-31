@@ -22,6 +22,7 @@ pub enum Action {
     TogglePins,
     ToggleCompact,
     ToggleLive,
+    ReadItem,
     PauseTracking,
     NewSession,
     ToggleLogging,
@@ -30,12 +31,13 @@ pub enum Action {
 }
 
 impl Action {
-    pub const ALL: [Action; 10] = [
+    pub const ALL: [Action; 11] = [
         Action::ToggleOverlay,
         Action::ToggleClickThrough,
         Action::TogglePins,
         Action::ToggleCompact,
         Action::ToggleLive,
+        Action::ReadItem,
         Action::PauseTracking,
         Action::NewSession,
         Action::ToggleLogging,
@@ -50,6 +52,7 @@ impl Action {
             Action::TogglePins => "Ctrl+Alt+P",
             Action::ToggleCompact => "Ctrl+Alt+H",
             Action::ToggleLive => "Ctrl+Alt+R",
+            Action::ReadItem => "Ctrl+Alt+I",
             Action::PauseTracking => "Ctrl+Alt+K",
             Action::NewSession => "Ctrl+Alt+N",
             Action::ToggleLogging => "Ctrl+Alt+J",
@@ -65,10 +68,11 @@ impl Action {
             Action::TogglePins => "Show or hide pinned panels",
             Action::ToggleCompact => "Compact HUD",
             Action::ToggleLive => "Start or stop live reading",
+            Action::ReadItem => "Read the item you're hovering, for a price check",
             Action::PauseTracking => "Pause or resume tracking",
             Action::NewSession => "Start a new session",
             Action::ToggleLogging => "Log this run or not",
-            Action::SaveFrame => "Save the picture live reading last read, to Pictures\\Leafline",
+            Action::SaveFrame => "Save the picture last read, to Pictures\\Leafline",
             Action::ShowWorkbench => "Open the workbench",
         }
     }
@@ -90,6 +94,7 @@ impl Action {
             Action::TogglePins => pins::toggle_visibility(app),
             Action::ToggleCompact => overlay::toggle_compact(app),
             Action::ToggleLive => live::toggle(app),
+            Action::ReadItem => live::read_item(app),
             Action::PauseTracking => {
                 live::toggle_held(app);
                 Ok(())

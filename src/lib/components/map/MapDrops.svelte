@@ -1,10 +1,22 @@
 <script lang="ts">
-  // Drops players logged on mapleclassic.wiki, fetched only when asked for.
-  import { Download, LoaderCircle } from "@lucide/svelte";
+  // Every drop players logged on mapleclassic.wiki for this map's monsters, by item, with who
+  // drops it. The first open downloads the wiki's whole table; lookups stay on this PC.
+  import { LoaderCircle, RefreshCw } from "@lucide/svelte";
+  import { untrack } from "svelte";
 
   import { backend } from "$lib/api";
   import { WIKI_CREDIT, WIKI_URL } from "$lib/mapdata.svelte";
   import type { MonsterDrops } from "$lib/types";
+
+  type Drop = MonsterDrops["drops"][number];
+
+  /** One item on this map, and each monster seen dropping it. */
+  interface MapItem {
+    name: string;
+    category: string | null;
+    quest: boolean;
+    sources: (Drop & { monster: string })[];
+  }
 
   let { monsters }: { monsters: string[] } = $props();
 
@@ -17,7 +29,31 @@
     void monsters.join("|");
     drops = null;
     error = null;
+    untrack(load);
   });
+
+  /** The best rate first; items only listed, with no rate, last. */
+  const items = $derived.by(() => {
+    const byName = new Map<string, MapItem>();
+    for (const entry of drops ?? []) {
+      for (const drop of entry.drops) {
+        let item = byName.get(drop.item);
+        if (!item) {
+          item = { name: drop.item, category: drop.category, quest: false, sources: [] };
+          byName.set(drop.item, item);
+        }
+        item.quest ||= drop.quest;
+        item.sources.push({ ...drop, monster: entry.monster });
+      }
+    }
+    const best = (item: MapItem) => item.sources[0].rate ?? -1;
+    const list = [...byName.values()];
+    for (const item of list) item.sources.sort((a, b) => (b.rate ?? -1) - (a.rate ?? -1));
+    return list.sort((a, b) => best(b) - best(a));
+  });
+
+  const unlogged = $derived((drops ?? []).filter((e) => !e.drops.length).map((e) => e.monster));
+  const fewKills = $derived((drops ?? []).filter((e) => e.sampleKills != null && e.sampleKills < FEW_KILLS));
 
   async function load() {
     loading = true;
@@ -38,12 +74,6 @@
     return value >= 10 ? `${value.toFixed(0)}%` : `${value.toFixed(1)}%`;
   }
 
-  function sample(entry: MonsterDrops) {
-    return [entry.sampleKills ? `${entry.sampleKills.toLocaleString()} kills` : null, entry.gameVersion && `v${entry.gameVersion}`]
-      .filter(Boolean)
-      .join(" · ");
-  }
-
   /** Below this many kills, drops rarer than about 1 in N are likely missing from the log. */
   const FEW_KILLS = 200;
 
@@ -51,124 +81,122 @@
     return `${WIKI_URL}/index.php?search=${encodeURIComponent(monster)}&go=Go`;
   }
 
-  function range(low: number | null, high: number | null) {
-    return low != null && high != null ? `Likely between ${low}% and ${high}%` : "";
+  function quantity(drop: Drop) {
+    if (drop.minQuantity == null || drop.maxQuantity == null) return "";
+    return ` ×${drop.minQuantity === drop.maxQuantity ? drop.minQuantity : `${drop.minQuantity}–${drop.maxQuantity}`}`;
+  }
+
+  /** How solid a rate is, for the tooltip. */
+  function evidence(drop: Drop) {
+    return [
+      drop.rateLow != null && drop.rateHigh != null ? `Likely between ${drop.rateLow}% and ${drop.rateHigh}%` : null,
+      drop.sampleKills ? `${drop.sampleKills.toLocaleString()} kills logged` : null,
+      drop.gameVersion && `v${drop.gameVersion}`,
+    ]
+      .filter(Boolean)
+      .join(" · ");
   }
 </script>
 
 {#if drops}
-  {#each drops as entry (entry.monster)}
-    <div class="monster">
-      <div class="head">
-        <button class="name" title="Open {entry.monster} on mapleclassic.wiki" onclick={() => backend.openLink(wikiPage(entry.monster))}
-          >{entry.monster}</button
-        >
-        <span class="sample">{sample(entry)}</span>
-      </div>
-      {#if entry.drops.length}
-        <ul>
-          {#each entry.drops as drop}
-            <li class:unmeasured={drop.rate == null}>
-              <span class="rate tabular" title={range(drop.rateLow, drop.rateHigh)}>{percent(drop.rate)}</span>
-              <span class="item">
-                {drop.item}
-                {#if drop.minQuantity != null && drop.maxQuantity != null}
-                  <span class="qty">
-                    ×{drop.minQuantity === drop.maxQuantity ? drop.minQuantity : `${drop.minQuantity}–${drop.maxQuantity}`}
-                  </span>
-                {/if}
-                {#if drop.quest}<span class="tag">quest</span>{/if}
+  {#if items.length}
+    <ul class="items">
+      {#each items as item (item.name)}
+        <li>
+          <div class="item">
+            <span class="name">{item.name}</span>
+            {#if item.quest}<span class="tag">quest</span>{/if}
+            {#if item.category}<span class="cat">{item.category}</span>{/if}
+          </div>
+          <div class="sources">
+            {#each item.sources as source (source.monster)}
+              <span class="source" class:unmeasured={source.rate == null} title={evidence(source)}>
+                <button
+                  class="monster"
+                  title="Open {source.monster} on mapleclassic.wiki"
+                  onclick={() => backend.openLink(wikiPage(source.monster))}>{source.monster}</button
+                >
+                <span class="rate tabular">{percent(source.rate)}{quantity(source)}</span>
               </span>
-              {#if drop.category}<span class="cat">{drop.category}</span>{/if}
-            </li>
-          {/each}
-        </ul>
-      {:else}
-        <p class="note">No drops logged yet.</p>
-      {/if}
-      {#if entry.sampleKills != null && entry.sampleKills < FEW_KILLS}
-        <p class="few">
-          Only {entry.sampleKills} kills logged, so drops rarer than about 1 in {entry.sampleKills}, such as most equips
-          and potions, may not show up yet.
-        </p>
-      {/if}
-    </div>
-  {/each}
+            {/each}
+          </div>
+        </li>
+      {/each}
+    </ul>
+  {:else}
+    <p class="note">No drops logged for this map's monsters yet.</p>
+  {/if}
+  {#if items.length && unlogged.length}
+    <p class="note none">Nothing logged yet for {unlogged.join(", ")}.</p>
+  {/if}
+  {#if fewKills.length}
+    <p class="few">
+      Few kills logged for {fewKills.map((e) => `${e.monster} (${e.sampleKills})`).join(", ")}, so rarer drops, such as
+      most equips and potions, may not show up yet.
+    </p>
+  {/if}
   <p class="credit">
     Rates are what players saw, not the game's tables; small samples can be far off. "?" means listed but not
     measured.
     <button class="link" onclick={() => backend.openLink(WIKI_URL)}>{WIKI_CREDIT}</button>
   </p>
+{:else if error}
+  <p class="error">{error}</p>
+  <button class="load" onclick={load} disabled={loading}><RefreshCw size={13} />Try again</button>
 {:else}
-  <p class="note">Drops aren't in the game data. Players log them on mapleclassic.wiki, with how many kills each rate is based on.</p>
-  <button class="load" onclick={load} disabled={loading}>
-    {#if loading}<span class="spin"><LoaderCircle size={13} /></span>Asking the wiki…{:else}<Download size={13} />Load
-      player-observed drops{/if}
-  </button>
-  {#if error}<p class="error">{error}</p>{/if}
+  <p class="note"><span class="spin"><LoaderCircle size={13} /></span> Loading drops…</p>
 {/if}
 
 <style>
-  .monster + .monster {
-    margin-top: 10px;
-  }
-
-  .head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 8px;
-    margin-bottom: 3px;
-  }
-
-  .name {
-    padding: 0;
-    border: 0;
-    background: transparent;
-    font-size: 12px;
-    font-weight: 600;
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .name:hover {
-    color: var(--map);
-    text-decoration: underline;
-  }
-
-  .few {
-    margin: 4px 0 0;
-    padding: 4px 7px;
-    border-radius: var(--radius-sm);
-    background: var(--warn-soft);
-    color: var(--muted);
-    font-size: 10.5px;
-  }
-
-  .sample {
-    font-size: 10.5px;
-    color: var(--faint);
-    white-space: nowrap;
-  }
-
-  ul {
+  .items {
     display: grid;
-    gap: 1px;
+    gap: 7px;
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
-  li {
-    display: grid;
-    grid-template-columns: 40px 1fr auto;
+  .item {
+    display: flex;
     align-items: baseline;
-    gap: 8px;
-    font-size: 11.5px;
+    gap: 4px;
+    font-size: 12px;
+  }
+
+  .name {
+    min-width: 0;
+    font-weight: 600;
+  }
+
+  .sources {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 10px;
+    font-size: 11px;
+  }
+
+  .source {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 4px;
+  }
+
+  .monster {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    font-size: 11px;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .monster:hover {
+    color: var(--map);
+    text-decoration: underline;
   }
 
   .rate {
-    text-align: right;
     color: var(--accent);
     font-weight: 600;
   }
@@ -177,12 +205,13 @@
     color: var(--faint);
   }
 
-  .item {
-    min-width: 0;
-  }
-
-  .qty {
+  .few {
+    margin: 8px 0 0;
+    padding: 4px 7px;
+    border-radius: var(--radius-sm);
+    background: var(--warn-soft);
     color: var(--muted);
+    font-size: 10.5px;
   }
 
   .tag {
@@ -195,14 +224,19 @@
   }
 
   .cat {
+    margin-left: auto;
     font-size: 10px;
     color: var(--faint);
   }
 
   .note {
-    margin: 0 0 8px;
+    margin: 0;
     font-size: 11.5px;
     color: var(--faint);
+  }
+
+  .none {
+    margin-top: 8px;
   }
 
   .load {
@@ -259,7 +293,7 @@
   }
 
   .error {
-    margin: 6px 0 0;
+    margin: 0 0 6px;
     font-size: 11.5px;
     color: var(--bad);
   }

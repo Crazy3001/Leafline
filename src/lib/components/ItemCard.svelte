@@ -28,7 +28,7 @@
 <Card {title} {plain}>
   {#snippet aside()}
     <!-- Upgrades are read from the name's (+N) suffix, so say nothing when the name is unreadable. -->
-    {#if item.name}
+    {#if item.name && !item.plain}
       <span class="verdict" class:upgraded>
         {upgraded ? `Upgraded +${item.upgrades}` : "No upgrades"}
       </span>
@@ -63,14 +63,16 @@
     <p class="property"><span>{property.label}</span>{property.value}</p>
   {/each}
 
-  <div class="chips">
-    {#each requirementKeys as [key, label] (key)}
-      {@const value = item.requirements[key]}
-      <span class="chip req" class:zero={!value} class:unread={value == null}>
-        {label}<b class="tabular">{value ?? "?"}</b>
-      </span>
-    {/each}
-  </div>
+  {#if !item.plain}
+    <div class="chips">
+      {#each requirementKeys as [key, label] (key)}
+        {@const value = item.requirements[key]}
+        <span class="chip req" class:zero={!value} class:unread={value == null}>
+          {label}<b class="tabular">{value ?? "?"}</b>
+        </span>
+      {/each}
+    </div>
+  {/if}
 
   {#if item.jobs.length}
     <div class="chips jobs">
@@ -80,7 +82,7 @@
     </div>
   {/if}
 
-  <PriceLog {item} compact={plain} />
+  <PriceLog {item} />
 </Card>
 
 <style>

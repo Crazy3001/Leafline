@@ -215,6 +215,8 @@ pub struct QuestRecord {
     /// The NPC who gives the quest.
     pub npc_id: Option<u32>,
     pub level_min: Option<u32>,
+    /// The quest this one leads to.
+    pub next_quest_id: Option<u32>,
     /// Only the monsters to hunt are kept; other requirement types are skipped.
     #[serde(default, deserialize_with = "mob_requirements")]
     pub requirements: Vec<MobRequirement>,

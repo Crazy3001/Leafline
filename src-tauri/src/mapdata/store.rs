@@ -1,7 +1,7 @@
 //! The local SQLite cache of downloaded map data.
 //!
 //! Each OSMS file is kept with the checksum it was downloaded at, so a later check can skip
-//! files that have not changed. Wiki drops are cached per monster with the time they were
+//! files that have not changed. The wiki's drop table is kept whole, with the time it was
 //! fetched.
 
 use std::collections::{BTreeMap, HashMap};
@@ -10,7 +10,7 @@ use std::path::Path;
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use serde::Serialize;
 
-use super::drops::{Drop, Dropper, ItemSources, MonsterDrops};
+use super::drops::{Drop, Dropper, MonsterDrops};
 use super::osms::{
     Dataset, FILES, FileMeta, Height, MapRecord, Meta, MobRequirement, MonsterRecord, NpcRecord, Portal, QuestRecord,
     Records, Side, Spawn,
@@ -18,7 +18,7 @@ use super::osms::{
 use crate::error::Result;
 
 /// Bump when the tables change; an older cache is then dropped and downloaded again.
-const CACHE_VERSION: i32 = 2;
+const CACHE_VERSION: i32 = 3;
 
 const SCHEMA: &str = "
 CREATE TABLE source_files (
@@ -38,7 +38,7 @@ CREATE TABLE monsters (
 CREATE TABLE spawns (mob_id INTEGER NOT NULL, map_id INTEGER NOT NULL, count INTEGER NOT NULL, PRIMARY KEY (mob_id, map_id));
 CREATE TABLE npcs (id INTEGER PRIMARY KEY, name TEXT NOT NULL);
 CREATE TABLE npc_maps (npc_id INTEGER NOT NULL, map_id INTEGER NOT NULL, PRIMARY KEY (npc_id, map_id));
-CREATE TABLE quests (id INTEGER PRIMARY KEY, name TEXT NOT NULL, npc_id INTEGER, level_min INTEGER);
+CREATE TABLE quests (id INTEGER PRIMARY KEY, name TEXT NOT NULL, npc_id INTEGER, level_min INTEGER, next_quest_id INTEGER);
 CREATE TABLE quest_mobs (quest_id INTEGER NOT NULL, mob_id INTEGER NOT NULL, count INTEGER NOT NULL);
 CREATE TABLE drops (
     monster TEXT NOT NULL, item TEXT NOT NULL, category TEXT, rate REAL, rate_low REAL, rate_high REAL,
@@ -48,14 +48,20 @@ CREATE INDEX drops_by_monster ON drops (monster);
 CREATE TABLE drop_fetches (monster TEXT PRIMARY KEY, fetched_at INTEGER NOT NULL, sample_kills INTEGER, game_version TEXT);
 ";
 
-/// Tables added since cache version 1. They only hold what the wiki was asked, so they are
-/// created alongside an existing cache instead of forcing a new download.
-const ADDITIONS: &str = "
-CREATE TABLE IF NOT EXISTS item_lookups (key TEXT PRIMARY KEY, item TEXT, fetched_at INTEGER NOT NULL);
-CREATE TABLE IF NOT EXISTS item_droppers (
-    key TEXT NOT NULL, monster TEXT NOT NULL, rate REAL, rate_low REAL, rate_high REAL,
-    sample_kills INTEGER, game_version TEXT, quest INTEGER NOT NULL);
+/// Tables from when items were asked about one at a time. The whole drop table replaces them,
+/// so they are removed from an existing cache without forcing a new download.
+const RETIRED: &str = "
+DROP TABLE IF EXISTS item_lookups;
+DROP TABLE IF EXISTS item_droppers;
 ";
+
+/// Where the time the drop table was downloaded is kept in `source_info`.
+const DROPS_FETCHED_AT: &str = "drops_fetched_at";
+
+/// Kept in `source_info` when a new version of Leafline replaces the cache: the player had
+/// downloaded the map data or drop table, so each comes back without asking again.
+const WANTS_MAPS: &str = "wants_maps";
+const WANTS_DROPS: &str = "wants_drops";
 
 /// The tables that hold each OSMS file, cleared before the file is stored again.
 fn tables_of(file: &str) -> &'static [&'static str] {
@@ -116,7 +122,11 @@ impl Store {
     fn init(conn: Connection) -> Result<Self> {
         let version: i32 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
         if version != CACHE_VERSION {
-            // A cache from another version of Leafline: start over rather than guess.
+            // A cache from another version of Leafline: start over rather than guess. Tables an
+            // older cache lacks count as empty.
+            let held = |sql: &str| conn.query_row(sql, [], |row| row.get::<_, i64>(0)).unwrap_or(0) > 0;
+            let maps = held("SELECT COUNT(*) FROM source_files");
+            let drops = held("SELECT COUNT(*) FROM source_info WHERE key = 'drops_fetched_at'");
             let tables: Vec<String> = conn
                 .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")?
                 .query_map([], |row| row.get(0))?
@@ -126,9 +136,24 @@ impl Store {
             }
             conn.execute_batch(SCHEMA)?;
             conn.pragma_update(None, "user_version", CACHE_VERSION)?;
+            for (key, wanted) in [(WANTS_MAPS, maps), (WANTS_DROPS, drops)] {
+                if wanted {
+                    conn.execute("INSERT INTO source_info (key, value) VALUES (?1, '1')", [key])?;
+                }
+            }
         }
-        conn.execute_batch(ADDITIONS)?;
+        conn.execute_batch(RETIRED)?;
         Ok(Self { conn })
+    }
+
+    /// Whether the player downloaded the map data before this cache replaced an older one.
+    pub fn wants_maps(&self) -> Result<bool> {
+        Ok(self.info(WANTS_MAPS)?.is_some())
+    }
+
+    /// Whether the drop table should be kept up to date.
+    pub fn wants_drops(&self) -> Result<bool> {
+        Ok(self.drops_fetched_at()?.is_some() || self.info(WANTS_DROPS)?.is_some())
     }
 
     /// The checksum each cached file was downloaded at.
@@ -303,7 +328,8 @@ impl Store {
             let (quest, need) = row?;
             needs.entry(quest).or_default().push(need);
         }
-        let mut stmt = self.conn.prepare("SELECT id, name, npc_id, level_min FROM quests ORDER BY id")?;
+        let mut stmt =
+            self.conn.prepare("SELECT id, name, npc_id, level_min, next_quest_id FROM quests ORDER BY id")?;
         let quests = stmt.query_map([], |row| {
             let id: u32 = row.get(0)?;
             Ok(QuestRecord {
@@ -311,37 +337,40 @@ impl Store {
                 name: row.get(1)?,
                 npc_id: row.get(2)?,
                 level_min: row.get(3)?,
+                next_quest_id: row.get(4)?,
                 requirements: needs.remove(&id).unwrap_or_default(),
             })
         })?;
         Ok(quests.collect::<rusqlite::Result<_>>()?)
     }
 
-    /// Cached drops for `monsters` fetched after `since`, and the monsters that need fetching.
-    pub fn cached_drops(&self, monsters: &[String], since: i64) -> Result<(Vec<MonsterDrops>, Vec<String>)> {
-        let mut found = Vec::new();
-        let mut missing = Vec::new();
+    /// When the drop table was downloaded, or `None` if it has not been.
+    pub fn drops_fetched_at(&self) -> Result<Option<i64>> {
+        Ok(self.info(DROPS_FETCHED_AT)?.and_then(|v| v.parse().ok()))
+    }
+
+    /// The downloaded drops of each of `monsters`. One the table doesn't list comes back with
+    /// no drops.
+    pub fn drops(&self, monsters: &[String]) -> Result<Vec<MonsterDrops>> {
+        let fetched_at = self.drops_fetched_at()?.unwrap_or_default();
+        let mut found = Vec::with_capacity(monsters.len());
         for monster in monsters {
-            let fetch: Option<(i64, Option<u32>, Option<String>)> = self
+            let summary: Option<(Option<u32>, Option<String>)> = self
                 .conn
-                .query_row(
-                    "SELECT fetched_at, sample_kills, game_version FROM drop_fetches WHERE monster = ?1",
-                    [monster],
-                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-                )
+                .query_row("SELECT sample_kills, game_version FROM drop_fetches WHERE monster = ?1", [monster], |row| {
+                    Ok((row.get(0)?, row.get(1)?))
+                })
                 .optional()?;
-            match fetch {
-                Some((fetched_at, sample_kills, game_version)) if fetched_at > since => found.push(MonsterDrops {
-                    monster: monster.clone(),
-                    sample_kills,
-                    game_version,
-                    fetched_at,
-                    drops: self.drops_of(monster)?,
-                }),
-                _ => missing.push(monster.clone()),
-            }
+            let (sample_kills, game_version) = summary.unwrap_or_default();
+            found.push(MonsterDrops {
+                monster: monster.clone(),
+                sample_kills,
+                game_version,
+                fetched_at,
+                drops: self.drops_of(monster)?,
+            });
         }
-        Ok((found, missing))
+        Ok(found)
     }
 
     fn drops_of(&self, monster: &str) -> Result<Vec<Drop>> {
@@ -352,8 +381,7 @@ impl Store {
         )?;
         let drops = stmt.query_map([monster], |row| {
             Ok(Drop {
-                // Drops cached before names were unescaped still hold `&#039;`.
-                item: super::drops::unescape(&row.get::<_, String>(0)?),
+                item: row.get(0)?,
                 category: row.get(1)?,
                 rate: row.get(2)?,
                 rate_low: row.get(3)?,
@@ -369,12 +397,39 @@ impl Store {
         Ok(drops.collect::<rusqlite::Result<_>>()?)
     }
 
-    /// Replaces the cached drops of every monster in `fetched`, including ones the wiki had
-    /// nothing for, so they are not asked about again until the cache expires.
-    pub fn save_drops(&mut self, fetched: &BTreeMap<String, MonsterDrops>) -> Result<()> {
+    /// Every item the table lists, for matching what was read against.
+    pub fn dropped_items(&self) -> Result<Vec<String>> {
+        let mut stmt = self.conn.prepare("SELECT DISTINCT item FROM drops ORDER BY item")?;
+        let items = stmt.query_map([], |row| row.get(0))?;
+        Ok(items.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// The monsters the table lists for `item`, with their rates.
+    pub fn droppers(&self, item: &str) -> Result<Vec<Dropper>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT monster, rate, rate_low, rate_high, sample_kills, game_version, quest
+             FROM drops WHERE item = ?1 ORDER BY rowid",
+        )?;
+        let droppers = stmt.query_map([item], |row| {
+            Ok(Dropper {
+                monster: row.get(0)?,
+                rate: row.get(1)?,
+                rate_low: row.get(2)?,
+                rate_high: row.get(3)?,
+                sample_kills: row.get(4)?,
+                game_version: row.get(5)?,
+                quest: row.get(6)?,
+            })
+        })?;
+        Ok(droppers.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// Replaces the whole drop table, so a monster the wiki no longer lists goes with it.
+    pub fn replace_drops(&mut self, table: &BTreeMap<String, MonsterDrops>, now: i64) -> Result<()> {
         let tx = self.conn.transaction()?;
-        for (monster, entry) in fetched {
-            tx.execute("DELETE FROM drops WHERE monster = ?1", [monster])?;
+        tx.execute("DELETE FROM drops", [])?;
+        tx.execute("DELETE FROM drop_fetches", [])?;
+        for (monster, entry) in table {
             for d in &entry.drops {
                 tx.execute(
                     "INSERT INTO drops (monster, item, category, rate, rate_low, rate_high, min_quantity,
@@ -401,72 +456,9 @@ impl Store {
                 params![monster, entry.fetched_at, entry.sample_kills, entry.game_version],
             )?;
         }
-        tx.commit()?;
-        Ok(())
-    }
-}
-
-impl Store {
-    /// Cached droppers for each item key looked up after `since`, and the keys that need asking.
-    pub fn cached_item_sources(&self, keys: &[String], since: i64) -> Result<(Vec<ItemSources>, Vec<String>)> {
-        let mut found = Vec::new();
-        let mut missing = Vec::new();
-        for key in keys {
-            let lookup: Option<(Option<String>, i64)> = self
-                .conn
-                .query_row("SELECT item, fetched_at FROM item_lookups WHERE key = ?1", [key], |row| {
-                    Ok((row.get(0)?, row.get(1)?))
-                })
-                .optional()?;
-            match lookup {
-                Some((item, fetched_at)) if fetched_at > since => {
-                    let mut stmt = self.conn.prepare(
-                        "SELECT monster, rate, rate_low, rate_high, sample_kills, game_version, quest
-                         FROM item_droppers WHERE key = ?1 ORDER BY rowid",
-                    )?;
-                    let droppers = stmt.query_map([key], |row| {
-                        Ok(Dropper {
-                            monster: row.get(0)?,
-                            rate: row.get(1)?,
-                            rate_low: row.get(2)?,
-                            rate_high: row.get(3)?,
-                            sample_kills: row.get(4)?,
-                            game_version: row.get(5)?,
-                            quest: row.get(6)?,
-                        })
-                    })?;
-                    let droppers = droppers.collect::<rusqlite::Result<_>>()?;
-                    found.push(ItemSources { key: key.clone(), item, fetched_at, droppers });
-                }
-                _ => missing.push(key.clone()),
-            }
-        }
-        Ok((found, missing))
-    }
-
-    /// Replaces what is cached for one item lookup, including a lookup that found nothing.
-    pub fn save_item_sources(&mut self, sources: &ItemSources) -> Result<()> {
-        let tx = self.conn.transaction()?;
-        tx.execute("DELETE FROM item_droppers WHERE key = ?1", [&sources.key])?;
-        for d in &sources.droppers {
-            tx.execute(
-                "INSERT INTO item_droppers (key, monster, rate, rate_low, rate_high, sample_kills, game_version, quest)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-                params![
-                    sources.key,
-                    d.monster,
-                    d.rate,
-                    d.rate_low,
-                    d.rate_high,
-                    d.sample_kills,
-                    d.game_version,
-                    d.quest
-                ],
-            )?;
-        }
         tx.execute(
-            "INSERT OR REPLACE INTO item_lookups (key, item, fetched_at) VALUES (?1, ?2, ?3)",
-            params![sources.key, sources.item, sources.fetched_at],
+            "INSERT OR REPLACE INTO source_info (key, value) VALUES (?1, ?2)",
+            [DROPS_FETCHED_AT, &now.to_string()],
         )?;
         tx.commit()?;
         Ok(())
@@ -527,14 +519,51 @@ fn insert_npcs(tx: &Transaction, npcs: &[NpcRecord]) -> Result<()> {
 }
 
 fn insert_quests(tx: &Transaction, quests: &[QuestRecord]) -> Result<()> {
-    let mut quest =
-        tx.prepare("INSERT OR REPLACE INTO quests (id, name, npc_id, level_min) VALUES (?1, ?2, ?3, ?4)")?;
+    let mut quest = tx.prepare(
+        "INSERT OR REPLACE INTO quests (id, name, npc_id, level_min, next_quest_id) VALUES (?1, ?2, ?3, ?4, ?5)",
+    )?;
     let mut need = tx.prepare("INSERT INTO quest_mobs (quest_id, mob_id, count) VALUES (?1, ?2, ?3)")?;
     for q in quests {
-        quest.execute(params![q.id, q.name, q.npc_id, q.level_min])?;
+        quest.execute(params![q.id, q.name, q.npc_id, q.level_min, q.next_quest_id])?;
         for r in &q.requirements {
             need.execute(params![q.id, r.mob_id, r.count])?;
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A cache left by the version of Leafline before this one.
+    fn older_cache(setup: &str) -> Connection {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(SCHEMA).unwrap();
+        conn.execute_batch(setup).unwrap();
+        conn.pragma_update(None, "user_version", CACHE_VERSION - 1).unwrap();
+        conn
+    }
+
+    const A_FILE: &str = "INSERT INTO source_files VALUES ('maps.json', 'abc', 1, 'today', 0);";
+    const DROPS: &str = "INSERT INTO source_info VALUES ('drops_fetched_at', '5');";
+
+    #[test]
+    fn a_replaced_cache_remembers_what_the_player_downloaded() {
+        let store = Store::init(older_cache(&format!("{A_FILE}{DROPS}"))).unwrap();
+        assert!(!store.status().unwrap().ready, "the old data is gone");
+        assert!(store.wants_maps().unwrap());
+        assert!(store.wants_drops().unwrap());
+        assert_eq!(store.drops_fetched_at().unwrap(), None);
+
+        let store = Store::init(older_cache(A_FILE)).unwrap();
+        assert!(store.wants_maps().unwrap());
+        assert!(!store.wants_drops().unwrap(), "the drop table was never asked for");
+    }
+
+    #[test]
+    fn nothing_comes_down_until_the_player_asks() {
+        assert!(!Store::open_in_memory().unwrap().wants_maps().unwrap());
+        assert!(!Store::init(older_cache("")).unwrap().wants_maps().unwrap());
+    }
 }

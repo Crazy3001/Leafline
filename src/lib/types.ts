@@ -28,6 +28,8 @@ export interface HudReading {
   expPercent: number | null;
   /** The HUD font has not been learned at this size, or shows a character not seen yet. */
   needsCalibration: boolean;
+  /** The level shows a digit not learned yet. The session tracker follows it from the EXP meanwhile. */
+  levelUnread: boolean;
 }
 
 /** What the user reads off their HUD to teach Leafline its font. */
@@ -91,6 +93,8 @@ export interface ItemTooltip {
   properties: Property[];
   remainingEnhancements: number | null;
   panel: Rect;
+  /** An item with no stats: only the name and `itemType`, which holds any tags, are read. */
+  plain: boolean;
 }
 
 export interface Objective {
@@ -123,6 +127,8 @@ export interface MapReading {
   /** Read from the collapsed minimap's one-line title. */
   collapsed: boolean;
   rect: Rect;
+  /** Which map this is, when the header alone can't say and the live loop worked it out. */
+  twin: number | null;
 }
 
 export interface Word {
@@ -160,6 +166,14 @@ export interface Analysis {
   timings: Timing[];
   /** Parts that hit an error this time. The rest were still read. */
   failed: string[];
+}
+
+/** How a price check went. */
+export interface ItemRead {
+  /** Item tooltips found, the compared item included. */
+  found: number;
+  /** Why no picture could be read. */
+  problem: string | null;
 }
 
 /** The overlay's tabs, each of which can be pinned into a window of its own. */
@@ -576,7 +590,14 @@ export interface ObjectiveGuide {
 
 export interface QuestGuide {
   title: string;
-  quest: { quest: QuestRef; giver: string | null; giverMaps: MapRef[] } | null;
+  quest: {
+    quest: QuestRef;
+    giver: string | null;
+    giverMaps: MapRef[];
+    /** Who takes the quest in, when something shows it. Not always the giver. */
+    turnIn: string | null;
+    turnInMaps: MapRef[];
+  } | null;
   objectives: ObjectiveGuide[];
 }
 

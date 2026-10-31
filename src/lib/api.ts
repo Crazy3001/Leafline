@@ -13,6 +13,7 @@ import type {
   Calibration,
   DisplaySettings,
   GameWindow,
+  ItemRead,
   LiveStatus,
   TravelInfo,
   Guide,
@@ -77,6 +78,8 @@ export interface Backend {
   saveLiveFrame(): Promise<string>;
   onLive(handler: (status: LiveStatus) => void): Promise<UnlistenFn>;
   onFrameSaved(handler: (path: string) => void): Promise<UnlistenFn>;
+  /** A price check from the hotkey has ended. */
+  onItemRead(handler: (read: ItemRead) => void): Promise<UnlistenFn>;
   /** An image passed on the command line at startup, once. */
   takeLaunchImage(): Promise<string | null>;
   /** Images passed to later launches while the app is already running. */
@@ -91,23 +94,29 @@ export interface Backend {
   /** The explicit "Download map data" action. Without `force`, skipped if checked in the last day. */
   downloadMapData(force: boolean): Promise<MapDataDownload>;
   /** The card for an OCR'd minimap header, or null without a close enough match or any data. */
-  findMap(name: string, street: string | null): Promise<MapMatch | null>;
+  findMap(name: string, street: string | null, twin: number | null): Promise<MapMatch | null>;
   mapCard(id: number): Promise<MapDetails | null>;
   searchMaps(text: string): Promise<MapRef[]>;
   mapRoute(from: number, to: number): Promise<MapRoute | null>;
-  /** Player-observed drops from mapleclassic.wiki, cached for a week. */
+  /** Player-observed drops, from a copy of mapleclassic.wiki's table renewed weekly. */
   monsterDrops(monsters: string[]): Promise<MonsterDrops[]>;
   /** Where to go for each quest objective, from cached data only. Null until map data is downloaded. */
   questGuide(
     quests: QuestQuery[],
     mapName: string | null,
     mapStreet: string | null,
+    mapTwin: number | null,
     measured: MeasuredRate[],
   ): Promise<Guide | null>;
-  /** Asks mapleclassic.wiki which monsters drop these quest items; cached for a week. */
-  lookUpQuestItems(items: string[]): Promise<void>;
+  /** Downloads mapleclassic.wiki's whole drop table, so quest items can be looked up on this PC. */
+  downloadDrops(): Promise<void>;
   /** Every map with monsters to hunt, with the rates the player measured. Null until map data is downloaded. */
-  trainingSpots(mapName: string | null, mapStreet: string | null, measured: MeasuredRate[]): Promise<TrainingSpots | null>;
+  trainingSpots(
+    mapName: string | null,
+    mapStreet: string | null,
+    mapTwin: number | null,
+    measured: MeasuredRate[],
+  ): Promise<TrainingSpots | null>;
   /** Opens one of the card's link-outs or credits in the browser. */
   openLink(url: string): Promise<void>;
   onMapData(handler: (status: MapDataStatus) => void): Promise<UnlistenFn>;
@@ -139,6 +148,8 @@ export interface Backend {
   pinPanel(panel: Panel): Promise<PinStatus>;
   unpinPanel(panel: Panel): Promise<PinStatus>;
   onPins(handler: (status: PinStatus) => void): Promise<UnlistenFn>;
+  /** The player resized the calling pinned panel, with its new width and height in screen units. */
+  onPinResized(handler: (size: [number, number]) => void): Promise<UnlistenFn>;
   settings(): Promise<DisplaySettings>;
   updateSettings(settings: DisplaySettings): Promise<DisplaySettings>;
   onSettings(handler: (settings: DisplaySettings) => void): Promise<UnlistenFn>;
@@ -192,6 +203,7 @@ const tauriBackend: Backend = {
   saveLiveFrame: () => invoke("save_live_frame"),
   onLive: (handler) => listen<LiveStatus>("live", (e) => handler(e.payload)),
   onFrameSaved: (handler) => listen<string>("frame-saved", (e) => handler(e.payload)),
+  onItemRead: (handler) => listen<ItemRead>("item-read", (e) => handler(e.payload)),
   takeLaunchImage: () => invoke("take_launch_image"),
   onOpenImage: (handler) => listen<string>("open-image", (e) => handler(e.payload)),
   onAnalysis: (handler) => listen<Analysis>("analysis", (e) => handler(e.payload)),
@@ -200,16 +212,16 @@ const tauriBackend: Backend = {
   onOverlayStatus: (handler) => listen<OverlayStatus>("overlay-status", (e) => handler(e.payload)),
   mapDataStatus: () => invoke("map_data_status"),
   downloadMapData: (force) => invoke("download_map_data", { force }),
-  findMap: (name, street) => invoke("find_map", { name, street }),
+  findMap: (name, street, twin) => invoke("find_map", { name, street, twin }),
   mapCard: (id) => invoke("map_card", { id }),
   searchMaps: (text) => invoke("search_maps", { text }),
   mapRoute: (from, to) => invoke("map_route", { from, to }),
   monsterDrops: (monsters) => invoke("monster_drops", { monsters }),
-  questGuide: (quests, mapName, mapStreet, measured) => invoke("quest_guide", { quests, mapName, mapStreet, measured }),
-  lookUpQuestItems: async (items) => {
-    await invoke("look_up_quest_items", { items });
-  },
-  trainingSpots: (mapName, mapStreet, measured) => invoke("training_spots", { mapName, mapStreet, measured }),
+  questGuide: (quests, mapName, mapStreet, mapTwin, measured) =>
+    invoke("quest_guide", { quests, mapName, mapStreet, mapTwin, measured }),
+  downloadDrops: () => invoke("download_drops"),
+  trainingSpots: (mapName, mapStreet, mapTwin, measured) =>
+    invoke("training_spots", { mapName, mapStreet, mapTwin, measured }),
   openLink: (url) => invoke("open_link", { url }),
   onMapData: (handler) => listen<MapDataStatus>("map-data", (e) => handler(e.payload)),
   priceLog: (item, upgrades, slots) => invoke("price_log", { item, upgrades, slots }),
@@ -236,6 +248,7 @@ const tauriBackend: Backend = {
   pinPanel: (panel) => invoke("pin_panel", { panel }),
   unpinPanel: (panel) => invoke("unpin_panel", { panel }),
   onPins: (handler) => listen<PinStatus>("pins", (e) => handler(e.payload)),
+  onPinResized: (handler) => getCurrentWindow().listen<[number, number]>("pin-resized", (e) => handler(e.payload)),
   settings: () => invoke("get_settings"),
   updateSettings: (settings) => invoke("update_settings", { settings }),
   onSettings: (handler) => listen<DisplaySettings>("settings", (e) => handler(e.payload)),

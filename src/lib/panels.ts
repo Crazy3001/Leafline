@@ -9,16 +9,17 @@ export interface PanelInfo {
   id: Panel;
   title: string;
   icon: typeof Activity;
-  /** Width of the pinned window, matching `Panel::width` in src-tauri/src/app/pins.rs. */
-  pinWidth: number;
 }
 
+/** Width of a pinned window, matching `WIDTH` in src-tauri/src/app/pins.rs. */
+export const PIN_WIDTH = 340;
+
 export const PANELS: PanelInfo[] = [
-  { id: "stats", title: "Stats", icon: Activity, pinWidth: 264 },
-  { id: "map", title: "Map", icon: MapIcon, pinWidth: 300 },
-  { id: "train", title: "Train", icon: Swords, pinWidth: 300 },
-  { id: "quests", title: "Quests", icon: ScrollText, pinWidth: 280 },
-  { id: "item", title: "Item", icon: Tag, pinWidth: 300 },
+  { id: "stats", title: "Stats", icon: Activity },
+  { id: "map", title: "Map", icon: MapIcon },
+  { id: "train", title: "Train", icon: Swords },
+  { id: "quests", title: "Quests", icon: ScrollText },
+  { id: "item", title: "Item", icon: Tag },
 ];
 
 export function panelInfo(id: Panel): PanelInfo {
