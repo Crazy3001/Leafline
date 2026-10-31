@@ -4,21 +4,21 @@
 //! coordinates, so it works at any resolution. Everything else is placed relative to the gauge
 //! slots, in units of the slot height, using proportions measured on Classic's default HUD.
 //!
-//! The numbers use a tiny pixel font that general OCR misreads, so they are read with glyph
-//! templates the user teaches once by typing what their HUD shows ([`calibrate`]). Job and name
-//! use a plainer font and go through OCR.
+//! The numbers use a tiny pixel font that general OCR misreads, so they are read by rules about
+//! their shape ([`digits`]). Job and name use a plainer font and go through OCR.
 
 use std::sync::LazyLock;
 
 use image::Rgba;
 use regex::Regex;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
+use super::digits;
 use super::text::{best_match, digitize, parse_grouped};
 use super::ui::{self, CANONICAL_SCALE, Canonical};
-use crate::error::{Error, Result};
-use crate::vision::glyphs::{GlyphSet, MIN_SIMILARITY, Mask, ink_columns, ink_rows};
-use crate::vision::{Frame, Ocr, Rect, color, group_lines, preprocess};
+use crate::error::Result;
+use crate::vision::glyphs::{Mask, ink_columns, ink_rows};
+use crate::vision::{Frame, Line, Ocr, Rect, color, group_lines, preprocess};
 
 #[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -32,12 +32,6 @@ pub struct HudReading {
     /// The EXP percentage, when the HUD shows it with no points beside it, as it does at high
     /// levels.
     pub exp_percent: Option<f32>,
-    /// The gauges could not all be read because the HUD font has not been learned at this size,
-    /// or shows a character not seen yet. Calibrating fixes it.
-    pub needs_calibration: bool,
-    /// The level shows a digit not learned yet, which a new level often does. The session
-    /// tracker follows the level from the EXP meanwhile, so nothing is lost.
-    pub level_unread: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
@@ -68,49 +62,8 @@ pub struct HudLayout {
     pub identity: Rect,
 }
 
-/// The HUD's two pixel fonts, learned from the user's screen.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct HudFont {
-    /// Gauge values and EXP: digits, `/`, separators and `%`.
-    pub values: GlyphSet,
-    /// The bold level digits.
-    pub level: GlyphSet,
-    /// Character names calibrated so far, which OCR sometimes misreads.
-    #[serde(default)]
-    pub names: Vec<KnownName>,
-}
-
-/// A character name and how the HUD draws it. Names are matched whole, because the letters of
-/// the HUD's name font touch and cannot be split reliably.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct KnownName {
-    pub name: String,
-    pub mask: Mask,
-}
-
-/// What the user reads off their HUD during calibration.
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct HudValues {
-    pub level: u32,
-    pub hp: (u32, u32),
-    pub mp: (u32, u32),
-    pub exp_points: u64,
-    /// As shown, for example `25.42`; a trailing `%` is optional.
-    pub exp_percent: String,
-    pub name: Option<String>,
-}
-
-/// Which fields calibration could match to the screen.
-#[derive(Debug, Clone, Default, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Calibration {
-    pub learned: Vec<&'static str>,
-    pub failed: Vec<&'static str>,
-}
-
-/// The HUD as glyphs are read from it: the frame itself when the UI is at the size fonts are
-/// learned at, otherwise put back on the design grid at that size.
+/// The HUD as glyphs are read from it: the frame itself when the UI is at the size the digits are
+/// read at, otherwise put back on the design grid at that size.
 fn canonical(frame: &Frame, layout: HudLayout) -> Option<(Glyphs, HudLayout)> {
     let scale = ui::hud_scale(frame, &layout);
     if (scale - CANONICAL_SCALE).abs() <= 0.005 {
@@ -121,23 +74,20 @@ fn canonical(frame: &Frame, layout: HudLayout) -> Option<(Glyphs, HudLayout)> {
     Some((Glyphs::extract(&view.frame, &found), view.layout_to_window(&found)))
 }
 
-pub fn read(frame: &Frame, ocr: &Ocr, font: &HudFont) -> Result<Option<(HudLayout, HudReading)>> {
+pub fn read(frame: &Frame, ocr: &Ocr) -> Result<Option<(HudLayout, HudReading)>> {
     let Some(located) = locate(frame) else { return Ok(None) };
     let Some((glyphs, layout)) = canonical(frame, located) else { return Ok(None) };
     let mut reading = HudReading::default();
 
-    reading.hp = font.values.read(&glyphs.hp).and_then(|t| parse_gauge(&t));
-    reading.mp = font.values.read(&glyphs.mp).and_then(|t| parse_gauge(&t));
-    reading.exp = exp_points(&font.values, &glyphs.before_percent)
-        .zip(font.values.read(&glyphs.percent))
-        .and_then(|(points, percent)| parse_exp(&points, &percent));
+    reading.hp = digits::values(&glyphs.hp).and_then(|t| parse_gauge(&t));
+    reading.mp = digits::values(&glyphs.mp).and_then(|t| parse_gauge(&t));
+    let points = digits::values(&glyphs.before_percent).filter(|t| !t.is_empty());
+    reading.exp =
+        points.zip(digits::values(&glyphs.percent)).and_then(|(points, percent)| parse_exp(&points, &percent));
     if glyphs.before_percent.is_empty() {
-        reading.exp_percent = font.values.read(&glyphs.percent).and_then(|t| parse_percent(&t));
+        reading.exp_percent = digits::values(&glyphs.percent).and_then(|t| parse_percent(&t));
     }
-    reading.level = font.level.read(&glyphs.level).and_then(|t| parse_level(&t));
-    reading.needs_calibration =
-        reading.hp.is_none() || reading.mp.is_none() || (reading.exp.is_none() && reading.exp_percent.is_none());
-    reading.level_unread = !glyphs.level.is_empty() && reading.level.is_none();
+    reading.level = digits::number(&glyphs.level).and_then(|t| parse_level(&t));
 
     // Job and name use a plainer font that OCR handles once enlarged and keyed.
     const IDENTITY_SCALE: f32 = 3.0;
@@ -146,62 +96,24 @@ pub fn read(frame: &Frame, ocr: &Ocr, font: &HudFont) -> Result<Option<(HudLayou
     })?;
     let lines = group_lines(&words);
     reading.job = lines.first().map(|l| best_match(&l.text, &JOBS, 0.6).map_or_else(|| l.text.clone(), String::from));
-    // A calibrated name is read exactly by its glyphs; any other name falls back to OCR.
-    let known = glyphs
-        .name
-        .as_ref()
-        .and_then(|mask| font.names.iter().find(|n| n.mask.similarity(mask) >= MIN_SIMILARITY).map(|n| n.name.clone()));
-    reading.name = known.or_else(|| lines.get(1).map(|l| l.text.replace(' ', "")));
+    reading.name = lines.get(1).map(|l| l.text.replace(' ', ""));
 
     Ok(Some((layout, reading)))
 }
 
-/// Learns the HUD font from a frame whose values the user has typed in. Fields that cannot be
-/// matched to the screen (a typo, or something covering the HUD) are reported, not learned.
-pub fn calibrate(frame: &Frame, font: &mut HudFont, values: &HudValues) -> Result<Calibration> {
-    let no_hud = || Error::Invalid("no HUD found in this image".into());
-    let (glyphs, _) = canonical(frame, locate(frame).ok_or_else(no_hud)?).ok_or_else(no_hud)?;
-    let mut report = Calibration::default();
-    let mut record =
-        |field, learned: bool| if learned { report.learned.push(field) } else { report.failed.push(field) };
-
-    record("HP", font.values.learn(&glyphs.hp, &format!("{}/{}", values.hp.0, values.hp.1)));
-    record("MP", font.values.learn(&glyphs.mp, &format!("{}/{}", values.mp.0, values.mp.1)));
-    let points = group_thousands(values.exp_points);
-    let points_glyphs =
-        glyphs.before_percent.len().checked_sub(points.len()).map(|start| &glyphs.before_percent[start..]);
-    record("EXP", points_glyphs.is_some_and(|g| font.values.learn(g, &points)));
-    let percent = format!("{}%", values.exp_percent.trim().trim_end_matches('%'));
-    record("EXP %", font.values.learn(&glyphs.percent, &percent));
-    record("Level", font.level.learn(&glyphs.level, &values.level.to_string()));
-    if let Some(name) = values.name.as_deref().map(str::trim).filter(|n| !n.is_empty()) {
-        let mask = glyphs.name.clone();
-        record("Name", mask.is_some());
-        if let Some(mask) = mask {
-            font.names.retain(|n| n.name != name);
-            font.names.push(KnownName { name: name.to_string(), mask });
-        }
+/// Takes the character's name from the pass over the whole frame, which gets it right where a
+/// crop of it alone stumbles on letters that touch (`PebuieThief`). That pass may miss the line
+/// or read only the job above it, and then the crop's reading stands.
+pub fn settle_name(reading: &mut HudReading, layout: &HudLayout, overview: &[Line]) {
+    let area = layout.identity;
+    let inside = |line: &&Line| {
+        let (x, y) = (line.rect.x, line.rect.center_y());
+        x >= area.x && x <= area.right() && y >= area.y && y <= area.bottom()
+    };
+    let lowest = overview.iter().filter(inside).max_by(|a, b| a.rect.y.total_cmp(&b.rect.y));
+    if let Some(line) = lowest.filter(|line| best_match(&line.text, &JOBS, 0.75).is_none()) {
+        reading.name = Some(line.text.replace(' ', ""));
     }
-    Ok(report)
-}
-
-/// Reads the EXP points, the glyphs between the `EXP.` label and the percentage.
-fn exp_points(font: &GlyphSet, glyphs: &[Mask]) -> Option<String> {
-    let text: String = glyphs.iter().map(|g| font.recognize(g)).collect::<Option<_>>()?;
-    (!text.is_empty()).then_some(text)
-}
-
-/// `24331` as the HUD prints it, `24,331`.
-fn group_thousands(n: u64) -> String {
-    let digits = n.to_string();
-    let mut out = String::new();
-    for (i, c) in digits.chars().enumerate() {
-        if i > 0 && (digits.len() - i).is_multiple_of(3) {
-            out.push(',');
-        }
-        out.push(c);
-    }
-    out
 }
 
 /// The value glyphs around the gauges, split into fields.
@@ -212,8 +124,6 @@ struct Glyphs {
     before_percent: Vec<Mask>,
     percent: Vec<Mask>,
     level: Vec<Mask>,
-    /// The character name, the lower of the two identity lines, as one mask.
-    name: Option<Mask>,
 }
 
 impl Glyphs {
@@ -227,9 +137,9 @@ impl Glyphs {
 
         // The values sit between green brackets, which also mark the digit rows. The labels in
         // front (HP, MP, EXP.) are bold and taller, so ink above the brackets marks a label.
-        let (level, name) = (level_glyphs(frame, layout), name_glyphs(frame, layout));
+        let level = level_glyphs(frame, layout);
         let Some(rows) = ink_rows(frame, layout.labels, is_bracket) else {
-            return Self { hp: vec![], mp: vec![], before_percent: vec![], percent: vec![], level, name };
+            return Self { hp: vec![], mp: vec![], before_percent: vec![], percent: vec![], level };
         };
         let label_band = Rect::from_edges(layout.labels.x, layout.labels.y, layout.labels.right(), rows.0 as f32);
         let mask = |cols: (u32, u32)| Mask::new(frame, cols, rows, is_light_text);
@@ -249,20 +159,13 @@ impl Glyphs {
         let (_, hp) = bracketed(hp);
         let (_, mp) = bracketed(mp);
         let (before_percent, percent) = bracketed(exp);
-        Self { hp, mp, before_percent, percent, level, name }
+        Self { hp, mp, before_percent, percent, level }
     }
 }
 
 /// The level digits, white on orange tiles.
 fn level_glyphs(frame: &Frame, layout: &HudLayout) -> Vec<Mask> {
     layout.level.map_or_else(Vec::new, |area| glyphs_in(frame, area, is_level_digit))
-}
-
-fn name_glyphs(frame: &Frame, layout: &HudLayout) -> Option<Mask> {
-    let area = Rect::from_edges(layout.identity.x, layout.hp.y, layout.identity.right(), layout.identity.bottom());
-    let rows = ink_rows(frame, area, is_light_text)?;
-    let columns = ink_columns(frame, area, is_light_text);
-    Some(Mask::new(frame, (columns.first()?.0, columns.last()?.1), rows, is_light_text))
 }
 
 /// One mask per run of inked columns, all spanning the inked rows of `area`.
@@ -514,6 +417,26 @@ mod tests {
     }
 
     #[test]
+    fn the_name_comes_from_the_whole_frame_when_it_read_one() {
+        let area = Rect::new(500.0, 1380.0, 300.0, 60.0);
+        let slot = Rect::new(0.0, 0.0, 10.0, 10.0);
+        let layout = HudLayout { hp: slot, mp: slot, exp: slot, labels: slot, level: None, identity: area };
+        let line = |text: &str, x: f32, y: f32| {
+            let rect = Rect::new(x, y, 120.0, 20.0);
+            Line { text: text.into(), rect, words: vec![] }
+        };
+        let settled = |overview: &[Line]| {
+            let mut reading = HudReading { name: Some("PebuieThief".into()), ..HudReading::default() };
+            settle_name(&mut reading, &layout, overview);
+            reading.name.unwrap()
+        };
+        assert_eq!(settled(&[line("Beginner", 510.0, 1385.0), line("PebbleThief", 510.0, 1410.0)]), "PebbleThief");
+        assert_eq!(settled(&[line("PebbleThief", 510.0, 1410.0)]), "PebbleThief");
+        assert_eq!(settled(&[line("Beginner", 510.0, 1385.0)]), "PebuieThief", "only the job was read");
+        assert_eq!(settled(&[line("Someone", 900.0, 1000.0)]), "PebuieThief", "another player's name tag");
+    }
+
+    #[test]
     fn scenery_spaced_like_the_gauges_is_not_the_hud() {
         let frame = picture(&[
             (396, 936, 160, RED),
@@ -559,12 +482,5 @@ mod tests {
         assert_eq!(parse_level("30"), Some(30));
         assert_eq!(parse_level("0"), None);
         assert_eq!(parse_level("3/0"), None);
-    }
-
-    #[test]
-    fn thousands_are_grouped_like_the_hud() {
-        assert_eq!(group_thousands(24331), "24,331");
-        assert_eq!(group_thousands(331), "331");
-        assert_eq!(group_thousands(1234567), "1,234,567");
     }
 }

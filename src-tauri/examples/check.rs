@@ -3,13 +3,11 @@
 //! `cargo run --release --example check -- [folder]` (default `../test-screenshots`)
 //!
 //! The folder needs an `expected.json` mapping each file name to what the screenshot really
-//! shows; fields left out are not scored. The HUD font is first learned from the files listed
-//! under `_calibrate` and saved beside them as `hud-font.json`. Prints every mismatch and a total.
+//! shows; fields left out are not scored. Prints every mismatch and a total.
 
 use std::path::PathBuf;
 
 use leafline_lib::pipeline;
-use leafline_lib::readers::hud::{self, HudFont, HudValues};
 use leafline_lib::vision::{self, Ocr};
 use serde_json::{Map, Value};
 
@@ -20,30 +18,10 @@ fn main() {
             .expect("parse expected.json");
     let ocr = Ocr::new().expect("OCR engine");
 
-    // Teach the HUD font from the screenshots listed under `_calibrate`, as a user would.
-    let mut font = HudFont::default();
-    for file in expected["_calibrate"].as_array().into_iter().flatten().filter_map(Value::as_str) {
-        let hud = &expected[file]["hud"];
-        let pair = |v: &Value| (v[0].as_u64().unwrap() as u32, v[1].as_u64().unwrap() as u32);
-        let values = HudValues {
-            level: hud["level"].as_u64().unwrap() as u32,
-            hp: pair(&hud["hp"]),
-            mp: pair(&hud["mp"]),
-            exp_points: hud["exp"][0].as_u64().unwrap(),
-            exp_percent: format!("{:.2}", hud["exp"][1].as_f64().unwrap()),
-            name: hud["name"].as_str().map(String::from),
-        };
-        let frame = vision::load(&folder.join(file)).expect("load image");
-        let report = hud::calibrate(&frame, &mut font, &values).expect("calibrate");
-        println!("calibrated on {file}: learned {:?}, failed {:?}", report.learned, report.failed);
-    }
-    // Saved for `analyze --font`; the folder is git-ignored like the screenshots it came from.
-    std::fs::write(folder.join("hud-font.json"), serde_json::to_string_pretty(&font).unwrap()).expect("save font");
-
     let mut score = Score::default();
     for (file, want) in expected.iter().filter(|(k, _)| !k.starts_with('_')) {
         let frame = vision::load(&folder.join(file)).expect("load image");
-        let got = serde_json::to_value(pipeline::analyze(&frame, &ocr, &font).expect("analyze")).unwrap();
+        let got = serde_json::to_value(pipeline::analyze(&frame, &ocr).expect("analyze")).unwrap();
         let before = score.clone();
         let mut check = |what: String, want: &Value, got: &Value| score.check(file, what, want, got);
 

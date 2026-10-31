@@ -40,7 +40,14 @@
       <div class="name">{hud?.name ?? "Unknown character"}</div>
       <div class="mesos tabular">
         <span class="coin" aria-hidden="true"></span>
-        {mesos ? `${formatNumber(mesos.mesos)} mesos` : "Mesos not visible"}
+        {#if mesos}
+          {formatNumber(mesos.mesos)} mesos
+        {:else if session?.mesos != null}
+          {formatNumber(session.mesos)} mesos
+          <span class="seen">(last seen {formatDuration(session.mesosAge)} ago)</span>
+        {:else}
+          Mesos not visible
+        {/if}
       </div>
     </div>
   </div>
@@ -55,12 +62,6 @@
       value={hud?.exp ? `${formatNumber(hud.exp.points)} · ${formatPercent(hud.exp.percent)}` : formatPercent(expPercent)}
     />
   </div>
-
-  {#if hud?.needsCalibration}
-    <p class="calibrate">Teach Leafline your HUD in the workbench to read HP, MP and EXP.</p>
-  {:else if hud?.levelUnread}
-    <p class="calibrate">New level digit: your level is worked out from EXP until you teach it in the workbench.</p>
-  {/if}
 
   <dl class="rates" class:live={session != null}>
     {#if percentOnly}
@@ -98,7 +99,7 @@
     </div>
   {/if}
   {#if !session}
-    <p class="hint">Rates appear once a session is tracked. Replay a folder in the workbench to try it.</p>
+    <p class="hint">Rates appear once a session is tracked.</p>
   {:else if session.expPerHour == null}
     <p class="hint">Rates need at least 30 s of EXP gains with the HUD in view.</p>
   {/if}
@@ -178,6 +179,10 @@
     font-size: 12px;
   }
 
+  .seen {
+    color: var(--faint);
+  }
+
   .coin {
     width: 9px;
     height: 9px;
@@ -188,15 +193,6 @@
   .gauges {
     display: grid;
     gap: 8px;
-  }
-
-  .calibrate {
-    margin: 10px 0 0;
-    padding: 7px 9px;
-    border-radius: var(--radius-sm);
-    background: var(--accent-soft);
-    color: var(--accent-strong);
-    font-size: 12px;
   }
 
   .rates {

@@ -21,12 +21,9 @@ npm install
 npm run tauri dev
 ```
 
-Two windows open:
+The **overlay** opens: the compact, transparent, always-on-top panel. Drag it by its title bar.
 
-- **Overlay**: the compact, transparent, always-on-top panel. Drag it by its title bar.
-- **Workbench**: offline mode. Open a screenshot or a folder of them; the pipeline runs on each, outlines what it found and shows the readings. The overlay updates too, as it would during play. With a folder open, **Replay as session** reads every frame in order as one play session and shows EXP/hour, mesos/hour and time to level, overall and per map (see below).
-
-You can also pass an image on the command line (`leafline.exe shot.png`), or use *Open with*.
+Development builds also open the **workbench**, a tool for working on Leafline that release builds don't have. Open a screenshot or a folder of them; the pipeline runs on each, outlines what it found and shows the readings. The overlay updates too, as it would during play. With a folder open, **Replay as session** reads every frame in order as one play session and shows EXP/hour, mesos/hour and time to level, overall and per map (see below). You can also pass it an image on the command line (`leafline.exe shot.png`), or use *Open with*.
 
 | Hotkey | Action |
 |---|---|
@@ -39,8 +36,8 @@ You can also pass an image on the command line (`leafline.exe shot.png`), or use
 | `Ctrl+Alt+K` | Pause or resume tracking |
 | `Ctrl+Alt+N` | Start a new session |
 | `Ctrl+Alt+J` | Keep this run in the history or out of it |
-| `Ctrl+Alt+F` | Save the picture live reading last read, to `Pictures\Leafline` |
-| `Ctrl+Alt+W` | Open the workbench |
+| `Ctrl+Alt+F` | Save the picture last read, to `Pictures\Leafline` |
+| `Ctrl+Alt+W` | Open the workbench (development builds) |
 
 Change any hotkey, turn one off or turn them all off in Settings.
 
@@ -58,11 +55,11 @@ Item tooltips aren't read as you play. Hover an item and press `Ctrl+Alt+I`, and
 
 The window is found by its title or class. If Leafline can't tell which window is the game, pick it in Settings; the choice is remembered. If Windows HDR is on for the game's display, the overlay warns you, because readings are unreliable until HDR is off and the game restarted.
 
-### Teaching it your HUD
+### Reading the HUD
 
-The HUD's numbers use a tiny pixel font that general OCR misreads, so Leafline reads them by matching character shapes it learns from your own screen. Open a screenshot in the workbench, type the values your HUD shows (level, name, HP, MP, EXP and EXP %) under **Teach the HUD**, and choose **Learn from this screenshot**. A second screenshot with different numbers fills in any digits the first one did not show. The shapes are saved in the app's data folder and never leave your PC.
+The HUD's numbers use a tiny pixel font that general OCR misreads, so Leafline tells each character apart by rules about its shape: how many closed holes it has, whether its top or bottom row is solid, and which sides have ink partway down. There is nothing to set up, and no font data ships with the app. A shape that fits no rule is left unread rather than guessed.
 
-The game lays its UI out on a 1024×768 grid and scales that to the window, so Leafline puts the HUD back on that grid before reading it. What you teach at one resolution or UI size works at the others.
+The game lays its UI out on a 1024×768 grid and scales that to the window, so Leafline puts the HUD back on that grid before reading it.
 
 ### Session tracking
 
@@ -102,11 +99,10 @@ cd src-tauri
 cargo test                                                      # unit tests
 cargo run --release --example check                             # score readers against expected.json
 cargo run --release --example analyze -- ../test-screenshots/   # readings as JSON
-cargo run --release --example replay -- ../test-screenshots/ --font ../test-screenshots/hud-font.json
-                                                                # replay a folder as a session
+cargo run --release --example replay -- ../test-screenshots/    # replay a folder as a session
 ```
 
-`check` needs a `test-screenshots/expected.json` that maps each file to what the screenshot really shows (see `examples/check.rs`). It teaches the HUD from the files listed under `_calibrate`, saves that as `test-screenshots/hud-font.json`, then prints every mismatch and a score. For `analyze`, add `--font ../test-screenshots/hud-font.json` to read HUD numbers and `--overview` to include every line from the whole-frame OCR pass.
+`check` needs a `test-screenshots/expected.json` that maps each file to what the screenshot really shows (see `examples/check.rs`). It prints every mismatch and a score. For `analyze`, add `--overview` to include every line from the whole-frame OCR pass.
 
 `replay` prints what each frame read and the session summary as JSON; add `--every <seconds>` to order by name instead of file time.
 
@@ -115,8 +111,8 @@ cargo run --release --example replay -- ../test-screenshots/ --font ../test-scre
 ## How it works
 
 ```
-frame ─┬─ HUD reader ──────── finds the HP/MP/EXP gauges by colour; numbers by learned glyphs,
-       │                     job and name by OCR (calibrated names by glyphs)
+frame ─┬─ HUD reader ──────── finds the HP/MP/EXP gauges by colour; numbers by shape rules,
+       │                     job and name by OCR
        ├─ meso reader ─────── white box beside a gold coin; amount only when OCR readings agree
        ├─ map reader ──────── anchored on the minimap's orange WORLD button; reads the expanded
        │                     header or the collapsed title bar, four OCR passes voting per word
@@ -152,7 +148,6 @@ src-tauri/src/
 
 - Tuned on 2560×1440 screenshots. HUD reading is checked on real frames at both 2x and 1.875x; other resolutions are checked on simulated frames only, and Default Ratio (Filter Applied) not at all.
 - **Windows HDR washes out screen captures** (the game itself looks fine). Readers expect HDR off; live reading warns when it is on.
-- Live reading has been tested on saved screenshots shown in a window, not yet on the running game.
 - Windows only. macOS capture and OCR are not built yet.
 - The Quest Helper is translucent with black text: it reads well over dark maps and poorly over bright, busy ones such as Henesys.
 - Meso amounts are skipped when OCR readings disagree (the pixel font's 6 and 8 look alike). When a storage window shows a second box, the amount most boxes agree on wins.
@@ -160,7 +155,7 @@ src-tauri/src/
 - Without the map data, the session tracker keeps map names as read, so an OCR slip shows up as a separate map. Fix one under **History**.
 - Shop, storage and trade windows are recognised by their buttons. This has not been tried on real frames of those windows yet.
 - The party reader is checked on another project's reference frames, not on a party seen through Leafline.
-- Digits your HUD hasn't shown yet aren't known until you teach them, so a new character needs teaching again as its numbers grow.
+- The level's bolder digits are only proven for 0 to 3. Levels showing 4 to 9 rely on those digits having the same shapes as the smaller font.
 - When two readings are far apart and on different maps, the tracker cannot tell where the EXP was earned and lists it under *Between maps*. Frequent screenshots or a recording fix this.
 - A jump of several levels between two readings adds no EXP, because the levels in between were never measured.
 - Session rates have been checked on 14 hand-taken screenshots and synthetic tests, not yet on a continuous recording of real play.

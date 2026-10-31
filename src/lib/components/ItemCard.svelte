@@ -16,7 +16,7 @@
     ["fam", "FAM"],
   ];
 
-  const upgraded = $derived((item.upgrades ?? 0) > 0);
+  const upgraded = $derived(item.upgraded);
   const summary = $derived(
     [
       item.itemType,
@@ -31,7 +31,7 @@
     <!-- Upgrades are read from the name's (+N) suffix, so say nothing when the name is unreadable. -->
     {#if item.name && !item.plain}
       <span class="verdict" class:upgraded>
-        {upgraded ? `Upgraded +${item.upgrades}` : "No upgrades"}
+        {#if item.upgrades}Upgraded +{item.upgrades}{:else if upgraded}Upgraded{:else}No upgrades{/if}
       </span>
     {/if}
   {/snippet}

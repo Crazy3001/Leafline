@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
 use crate::pipeline::{self, Analysis};
-use crate::readers::hud::HudFont;
 use crate::session::{Sample, SessionSummary, SessionTracker, TrackerConfig};
 use crate::vision::{self, Ocr};
 
@@ -81,12 +80,11 @@ pub fn run(
     frames: &[ReplayFrame],
     config: TrackerConfig,
     ocr: &Ocr,
-    font: &HudFont,
     mut on_frame: impl FnMut(usize, &ReplayFrame, &Analysis, &SessionSummary) -> bool,
 ) -> Result<SessionSummary> {
     let mut tracker = SessionTracker::new(config);
     for (i, frame) in frames.iter().enumerate() {
-        let analysis = pipeline::analyze(&vision::load(&frame.path)?, ocr, font)?;
+        let analysis = pipeline::analyze(&vision::load(&frame.path)?, ocr)?;
         tracker.push(&Sample::from_analysis(frame.at, &analysis));
         if !on_frame(i, frame, &analysis, &tracker.summary()) {
             break;

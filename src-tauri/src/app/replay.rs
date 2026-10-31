@@ -6,7 +6,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
 
-use super::calibration::HudFontState;
 use super::overlay::WORKBENCH;
 use super::readings;
 use crate::error::{Error, Result};
@@ -47,13 +46,12 @@ pub async fn replay_session(app: AppHandle, folder: PathBuf, order: Order) -> Re
         return Err(Error::Invalid("A replay is already running.".into()));
     }
     state.cancel.store(false, Ordering::SeqCst);
-    let hud_font = app.state::<HudFontState>().current();
     let handle = app.clone();
     let result = tauri::async_runtime::spawn_blocking(move || -> Result<SessionSummary> {
         let frames = replay::frames(&folder, order)?;
         let total = frames.len();
         let ocr = Ocr::new()?;
-        replay::run(&frames, order.tracker_config(), &ocr, &hud_font, |i, frame, analysis, session| {
+        replay::run(&frames, order.tracker_config(), &ocr, |i, frame, analysis, session| {
             let progress = Progress { done: i + 1, total, path: &frame.path, at: frame.at, analysis, session };
             // A closed window just misses the update; the replay carries on.
             let _ = handle.emit_to(WORKBENCH, PROGRESS_EVENT, &progress);

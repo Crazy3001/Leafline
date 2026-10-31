@@ -20,7 +20,6 @@
   import { isSaved, watchHistory } from "$lib/history.svelte";
   import type {
     Analysis,
-    HudValues,
     Rect,
     ReplayOrder,
     ReplayProgress,
@@ -148,14 +147,6 @@
     } finally {
       busy = false;
     }
-  }
-
-  /** Learns the HUD font from the open screenshot, then reads it again with what was learned. */
-  async function calibrate(values: HudValues) {
-    if (!selected) throw new Error("No screenshot is open.");
-    const result = await backend.calibrateHud(selected, values);
-    await analyze();
-    return result;
   }
 
   function step(offset: number) {
@@ -318,7 +309,7 @@
   <aside class="results">
     {#if analysis}
       {#key selected}
-        <ResultsPanel {analysis} {session} {calibrate} bind:highlight />
+        <ResultsPanel {analysis} {session} bind:highlight />
       {/key}
     {:else}
       <div class="results-empty">Readings appear here.</div>

@@ -83,7 +83,7 @@
   });
 
   /** One line under the header for what needs the player's attention, most urgent first. */
-  const notice = $derived.by((): { tone: "bad" | "warn" | "good" | "quiet"; text: string; teach?: boolean } | null => {
+  const notice = $derived.by((): { tone: "bad" | "warn" | "good" | "quiet"; text: string } | null => {
     const s = live.liveStatus;
     if (liveError) return { tone: "bad", text: liveError };
     if (s.state === "failed") return { tone: "bad", text: `Live reading stopped: ${s.message}` };
@@ -94,8 +94,6 @@
     if (s.state === "waiting") return { tone: "quiet", text: s.reason };
     if (s.state === "reading" && s.hdr)
       return { tone: "warn", text: "Windows HDR is on for the game's display, so readings will be off. Turn HDR off, then restart the game." };
-    if (s.state === "reading" && !s.hudTaught)
-      return { tone: "warn", text: "EXP, HP and MP need the HUD taught once. Save a frame (Ctrl+Alt+F), then teach it in the", teach: true };
     if (live.analysis?.failed.length) return { tone: "warn", text: `Can't read the ${live.analysis.failed.join(", ")} right now.` };
     return null;
   });
@@ -156,16 +154,18 @@
       <span class="actions">
         {#if live.liveStatus.state === "reading"}
           <button
-            title="Save this game picture to Pictures\Leafline, to teach the HUD or report a misread (Ctrl+Alt+F)"
+            title="Save this game picture to Pictures\Leafline, to report a misread (Ctrl+Alt+F)"
             aria-label="Save game picture"
             onclick={saveFrame}
           >
             <Camera size={14} />
           </button>
         {/if}
-        <button title="Open workbench (Ctrl+Alt+W)" aria-label="Open workbench" onclick={() => backend.showWorkbench()}>
-          <PanelsTopLeft size={14} />
-        </button>
+        {#if import.meta.env.DEV}
+          <button title="Open workbench (Ctrl+Alt+W)" aria-label="Open workbench" onclick={() => backend.showWorkbench()}>
+            <PanelsTopLeft size={14} />
+          </button>
+        {/if}
         <button title="Settings" aria-label="Settings" onclick={() => backend.showSettings()}>
           <Settings size={14} />
         </button>
@@ -193,9 +193,7 @@
 
     {#if notice}
       <div class="notice {notice.tone}" role="status">
-        <span
-          >{notice.text}{#if notice.teach}{" "}<button class="inline" onclick={() => backend.showWorkbench()}>workbench</button>.{/if}</span
-        >
+        <span>{notice.text}</span>
         {#if notice.tone === "bad"}
           <button class="dismiss" aria-label="Dismiss" onclick={() => (liveError = null)}><X size={12} /></button>
         {/if}
@@ -253,8 +251,7 @@
               <span class="n">1</span>
               <span
                 >Turn on <button class="inline" onclick={() => backend.showSettings()}>live reading</button> to read the
-                game as you play, or load a screenshot in the
-                <button class="inline" onclick={() => backend.showWorkbench()}>workbench</button>.</span
+                game as you play.</span
               >
             </li>
             <li>
@@ -405,11 +402,6 @@
   .notice.good {
     color: var(--good);
     background: var(--good-soft);
-  }
-
-  .notice .inline {
-    color: inherit;
-    text-decoration: underline;
   }
 
   .dismiss {

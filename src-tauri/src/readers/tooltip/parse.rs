@@ -18,6 +18,8 @@ pub struct ItemTooltip {
     pub name: String,
     /// Successful upgrades, from the `(+N)` suffix on the name.
     pub upgrades: Option<u32>,
+    /// The item has been upgraded, going by its amber name, even if the count couldn't be read.
+    pub upgraded: bool,
     pub item_type: Option<String>,
     pub requirements: Requirements,
     pub jobs: Vec<JobFlag>,
@@ -103,7 +105,11 @@ const STAT_LABELS: &[&str] = &[
 
 const REQ_KEYS: [&str; 6] = ["LEV", "STR", "DEX", "INT", "LUK", "FAM"];
 
-static UPGRADES: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\(\s*\+\s*([0-9OoIlSB]{1,2})\s*\)?\s*$").unwrap());
+/// `(+1)`, also with its opening bracket read as `4` or `1`.
+static UPGRADES: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?:\(|\s[41lI])\s*\+\s*([0-9OoIlSB]{1,2})\s*\)?\s*$").unwrap());
+/// `(+1)` anywhere in a line, for the times OCR reads a wrapped name out of order.
+static ANY_UPGRADES: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\(\s*\+\s*(\d{1,2})").unwrap());
 /// The `(M)` of `White Undershirt (M)`, with OCR's usual brackets, and any `(+N)` after it.
 static SIZE_TAG: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\s*[({\[]\s*([MFU])\s*[)}\]|lI1]?(\s*\(\s*\+.*)?$").unwrap());
@@ -188,6 +194,11 @@ pub fn parse(lines: &[Line], separator_y: f32) -> ItemTooltip {
         (item.name, item.upgrades) = split_name(trim_noise(&line.text));
     }
     item
+}
+
+/// The count in a `(+N)` anywhere in `text`.
+pub fn upgrades_in(text: &str) -> Option<u32> {
+    ANY_UPGRADES.captures(text)?[1].parse().ok()
 }
 
 /// Splits `Green Robin Hat (+1)` into the name and the upgrade count, and mends the small tag
@@ -334,6 +345,15 @@ mod tests {
         assert_eq!(split("Green Robin Hat (+1)"), ("Green Robin Hat".to_string(), Some(1)));
         assert_eq!(split("Sera's Mirror"), ("Sera's Mirror".to_string(), None));
         assert_eq!(split("wooden Club"), ("Wooden Club".to_string(), None));
+        assert_eq!(split("Green Robin Hat 4+1"), ("Green Robin Hat".to_string(), Some(1)));
+        assert_eq!(split("Green Robin Hat 1+1"), ("Green Robin Hat".to_string(), Some(1)));
+        assert_eq!(split("Brown Hard Leather Top (M) (+1)"), ("Brown Hard Leather Top (M)".to_string(), Some(1)));
+    }
+
+    #[test]
+    fn an_upgrade_count_is_found_out_of_order() {
+        assert_eq!(upgrades_in("Brown Hard Leather (+1) Top"), Some(1));
+        assert_eq!(upgrades_in("Brown Hard Leather Top"), None);
     }
 
     #[test]

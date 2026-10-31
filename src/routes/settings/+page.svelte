@@ -428,7 +428,7 @@
       {/if}
       <p class="note">
         Works in windowed mode, and in Full Screen as long as the overlay shows above the game. Pictures stay in memory
-        and are never saved, unless you press Save frame (Ctrl+Alt+F) to keep one for the workbench. Items are read one
+        and are never saved, unless you press Save frame (Ctrl+Alt+F) to keep one. Items are read one
         at a time when you hover one and press Ctrl+Alt+I, whether live reading is running or not. This switch has to be
         on for that too.
       </p>

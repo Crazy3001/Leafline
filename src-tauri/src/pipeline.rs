@@ -5,7 +5,7 @@ use std::time::Instant;
 use serde::Serialize;
 
 use crate::error::Result;
-use crate::readers::hud::{HudFont, HudLayout, HudReading};
+use crate::readers::hud::{HudLayout, HudReading};
 use crate::readers::map::MapReading;
 use crate::readers::mesos::MesoReading;
 use crate::readers::quest::QuestReading;
@@ -59,14 +59,14 @@ fn kept<T>(failed: &mut Vec<&'static str>, part: &'static str, result: Result<T>
 }
 
 /// Reads everything in a saved screenshot.
-pub fn analyze(frame: &Frame, ocr: &Ocr, hud_font: &HudFont) -> Result<Analysis> {
-    read(frame, ocr, hud_font, true)
+pub fn analyze(frame: &Frame, ocr: &Ocr) -> Result<Analysis> {
+    read(frame, ocr, true)
 }
 
 /// Reads a live picture. Item tooltips are left out: [`read_items`] reads those once, when the
 /// player asks.
-pub fn analyze_live(frame: &Frame, ocr: &Ocr, hud_font: &HudFont) -> Result<Analysis> {
-    read(frame, ocr, hud_font, false)
+pub fn analyze_live(frame: &Frame, ocr: &Ocr) -> Result<Analysis> {
+    read(frame, ocr, false)
 }
 
 /// Reads only the item tooltips in `frame`.
@@ -74,7 +74,7 @@ pub fn read_items(frame: &Frame, ocr: &Ocr) -> Result<Vec<ItemTooltip>> {
     tooltip::read_all(frame, &overview(frame, ocr)?, ocr)
 }
 
-fn read(frame: &Frame, ocr: &Ocr, hud_font: &HudFont, items: bool) -> Result<Analysis> {
+fn read(frame: &Frame, ocr: &Ocr, items: bool) -> Result<Analysis> {
     let mut failed = Vec::new();
     let mut timings = Vec::new();
     let mut timed = |stage: &'static str, started: Instant| {
@@ -82,12 +82,16 @@ fn read(frame: &Frame, ocr: &Ocr, hud_font: &HudFont, items: bool) -> Result<Ana
     };
 
     let started = Instant::now();
-    let (hud_layout, hud) = kept(&mut failed, "HUD", hud::read(frame, ocr, hud_font)).flatten().unzip();
+    let (hud_layout, mut hud): (Option<HudLayout>, Option<HudReading>) =
+        kept(&mut failed, "HUD", hud::read(frame, ocr)).flatten().unzip();
     timed("HUD", started);
 
     let started = Instant::now();
     let overview = kept(&mut failed, "text", overview(frame, ocr)).unwrap_or_default();
     timed("Overview OCR", started);
+    if let (Some(hud), Some(layout)) = (hud.as_mut(), hud_layout.as_ref()) {
+        hud::settle_name(hud, layout, &overview);
+    }
 
     let mut tooltips = Vec::new();
     if items {

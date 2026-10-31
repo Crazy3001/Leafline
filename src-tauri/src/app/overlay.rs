@@ -6,7 +6,11 @@ use std::sync::{Mutex, OnceLock};
 
 use serde::{Deserialize, Serialize};
 use tauri::menu::CheckMenuItem;
-use tauri::{AppHandle, Emitter, LogicalSize, Manager, PhysicalSize, WebviewWindow, Wry};
+#[cfg(debug_assertions)]
+use tauri::webview::Color;
+use tauri::{AppHandle, Emitter, LogicalSize, Manager, WebviewWindow, Wry};
+#[cfg(debug_assertions)]
+use tauri::{PhysicalSize, WebviewUrl, WebviewWindowBuilder};
 
 use super::pins;
 use crate::error::{Error, Result};
@@ -194,18 +198,41 @@ pub fn toggle_click_through(app: &AppHandle) -> Result<()> {
     set_click_through(app, !enabled)
 }
 
+/// Shows the workbench, or in a release build, which has none, the overlay.
 pub fn show_workbench(app: &AppHandle) -> Result<()> {
-    let workbench = window(app, WORKBENCH)?;
+    let Some(workbench) = app.get_webview_window(WORKBENCH) else {
+        window(app, OVERLAY)?.show()?;
+        return broadcast(app);
+    };
     workbench.show()?;
     workbench.unminimize()?;
     workbench.set_focus()?;
     Ok(())
 }
 
+/// Opens the workbench, a tool for working on Leafline that players never see. It is made here
+/// and not in `tauri.conf.json` so that a release build has no such window at all.
+#[cfg(debug_assertions)]
+pub fn create_workbench(app: &AppHandle) -> Result<()> {
+    let workbench = WebviewWindowBuilder::new(app, WORKBENCH, WebviewUrl::App("workbench".into()))
+        .title("Leafline — Workbench")
+        .inner_size(1360.0, 860.0)
+        .min_inner_size(960.0, 600.0)
+        .center()
+        .background_color(Color(13, 16, 23, 255))
+        .build()?;
+    fit_workbench(&workbench)
+}
+
+#[cfg(not(debug_assertions))]
+pub fn create_workbench(_app: &AppHandle) -> Result<()> {
+    Ok(())
+}
+
 /// Shrinks the workbench to fit its monitor's work area when the default size is too big
 /// (small or high-DPI screens). A size the user chose is restored before this runs.
-pub fn fit_workbench(app: &AppHandle) -> Result<()> {
-    let workbench = window(app, WORKBENCH)?;
+#[cfg(debug_assertions)]
+fn fit_workbench(workbench: &WebviewWindow) -> Result<()> {
     let Some(monitor) = workbench.current_monitor()? else { return Ok(()) };
     let area = monitor.work_area().size;
     let size = workbench.outer_size()?;

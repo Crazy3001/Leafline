@@ -13,7 +13,6 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
 
-use super::calibration::HudFontState;
 use super::mapdata::MapDataState;
 use super::records::{self, HISTORY_EVENT, UserDataState};
 use super::replay;
@@ -66,8 +65,6 @@ pub enum LiveStatus {
         read_ms: f32,
         /// Windows HDR is on for the game's display, which washes the picture out.
         hdr: bool,
-        /// Whether the HUD font has been taught; without it EXP, HP and MP aren't read.
-        hud_taught: bool,
         /// Tracking is paused by hand.
         held: bool,
         /// This run goes to the log.
@@ -395,9 +392,8 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
         };
         match grabbed {
             Grab::Frame(frame) => {
-                let font = app.state::<HudFontState>().current();
                 let started = Instant::now();
-                let mut analysis = match pipeline::analyze_live(&frame, &ocr, &font) {
+                let mut analysis = match pipeline::analyze_live(&frame, &ocr) {
                     Ok(analysis) => analysis,
                     Err(err) => {
                         report::note(format!("Couldn't read a picture: {err}"));
@@ -466,7 +462,6 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
                         frames,
                         read_ms,
                         hdr: *hdr,
-                        hud_taught: !font.values.is_empty(),
                         held,
                         logging: !state.log_off.load(Ordering::SeqCst),
                     },

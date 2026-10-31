@@ -27,17 +27,6 @@
         "alwaysOnTop": true,
         "skipTaskbar": true,
         "focus": false
-      },
-      {
-        "label": "workbench",
-        "title": "Leafline — Workbench",
-        "url": "/workbench",
-        "width": 1360,
-        "height": 860,
-        "minWidth": 960,
-        "minHeight": 600,
-        "center": true,
-        "backgroundColor": "#0d1017"
       }
     ],
     "security": {

@@ -5,23 +5,19 @@
   import QuestCard from "$lib/components/QuestCard.svelte";
   import SessionCard from "$lib/components/SessionCard.svelte";
   import { formatMs } from "$lib/format";
-  import type { Analysis, Calibration, HudValues, Rect, SessionSummary } from "$lib/types";
-  import HudCalibration from "./HudCalibration.svelte";
+  import type { Analysis, Rect, SessionSummary } from "$lib/types";
 
   let {
     analysis,
     session = null,
     highlight = $bindable(null),
-    calibrate,
   }: {
     analysis: Analysis;
     session?: SessionSummary | null;
     highlight?: Rect | null;
-    calibrate: (values: HudValues) => Promise<Calibration>;
   } = $props();
 
   let tab = $state<"readings" | "text">("readings");
-  let teaching = $state(false);
   const total = $derived(analysis.timings.reduce((sum, t) => sum + t.ms, 0));
 </script>
 
@@ -36,13 +32,6 @@
   <div class="body">
     {#if tab === "readings"}
       <CharacterCard hud={analysis.hud} mesos={analysis.mesos} {session} />
-      {#if analysis.hud}
-        {#if analysis.hud.needsCalibration || analysis.hud.levelUnread || teaching}
-          <HudCalibration hud={analysis.hud} {calibrate} />
-        {:else}
-          <button class="link" onclick={() => (teaching = true)}>Teach the HUD again from this screenshot</button>
-        {/if}
-      {/if}
       {#if session}
         <SessionCard {session} />
       {/if}
@@ -130,22 +119,6 @@
     gap: 10px;
     padding: 12px;
     overflow-y: auto;
-  }
-
-  .link {
-    justify-self: start;
-    padding: 0 2px;
-    border: 0;
-    background: none;
-    color: var(--faint);
-    font-size: 12px;
-    text-decoration: underline;
-    text-underline-offset: 3px;
-    cursor: pointer;
-  }
-
-  .link:hover {
-    color: var(--muted);
   }
 
   .none,
