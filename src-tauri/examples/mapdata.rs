@@ -21,10 +21,14 @@
 //! show for a screenshot (analysis, map match, quest guide, training spots), for the dev UI's
 //! `window.__LEAFLINE_PREVIEW__`. `--travel` fetches the taxis and return scrolls from
 //! mapleclassic.wiki and turns them all on. It holds game data: keep it outside the repo.
+//!
+//! `--builds` lays out a build for every job, with each skill to its maximum in the data's order,
+//! and prints what the planner makes of it.
 
 use std::path::Path;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use leafline_lib::build::{Build, Catalog, Plan, Rules, SkillLevel, Start, Stat, StatGoal, Stats, expand};
 use leafline_lib::mapdata::fetch::{self, Http};
 use leafline_lib::mapdata::{Atlas, MapCard, QuestQuery, Store, Travel, TravelChoice, TravelFile, drops};
 use leafline_lib::pipeline;
@@ -47,6 +51,11 @@ fn main() {
     println!("client build {:?}, data from {:?}", status.client_build, status.data_updated_at);
     let atlas = Atlas::new(store.load().expect("load cache").expect("no map data yet: run with --download"));
     println!("{} maps\n", atlas.map_count());
+
+    if args.iter().any(|a| a == "--builds") {
+        let data = store.load().expect("load cache").expect("no map data yet");
+        print_builds(Catalog::new(data.skills, data.items));
+    }
 
     if let Some(label) = value("--find", 1) {
         let (street, name) = label.split_once(" : ").map_or((None, label.as_str()), |(s, n)| (Some(s), n));
@@ -223,6 +232,37 @@ fn main() {
                 },
                 None => println!("{file:<14} minimap not found"),
             }
+        }
+    }
+}
+
+fn print_builds(catalog: Catalog) {
+    println!("{} skills, {} jobs", catalog.skills().len(), catalog.jobs().len());
+    println!("gear: {} match \"hat\"\n", catalog.search_gear("hat", None).len());
+    for job in catalog.jobs() {
+        let path = [job.parent.unwrap_or(job.id), job.id];
+        let skills: Vec<SkillLevel> = catalog
+            .skills()
+            .iter()
+            .filter(|s| path.contains(&s.job_id))
+            .map(|s| SkillLevel { skill_id: s.id, level: s.max_level })
+            .collect();
+        let build = Build {
+            start: Start { level: 10, stats: Some(Stats { str: 4, dex: 25, int: 4, luk: 12 }), ..Start::default() },
+            plan: Plan {
+                job: job.id,
+                skills,
+                stats: vec![StatGoal { stat: job.primary.unwrap_or(Stat::Luk), target: None, from_level: None }],
+                plan_to: 120,
+                ..Plan::default()
+            },
+            ..Build::default()
+        };
+        let plan = expand(&build, &Rules::default(), &catalog);
+        let last_sp = plan.steps.iter().rev().find(|s| !s.sp.is_empty()).map(|s| s.level);
+        println!("{:>3} {:<14} tier {} last SP spent at {last_sp:?}", job.id, job.name, job.tier);
+        for problem in &plan.problems {
+            println!("      {:?}: {}", problem.severity, problem.message);
         }
     }
 }

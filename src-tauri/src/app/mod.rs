@@ -1,5 +1,6 @@
 //! Tauri wiring: windows, tray, hotkeys and commands.
 
+mod builds;
 mod calibration;
 mod commands;
 mod launch;
@@ -136,6 +137,19 @@ pub fn run() {
             records::set_session_note,
             records::rename_map,
             records::export_csv,
+            builds::build_catalog,
+            builds::search_gear,
+            builds::list_builds,
+            builds::build_plan,
+            builds::active_build,
+            builds::save_build,
+            builds::use_build,
+            builds::delete_build,
+            builds::export_build,
+            builds::import_build,
+            builds::build_item_fit,
+            builds::open_guide,
+            builds::show_build,
             settings::get_settings,
             settings::update_settings,
             settings::show_settings,

@@ -10,6 +10,7 @@ use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder
 use super::overlay::{self, OVERLAY};
 use super::pins;
 use super::shortcuts;
+use crate::build::Rules;
 use crate::capture::WindowChoice;
 use crate::error::{Error, Result};
 use crate::mapdata::TravelChoice;
@@ -34,6 +35,8 @@ pub struct Settings {
     /// Taxis and return scrolls in routes. Off until the player turns it on.
     pub travel: TravelChoice,
     pub live: LiveChoice,
+    /// How points are earned, as the build planner counts them. The player can correct these.
+    pub build_rules: Rules,
 }
 
 impl Default for Settings {
@@ -46,6 +49,7 @@ impl Default for Settings {
             hotkeys: HotkeyChoice::default(),
             travel: TravelChoice::default(),
             live: LiveChoice::default(),
+            build_rules: Rules::default(),
         }
     }
 }
@@ -107,6 +111,7 @@ impl Settings {
                 pause_after: finite(self.live.pause_after, 15.0).clamp(5.0, 300.0),
                 ..self.live
             },
+            build_rules: self.build_rules.clamped(),
             ..self
         }
     }

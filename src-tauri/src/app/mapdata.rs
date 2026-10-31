@@ -10,8 +10,10 @@ use tauri::{AppHandle, Emitter, Manager, State, Url};
 use tauri_plugin_opener::OpenerExt;
 
 use super::settings::SettingsState;
+use crate::build::Catalog;
 use crate::error::{Error, Result};
 use crate::mapdata::fetch::{self, Http};
+use crate::mapdata::osms::Dataset;
 use crate::mapdata::{
     Atlas, DataStatus, MapCard, MapMatch, MapRef, MeasuredRate, MonsterDrops, QuestGuide, QuestQuery, RefreshReport,
     Route, Store, TrainingSpot, Travel, TravelFile, drops,
@@ -39,9 +41,16 @@ const LINK_HOSTS: [&str; 9] = [
     "svelte.dev",
 ];
 
+/// The map data, and the skills and equipment that came with it.
+fn split(mut data: Dataset) -> (Arc<Atlas>, Arc<Catalog>) {
+    let catalog = Catalog::new(std::mem::take(&mut data.skills), std::mem::take(&mut data.items));
+    (Arc::new(Atlas::new(data)), Arc::new(catalog))
+}
+
 pub struct MapDataState {
     path: PathBuf,
     atlas: RwLock<Option<Arc<Atlas>>>,
+    catalog: RwLock<Option<Arc<Catalog>>>,
     downloading: AtomicBool,
     osms: Http,
     /// Shared so every wiki request keeps to its one-a-second pace.
@@ -55,16 +64,17 @@ impl MapDataState {
     pub fn load(app: &AppHandle) -> Result<Self> {
         let path = app.path().app_data_dir()?.join(FILE_NAME);
         // A damaged cache must not stop the app; downloading again rebuilds it.
-        let atlas = match Store::open(&path).and_then(|store| store.load()) {
-            Ok(data) => data.map(|data| Arc::new(Atlas::new(data))),
+        let (atlas, catalog) = match Store::open(&path).and_then(|store| store.load()) {
+            Ok(data) => data.map(split).unzip(),
             Err(err) => {
                 eprintln!("map data cache unreadable: {err}");
-                None
+                (None, None)
             }
         };
         Ok(Self {
             path,
             atlas: RwLock::new(atlas),
+            catalog: RwLock::new(catalog),
             downloading: AtomicBool::new(false),
             osms: Http::new(Duration::from_millis(250)),
             wiki: Http::new(Duration::from_secs(1)),
@@ -76,6 +86,10 @@ impl MapDataState {
         self.atlas.read().expect("atlas lock").clone()
     }
 
+    pub(super) fn catalog(&self) -> Option<Arc<Catalog>> {
+        self.catalog.read().expect("catalog lock").clone()
+    }
+
     fn refresh(&self, force: bool) -> Result<RefreshReport> {
         if self.downloading.swap(true, Ordering::SeqCst) {
             return Err(Error::Invalid("Map data is already being checked. Try again in a moment.".into()));
@@ -84,8 +98,9 @@ impl MapDataState {
             let mut store = Store::open(&self.path)?;
             let report = fetch::refresh(&mut store, &self.osms, force, now())?;
             if !report.downloaded.is_empty() || self.atlas().is_none() {
-                let atlas = store.load()?.map(|data| Arc::new(Atlas::new(data)));
+                let (atlas, catalog) = store.load()?.map(split).unzip();
                 *self.atlas.write().expect("atlas lock") = atlas;
+                *self.catalog.write().expect("catalog lock") = catalog;
             }
             Ok(report)
         })();

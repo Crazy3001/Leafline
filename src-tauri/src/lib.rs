@@ -4,6 +4,7 @@
 //! files or network traffic, and never sends input to the game.
 
 mod app;
+pub mod build;
 pub mod capture;
 pub mod error;
 pub mod mapdata;

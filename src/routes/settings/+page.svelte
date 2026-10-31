@@ -240,9 +240,9 @@
 
   const does = [
     "Reads what the game shows, from saved screenshots or, once you turn it on, the game window, with the OCR built into Windows on this PC.",
-    "Shows map, monster and quest facts from community data, downloaded only when you ask.",
+    "Shows map, monster, quest, skill and equipment facts from community data, downloaded only when you ask.",
     "Downloads the player-logged drop table from mapleclassic.wiki when you first need it, renews it weekly, and looks drops up on this PC.",
-    "Keeps your settings, sessions and price log on this PC.",
+    "Keeps your settings, sessions, price log and builds on this PC.",
   ];
   const doesNot = [
     "Read or change the game's memory or files.",
@@ -253,7 +253,7 @@
   ];
   const credits = [
     {
-      what: "Map, monster, NPC and quest data",
+      what: "Map, monster, NPC, quest, skill and equipment data",
       who: "OSMS Data Explorer",
       licence: "CC BY 4.0",
       url: OSMS_URL,

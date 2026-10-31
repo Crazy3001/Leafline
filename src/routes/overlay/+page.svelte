@@ -238,7 +238,8 @@
     </nav>
 
     <div class="main" id="panel" role="tabpanel" aria-labelledby="tab-{tab}">
-      {#if live.analysis || live.session}
+      <!-- A build can be planned with nothing read yet. -->
+      {#if live.analysis || live.session || tab === "build"}
         {#key tab}
           <div class="panel"><PanelView panel={tab} analysis={live.analysis} session={live.session} /></div>
         {/key}

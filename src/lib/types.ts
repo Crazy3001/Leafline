@@ -177,7 +177,7 @@ export interface ItemRead {
 }
 
 /** The overlay's tabs, each of which can be pinned into a window of its own. */
-export type Panel = "stats" | "map" | "train" | "quests" | "item";
+export type Panel = "stats" | "map" | "train" | "quests" | "item" | "build";
 
 export interface PinStatus {
   pinned: Panel[];
@@ -701,6 +701,8 @@ export interface DisplaySettings {
   /** Taxis and return scrolls in routes; off by default. */
   travel: TravelChoice;
   live: LiveChoice;
+  /** How the build planner counts points. The player can correct these. */
+  buildRules: BuildRules;
 }
 
 // Session history (see src-tauri/src/userdata/sessions.rs).
@@ -743,4 +745,186 @@ export interface History {
   /** Newest first. */
   sessions: SavedSession[];
   maps: MapRate[];
+}
+
+// The build planner (see src-tauri/src/build/).
+
+export type BaseStat = "str" | "dex" | "int" | "luk";
+
+export type BaseStats = Record<BaseStat, number>;
+
+/** A skill and a level: a goal, or what a character already has. */
+export interface SkillLevel {
+  skillId: number;
+  level: number;
+}
+
+/** Raise `stat` to `target`, or with no target put all the AP left there. */
+export interface StatGoal {
+  stat: BaseStat;
+  target: number | null;
+  /** Waits for this level. */
+  fromLevel: number | null;
+}
+
+/** Where the character is now, as its windows show it. */
+export interface BuildStart {
+  level: number;
+  /** Null until the player has entered them. */
+  stats: BaseStats | null;
+  ap: number;
+  sp: number;
+  skills: SkillLevel[];
+}
+
+/** The part of a build that can be shared. */
+export interface BuildGoals {
+  /** The first or second job chosen; 0 before there is one. */
+  job: number;
+  skills: SkillLevel[];
+  stats: StatGoal[];
+  /** Equipment to aim for, by item id. */
+  gear: number[];
+  planTo: number;
+}
+
+export interface Build {
+  /** 0 until it has been saved. */
+  id: number;
+  name: string;
+  /** Follows this character when the HUD shows its name. */
+  character: string | null;
+  /** A link to the guide this build follows, typed by the player. */
+  guide: string;
+  start: BuildStart;
+  plan: BuildGoals;
+}
+
+export interface BuildSummary {
+  id: number;
+  name: string;
+  character: string | null;
+  updatedAt: number;
+}
+
+export interface StatGain {
+  stat: BaseStat;
+  amount: number;
+  total: number;
+}
+
+export interface SkillGain {
+  skillId: number;
+  name: string;
+  from: number;
+  to: number;
+}
+
+/** What happens on reaching a level. */
+export interface LevelStep {
+  level: number;
+  /** The job advancement due at this level. */
+  advance: string | null;
+  ap: StatGain[];
+  sp: SkillGain[];
+  /** Goal gear this level can first wear. */
+  gear: string[];
+  /** Base stats after this level's AP. */
+  stats: BaseStats;
+  apLeft: number;
+  spLeft: number;
+}
+
+export interface BuildProblem {
+  severity: "note" | "warning";
+  level: number | null;
+  message: string;
+}
+
+export interface GearItem {
+  id: number;
+  name: string;
+  slot: string;
+  gender: string | null;
+  /** Who can use it, as tooltips name them. Empty means anyone. */
+  classes: string[];
+  weaponType: string | null;
+  reqLevel: number;
+  reqStr: number;
+  reqDex: number;
+  reqInt: number;
+  reqLuk: number;
+  stats: { label: string; value: number }[];
+}
+
+export interface GearCheck {
+  item: GearItem;
+  /** The first level the plan can wear it. */
+  level: number | null;
+  usable: boolean;
+}
+
+export interface Expansion {
+  steps: LevelStep[];
+  problems: BuildProblem[];
+  gear: GearCheck[];
+  /** Skill levels when the plan ends. */
+  skills: SkillLevel[];
+}
+
+export interface BuildPlan {
+  build: Build;
+  expansion: Expansion;
+}
+
+export interface JobChoice {
+  id: number;
+  name: string;
+  /** 1 for a first job, 2 for a second. */
+  tier: number;
+  /** The first job a second job comes from. */
+  parent: number | null;
+  /** The stat a new build starts by putting AP into. */
+  primary: BaseStat | null;
+}
+
+export interface SkillInfo {
+  id: number;
+  name: string;
+  jobId: number;
+  className: string;
+  jobTier: string;
+  maxLevel: number;
+  passive: boolean;
+  description: string | null;
+  requiredSkills: SkillLevel[];
+  /** What the skill does at each level, from level 1. */
+  levelDescriptions: string[];
+}
+
+export interface BuildCatalog {
+  jobs: JobChoice[];
+  skills: SkillInfo[];
+}
+
+export interface BuildRules {
+  apPerLevel: number;
+  spPerLevel: number;
+  /** AP before this level goes in by itself. */
+  manualApLevel: number;
+  /** The first level that gives SP, by branch. The level before it is the 1st job advancement. */
+  firstSp: { warrior: number; magician: number; bowman: number; thief: number };
+  secondJobLevel: number;
+}
+
+/** How a hovered item suits the build. */
+export interface ItemFit {
+  level: number;
+  /** Null when no job flag was read for it. */
+  jobOk: boolean | null;
+  wearableNow: boolean;
+  wearableAt: number | null;
+  short: { label: string; amount: number }[];
+  /** A requirement could not be read. */
+  unread: boolean;
 }

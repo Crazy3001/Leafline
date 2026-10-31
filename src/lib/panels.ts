@@ -1,6 +1,6 @@
 // The overlay's panels: one tab each, and each can be pinned into a window of its own.
 
-import { Activity, Map as MapIcon, ScrollText, Swords, Tag } from "@lucide/svelte";
+import { Activity, Map as MapIcon, Milestone, ScrollText, Swords, Tag } from "@lucide/svelte";
 
 import { mapLabel } from "./format";
 import type { Analysis, Panel, SessionSummary } from "./types";
@@ -20,6 +20,7 @@ export const PANELS: PanelInfo[] = [
   { id: "train", title: "Train", icon: Swords },
   { id: "quests", title: "Quests", icon: ScrollText },
   { id: "item", title: "Item", icon: Tag },
+  { id: "build", title: "Build", icon: Milestone },
 ];
 
 export function panelInfo(id: Panel): PanelInfo {
@@ -37,6 +38,7 @@ export function signature(panel: Panel, analysis: Analysis | null, session: Sess
     case "map":
       return analysis?.map ? mapLabel(analysis.map) : null;
     case "train":
+    case "build":
       // Changes with the character's level; the list itself is looked up, not read.
       return (analysis?.hud?.level ?? session?.level) != null ? `${analysis?.hud?.level ?? session?.level}` : null;
     case "quests":

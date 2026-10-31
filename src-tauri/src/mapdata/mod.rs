@@ -1,4 +1,5 @@
-//! Map, monster, NPC and quest facts for the map details card.
+//! Map, monster, NPC and quest facts for the map details card, and skill and equipment facts for
+//! the build planner.
 //!
 //! The facts come from OSMS Data Explorer's public JSON (CC BY 4.0), which is extracted from the
 //! Classic client. Leafline downloads it only after the user asks, keeps it in a local SQLite

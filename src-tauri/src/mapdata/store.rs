@@ -12,13 +12,13 @@ use serde::Serialize;
 
 use super::drops::{Drop, Dropper, MonsterDrops};
 use super::osms::{
-    Dataset, FILES, FileMeta, Height, MapRecord, Meta, MobRequirement, MonsterRecord, NpcRecord, Portal, QuestRecord,
-    Records, Side, Spawn,
+    Dataset, FILES, FileMeta, Height, ItemRecord, MapRecord, Meta, MobRequirement, MonsterRecord, NpcRecord, Portal,
+    QuestRecord, Records, Side, SkillNeed, SkillRecord, Spawn,
 };
-use crate::error::Result;
+use crate::error::{Error, Result};
 
 /// Bump when the tables change; an older cache is then dropped and downloaded again.
-const CACHE_VERSION: i32 = 3;
+const CACHE_VERSION: i32 = 4;
 
 const SCHEMA: &str = "
 CREATE TABLE source_files (
@@ -40,6 +40,15 @@ CREATE TABLE npcs (id INTEGER PRIMARY KEY, name TEXT NOT NULL);
 CREATE TABLE npc_maps (npc_id INTEGER NOT NULL, map_id INTEGER NOT NULL, PRIMARY KEY (npc_id, map_id));
 CREATE TABLE quests (id INTEGER PRIMARY KEY, name TEXT NOT NULL, npc_id INTEGER, level_min INTEGER, next_quest_id INTEGER);
 CREATE TABLE quest_mobs (quest_id INTEGER NOT NULL, mob_id INTEGER NOT NULL, count INTEGER NOT NULL);
+CREATE TABLE skills (
+    id INTEGER PRIMARY KEY, name TEXT NOT NULL, job_id INTEGER NOT NULL, class_name TEXT NOT NULL,
+    job_tier TEXT NOT NULL, max_level INTEGER NOT NULL, passive INTEGER NOT NULL, description TEXT);
+CREATE TABLE skill_needs (skill_id INTEGER NOT NULL, needs_id INTEGER NOT NULL, level INTEGER NOT NULL);
+CREATE TABLE skill_levels (skill_id INTEGER NOT NULL, level INTEGER NOT NULL, description TEXT NOT NULL, PRIMARY KEY (skill_id, level));
+CREATE TABLE equipment (
+    id INTEGER PRIMARY KEY, name TEXT NOT NULL, slot TEXT NOT NULL, gender TEXT, classes TEXT NOT NULL, weapon_type TEXT,
+    req_level INTEGER NOT NULL, req_str INTEGER NOT NULL, req_dex INTEGER NOT NULL, req_int INTEGER NOT NULL,
+    req_luk INTEGER NOT NULL, stats TEXT NOT NULL);
 CREATE TABLE drops (
     monster TEXT NOT NULL, item TEXT NOT NULL, category TEXT, rate REAL, rate_low REAL, rate_high REAL,
     min_quantity INTEGER, max_quantity INTEGER, sample_kills INTEGER, sample_drops INTEGER,
@@ -63,6 +72,9 @@ const DROPS_FETCHED_AT: &str = "drops_fetched_at";
 const WANTS_MAPS: &str = "wants_maps";
 const WANTS_DROPS: &str = "wants_drops";
 
+/// Between the classes that can use a piece of equipment, in `equipment.classes`.
+const CLASS_SEPARATOR: &str = ",";
+
 /// The tables that hold each OSMS file, cleared before the file is stored again.
 fn tables_of(file: &str) -> &'static [&'static str] {
     match file {
@@ -70,6 +82,8 @@ fn tables_of(file: &str) -> &'static [&'static str] {
         "monsters.json" => &["monsters", "spawns"],
         "npcs.json" => &["npcs", "npc_maps"],
         "quests.json" => &["quests", "quest_mobs"],
+        "skills.json" => &["skills", "skill_needs", "skill_levels"],
+        "items.json" => &["equipment"],
         _ => &[],
     }
 }
@@ -184,6 +198,8 @@ impl Store {
                 Records::Monsters(monsters) => insert_monsters(&tx, monsters)?,
                 Records::Npcs(npcs) => insert_npcs(&tx, npcs)?,
                 Records::Quests(quests) => insert_quests(&tx, quests)?,
+                Records::Skills(skills) => insert_skills(&tx, skills)?,
+                Records::Items(items) => insert_items(&tx, items)?,
             }
             tx.execute(
                 "INSERT OR REPLACE INTO source_files (name, sha256, records, updated_at, fetched_at)
@@ -231,7 +247,78 @@ impl Store {
             monsters: self.load_monsters()?,
             npcs: self.load_npcs()?,
             quests: self.load_quests()?,
+            skills: self.load_skills()?,
+            items: self.load_items()?,
         }))
+    }
+
+    fn load_skills(&self) -> Result<Vec<SkillRecord>> {
+        let mut needs: HashMap<u32, Vec<SkillNeed>> = HashMap::new();
+        let mut stmt = self.conn.prepare("SELECT skill_id, needs_id, level FROM skill_needs ORDER BY rowid")?;
+        for row in stmt.query_map([], |row| Ok((row.get(0)?, SkillNeed { skill_id: row.get(1)?, level: row.get(2)? })))?
+        {
+            let (skill, need) = row?;
+            needs.entry(skill).or_default().push(need);
+        }
+        let mut levels: HashMap<u32, Vec<String>> = HashMap::new();
+        let mut stmt = self.conn.prepare("SELECT skill_id, description FROM skill_levels ORDER BY skill_id, level")?;
+        for row in stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))? {
+            let (skill, description) = row?;
+            levels.entry(skill).or_default().push(description);
+        }
+        let mut stmt = self.conn.prepare(
+            "SELECT id, name, job_id, class_name, job_tier, max_level, passive, description FROM skills ORDER BY id",
+        )?;
+        let skills = stmt.query_map([], |row| {
+            let id: u32 = row.get(0)?;
+            Ok(SkillRecord {
+                id,
+                name: row.get(1)?,
+                job_id: row.get(2)?,
+                class_name: row.get(3)?,
+                job_tier: row.get(4)?,
+                max_level: row.get(5)?,
+                passive: row.get(6)?,
+                description: row.get(7)?,
+                required_skills: needs.remove(&id).unwrap_or_default(),
+                level_descriptions: levels.remove(&id).unwrap_or_default(),
+            })
+        })?;
+        Ok(skills.collect::<rusqlite::Result<_>>()?)
+    }
+
+    fn load_items(&self) -> Result<Vec<ItemRecord>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, name, slot, gender, classes, weapon_type, req_level, req_str, req_dex, req_int, req_luk, stats
+             FROM equipment ORDER BY id",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            let classes: String = row.get(4)?;
+            let stats: String = row.get(11)?;
+            let item = ItemRecord {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                category: "Equipment".into(),
+                slot: row.get(2)?,
+                gender: row.get(3)?,
+                classes: classes.split(CLASS_SEPARATOR).filter(|c| !c.is_empty()).map(str::to_string).collect(),
+                weapon_type: row.get(5)?,
+                req_level: row.get(6)?,
+                req_str: row.get(7)?,
+                req_dex: row.get(8)?,
+                req_int: row.get(9)?,
+                req_luk: row.get(10)?,
+                stats: Vec::new(),
+            };
+            Ok((item, stats))
+        })?;
+        let mut items = Vec::new();
+        for row in rows {
+            let (mut item, stats) = row?;
+            item.stats = serde_json::from_str(&stats).map_err(|err| Error::Invalid(err.to_string()))?;
+            items.push(item);
+        }
+        Ok(items)
     }
 
     fn load_maps(&self) -> Result<Vec<MapRecord>> {
@@ -528,6 +615,51 @@ fn insert_quests(tx: &Transaction, quests: &[QuestRecord]) -> Result<()> {
         for r in &q.requirements {
             need.execute(params![q.id, r.mob_id, r.count])?;
         }
+    }
+    Ok(())
+}
+
+fn insert_skills(tx: &Transaction, skills: &[SkillRecord]) -> Result<()> {
+    let mut skill = tx.prepare(
+        "INSERT OR REPLACE INTO skills (id, name, job_id, class_name, job_tier, max_level, passive, description)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+    )?;
+    let mut need = tx.prepare("INSERT INTO skill_needs (skill_id, needs_id, level) VALUES (?1, ?2, ?3)")?;
+    let mut level = tx.prepare("INSERT OR REPLACE INTO skill_levels (skill_id, level, description) VALUES (?1, ?2, ?3)")?;
+    for s in skills {
+        skill.execute(params![s.id, s.name, s.job_id, s.class_name, s.job_tier, s.max_level, s.passive, s.description])?;
+        for n in &s.required_skills {
+            need.execute(params![s.id, n.skill_id, n.level])?;
+        }
+        for (i, text) in s.level_descriptions.iter().enumerate() {
+            level.execute(params![s.id, i as i64 + 1, text])?;
+        }
+    }
+    Ok(())
+}
+
+fn insert_items(tx: &Transaction, items: &[ItemRecord]) -> Result<()> {
+    let mut item = tx.prepare(
+        "INSERT OR REPLACE INTO equipment (id, name, slot, gender, classes, weapon_type, req_level, req_str, req_dex,
+                                           req_int, req_luk, stats)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+    )?;
+    for i in items {
+        let stats = serde_json::to_string(&i.stats).map_err(|err| Error::Invalid(err.to_string()))?;
+        item.execute(params![
+            i.id,
+            i.name,
+            i.slot,
+            i.gender,
+            i.classes.join(CLASS_SEPARATOR),
+            i.weapon_type,
+            i.req_level,
+            i.req_str,
+            i.req_dex,
+            i.req_int,
+            i.req_luk,
+            stats
+        ])?;
     }
     Ok(())
 }

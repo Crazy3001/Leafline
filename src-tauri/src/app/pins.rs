@@ -32,10 +32,11 @@ pub enum Panel {
     Train,
     Quests,
     Item,
+    Build,
 }
 
 impl Panel {
-    const ALL: [Panel; 5] = [Panel::Stats, Panel::Map, Panel::Train, Panel::Quests, Panel::Item];
+    const ALL: [Panel; 6] = [Panel::Stats, Panel::Map, Panel::Train, Panel::Quests, Panel::Item, Panel::Build];
 
     fn id(self) -> &'static str {
         match self {
@@ -44,6 +45,7 @@ impl Panel {
             Panel::Train => "train",
             Panel::Quests => "quests",
             Panel::Item => "item",
+            Panel::Build => "build",
         }
     }
 
@@ -54,6 +56,7 @@ impl Panel {
             Panel::Train => "Train",
             Panel::Quests => "Quests",
             Panel::Item => "Item",
+            Panel::Build => "Build",
         }
     }
 

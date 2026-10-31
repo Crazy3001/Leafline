@@ -1,7 +1,16 @@
 // Display settings shared by the overlay, pinned panels and the Settings window.
 
 import { backend } from "./api";
-import type { DisplaySettings } from "./types";
+import type { BuildRules, DisplaySettings } from "./types";
+
+/** The wiki's numbers, as in src-tauri/src/build/rules.rs. */
+export const DEFAULT_RULES: BuildRules = {
+  apPerLevel: 5,
+  spPerLevel: 3,
+  manualApLevel: 11,
+  firstSp: { warrior: 11, magician: 9, bowman: 11, thief: 11 },
+  secondJobLevel: 30,
+};
 
 export const display = $state<DisplaySettings>({
   opacity: 1,
@@ -11,6 +20,7 @@ export const display = $state<DisplaySettings>({
   hotkeys: { enabled: true, keys: {} },
   travel: { enabled: false, cabs: true, vipCabs: false, scrolls: true },
   live: { enabled: false, interval: 2, pauseAfter: 15, window: null },
+  buildRules: DEFAULT_RULES,
 });
 
 /** Changes whenever the travel routes may use changes, for effects that ask for routes. */

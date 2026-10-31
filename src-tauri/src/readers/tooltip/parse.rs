@@ -7,7 +7,7 @@
 use std::sync::LazyLock;
 
 use regex::Regex;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::readers::text::{best_match, digitize, similarity, starts_like, trim_noise};
 use crate::vision::{Line, Rect};
@@ -31,7 +31,7 @@ pub struct ItemTooltip {
     pub plain: bool,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Requirements {
     pub level: Option<u32>,
     pub str: Option<u32>,

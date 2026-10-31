@@ -1,7 +1,8 @@
-//! What the player records themselves: prices they saw or paid, and sessions they saved. Kept in
-//! its own SQLite file, apart from the map data cache, because that cache can be thrown away and
-//! downloaded again while these records cannot.
+//! What the player records themselves: prices they saw or paid, sessions they saved and builds
+//! they planned. Kept in its own SQLite file, apart from the map data cache, because that cache
+//! can be thrown away and downloaded again while these records cannot.
 
+pub mod builds;
 pub mod prices;
 pub mod sessions;
 
@@ -70,6 +71,15 @@ CREATE INDEX session_lines_by_session ON session_lines (session_id);
 CREATE TABLE map_renames (
     read_as TEXT PRIMARY KEY,
     name TEXT NOT NULL);
+",
+    "
+CREATE TABLE builds (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL,
+    character TEXT,
+    body TEXT NOT NULL,
+    updated_at INTEGER NOT NULL,
+    used_at INTEGER NOT NULL);
 ",
 ];
 

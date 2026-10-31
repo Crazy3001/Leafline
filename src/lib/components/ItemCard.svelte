@@ -1,4 +1,5 @@
 <script lang="ts">
+  import BuildFit from "./BuildFit.svelte";
   import Card from "./Card.svelte";
   import PriceLog from "./PriceLog.svelte";
   import { formatSigned, titleCase } from "$lib/format";
@@ -81,6 +82,8 @@
       {/each}
     </div>
   {/if}
+
+  {#if !item.plain}<BuildFit {item} />{/if}
 
   <PriceLog {item} />
 </Card>

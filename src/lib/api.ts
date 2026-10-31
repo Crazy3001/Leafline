@@ -10,10 +10,17 @@ import { open, save } from "@tauri-apps/plugin-dialog";
 
 import type {
   Analysis,
+  Build,
+  BuildCatalog,
+  BuildPlan,
+  BuildSummary,
   Calibration,
   DisplaySettings,
   GameWindow,
+  GearItem,
+  ItemFit,
   ItemRead,
+  ItemTooltip,
   LiveStatus,
   TravelInfo,
   Guide,
@@ -141,6 +148,31 @@ export interface Backend {
   /** Asks where to save, then writes the price log or session history as CSV. Null if cancelled. */
   exportCsv(what: "prices" | "sessions"): Promise<number | null>;
 
+  /** The jobs and skills to plan with. Null until map data is downloaded. */
+  buildCatalog(): Promise<BuildCatalog | null>;
+  /** Equipment by name, limited to what the job can use. */
+  searchGear(text: string, job: number): Promise<GearItem[]>;
+  listBuilds(): Promise<BuildSummary[]>;
+  buildPlan(id: number): Promise<BuildPlan | null>;
+  /** The build to show for this character, or the one used last. */
+  activeBuild(character: string | null): Promise<BuildPlan | null>;
+  /** Saves a build, new or changed, and returns how it plays out. */
+  saveBuild(build: Build): Promise<BuildPlan>;
+  /** Makes a build the one shown when no other is tied to the character. */
+  useBuild(id: number): Promise<void>;
+  deleteBuild(id: number): Promise<void>;
+  /** The build's plan as a line of text, for the player to pass on themselves. */
+  exportBuild(id: number): Promise<string>;
+  /** Adds a build from a code. */
+  importBuild(code: string, character: string | null): Promise<BuildPlan>;
+  /** How a hovered item suits the build for this character. Null with no build to judge by. */
+  buildItemFit(item: ItemTooltip, level: number | null, character: string | null): Promise<ItemFit | null>;
+  /** Opens the guide link the player typed for a build. */
+  openGuide(url: string): Promise<void>;
+  /** Opens the build editor, or brings it forward. */
+  showBuild(): Promise<void>;
+  onBuilds(handler: () => void): Promise<UnlistenFn>;
+
   /** The latest analysis and session, for a window opened after they were sent. */
   currentReadings(): Promise<{ analysis: Analysis | null; session: SessionSummary | null }>;
   pinStatus(): Promise<PinStatus>;
@@ -243,6 +275,21 @@ const tauriBackend: Backend = {
     });
     return path ? invoke<number>("export_csv", { what, path }) : null;
   },
+  buildCatalog: () => invoke("build_catalog"),
+  searchGear: (text, job) => invoke("search_gear", { text, job }),
+  listBuilds: () => invoke("list_builds"),
+  buildPlan: (id) => invoke("build_plan", { id }),
+  activeBuild: (character) => invoke("active_build", { character }),
+  saveBuild: (build) => invoke("save_build", { build }),
+  useBuild: (id) => invoke("use_build", { id }),
+  deleteBuild: (id) => invoke("delete_build", { id }),
+  exportBuild: (id) => invoke("export_build", { id }),
+  importBuild: (code, character) => invoke("import_build", { code, character }),
+  buildItemFit: (item, level, character) =>
+    invoke("build_item_fit", { requirements: item.requirements, jobs: item.jobs, level, character }),
+  openGuide: (url) => invoke("open_guide", { url }),
+  showBuild: () => invoke("show_build"),
+  onBuilds: (handler) => listen("builds", () => handler()),
   currentReadings: () => invoke("current_readings"),
   pinStatus: () => invoke("pin_status"),
   pinPanel: (panel) => invoke("pin_panel", { panel }),

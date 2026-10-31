@@ -4,6 +4,13 @@
 import type { Backend } from "../api";
 import type {
   Analysis,
+  BaseStats,
+  Build,
+  BuildCatalog,
+  BuildPlan,
+  Expansion,
+  GearItem,
+  LevelStep,
   MapRoute,
   History,
   SavedSession,
@@ -207,7 +214,114 @@ let displaySettings: DisplaySettings = {
   hotkeys: { enabled: true, keys: {} },
   travel: { enabled: false, cabs: true, vipCabs: false, scrolls: true },
   live: { enabled: false, interval: 2, pauseAfter: 15, window: null },
+  buildRules: { apPerLevel: 5, spPerLevel: 3, manualApLevel: 11, firstSp: { warrior: 11, magician: 9, bowman: 11, thief: 11 }, secondJobLevel: 30 },
 };
+
+/** A made-up job tree and equipment, in the shapes the real data has. None of it is game data. */
+const mockSkill = (id: number, name: string, jobId: number, maxLevel: number, requiredSkills: { skillId: number; level: number }[] = []) => ({
+  id,
+  name,
+  jobId,
+  className: jobId === 400 ? "Drifter" : jobId === 420 ? "Fernblade" : jobId === 410 ? "Mistwalker" : "Beginner",
+  jobTier: "",
+  maxLevel,
+  passive: false,
+  description: null,
+  requiredSkills,
+  levelDescriptions: Array.from({ length: maxLevel }, (_, i) => `Damage ${100 + i * 5}%`),
+});
+const mockCatalog: BuildCatalog = {
+  jobs: [
+    { id: 400, name: "Drifter", tier: 1, parent: null, primary: "luk" },
+    { id: 410, name: "Mistwalker", tier: 2, parent: 400, primary: "luk" },
+    { id: 420, name: "Fernblade", tier: 2, parent: 400, primary: "luk" },
+  ],
+  skills: [
+    mockSkill(1, "Pebble Toss", 0, 3),
+    mockSkill(10, "Quick Step", 400, 20),
+    mockSkill(11, "Twin Throw", 400, 20, [{ skillId: 10, level: 3 }]),
+    mockSkill(12, "Soft Landing", 400, 10),
+    mockSkill(20, "Fern Stab", 420, 30),
+    mockSkill(21, "Bramble Guard", 420, 20, [{ skillId: 20, level: 5 }]),
+    mockSkill(30, "Thin Mist", 410, 30),
+  ],
+};
+const mockGear: GearItem[] = [
+  { id: 500, name: "Fern Dagger", slot: "Weapon", gender: null, classes: ["Thief"], weaponType: "Dagger", reqLevel: 30, reqStr: 0, reqDex: 60, reqInt: 0, reqLuk: 0, stats: [{ label: "Attack", value: 28 }] },
+  { id: 501, name: "Mossy Cap", slot: "Hat", gender: null, classes: [], weaponType: null, reqLevel: 15, reqStr: 0, reqDex: 0, reqInt: 0, reqLuk: 0, stats: [{ label: "Weapon Def.", value: 12 }] },
+];
+
+/** Made-up builds kept in this browser tab. */
+let mockBuilds: (Build & { usedAt: number })[] = [
+  {
+    id: 1,
+    name: "Fernblade, LUK heavy",
+    character: null,
+    guide: "",
+    start: { level: 29, stats: { str: 4, dex: 60, int: 4, luk: 92 }, ap: 0, sp: 0, skills: [{ skillId: 10, level: 20 }, { skillId: 11, level: 17 }] },
+    plan: {
+      job: 420,
+      skills: [{ skillId: 11, level: 20 }, { skillId: 20, level: 20 }, { skillId: 21, level: 10 }, { skillId: 12, level: 10 }],
+      stats: [{ stat: "dex", target: 80, fromLevel: null }, { stat: "luk", target: null, fromLevel: null }],
+      gear: [500, 501],
+      planTo: 70,
+    },
+    usedAt: 2,
+  },
+];
+const buildHandlers: (() => void)[] = [];
+const buildsChanged = () => buildHandlers.forEach((h) => h());
+
+/**
+ * A rough stand-in for src-tauri/src/build/plan.rs, only for designing the pages: the same shape
+ * of answer, without the tier, prerequisite and problem rules. The tests cover the real one.
+ */
+function mockExpand(build: Build): Expansion {
+  const rules = displaySettings.buildRules;
+  const stats: BaseStats = { ...(build.start.stats ?? { str: 0, dex: 0, int: 0, luk: 0 }) };
+  const skills = new Map(build.start.skills.map((s) => [s.skillId, s.level]));
+  const steps: LevelStep[] = [];
+  for (let level = build.start.level; level <= build.plan.planTo; level++) {
+    const step: LevelStep = { level, advance: level === rules.secondJobLevel ? "2nd job: Fernblade" : null, ap: [], sp: [], gear: [], stats, apLeft: 0, spLeft: 0 };
+    let ap = level > build.start.level ? rules.apPerLevel : 0;
+    for (const goal of build.plan.stats) {
+      const amount = goal.target == null ? ap : Math.min(ap, Math.max(0, goal.target - stats[goal.stat]));
+      if (!amount) continue;
+      stats[goal.stat] += amount;
+      ap -= amount;
+      step.ap.push({ stat: goal.stat, amount, total: stats[goal.stat] });
+    }
+    let sp = level > build.start.level ? rules.spPerLevel : 0;
+    for (const goal of build.plan.skills) {
+      const have = skills.get(goal.skillId) ?? 0;
+      const amount = Math.min(sp, Math.max(0, goal.level - have));
+      if (!amount) continue;
+      skills.set(goal.skillId, have + amount);
+      sp -= amount;
+      const name = mockCatalog.skills.find((s) => s.id === goal.skillId)?.name ?? "";
+      step.sp.push({ skillId: goal.skillId, name, from: have, to: have + amount });
+    }
+    steps.push({ ...step, stats: { ...stats }, apLeft: ap, spLeft: sp });
+  }
+  const gear = build.plan.gear.flatMap((id) => {
+    const item = mockGear.find((g) => g.id === id);
+    if (!item) return [];
+    const at = steps.find((s) => s.level >= item.reqLevel && s.stats.dex >= item.reqDex);
+    at?.gear.push(item.name);
+    return [{ item, level: at?.level ?? null, usable: true }];
+  });
+  const problems = [
+    ...(build.start.stats ? [] : [{ severity: "warning" as const, level: null, message: "Enter your stats from the Character Stat window, so the totals are right." }]),
+    ...(build.plan.job ? [] : [{ severity: "note" as const, level: null, message: "Choose a job to plan its skills." }]),
+  ];
+  return { steps, problems, gear, skills: [...skills].map(([skillId, level]) => ({ skillId, level })) };
+}
+
+const mockPlan = (build: Build): BuildPlan => {
+  const { id, name, character, guide, start, plan } = build;
+  return { build: { id, name, character, guide, start, plan }, expansion: mockExpand(build) };
+};
+const newestBuild = () => [...mockBuilds].sort((a, b) => b.usedAt - a.usedAt)[0];
 
 let liveStatus: LiveStatus = { state: "off" };
 let liveTimer: ReturnType<typeof setInterval> | undefined;
@@ -353,7 +467,7 @@ export const mockBackend: Backend = {
   async downloadMapData() {
     await delay(1200);
     const now = Date.now() / 1000;
-    const files = ["maps.json", "monsters.json", "npcs.json", "quests.json"];
+    const files = ["maps.json", "monsters.json", "npcs.json", "quests.json", "skills.json", "items.json"];
     mapStatus = {
       ready: true,
       clientBuild: "0000000 (sample)",
@@ -460,6 +574,54 @@ export const mockBackend: Backend = {
   },
   async exportCsv(what) {
     return what === "prices" ? prices.length : savedSessions.length;
+  },
+  buildCatalog: async () => (mapStatus.ready ? mockCatalog : null),
+  searchGear: async (text) => mockGear.filter((g) => g.name.toLowerCase().includes(text.toLowerCase())),
+  listBuilds: async () =>
+    [...mockBuilds].sort((a, b) => b.usedAt - a.usedAt).map(({ id, name, character }) => ({ id, name, character, updatedAt: now })),
+  async buildPlan(id) {
+    const build = mockBuilds.find((b) => b.id === id);
+    return build ? mockPlan(build) : null;
+  },
+  async activeBuild() {
+    const build = newestBuild();
+    return mapStatus.ready && build ? mockPlan(build) : null;
+  },
+  async saveBuild(build) {
+    const usedAt = Date.now();
+    const id = build.id || Math.max(0, ...mockBuilds.map((b) => b.id)) + 1;
+    mockBuilds = [...mockBuilds.filter((b) => b.id !== id), { ...build, id, usedAt }];
+    buildsChanged();
+    return mockPlan({ ...build, id });
+  },
+  async useBuild(id) {
+    mockBuilds = mockBuilds.map((b) => (b.id === id ? { ...b, usedAt: Date.now() } : b));
+    buildsChanged();
+  },
+  async deleteBuild(id) {
+    mockBuilds = mockBuilds.filter((b) => b.id !== id);
+    buildsChanged();
+  },
+  exportBuild: async (id) => `LEAFLINE-BUILD-1:mock${id}`,
+  async importBuild() {
+    throw "That isn't a Leafline build code.";
+  },
+  async buildItemFit(item, level) {
+    const build = newestBuild();
+    if (!build) return null;
+    const at = level ?? build.start.level;
+    const need = item.requirements.level ?? 0;
+    return { level: at, jobOk: null, wearableNow: at >= need, wearableAt: need, short: at >= need ? [] : [{ label: "Lv", amount: need - at }], unread: false };
+  },
+  async openGuide(url) {
+    window.open(url, "_blank", "noopener");
+  },
+  async showBuild() {
+    window.open("/build", "_blank");
+  },
+  async onBuilds(handler) {
+    buildHandlers.push(handler);
+    return () => {};
   },
   currentReadings: async () => ({
     analysis: preview?.empty ? null : sampleAnalysis,

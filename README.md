@@ -1,6 +1,6 @@
 # Leafline
 
-An unofficial, read-only overlay for **MapleStory Classic World**: price checks, EXP tracking, routes and quest help, read from what is visible on screen.
+An unofficial, read-only overlay for **MapleStory Classic World**: price checks, EXP tracking, routes, quest help and build planning, beside what is visible on screen.
 
 > The project is not affiliated with or endorsed by Nexon.
 
@@ -83,6 +83,16 @@ OCR is sometimes wrong, so the tracker checks readings against each other rather
 - The clock pauses after 15 seconds without EXP (change it in Settings), and at once on a map change without EXP, so time in town does not dilute the rates. Rates appear after 30 seconds of active time.
 - A missing reading is skipped, never guessed. No EXP table is built in: each level's requirement is measured from the HUD, since Classic's table may differ from old GMS.
 
+### Build planner
+
+The **Build** tab shows what your plan says at your level: this level's AP and SP, the next job advancement and what comes after. **Edit** opens the planner.
+
+A build is a job and a list of goals in order, the way written guides put them: this skill to 20, then that one; DEX to 25, the rest into LUK. Each new point goes to the first goal that can take it, and the planner lays the result out level by level. It says when a prerequisite comes too late, a goal can't finish in time, or 1st-job SP would be lost at the 2nd job advancement. Add gear to see the first level the plan can wear it, and a hovered item (Ctrl+Alt+I) shows whether it suits the build.
+
+Leafline ships no guides or recommended builds. If you follow a guide, keep its link on the build. **Copy plan** turns a build's goals into a line of text you can pass on, and **Paste a code** adds one. It holds goals only, not your character, stats or link.
+
+The planner counts points. It doesn't model damage, accuracy or HP, because those are unsettled for Classic. The numbers it counts by come from mapleclassic.wiki, checked before launch at best, so each can be changed under **How points are counted**. Your stats have to be typed in, because they differ by character. Everything is a plan you follow by hand: nothing is spent for you, and Leafline can't yet tell whether you followed it.
+
 ## Testing the readers
 
 Put screenshots in `test-screenshots/` (git-ignored: game screenshots must never be committed or shipped), then:
@@ -155,12 +165,14 @@ src-tauri/src/
 - A jump of several levels between two readings adds no EXP, because the levels in between were never measured.
 - Session rates have been checked on 14 hand-taken screenshots and synthetic tests, not yet on a continuous recording of real play.
 - macOS OCR (Apple Vision) and the Tesseract fallback are not built yet.
+- The build planner's item checks use base stats only: whether bonuses from other gear count toward a requirement isn't confirmed for Classic.
+- AP before Lv 11 is assigned by the game, so a plan's stats are low until you update your starting point at Lv 11.
 
 ## Data and credits
 
 Leafline ships no game data. Map details are downloaded on your machine when you ask for them, kept in a local cache and credited in the app:
 
-- Map, monster, NPC and quest data: [OSMS Data Explorer](https://osmsdataexplorer.com), CC BY 4.0.
+- Map, monster, NPC, quest, skill and equipment data: [OSMS Data Explorer](https://osmsdataexplorer.com), CC BY 4.0.
 - Player-observed drop rates, taxi routes and return scrolls: [mapleclassic.wiki](https://mapleclassic.wiki) contributors, CC BY-NC-SA 4.0.
 
 Game content belongs to Nexon. Leafline is unofficial and not affiliated with or endorsed by Nexon.

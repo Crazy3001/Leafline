@@ -29,8 +29,9 @@
     </button>
   {:else}
     <p class="explain">
-      Map details (monsters, NPCs, quests and exits) come from OSMS Data Explorer, a community dataset taken from the
-      Classic client. About 1 MB is downloaded once, kept on this PC, and checked for changes at most daily.
+      Map details (monsters, NPCs, quests and exits) and the skills and equipment for builds come from OSMS Data
+      Explorer, a community dataset taken from the Classic client. About 2 MB is downloaded once, kept on this PC, and
+      checked for changes at most daily.
     </p>
     <button class="action primary" onclick={() => downloadMapData(false)} disabled={mapData.downloading}>
       {#if mapData.downloading}<span class="spin"><LoaderCircle size={13} /></span>Downloading…{:else}<Database

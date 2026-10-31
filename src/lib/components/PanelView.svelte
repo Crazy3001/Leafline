@@ -1,6 +1,7 @@
 <script lang="ts">
   // What one panel shows, the same as a tab of the overlay or pinned into its own window. A
   // pinned window names the panel itself, so single cards drop their frame there.
+  import BuildCard from "./BuildCard.svelte";
   import CharacterCard from "./CharacterCard.svelte";
   import HistoryCard from "./HistoryCard.svelte";
   import ItemCard from "./ItemCard.svelte";
@@ -48,6 +49,8 @@
   {:else}
     {@render empty("Hover a piece of equipment in game and press Ctrl+Alt+I to see its stats and whether it has been scrolled.")}
   {/each}
+{:else if panel === "build"}
+  <BuildCard level={analysis?.hud?.level ?? session?.level ?? null} character={analysis?.hud?.name ?? null} plain={pinned} />
 {/if}
 
 <style>

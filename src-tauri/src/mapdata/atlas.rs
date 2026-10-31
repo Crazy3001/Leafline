@@ -825,6 +825,7 @@ pub(crate) mod tests {
                     requirements: vec![MobRequirement { mob_id: 11, count: 5 }],
                 },
             ],
+            ..Dataset::default()
         })
     }
 
@@ -856,6 +857,7 @@ pub(crate) mod tests {
                 next_quest_id: None,
                 requirements: vec![MobRequirement { mob_id: 10, count: 8 }],
             }],
+            ..Dataset::default()
         })
     }
 
@@ -870,6 +872,7 @@ pub(crate) mod tests {
                 NpcRecord { id: 2, name: "Nina".into(), maps: vec![20] },
             ],
             quests: vec![],
+            ..Dataset::default()
         });
         let (name, street) = ("Mushrooun Town", Some("Maple Road"));
 

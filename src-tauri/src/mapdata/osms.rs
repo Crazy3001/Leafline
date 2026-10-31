@@ -1,4 +1,4 @@
-//! The parts of OSMS Data Explorer's v1 JSON that the map card uses.
+//! The parts of OSMS Data Explorer's v1 JSON that the map card and build planner use.
 //!
 //! Only the fields listed here are read. Every `*_url` image field is left out on purpose, so
 //! none can reach the cache or the screen. Coordinates are read only to tell which third of its
@@ -9,8 +9,8 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-/// The files the map card needs, in the order they are fetched.
-pub const FILES: [&str; 4] = ["maps.json", "monsters.json", "npcs.json", "quests.json"];
+/// The files Leafline needs, in the order they are fetched.
+pub const FILES: [&str; 6] = ["maps.json", "monsters.json", "npcs.json", "quests.json", "skills.json", "items.json"];
 
 /// The only `schema_version` this reader understands. OSMS ships breaking changes as `v2/`.
 pub const SCHEMA_VERSION: u32 = 1;
@@ -244,13 +244,144 @@ fn mob_requirements<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result
         .collect())
 }
 
-/// Everything the card is built from.
+/// The tier of the crafting disciplines, which share the file but use no skill points.
+const CRAFTING: &str = "Crafting";
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all(serialize = "camelCase"))]
+pub struct SkillRecord {
+    pub id: u32,
+    pub name: String,
+    pub job_id: u32,
+    #[serde(default)]
+    pub class_name: String,
+    pub job_tier: String,
+    #[serde(default)]
+    pub max_level: u32,
+    #[serde(default)]
+    pub passive: bool,
+    pub description: Option<String>,
+    #[serde(default)]
+    pub required_skills: Vec<SkillNeed>,
+    /// What the skill does at each level, from level 1.
+    #[serde(default)]
+    pub level_descriptions: Vec<String>,
+}
+
+/// A skill that must reach `level` first.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all(serialize = "camelCase"))]
+pub struct SkillNeed {
+    pub skill_id: u32,
+    pub level: u32,
+}
+
+/// The file's equipment stats and the name each goes by on screen, in the order shown.
+const ITEM_STATS: [(&str, &str); 16] = [
+    ("incPAD", "Attack"),
+    ("incMAD", "Magic"),
+    ("incPDD", "Weapon Def."),
+    ("incMDD", "Magic Def."),
+    ("incSTR", "STR"),
+    ("incDEX", "DEX"),
+    ("incINT", "INT"),
+    ("incLUK", "LUK"),
+    ("incMHP", "MaxHP"),
+    ("incMMP", "MaxMP"),
+    ("incACC", "Accuracy"),
+    ("incEVA", "Evasion"),
+    ("incCRT", "Crit. Rate"),
+    ("incCRD", "Crit. Damage"),
+    ("incSpeed", "Speed"),
+    ("incJump", "Jump"),
+];
+
+#[derive(Deserialize)]
+struct RawItem {
+    id: u32,
+    name: String,
+    category: String,
+    sub_category: Option<String>,
+    gender: Option<String>,
+    #[serde(default)]
+    req_classes: Vec<String>,
+    #[serde(default)]
+    stats: HashMap<String, serde_json::Value>,
+    weapon: Option<RawWeapon>,
+}
+
+#[derive(Deserialize)]
+struct RawWeapon {
+    #[serde(rename = "type")]
+    kind: Option<String>,
+}
+
+impl From<RawItem> for ItemRecord {
+    fn from(raw: RawItem) -> Self {
+        // A few values are written as text.
+        let number = |key: &str| {
+            let value = raw.stats.get(key)?;
+            value.as_i64().or_else(|| value.as_str()?.trim().parse().ok())
+        };
+        let need = |key: &str| number(key).map_or(0, |v| v.max(0) as u32);
+        let stats = ITEM_STATS
+            .iter()
+            .filter_map(|(key, label)| Some(ItemStat { label: (*label).to_string(), value: number(key)? }))
+            .collect();
+        Self {
+            id: raw.id,
+            slot: raw.sub_category.clone().unwrap_or_default(),
+            gender: raw.gender.clone(),
+            req_level: need("reqLevel"),
+            req_str: need("reqSTR"),
+            req_dex: need("reqDEX"),
+            req_int: need("reqINT"),
+            req_luk: need("reqLUK"),
+            weapon_type: raw.weapon.as_ref().and_then(|w| w.kind.clone()),
+            stats,
+            classes: raw.req_classes,
+            category: raw.category,
+            name: raw.name,
+        }
+    }
+}
+
+/// A piece of equipment. Other items in the file are dropped as it is parsed.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(from = "RawItem", rename_all(serialize = "camelCase"))]
+pub struct ItemRecord {
+    pub id: u32,
+    pub name: String,
+    #[serde(skip_serializing)]
+    pub category: String,
+    pub slot: String,
+    pub gender: Option<String>,
+    /// Who can use it, as the tooltip's job flags name them. Empty means anyone.
+    pub classes: Vec<String>,
+    pub weapon_type: Option<String>,
+    pub req_level: u32,
+    pub req_str: u32,
+    pub req_dex: u32,
+    pub req_int: u32,
+    pub req_luk: u32,
+    pub stats: Vec<ItemStat>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ItemStat {
+    pub label: String,
+    pub value: i64,
+}
+
+/// Everything the map card and build planner are built from.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Dataset {
     pub maps: Vec<MapRecord>,
     pub monsters: Vec<MonsterRecord>,
     pub npcs: Vec<NpcRecord>,
     pub quests: Vec<QuestRecord>,
+    pub skills: Vec<SkillRecord>,
+    pub items: Vec<ItemRecord>,
 }
 
 /// One downloaded file, parsed.
@@ -260,6 +391,8 @@ pub enum Records {
     Monsters(Vec<MonsterRecord>),
     Npcs(Vec<NpcRecord>),
     Quests(Vec<QuestRecord>),
+    Skills(Vec<SkillRecord>),
+    Items(Vec<ItemRecord>),
 }
 
 impl Records {
@@ -270,6 +403,16 @@ impl Records {
             "monsters.json" => Self::Monsters(serde_json::from_slice(body)?),
             "npcs.json" => Self::Npcs(serde_json::from_slice(body)?),
             "quests.json" => Self::Quests(serde_json::from_slice(body)?),
+            "skills.json" => {
+                let mut skills: Vec<SkillRecord> = serde_json::from_slice(body)?;
+                skills.retain(|s| s.job_tier != CRAFTING);
+                Self::Skills(skills)
+            }
+            "items.json" => {
+                let mut items: Vec<ItemRecord> = serde_json::from_slice(body)?;
+                items.retain(|i| i.category == "Equipment");
+                Self::Items(items)
+            }
             other => unreachable!("not a map data file: {other}"),
         })
     }
@@ -343,6 +486,40 @@ mod tests {
         assert_eq!((flat[0].side, flat[0].height), (Some(Side::Left), None));
         let unplaced = portals_of(br#"[{"id": 1, "name": "Fernway", "portals": [{"name": "a"}]}]"#);
         assert_eq!((unplaced[0].side, unplaced[0].height), (None, None));
+    }
+
+    #[test]
+    fn reads_skills_but_not_crafting_or_icons() {
+        // Made-up skills in OSMS's shape. Crafting records carry no levels at all.
+        let json = br#"[
+            {"id": 7, "name": "Pebble Toss", "job_id": 400, "class_name": "Rogue", "job_tier": "1st Job",
+             "max_level": 2, "passive": false, "description": "Throws a pebble.", "icon_url": "https://example.invalid/i.png",
+             "required_skills": [{"skill_id": 6, "level": 3}], "level_descriptions": ["Damage 1", "Damage 2"]},
+            {"id": 92000000, "name": "Knitting", "job_id": 9200, "job_tier": "Crafting", "max_level": 10}]"#;
+        let Records::Skills(skills) = Records::parse("skills.json", json).unwrap() else { panic!() };
+        assert_eq!(skills.len(), 1);
+        assert_eq!(skills[0].required_skills, vec![SkillNeed { skill_id: 6, level: 3 }]);
+        assert_eq!(skills[0].level_descriptions.len(), 2);
+    }
+
+    #[test]
+    fn keeps_only_equipment_and_reads_numbers_written_as_text() {
+        let json = br#"[
+            {"id": 1, "name": "Twig Wand", "category": "Equipment", "sub_category": "Weapon", "price": "5",
+             "req_classes": ["Magician"], "weapon": {"type": "Wand", "swing_reach_px": 88},
+             "stats": {"reqLevel": 8, "reqINT": 20, "incMAD": 12, "incPDD": "3", "tuc": 7},
+             "icon_url": "https://example.invalid/w.png"},
+            {"id": 2, "name": "Plain Cap", "category": "Equipment", "sub_category": "Hat", "gender": "male"},
+            {"id": 3, "name": "Red Berry", "category": "Consumable", "sub_category": "Consume"}]"#;
+        let Records::Items(items) = Records::parse("items.json", json).unwrap() else { panic!() };
+        assert_eq!(items.len(), 2);
+        let wand = &items[0];
+        assert_eq!((wand.req_level, wand.req_int, wand.req_str), (8, 20, 0));
+        assert_eq!(wand.weapon_type.as_deref(), Some("Wand"));
+        assert_eq!(wand.classes, ["Magician"]);
+        let stats: Vec<_> = wand.stats.iter().map(|s| (s.label.as_str(), s.value)).collect();
+        assert_eq!(stats, [("Magic", 12), ("Weapon Def.", 3)]);
+        assert!(items[1].classes.is_empty() && items[1].req_level == 0);
     }
 
     #[test]

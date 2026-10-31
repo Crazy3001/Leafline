@@ -149,9 +149,21 @@ pub(crate) mod tests {
     const MONSTERS: &str = r#"[{"id": 10, "name": "Pebble Snail", "level": 2, "hp": 20, "exp": 4, "spawns": [{"map_id": 2, "count": 6}]}]"#;
     const NPCS: &str = r#"[{"id": 50, "name": "Warden Ilse", "maps": [1]}]"#;
     const QUESTS: &str = r#"[{"id": 70, "name": "Shell Sorting", "npc_id": 50, "requirements": [{"type": "mob", "id": 10, "count": 8}]}]"#;
+    const SKILLS: &str = r#"[{"id": 80, "name": "Pebble Toss", "job_id": 400, "class_name": "Rogue", "job_tier": "1st Job",
+        "max_level": 2, "description": "Throws a pebble.", "required_skills": [{"skill_id": 79, "level": 1}],
+        "level_descriptions": ["Damage 1", "Damage 2"]}]"#;
+    const ITEMS: &str = r#"[{"id": 90, "name": "Twig Wand", "category": "Equipment", "sub_category": "Weapon",
+        "req_classes": ["Magician", "Thief"], "stats": {"reqLevel": 8, "incMAD": 12}}]"#;
 
     pub fn fake_osms(maps: &str) -> FakeSource {
-        let bodies = [("maps.json", maps), ("monsters.json", MONSTERS), ("npcs.json", NPCS), ("quests.json", QUESTS)];
+        let bodies = [
+            ("maps.json", maps),
+            ("monsters.json", MONSTERS),
+            ("npcs.json", NPCS),
+            ("quests.json", QUESTS),
+            ("skills.json", SKILLS),
+            ("items.json", ITEMS),
+        ];
         let files: Vec<String> = bodies
             .iter()
             .map(|(name, body)| {
@@ -180,7 +192,10 @@ pub(crate) mod tests {
         let source = fake_osms(MAPS);
         let report = refresh(&mut store, &source, false, 1000).unwrap();
         assert_eq!(report.downloaded, FILES);
-        assert_eq!(source.names(), ["meta.json", "maps.json", "monsters.json", "npcs.json", "quests.json"]);
+        assert_eq!(
+            source.names(),
+            ["meta.json", "maps.json", "monsters.json", "npcs.json", "quests.json", "skills.json", "items.json"]
+        );
 
         let status = store.status().unwrap();
         assert!(status.ready);
@@ -190,6 +205,10 @@ pub(crate) mod tests {
         assert_eq!(data.maps[0].portals[0].dest_map_id, Some(2));
         assert_eq!(data.monsters[0].spawns[0].count, 6);
         assert_eq!(data.quests[0].requirements[0].count, 8);
+        assert_eq!(data.skills[0].required_skills[0].skill_id, 79);
+        assert_eq!(data.skills[0].level_descriptions, ["Damage 1", "Damage 2"]);
+        assert_eq!(data.items[0].classes, ["Magician", "Thief"]);
+        assert_eq!(data.items[0].stats[0].value, 12);
     }
 
     #[test]
