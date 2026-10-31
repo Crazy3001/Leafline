@@ -781,6 +781,17 @@ export interface Build {
   plan: BuildGoals;
 }
 
+/** A ready-made plan written for Leafline. Nobody has played these yet. */
+export interface StarterPlan {
+  id: string;
+  job: number;
+  name: string;
+  summary: string;
+  plan: BuildGoals;
+  /** Names the data doesn't have, left out of the plan. */
+  missing: string[];
+}
+
 export interface BuildSummary {
   id: number;
   name: string;

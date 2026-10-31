@@ -71,6 +71,15 @@ impl Catalog {
         &self.skills
     }
 
+    /// The skill called `name` in one of `jobs`. Several jobs have a skill of the same name.
+    pub fn skill_named(&self, name: &str, jobs: &[u32]) -> Option<&SkillRecord> {
+        self.skills.iter().find(|s| s.name == name && jobs.contains(&s.job_id))
+    }
+
+    pub fn item_named(&self, name: &str) -> Option<&ItemRecord> {
+        self.items.iter().find(|i| i.name == name)
+    }
+
     pub fn job_name(&self, job: u32) -> Option<&str> {
         self.skills.iter().find(|s| s.job_id == job).map(|s| s.class_name.as_str())
     }

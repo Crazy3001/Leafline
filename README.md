@@ -86,7 +86,9 @@ The **Build** tab shows what your plan says at your level: this level's AP and S
 
 A build is a job and a list of goals in order, the way written guides put them: this skill to 20, then that one; DEX to 25, the rest into LUK. Each new point goes to the first goal that can take it, and the planner lays the result out level by level. It says when a prerequisite comes too late, a goal can't finish in time, or 1st-job SP would be lost at the 2nd job advancement. Add gear to see the first level the plan can wear it, and a hovered item (Ctrl+Alt+I) shows whether it suits the build.
 
-Leafline ships no guides or recommended builds. If you follow a guide, keep its link on the build. **Copy plan** turns a build's goals into a line of text you can pass on, and **Paste a code** adds one. It holds goals only, not your character, stats or link.
+**Start from a plan** offers one ready-made Lv 1-70 plan for each 2nd job, and using one fills in goals you can then change. Leafline's plans were written for it from what each skill does and what each weapon needs. They aren't copied from any guide, and nobody has played them yet, so treat them as a starting point. A blank build is always there for your own.
+
+**Guides** links to written guides for your job on MapleScanner and NiaDB. Those stay on their sites. If you follow another guide, keep its link on the build. **Copy plan** turns a build's goals into a line of text you can pass on, and **Paste a code** adds one. It holds goals only, not your character, stats or link.
 
 The planner counts points. It doesn't model damage, accuracy or HP, because those are unsettled for Classic. The numbers it counts by come from community guides and in-game checks, not from Nexon, so each can be changed under **How points are counted**. Your stats have to be typed in, because they differ by character. Everything is a plan you follow by hand: nothing is spent for you, and Leafline can't yet tell whether you followed it.
 

@@ -28,7 +28,7 @@
 use std::path::Path;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use leafline_lib::build::{Build, Catalog, Plan, Rules, SkillLevel, Start, Stat, StatGoal, Stats, expand};
+use leafline_lib::build::{Build, Catalog, Plan, Rules, SkillLevel, Start, Stat, StatGoal, Stats, expand, starters};
 use leafline_lib::mapdata::fetch::{self, Http};
 use leafline_lib::mapdata::{Atlas, MapCard, QuestQuery, Store, Travel, TravelChoice, TravelFile, drops};
 use leafline_lib::pipeline;
@@ -234,6 +234,29 @@ fn main() {
 fn print_builds(catalog: Catalog) {
     println!("{} skills, {} jobs", catalog.skills().len(), catalog.jobs().len());
     println!("gear: {} match \"hat\"\n", catalog.search_gear("hat", None).len());
+    // Each ready-made plan on a Lv 1 character. Anything printed under one needs fixing.
+    for starter in starters::all(&catalog, &Rules::default()) {
+        let build = Build {
+            start: Start { level: 1, stats: Some(Stats { str: 4, dex: 5, int: 4, luk: 12 }), ..Start::default() },
+            plan: starter.plan.clone(),
+            ..Build::default()
+        };
+        let plan = expand(&build, &Rules::default(), &catalog);
+        let last = plan.steps.last().expect("a plan has levels");
+        let weapons = plan.gear.iter().map(|g| format!("{} {:?}", g.item.name, g.level)).collect::<Vec<_>>().join(", ");
+        println!(
+            "{:<24} Lv 70: STR {} DEX {} INT {} LUK {}, {} AP and {} SP left",
+            starter.name, last.stats.str, last.stats.dex, last.stats.int, last.stats.luk, last.ap_left, last.sp_left
+        );
+        println!("      {weapons}");
+        for missing in &starter.missing {
+            println!("      MISSING: {missing}");
+        }
+        for problem in &plan.problems {
+            println!("      {:?}: {}", problem.severity, problem.message);
+        }
+    }
+    println!();
     for job in catalog.jobs() {
         let path = [job.parent.unwrap_or(job.id), job.id];
         let skills: Vec<SkillLevel> = catalog

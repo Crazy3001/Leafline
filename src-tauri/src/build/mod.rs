@@ -9,8 +9,10 @@ pub mod fit;
 pub mod plan;
 pub mod rules;
 pub mod share;
+pub mod starters;
 
 pub use catalog::{Catalog, JobChoice};
 pub use fit::{ItemFit, ItemJob};
 pub use plan::{Build, Expansion, Plan, SkillLevel, Start, Stat, StatGoal, Stats, expand};
 pub use rules::{Branch, Rules};
+pub use starters::Starter;

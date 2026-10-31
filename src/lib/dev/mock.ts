@@ -572,6 +572,25 @@ export const mockBackend: Backend = {
     return what === "prices" ? prices.length : savedSessions.length;
   },
   buildCatalog: async () => (mapStatus.ready ? mockCatalog : null),
+  starterPlans: async () =>
+    mapStatus.ready
+      ? [
+          {
+            id: "fernblade",
+            job: 420,
+            name: "Dagger Fernblade",
+            summary: "A made-up plan, to design the page with.",
+            plan: {
+              job: 420,
+              skills: [{ skillId: 1, level: 3 }, { skillId: 10, level: 20 }, { skillId: 20, level: 30 }],
+              stats: [{ stat: "dex", target: 40, fromLevel: 20 }, { stat: "luk", target: null, fromLevel: null }],
+              gear: [500],
+              planTo: 70,
+            },
+            missing: [],
+          },
+        ]
+      : [],
   searchGear: async (text) => mockGear.filter((g) => g.name.toLowerCase().includes(text.toLowerCase())),
   listBuilds: async () =>
     [...mockBuilds].sort((a, b) => b.usedAt - a.usedAt).map(({ id, name, character }) => ({ id, name, character, updatedAt: now })),

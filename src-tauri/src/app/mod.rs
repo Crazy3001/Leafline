@@ -134,6 +134,7 @@ pub fn run() {
             records::rename_map,
             records::export_csv,
             builds::build_catalog,
+            builds::starter_plans,
             builds::search_gear,
             builds::list_builds,
             builds::build_plan,

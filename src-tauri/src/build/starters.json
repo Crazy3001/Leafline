@@ -1,0 +1,146 @@
+{
+  "beginner": [["Three Snails", 3], ["Recovery", 3], ["Nimble Feet", 3]],
+  "openings": {
+    "warrior": [
+      ["Power Strike", 20], ["Slash Blast", 10], ["Improved HP Recovery", 3], ["Max HP Increase", 3],
+      ["Precise Strikes", 15], ["Slash Blast", 20]
+    ],
+    "magician": [
+      ["Energy Bolt", 1], ["Magic Claw", 8], ["Improved MP Recovery", 5], ["Magic Claw", 20],
+      ["Magic Guard", 3], ["Improved MP Recovery", 15], ["Magic Guard", 15], ["Max MP Increase", 10]
+    ],
+    "bowman": [
+      ["Arrow Blow", 1], ["Double Shot", 8], ["Critical Shot", 5], ["Double Shot", 20], ["Critical Shot", 15],
+      ["The Eye of Amazon", 3], ["Focus", 10], ["The Eye of Amazon", 15]
+    ],
+    "claw": [
+      ["Lucky Seven", 8], ["Nimble Body", 3], ["Keen Eyes", 3], ["Lucky Seven", 20], ["Nimble Body", 15],
+      ["Keen Eyes", 15], ["Disorder", 3], ["Dark Sight", 8]
+    ],
+    "dagger": [
+      ["Double Stab", 20], ["Nimble Body", 15], ["Disorder", 6], ["Dark Sight", 20]
+    ]
+  },
+  "plans": [
+    {
+      "id": "fighter-sword", "job": 110, "name": "Sword Fighter",
+      "summary": "One-handed swords for steady speed. Rage early, then Final Attack.",
+      "opening": "warrior",
+      "skills": [
+        ["Sword Mastery", 5], ["Sword Booster", 1], ["Rage", 10], ["Sword Mastery", 20], ["Final Attack: Sword", 30],
+        ["Rage", 30], ["Sword Booster", 20], ["Rush", 20], ["Axe Mastery", 1]
+      ],
+      "primary": "str", "secondary": "dex",
+      "steps": [[10, 15], [15, 20], [20, 25], [30, 30], [35, 40], [45, 50], [55, 60], [65, 70]],
+      "gear": ["Long Sword", "Sabre", "Viking Sword", "Eloon", "Gladius", "Traus", "Jeweled Katar", "Neocora", "Red Katana"]
+    },
+    {
+      "id": "page-sword", "job": 120, "name": "Sword Page",
+      "summary": "One-handed swords for the accuracy from Sword Mastery. Threaten comes last.",
+      "opening": "warrior",
+      "skills": [
+        ["Sword Mastery", 5], ["Sword Booster", 1], ["Sword Mastery", 20], ["Final Attack: Sword", 30], ["Sword Booster", 20],
+        ["Rush", 20], ["Threaten", 30], ["Blunt Weapon Mastery", 1]
+      ],
+      "primary": "str", "secondary": "dex",
+      "steps": [[10, 15], [15, 20], [20, 25], [30, 30], [35, 40], [45, 50], [55, 60], [65, 70]],
+      "gear": ["Long Sword", "Sabre", "Viking Sword", "Eloon", "Gladius", "Traus", "Jeweled Katar", "Neocora", "Red Katana"]
+    },
+    {
+      "id": "spearman-spear", "job": 130, "name": "Spear Spearman",
+      "summary": "Spears over polearms for faster weapons. Iron Will early for safer grinding.",
+      "opening": "warrior",
+      "skills": [
+        ["Spear Mastery", 5], ["Spear Booster", 1], ["Iron Will", 5], ["Spear Mastery", 20], ["Final Attack: Spear", 30],
+        ["Spear Booster", 20], ["Iron Will", 30], ["Rush", 20], ["Polearm Mastery", 1]
+      ],
+      "primary": "str", "secondary": "dex",
+      "steps": [[30, 30], [35, 35], [40, 40], [50, 50], [60, 60], [70, 70]],
+      "gear": ["Spear", "Fork on a Stick", "Fish Spear", "Forked Spear", "Nakamaki", "Zeco", "Serpent's Tongue", "Holy Spear", "Redemption"]
+    },
+    {
+      "id": "fp-wizard", "job": 210, "name": "Fire Arrow F/P Wizard",
+      "summary": "Fire Arrow first, then Meditation for the party, with Poison Breath for later.",
+      "opening": "magician",
+      "skills": [
+        ["Teleport", 1], ["Fire Arrow", 15], ["MP Eater", 3], ["Meditation", 10], ["Fire Arrow", 30], ["Meditation", 20],
+        ["Teleport", 20], ["MP Eater", 20], ["Poison Breath", 30], ["Slow", 1]
+      ],
+      "primary": "int", "secondary": "luk",
+      "steps": [[10, 20], [15, 25], [20, 30], [25, 35], [30, 40], [40, 50], [55, 60], [65, 70]],
+      "gear": ["Wooden Wand", "Hardwood Wand", "Metal Wand", "Ice Wand", "Mithril Wand", "Wizard Wand", "Fairy Wand", "Cromi", "Evil Tale", "Angel Wings"]
+    },
+    {
+      "id": "il-wizard", "job": 220, "name": "Cold Beam I/L Wizard",
+      "summary": "Cold Beam to single out targets, Thunder Bolt alongside it for groups.",
+      "opening": "magician",
+      "skills": [
+        ["Teleport", 1], ["Cold Beam", 15], ["MP Eater", 3], ["Meditation", 10], ["Thunder Bolt", 15], ["Cold Beam", 30],
+        ["Meditation", 20], ["Thunder Bolt", 30], ["Teleport", 20], ["MP Eater", 20], ["Slow", 1]
+      ],
+      "primary": "int", "secondary": "luk",
+      "steps": [[10, 20], [15, 25], [20, 30], [25, 35], [30, 40], [40, 50], [55, 60], [65, 70]],
+      "gear": ["Wooden Wand", "Hardwood Wand", "Metal Wand", "Ice Wand", "Mithril Wand", "Wizard Wand", "Fairy Wand", "Cromi", "Evil Tale", "Angel Wings"]
+    },
+    {
+      "id": "cleric", "job": 230, "name": "Party Cleric",
+      "summary": "Heal and Bless for parties, with Holy Arrow to grind between them. MP Eater is skipped.",
+      "opening": "magician",
+      "skills": [
+        ["Teleport", 1], ["Holy Arrow", 10], ["Heal", 15], ["Invincible", 5], ["Bless", 5], ["Holy Arrow", 30], ["Heal", 30],
+        ["Bless", 20], ["Invincible", 20], ["Teleport", 20], ["MP Eater", 1]
+      ],
+      "primary": "int", "secondary": "luk",
+      "steps": [[10, 20], [15, 25], [20, 30], [25, 35], [30, 40], [40, 50], [55, 60], [65, 70]],
+      "gear": ["Wooden Wand", "Hardwood Wand", "Metal Wand", "Ice Wand", "Mithril Wand", "Wizard Wand", "Fairy Wand", "Cromi", "Evil Tale", "Angel Wings"]
+    },
+    {
+      "id": "hunter", "job": 310, "name": "Arrow Bomb Hunter",
+      "summary": "Mastery first for steadier damage, then Arrow Bomb for groups.",
+      "opening": "bowman",
+      "skills": [
+        ["Bow Mastery", 5], ["Bow Booster", 1], ["Bow Mastery", 20], ["Arrow Bomb", 30], ["Final Attack: Bow", 30],
+        ["Bow Booster", 20], ["Soul Arrow: Bow", 20], ["Amazon's Judgement", 1]
+      ],
+      "primary": "dex", "secondary": "str",
+      "steps": [[15, 15], [20, 20], [25, 25], [30, 30], [35, 35], [40, 40], [50, 50], [60, 60], [70, 70]],
+      "gear": ["War Bow", "Composite Bow", "Hunter's Bow", "Battle Bow", "Ryden", "Red Viper", "Vaulter 2000", "Olympus", "Asianic Bow", "Red Hinkel"]
+    },
+    {
+      "id": "crossbowman", "job": 320, "name": "Iron Arrow Crossbowman",
+      "summary": "Mastery first, then Iron Arrow. Crossbows ask for less STR than bows.",
+      "opening": "bowman",
+      "skills": [
+        ["Crossbow Mastery", 5], ["Crossbow Booster", 1], ["Crossbow Mastery", 20], ["Iron Arrow", 30],
+        ["Final Attack: Crossbow", 30], ["Crossbow Booster", 20], ["Soul Arrow: Crossbow", 20], ["Amazon's Judgement", 1]
+      ],
+      "primary": "dex", "secondary": "str",
+      "steps": [[10, 20], [15, 25], [20, 30], [30, 40], [35, 45], [40, 50], [50, 60], [60, 70]],
+      "gear": ["Crossbow", "Battle Crossbow", "Balanche", "Mountain Crossbow", "Eagle Crow", "Heckler", "Silver Crow", "Rower", "Golden Crow", "Gross Jaeger"]
+    },
+    {
+      "id": "assassin", "job": 410, "name": "Claw Assassin",
+      "summary": "Lucky Seven with claws throughout. Critical Throw first, then Drain for sustain.",
+      "opening": "claw",
+      "skills": [
+        ["Claw Mastery", 5], ["Claw Booster", 1], ["Claw Mastery", 20], ["Critical Throw", 30], ["Haste", 5], ["Claw Booster", 20],
+        ["Critical Recovery", 3], ["Drain", 28], ["Haste", 20]
+      ],
+      "primary": "luk", "secondary": "dex",
+      "steps": [[15, 15], [20, 20], [25, 25], [30, 30], [35, 35], [40, 40], [50, 50], [60, 60], [70, 70]],
+      "gear": ["Garnier", "Steel Titans", "Bronze Igor", "Meba", "Adamantium Guards", "Dark Guardian", "Dark Avarice", "Dark Slain", "Dark Gigantic", "Black Scarab"]
+    },
+    {
+      "id": "bandit", "job": 420, "name": "Dagger Bandit",
+      "summary": "Double Stab from the start, so no SP reset is needed at Lv 30. DEX daggers, not STR ones.",
+      "opening": "dagger",
+      "skills": [
+        ["Savage Blow", 1], ["Dagger Mastery", 5], ["Dagger Booster", 1], ["Dagger Mastery", 20], ["Savage Blow", 30], ["Haste", 5],
+        ["Dagger Booster", 20], ["Steal", 30], ["Haste", 20], ["Nimble Recovery", 1]
+      ],
+      "primary": "luk", "secondary": "dex",
+      "steps": [[10, 15], [15, 20], [20, 25], [22, 27], [25, 30], [30, 35], [35, 40], [45, 50], [55, 60], [65, 70]],
+      "gear": ["Triangular Zamadar", "Field Dagger", "Coconut Knife", "Iron Dagger", "Forked Dagger", "Reef Claw", "Halfmoon Zamadar", "Gephart", "Shinkita", "Deadly Fin", "Kandine"]
+    }
+  ]
+}

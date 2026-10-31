@@ -9,7 +9,9 @@ use super::mapdata::MapDataState;
 use super::records::{UserDataState, now};
 use super::settings::SettingsState;
 use crate::build::plan::MAX_LEVEL;
-use crate::build::{Branch, Build, Catalog, Expansion, ItemFit, ItemJob, JobChoice, Rules, expand, fit, share};
+use crate::build::{
+    Branch, Build, Catalog, Expansion, ItemFit, ItemJob, JobChoice, Rules, Starter, expand, fit, share, starters,
+};
 use crate::error::{Error, Result};
 use crate::mapdata::osms::{ItemRecord, SkillRecord};
 use crate::readers::tooltip::Requirements;
@@ -75,6 +77,12 @@ pub struct CatalogView {
 pub fn build_catalog(state: State<MapDataState>) -> Option<CatalogView> {
     let catalog = state.catalog()?;
     Some(CatalogView { jobs: catalog.jobs(), skills: catalog.skills().to_vec() })
+}
+
+/// The plans written for Leafline, one for each second job. Empty until the map data is here.
+#[tauri::command]
+pub fn starter_plans(app: AppHandle) -> Vec<Starter> {
+    app.state::<MapDataState>().catalog().map_or_else(Vec::new, |c| starters::all(&c, &rules(&app)))
 }
 
 /// Equipment by name, limited to what `job` can use.

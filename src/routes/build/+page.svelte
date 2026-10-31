@@ -19,6 +19,7 @@
   import { backend } from "$lib/api";
   import { STATS, buildState, statLabel, watchBuilds } from "$lib/builds.svelte";
   import MapDataPanel from "$lib/components/map/MapDataPanel.svelte";
+  import { guideLinks } from "$lib/guides";
   import { OSMS_CREDIT, OSMS_URL, mapData, watchMapData } from "$lib/mapdata.svelte";
   import { live, watchLive } from "$lib/readings.svelte";
   import { DEFAULT_RULES, changeSettings, display, watchSettings } from "$lib/settings.svelte";
@@ -33,6 +34,7 @@
     GearItem,
     LevelStep,
     SkillInfo,
+    StarterPlan,
   } from "$lib/types";
 
   const SAVE_DELAY = 250;
@@ -51,6 +53,9 @@
   let pasted = $state("");
   let gearText = $state("");
   let gearFound = $state<GearItem[]>([]);
+  let starters = $state<StarterPlan[]>([]);
+  /** The plan waiting for a second click, because it would replace goals already written. */
+  let confirmStarter = $state<string | null>(null);
 
   /** The draft as last saved, so an unchanged draft isn't saved again. */
   let saved = "";
@@ -73,6 +78,7 @@
     void mapData.status?.dataUpdatedAt;
     if (!ready) return;
     backend.buildCatalog().then((c) => (catalog = c));
+    backend.starterPlans().then((plans) => (starters = plans));
     if (!draft) untrack(openActive);
   });
 
@@ -216,6 +222,24 @@
     // A place to start, not advice. Goals already written are left alone.
     const primary = catalog?.jobs.find((j) => j.id === id)?.primary;
     if (primary && !draft.plan.stats.length) draft.plan.stats.push({ stat: primary, target: null, fromLevel: null });
+  }
+
+  /** The plans for this job, or all of them before one is chosen. */
+  const jobPlans = $derived(
+    starters.filter((s) => (secondJob ? s.job === secondJob : firstJob ? Math.floor(s.job / 100) * 100 === firstJob : true)),
+  );
+  const jobGuides = $derived([firstJob, secondJob].filter(Boolean).flatMap((id) => guideLinks(id).map((link) => ({ ...link, job: jobName(id) }))));
+
+  /** Fills in a plan's goals. The character's own starting point stays. */
+  function useStarter(starter: StarterPlan) {
+    if (!draft) return;
+    const written = draft.plan.skills.length > 0 || draft.plan.gear.length > 0 || draft.plan.stats.length > 1;
+    if (written && confirmStarter !== starter.id) {
+      confirmStarter = starter.id;
+      return;
+    }
+    confirmStarter = null;
+    draft.plan = JSON.parse(JSON.stringify(starter.plan));
   }
 
   const pathSkills = $derived(
@@ -397,6 +421,30 @@
         </div>
       </section>
 
+      {#if jobPlans.length}
+        <section>
+          <h2>Start from a plan</h2>
+          <p class="help">
+            Written for Leafline from what each skill does and what each weapon needs. Nobody has played them yet, so treat
+            them as a starting point. Using one fills in your goals, which you can then change. Your stats stay as they are.
+          </p>
+          <ul class="plans">
+            {#each jobPlans as starter (starter.id)}
+              <li>
+                <span class="goal-name">
+                  <span>{starter.name}</span>
+                  <small>{starter.summary}</small>
+                  {#if starter.missing.length}<small class="warn">Not in this data: {starter.missing.join(", ")}</small>{/if}
+                </span>
+                <button class="plain" class:danger={confirmStarter === starter.id} onclick={() => useStarter(starter)}>
+                  {confirmStarter === starter.id ? "Replace my goals?" : "Use this plan"}
+                </button>
+              </li>
+            {/each}
+          </ul>
+        </section>
+      {/if}
+
       <section>
         <h2>Where you are now</h2>
         <p class="help">From your Character Stat window. Stats differ by character, so they can't be filled in for you.</p>
@@ -577,8 +625,18 @@
       </section>
 
       <section>
-        <h2>Guide</h2>
-        <p class="help">Following a guide? Keep its link here. It stays on this PC and isn't part of a copied plan.</p>
+        <h2>Guides</h2>
+        {#if jobGuides.length}
+          <p class="help">Written by other players, on their own sites. Enter what you want from them as goals above.</p>
+          <div class="links">
+            {#each jobGuides as guide (guide.url)}
+              <button class="plain" onclick={() => backend.openGuide(guide.url)}>
+                <ExternalLink size={13} />{guide.job}, {guide.site} ({guide.levels})
+              </button>
+            {/each}
+          </div>
+        {/if}
+        <p class="help">Following another guide? Keep its link here. It stays on this PC and isn't part of a copied plan.</p>
         <div class="guide">
           <input type="url" placeholder="https://" aria-label="Guide link" bind:value={draft.guide} />
           <button class="plain" disabled={!draft.guide.trim()} onclick={() => draft && backend.openGuide(draft.guide)}>
@@ -1038,6 +1096,35 @@
   .guide {
     display: flex;
     gap: 6px;
+  }
+
+  .links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+
+  .plans {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .plans li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+  }
+
+  .plans li + li {
+    border-top: 1px solid var(--border);
+  }
+
+  small.warn {
+    color: var(--warn);
   }
 
   .guide input {

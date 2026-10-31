@@ -42,6 +42,7 @@ import type {
   ReplayProgress,
   SessionSummary,
   ShortcutInfo,
+  StarterPlan,
   TrainingSpots,
 } from "./types";
 
@@ -148,6 +149,8 @@ export interface Backend {
   buildCatalog(): Promise<BuildCatalog | null>;
   /** Equipment by name, limited to what the job can use. */
   searchGear(text: string, job: number): Promise<GearItem[]>;
+  /** The plans written for Leafline, one for each second job. Empty until map data is downloaded. */
+  starterPlans(): Promise<StarterPlan[]>;
   listBuilds(): Promise<BuildSummary[]>;
   buildPlan(id: number): Promise<BuildPlan | null>;
   /** The build to show for this character, or the one used last. */
@@ -272,6 +275,7 @@ const tauriBackend: Backend = {
   },
   buildCatalog: () => invoke("build_catalog"),
   searchGear: (text, job) => invoke("search_gear", { text, job }),
+  starterPlans: () => invoke("starter_plans"),
   listBuilds: () => invoke("list_builds"),
   buildPlan: (id) => invoke("build_plan", { id }),
   activeBuild: (character) => invoke("active_build", { character }),
