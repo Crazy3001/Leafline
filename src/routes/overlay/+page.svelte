@@ -212,14 +212,14 @@
             tabindex={tab === panel.id ? 0 : -1}
             class:empty={signatures[panel.id] == null}
             class:pinned={live.pins.pinned.includes(panel.id)}
-            title={live.pins.pinned.includes(panel.id) ? `${panel.title} (also pinned)` : undefined}
+            title={live.pins.pinned.includes(panel.id) ? `${panel.title} (also pinned)` : panel.title}
             onclick={() => select(panel.id)}
           >
             <span class="icon">
-              <Icon size={14} />
+              <Icon size={13} />
               {#if fresh(panel.id)}<span class="dot" aria-label="Updated"></span>{/if}
             </span>
-            <span>{panel.title}</span>
+            <span class="tab-title">{panel.title}</span>
           </button>
         {/each}
       </div>
@@ -468,21 +468,28 @@
     flex: 1 1 auto;
     align-items: center;
     justify-content: center;
-    gap: 4px;
+    gap: 3px;
     min-width: 0;
     height: 34px;
-    padding: 0 3px;
+    padding: 0 2px;
     border: 0;
     border-bottom: 2px solid transparent;
     background: transparent;
     color: var(--muted);
-    font-size: 12px;
+    font-size: 11.5px;
     font-weight: 500;
     white-space: nowrap;
     cursor: pointer;
     transition:
       color 0.12s ease,
       border-color 0.12s ease;
+  }
+
+  /* Six titles don't fit a window dragged narrow, so only the open tab keeps its title. */
+  @media (max-width: 318px) {
+    [role="tab"]:not([aria-selected="true"]) .tab-title {
+      display: none;
+    }
   }
 
   [role="tab"]:hover {
