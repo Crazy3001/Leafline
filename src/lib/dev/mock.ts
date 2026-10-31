@@ -252,10 +252,6 @@ export const mockBackend: Backend = {
     analysisHandlers.forEach((handler) => handler(analysis));
     return analysis;
   },
-  async calibrateHud() {
-    await delay(250);
-    return { learned: ["HP", "MP", "EXP", "EXP %", "Level", "Name"], failed: [] };
-  },
   listImages: async () => Object.keys(screenshots),
   async replaySession() {
     replayCancelled = false;
@@ -313,7 +309,7 @@ export const mockBackend: Backend = {
     clearInterval(liveTimer);
     liveTimer = setInterval(() => {
       frames += 1;
-      setLive({ state: "reading", window: "MapleStory", width: 2560, height: 1440, frames, readMs: 412, hdr: false, hudTaught: frames > 3, held: false, logging: true });
+      setLive({ state: "reading", window: "MapleStory", width: 2560, height: 1440, frames, readMs: 412, hdr: false, held: false, logging: true });
       analysisHandlers.forEach((h) => h(sampleAnalysis));
     }, displaySettings.live.interval * 1000);
   },

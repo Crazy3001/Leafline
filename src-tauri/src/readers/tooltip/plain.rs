@@ -8,8 +8,8 @@
 
 use image::Rgba;
 
-use super::{LINE_PITCH, Panel, TARGET_TEXT_HEIGHT, parse};
 use super::parse::ItemTooltip;
+use super::{LINE_PITCH, Panel, TARGET_TEXT_HEIGHT, parse};
 use crate::error::Result;
 use crate::readers::text::{best_match, trim_noise};
 use crate::vision::{Frame, Line, Ocr, Rect, group_lines, preprocess};

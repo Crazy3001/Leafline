@@ -17,7 +17,7 @@
 //!
 //! `--hunt <monster> --from <map-id>` lists where the quest guide sends a player for that monster.
 //!
-//! `--preview <image> <out.json> [--font <hud-font.json>] [--travel]` writes what the overlay would
+//! `--preview <image> <out.json> [--travel]` writes what the overlay would
 //! show for a screenshot (analysis, map match, quest guide, training spots), for the dev UI's
 //! `window.__LEAFLINE_PREVIEW__`. `--travel` fetches the taxis and return scrolls from
 //! mapleclassic.wiki and turns them all on. It holds game data: keep it outside the repo.
@@ -28,7 +28,6 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use leafline_lib::mapdata::fetch::{self, Http};
 use leafline_lib::mapdata::{Atlas, MapCard, QuestQuery, Store, Travel, TravelChoice, TravelFile, drops};
 use leafline_lib::pipeline;
-use leafline_lib::readers::hud::HudFont;
 use leafline_lib::readers::map;
 use leafline_lib::vision::{self, Ocr};
 
@@ -85,8 +84,7 @@ fn main() {
     }
     if let Some(image) = value("--quests", 1) {
         let frame = vision::load(Path::new(&image)).expect("load screenshot");
-        let analysis =
-            pipeline::analyze(&frame, &Ocr::new().expect("OCR engine"), &HudFont::default()).expect("analyze");
+        let analysis = pipeline::analyze(&frame, &Ocr::new().expect("OCR engine")).expect("analyze");
         let quests: Vec<QuestQuery> = analysis
             .quest
             .iter()
@@ -153,11 +151,8 @@ fn main() {
         }
     }
     if let (Some(image), Some(out)) = (value("--preview", 1), value("--preview", 2)) {
-        let font: HudFont = value("--font", 1)
-            .map(|f| serde_json::from_str(&std::fs::read_to_string(f).expect("read font")).expect("parse font"))
-            .unwrap_or_default();
         let frame = vision::load(Path::new(&image)).expect("load screenshot");
-        let mut analysis = pipeline::analyze(&frame, &Ocr::new().expect("OCR engine"), &font).expect("analyze");
+        let mut analysis = pipeline::analyze(&frame, &Ocr::new().expect("OCR engine")).expect("analyze");
         analysis.overview.clear();
         let found = analysis.map.as_ref().and_then(|m| atlas.find(&m.name, m.street.as_deref()));
         let from = found.as_ref().map(|m| m.card.map.id);

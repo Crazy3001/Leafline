@@ -1,23 +1,19 @@
 //! Replays a folder of screenshots as a session and prints what the tracker made of it.
 //!
-//! `cargo run --release --example replay -- <folder> [--font hud-font.json] [--every <seconds>]`
+//! `cargo run --release --example replay -- <folder> [--every <seconds>]`
 //!
 //! Frames are ordered by file modified time, or by name `--every` seconds apart (for frames
-//! extracted from a recording). Without `--font` HUD numbers are not read, so EXP is not tracked.
+//! extracted from a recording).
 
 use std::path::PathBuf;
 
-use leafline_lib::readers::hud::HudFont;
 use leafline_lib::replay::{self, Order};
 use leafline_lib::vision::Ocr;
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let folder = PathBuf::from(args.first().expect("usage: replay <folder> [--font <file>] [--every <seconds>]"));
+    let folder = PathBuf::from(args.first().expect("usage: replay <folder> [--every <seconds>]"));
     let value = |flag: &str| args.iter().position(|a| a == flag).map(|i| args[i + 1].clone());
-    let font: HudFont = value("--font").map_or_else(HudFont::default, |path| {
-        serde_json::from_str(&std::fs::read_to_string(path).expect("read font")).expect("parse font")
-    });
     let order = match value("--every") {
         Some(seconds) => Order::Name { interval_seconds: seconds.parse().expect("--every takes seconds") },
         None => Order::Modified,
@@ -26,7 +22,7 @@ fn main() {
     let frames = replay::frames(&folder, order).expect("list frames");
     let start = frames.first().map_or(0.0, |f| f.at);
 
-    let summary = replay::run(&frames, order.tracker_config(), &ocr, &font, |_, frame, analysis, _| {
+    let summary = replay::run(&frames, order.tracker_config(), &ocr, |_, frame, analysis, _| {
         let hud = analysis.hud.as_ref();
         println!(
             "{:>7.0} s  {:<14} LV {:<4} EXP {:<20} mesos {:<8} {}",

@@ -4,7 +4,7 @@
 //! `cargo run --example capture` lists them.
 //! `cargo run --example capture -- "<title text>" out.png` captures the first window whose title
 //! contains the text.
-//! `cargo run --example capture -- --auto [--font hud-font.json] [--frames 3] [--compare image]`
+//! `cargo run --example capture -- --auto [--frames 3] [--compare image]`
 //! finds the game window on its own and runs each picture through the pipeline. `--compare`
 //! counts how many pixels differ from a saved screenshot.
 //! `cargo run --example capture -- --item` reads the items in one picture, like a price check.
@@ -14,7 +14,6 @@ use std::time::{Duration, Instant};
 
 use leafline_lib::capture::{self, Capturer, Grab};
 use leafline_lib::pipeline;
-use leafline_lib::readers::hud::HudFont;
 use leafline_lib::session::{Sample, SessionTracker, TrackerConfig};
 use leafline_lib::vision::{self, Frame, Ocr};
 
@@ -74,9 +73,6 @@ fn read_item() {
 
 fn read_live(args: &[String]) {
     let value = |flag: &str| args.iter().position(|a| a == flag).and_then(|i| args.get(i + 1));
-    let font: HudFont = value("--font")
-        .map(|path| serde_json::from_str(&std::fs::read_to_string(path).expect("read font")).expect("parse font"))
-        .unwrap_or_default();
     let frames: usize = value("--frames").map_or(3, |n| n.parse().expect("frame count"));
     let reference = value("--compare").map(|path| vision::load(Path::new(path)).expect("load comparison image"));
 
@@ -101,7 +97,7 @@ fn read_live(args: &[String]) {
             }
         };
         let reading = Instant::now();
-        let analysis = pipeline::analyze_live(&frame, &ocr, &font).expect("analyze");
+        let analysis = pipeline::analyze_live(&frame, &ocr).expect("analyze");
         let read_ms = reading.elapsed().as_millis();
         tracker.push(&Sample::from_analysis(started.elapsed().as_secs_f64(), &analysis));
         let hud = analysis.hud.as_ref();

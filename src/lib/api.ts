@@ -10,7 +10,6 @@ import { open, save } from "@tauri-apps/plugin-dialog";
 
 import type {
   Analysis,
-  Calibration,
   DisplaySettings,
   GameWindow,
   ItemRead,
@@ -18,7 +17,6 @@ import type {
   TravelInfo,
   Guide,
   History,
-  HudValues,
   MapDataDownload,
   MapDataStatus,
   MapDetails,
@@ -42,8 +40,6 @@ import type {
 
 export interface Backend {
   analyzeImage(path: string): Promise<Analysis>;
-  /** Teaches the HUD font from a screenshot whose values the user typed in. */
-  calibrateHud(path: string, values: HudValues): Promise<Calibration>;
   listImages(folder: string): Promise<string[]>;
   /** Runs every screenshot in the folder through the pipeline as one session. */
   replaySession(folder: string, order: ReplayOrder): Promise<SessionSummary>;
@@ -170,7 +166,6 @@ const IMAGE_FILTER = { name: "Screenshots", extensions: ["png", "jpg", "jpeg", "
 
 const tauriBackend: Backend = {
   analyzeImage: (path) => invoke("analyze_image", { path }),
-  calibrateHud: (path, values) => invoke("calibrate_hud", { path, values }),
   listImages: (folder) => invoke("list_images", { folder }),
   replaySession: (folder, order) => invoke("replay_session", { folder, order }),
   cancelReplay: () => invoke("cancel_replay"),

@@ -77,6 +77,11 @@ impl Action {
         }
     }
 
+    /// Whether this build has this action. Only development builds have a workbench.
+    pub fn available(self) -> bool {
+        self != Action::ShowWorkbench || cfg!(debug_assertions)
+    }
+
     /// The name settings know this action by.
     fn name(self) -> String {
         format!("{self:?}")
@@ -126,6 +131,7 @@ pub struct ShortcutInfo {
 pub fn list(choice: &HotkeyChoice) -> Vec<ShortcutInfo> {
     Action::ALL
         .iter()
+        .filter(|action| action.available())
         .map(|&action| ShortcutInfo {
             action: action.name(),
             keys: action.keys(choice),
@@ -143,7 +149,7 @@ pub struct Bindings(Mutex<Vec<(Shortcut, Action)>>);
 /// and two actions can't share one.
 fn parsed(choice: &HotkeyChoice) -> Result<Vec<(Shortcut, Action)>> {
     let mut bindings: Vec<(Shortcut, Action)> = Vec::new();
-    for action in Action::ALL {
+    for action in Action::ALL.into_iter().filter(|action| action.available()) {
         let keys = action.keys(choice);
         if keys.is_empty() {
             continue;

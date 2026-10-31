@@ -31,7 +31,7 @@
   const stats = $derived(item.stats.map((s) => `${s.label} ${s.value >= 0 ? "+" : ""}${s.value}`).join(", "));
   const variant = $derived(
     [
-      (item.upgrades ?? 0) > 0 ? `+${item.upgrades}` : item.plain ? null : "no upgrades",
+      (item.upgrades ?? 0) > 0 ? `+${item.upgrades}` : item.plain ? null : item.upgraded ? "upgraded" : "no upgrades",
       slotsText(item.remainingEnhancements),
     ]
       .filter(Boolean)

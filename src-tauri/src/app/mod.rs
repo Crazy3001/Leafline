@@ -1,6 +1,5 @@
 //! Tauri wiring: windows, tray, hotkeys and commands.
 
-mod calibration;
 mod commands;
 mod launch;
 mod layout;
@@ -19,7 +18,6 @@ mod tray;
 
 use tauri::{Manager, WindowEvent};
 
-use calibration::HudFontState;
 use launch::LaunchImage;
 use live::LiveState;
 use mapdata::MapDataState;
@@ -55,7 +53,6 @@ pub fn run() {
         .manage(Bindings::default())
         .manage(LaunchImage::new(&args))
         .setup(|app| {
-            app.manage(HudFontState::load(app.handle())?);
             app.manage(MapDataState::load(app.handle())?);
             app.manage(UserDataState::load(app.handle())?);
             mapdata::check_for_updates(app.handle());
@@ -68,7 +65,7 @@ pub fn run() {
             app.manage(PinState::load(app.handle())?);
             pins::restore(app.handle())?;
             tray::create(app)?;
-            overlay::fit_workbench(app.handle())?;
+            overlay::create_workbench(app.handle())?;
             Ok(())
         })
         .on_window_event(|window, event| match event {
@@ -86,7 +83,6 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::analyze_image,
-            calibration::calibrate_hud,
             commands::list_images,
             commands::read_image,
             replay::replay_session,

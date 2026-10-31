@@ -26,26 +26,6 @@ export interface HudReading {
   exp: Exp | null;
   /** The EXP percentage, when the HUD shows it with no points beside it, as it does at high levels. */
   expPercent: number | null;
-  /** The HUD font has not been learned at this size, or shows a character not seen yet. */
-  needsCalibration: boolean;
-  /** The level shows a digit not learned yet. The session tracker follows it from the EXP meanwhile. */
-  levelUnread: boolean;
-}
-
-/** What the user reads off their HUD to teach Leafline its font. */
-export interface HudValues {
-  level: number;
-  hp: [number, number];
-  mp: [number, number];
-  expPoints: number;
-  expPercent: string;
-  name: string | null;
-}
-
-/** Which fields calibration could match to the screen. */
-export interface Calibration {
-  learned: string[];
-  failed: string[];
 }
 
 export interface HudLayout {
@@ -86,6 +66,8 @@ export interface Property {
 export interface ItemTooltip {
   name: string;
   upgrades: number | null;
+  /** Upgraded, going by its amber name, even if the count couldn't be read. */
+  upgraded: boolean;
   itemType: string | null;
   requirements: Requirements;
   jobs: JobFlag[];
@@ -208,7 +190,6 @@ export type LiveStatus =
       /** Windows HDR is on for the game's display, which washes the picture out. */
       hdr: boolean;
       /** Without a taught HUD font, EXP, HP and MP aren't read. */
-      hudTaught: boolean;
       /** Tracking is paused by hand. */
       held: boolean;
       /** This run goes to the log. */

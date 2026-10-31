@@ -6,7 +6,6 @@ use tauri::ipc::Response;
 use tauri::{AppHandle, Manager};
 use tauri_plugin_opener::OpenerExt;
 
-use super::calibration::HudFontState;
 use super::overlay::{self, OverlayStatus};
 use super::readings;
 use super::settings::SettingsState;
@@ -19,10 +18,9 @@ use crate::vision::{self, Ocr};
 /// overlay and pinned panels as it would appear live.
 #[tauri::command]
 pub async fn analyze_image(app: AppHandle, path: PathBuf) -> Result<Analysis> {
-    let hud_font = app.state::<HudFontState>().current();
     let analysis = tauri::async_runtime::spawn_blocking(move || -> Result<Analysis> {
         let frame = vision::load(&path)?;
-        pipeline::analyze(&frame, &Ocr::new()?, &hud_font)
+        pipeline::analyze(&frame, &Ocr::new()?)
     })
     .await
     .map_err(|err| Error::Invalid(err.to_string()))??;

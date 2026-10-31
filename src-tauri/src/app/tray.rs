@@ -28,12 +28,14 @@ pub fn create(app: &App) -> tauri::Result<()> {
             &click_through,
             &item(Action::TogglePins, "Show / hide pinned panels")?,
             &item(Action::ToggleLive, "Start / stop live reading")?,
-            &item(Action::ShowWorkbench, "Open workbench")?,
             &MenuItem::with_id(app, SETTINGS, "Settings…", true, None::<&str>)?,
             &PredefinedMenuItem::separator(app)?,
             &MenuItem::with_id(app, QUIT, "Quit Leafline", true, None::<&str>)?,
         ],
     )?;
+    if Action::ShowWorkbench.available() {
+        menu.insert(&item(Action::ShowWorkbench, "Open workbench")?, 4)?;
+    }
     let _ = app.state::<OverlayState>().click_through_item.set(click_through);
 
     TrayIconBuilder::with_id("main")

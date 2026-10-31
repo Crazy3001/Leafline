@@ -6,8 +6,9 @@
 //!
 //! Tooltips are translucent, so the scenery behind them confuses OCR. The text is read twice,
 //! as is and with the text colour-keyed out of the background, and the passes are merged. The
-//! `REQ` block uses a pixel font: its six rows are read by position, and digits OCR is unsure
-//! of are matched against ones it read cleanly elsewhere in the frame.
+//! `REQ` block uses a pixel font: its six rows are read by position, by the rules that read the
+//! HUD's numbers, and failing that by OCR, with digits it is unsure of matched against ones it
+//! read cleanly elsewhere in the frame.
 //!
 //! Items with no stats have no separator, so [`plain`] finds those.
 
@@ -22,6 +23,7 @@ use serde::Serialize;
 
 pub use parse::{ItemTooltip, JOBS, JobFlag, Property, Requirements, Stat};
 
+use super::digits::number;
 use super::text::{best_match, starts_like, trim_noise};
 use crate::error::Result;
 use crate::vision::glyphs::{GlyphSet, MIN_SIMILARITY, Mask, ink_columns};
@@ -49,6 +51,13 @@ const REQ_DIGIT_HEIGHT: f32 = 7.0;
 const REQ_VALUE_LEFT: f32 = 138.0;
 /// OCR reads best with text around this many pixels tall.
 const TARGET_TEXT_HEIGHT: f32 = 30.0;
+/// How much amber above the `REQ` block makes a name upgraded, in square game pixels. A name has
+/// hundreds; one that isn't upgraded has none.
+const MIN_AMBER_AREA: f32 = 25.0;
+/// Amber text is keyed before enlarging, without smoothing, which keeps it crisp.
+const AMBER_SCALE: u32 = 3;
+/// How many lines above the `REQ` block a name can reach, wrapped.
+const NAME_LINES: f32 = 3.25;
 
 static DIGITS: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(\d{1,3})\s*$").unwrap());
 /// Words, an optional `(M)`-style tag and an optional `(+N)`, with nothing OCR made up.
@@ -123,17 +132,78 @@ pub fn read(frame: &Frame, panel: Panel, ocr: &Ocr) -> Result<ItemTooltip> {
     })?;
 
     let mut item = parse_pass(&plain, panel).merge(parse_pass(&keyed, panel));
+    // An upgraded item's name is amber, which says so whatever OCR makes of its `(+1)`, and
+    // keying that colour alone leaves the scenery behind the name out.
+    let top = req_row_top(panel, 0) - NAME_LINES * LINE_PITCH * panel.unit;
+    let above = Rect::from_edges(panel.rect.x, top.max(panel.rect.y), panel.rect.right(), req_row_top(panel, 0));
+    let upgraded = amber_pixels(frame, above) >= MIN_AMBER_AREA * panel.unit * panel.unit;
+    let amber = if upgraded { amber_name(frame, above, ocr)? } else { None };
     // Prefer whichever pass read the name cleanly; keying helps over busy scenery but can
     // garble the `(+1)` suffix.
-    let names = [name_text(&plain, panel), name_text(&keyed, panel)];
-    if let Some(name) =
-        names.iter().flatten().find(|n| CLEAN_NAME.is_match(n)).or(names[1].as_ref()).or(names[0].as_ref())
+    let names = [amber, name_text(&plain, panel), name_text(&keyed, panel)].map(|name| name.map(|n| tidy_name(&n)));
+    if let Some(name) = names
+        .iter()
+        .flatten()
+        .find(|n| CLEAN_NAME.is_match(n))
+        .or(names[0].as_ref())
+        .or(names[2].as_ref())
+        .or(names[1].as_ref())
     {
         (item.name, item.upgrades) = parse::split_name(name);
     }
+    // A wrapped name can lose its `(+N)` or read it out of order in the pass that won.
+    if upgraded && item.upgrades.is_none() {
+        item.upgrades = names.iter().flatten().find_map(|name| parse::upgrades_in(name));
+    }
+    item.upgraded = upgraded || item.upgrades.is_some_and(|n| n > 0);
     item.panel = panel.rect;
     item.jobs = read_jobs(frame, panel);
     Ok(item)
+}
+
+/// Rounds the brackets OCR reads as `{` or `[`, as in `Green Robin Hat {+1}`.
+fn tidy_name(name: &str) -> String {
+    name.replace(['{', '['], "(").replace(['}', ']'], ")")
+}
+
+/// An amber name, each line read alone: OCR loses or reorders the lines of a wrapped name read
+/// together.
+fn amber_name(frame: &Frame, area: Rect, ocr: &Ocr) -> Result<Option<String>> {
+    let (x, y, w, h) = area.to_pixels(frame.width(), frame.height());
+    let ink = |row: u32| (x..x + w).filter(|&col| is_amber(frame.get_pixel(col, row))).count();
+    let mut lines: Vec<(u32, u32)> = Vec::new();
+    for row in (y..y + h).filter(|&row| ink(row) > 0) {
+        match lines.last_mut() {
+            Some(line) if row - line.1 <= 2 => line.1 = row + 1,
+            _ => lines.push((row, row + 1)),
+        }
+    }
+    let mut name = Vec::new();
+    for (top, bottom) in lines {
+        // Cropped close: OCR finds nothing in a short line left in a wide, empty picture.
+        let inked: Vec<u32> =
+            (x..x + w).filter(|&col| (top..bottom).any(|row| is_amber(frame.get_pixel(col, row)))).collect();
+        let (Some(left), Some(right)) = (inked.first(), inked.last()) else { continue };
+        let line = Rect::from_edges(*left as f32 - 6.0, top as f32 - 4.0, *right as f32 + 7.0, bottom as f32 + 4.0);
+        let words = ocr.words_in(frame, line, AMBER_SCALE as f32, |crop| {
+            // Looser than the check for amber: text over a dark patch of scenery comes out dimmer.
+            let keyed = preprocess::keep(crop, |px| {
+                let [r, g, b, _] = px.0;
+                r >= 150 && g >= 90 && b <= 70 && r >= g + 40
+            });
+            let (w, h) = (keyed.width() * AMBER_SCALE, keyed.height() * AMBER_SCALE);
+            preprocess::pad(&imageops::resize(&keyed, w, h, imageops::FilterType::Nearest), 24)
+        })?;
+        let text: Vec<&str> = words.iter().map(|word| word.text.as_str()).collect();
+        name.push(text.join(" "));
+    }
+    let name = name.join(" ");
+    Ok((!name.trim().is_empty()).then(|| trim_noise(&name).to_string()))
+}
+
+fn amber_pixels(frame: &Frame, area: Rect) -> f32 {
+    let (x, y, w, h) = area.to_pixels(frame.width(), frame.height());
+    (y..y + h).map(|row| (x..x + w).filter(|&col| is_amber(frame.get_pixel(col, row))).count()).sum::<usize>() as f32
 }
 
 /// The item name: it sits just above the REQ block and may wrap onto two lines, so it is the
@@ -232,8 +302,14 @@ impl RequirementRows {
             .rows
             .iter()
             .map(|row| {
+                // Only a UI at the size the rules read needs nothing else.
+                let shape = number(&row.glyphs).filter(|t| !t.is_empty());
                 let ocr = row.ocr.as_ref().filter(|t| t.chars().count() == row.glyphs.len());
-                ocr.cloned().or_else(|| digits.read(&row.glyphs).filter(|t| !t.is_empty()))?.parse().ok()
+                shape
+                    .or_else(|| ocr.cloned())
+                    .or_else(|| digits.read(&row.glyphs).filter(|t| !t.is_empty()))?
+                    .parse()
+                    .ok()
             })
             .collect();
         Requirements {
@@ -359,6 +435,13 @@ fn is_tooltip_text(px: &Rgba<u8>) -> bool {
     let light_grey = preprocess::luminance(px) >= 150 && preprocess::saturation(px) <= 70;
     let amber = r >= 200 && g >= 140 && b <= 120;
     light_grey || amber
+}
+
+/// The amber of an upgraded item's name, solid (255, 170, 0). The scenery behind a tooltip is
+/// dimmed by the panel, and this close to that shade it doesn't pass for it.
+fn is_amber(px: &Rgba<u8>) -> bool {
+    let [r, g, b, _] = px.0;
+    r >= 235 && (150..=190).contains(&g) && b <= 40
 }
 
 /// The jobs that can use the item: bright orange.

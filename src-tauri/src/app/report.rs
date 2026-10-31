@@ -43,10 +43,10 @@ pub fn diagnostics(app: AppHandle) -> String {
         LiveStatus::Failed { message } => {
             let _ = writeln!(text, "Live reading: stopped ({message})");
         }
-        LiveStatus::Reading { width, height, frames, read_ms, hdr, hud_taught, held, logging, .. } => {
+        LiveStatus::Reading { width, height, frames, read_ms, hdr, held, logging, .. } => {
             let _ = writeln!(
                 text,
-                "Live reading: {width}x{height}, {frames} readings, last {read_ms:.0} ms, HDR {hdr}, HUD taught {hud_taught}, paused {held}, logging {logging}",
+                "Live reading: {width}x{height}, {frames} readings, last {read_ms:.0} ms, HDR {hdr}, paused {held}, logging {logging}",
             );
         }
     }

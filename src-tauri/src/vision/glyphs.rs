@@ -1,8 +1,8 @@
 //! Reading fixed bitmap fonts by template matching.
 //!
 //! General OCR misreads small pixel fonts (9 as S, 953 as "ss.3"), but such a font draws each
-//! character identically every time, so comparing glyph shapes is exact. The templates are
-//! learned on the user's own screen during calibration: no game font data ships with the app.
+//! character identically every time, so comparing glyph shapes is exact. Shapes are only ever
+//! compared within one picture: no game font data is saved or ships with the app.
 
 use image::Rgba;
 use serde::{Deserialize, Serialize};
