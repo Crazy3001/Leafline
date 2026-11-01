@@ -18,7 +18,7 @@ use crate::mapdata::osms::Dataset;
 use crate::mapdata::{
     Atlas, DataStatus, ItemOrigin, MapCard, MapMatch, MapPage, MapQuery, MapRef, MeasuredRate, MonsterDrops, MonsterFilters,
     MonsterPage, MonsterQuery, MonsterSheet, NpcPage, NpcQuery, NpcSheet, QuestGuide, QuestPage, QuestQuery, QuestSearch,
-    QuestSheet, RefreshReport, Route, Store, TrainingSpot, Travel, TravelFile, drops,
+    QuestSheet, RefreshReport, Route, Store, TrainingSpot, Travel, TravelFile, drops, turnins,
 };
 
 const FILE_NAME: &str = "map-data.sqlite3";
@@ -116,6 +116,18 @@ impl MapDataState {
         result
     }
 
+    /// Renews the table of who takes each quest in, and brings the atlas up to date with it.
+    fn refresh_turn_ins(&self) -> Result<()> {
+        let _turn = self.drops_refresh.lock().expect("drops refresh lock");
+        let mut store = Store::open(&self.path)?;
+        if turnins::refresh(&mut store, &self.wiki, now())? {
+            let (atlas, catalog) = store.load()?.map(split).unzip();
+            *self.atlas.write().expect("atlas lock") = atlas;
+            *self.catalog.write().expect("catalog lock") = catalog;
+        }
+        Ok(())
+    }
+
     fn refresh_drops(&self) -> Result<()> {
         let _turn = self.drops_refresh.lock().expect("drops refresh lock");
         drops::refresh(&mut Store::open(&self.path)?, &self.wiki, now())
@@ -123,8 +135,9 @@ impl MapDataState {
 }
 
 /// Once the user has downloaded map data, checks OSMS for changes in the background, at most
-/// once a day, and renews the drop table once it is a week old, if it was ever downloaded. An
-/// update of Leafline that replaced the cache gets back what the user had the same way.
+/// once a day, renews the turn-in table once it is a week old, and the drop table too if it was
+/// ever downloaded. An update of Leafline that replaced the cache gets back what the user had
+/// the same way.
 pub fn check_for_updates(app: &AppHandle) {
     let state = app.state::<MapDataState>();
     let wanted = Store::open(&state.path).and_then(|s| s.wants_maps()).unwrap_or(false);
@@ -143,6 +156,9 @@ pub fn check_for_updates(app: &AppHandle) {
             Ok(_) => {}
             // Offline or OSMS unavailable: the cache keeps working, and the user can retry.
             Err(err) => eprintln!("map data update check failed: {err}"),
+        }
+        if let Err(err) = state.refresh_turn_ins() {
+            eprintln!("turn-in table download failed: {err}");
         }
         let has_drops = Store::open(&state.path).and_then(|s| s.wants_drops()).unwrap_or(false);
         if has_drops && let Err(err) = state.refresh_drops() {
@@ -171,6 +187,10 @@ pub async fn download_map_data(app: AppHandle, force: bool) -> Result<Downloaded
     let downloaded = tauri::async_runtime::spawn_blocking(move || -> Result<Downloaded> {
         let state = handle.state::<MapDataState>();
         let report = state.refresh(force)?;
+        // Quest help still works without it, from what the map data shows.
+        if let Err(err) = state.refresh_turn_ins() {
+            eprintln!("turn-in table download failed: {err}");
+        }
         Ok(Downloaded { report, status: Store::open(&state.path)?.status()? })
     })
     .await

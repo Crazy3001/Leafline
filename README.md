@@ -97,6 +97,8 @@ The Quests tab and its pinned window show each quest in the Quest Helper with it
 
 Once a tracked quest matches the data it stays locked in, so scenery moving behind the Quest Helper can't change it.
 
+The game's data only says who gives a quest, so who takes it in comes from mapleclassic.wiki. Where the wiki doesn't say, Leafline goes by the next quest in a chain or a title like `to Heena`, and otherwise says it doesn't know rather than guess.
+
 ### Lookup
 
 The Lookup tab searches Items, Monsters, Maps and NPCs. None of it needs live reading.
@@ -197,7 +199,7 @@ src-tauri/src/
 Leafline ships no game data. Map details are downloaded on your machine when you ask for them, kept in a local cache and credited in the app:
 
 - Map, monster, NPC, quest, skill and equipment data: [OSMS Data Explorer](https://osmsdataexplorer.com), CC BY 4.0.
-- Player-observed drop rates, taxi routes and return scrolls: [mapleclassic.wiki](https://mapleclassic.wiki) contributors, CC BY-NC-SA 4.0.
+- Player-observed drop rates, quest turn-ins, taxi routes and return scrolls: [mapleclassic.wiki](https://mapleclassic.wiki) contributors, CC BY-NC-SA 4.0.
 
 Game content belongs to Nexon. Leafline is unofficial and not affiliated with or endorsed by Nexon.
 

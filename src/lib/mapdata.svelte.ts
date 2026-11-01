@@ -6,7 +6,7 @@ import type { MapDataStatus } from "./types";
 
 export const OSMS_CREDIT = "Data from OSMS Data Explorer (https://osmsdataexplorer.com), CC BY 4.0";
 export const OSMS_URL = "https://osmsdataexplorer.com";
-export const WIKI_CREDIT = "Player-observed drops from mapleclassic.wiki, CC BY-NC-SA 4.0";
+export const WIKI_CREDIT = "Player-observed drops and quest turn-ins from mapleclassic.wiki, CC BY-NC-SA 4.0";
 export const WIKI_URL = "https://mapleclassic.wiki";
 
 export const mapData = $state<{

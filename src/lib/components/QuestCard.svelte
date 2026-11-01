@@ -188,6 +188,14 @@
             </span>
           </p>
         {/if}
+        {#if !finished && info.quest.turnIn && info.quest.turnIn !== info.quest.giver}
+          <p class="giver">
+            <UserRound size={11} />
+            <span>
+              Turn in to {info.quest.turnIn}{#if info.quest.turnInMaps.length}<span class="faint">{" · "}{info.quest.turnInMaps.map((m) => m.name).join(", ")}</span>{/if}
+            </span>
+          </p>
+        {/if}
       {/if}
       {#if objectives.length}
         <ul>
@@ -248,7 +256,7 @@
     {/if}
     {#if guide}
       <p class="credit">
-        Maps: <button onclick={() => backend.openLink(OSMS_URL)}>OSMS</button> (CC BY 4.0){#if showsDrops}{" · "}Drop rates players logged on <button onclick={() => backend.openLink(WIKI_URL)}>mapleclassic.wiki</button>{/if}
+        Maps: <button onclick={() => backend.openLink(OSMS_URL)}>OSMS</button> (CC BY 4.0){" · "}{showsDrops ? "Drops and turn-ins" : "Turn-ins"} from <button onclick={() => backend.openLink(WIKI_URL)}>mapleclassic.wiki</button>
       </p>
     {/if}
   {/if}

@@ -9,6 +9,7 @@ use strsim::normalized_levenshtein;
 
 use super::osms::{Dataset, Height, MapRecord, MonsterRecord, NO_MAP, QuestRecord, Side};
 use super::travel::{Travel, TravelKind, TravelLink};
+use super::turnins;
 
 /// Below this similarity an OCR'd name is not taken for any map.
 const MIN_SCORE: f64 = 0.72;
@@ -241,6 +242,8 @@ pub struct Atlas {
     pub(super) quests_from: HashMap<u32, Vec<u32>>,
     /// Item → quests that can give it, the lowest level first.
     pub(super) quests_rewarding: HashMap<u32, Vec<u32>>,
+    /// Quest → the NPC who takes it in, where the wiki says.
+    pub(super) turn_ins: HashMap<u32, u32>,
     /// Map → its exits, in display order.
     pub(super) exits: HashMap<u32, Vec<Exit>>,
     /// Each map's name, street and town folded for fuzzy matching.
@@ -293,10 +296,12 @@ impl Atlas {
             quests_for_mob,
             quests_from,
             quests_rewarding,
+            turn_ins: HashMap::new(),
             exits: HashMap::new(),
             keys,
         };
         atlas.exits = atlas.maps.values().map(|m| (m.id, atlas.exits_of(m))).collect();
+        atlas.turn_ins = turnins::resolve(&data.turn_ins, |quest, name| atlas.turn_in_npc(quest, name));
         atlas
     }
 

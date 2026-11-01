@@ -10,6 +10,7 @@
 
 use std::collections::BTreeMap;
 
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 use super::fetch::Source;
@@ -78,7 +79,7 @@ pub fn refresh(store: &mut Store, source: &dyn Source, now: i64) -> Result<()> {
 fn download(source: &dyn Source, now: i64) -> Result<BTreeMap<String, MonsterDrops>> {
     let mut rows = Vec::new();
     for page in 0..MAX_PAGES {
-        let batch = parse_rows(&source.get(&page_url(page * PAGE))?)?;
+        let batch: Vec<Row> = cargo_rows(&source.get(&page_url(page * PAGE))?)?;
         let last = batch.len() < PAGE;
         rows.extend(batch);
         if last && rows.is_empty() {
@@ -223,17 +224,17 @@ struct Row {
 }
 
 /// The rows of a Cargo reply, or the wiki's error.
-fn parse_rows(body: &[u8]) -> Result<Vec<Row>> {
+pub(super) fn cargo_rows<T: DeserializeOwned>(body: &[u8]) -> Result<Vec<T>> {
     #[derive(Deserialize)]
-    struct Response {
-        cargoquery: Option<Vec<Entry>>,
+    struct Response<T> {
+        cargoquery: Option<Vec<Entry<T>>>,
         error: Option<serde_json::Value>,
     }
     #[derive(Deserialize)]
-    struct Entry {
-        title: Row,
+    struct Entry<T> {
+        title: T,
     }
-    let response: Response = serde_json::from_slice(body)
+    let response: Response<T> = serde_json::from_slice(body)
         .map_err(|err| Error::Download(format!("mapleclassic.wiki sent an unexpected reply: {err}")))?;
     if let Some(error) = response.error {
         return Err(Error::Download(format!(

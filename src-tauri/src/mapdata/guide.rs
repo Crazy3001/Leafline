@@ -576,13 +576,20 @@ impl Atlas {
         maps
     }
 
-    /// Who a quest is handed in to. The data has no field for it, so this goes by what shows
-    /// it: the next quest of a chain starts with them, or the title ends `to Heena`. Otherwise
-    /// it stays unknown: the giver is not a safe guess, being someone else on over half the
-    /// chained quests.
+    /// The NPC the wiki names as taking a quest in. Several can share a name, as the ones in a
+    /// job's instance do, so the quest's own giver wins, and then one standing on a map.
+    pub(super) fn turn_in_npc(&self, quest: u32, name: &str) -> Option<u32> {
+        let giver = self.quests.get(&quest).and_then(|q| q.npc_id);
+        giver.filter(|id| self.npc_names.get(id).is_some_and(|n| n == name)).or_else(|| self.npc_like(name))
+    }
+
+    /// Who a quest is handed in to. The client data has no field for it, so this is the wiki's
+    /// answer where it has one. Otherwise it goes by what shows it: the next quest of a chain
+    /// starts with them, or the title ends `to Heena`. Failing that it stays unknown: the giver
+    /// is not a safe guess, being someone else on half the quests the wiki covers.
     pub(super) fn turn_in(&self, quest: &QuestRecord) -> Option<u32> {
         let next = quest.next_quest_id.and_then(|id| self.quests.get(&id)).and_then(|q| q.npc_id);
-        next.or_else(|| {
+        self.turn_ins.get(&quest.id).copied().or(next).or_else(|| {
             let (_, name) = quest.name.rsplit_once(" to ")?;
             let name = name.trim_end_matches(['.', '!', '?']);
             let mut named: Vec<u32> =
@@ -774,6 +781,54 @@ mod tests {
 
         assert_eq!(atlas.quest_info(82).unwrap().turn_in, None);
         assert_eq!(atlas.quest_info(83).unwrap().turn_in, None, "`to` followed by no NPC");
+    }
+
+    #[test]
+    fn the_wiki_says_who_takes_a_quest_in_before_anything_is_inferred() {
+        use crate::mapdata::atlas::tests::map;
+        use crate::mapdata::osms::{Dataset, NpcRecord, QuestRecord};
+        use crate::mapdata::turnins::TurnIn;
+        let npc = |id: u32, name: &str, maps: Vec<u32>| NpcRecord { id, name: name.into(), maps };
+        let quest = |id: u32, name: &str, giver: u32, next: Option<u32>| QuestRecord {
+            id,
+            name: name.into(),
+            npc_id: Some(giver),
+            next_quest_id: next,
+            ..QuestRecord::default()
+        };
+        let turn_in = |quest: u32, npc: &str| TurnIn { quest, npc: npc.into() };
+        let atlas = Atlas::new(Dataset {
+            maps: vec![map(1, "Mossbank", "Fern Road", vec![]), map(2, "Split Road", "Fern Road", vec![]), map(9, "Instance", "Fern Road", vec![])],
+            npcs: vec![
+                npc(1, "Sam", vec![1]),
+                npc(2, "Mai", vec![2]),
+                npc(3, "Tutor", vec![9]),
+                npc(4, "Tutor", vec![2]),
+                npc(5, "Biggs", vec![1]),
+            ],
+            quests: vec![
+                quest(10, "Sam's Suggestion", 1, None),
+                quest(11, "Into a Chain", 1, Some(12)),
+                quest(12, "Tutor's Test", 4, None),
+                quest(13, "Off the Wiki", 5, None),
+                quest(14, "Unmatched", 1, Some(12)),
+            ],
+            turn_ins: vec![
+                turn_in(10, "Mai"),
+                turn_in(11, "Biggs"),
+                turn_in(12, "Tutor (Fern Road)"),
+                turn_in(14, "Nobody The Data Has"),
+                turn_in(99, "Mai"),
+            ],
+            ..Dataset::default()
+        });
+        let who = |id: u32| atlas.quest_info(id).unwrap().turn_in;
+        assert_eq!(who(10).as_deref(), Some("Mai"), "the client data has nothing to say on this one");
+        assert_eq!(atlas.quest_info(10).unwrap().turn_in_maps[0].name, "Split Road");
+        assert_eq!(who(11).as_deref(), Some("Biggs"), "the wiki outranks the next quest's giver");
+        assert_eq!(atlas.quest_info(12).unwrap().turn_in_maps[0].name, "Split Road", "the giver wins among shared names");
+        assert_eq!(who(13), None, "nothing to go on, so nothing is guessed");
+        assert_eq!(who(14).as_deref(), Some("Tutor"), "a name the data lacks falls back on the chain");
     }
 
     #[test]

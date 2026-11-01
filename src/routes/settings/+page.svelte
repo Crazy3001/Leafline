@@ -241,7 +241,7 @@
   const does = [
     "Reads what the game shows, from saved screenshots or, once you turn it on, the game window, with the OCR built into Windows on this PC.",
     "Shows map, monster, quest, skill and equipment facts from community data, downloaded only when you ask.",
-    "Downloads the player-logged drop table from mapleclassic.wiki when you first need it, renews it weekly, and looks drops up on this PC.",
+    "Downloads the player-logged drop table from mapleclassic.wiki when you first need it, and who takes each quest in along with the map data. Both renew weekly and are looked up on this PC.",
     "Keeps your settings, sessions, price log and builds on this PC.",
   ];
   const doesNot = [
@@ -259,7 +259,7 @@
       url: OSMS_URL,
     },
     {
-      what: "Player-observed drop rates, taxi routes and return scrolls",
+      what: "Player-observed drop rates, quest turn-ins, taxi routes and return scrolls",
       who: "mapleclassic.wiki contributors",
       licence: "CC BY-NC-SA 4.0",
       url: WIKI_URL,

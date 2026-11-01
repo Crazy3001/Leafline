@@ -9,6 +9,8 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Deserializer, Serialize};
 
+use super::turnins::TurnIn;
+
 /// The files Leafline needs, in the order they are fetched.
 pub const FILES: [&str; 6] = ["maps.json", "monsters.json", "npcs.json", "quests.json", "skills.json", "items.json"];
 
@@ -724,6 +726,8 @@ pub struct ScrollInfo {
 /// Everything the map card and build planner are built from.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Dataset {
+    /// Who takes quests in. Not from OSMS: the client data doesn't say.
+    pub turn_ins: Vec<TurnIn>,
     pub maps: Vec<MapRecord>,
     pub monsters: Vec<MonsterRecord>,
     pub npcs: Vec<NpcRecord>,

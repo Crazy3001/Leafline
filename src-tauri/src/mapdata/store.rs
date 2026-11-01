@@ -15,6 +15,7 @@ use super::osms::{
     Dataset, FILES, FileMeta, Height, ItemKind, ItemNeed, ItemRecord, MapRecord, Meta, MobRequirement, MonsterDetails,
     MonsterRecord, NpcRecord, Portal, QuestRecord, Records, RewardItem, Side, SkillNeed, SkillRecord, Spawn,
 };
+use super::turnins::TurnIn;
 use crate::error::{Error, Result};
 
 /// Bump when the tables change; an older cache is then dropped and downloaded again.
@@ -65,6 +66,12 @@ CREATE INDEX drops_by_monster ON drops (monster);
 CREATE TABLE drop_fetches (monster TEXT PRIMARY KEY, fetched_at INTEGER NOT NULL, sample_kills INTEGER, game_version TEXT);
 ";
 
+/// Tables added since the last `CACHE_VERSION`, which hold nothing the player would have to
+/// download again.
+const ADDED: &str = "
+CREATE TABLE IF NOT EXISTS quest_turn_ins (quest_id INTEGER PRIMARY KEY, npc TEXT NOT NULL);
+";
+
 /// Tables from when items were asked about one at a time. The whole drop table replaces them,
 /// so they are removed from an existing cache without forcing a new download.
 const RETIRED: &str = "
@@ -74,6 +81,8 @@ DROP TABLE IF EXISTS item_droppers;
 
 /// Where the time the drop table was downloaded is kept in `source_info`.
 const DROPS_FETCHED_AT: &str = "drops_fetched_at";
+/// Likewise for the wiki's table of who takes each quest in.
+const TURN_INS_FETCHED_AT: &str = "turn_ins_fetched_at";
 
 /// Kept in `source_info` when a new version of Leafline replaces the cache: the player had
 /// downloaded the map data or drop table, so each comes back without asking again.
@@ -164,6 +173,7 @@ impl Store {
                 }
             }
         }
+        conn.execute_batch(ADDED)?;
         conn.execute_batch(RETIRED)?;
         Ok(Self { conn })
     }
@@ -251,6 +261,7 @@ impl Store {
             return Ok(None);
         }
         Ok(Some(Dataset {
+            turn_ins: self.turn_ins()?,
             maps: self.load_maps()?,
             monsters: self.load_monsters()?,
             npcs: self.load_npcs()?,
@@ -494,6 +505,33 @@ impl Store {
             })
         })?;
         Ok(quests.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// When the turn-in table was downloaded, or `None` if it has not been.
+    pub fn turn_ins_fetched_at(&self) -> Result<Option<i64>> {
+        Ok(self.info(TURN_INS_FETCHED_AT)?.and_then(|v| v.parse().ok()))
+    }
+
+    /// Who takes each quest in, as downloaded.
+    pub fn turn_ins(&self) -> Result<Vec<TurnIn>> {
+        let mut stmt = self.conn.prepare("SELECT quest_id, npc FROM quest_turn_ins ORDER BY quest_id")?;
+        let rows = stmt.query_map([], |row| Ok(TurnIn { quest: row.get(0)?, npc: row.get(1)? }))?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// Replaces the whole turn-in table.
+    pub fn replace_turn_ins(&mut self, rows: &[TurnIn], now: i64) -> Result<()> {
+        let tx = self.conn.transaction()?;
+        tx.execute("DELETE FROM quest_turn_ins", [])?;
+        for row in rows {
+            tx.execute("INSERT OR REPLACE INTO quest_turn_ins (quest_id, npc) VALUES (?1, ?2)", params![row.quest, row.npc])?;
+        }
+        tx.execute(
+            "INSERT OR REPLACE INTO source_info (key, value) VALUES (?1, ?2)",
+            [TURN_INS_FETCHED_AT, &now.to_string()],
+        )?;
+        tx.commit()?;
+        Ok(())
     }
 
     /// When the drop table was downloaded, or `None` if it has not been.
@@ -803,6 +841,17 @@ mod tests {
         let store = Store::init(older_cache(A_FILE)).unwrap();
         assert!(store.wants_maps().unwrap());
         assert!(!store.wants_drops().unwrap(), "the drop table was never asked for");
+    }
+
+    #[test]
+    fn a_cache_from_before_the_turn_in_table_keeps_what_it_holds() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(SCHEMA).unwrap();
+        conn.execute_batch(A_FILE).unwrap();
+        conn.pragma_update(None, "user_version", CACHE_VERSION).unwrap();
+        let store = Store::init(conn).unwrap();
+        assert_eq!(store.status().unwrap().files.len(), 1, "nothing to download again");
+        assert!(store.turn_ins().unwrap().is_empty());
     }
 
     #[test]

@@ -57,7 +57,7 @@
       <PlaceRoute maps={info.turnInMaps} {from} />
     {:else if info.giver}
       <p class="step">Turn it in</p>
-      <p class="unsure">The data doesn't say to whom. It came from {info.giver}.</p>
+      <p class="unsure">Nothing says to whom yet. It came from {info.giver}.</p>
       <PlaceRoute maps={info.giverMaps} {from} />
     {:else}
       <p class="step">Turn it in</p>
