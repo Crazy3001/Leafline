@@ -6,7 +6,9 @@
   import CompactHud from "$lib/components/CompactHud.svelte";
   import Logo from "$lib/components/Logo.svelte";
   import PanelView from "$lib/components/PanelView.svelte";
+  import { itemView, watchItems } from "$lib/items.svelte";
   import { PANELS, panelInfo, signature } from "$lib/panels";
+  import { questView, watchQuests } from "$lib/quests.svelte";
   import { live, watchLive } from "$lib/readings.svelte";
   import { display, watchSettings } from "$lib/settings.svelte";
   import type { Panel } from "$lib/types";
@@ -20,6 +22,8 @@
   onMount(() => {
     watchLive();
     watchSettings();
+    watchItems();
+    watchQuests();
   });
 
   const signatures = $derived(
@@ -38,6 +42,22 @@
   // A price check is asked for by hotkey, so its result opens by itself.
   $effect(() => {
     if (live.itemRead?.found) select("item");
+  });
+
+  // So is reading the character's windows, whose result is in the Build tab. When the live
+  // pictures catch a change by themselves, a line says so and the tab stays where it is.
+  $effect(() => {
+    const read = live.characterRead;
+    if (read && !read.problem && !read.automatic) select("build");
+  });
+
+  // So is a link to an item, from the build planner or a list of drops.
+  $effect(() => {
+    if (itemView.seen) select("item");
+  });
+
+  $effect(() => {
+    if (questView.seen) select("quests");
   });
 
   const fresh = (panel: Panel) => panel !== tab && signatures[panel] != null && signatures[panel] !== seen[panel];
@@ -90,6 +110,13 @@
     if (live.itemRead?.problem) return { tone: "warn", text: `Couldn't read the item: ${live.itemRead.problem}` };
     if (live.itemRead?.found === 0)
       return { tone: "quiet", text: "No equipment tooltip found. Hover a piece of equipment in game, then press Ctrl+Alt+I." };
+    if (live.characterRead?.problem) return { tone: "warn", text: live.characterRead.problem };
+    if (live.characterRead) {
+      const { build, result } = live.characterRead;
+      const unknown = result.unknown.length ? ` Not on this job: ${result.unknown.join(", ")}.` : "";
+      const changed = result.changes.length ? `${build} updated: ${result.changes.join(", ")}.` : `${build} already matches your windows.`;
+      return { tone: "good", text: changed + unknown };
+    }
     if (live.savedFrame) return { tone: "good", text: `Saved ${fileName(live.savedFrame)} to Pictures\\Leafline.` };
     if (s.state === "waiting") return { tone: "quiet", text: s.reason };
     if (s.state === "reading" && s.hdr)
@@ -210,7 +237,7 @@
             aria-selected={tab === panel.id}
             aria-controls="panel"
             tabindex={tab === panel.id ? 0 : -1}
-            class:empty={signatures[panel.id] == null}
+            class:empty={signatures[panel.id] == null && panel.id !== "item" && panel.id !== "quests"}
             class:pinned={live.pins.pinned.includes(panel.id)}
             title={live.pins.pinned.includes(panel.id) ? `${panel.title} (also pinned)` : panel.title}
             onclick={() => select(panel.id)}
@@ -236,8 +263,8 @@
     </nav>
 
     <div class="main" id="panel" role="tabpanel" aria-labelledby="tab-{tab}">
-      <!-- A build can be planned with nothing read yet. -->
-      {#if live.analysis || live.session || tab === "build"}
+      <!-- A build can be planned and items and quests looked up with nothing read yet. -->
+      {#if live.analysis || live.session || tab === "build" || tab === "item" || tab === "quests"}
         {#key tab}
           <div class="panel"><PanelView panel={tab} analysis={live.analysis} session={live.session} /></div>
         {/key}

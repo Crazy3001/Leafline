@@ -239,6 +239,8 @@ pub struct Atlas {
     pub(super) quests_for_mob: HashMap<u32, Vec<u32>>,
     /// NPC → quests they give.
     pub(super) quests_from: HashMap<u32, Vec<u32>>,
+    /// Item → quests that can give it, the lowest level first.
+    pub(super) quests_rewarding: HashMap<u32, Vec<u32>>,
     /// Map → its exits, in display order.
     pub(super) exits: HashMap<u32, Vec<Exit>>,
     /// Each map's name, street and town folded for fuzzy matching.
@@ -264,6 +266,14 @@ impl Atlas {
         }
         let mut quests_for_mob: HashMap<u32, Vec<u32>> = HashMap::new();
         let mut quests_from: HashMap<u32, Vec<u32>> = HashMap::new();
+        let mut quests_rewarding: HashMap<u32, Vec<u32>> = HashMap::new();
+        let mut by_level: Vec<&super::osms::QuestRecord> = data.quests.iter().collect();
+        by_level.sort_by_key(|q| (q.level_min.unwrap_or(0), q.id));
+        for quest in by_level {
+            for reward in &quest.reward_items {
+                quests_rewarding.entry(reward.item_id).or_default().push(quest.id);
+            }
+        }
         for quest in &data.quests {
             for need in &quest.requirements {
                 quests_for_mob.entry(need.mob_id).or_default().push(quest.id);
@@ -282,6 +292,7 @@ impl Atlas {
             npcs_on,
             quests_for_mob,
             quests_from,
+            quests_rewarding,
             exits: HashMap::new(),
             keys,
         };
@@ -695,7 +706,7 @@ pub(super) fn similarity(a: &str, b: &str) -> f64 {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::mapdata::osms::{MobRequirement, MonsterRecord, NpcRecord, Portal, QuestRecord, Spawn};
+    use crate::mapdata::osms::{MobRequirement, MonsterRecord, NpcRecord, Portal, QuestRecord, RewardItem, Spawn};
 
     // A small made-up world; none of it is real game data.
     //
@@ -815,6 +826,8 @@ pub(crate) mod tests {
                         MobRequirement { mob_id: 10, count: 8 },
                         MobRequirement { mob_id: 12, count: 2 },
                     ],
+                    reward_items: vec![RewardItem { item_id: 90, count: 2, sure: true }],
+                    ..QuestRecord::default()
                 },
                 QuestRecord {
                     id: 71,
@@ -823,6 +836,11 @@ pub(crate) mod tests {
                     level_min: Some(1),
                     next_quest_id: None,
                     requirements: vec![MobRequirement { mob_id: 11, count: 5 }],
+                    reward_items: vec![
+                        RewardItem { item_id: 90, count: 1, sure: false },
+                        RewardItem { item_id: 91, count: 1, sure: false },
+                    ],
+                    ..QuestRecord::default()
                 },
             ],
             ..Dataset::default()
@@ -856,6 +874,7 @@ pub(crate) mod tests {
                 level_min: Some(1),
                 next_quest_id: None,
                 requirements: vec![MobRequirement { mob_id: 10, count: 8 }],
+                ..QuestRecord::default()
             }],
             ..Dataset::default()
         })

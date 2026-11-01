@@ -10,13 +10,14 @@ use tauri::{AppHandle, Emitter, Manager, State, Url};
 use tauri_plugin_opener::OpenerExt;
 
 use super::settings::SettingsState;
+use super::{overlay, pins};
 use crate::build::Catalog;
 use crate::error::{Error, Result};
 use crate::mapdata::fetch::{self, Http};
 use crate::mapdata::osms::Dataset;
 use crate::mapdata::{
-    Atlas, DataStatus, MapCard, MapMatch, MapRef, MeasuredRate, MonsterDrops, QuestGuide, QuestQuery, RefreshReport,
-    Route, Store, TrainingSpot, Travel, TravelFile, drops,
+    Atlas, DataStatus, ItemOrigin, MapCard, MapMatch, MapRef, MeasuredRate, MonsterDrops, QuestGuide, QuestPage, QuestQuery,
+    QuestSearch, QuestSheet, RefreshReport, Route, Store, TrainingSpot, Travel, TravelFile, drops,
 };
 
 const FILE_NAME: &str = "map-data.sqlite3";
@@ -27,6 +28,8 @@ const TRAVEL_CACHE: &str = "travel-wiki.json";
 
 /// Emitted to every window when the cached map data changes.
 pub const MAP_DATA_EVENT: &str = "map-data";
+/// Emitted to every window to bring up a quest in the Quests tab.
+pub const SHOW_QUEST_EVENT: &str = "show-quest";
 
 /// Sites Leafline may open in the browser: the link-outs and the credits.
 const LINK_HOSTS: [&str; 9] = [
@@ -335,6 +338,96 @@ pub fn quest_guide(
     let items = drops::sources_for(&Store::open(&state.path)?, &objectives)?;
     let quests = atlas.quest_guide(&quests, from.as_ref().map(|m| m.id), &items, &measured, &travel(&app, &atlas));
     Ok(Some(Guide { from, quests }))
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ItemWhere {
+    /// The map portals are counted from, when the minimap was read and matched.
+    from: Option<MapRef>,
+    origin: ItemOrigin,
+}
+
+/// Who drops an item and which quests give it. The first call downloads the drop table; the
+/// item's name is never sent. Without that table, the quests still show.
+#[tauri::command]
+pub async fn item_origin(
+    app: AppHandle,
+    id: u32,
+    map_name: Option<String>,
+    map_street: Option<String>,
+    map_twin: Option<u32>,
+) -> Result<Option<ItemWhere>> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<MapDataState>();
+        let (Some(atlas), Some(catalog)) = (state.atlas(), state.catalog()) else { return Ok(None) };
+        let Some(item) = catalog.item(id) else { return Ok(None) };
+        if let Err(err) = state.refresh_drops() {
+            eprintln!("drop table download failed: {err}");
+        }
+        let store = Store::open(&state.path)?;
+        let sources = drops::sources_for(&store, std::slice::from_ref(&item.name))?;
+        let from = map_name.and_then(|name| atlas.find_twin(&name, map_street.as_deref(), map_twin)).map(|m| m.card.map);
+        let start = from.as_ref().map(|m| m.id);
+        let origin = atlas.item_origin(id, &item.name, sources.first(), start, &travel(&app, &atlas));
+        Ok(Some(ItemWhere { from, origin }))
+    })
+    .await
+    .map_err(|err| Error::Invalid(err.to_string()))?
+}
+
+#[tauri::command]
+pub fn search_quests(state: State<MapDataState>, search: QuestSearch) -> QuestPage {
+    state.atlas().map(|atlas| atlas.search_quests(&search)).unwrap_or_default()
+}
+
+#[tauri::command]
+pub fn quest_regions(state: State<MapDataState>) -> Vec<String> {
+    state.atlas().map(|atlas| atlas.quest_regions()).unwrap_or_default()
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QuestWhere {
+    /// The map portals are counted from, when the minimap was read and matched.
+    from: Option<MapRef>,
+    sheet: QuestSheet,
+}
+
+/// All the data says about a quest. Without the drop table, its items show no droppers.
+#[tauri::command]
+pub async fn quest_sheet(
+    app: AppHandle,
+    id: u32,
+    map_name: Option<String>,
+    map_street: Option<String>,
+    map_twin: Option<u32>,
+) -> Result<Option<QuestWhere>> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<MapDataState>();
+        let (Some(atlas), Some(catalog)) = (state.atlas(), state.catalog()) else { return Ok(None) };
+        let item_name = |id: u32| catalog.item(id).map(|item| item.name.clone());
+        if let Err(err) = state.refresh_drops() {
+            eprintln!("drop table download failed: {err}");
+        }
+        let items = atlas.quest_items(id, item_name);
+        let sources = drops::sources_for(&Store::open(&state.path)?, &items)?;
+        let from = map_name.and_then(|name| atlas.find_twin(&name, map_street.as_deref(), map_twin)).map(|m| m.card.map);
+        let start = from.as_ref().map(|m| m.id);
+        let sheet = atlas.quest_sheet(id, item_name, &sources, start, &travel(&app, &atlas));
+        Ok(sheet.map(|sheet| QuestWhere { from, sheet }))
+    })
+    .await
+    .map_err(|err| Error::Invalid(err.to_string()))?
+}
+
+/// Brings a quest up in the Quests tab, from whichever window asked.
+#[tauri::command]
+pub fn show_quest(app: AppHandle, id: u32) -> Result<()> {
+    if !pins::shows_quests(&app) {
+        overlay::show_full(&app)?;
+    }
+    Ok(app.emit(SHOW_QUEST_EVENT, id)?)
 }
 
 /// Downloads the drop table from mapleclassic.wiki, for finding who drops a quest item. Only on

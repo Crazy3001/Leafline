@@ -756,6 +756,8 @@ export interface BuildStart {
   ap: number;
   sp: number;
   skills: SkillLevel[];
+  /** `male` or `female`, for gear that is made for one. */
+  gender?: string | null;
 }
 
 /** The part of a build that can be shared. */
@@ -849,6 +851,148 @@ export interface GearItem {
   reqInt: number;
   reqLuk: number;
   stats: { label: string; value: number }[];
+}
+
+export type ItemKind = "equip" | "use" | "scroll" | "setup" | "etc";
+
+/** Any item in the map data. Only equipment has a slot, stats and requirements that matter. */
+export interface ItemRecord extends GearItem {
+  kind: ItemKind;
+  reqFame: number;
+  /** The data's own number for a weapon's speed. Lower is faster. */
+  attackSpeed: number | null;
+  /** Upgrade slots on a clean copy. */
+  upgradeSlots: number | null;
+  questItem: boolean;
+  untradable: boolean;
+  /** The price the data lists. What it means in Classic isn't confirmed. */
+  price: number | null;
+  description: string | null;
+  scroll: { fits: string; tier: string | null; successRate: number | null } | null;
+}
+
+export interface ItemQuery {
+  text: string;
+  kind: ItemKind | null;
+  /** A slot or a weapon type. Scrolls count as what they go on. */
+  slot: string | null;
+  /** Only equipment this class can use. */
+  class: string | null;
+  levelMin: number | null;
+  levelMax: number | null;
+  /** `name`, or a stat's label to put the highest first. By level otherwise. */
+  sort: string | null;
+  /** Only equipment the character's build can wear at its level. */
+  mine: boolean;
+  offset: number;
+}
+
+export interface ItemPage {
+  items: ItemRecord[];
+  /** How many matched in all. */
+  total: number;
+  /** Nothing matched outright, so these are the closest names. */
+  closest: boolean;
+}
+
+export interface ItemFilters {
+  slots: string[];
+  weapons: string[];
+}
+
+/** Where to get an item. */
+export interface ItemWhere {
+  /** The map portals are counted from, when the minimap was read and matched. */
+  from: MapRef | null;
+  origin: {
+    drops: ObjectiveGuide;
+    /** Quests that can give it, the lowest level first. */
+    quests: NonNullable<QuestGuide["quest"]>[];
+  };
+}
+
+/** What to bring up in the Item tab: one item, or a search when no item was matched. */
+export interface ItemLink {
+  id: number | null;
+  text: string | null;
+}
+
+/** How reading the Character Stat and Skill windows went. */
+export interface CharacterRead {
+  /** Which windows were read. */
+  stats: boolean;
+  skills: boolean;
+  /** The build that was brought up to date. */
+  build: string | null;
+  result: {
+    changes: string[];
+    /** Skills in the window that aren't on the build's job path, or didn't read. */
+    unknown: string[];
+  };
+  /** Why nothing was updated. */
+  problem: string | null;
+  /** It came from a live picture, not from the player asking. */
+  automatic: boolean;
+}
+
+/** What the quest search asks for. */
+export interface QuestSearch {
+  text: string;
+  region: string | null;
+  /** `daily`, `weekly` or `repeatable`. */
+  repeat: string | null;
+  /** Only quests a character of this level can start. */
+  atLevel: number | null;
+  offset: number;
+}
+
+export interface QuestRow {
+  id: number;
+  name: string;
+  region: string | null;
+  levelMin: number | null;
+  giver: string | null;
+  repeat: string | null;
+  exp: number;
+  mesos: number;
+}
+
+export interface QuestPage {
+  quests: QuestRow[];
+  total: number;
+}
+
+/** All the map data says about one quest. */
+export interface QuestSheet {
+  info: NonNullable<QuestGuide["quest"]>;
+  row: QuestRow;
+  chain: string | null;
+  story: string[];
+  /** Quests to finish first. */
+  after: QuestRef[];
+  next: QuestRef | null;
+  objectives: { count: number; guide: ObjectiveGuide }[];
+  rewards: {
+    id: number;
+    name: string;
+    count: number;
+    /** Always given. Otherwise it is one of a choice, or down to chance. */
+    sure: boolean;
+  }[];
+}
+
+export interface QuestWhere {
+  /** The map portals are counted from, when the minimap was read and matched. */
+  from: MapRef | null;
+  sheet: QuestSheet;
+}
+
+/** Gear a build could look for at a level. */
+export interface GearSuggestions {
+  level: number;
+  /** What the ranking counted, the heaviest first. */
+  rankedBy: string[];
+  slots: { slot: string; picks: { item: ItemRecord; goal: boolean }[] }[];
 }
 
 export interface GearCheck {

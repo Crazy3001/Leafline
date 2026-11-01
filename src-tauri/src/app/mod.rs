@@ -136,6 +136,14 @@ pub fn run() {
             builds::build_catalog,
             builds::starter_plans,
             builds::search_gear,
+            builds::search_items,
+            builds::item_filters,
+            builds::item_record,
+            builds::find_item,
+            builds::show_item,
+            builds::set_gear_goal,
+            builds::gear_suggestions,
+            live::read_character_windows,
             builds::list_builds,
             builds::build_plan,
             builds::active_build,
@@ -151,6 +159,11 @@ pub fn run() {
             settings::update_settings,
             settings::show_settings,
             mapdata::open_link,
+            mapdata::item_origin,
+            mapdata::search_quests,
+            mapdata::quest_regions,
+            mapdata::quest_sheet,
+            mapdata::show_quest,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Leafline");

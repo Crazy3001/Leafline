@@ -5,6 +5,7 @@
   import { untrack } from "svelte";
 
   import { backend } from "$lib/api";
+  import { showItemNamed } from "$lib/items.svelte";
   import { WIKI_CREDIT, WIKI_URL } from "$lib/mapdata.svelte";
   import type { MonsterDrops } from "$lib/types";
 
@@ -104,7 +105,7 @@
       {#each items as item (item.name)}
         <li>
           <div class="item">
-            <span class="name">{item.name}</span>
+            <button class="name" title="Show it in the Item tab" onclick={() => showItemNamed(item.name)}>{item.name}</button>
             {#if item.quest}<span class="tag">quest</span>{/if}
             {#if item.category}<span class="cat">{item.category}</span>{/if}
           </div>
@@ -165,7 +166,18 @@
 
   .name {
     min-width: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    font-size: 12px;
     font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .name:hover {
+    color: var(--map);
+    text-decoration: underline;
   }
 
   .sources {

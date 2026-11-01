@@ -18,6 +18,7 @@
 
   import { backend } from "$lib/api";
   import { STATS, buildState, statLabel, watchBuilds } from "$lib/builds.svelte";
+  import GearPicks from "$lib/components/GearPicks.svelte";
   import MapDataPanel from "$lib/components/map/MapDataPanel.svelte";
   import { guideLinks } from "$lib/guides";
   import { OSMS_CREDIT, OSMS_URL, mapData, watchMapData } from "$lib/mapdata.svelte";
@@ -53,6 +54,8 @@
   let pasted = $state("");
   let gearText = $state("");
   let gearFound = $state<GearItem[]>([]);
+  /** The level the suggestions are for, until the player picks one: the character's own. */
+  let gearLevel = $state<number | null>(null);
   let starters = $state<StarterPlan[]>([]);
   /** The plan waiting for a second click, because it would replace goals already written. */
   let confirmStarter = $state<string | null>(null);
@@ -96,6 +99,20 @@
     saveTimer = setTimeout(() => save(snapshot), SAVE_DELAY);
   });
 
+  // A gear goal can be set from the Item tab. Unsaved typing here comes first.
+  $effect(() => {
+    void buildState.version;
+    const id = untrack(() => draft?.id);
+    if (!id) return;
+    backend.buildPlan(id).then((plan) => {
+      if (!plan || !draft || draft.id !== id || JSON.stringify(draft) !== saved) return;
+      if (JSON.stringify(plan.build.plan.gear) === JSON.stringify(draft.plan.gear)) return;
+      draft.plan.gear = plan.build.plan.gear;
+      saved = JSON.stringify(draft);
+      expansion = plan.expansion;
+    });
+  });
+
   // The rules decide how the plan plays out, so the table follows them.
   $effect(() => {
     void JSON.stringify(display.buildRules);
@@ -117,6 +134,7 @@
     copied = false;
     gearText = "";
     gearFound = [];
+    gearLevel = null;
   }
 
   async function save(snapshot: string) {
@@ -307,6 +325,8 @@
     return needs.filter(([, n]) => n > 0).map(([label, n]) => `${label} ${n}`).join(", ") || "No requirements";
   }
 
+  const suggestAt = $derived(gearLevel ?? level ?? draft?.start.level ?? 1);
+
   const gives = (item: GearItem) => item.stats.map((s) => `${s.label} +${s.value}`).join(", ");
 
   function setRules(change: Partial<BuildRules>) {
@@ -447,7 +467,7 @@
 
       <section>
         <h2>Where you are now</h2>
-        <p class="help">From your Character Stat window. Stats differ by character, so they can't be filled in for you.</p>
+        <p class="help">Live reading fills these in while your Character Stat and Skill windows are open in game. You can also press Ctrl+Alt+B to read them once, or type them here. The plan carries on from whatever they say.</p>
         <div class="fields">
           <label><span>Level</span><input class="number" type="number" min="1" max="200" bind:value={draft.start.level} /></label>
           {#each STATS as stat (stat.id)}
@@ -581,13 +601,13 @@
 
       <section>
         <h2>Gear to aim for</h2>
-        <p class="help">Shows the first level this plan can wear it, counting the stats on earlier gear goals.</p>
+        <p class="help">Shows the first level this plan can wear it, counting the stats on earlier gear goals. Names open in the Item tab.</p>
         {#if expansion?.gear.length}
           <ol class="goals">
             {#each expansion.gear as check (check.item.id)}
               <li>
                 <span class="goal-name">
-                  <span>{check.item.name}</span>
+                  <button class="item-link" title="Show it in the Item tab" onclick={() => backend.showItem(check.item.id, null)}>{check.item.name}</button>
                   <small>{check.item.slot} · {requires(check.item)}{gives(check.item) ? ` · ${gives(check.item)}` : ""}</small>
                 </span>
                 <span class="max tabular" class:warn={!check.usable || check.level == null}>
@@ -621,6 +641,28 @@
               </li>
             {/each}
           </ul>
+        {/if}
+      </section>
+
+      <section>
+        <h2>Suggested gear</h2>
+        <p class="help">What this plan could wear at a level, slot by slot, to look through. Add any you like as goals above.</p>
+        <div class="fields">
+          <label>
+            <span>At level</span>
+            <input class="number" type="number" min="1" max="200" value={suggestAt} oninput={(e) => (gearLevel = Math.max(1, whole(e.currentTarget.value)))} />
+          </label>
+          <label>
+            <span>Gear made for</span>
+            <select value={draft.start.gender ?? ""} onchange={(e) => draft && (draft.start.gender = e.currentTarget.value || null)}>
+              <option value="">Either</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+            </select>
+          </label>
+        </div>
+        {#if draft.id}
+          <GearPicks build={draft.id} level={suggestAt} full onAdd={(item) => draft?.plan.gear.push(item.id)} />
         {/if}
       </section>
 
@@ -998,6 +1040,23 @@
 
   .goals li + li {
     border-top: 1px solid var(--border);
+  }
+
+  .item-link {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .item-link:hover,
+  .item-link:focus-visible {
+    color: var(--accent-strong);
+    text-decoration: underline;
+    outline: none;
   }
 
   .goal-name {

@@ -14,7 +14,7 @@ use super::drops::{ItemSources, item_key};
 use super::osms::QuestRecord;
 use super::training::{Measured, MeasuredRate};
 use super::travel::Travel;
-use crate::readers::quest::Quest;
+use crate::readers::quest::{Objective, Quest, QuestReading};
 
 /// How closely an objective must match a monster's name to be taken for that monster.
 const MIN_MONSTER_SCORE: f64 = 0.85;
@@ -25,40 +25,119 @@ const MIN_DROPPER_SCORE: f64 = 0.9;
 const MIN_QUEST_SCORE: f64 = 0.8;
 /// Below this a title is another quest, not a bad reading of one already known.
 const MIN_HELD_SCORE: f64 = 0.6;
+/// Words of a title shorter than this say too little to look a quest up by.
+const MIN_TITLE_WORD: usize = 4;
 const MAPS_PER_MONSTER: usize = 4;
 const DROPPERS_PER_ITEM: usize = 4;
+/// Some scrolls are given by dozens of quests. The first few, by level, say enough.
+const QUESTS_PER_ITEM: usize = 6;
 
-/// The quests matched so far in a live run, with what each one counts. OCR can read one title
-/// differently from one moment to the next as the scenery moves behind the panel, so a reading
-/// too rough to match keeps the quest it most resembles rather than losing the match.
+/// How many readings in a row a known quest can go unread before it counts as gone, or the
+/// panel as closed. A few, so a bad moment shows nothing, but closing it soon shows.
+const HELD_READINGS: u32 = 4;
+
+/// A quest matched in this live run and what it last counted.
+struct Known {
+    name: String,
+    objectives: Vec<Objective>,
+    unread: u32,
+}
+
+impl Known {
+    fn targets(&self) -> impl Iterator<Item = &str> {
+        self.objectives.iter().map(|o| o.target.as_str())
+    }
+}
+
+/// The quests matched so far in a live run. OCR can read one title differently from one moment
+/// to the next as the scenery moves behind the panel, so once a quest is known it stays: a
+/// reading too rough to match keeps the quest it most resembles, one with no counter keeps the
+/// last counter, and one that loses the quest altogether shows it a little longer.
 #[derive(Default)]
 pub struct QuestTitles {
-    known: Vec<(String, Vec<String>)>,
+    known: Vec<Known>,
+    last: Option<QuestReading>,
+    missed: u32,
 }
 
 impl QuestTitles {
-    /// Gives each quest the data's name, from its title or the known quest it most resembles.
+    /// Steadies one live reading of the panel. `None` when the panel wasn't found this time.
+    pub fn hold(&mut self, atlas: &Atlas, reading: &mut Option<QuestReading>) {
+        let Some(read) = reading else {
+            self.missed += 1;
+            if self.missed <= HELD_READINGS {
+                reading.clone_from(&self.last);
+            } else {
+                *self = Self::default();
+            }
+            return;
+        };
+        self.missed = 0;
+        if read.page.is_some_and(|(shown, _)| shown == 0) {
+            *self = Self::default();
+            return;
+        }
+        self.settle(atlas, &mut read.quests);
+        self.keep_known(read);
+        self.last = Some(read.clone());
+    }
+
+    /// Takes out rows that are no quest, and puts back known quests that went unread.
+    fn keep_known(&mut self, read: &mut QuestReading) {
+        let is_known = |known: &[Known], title: &str| known.iter().any(|k| k.name == title);
+        if !self.known.is_empty() {
+            read.quests.retain(|q| !q.objectives.is_empty() || is_known(&self.known, &q.title));
+        }
+        let mut seen: Vec<String> = Vec::new();
+        read.quests.retain(|q| {
+            let new = !seen.contains(&q.title);
+            seen.push(q.title.clone());
+            new
+        });
+        for known in &mut self.known {
+            known.unread = if seen.contains(&known.name) { 0 } else { known.unread + 1 };
+        }
+        self.known.retain(|k| k.unread <= HELD_READINGS);
+        let room = read.page.map_or(usize::MAX, |(shown, _)| shown as usize);
+        for known in &self.known {
+            if known.unread > 0 && read.quests.len() < room {
+                read.quests.push(Quest { title: known.name.clone(), objectives: known.objectives.clone() });
+            }
+        }
+        let place = |q: &Quest| self.known.iter().position(|k| k.name == q.title).unwrap_or(usize::MAX);
+        read.quests.sort_by_key(place);
+    }
+
+    /// Gives each quest the data's name and counts, from its title and what it counts, or the
+    /// known quest it most resembles.
     pub fn settle(&mut self, atlas: &Atlas, quests: &mut [Quest]) {
         for quest in quests {
-            let targets: Vec<String> = quest.objectives.iter().map(|o| o.target.clone()).collect();
-            if let Some(id) = atlas.find_quest(&quest.title) {
+            let matched = atlas.quest_for(&quest.title, &quest.objectives);
+            if let Some(id) = matched {
                 quest.title = atlas.quests[&id].name.clone();
-                self.known.retain(|(name, _)| *name != quest.title);
-                self.known.push((quest.title.clone(), targets));
-            } else if let Some(name) = self.closest(&quest.title, &targets) {
+                atlas.fit_counts(id, &mut quest.objectives);
+            } else if let Some(name) = self.closest(&quest.title, &quest.objectives) {
                 quest.title = name.to_string();
+            } else {
+                continue;
+            }
+            match self.known.iter_mut().find(|k| k.name == quest.title) {
+                Some(known) if quest.objectives.is_empty() => quest.objectives.clone_from(&known.objectives),
+                Some(known) => known.objectives.clone_from(&quest.objectives),
+                None => self.known.push(Known { name: quest.title.clone(), objectives: quest.objectives.clone(), unread: 0 }),
             }
         }
     }
 
     /// The known quest counting the same things, or else with the most similar name.
-    fn closest(&self, title: &str, targets: &[String]) -> Option<&str> {
+    fn closest(&self, title: &str, objectives: &[Objective]) -> Option<&str> {
         let query = fold(title);
+        let targets: Vec<&str> = objectives.iter().map(|o| o.target.as_str()).collect();
         self.known
             .iter()
-            .map(|(name, known)| {
-                let same = !targets.is_empty() && known == targets;
-                (if same { 1.0 } else { similarity(&query, &fold(name)) }, name.as_str())
+            .map(|known| {
+                let same = !targets.is_empty() && known.targets().eq(targets.iter().copied());
+                (if same { 1.0 } else { similarity(&query, &fold(&known.name)) }, known.name.as_str())
             })
             .filter(|(score, _)| *score >= MIN_HELD_SCORE)
             .max_by(|a, b| a.0.total_cmp(&b.0))
@@ -115,6 +194,15 @@ pub struct ObjectiveGuide {
     pub looked_up: bool,
     /// Monsters to hunt: the one named, or the item's droppers, highest drop rate first.
     pub hunts: Vec<Hunt>,
+}
+
+/// Where to get an item.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ItemOrigin {
+    pub drops: ObjectiveGuide,
+    /// Quests that can give it, the lowest level first.
+    pub quests: Vec<QuestInfo>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -231,7 +319,11 @@ impl Atlas {
         }
 
         let key = item_key(target);
-        let sources = items.iter().find(|s| s.key == key);
+        self.item_objective(target, items.iter().find(|s| s.key == key), context)
+    }
+
+    /// An item and the monsters players saw drop it. `sources` is `None` until it is looked up.
+    fn item_objective(&self, target: &str, sources: Option<&ItemSources>, context: &Context) -> ObjectiveGuide {
         let hunts = sources
             .into_iter()
             .flat_map(|s| &s.droppers)
@@ -268,6 +360,26 @@ impl Atlas {
             item: sources.and_then(|s| s.item.clone()),
             looked_up: sources.is_some(),
             hunts,
+        }
+    }
+
+    /// Where to get an item by its data id: who drops it, as a quest item's objective would show,
+    /// and the quests that can give it. `from` is the map the player is on, for portal counts.
+    pub fn item_origin(
+        &self,
+        item: u32,
+        name: &str,
+        sources: Option<&ItemSources>,
+        from: Option<u32>,
+        travel: &Travel,
+    ) -> ItemOrigin {
+        let hops = from.map(|id| self.hops_from(id)).unwrap_or_default();
+        let shortcuts = from.map(|id| self.shortcuts_from(id, travel, &hops)).unwrap_or_default();
+        let context = Context { hops, shortcuts, ..Context::default() };
+        let quests = self.quests_rewarding.get(&item).into_iter().flatten();
+        ItemOrigin {
+            drops: self.item_objective(name, sources, &context),
+            quests: quests.filter_map(|id| self.quest_info(*id)).take(QUESTS_PER_ITEM).collect(),
         }
     }
 
@@ -355,6 +467,52 @@ impl Atlas {
         })
     }
 
+    /// The quest a reading of the panel means: by its title, or when that lost words, by a name
+    /// holding what is left of it and by what it counts, if only one quest fits.
+    fn quest_for(&self, title: &str, objectives: &[Objective]) -> Option<u32> {
+        if let Some(id) = self.find_quest(title) {
+            return Some(id);
+        }
+        let query = fold(title);
+        let words: Vec<&str> = query.split_whitespace().filter(|w| w.len() >= MIN_TITLE_WORD).collect();
+        let named = |q: &&QuestRecord| {
+            let name = fold(&q.name);
+            !words.is_empty() && words.iter().all(|w| name.contains(w))
+        };
+        let counts = |q: &&QuestRecord| {
+            !objectives.is_empty() && objectives.iter().all(|o| self.count_of(q, &o.target) == Some(o.required))
+        };
+        let only = |found: Vec<u32>| (found.len() == 1).then(|| found[0]);
+        let quests = || self.quests.values();
+        only(quests().filter(named).filter(counts).map(|q| q.id).collect())
+            .or_else(|| only(quests().filter(counts).map(|q| q.id).collect()))
+            .or_else(|| only(quests().filter(named).map(|q| q.id).collect()))
+    }
+
+    /// The monster called `target` that a quest asks for, and how many.
+    fn wanted(&self, quest: &QuestRecord, target: &str) -> Option<(&str, u32)> {
+        let target = fold(target);
+        quest.requirements.iter().find_map(|need| {
+            let monster = self.monsters.get(&need.mob_id).filter(|m| fold(&m.name) == target)?;
+            Some((monster.name.as_str(), need.count))
+        })
+    }
+
+    fn count_of(&self, quest: &QuestRecord, target: &str) -> Option<u32> {
+        self.wanted(quest, target).map(|(_, count)| count)
+    }
+
+    /// Corrects what a quest counts to what the data says it asks for, spelled the data's way.
+    fn fit_counts(&self, id: u32, objectives: &mut [Objective]) {
+        let Some(quest) = self.quests.get(&id) else { return };
+        for objective in objectives {
+            if let Some((name, count)) = self.wanted(quest, &objective.target) {
+                objective.target = name.to_string();
+                objective.required = count;
+            }
+        }
+    }
+
     /// The quest whose name the Quest Helper's title matches. Long titles are cut short with
     /// `...` there, so those are compared with the start of each name.
     fn find_quest(&self, title: &str) -> Option<u32> {
@@ -376,7 +534,7 @@ impl Atlas {
             .map(|(_, id)| id)
     }
 
-    fn quest_info(&self, id: u32) -> Option<QuestInfo> {
+    pub(super) fn quest_info(&self, id: u32) -> Option<QuestInfo> {
         let quest = self.quests.get(&id)?;
         let name = |npc: Option<u32>| npc.and_then(|n| self.npc_names.get(&n).cloned());
         let maps = |npc: Option<u32>| npc.map(|n| self.npc_maps(n)).unwrap_or_default();
@@ -479,13 +637,94 @@ mod tests {
             quests[0].title.clone()
         };
         const GARBLED: &str = "Sheli Sor 101ng";
-        assert_eq!(settle(GARBLED, "Pebble Snail"), GARBLED, "nothing to hold on to yet");
+        assert_eq!(settle(GARBLED, "Fern Moth"), GARBLED, "nothing to hold on to yet");
+        assert_eq!(settle(GARBLED, "Pebble Snail"), "Shell Sorting", "only this quest counts these");
         assert_eq!(settle("Shell Sortng", "Pebble Snail"), "Shell Sorting");
         assert_eq!(settle(GARBLED, "Pebble Snail"), "Shell Sorting");
         assert_eq!(settle(GARBLED, "Pebb1e Snail"), "Shell Sorting", "resembles it, counter or not");
         assert_eq!(settle("", "Pebble Snail"), "Shell Sorting", "the title lost, the same counter");
         assert_eq!(settle("Another Errand", "Moss Slime"), "Another Errand");
         assert_eq!(settle("", "Moss Slime"), "");
+    }
+
+    fn reading(quests: Vec<Quest>, page: Option<(u32, u32)>) -> Option<QuestReading> {
+        Some(QuestReading { quests, page, ..QuestReading::default() })
+    }
+
+    fn quest(title: &str, counted: &[(&str, u32, u32)]) -> Quest {
+        let objectives = counted
+            .iter()
+            .map(|(target, current, required)| Objective { target: (*target).into(), current: *current, required: *required })
+            .collect();
+        Quest { title: title.into(), objectives }
+    }
+
+    fn held(titles: &mut QuestTitles, atlas: &Atlas, mut read: Option<QuestReading>) -> Option<QuestReading> {
+        titles.hold(atlas, &mut read);
+        read
+    }
+
+    #[test]
+    fn a_title_that_lost_a_word_finds_its_quest() {
+        let atlas = world();
+        assert_eq!(atlas.quest_for("Sorting", &[]), Some(70), "only one name holds it");
+        let wanted = [Objective { target: "Moss Slime".into(), current: 0, required: 5 }];
+        assert_eq!(atlas.quest_for("Xq", &wanted), Some(71), "only one quest counts that");
+        assert_eq!(atlas.quest_for("Xq", &[]), None);
+    }
+
+    #[test]
+    fn a_locked_quest_keeps_its_counter_through_a_bad_reading() {
+        let (atlas, mut titles) = (world(), QuestTitles::default());
+        held(&mut titles, &atlas, reading(vec![quest("Slime Samples", &[("Moss Slime", 2, 5)])], None));
+        let bad = held(&mut titles, &atlas, reading(vec![quest("Slime Samples", &[])], None)).unwrap();
+        assert_eq!(bad.quests, [quest("Slime Samples", &[("Moss Slime", 2, 5)])]);
+    }
+
+    #[test]
+    fn the_data_corrects_what_a_quest_counts() {
+        let (atlas, mut titles) = (world(), QuestTitles::default());
+        let read = held(&mut titles, &atlas, reading(vec![quest("Slime Samples", &[("Moss Slime", 2, 6)])], None)).unwrap();
+        assert_eq!(read.quests[0].objectives[0].required, 5);
+    }
+
+    #[test]
+    fn a_row_that_is_no_quest_goes_and_a_lost_quest_comes_back_in_order() {
+        let (atlas, mut titles) = (world(), QuestTitles::default());
+        let both = vec![quest("Shell Sorting", &[("Pebble Snail", 1, 8)]), quest("Slime Samples", &[("Moss Slime", 2, 5)])];
+        held(&mut titles, &atlas, reading(both.clone(), None));
+        let rough = vec![quest("O Slime", &[]), quest("Slime Samples", &[("Moss Slime", 2, 5)])];
+        assert_eq!(held(&mut titles, &atlas, reading(rough, None)).unwrap().quests, both);
+    }
+
+    #[test]
+    fn a_quest_unread_for_long_is_gone() {
+        let (atlas, mut titles) = (world(), QuestTitles::default());
+        held(&mut titles, &atlas, reading(vec![quest("Slime Samples", &[("Moss Slime", 2, 5)])], None));
+        for _ in 0..HELD_READINGS {
+            assert_eq!(held(&mut titles, &atlas, reading(vec![], None)).unwrap().quests.len(), 1);
+        }
+        assert!(held(&mut titles, &atlas, reading(vec![], None)).unwrap().quests.is_empty());
+    }
+
+    #[test]
+    fn the_panel_going_missing_shows_for_a_moment_then_clears() {
+        let (atlas, mut titles) = (world(), QuestTitles::default());
+        held(&mut titles, &atlas, reading(vec![quest("Slime Samples", &[("Moss Slime", 2, 5)])], None));
+        for _ in 0..HELD_READINGS {
+            assert!(held(&mut titles, &atlas, None).is_some());
+        }
+        assert!(held(&mut titles, &atlas, None).is_none());
+    }
+
+    #[test]
+    fn the_panels_own_count_decides_how_many_show() {
+        let (atlas, mut titles) = (world(), QuestTitles::default());
+        let both = vec![quest("Shell Sorting", &[("Pebble Snail", 1, 8)]), quest("Slime Samples", &[("Moss Slime", 2, 5)])];
+        held(&mut titles, &atlas, reading(both, Some((2, 5))));
+        let one = held(&mut titles, &atlas, reading(vec![quest("Slime Samples", &[("Moss Slime", 2, 5)])], Some((1, 5))));
+        assert_eq!(one.unwrap().quests.len(), 1);
+        assert!(held(&mut titles, &atlas, reading(vec![], Some((0, 5)))).unwrap().quests.is_empty());
     }
 
     #[test]
@@ -500,7 +739,7 @@ mod tests {
         let mut add = |id, name: &str, npc_id, next_quest_id| {
             let name = name.into();
             let quest =
-                QuestRecord { id, name, npc_id: Some(npc_id), level_min: None, next_quest_id, requirements: vec![] };
+                QuestRecord { id, name, npc_id: Some(npc_id), next_quest_id, ..QuestRecord::default() };
             atlas.quests.insert(id, quest);
         };
         add(80, "Borrowing a Lamp", 50, Some(81));

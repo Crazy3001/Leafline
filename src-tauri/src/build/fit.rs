@@ -40,7 +40,7 @@ pub struct Shortfall {
 }
 
 /// Armour slots as the item data names them. A tooltip type that is none of these is a weapon.
-const ARMOUR: [&str; 9] = ["Hat", "Top", "Bottom", "Overall", "Shoes", "Glove", "Cape", "Shield", "Earring"];
+pub const ARMOUR: [&str; 9] = ["Hat", "Top", "Bottom", "Overall", "Shoes", "Glove", "Cape", "Shield", "Earring"];
 
 /// Whether worn gear in `slot` would come off for an item of the tooltip's `item_type`.
 fn replaces(slot: &str, item_type: Option<&str>) -> bool {

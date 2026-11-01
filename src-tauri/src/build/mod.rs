@@ -7,12 +7,15 @@
 pub mod catalog;
 pub mod fit;
 pub mod plan;
+pub mod progress;
 pub mod rules;
 pub mod share;
 pub mod starters;
+pub mod suggest;
 
-pub use catalog::{Catalog, JobChoice};
+pub use catalog::{Catalog, ItemFilters, ItemPage, ItemQuery, JobChoice};
 pub use fit::{ItemFit, ItemJob};
 pub use plan::{Build, Expansion, Plan, SkillLevel, Start, Stat, StatGoal, Stats, expand};
 pub use rules::{Branch, Rules};
 pub use starters::Starter;
+pub use suggest::{GearSuggestions, Wearer};

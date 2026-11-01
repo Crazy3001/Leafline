@@ -33,6 +33,7 @@ Development builds also open the **workbench**, a tool for working on Leafline t
 | `Ctrl+Alt+H` | Compact HUD |
 | `Ctrl+Alt+R` | Start or stop live reading |
 | `Ctrl+Alt+I` | Read the item you're hovering, for a price check |
+| `Ctrl+Alt+B` | Read your Character Stat and Skill windows, to update your build |
 | `Ctrl+Alt+K` | Pause or resume tracking |
 | `Ctrl+Alt+N` | Start a new session |
 | `Ctrl+Alt+J` | Keep this run in the history or out of it |
@@ -85,6 +86,20 @@ OCR is sometimes wrong, so the tracker checks readings against each other rather
 The **Build** tab shows what your plan says at your level: this level's AP and SP, the next job advancement and what comes after. **Edit** opens the planner.
 
 A build is a job and a list of goals in order, the way written guides put them: this skill to 20, then that one; DEX to 25, the rest into LUK. Each new point goes to the first goal that can take it, and the planner lays the result out level by level. It says when a prerequisite comes too late, a goal can't finish in time, or 1st-job SP would be lost at the 2nd job advancement. Add gear to see the first level the plan can wear it, and a hovered item (Ctrl+Alt+I) shows whether it suits the build.
+
+Starting late, or spent points your own way? While live reading runs, open your Character Stat or Skill window: when what it shows changes, Leafline moves the build's starting point to match and lays out the rest of the plan from there. These windows are read from the same pictures live reading already takes, and only while one is open. With live reading stopped, press `Ctrl+Alt+B` or **Read stats** in the Build tab to read them from a single picture. The skill window shows one job tab at a time, so open each tab you've spent points on.
+
+The Build tab also lists gear to look for at your level, ranked by the stats your plan raises. It doesn't know prices or how easy an item is to find, and nobody has checked its picks in game, so treat it as a list to look through.
+
+### Quest search
+
+The Quests tab and its pinned window show each quest in the Quest Helper with its counters and payout. Open one to see its steps, with directions to each monster and to whoever takes it in, plus its rewards and the quests before and after it. Search covers all the quests in the map data, by name, person, monster or region.
+
+Once a tracked quest matches the data it stays locked in, so scenery moving behind the Quest Helper can't change it.
+
+### Item search
+
+The Item tab searches every item in the map data by name or by what it does, with categories and filters for slot, job, level and stat. An item's card shows its stats, whether your build can wear it, your logged prices, who players saw drop it and which quests give it. Names in a build, its suggestions and a map's drops open here. Search reads nothing from the game, so it works with live reading off.
 
 **Start from a plan** offers one ready-made Lv 1-70 plan for each 2nd job, and using one fills in goals you can then change. Leafline's plans were written for it from what each skill does and what each weapon needs. They aren't copied from any guide, and nobody has played them yet, so treat them as a starting point. A blank build is always there for your own.
 

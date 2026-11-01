@@ -8,12 +8,16 @@ use tauri_plugin_opener::OpenerExt;
 use super::mapdata::MapDataState;
 use super::records::{UserDataState, now};
 use super::settings::SettingsState;
+use super::{overlay, pins};
 use crate::build::plan::MAX_LEVEL;
+use crate::build::progress::{self, CatchUp};
 use crate::build::{
-    Branch, Build, Catalog, Expansion, ItemFit, ItemJob, JobChoice, Rules, Starter, expand, fit, share, starters,
+    Branch, Build, Catalog, Expansion, GearSuggestions, ItemFilters, ItemFit, ItemJob, ItemPage, ItemQuery, JobChoice,
+    Rules, Starter, Wearer, expand, fit, share, starters, suggest,
 };
 use crate::error::{Error, Result};
 use crate::mapdata::osms::{ItemRecord, SkillRecord};
+use crate::pipeline::CharacterScan;
 use crate::readers::tooltip::Requirements;
 use crate::userdata::builds::BuildSummary;
 
@@ -21,6 +25,8 @@ pub const BUILD: &str = "build";
 
 /// Emitted to every window when a build is saved, deleted or chosen.
 pub const BUILDS_EVENT: &str = "builds";
+/// Emitted to every window to bring up an item in the Item tab.
+pub const SHOW_ITEM_EVENT: &str = "show-item";
 
 /// A name no longer than a heading can show.
 const MAX_NAME: usize = 80;
@@ -89,6 +95,148 @@ pub fn starter_plans(app: AppHandle) -> Vec<Starter> {
 #[tauri::command]
 pub fn search_gear(state: State<MapDataState>, text: String, job: u32) -> Vec<ItemRecord> {
     state.catalog().map_or_else(Vec::new, |c| c.search_gear(&text, Branch::of_job(job)))
+}
+
+/// One page of the item search. Without map data there is nothing to find.
+#[tauri::command]
+pub fn search_items(
+    app: AppHandle,
+    state: State<UserDataState>,
+    query: ItemQuery,
+    level: Option<u32>,
+    character: Option<String>,
+) -> Result<ItemPage> {
+    let Some(catalog) = app.state::<MapDataState>().catalog() else { return Ok(ItemPage::default()) };
+    if !query.mine {
+        return Ok(catalog.search_items(&query, |_| true));
+    }
+    let Some(build) = state.with(|db| db.active_build(character.as_deref()))? else { return Ok(ItemPage::default()) };
+    let rules = rules(&app);
+    let expansion = expand(&build, &rules, &catalog);
+    let wearer = Wearer::new(&build, &expansion, &rules, &catalog, level.unwrap_or(build.start.level));
+    Ok(catalog.search_items(&query, |item| wearer.can_wear(item)))
+}
+
+#[tauri::command]
+pub fn item_filters(state: State<MapDataState>) -> ItemFilters {
+    state.catalog().map_or_else(ItemFilters::default, |c| c.item_filters())
+}
+
+#[tauri::command]
+pub fn item_record(state: State<MapDataState>, id: u32) -> Option<ItemRecord> {
+    state.catalog()?.item(id).cloned()
+}
+
+/// The item a name read from the game most likely means.
+#[tauri::command]
+pub fn find_item(state: State<MapDataState>, name: String, level: Option<u32>) -> Option<ItemRecord> {
+    state.catalog()?.item_like(&name, level).cloned()
+}
+
+/// What to bring up in the Item tab: one item, or a search when no item was matched.
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ItemLink {
+    id: Option<u32>,
+    text: Option<String>,
+}
+
+/// Brings an item up in the Item tab, from whichever window asked. A pinned Item panel shows it
+/// by itself; otherwise the overlay has to.
+#[tauri::command]
+pub fn show_item(app: AppHandle, id: Option<u32>, text: Option<String>) -> Result<()> {
+    if !pins::shows_item(&app) {
+        overlay::show_full(&app)?;
+    }
+    Ok(app.emit(SHOW_ITEM_EVENT, ItemLink { id, text })?)
+}
+
+/// Adds an item to the gear goals of the build for `character`, or takes it off.
+#[tauri::command]
+pub fn set_gear_goal(
+    app: AppHandle,
+    state: State<UserDataState>,
+    item: u32,
+    wanted: bool,
+    character: Option<String>,
+) -> Result<()> {
+    let Some(mut build) = state.with(|db| db.active_build(character.as_deref()))? else {
+        return Err(Error::Invalid("Plan a build first, in the Build tab.".into()));
+    };
+    build.plan.gear.retain(|id| *id != item);
+    if wanted {
+        build.plan.gear.push(item);
+    }
+    state.with(|db| db.save_build(&build, now()))?;
+    changed(&app)
+}
+
+/// How reading the character's windows went.
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CharacterRead {
+    /// Which windows were read.
+    stats: bool,
+    skills: bool,
+    /// The build that was brought up to date.
+    build: Option<String>,
+    result: CatchUp,
+    /// Why nothing was updated.
+    problem: Option<String>,
+    /// It came from a live picture, not from the player asking.
+    automatic: bool,
+}
+
+impl CharacterRead {
+    pub fn failed(problem: String) -> Self {
+        Self { problem: Some(problem), ..Self::default() }
+    }
+
+    /// Whether the build moved.
+    pub fn changed(&self) -> bool {
+        self.problem.is_none() && !self.result.changes.is_empty()
+    }
+
+    pub fn on_its_own(self) -> Self {
+        Self { automatic: true, ..self }
+    }
+}
+
+/// Moves the character's build to what its windows show, so the plan carries on from there. A
+/// build tied to another character is left alone.
+pub fn catch_up(app: &AppHandle, scan: CharacterScan) -> Result<CharacterRead> {
+    let (stats, skills) = (scan.windows.stats.is_some(), scan.windows.skills.is_some());
+    let done = |problem: &str| CharacterRead { stats, skills, problem: Some(problem.into()), ..CharacterRead::default() };
+    if !stats && !skills {
+        return Ok(done("Open your Character Stat or Skill window so all of it shows, then try again."));
+    }
+    let Some(catalog) = app.state::<MapDataState>().catalog() else {
+        return Ok(done("Download the map data first: builds use its skills and equipment."));
+    };
+    let state = app.state::<UserDataState>();
+    let Some(mut build) = state.with(|db| db.active_build(scan.name.as_deref()))? else {
+        return Ok(done("Plan a build first, in the Build tab."));
+    };
+    if let (Some(owner), Some(name)) = (&build.character, &scan.name)
+        && !owner.eq_ignore_ascii_case(name)
+    {
+        return Ok(done(&format!("This build is for {owner}, not {name}.")));
+    }
+    build.character = build.character.or(scan.name);
+    let result = progress::catch_up(&mut build.start, scan.level, &scan.windows, build.plan.job, &rules(app), &catalog);
+    state.with(|db| db.save_build(&build, now()))?;
+    changed(app)?;
+    Ok(CharacterRead { stats, skills, build: Some(build.name), result, ..CharacterRead::default() })
+}
+
+/// Gear to look for at `level` on this build. `None` without the build or the map data.
+#[tauri::command]
+pub fn gear_suggestions(app: AppHandle, state: State<UserDataState>, id: i64, level: u32) -> Result<Option<GearSuggestions>> {
+    let Some(catalog) = app.state::<MapDataState>().catalog() else { return Ok(None) };
+    let Some(build) = state.with(|db| db.build(id))? else { return Ok(None) };
+    let rules = rules(&app);
+    let expansion = expand(&build, &rules, &catalog);
+    Ok(Some(suggest::suggest(&build, &expansion, &rules, &catalog, level.clamp(1, MAX_LEVEL))))
 }
 
 #[tauri::command]

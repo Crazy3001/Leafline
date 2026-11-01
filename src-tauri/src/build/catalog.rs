@@ -1,16 +1,121 @@
-//! The skills and equipment a build can use, from the downloaded data. Jobs are worked out from
-//! the skills, so nothing about them is written into Leafline.
+//! The skills and items in the downloaded data, for the build planner and the item search. Jobs
+//! are worked out from the skills, so nothing about them is written into Leafline.
 
 use std::collections::HashMap;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
+use super::fit::ARMOUR;
 use super::plan::Stat;
 use super::rules::Branch;
-use crate::mapdata::osms::{ItemRecord, SkillRecord};
+use crate::mapdata::drops::item_key;
+use crate::mapdata::osms::{ItemKind, ItemRecord, SkillRecord};
 
 /// The most gear a search returns.
 const SEARCH_LIMIT: usize = 40;
+/// Items in one page of search results.
+const ITEM_PAGE: usize = 40;
+/// How closely a typed word must match a word of a name when nothing matches outright.
+const MIN_WORD_SCORE: f64 = 0.7;
+/// How closely a name read from a tooltip must match an item in the data.
+const MIN_NAME_SCORE: f64 = 0.85;
+/// The slot all weapons share. Their kinds are in `weapon_type`.
+const WEAPON: &str = "Weapon";
+
+/// What the item search asks for. Everything but `text` narrows it down.
+#[derive(Debug, Clone, Default, PartialEq, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ItemQuery {
+    pub text: String,
+    pub kind: Option<ItemKind>,
+    /// A slot or a weapon type. Scrolls count as what they go on.
+    pub slot: Option<String>,
+    /// Only equipment this class can use.
+    pub class: Option<String>,
+    pub level_min: Option<u32>,
+    pub level_max: Option<u32>,
+    /// `name`, or a stat's label to put the highest first. By level otherwise.
+    pub sort: Option<String>,
+    /// Only equipment the character's build can wear at its level.
+    pub mine: bool,
+    pub offset: usize,
+}
+
+impl ItemQuery {
+    fn admits(&self, item: &ItemRecord) -> bool {
+        let equipment = item.kind == ItemKind::Equip;
+        self.kind.is_none_or(|kind| item.kind == kind)
+            && self.slot.as_deref().is_none_or(|slot| fits_slot(item, slot))
+            && self.class.as_deref().is_none_or(|class| {
+                equipment && (item.classes.is_empty() || item.classes.iter().any(|c| c.eq_ignore_ascii_case(class)))
+            })
+            && self.level_min.is_none_or(|level| equipment && item.req_level >= level)
+            && self.level_max.is_none_or(|level| equipment && item.req_level <= level)
+    }
+}
+
+/// Whether an item goes in `slot`, or for a scroll, goes on what does.
+fn fits_slot(item: &ItemRecord, slot: &str) -> bool {
+    match &item.scroll {
+        Some(scroll) => {
+            let weapon = scroll.fits != "Other" && !ARMOUR.contains(&scroll.fits.as_str());
+            scroll.fits == slot || (slot == WEAPON && weapon)
+        }
+        None => item.slot == slot || item.weapon_type.as_deref() == Some(slot),
+    }
+}
+
+/// How well `words` match an item, best first, or `None` if they don't. An empty search matches
+/// everything equally.
+fn text_rank(item: &ItemRecord, words: &[String]) -> Option<u8> {
+    if words.is_empty() {
+        return Some(0);
+    }
+    let name = item_key(&item.name);
+    if name.starts_with(&words.join(" ")) {
+        return Some(0);
+    }
+    // By the start of a word: `hat` shouldn't find `Chat`, or every description with `that` in it.
+    let name: Vec<&str> = name.split_whitespace().collect();
+    let in_words = |list: &[&str]| words.iter().all(|word| list.iter().any(|w| w.starts_with(word.as_str())));
+    if in_words(&name) {
+        return Some(1);
+    }
+    let about = [Some(item.slot.as_str()), item.weapon_type.as_deref(), item.description.as_deref()];
+    let about = about.iter().flatten().map(|text| item_key(text)).collect::<Vec<_>>().join(" ");
+    let about: Vec<&str> = about.split_whitespace().chain(name).collect();
+    in_words(&about).then_some(2)
+}
+
+/// Whether each typed word is close to a word of the name, for a search with a typo in it.
+fn nearly_named(item: &ItemRecord, words: &[String]) -> bool {
+    let name = item_key(&item.name);
+    let close = |word: &String| name.split_whitespace().any(|w| strsim::normalized_damerau_levenshtein(w, word) >= MIN_WORD_SCORE);
+    words.iter().all(close)
+}
+
+fn stat_of(item: &ItemRecord, label: &str) -> Option<i64> {
+    item.stats.iter().find(|s| s.label == label).map(|s| s.value)
+}
+
+/// One page of an item search.
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ItemPage {
+    pub items: Vec<ItemRecord>,
+    /// How many matched in all.
+    pub total: usize,
+    /// Nothing matched outright, so these are the closest names.
+    pub closest: bool,
+}
+
+/// The choices the item search offers, from what the data holds.
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ItemFilters {
+    pub slots: Vec<String>,
+    pub weapons: Vec<String>,
+}
 
 /// A job a player can choose.
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -76,8 +181,75 @@ impl Catalog {
         self.skills.iter().find(|s| s.name == name && jobs.contains(&s.job_id))
     }
 
+    /// The piece of equipment called `name`.
     pub fn item_named(&self, name: &str) -> Option<&ItemRecord> {
-        self.items.iter().find(|i| i.name == name)
+        self.equipment().find(|i| i.name == name)
+    }
+
+    pub fn equipment(&self) -> impl Iterator<Item = &ItemRecord> {
+        self.items.iter().filter(|i| i.kind == ItemKind::Equip)
+    }
+
+    /// The item a name read from the game most likely means. Several items can share a name, so
+    /// `level` settles it when it is known.
+    pub fn item_like(&self, name: &str, level: Option<u32>) -> Option<&ItemRecord> {
+        let key = item_key(name);
+        if key.is_empty() {
+            return None;
+        }
+        self.items
+            .iter()
+            .map(|item| (strsim::normalized_levenshtein(&item_key(&item.name), &key), item))
+            .filter(|(score, _)| *score >= MIN_NAME_SCORE)
+            .max_by(|a, b| a.0.total_cmp(&b.0).then((Some(a.1.req_level) == level).cmp(&(Some(b.1.req_level) == level))))
+            .map(|(_, item)| item)
+    }
+
+    /// The weapons a job trains in, going by its Mastery skills, as written in `weapon_type`.
+    /// Empty for a path with none, such as a first job or a Magician.
+    pub fn weapons_of(&self, job: u32) -> Vec<String> {
+        let path = path_of(job);
+        let trained = self.skills.iter().filter(|s| path.contains(&s.job_id));
+        let words: Vec<&str> = trained.filter_map(|s| s.name.strip_suffix(" Mastery")).collect();
+        self.weapon_types().into_iter().filter(|t| words.iter().any(|w| t.ends_with(w))).collect()
+    }
+
+    fn weapon_types(&self) -> Vec<String> {
+        let mut types: Vec<String> = self.items.iter().filter_map(|i| i.weapon_type.clone()).collect();
+        types.sort();
+        types.dedup();
+        types
+    }
+
+    pub fn item_filters(&self) -> ItemFilters {
+        let has = |slot: &&str| self.equipment().any(|i| i.slot == *slot);
+        let slots = std::iter::once(WEAPON).chain(ARMOUR).filter(has).map(str::to_string).collect();
+        ItemFilters { slots, weapons: self.weapon_types() }
+    }
+
+    /// One page of the items that `query` finds and `allowed` lets through.
+    pub fn search_items(&self, query: &ItemQuery, allowed: impl Fn(&ItemRecord) -> bool) -> ItemPage {
+        let words: Vec<String> = item_key(&query.text).split_whitespace().map(str::to_string).collect();
+        let candidates: Vec<&ItemRecord> = self.items.iter().filter(|i| query.admits(i) && allowed(i)).collect();
+        let mut found: Vec<(u8, &ItemRecord)> =
+            candidates.iter().filter_map(|i| Some((text_rank(i, &words)?, *i))).collect();
+        let closest = found.is_empty() && !words.is_empty();
+        if closest {
+            found = candidates.iter().filter(|i| nearly_named(i, &words)).map(|i| (0, *i)).collect();
+        }
+        match query.sort.as_deref() {
+            Some("name") => found.sort_by(|a, b| a.1.name.cmp(&b.1.name)),
+            Some(label) => {
+                found.retain(|(_, i)| stat_of(i, label).is_some());
+                found.sort_by_key(|(_, i)| std::cmp::Reverse(stat_of(i, label)));
+            }
+            None => found.sort_by(|a, b| (a.0, a.1.req_level, &a.1.name).cmp(&(b.0, b.1.req_level, &b.1.name))),
+        }
+        ItemPage {
+            total: found.len(),
+            items: found.into_iter().skip(query.offset).take(ITEM_PAGE).map(|(_, i)| i.clone()).collect(),
+            closest,
+        }
     }
 
     pub fn job_name(&self, job: u32) -> Option<&str> {
@@ -105,7 +277,7 @@ impl Catalog {
         let mut found: Vec<&ItemRecord> = self
             .items
             .iter()
-            .filter(|i| i.name.to_lowercase().contains(&text))
+            .filter(|i| i.kind == ItemKind::Equip && i.name.to_lowercase().contains(&text))
             .filter(|i| branch.is_none_or(|b| usable_by(i, b)))
             .collect();
         found.sort_by(|a, b| (a.req_level, &a.name).cmp(&(b.req_level, &b.name)));
@@ -121,7 +293,7 @@ pub fn usable_by(item: &ItemRecord, branch: Branch) -> bool {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::mapdata::osms::SkillNeed;
+    use crate::mapdata::osms::{ItemStat, ScrollInfo, SkillNeed};
 
     /// A made-up skill.
     pub fn skill(id: u32, name: &str, job_id: u32, max_level: u32, needs: &[(u32, u32)]) -> SkillRecord {
@@ -144,7 +316,7 @@ pub(crate) mod tests {
         ItemRecord {
             id,
             name: name.into(),
-            category: "Equipment".into(),
+            kind: ItemKind::Equip,
             slot: "Hat".into(),
             gender: None,
             classes: classes.iter().map(|c| c.to_string()).collect(),
@@ -154,8 +326,51 @@ pub(crate) mod tests {
             req_dex: 0,
             req_int: 0,
             req_luk: 0,
+            req_fame: 0,
+            attack_speed: None,
+            upgrade_slots: None,
+            quest_item: false,
+            untradable: false,
             stats: Vec::new(),
+            price: None,
+            description: None,
+            scroll: None,
         }
+    }
+
+    /// A made-up item of another kind.
+    fn other(id: u32, name: &str, kind: ItemKind, description: &str) -> ItemRecord {
+        ItemRecord { kind, slot: String::new(), description: Some(description.into()), ..item(id, name, 0, &[]) }
+    }
+
+    fn scroll(id: u32, name: &str, fits: &str) -> ItemRecord {
+        let info = ScrollInfo { fits: fits.into(), tier: None, success_rate: Some(60) };
+        ItemRecord { slot: "Scroll".into(), scroll: Some(info), ..other(id, name, ItemKind::Scroll, "") }
+    }
+
+    fn weapon(id: u32, name: &str, kind: &str) -> ItemRecord {
+        ItemRecord { slot: "Weapon".into(), weapon_type: Some(kind.into()), ..item(id, name, 10, &[]) }
+    }
+
+    fn found(catalog: &Catalog, query: ItemQuery) -> Vec<String> {
+        catalog.search_items(&query, |_| true).items.into_iter().map(|i| i.name).collect()
+    }
+
+    fn stocked() -> Catalog {
+        Catalog::new(
+            Vec::new(),
+            vec![
+                item(1, "Green Fern Hat", 20, &[]),
+                ItemRecord { slot: "Weapon".into(), ..item(2, "Fern Dagger", 10, &["Thief"]) },
+                ItemRecord { slot: "Weapon".into(), ..item(3, "Twig Wand", 5, &["Magician"]) },
+                other(4, "Red Berry", ItemKind::Use, "Restores 50 HP."),
+                other(5, "Chat Note", ItemKind::Etc, "A note that says hello."),
+                other(6, "Moss Stool", ItemKind::Setup, "Somewhere to sit."),
+                scroll(7, "Hat Moss Scroll", "Hat"),
+                scroll(8, "Claw Moss Scroll", "Claw"),
+                weapon(9, "Thorn Claw", "Claw"),
+            ],
+        )
     }
 
     #[test]
@@ -186,5 +401,98 @@ pub(crate) mod tests {
         let names = |found: Vec<ItemRecord>| found.into_iter().map(|i| i.name).collect::<Vec<_>>();
         assert_eq!(names(catalog.search_gear("fern", Some(Branch::Thief))), ["Fern Dagger", "Fern Hat"]);
         assert_eq!(names(catalog.search_gear("  WAND ", None)), ["Fern Wand"]);
+    }
+
+    #[test]
+    fn gear_search_and_names_keep_to_equipment() {
+        let catalog = Catalog::new(
+            Vec::new(),
+            vec![other(1, "Fern Hat", ItemKind::Etc, "A hat-shaped leaf."), item(2, "Fern Hat", 20, &[])],
+        );
+        assert_eq!(catalog.search_gear("fern", None).len(), 1);
+        assert_eq!(catalog.item_named("Fern Hat").unwrap().id, 2);
+    }
+
+    #[test]
+    fn item_search_puts_names_first_then_what_items_say_about_themselves() {
+        let text = |text: &str| ItemQuery { text: text.into(), ..ItemQuery::default() };
+        assert_eq!(found(&stocked(), text("fern")), ["Fern Dagger", "Green Fern Hat"], "the name's start comes first");
+        assert_eq!(found(&stocked(), text("hat green")), ["Green Fern Hat"], "words in any order");
+        assert_eq!(found(&stocked(), text("hp")), ["Red Berry"], "from its description");
+        assert_eq!(found(&stocked(), text("hat")), ["Hat Moss Scroll", "Green Fern Hat"], "not `that`");
+    }
+
+    #[test]
+    fn a_search_with_a_typo_finds_the_closest_names_and_says_so() {
+        let query = ItemQuery { text: "thron claw".into(), ..ItemQuery::default() };
+        let page = stocked().search_items(&query, |_| true);
+        assert!(page.closest);
+        assert_eq!(page.items[0].name, "Thorn Claw");
+        assert!(!stocked().search_items(&ItemQuery { text: "thorn".into(), ..query }, |_| true).closest);
+    }
+
+    #[test]
+    fn filters_narrow_the_search() {
+        let catalog = stocked();
+        let kind = ItemQuery { kind: Some(ItemKind::Setup), ..ItemQuery::default() };
+        assert_eq!(found(&catalog, kind), ["Moss Stool"]);
+        let class = ItemQuery { class: Some("thief".into()), ..ItemQuery::default() };
+        assert_eq!(found(&catalog, class), ["Fern Dagger", "Thorn Claw", "Green Fern Hat"], "no potions, and gear for anyone counts");
+        let levels = ItemQuery { level_min: Some(6), level_max: Some(10), ..ItemQuery::default() };
+        assert_eq!(found(&catalog, levels), ["Fern Dagger", "Thorn Claw"]);
+    }
+
+    #[test]
+    fn a_slot_finds_gear_and_the_scrolls_for_it() {
+        let catalog = stocked();
+        let slot = |slot: &str, kind| ItemQuery { slot: Some(slot.into()), kind, ..ItemQuery::default() };
+        assert_eq!(found(&catalog, slot("Claw", None)), ["Claw Moss Scroll", "Thorn Claw"]);
+        assert_eq!(found(&catalog, slot("Hat", Some(ItemKind::Scroll))), ["Hat Moss Scroll"]);
+        assert_eq!(found(&catalog, slot("Weapon", Some(ItemKind::Scroll))), ["Claw Moss Scroll"], "any weapon's");
+    }
+
+    #[test]
+    fn results_can_be_sorted_by_a_stat_and_paged() {
+        let stat = |id, name, value| ItemRecord {
+            stats: vec![ItemStat { label: "LUK".into(), value }],
+            ..item(id, name, 1, &[])
+        };
+        let mut items: Vec<ItemRecord> = (0..50).map(|i| item(100 + i, &format!("Filler {i:02}"), 1, &[])).collect();
+        items.extend([stat(1, "Low", 1), stat(2, "High", 9)]);
+        let catalog = Catalog::new(Vec::new(), items);
+        let by_luk = ItemQuery { sort: Some("LUK".into()), ..ItemQuery::default() };
+        assert_eq!(found(&catalog, by_luk), ["High", "Low"], "only items with the stat");
+        let page = catalog.search_items(&ItemQuery { sort: Some("name".into()), offset: 40, ..ItemQuery::default() }, |_| true);
+        assert_eq!((page.total, page.items.len()), (52, 12));
+    }
+
+    #[test]
+    fn a_name_read_from_the_game_finds_its_item() {
+        let catalog = Catalog::new(
+            Vec::new(),
+            vec![item(1, "Red Cloth Vest", 10, &[]), item(2, "Red Cloth Vest", 25, &[]), item(3, "Blue Cloth Vest", 10, &[])],
+        );
+        assert_eq!(catalog.item_like("Red Cloth Vest", Some(25)).unwrap().id, 2);
+        assert_eq!(catalog.item_like("Rcd Cloth Vest", Some(10)).unwrap().id, 1, "a misread letter");
+        assert!(catalog.item_like("Pebble", None).is_none());
+    }
+
+    #[test]
+    fn a_job_trains_in_the_weapons_its_mastery_skills_name() {
+        let catalog = Catalog::new(
+            vec![skill(1, "Claw Mastery", 410, 20, &[]), skill(2, "Sword Mastery", 110, 20, &[]), skill(3, "Bow Mastery", 310, 20, &[])],
+            vec![weapon(1, "A", "Claw"), weapon(2, "B", "Dagger"), weapon(3, "C", "1H Sword"), weapon(4, "D", "2H Sword"), weapon(5, "E", "Crossbow")],
+        );
+        assert_eq!(catalog.weapons_of(410), ["Claw"]);
+        assert_eq!(catalog.weapons_of(110), ["1H Sword", "2H Sword"]);
+        assert!(catalog.weapons_of(400).is_empty(), "a first job has no Mastery skill yet");
+        assert!(catalog.weapons_of(310).is_empty(), "`Bow` isn't `Crossbow`");
+    }
+
+    #[test]
+    fn the_filters_come_from_the_data() {
+        let filters = stocked().item_filters();
+        assert_eq!(filters.slots, ["Weapon", "Hat"]);
+        assert_eq!(filters.weapons, ["Claw"]);
     }
 }

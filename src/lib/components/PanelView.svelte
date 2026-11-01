@@ -4,9 +4,9 @@
   import BuildCard from "./BuildCard.svelte";
   import CharacterCard from "./CharacterCard.svelte";
   import HistoryCard from "./HistoryCard.svelte";
-  import ItemCard from "./ItemCard.svelte";
+  import ItemPanel from "./ItemPanel.svelte";
   import MapCard from "./MapCard.svelte";
-  import QuestCard from "./QuestCard.svelte";
+  import QuestPanel from "./QuestPanel.svelte";
   import SessionCard from "./SessionCard.svelte";
   import TimersCard from "./TimersCard.svelte";
   import TrainCard from "./TrainCard.svelte";
@@ -38,17 +38,21 @@
 {:else if panel === "train"}
   <TrainCard level={analysis?.hud?.level ?? session?.level ?? null} map={analysis?.map ?? null} {session} plain={pinned} />
 {:else if panel === "quests"}
-  {#if analysis?.quest}
-    <QuestCard quest={analysis.quest} map={analysis.map} {session} plain={pinned} />
-  {:else}
-    {@render empty("Open the Quest Helper in game to track quest counters here.")}
-  {/if}
+  <QuestPanel
+    quest={analysis?.quest ?? null}
+    map={analysis?.map ?? null}
+    {session}
+    level={analysis?.hud?.level ?? session?.level ?? null}
+    {pinned}
+  />
 {:else if panel === "item"}
-  {#each analysis?.tooltips ?? [] as item, i}
-    <ItemCard {item} title={i === 0 ? "Item" : "Compared item"} plain={pinned && i === 0} />
-  {:else}
-    {@render empty("Hover a piece of equipment in game and press Ctrl+Alt+I to see its stats and whether it has been scrolled.")}
-  {/each}
+  <ItemPanel
+    tooltips={analysis?.tooltips ?? []}
+    level={analysis?.hud?.level ?? session?.level ?? null}
+    character={analysis?.hud?.name ?? null}
+    map={analysis?.map ?? null}
+    {pinned}
+  />
 {:else if panel === "build"}
   <BuildCard level={analysis?.hud?.level ?? session?.level ?? null} character={analysis?.hud?.name ?? null} plain={pinned} />
 {/if}

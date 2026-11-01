@@ -5,12 +5,13 @@ use std::time::Instant;
 use serde::Serialize;
 
 use crate::error::Result;
+use crate::readers::character::CharacterReading;
 use crate::readers::hud::{HudLayout, HudReading};
 use crate::readers::map::MapReading;
 use crate::readers::mesos::MesoReading;
 use crate::readers::quest::QuestReading;
 use crate::readers::tooltip::ItemTooltip;
-use crate::readers::{hud, map, mesos, party, quest, shop, tooltip};
+use crate::readers::{character, hud, map, mesos, party, quest, shop, tooltip};
 use crate::vision::{Frame, Line, Ocr, group_lines};
 
 #[derive(Debug, Clone, Default, Serialize)]
@@ -72,6 +73,26 @@ pub fn analyze_live(frame: &Frame, ocr: &Ocr) -> Result<Analysis> {
 /// Reads only the item tooltips in `frame`.
 pub fn read_items(frame: &Frame, ocr: &Ocr) -> Result<Vec<ItemTooltip>> {
     tooltip::read_all(frame, &overview(frame, ocr)?, ocr)
+}
+
+/// What the character's windows show, with the name and level from the HUD.
+#[derive(Debug, Clone, Default)]
+pub struct CharacterScan {
+    pub name: Option<String>,
+    pub level: Option<u32>,
+    pub windows: CharacterReading,
+}
+
+/// Reads the stat and skill windows in `frame`.
+pub fn read_character(frame: &Frame, ocr: &Ocr) -> Result<CharacterScan> {
+    let located = hud::read(frame, ocr)?;
+    let (layout, reading) = located.unzip();
+    let mut reading = reading.unwrap_or_default();
+    if let Some(layout) = &layout {
+        hud::settle_name(&mut reading, layout, &overview(frame, ocr)?);
+    }
+    let windows = character::read(frame, layout.as_ref(), ocr)?;
+    Ok(CharacterScan { name: reading.name, level: reading.level, windows })
 }
 
 fn read(frame: &Frame, ocr: &Ocr, items: bool) -> Result<Analysis> {

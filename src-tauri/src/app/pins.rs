@@ -122,8 +122,16 @@ impl PinState {
 
 /// Whether a pinned Item panel is on screen.
 pub fn shows_item(app: &AppHandle) -> bool {
+    shows(app, Panel::Item)
+}
+
+pub fn shows_quests(app: &AppHandle) -> bool {
+    shows(app, Panel::Quests)
+}
+
+fn shows(app: &AppHandle, panel: Panel) -> bool {
     let status = app.state::<PinState>().status();
-    !status.hidden && status.pinned.contains(&Panel::Item)
+    !status.hidden && status.pinned.contains(&panel)
 }
 
 /// Reopens the panels that were pinned when Leafline last closed.

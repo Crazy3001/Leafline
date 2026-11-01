@@ -1,14 +1,16 @@
 <script lang="ts">
-  import { Hourglass, LoaderCircle, Search, UserRound } from "@lucide/svelte";
+  import { ChevronRight, Gift, Hourglass, LoaderCircle, Search, UserRound } from "@lucide/svelte";
   import { untrack } from "svelte";
 
   import Card from "./Card.svelte";
   import ObjectiveHint from "./quest/ObjectiveHint.svelte";
+  import QuestSteps from "./quest/QuestSteps.svelte";
   import { backend } from "$lib/api";
   import { formatCompact, formatDuration, objectiveProgress, splitMapLabel } from "$lib/format";
   import { measuredRates, watchHistory } from "$lib/history.svelte";
   import { OSMS_URL, WIKI_URL, mapData, watchMapData } from "$lib/mapdata.svelte";
-  import type { Guide, MapReading, ObjectiveGuide, Objective, QuestReading, SessionSummary } from "$lib/types";
+  import { payout, questView, toggleExpanded } from "$lib/quests.svelte";
+  import type { Guide, MapReading, ObjectiveGuide, Objective, QuestReading, QuestWhere, SessionSummary } from "$lib/types";
 
   let {
     quest,
@@ -30,6 +32,8 @@
   let guide = $state<Guide | null>(null);
   let lookingUp = $state(false);
   let lookupError = $state<string | null>(null);
+  /** The data's page for each quest, by id. */
+  let sheets = $state<Record<number, QuestWhere>>({});
 
   watchHistory();
   // EXP rates from saved sessions and this one, for a rough pace where no counter was timed.
@@ -100,6 +104,27 @@
     untrack(refresh).catch(() => (guide = null));
   });
 
+  const sheetKey = $derived(
+    JSON.stringify([guide?.quests.map((g) => g.quest?.quest.id), map?.name, map?.street, map?.twin]),
+  );
+
+  // Follows the key alone: every live reading brings new objects with the same content.
+  $effect(() => {
+    const asked = sheetKey;
+    untrack(() => {
+      const ids = (guide?.quests ?? []).flatMap((g) => (g.quest ? [g.quest.quest.id] : []));
+      const place = [map?.name ?? null, map?.street ?? null, map?.twin ?? null] as const;
+      Promise.all(ids.map((id) => backend.questSheet(id, ...place)))
+        .then((found) => {
+          if (asked !== sheetKey) return;
+          sheets = Object.fromEntries(found.flatMap((where, i) => (where ? [[ids[i], where]] : [])));
+        })
+        .catch(() => {
+          // The quest still shows, with no payout or steps.
+        });
+    });
+  });
+
   /** Unfinished item objectives, which wait for the drop table to be downloaded. */
   const unknownItems = $derived(
     guide
@@ -135,10 +160,20 @@
   {#each quest.quests as { title, objectives }, i}
     {@const info = guide?.quests[i]}
     {@const finished = objectives.length > 0 && objectives.every((o) => objectiveProgress(o) >= 1)}
+    {@const id = info?.quest?.quest.id}
+    {@const sheet = id != null ? sheets[id] : null}
+    {@const expanded = id != null && questView.expanded.includes(id)}
     <div class="quest" class:dense={plain}>
       <!-- The map data's spelling, once the title matched a quest there: OCR garbles some letters. -->
       <h3 class="title" title={info?.quest ? `Read on screen as "${title}"` : undefined}>
-        {info?.quest?.quest.name || title || "Untitled quest"}
+        {#if id != null}
+          <button class="open" aria-expanded={expanded} onclick={() => toggleExpanded(id)}>
+            <span class="chevron" class:expanded><ChevronRight size={13} /></span>
+            <span>{info?.quest?.quest.name}</span>
+          </button>
+        {:else}
+          {title || "Untitled quest"}
+        {/if}
       </h3>
       {#if info?.quest}
         {@const turnIn = finished ? info.quest.turnIn : null}
@@ -178,12 +213,18 @@
                   </span>
                 </p>
               {/if}
-              {#if hint && !done}<ObjectiveHint guide={hint} from={guide?.from ?? null} />{/if}
+              {#if hint && !done && id == null}<ObjectiveHint guide={hint} from={guide?.from ?? null} />{/if}
             </li>
           {/each}
         </ul>
-      {:else}
+      {:else if !expanded}
         <p class="empty">Counters could not be read.</p>
+      {/if}
+      {#if sheet && payout(sheet.sheet)}
+        <p class="payout"><Gift size={11} /><span>{payout(sheet.sheet)}</span></p>
+      {/if}
+      {#if expanded && sheet}
+        <div class="details"><QuestSteps sheet={sheet.sheet} from={sheet.from} tracked={objectives} /></div>
       {/if}
     </div>
   {:else}
@@ -214,6 +255,58 @@
 </Card>
 
 <style>
+  .open {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    width: 100%;
+    margin-left: -3px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .open:hover,
+  .open:focus-visible {
+    color: var(--accent-strong);
+    outline: none;
+  }
+
+  .chevron {
+    display: grid;
+    flex: none;
+    color: var(--faint);
+    transition: transform 0.15s ease;
+  }
+
+  .chevron.expanded {
+    transform: rotate(90deg);
+  }
+
+  .payout {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    margin: 7px 0 0;
+    color: var(--accent);
+    font-size: 11.5px;
+  }
+
+  .payout :global(svg) {
+    flex: none;
+    align-self: center;
+  }
+
+  .details {
+    margin-top: 6px;
+    padding-top: 2px;
+    border-top: 1px solid var(--border);
+  }
+
   .quest + .quest {
     margin-top: 12px;
     padding-top: 10px;

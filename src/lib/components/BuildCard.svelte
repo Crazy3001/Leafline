@@ -1,11 +1,13 @@
 <script lang="ts">
-  // What the build says at the character's level. It only tells the player what the plan is:
-  // nothing here checks what they really spent, and nothing moves on its own beyond the level.
-  import { ExternalLink, Pencil } from "@lucide/svelte";
+  // What the build says at the character's level. It moves on with the level, and catches up
+  // with what was really spent whenever the stat and skill windows are read.
+  import { ExternalLink, Pencil, RefreshCw } from "@lucide/svelte";
   import { untrack } from "svelte";
 
   import Card from "./Card.svelte";
+  import GearPicks from "./GearPicks.svelte";
   import MapDataPanel from "./map/MapDataPanel.svelte";
+  import Section from "./map/Section.svelte";
   import { backend } from "$lib/api";
   import { STATS, buildState, statLabel, watchBuilds } from "$lib/builds.svelte";
   import { OSMS_CREDIT, OSMS_URL, mapData, watchMapData } from "$lib/mapdata.svelte";
@@ -84,7 +86,10 @@
 {:else if plan && step}
   <Card title="Build" {plain}>
     {#snippet aside()}
-      <button class="link" title="Edit this build" onclick={() => backend.showBuild()}><Pencil size={12} />Edit</button>
+      <span class="tools">
+        <button class="link" title="Live reading follows your Character Stat and Skill windows while they're open. With it off, open them and read them once here (Ctrl+Alt+B)" onclick={() => backend.readCharacter()}><RefreshCw size={12} />Read stats</button>
+        <button class="link" title="Edit this build" onclick={() => backend.showBuild()}><Pencil size={12} />Edit</button>
+      </span>
     {/snippet}
 
     <h3 class="name">{plan.build.name}</h3>
@@ -147,6 +152,24 @@
       </ul>
     {/if}
 
+    {#if plan.expansion.gear.length}
+      <Section title="Gear goals" count={plan.expansion.gear.length}>
+        <ul class="goals">
+          {#each plan.expansion.gear as check (check.item.id)}
+            <li>
+              <button title="Show it in the Item tab" onclick={() => backend.showItem(check.item.id, null)}>{check.item.name}</button>
+              <span class="tabular" class:warn={!check.usable || check.level == null}>
+                {#if !check.usable}Wrong job{:else if check.level != null}Lv {check.level}{:else}Out of reach{/if}
+              </span>
+            </li>
+          {/each}
+        </ul>
+      </Section>
+    {/if}
+    <Section title="Gear to look for">
+      <GearPicks build={plan.build.id} level={at} />
+    </Section>
+
     {#if warnings.length}
       <h4 class="warn-title">{warnings.length === 1 ? "1 thing to fix" : `${warnings.length} things to fix`}</h4>
       <ul class="warnings">
@@ -204,6 +227,11 @@
   .link:focus-visible {
     color: var(--text);
     outline: none;
+  }
+
+  .tools {
+    display: inline-flex;
+    gap: 10px;
   }
 
   .name {
@@ -350,6 +378,39 @@
     flex-wrap: wrap;
     gap: 2px 10px;
     min-width: 0;
+  }
+
+  .goals li {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 2px 0;
+  }
+
+  .goals button {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    font-size: 12px;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .goals button:hover,
+  .goals button:focus-visible {
+    color: var(--accent-strong);
+    text-decoration: underline;
+    outline: none;
+  }
+
+  .goals span {
+    flex: none;
+    color: var(--muted);
+  }
+
+  .goals .warn {
+    color: var(--warn);
   }
 
   .warnings li {

@@ -102,11 +102,13 @@ pub struct Start {
     pub ap: u32,
     pub sp: u32,
     pub skills: Vec<SkillLevel>,
+    /// `male` or `female`, for gear that is made for one. `None` until the player says.
+    pub gender: Option<String>,
 }
 
 impl Default for Start {
     fn default() -> Self {
-        Self { level: 1, stats: None, ap: 0, sp: 0, skills: Vec::new() }
+        Self { level: 1, stats: None, ap: 0, sp: 0, skills: Vec::new(), gender: None }
     }
 }
 
@@ -567,7 +569,7 @@ fn check_gear(
 }
 
 /// Stats aren't compared until the player has entered theirs.
-fn meets(item: &ItemRecord, level: u32, stats: &Stats, known: bool) -> bool {
+pub(super) fn meets(item: &ItemRecord, level: u32, stats: &Stats, known: bool) -> bool {
     level >= item.req_level
         && (!known
             || (stats.str >= item.req_str

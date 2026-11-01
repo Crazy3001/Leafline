@@ -148,12 +148,15 @@ pub(crate) mod tests {
         "exits": [1], "portals": [{"name": "west00", "dest_map_id": 1, "dest_portal": "east00"}]}]"#;
     const MONSTERS: &str = r#"[{"id": 10, "name": "Pebble Snail", "level": 2, "hp": 20, "exp": 4, "spawns": [{"map_id": 2, "count": 6}]}]"#;
     const NPCS: &str = r#"[{"id": 50, "name": "Warden Ilse", "maps": [1]}]"#;
-    const QUESTS: &str = r#"[{"id": 70, "name": "Shell Sorting", "npc_id": 50, "requirements": [{"type": "mob", "id": 10, "count": 8}]}]"#;
+    const QUESTS: &str = r#"[{"id": 70, "name": "Shell Sorting", "npc_id": 50, "requirements": [{"type": "mob", "id": 10, "count": 8}],
+        "rewards": [{"type": "item", "id": 90, "count": 1}]}]"#;
     const SKILLS: &str = r#"[{"id": 80, "name": "Pebble Toss", "job_id": 400, "class_name": "Rogue", "job_tier": "1st Job",
         "max_level": 2, "description": "Throws a pebble.", "required_skills": [{"skill_id": 79, "level": 1}],
         "level_descriptions": ["Damage 1", "Damage 2"]}]"#;
     const ITEMS: &str = r#"[{"id": 90, "name": "Twig Wand", "category": "Equipment", "sub_category": "Weapon",
-        "req_classes": ["Magician", "Thief"], "stats": {"reqLevel": 8, "incMAD": 12}}]"#;
+        "req_classes": ["Magician", "Thief"], "stats": {"reqLevel": 8, "incMAD": 12}},
+        {"id": 91, "name": "Moss Scroll", "category": "Consumable", "sub_category": "Scroll", "price": 40,
+        "description": "Makes a hat mossier.", "scroll": {"slot": "Other", "tier": "Lesser", "success_rate": 60}}]"#;
 
     pub fn fake_osms(maps: &str) -> FakeSource {
         let bodies = [
@@ -207,8 +210,12 @@ pub(crate) mod tests {
         assert_eq!(data.quests[0].requirements[0].count, 8);
         assert_eq!(data.skills[0].required_skills[0].skill_id, 79);
         assert_eq!(data.skills[0].level_descriptions, ["Damage 1", "Damage 2"]);
+        assert_eq!(data.quests[0].reward_items[0].item_id, 90);
         assert_eq!(data.items[0].classes, ["Magician", "Thief"]);
         assert_eq!(data.items[0].stats[0].value, 12);
+        let scroll = &data.items[1];
+        assert_eq!((scroll.price, scroll.description.as_deref()), (Some(40), Some("Makes a hat mossier.")));
+        assert_eq!(scroll.scroll.as_ref().unwrap().success_rate, Some(60));
     }
 
     #[test]

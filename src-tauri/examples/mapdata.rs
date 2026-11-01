@@ -24,13 +24,26 @@
 //!
 //! `--builds` lays out a build for every job, with each skill to its maximum in the data's order,
 //! and prints what the planner makes of it.
+//!
+//! `--gear <level>` prints the gear suggested at that level for each ready-made plan.
+//!
+//! `--items <text>` prints what the item search finds.
+//!
+//! `--quests-for <text>` prints what the quest search finds, and the first one's sheet.
+//!
+//! `--hold <folder>` reads the Quest Helper of each picture in turn, as live reading does, and
+//! prints what each shows raw and once held.
 
 use std::path::Path;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use leafline_lib::build::{Build, Catalog, Plan, Rules, SkillLevel, Start, Stat, StatGoal, Stats, expand, starters};
+use leafline_lib::build::{
+    Build, Catalog, ItemQuery, Plan, Rules, SkillLevel, Start, Stat, StatGoal, Stats, expand, starters, suggest,
+};
 use leafline_lib::mapdata::fetch::{self, Http};
-use leafline_lib::mapdata::{Atlas, MapCard, QuestQuery, Store, Travel, TravelChoice, TravelFile, drops};
+use leafline_lib::mapdata::{
+    Atlas, MapCard, QuestQuery, QuestSearch, QuestTitles, Store, Travel, TravelChoice, TravelFile, drops,
+};
 use leafline_lib::pipeline;
 use leafline_lib::readers::map;
 use leafline_lib::vision::{self, Ocr};
@@ -54,6 +67,49 @@ fn main() {
     if args.iter().any(|a| a == "--builds") {
         let data = store.load().expect("load cache").expect("no map data yet");
         print_builds(Catalog::new(data.skills, data.items));
+    }
+
+    if let Some(folder) = value("--hold", 1) {
+        let ocr = Ocr::new().expect("OCR engine");
+        let mut titles = QuestTitles::default();
+        let mut paths: Vec<_> =
+            std::fs::read_dir(folder).expect("read folder").filter_map(|e| Some(e.ok()?.path())).collect();
+        paths.retain(|p| vision::is_supported(p));
+        paths.sort();
+        for path in paths {
+            let frame = vision::load(&path).expect("load screenshot");
+            let mut quest = pipeline::analyze_live(&frame, &ocr).expect("analyze").quest;
+            println!("{}", path.file_name().unwrap().to_string_lossy());
+            println!("    raw  {:?}", quest.as_ref().map(|q| &q.quests));
+            titles.hold(&atlas, &mut quest);
+            println!("    held {:?}", quest.as_ref().map(|q| &q.quests));
+        }
+    }
+    if let Some(text) = value("--quests-for", 1) {
+        let page = atlas.search_quests(&QuestSearch { text, ..QuestSearch::default() });
+        println!("{} found", page.total);
+        for quest in page.quests.iter().take(12) {
+            println!("{:<7} {:<44} Lv {:?} {:?} {:?} EXP {}", quest.id, quest.name, quest.level_min, quest.giver, quest.region, quest.exp);
+        }
+        if let Some(first) = page.quests.first() {
+            let data = store.load().expect("load cache").expect("no map data yet");
+            let catalog = Catalog::new(data.skills, data.items);
+            let name = |id: u32| catalog.item(id).map(|i| i.name.clone());
+            println!("{:#?}", atlas.quest_sheet(first.id, name, &[], None, &Travel::none()).map(|s| (s.story, s.after, s.next, s.rewards)));
+        }
+    }
+    if let Some(level) = value("--gear", 1) {
+        let data = store.load().expect("load cache").expect("no map data yet");
+        print_gear(Catalog::new(data.skills, data.items), level.parse().expect("level"));
+    }
+    if let Some(text) = value("--items", 1) {
+        let data = store.load().expect("load cache").expect("no map data yet");
+        let catalog = Catalog::new(data.skills, data.items);
+        let page = catalog.search_items(&ItemQuery { text, ..ItemQuery::default() }, |_| true);
+        println!("{} found, closest: {}", page.total, page.closest);
+        for item in page.items {
+            println!("{:<8} {:<40} {:<8} Lv {:>3} {:?}", item.id, item.name, item.slot, item.req_level, item.scroll);
+        }
     }
 
     if let Some(label) = value("--find", 1) {
@@ -281,6 +337,31 @@ fn print_builds(catalog: Catalog) {
         println!("{:>3} {:<14} tier {} last SP spent at {last_sp:?}", job.id, job.name, job.tier);
         for problem in &plan.problems {
             println!("      {:?}: {}", problem.severity, problem.message);
+        }
+    }
+}
+
+fn print_gear(catalog: Catalog, level: u32) {
+    let rules = Rules::default();
+    for starter in starters::all(&catalog, &rules) {
+        let build = Build {
+            start: Start { level: 1, stats: Some(Stats { str: 4, dex: 5, int: 4, luk: 12 }), ..Start::default() },
+            plan: starter.plan.clone(),
+            ..Build::default()
+        };
+        let plan = expand(&build, &rules, &catalog);
+        let picks = suggest::suggest(&build, &plan, &rules, &catalog, level);
+        println!("{} at Lv {level}, by {:?}", starter.name, picks.ranked_by);
+        for slot in picks.slots {
+            let items: Vec<String> = slot
+                .picks
+                .iter()
+                .map(|p| {
+                    let stats: Vec<String> = p.item.stats.iter().map(|s| format!("{} {}", s.label, s.value)).collect();
+                    format!("{} (Lv {}; {})", p.item.name, p.item.req_level, stats.join(", "))
+                })
+                .collect();
+            println!("    {:<8} {}", slot.slot, items.join(" | "));
         }
     }
 }

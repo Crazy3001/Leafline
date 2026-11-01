@@ -23,6 +23,7 @@ pub enum Action {
     ToggleCompact,
     ToggleLive,
     ReadItem,
+    ReadCharacter,
     PauseTracking,
     NewSession,
     ToggleLogging,
@@ -31,13 +32,14 @@ pub enum Action {
 }
 
 impl Action {
-    pub const ALL: [Action; 11] = [
+    pub const ALL: [Action; 12] = [
         Action::ToggleOverlay,
         Action::ToggleClickThrough,
         Action::TogglePins,
         Action::ToggleCompact,
         Action::ToggleLive,
         Action::ReadItem,
+        Action::ReadCharacter,
         Action::PauseTracking,
         Action::NewSession,
         Action::ToggleLogging,
@@ -53,6 +55,7 @@ impl Action {
             Action::ToggleCompact => "Ctrl+Alt+H",
             Action::ToggleLive => "Ctrl+Alt+R",
             Action::ReadItem => "Ctrl+Alt+I",
+            Action::ReadCharacter => "Ctrl+Alt+B",
             Action::PauseTracking => "Ctrl+Alt+K",
             Action::NewSession => "Ctrl+Alt+N",
             Action::ToggleLogging => "Ctrl+Alt+J",
@@ -69,6 +72,7 @@ impl Action {
             Action::ToggleCompact => "Compact HUD",
             Action::ToggleLive => "Start or stop live reading",
             Action::ReadItem => "Read the item you're hovering, for a price check",
+            Action::ReadCharacter => "Read your stat and skill windows, to update your build",
             Action::PauseTracking => "Pause or resume tracking",
             Action::NewSession => "Start a new session",
             Action::ToggleLogging => "Log this run or not",
@@ -100,6 +104,7 @@ impl Action {
             Action::ToggleCompact => overlay::toggle_compact(app),
             Action::ToggleLive => live::toggle(app),
             Action::ReadItem => live::read_item(app),
+            Action::ReadCharacter => live::read_character(app),
             Action::PauseTracking => {
                 live::toggle_held(app);
                 Ok(())

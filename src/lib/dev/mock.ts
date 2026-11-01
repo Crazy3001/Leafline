@@ -8,8 +8,11 @@ import type {
   Build,
   BuildCatalog,
   BuildPlan,
+  CharacterRead,
   Expansion,
   GearItem,
+  ItemLink,
+  ItemRecord,
   LevelStep,
   MapRoute,
   History,
@@ -27,6 +30,7 @@ import type {
   MapMatch,
   OverlayStatus,
   PinStatus,
+  QuestRow,
   ReplayProgress,
   SessionSummary,
 } from "../types";
@@ -250,6 +254,39 @@ const mockGear: GearItem[] = [
   { id: 500, name: "Fern Dagger", slot: "Weapon", gender: null, classes: ["Thief"], weaponType: "Dagger", reqLevel: 30, reqStr: 0, reqDex: 60, reqInt: 0, reqLuk: 0, stats: [{ label: "Attack", value: 28 }] },
   { id: 501, name: "Mossy Cap", slot: "Hat", gender: null, classes: [], weaponType: null, reqLevel: 15, reqStr: 0, reqDex: 0, reqInt: 0, reqLuk: 0, stats: [{ label: "Weapon Def.", value: 12 }] },
 ];
+
+/** Made-up items of every kind, in the shape the real data has. */
+const mockRecord = (gear: GearItem, more: Partial<ItemRecord> = {}): ItemRecord => ({
+  kind: "equip",
+  reqFame: 0,
+  attackSpeed: null,
+  upgradeSlots: 7,
+  questItem: false,
+  untradable: false,
+  price: 1200,
+  description: null,
+  scroll: null,
+  ...gear,
+  ...more,
+});
+const blankGear = (id: number, name: string, slot: string): GearItem => ({ id, name, slot, gender: null, classes: [], weaponType: null, reqLevel: 0, reqStr: 0, reqDex: 0, reqInt: 0, reqLuk: 0, stats: [] });
+const mockItems: ItemRecord[] = [
+  mockRecord(mockGear[0], { attackSpeed: 4 }),
+  mockRecord(mockGear[1]),
+  mockRecord({ ...blankGear(502, "Bark Vest", "Top"), gender: "male", classes: ["Thief"], reqLevel: 25, reqLuk: 40, stats: [{ label: "Weapon Def.", value: 36 }, { label: "LUK", value: 2 }] }),
+  mockRecord({ ...blankGear(503, "Thorn Claw", "Weapon"), classes: ["Thief"], weaponType: "Claw", reqLevel: 30, reqDex: 60, stats: [{ label: "Attack", value: 24 }] }, { attackSpeed: 3 }),
+  mockRecord(blankGear(504, "Berry Tonic", "Consume"), { kind: "use", upgradeSlots: null, price: 40, description: "A tonic pressed from red berries.\nRestores 100 HP." }),
+  mockRecord(blankGear(505, "Hat Moss Scroll: Lesser", "Scroll"), { kind: "scroll", upgradeSlots: null, price: 1, description: "Makes a hat mossier.\nSuccess rate: 60%, Weapon Def. +2", scroll: { fits: "Hat", tier: "Lesser", successRate: 60 } }),
+  mockRecord(blankGear(506, "Moss Stool", "Install"), { kind: "setup", upgradeSlots: null, description: "Somewhere to sit and rest." }),
+  mockRecord(blankGear(507, "Snail Tooth", "Etc"), { kind: "etc", upgradeSlots: null, price: 8, questItem: true, untradable: true, description: "A very small tooth." }),
+];
+const showItemHandlers: ((link: ItemLink) => void)[] = [];
+const showQuestHandlers: ((id: number) => void)[] = [];
+const mockQuests: QuestRow[] = [
+  { id: 71, name: "Slime Samples", region: "Fern Isle", levelMin: 1, giver: "Innkeeper Bo", repeat: null, exp: 30, mesos: 0 },
+  { id: 70, name: "Shell Sorting", region: "Mossbank", levelMin: 3, giver: "Warden Ilse", repeat: "daily", exp: 120, mesos: 500 },
+];
+const characterHandlers: ((read: CharacterRead) => void)[] = [];
 
 /** Made-up builds kept in this browser tab. */
 let mockBuilds: (Build & { usedAt: number })[] = [
@@ -592,6 +629,90 @@ export const mockBackend: Backend = {
         ]
       : [],
   searchGear: async (text) => mockGear.filter((g) => g.name.toLowerCase().includes(text.toLowerCase())),
+  async searchItems(query) {
+    const words = query.text.toLowerCase().split(/\s+/).filter(Boolean);
+    const items = mockItems.filter(
+      (item) =>
+        (!query.kind || item.kind === query.kind) &&
+        (!query.slot || item.slot === query.slot || item.weaponType === query.slot || item.scroll?.fits === query.slot) &&
+        (!query.class || (item.kind === "equip" && (!item.classes.length || item.classes.includes(query.class)))) &&
+        (query.levelMin == null || item.reqLevel >= query.levelMin) &&
+        (query.levelMax == null || item.reqLevel <= query.levelMax) &&
+        words.every((word) => item.name.toLowerCase().includes(word)),
+    );
+    return { items: items.slice(query.offset, query.offset + 40), total: items.length, closest: false };
+  },
+  itemFilters: async () => ({ slots: ["Weapon", "Hat", "Top"], weapons: ["Claw", "Dagger"] }),
+  itemRecord: async (id) => mockItems.find((item) => item.id === id) ?? null,
+  findItem: async (name) => mockItems.find((item) => item.name.toLowerCase() === name.toLowerCase()) ?? null,
+  async itemOrigin(id) {
+    const item = mockItems.find((i) => i.id === id);
+    if (!item) return null;
+    const guide = sampleGuide([{ title: "Moss Patrol", objectives: [item.name] }], null, true);
+    const quest = guide.quests[0];
+    return { from: guide.from, origin: { drops: quest.objectives[0], quests: quest.quest ? [quest.quest] : [] } };
+  },
+  async showItem(id, text) {
+    showItemHandlers.forEach((h) => h({ id, text }));
+  },
+  async onShowItem(handler) {
+    showItemHandlers.push(handler);
+    return () => {};
+  },
+  async setGearGoal(item, wanted) {
+    const build = newestBuild();
+    if (!build) return;
+    build.plan.gear = build.plan.gear.filter((id) => id !== item).concat(wanted ? [item] : []);
+    buildsChanged();
+  },
+  async searchQuests(search) {
+    const quests = mockQuests.filter((q) => q.name.toLowerCase().includes(search.text.toLowerCase()) && (!search.region || q.region === search.region));
+    return { quests, total: quests.length };
+  },
+  questRegions: async () => ["Fern Isle", "Mossbank"],
+  async questSheet(id) {
+    const row = mockQuests.find((q) => q.id === id);
+    if (!row) return null;
+    const quest = sampleGuide([{ title: row.name, objectives: ["Moss Slime"] }], null, true).quests[0];
+    return {
+      from: null,
+      sheet: {
+        info: quest.quest!,
+        row,
+        chain: "Slime Business",
+        story: ["Innkeeper Bo wants slime for a recipe.", "Bring back samples from the meadow."],
+        after: [{ id: 70, name: "Shell Sorting", levelMin: 1 }],
+        next: null,
+        objectives: [{ count: 5, guide: quest.objectives[0] }],
+        rewards: [{ id: 504, name: "Berry Tonic", count: 5, sure: true }, { id: 502, name: "Bark Vest", count: 1, sure: false }, { id: 503, name: "Thorn Claw", count: 1, sure: false }],
+      },
+    };
+  },
+  async showQuest(id) {
+    showQuestHandlers.forEach((h) => h(id));
+  },
+  async onShowQuest(handler) {
+    showQuestHandlers.push(handler);
+    return () => {};
+  },
+  async readCharacter() {
+    const read = { stats: true, skills: true, build: newestBuild()?.name ?? null, result: { changes: ["LUK 92 → 97"], unknown: [] }, problem: null, automatic: false };
+    characterHandlers.forEach((h) => h(read));
+  },
+  async onCharacterRead(handler) {
+    characterHandlers.push(handler);
+    return () => {};
+  },
+  async gearSuggestions(id, level) {
+    const build = mockBuilds.find((b) => b.id === id);
+    if (!build) return null;
+    const wearable = mockItems.filter((item) => item.kind === "equip" && item.reqLevel <= level);
+    const slots = [...new Set(wearable.map((item) => item.slot))].map((slot) => ({
+      slot,
+      picks: wearable.filter((item) => item.slot === slot).map((item) => ({ item, goal: build.plan.gear.includes(item.id) })),
+    }));
+    return { level, rankedBy: ["Attack", "LUK", "DEX", "Weapon Def."], slots };
+  },
   listBuilds: async () =>
     [...mockBuilds].sort((a, b) => b.usedAt - a.usedAt).map(({ id, name, character }) => ({ id, name, character, updatedAt: now })),
   async buildPlan(id) {

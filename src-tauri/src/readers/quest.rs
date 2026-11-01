@@ -16,6 +16,7 @@ use image::{Rgba, imageops};
 use regex::Regex;
 use serde::Serialize;
 
+use super::digits;
 use super::text::{digitize, similarity, squash, starts_like, trim_noise};
 use crate::error::Result;
 use crate::vision::glyphs::{GlyphSet, Mask, ink_columns, ink_rows};
@@ -73,7 +74,9 @@ pub fn read(frame: &Frame, overview: &[Line], ocr: &Ocr) -> Result<Option<QuestR
         let (w, h) = ((img.width() as f32 * SCALE) as u32, (img.height() as f32 * SCALE) as u32);
         preprocess::pad(&imageops::resize(img, w, h, filter), 24)
     };
-    let mut passes = Vec::new();
+    // Only the black text, so this pass sees the same picture whatever is behind the panel.
+    let keyed = ocr.words_in(frame, panel, SCALE, |crop| enlarge(&black_text(crop), imageops::FilterType::Triangle))?;
+    let mut passes = vec![group_lines(&keyed)];
     for limit in STRETCH {
         let words =
             ocr.words_in(frame, panel, SCALE, |crop| enlarge(&stretch(crop, limit), imageops::FilterType::Triangle))?;
@@ -88,13 +91,14 @@ pub fn read(frame: &Frame, overview: &[Line], ocr: &Ocr) -> Result<Option<QuestR
     // Scenery and name tags under the panel can look like text to OCR, but only the panel's
     // own rows are drawn in pure black.
     rows.retain(|row| has_text(frame, panel, row.y(), h));
-    let glyphs: Vec<Option<CounterGlyphs>> = rows
-        .iter()
-        .map(|row| match row {
-            Row::Objective { y, .. } => CounterGlyphs::read(frame, panel, *y, h),
-            Row::Title { .. } => None,
-        })
-        .collect();
+    // OCR can lose a counter altogether, leaving `O Snail` looking like a title, but a row that
+    // starts `digits / digits` as drawn is an objective, whatever is behind the panel.
+    let glyphs: Vec<Option<CounterGlyphs>> = rows.iter().map(|row| CounterGlyphs::read(frame, panel, row.y(), h)).collect();
+    for (row, glyphs) in rows.iter_mut().zip(&glyphs) {
+        if let (Row::Title { y, title }, Some(_)) = (&*row, glyphs) {
+            *row = Row::Objective { y: *y, target: after_counter(title), counters: Vec::new() };
+        }
+    }
     let mut quests = assemble(&rows, &settle_counters(&rows, &glyphs));
     if let Some((shown, _)) = page {
         quests.truncate(shown as usize);
@@ -117,6 +121,13 @@ fn is_ink(px: &Rgba<u8>) -> bool {
 fn has_text(frame: &Frame, panel: Rect, y: f32, text_height: f32) -> bool {
     let band = Rect::from_edges(panel.x, y - 0.6 * text_height, panel.right(), y + 0.6 * text_height);
     ink_rows(frame, band, is_text).is_some_and(|(top, bottom)| (bottom - top) as f32 >= 0.5 * text_height)
+}
+
+/// The panel's text as black on white, with everything else gone.
+fn black_text(img: &Frame) -> Frame {
+    Frame::from_fn(img.width(), img.height(), |x, y| {
+        if is_ink(img.get_pixel(x, y)) { Rgba([0, 0, 0, 255]) } else { Rgba([255, 255, 255, 255]) }
+    })
 }
 
 /// Grey image in which anything at least `limit` bright (by its strongest channel) is white
@@ -357,6 +368,9 @@ fn counter_readings(counter: &str) -> Vec<(u32, u32)> {
     readings
 }
 
+/// How many word gaps a digit can stand after a 1 and still belong to the same number.
+const ONE_GAP: u32 = 3;
+
 /// A counter's digits as drawn, cut out by shape: those before the slash and those after.
 struct CounterGlyphs {
     current: Vec<Mask>,
@@ -383,16 +397,42 @@ impl CounterGlyphs {
                 _ => words.push(vec![run]),
             }
         }
-        let [current, slash, required, ..] = words.as_slice() else { return None };
+        let [current, slash, required, after @ ..] = words.as_slice() else { return None };
         let mask = |cols: &(u32, u32)| Mask::new(frame, *cols, rows, is_ink);
         if slash.len() != 1 || !is_slash(&mask(&slash[0])) {
             return None;
+        }
+        // A 1 is narrow in a wider cell, so the digit after it stands further off than letters do.
+        let height = rows.1 - rows.0;
+        let mut required = required.clone();
+        for word in after {
+            let last = required[required.len() - 1];
+            let narrow = (last.1 - last.0) * 2 <= height;
+            if !narrow || word[0].0 - last.1 > ONE_GAP * word_gap {
+                break;
+            }
+            required.extend(word);
         }
         Some(Self { current: current.iter().map(mask).collect(), required: required.iter().map(mask).collect() })
     }
 
     fn fits(&self, (current, required): (u32, u32)) -> bool {
         current.to_string().len() == self.current.len() && required.to_string().len() == self.required.len()
+    }
+
+    /// The counter read from the digits' shapes, which the scenery behind them can't change.
+    fn shaped(&self) -> Option<(u32, u32)> {
+        let number = |masks: &[Mask]| digits::quest_number(masks)?.parse().ok();
+        Some((number(&self.current)?, number(&self.required)?))
+    }
+}
+
+/// What a row's text names once what is left of its counter is taken off the front.
+fn after_counter(text: &str) -> String {
+    let debris = |word: &str| word.chars().all(|c| c.is_ascii_digit() || "OoIlSB/!|$".contains(c));
+    match text.split_once(' ') {
+        Some((first, rest)) if debris(first) => clean_target(rest),
+        _ => clean_target(text),
     }
 }
 
@@ -424,7 +464,7 @@ fn settle_counters(rows: &[Row], glyphs: &[Option<CounterGlyphs>]) -> Vec<Option
         .map(|(row, glyphs)| {
             let Row::Objective { counters, .. } = row else { return None };
             match glyphs {
-                Some(glyphs) => counters.iter().copied().find(|&c| glyphs.fits(c)),
+                Some(glyphs) => glyphs.shaped().or_else(|| counters.iter().copied().find(|&c| glyphs.fits(c))),
                 None => counters.first().copied(),
             }
         })
@@ -575,6 +615,14 @@ mod tests {
             parse(&[rows.to_vec()], 30.0, 32.0),
             [Quest { title: "Roger's Apple".into(), objectives: vec![objective("Roger's Apple", 0, 0)] }]
         );
+    }
+
+    #[test]
+    fn what_is_left_of_a_counter_comes_off_the_target() {
+        assert_eq!(after_counter("O Snail"), "Snail");
+        assert_eq!(after_counter("0 Blue Snail"), "Blue Snail");
+        assert_eq!(after_counter("Snail"), "Snail");
+        assert_eq!(after_counter("Old Snail"), "Old Snail");
     }
 
     #[test]

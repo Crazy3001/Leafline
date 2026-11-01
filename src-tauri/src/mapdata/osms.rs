@@ -208,7 +208,8 @@ pub struct NpcRecord {
     pub maps: Vec<u32>,
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Deserialize)]
+#[serde(from = "RawQuest")]
 pub struct QuestRecord {
     pub id: u32,
     pub name: String,
@@ -217,31 +218,126 @@ pub struct QuestRecord {
     pub level_min: Option<u32>,
     /// The quest this one leads to.
     pub next_quest_id: Option<u32>,
-    /// Only the monsters to hunt are kept; other requirement types are skipped.
-    #[serde(default, deserialize_with = "mob_requirements")]
+    /// The monsters to hunt.
     pub requirements: Vec<MobRequirement>,
+    /// Items the quest can give, fixed, chosen or at random.
+    pub reward_items: Vec<RewardItem>,
+    pub region: Option<String>,
+    /// The story so far, a line for each stage.
+    pub description: Option<String>,
+    /// The name of the chain of quests this one is part of.
+    pub chain: Option<String>,
+    /// `daily`, `weekly` or `repeatable`.
+    pub repeat: Option<String>,
+    /// Items to bring.
+    pub items: Vec<ItemNeed>,
+    /// Quests to finish first.
+    pub follows: Vec<u32>,
+    pub reward_exp: u32,
+    pub reward_mesos: u32,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct RewardItem {
+    pub item_id: u32,
+    pub count: u32,
+    /// Always given. Otherwise it is one of a choice, or down to chance.
+    pub sure: bool,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ItemNeed {
+    pub item_id: u32,
+    pub count: u32,
+}
+
+#[derive(Deserialize)]
+struct RawQuest {
+    id: u32,
+    name: String,
+    npc_id: Option<u32>,
+    level_min: Option<u32>,
+    next_quest_id: Option<u32>,
+    region: Option<String>,
+    description: Option<String>,
+    chain: Option<String>,
+    repeat: Option<String>,
+    #[serde(default)]
+    requirements: Vec<serde_json::Value>,
+    #[serde(default)]
+    rewards: Vec<serde_json::Value>,
+    #[serde(default)]
+    reward_choices: Vec<serde_json::Value>,
+    #[serde(default)]
+    reward_random: Vec<serde_json::Value>,
+}
+
+impl From<RawQuest> for QuestRecord {
+    fn from(raw: RawQuest) -> Self {
+        let id_of = |value: &serde_json::Value| value.get("id")?.as_u64().map(|id| id as u32);
+        let count_of = |value: &serde_json::Value| value.get("count").and_then(|c| c.as_u64()).map_or(1, |c| c as u32);
+        let kind = |value: &serde_json::Value, kind: &str| value.get("type").and_then(|t| t.as_str()) == Some(kind);
+        let of_kind = |list: &'_ [serde_json::Value], wanted: &'static str| {
+            list.iter().filter(|v| kind(v, wanted)).cloned().collect::<Vec<_>>()
+        };
+        let amount = |wanted: &'static str| {
+            of_kind(&raw.rewards, wanted).iter().filter_map(|r| r.get("value")?.as_u64()).sum::<u64>() as u32
+        };
+        let requirements: Vec<MobRequirement> = of_kind(&raw.requirements, "mob")
+            .iter()
+            .filter_map(|r| Some(MobRequirement { mob_id: id_of(r)?, count: count_of(r) }))
+            .collect();
+        let items: Vec<ItemNeed> = of_kind(&raw.requirements, "item")
+            .iter()
+            .filter_map(|r| Some(ItemNeed { item_id: id_of(r)?, count: count_of(r) }))
+            .collect();
+        let follows: Vec<u32> = of_kind(&raw.requirements, "quest").iter().filter_map(id_of).collect();
+        let reward = |sure: bool| {
+            move |value: &serde_json::Value| Some(RewardItem { item_id: id_of(value)?, count: count_of(value), sure })
+        };
+        let fixed = raw.rewards.iter().filter(|r| kind(r, "item")).filter_map(|r| {
+            reward(r.get("guaranteed").and_then(|g| g.as_bool()).unwrap_or(true))(r)
+        });
+        // Choices and random rewards list their items in groups, some of them for one class.
+        let grouped = raw
+            .reward_choices
+            .iter()
+            .chain(&raw.reward_random)
+            .filter_map(|r| r.get("groups")?.as_array())
+            .flatten()
+            .filter_map(|group| group.get("items")?.as_array())
+            .flatten()
+            .filter_map(reward(false));
+        let mut reward_items: Vec<RewardItem> = Vec::new();
+        for item in fixed.chain(grouped) {
+            if !reward_items.iter().any(|r| r.item_id == item.item_id) {
+                reward_items.push(item);
+            }
+        }
+        Self {
+            id: raw.id,
+            name: raw.name,
+            npc_id: raw.npc_id,
+            level_min: raw.level_min,
+            next_quest_id: raw.next_quest_id,
+            requirements,
+            reward_exp: amount("exp"),
+            reward_mesos: amount("money"),
+            reward_items,
+            region: raw.region,
+            description: raw.description,
+            chain: raw.chain,
+            repeat: raw.repeat,
+            items,
+            follows,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct MobRequirement {
     pub mob_id: u32,
     pub count: u32,
-}
-
-fn mob_requirements<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Vec<MobRequirement>, D::Error> {
-    #[derive(Deserialize)]
-    struct Requirement {
-        #[serde(rename = "type")]
-        kind: String,
-        id: Option<u32>,
-        count: Option<u32>,
-    }
-    let all = Vec::<Requirement>::deserialize(deserializer)?;
-    Ok(all
-        .into_iter()
-        .filter(|r| r.kind == "mob")
-        .filter_map(|r| Some(MobRequirement { mob_id: r.id?, count: r.count.unwrap_or(1) }))
-        .collect())
 }
 
 /// The tier of the crafting disciplines, which share the file but use no skill points.
@@ -303,11 +399,14 @@ struct RawItem {
     category: String,
     sub_category: Option<String>,
     gender: Option<String>,
+    description: Option<String>,
+    price: Option<serde_json::Value>,
     #[serde(default)]
     req_classes: Vec<String>,
     #[serde(default)]
     stats: HashMap<String, serde_json::Value>,
     weapon: Option<RawWeapon>,
+    scroll: Option<RawScroll>,
 }
 
 #[derive(Deserialize)]
@@ -316,44 +415,121 @@ struct RawWeapon {
     kind: Option<String>,
 }
 
+#[derive(Deserialize)]
+struct RawScroll {
+    slot: Option<String>,
+    tier: Option<String>,
+    success_rate: Option<u32>,
+}
+
+/// A number that may be written as text, as a few values are.
+fn number_in(value: &serde_json::Value) -> Option<i64> {
+    value.as_i64().or_else(|| value.as_str()?.trim().parse().ok())
+}
+
+/// What a scroll goes on, in the words items use for their slots and weapon types. Scrolls for
+/// hats, tops and bottoms are filed under `Other`, so those come from the name.
+fn scroll_fits(slot: &str, name: &str) -> String {
+    const BY_NAME: [(&str, &str); 3] = [("Hat", "Hat"), ("Topwear", "Top"), ("Bottomwear", "Bottom")];
+    match slot {
+        "Other" => BY_NAME.iter().find(|(word, _)| name.starts_with(word)).map_or(slot, |(_, fits)| fits).to_string(),
+        "1H Blunt" | "2H Blunt" => format!("{slot} Weapon"),
+        _ => slot.to_string(),
+    }
+}
+
 impl From<RawItem> for ItemRecord {
     fn from(raw: RawItem) -> Self {
-        // A few values are written as text.
-        let number = |key: &str| {
-            let value = raw.stats.get(key)?;
-            value.as_i64().or_else(|| value.as_str()?.trim().parse().ok())
-        };
+        let number = |key: &str| number_in(raw.stats.get(key)?);
         let need = |key: &str| number(key).map_or(0, |v| v.max(0) as u32);
+        let flag = |key: &str| number(key).is_some_and(|v| v != 0) || raw.stats.get(key).and_then(|v| v.as_bool()) == Some(true);
         let stats = ITEM_STATS
             .iter()
             .filter_map(|(key, label)| Some(ItemStat { label: (*label).to_string(), value: number(key)? }))
             .collect();
+        let slot = raw.sub_category.clone().unwrap_or_default();
+        let scroll = raw.scroll.as_ref().map(|s| ScrollInfo {
+            fits: scroll_fits(s.slot.as_deref().unwrap_or_default(), &raw.name),
+            tier: s.tier.clone(),
+            success_rate: s.success_rate,
+        });
         Self {
             id: raw.id,
-            slot: raw.sub_category.clone().unwrap_or_default(),
+            kind: ItemKind::of(&raw.category, &slot),
+            slot,
             gender: raw.gender.clone(),
             req_level: need("reqLevel"),
             req_str: need("reqSTR"),
             req_dex: need("reqDEX"),
             req_int: need("reqINT"),
             req_luk: need("reqLUK"),
+            req_fame: need("reqPOP"),
             weapon_type: raw.weapon.as_ref().and_then(|w| w.kind.clone()),
+            attack_speed: number("attackSpeed").map(|v| v.max(0) as u32),
+            upgrade_slots: number("tuc").map(|v| v.max(0) as u32),
+            quest_item: flag("quest") || flag("pquest"),
+            untradable: flag("tradeBlock"),
             stats,
+            price: raw.price.as_ref().and_then(number_in),
+            description: raw.description.map(|d| d.trim().to_string()).filter(|d| !d.is_empty()),
+            scroll,
             classes: raw.req_classes,
-            category: raw.category,
             name: raw.name,
         }
     }
 }
 
-/// A piece of equipment. Other items in the file are dropped as it is parsed.
+/// The groups the game's inventory sorts items into, with scrolls kept apart from other Use
+/// items because players look for them separately.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ItemKind {
+    Equip,
+    Use,
+    Scroll,
+    Setup,
+    Etc,
+}
+
+impl ItemKind {
+    fn of(category: &str, slot: &str) -> Self {
+        match (category, slot) {
+            ("Equipment", _) => Self::Equip,
+            ("Consumable", "Scroll") => Self::Scroll,
+            ("Consumable", _) => Self::Use,
+            ("Setup", _) => Self::Setup,
+            _ => Self::Etc,
+        }
+    }
+
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Equip => "equip",
+            Self::Use => "use",
+            Self::Scroll => "scroll",
+            Self::Setup => "setup",
+            Self::Etc => "etc",
+        }
+    }
+
+    pub fn named(name: &str) -> Self {
+        match name {
+            "equip" => Self::Equip,
+            "use" => Self::Use,
+            "scroll" => Self::Scroll,
+            "setup" => Self::Setup,
+            _ => Self::Etc,
+        }
+    }
+}
+
+/// An item of any kind. Icon and sprite URLs in the file are left out, like every other image.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(from = "RawItem", rename_all(serialize = "camelCase"))]
 pub struct ItemRecord {
     pub id: u32,
     pub name: String,
-    #[serde(skip_serializing)]
-    pub category: String,
+    pub kind: ItemKind,
     pub slot: String,
     pub gender: Option<String>,
     /// Who can use it, as the tooltip's job flags name them. Empty means anyone.
@@ -364,13 +540,33 @@ pub struct ItemRecord {
     pub req_dex: u32,
     pub req_int: u32,
     pub req_luk: u32,
+    pub req_fame: u32,
+    /// The data's own number for a weapon's speed. Lower is faster.
+    pub attack_speed: Option<u32>,
+    /// Upgrade slots on a clean copy.
+    pub upgrade_slots: Option<u32>,
+    pub quest_item: bool,
+    pub untradable: bool,
     pub stats: Vec<ItemStat>,
+    /// The price the data lists, in mesos. What it means in Classic isn't confirmed.
+    pub price: Option<i64>,
+    pub description: Option<String>,
+    pub scroll: Option<ScrollInfo>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ItemStat {
     pub label: String,
     pub value: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScrollInfo {
+    /// The slot or weapon type it goes on, or `Other`.
+    pub fits: String,
+    pub tier: Option<String>,
+    pub success_rate: Option<u32>,
 }
 
 /// Everything the map card and build planner are built from.
@@ -408,11 +604,7 @@ impl Records {
                 skills.retain(|s| s.job_tier != CRAFTING);
                 Self::Skills(skills)
             }
-            "items.json" => {
-                let mut items: Vec<ItemRecord> = serde_json::from_slice(body)?;
-                items.retain(|i| i.category == "Equipment");
-                Self::Items(items)
-            }
+            "items.json" => Self::Items(serde_json::from_slice(body)?),
             other => unreachable!("not a map data file: {other}"),
         })
     }
@@ -503,23 +695,48 @@ mod tests {
     }
 
     #[test]
-    fn keeps_only_equipment_and_reads_numbers_written_as_text() {
+    fn reads_every_kind_of_item_and_numbers_written_as_text() {
         let json = br#"[
             {"id": 1, "name": "Twig Wand", "category": "Equipment", "sub_category": "Weapon", "price": "5",
              "req_classes": ["Magician"], "weapon": {"type": "Wand", "swing_reach_px": 88},
-             "stats": {"reqLevel": 8, "reqINT": 20, "incMAD": 12, "incPDD": "3", "tuc": 7},
-             "icon_url": "https://example.invalid/w.png"},
+             "stats": {"reqLevel": 8, "reqINT": 20, "reqPOP": 2, "incMAD": 12, "incPDD": "3", "tuc": 7, "attackSpeed": 6},
+             "icon_url": "https://example.invalid/w.png", "sprite_urls": ["https://example.invalid/s.png"]},
             {"id": 2, "name": "Plain Cap", "category": "Equipment", "sub_category": "Hat", "gender": "male"},
-            {"id": 3, "name": "Red Berry", "category": "Consumable", "sub_category": "Consume"}]"#;
+            {"id": 3, "name": "Red Berry", "category": "Consumable", "sub_category": "Consume",
+             "description": " Restores 5 HP.\n", "stats": {"tradeBlock": 1}},
+            {"id": 4, "name": "Bent Twig", "category": "Etc", "sub_category": "Etc", "stats": {"quest": 1}},
+            {"id": 5, "name": "Moss Stool", "category": "Setup", "sub_category": "Install"}]"#;
         let Records::Items(items) = Records::parse("items.json", json).unwrap() else { panic!() };
-        assert_eq!(items.len(), 2);
+        let kinds: Vec<_> = items.iter().map(|i| i.kind).collect();
+        assert_eq!(kinds, [ItemKind::Equip, ItemKind::Equip, ItemKind::Use, ItemKind::Etc, ItemKind::Setup]);
         let wand = &items[0];
-        assert_eq!((wand.req_level, wand.req_int, wand.req_str), (8, 20, 0));
+        assert_eq!((wand.req_level, wand.req_int, wand.req_str, wand.req_fame), (8, 20, 0, 2));
         assert_eq!(wand.weapon_type.as_deref(), Some("Wand"));
         assert_eq!(wand.classes, ["Magician"]);
+        assert_eq!((wand.upgrade_slots, wand.attack_speed, wand.price), (Some(7), Some(6), Some(5)));
         let stats: Vec<_> = wand.stats.iter().map(|s| (s.label.as_str(), s.value)).collect();
         assert_eq!(stats, [("Magic", 12), ("Weapon Def.", 3)]);
         assert!(items[1].classes.is_empty() && items[1].req_level == 0);
+        assert_eq!((items[2].description.as_deref(), items[2].untradable), (Some("Restores 5 HP."), true));
+        assert!(items[3].quest_item);
+    }
+
+    #[test]
+    fn scrolls_say_what_they_go_on_in_the_words_items_use() {
+        let json = br#"[
+            {"id": 1, "name": "Hat Moss Scroll: Lesser", "category": "Consumable", "sub_category": "Scroll",
+             "scroll": {"slot": "Other", "stat": "Moss", "tier": "Lesser", "success_rate": 100}},
+            {"id": 2, "name": "Bottomwear Moss Scroll: Lesser", "category": "Consumable", "sub_category": "Scroll",
+             "scroll": {"slot": "Other", "tier": "Lesser"}},
+            {"id": 3, "name": "One-Handed Blunt Moss Scroll", "category": "Consumable", "sub_category": "Scroll",
+             "scroll": {"slot": "1H Blunt"}},
+            {"id": 4, "name": "Cape Moss Scroll", "category": "Consumable", "sub_category": "Scroll",
+             "scroll": {"slot": "Cape"}}]"#;
+        let Records::Items(items) = Records::parse("items.json", json).unwrap() else { panic!() };
+        assert!(items.iter().all(|i| i.kind == ItemKind::Scroll));
+        let fits: Vec<_> = items.iter().map(|i| i.scroll.as_ref().unwrap().fits.as_str()).collect();
+        assert_eq!(fits, ["Hat", "Bottom", "1H Blunt Weapon", "Cape"]);
+        assert_eq!(items[0].scroll.as_ref().unwrap().success_rate, Some(100));
     }
 
     #[test]
@@ -529,5 +746,35 @@ mod tests {
             {"type": "quest", "id": 9, "state": 2}]}]"#;
         let Records::Quests(quests) = Records::parse("quests.json", json).unwrap() else { panic!() };
         assert_eq!(quests[0].requirements, vec![MobRequirement { mob_id: 11, count: 20 }]);
+    }
+
+    #[test]
+    fn gathers_every_item_a_quest_can_give() {
+        let json = br#"[{"id": 1, "name": "Pebble Patrol",
+            "rewards": [{"type": "exp", "value": 2}, {"type": "item", "guaranteed": true, "id": 40, "count": 3},
+                {"type": "item", "guaranteed": false, "id": 41, "count": 1, "prop": 1}],
+            "reward_choices": [{"type": "choose_one", "groups": [{"classes": ["Thief"], "items": [{"id": 42, "count": 1}]},
+                {"classes": ["Warrior"], "items": [{"id": 43, "count": 1}]}]}],
+            "reward_random": [{"type": "weighted_random", "groups": [{"items": [{"id": 40, "count": 1, "weight": 1},
+                {"id": 44, "count": 1, "weight": 1}]}]}]}]"#;
+        let Records::Quests(quests) = Records::parse("quests.json", json).unwrap() else { panic!() };
+        let rewards = &quests[0].reward_items;
+        assert_eq!(rewards.iter().map(|r| r.item_id).collect::<Vec<_>>(), [40, 41, 42, 43, 44]);
+        assert_eq!((rewards[0].count, rewards[0].sure), (3, true));
+        assert!(!rewards[1].sure && !rewards[2].sure, "by chance, and one to choose");
+    }
+
+    #[test]
+    fn reads_what_a_quest_asks_and_pays() {
+        let json = br#"[{"id": 1, "name": "Pebble Patrol", "region": "Fern Isle", "chain": "Pebbles", "repeat": "daily",
+            "description": "Go.\nBack.", "requirements": [{"type": "item", "id": 400, "count": 5},
+                {"type": "quest", "id": 9, "state": 2}, {"type": "citizenship", "value": 1}],
+            "rewards": [{"type": "exp", "value": 30}, {"type": "money", "value": 200}]}]"#;
+        let Records::Quests(quests) = Records::parse("quests.json", json).unwrap() else { panic!() };
+        let quest = &quests[0];
+        assert_eq!(quest.items, [ItemNeed { item_id: 400, count: 5 }]);
+        assert_eq!(quest.follows, [9]);
+        assert_eq!((quest.reward_exp, quest.reward_mesos), (30, 200));
+        assert_eq!((quest.region.as_deref(), quest.repeat.as_deref()), (Some("Fern Isle"), Some("daily")));
     }
 }

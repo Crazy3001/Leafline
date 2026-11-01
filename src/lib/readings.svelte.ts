@@ -2,7 +2,7 @@
 // window asks for the current state once and then follows the backend's events.
 
 import { backend } from "./api";
-import type { Analysis, ItemRead, LiveStatus, OverlayStatus, PinStatus, SessionSummary } from "./types";
+import type { Analysis, CharacterRead, ItemRead, LiveStatus, OverlayStatus, PinStatus, SessionSummary } from "./types";
 
 export const live = $state<{
   analysis: Analysis | null;
@@ -14,6 +14,8 @@ export const live = $state<{
   savedFrame: string | null;
   /** How the last price check went, shown briefly. */
   itemRead: ItemRead | null;
+  /** How the last read of the stat and skill windows went, for a moment. */
+  characterRead: CharacterRead | null;
 }>({
   analysis: null,
   session: null,
@@ -22,10 +24,12 @@ export const live = $state<{
   liveStatus: { state: "off" },
   savedFrame: null,
   itemRead: null,
+  characterRead: null,
 });
 
 let savedTimer: ReturnType<typeof setTimeout> | undefined;
 let itemTimer: ReturnType<typeof setTimeout> | undefined;
+let characterTimer: ReturnType<typeof setTimeout> | undefined;
 
 let watching = false;
 
@@ -69,5 +73,10 @@ export function watchLive() {
     live.itemRead = read;
     clearTimeout(itemTimer);
     itemTimer = setTimeout(() => (live.itemRead = null), 4000);
+  });
+  backend.onCharacterRead((read) => {
+    live.characterRead = read;
+    clearTimeout(characterTimer);
+    characterTimer = setTimeout(() => (live.characterRead = null), 6000);
   });
 }

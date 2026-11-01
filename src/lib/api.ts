@@ -14,9 +14,17 @@ import type {
   BuildCatalog,
   BuildPlan,
   BuildSummary,
+  CharacterRead,
   DisplaySettings,
   GameWindow,
   GearItem,
+  GearSuggestions,
+  ItemFilters,
+  ItemLink,
+  ItemPage,
+  ItemQuery,
+  ItemRecord,
+  ItemWhere,
   ItemFit,
   ItemRead,
   ItemTooltip,
@@ -37,7 +45,10 @@ import type {
   Panel,
   PinStatus,
   PriceLog,
+  QuestPage,
   QuestQuery,
+  QuestSearch,
+  QuestWhere,
   ReplayOrder,
   ReplayProgress,
   SessionSummary,
@@ -121,6 +132,14 @@ export interface Backend {
     mapTwin: number | null,
     measured: MeasuredRate[],
   ): Promise<TrainingSpots | null>;
+  /** One page of the quest search. */
+  searchQuests(search: QuestSearch): Promise<QuestPage>;
+  questRegions(): Promise<string[]>;
+  /** All the data says about a quest. */
+  questSheet(id: number, mapName: string | null, mapStreet: string | null, mapTwin: number | null): Promise<QuestWhere | null>;
+  /** Brings a quest up in the Quests tab from any window. */
+  showQuest(id: number): Promise<void>;
+  onShowQuest(handler: (id: number) => void): Promise<UnlistenFn>;
   /** Opens one of the card's link-outs or credits in the browser. */
   openLink(url: string): Promise<void>;
   onMapData(handler: (status: MapDataStatus) => void): Promise<UnlistenFn>;
@@ -149,6 +168,25 @@ export interface Backend {
   buildCatalog(): Promise<BuildCatalog | null>;
   /** Equipment by name, limited to what the job can use. */
   searchGear(text: string, job: number): Promise<GearItem[]>;
+  /** One page of the item search. */
+  searchItems(query: ItemQuery, level: number | null, character: string | null): Promise<ItemPage>;
+  /** The slots and weapon types the item search offers. */
+  itemFilters(): Promise<ItemFilters>;
+  itemRecord(id: number): Promise<ItemRecord | null>;
+  /** The item a name read from the game most likely means. */
+  findItem(name: string, level: number | null): Promise<ItemRecord | null>;
+  /** Who drops an item and which quests give it. Downloads the drop table the first time. */
+  itemOrigin(id: number, mapName: string | null, mapStreet: string | null, mapTwin: number | null): Promise<ItemWhere | null>;
+  /** Brings an item, or a search for `text`, up in the Item tab from any window. */
+  showItem(id: number | null, text: string | null): Promise<void>;
+  onShowItem(handler: (link: ItemLink) => void): Promise<UnlistenFn>;
+  /** Adds an item to the gear goals of the build for this character, or takes it off. */
+  setGearGoal(item: number, wanted: boolean, character: string | null): Promise<void>;
+  /** Reads the open stat and skill windows once and moves the build to match. */
+  readCharacter(): Promise<void>;
+  onCharacterRead(handler: (read: CharacterRead) => void): Promise<UnlistenFn>;
+  /** Gear to look for at this level on this build. */
+  gearSuggestions(build: number, level: number): Promise<GearSuggestions | null>;
   /** The plans written for Leafline, one for each second job. Empty until map data is downloaded. */
   starterPlans(): Promise<StarterPlan[]>;
   listBuilds(): Promise<BuildSummary[]>;
@@ -252,6 +290,11 @@ const tauriBackend: Backend = {
   downloadDrops: () => invoke("download_drops"),
   trainingSpots: (mapName, mapStreet, mapTwin, measured) =>
     invoke("training_spots", { mapName, mapStreet, mapTwin, measured }),
+  searchQuests: (search) => invoke("search_quests", { search }),
+  questRegions: () => invoke("quest_regions"),
+  questSheet: (id, mapName, mapStreet, mapTwin) => invoke("quest_sheet", { id, mapName, mapStreet, mapTwin }),
+  showQuest: (id) => invoke("show_quest", { id }),
+  onShowQuest: (handler) => listen<number>("show-quest", (e) => handler(e.payload)),
   openLink: (url) => invoke("open_link", { url }),
   onMapData: (handler) => listen<MapDataStatus>("map-data", (e) => handler(e.payload)),
   priceLog: (item, upgrades, slots) => invoke("price_log", { item, upgrades, slots }),
@@ -275,6 +318,17 @@ const tauriBackend: Backend = {
   },
   buildCatalog: () => invoke("build_catalog"),
   searchGear: (text, job) => invoke("search_gear", { text, job }),
+  searchItems: (query, level, character) => invoke("search_items", { query, level, character }),
+  itemFilters: () => invoke("item_filters"),
+  itemRecord: (id) => invoke("item_record", { id }),
+  findItem: (name, level) => invoke("find_item", { name, level }),
+  itemOrigin: (id, mapName, mapStreet, mapTwin) => invoke("item_origin", { id, mapName, mapStreet, mapTwin }),
+  showItem: (id, text) => invoke("show_item", { id, text }),
+  onShowItem: (handler) => listen<ItemLink>("show-item", (e) => handler(e.payload)),
+  setGearGoal: (item, wanted, character) => invoke("set_gear_goal", { item, wanted, character }),
+  gearSuggestions: (build, level) => invoke("gear_suggestions", { id: build, level }),
+  readCharacter: () => invoke("read_character_windows"),
+  onCharacterRead: (handler) => listen<CharacterRead>("character-read", (e) => handler(e.payload)),
   starterPlans: () => invoke("starter_plans"),
   listBuilds: () => invoke("list_builds"),
   buildPlan: (id) => invoke("build_plan", { id }),

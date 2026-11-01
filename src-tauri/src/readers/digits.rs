@@ -10,12 +10,26 @@
 
 use crate::vision::glyphs::Mask;
 
-/// How tall a character is, in pixels of the font. Masks arrive at twice this on the design grid.
-const ROWS: u32 = 7;
-/// Rows of the lower and upper part of a digit, where the sides tell digits apart.
-const UPPER: u32 = 2;
-const LOWER: u32 = 4;
-/// A digit no wider than this is a 1, which is narrow in both fonts.
+/// How a font's digits are laid out, in pixels of the font. Masks arrive at twice this on the
+/// design grid.
+#[derive(Clone, Copy)]
+struct Font {
+    /// How tall a character is.
+    rows: u32,
+    /// Rows of the upper and lower part of a digit, where the sides tell digits apart.
+    upper: u32,
+    lower: u32,
+}
+
+/// The HUD's numbers, plain and bold.
+const HUD: Font = Font { rows: 7, upper: 2, lower: 4 };
+/// The taller, rounder numbers in windows such as Character Stat.
+const WINDOW: Font = Font { rows: 9, upper: 2, lower: 6 };
+
+/// The same round numbers a row shorter, in the Quest Helper.
+const QUEST: Font = Font { rows: 8, upper: 2, lower: 5 };
+
+/// A digit no wider than this is a 1, which is narrow in every font.
 const ONE_WIDTH: u32 = 3;
 /// The value font's digits are narrower than this, and its `%` isn't.
 const PERCENT_WIDTH: u32 = 6;
@@ -23,15 +37,17 @@ const PERCENT_WIDTH: u32 = 6;
 /// A mask reduced to pixels of the font.
 struct Shape<'a> {
     mask: &'a Mask,
+    font: Font,
     cell: u32,
     width: u32,
 }
 
 impl<'a> Shape<'a> {
-    fn new(mask: &'a Mask) -> Option<Self> {
-        let cell = mask.height() / ROWS;
-        (cell > 0 && mask.height() % ROWS == 0 && mask.width() % cell == 0).then(|| Self {
+    fn new(mask: &'a Mask, font: Font) -> Option<Self> {
+        let cell = mask.height() / font.rows;
+        (cell > 0 && mask.height().is_multiple_of(font.rows) && mask.width().is_multiple_of(cell)).then(|| Self {
             mask,
+            font,
             cell,
             width: mask.width() / cell,
         })
@@ -64,12 +80,12 @@ impl<'a> Shape<'a> {
 
     /// The first row with ink.
     fn top(&self) -> Option<u32> {
-        (0..ROWS).find(|&y| self.row(y) > 0)
+        (0..self.font.rows).find(|&y| self.row(y) > 0)
     }
 
     /// How many blank areas the ink closes off from the edge.
     fn holes(&self) -> u32 {
-        let (width, height) = (self.width as i32, ROWS as i32);
+        let (width, height) = (self.width as i32, self.font.rows as i32);
         let at = |x: i32, y: i32| (y * width + x) as usize;
         let mut seen = vec![false; (width * height) as usize];
         let mut holes = 0;
@@ -97,23 +113,25 @@ impl<'a> Shape<'a> {
     }
 
     fn digit(&self) -> Option<char> {
+        let Font { rows, upper, lower } = self.font;
         if self.width <= ONE_WIDTH {
-            return (0..ROWS).all(|y| self.row(y) > 0).then_some('1');
+            return (0..rows).all(|y| self.row(y) > 0).then_some('1');
         }
-        let upper = (self.left(UPPER), self.right(UPPER));
-        let lower = (self.left(LOWER), self.right(LOWER));
+        let upper = (self.left(upper), self.right(upper));
+        let lower = (self.left(lower), self.right(lower));
+        let left_near_top = self.left(1) || self.left(2);
         match self.holes() {
             2 => Some('8'),
-            1 if self.solid(LOWER) && self.sparse(ROWS - 1) => Some('4'),
+            1 if self.solid(self.font.lower) && self.sparse(rows - 1) => Some('4'),
             1 => match (upper, lower) {
                 ((true, true), (true, true)) => Some('0'),
                 ((true, false), (true, true)) => Some('6'),
                 ((true, true), (false, true)) => Some('9'),
                 _ => None,
             },
-            0 if self.solid(0) && self.left(1) && !self.right(1) => Some('5'),
-            0 if self.solid(0) && self.right(1) && !self.left(1) && self.sparse(ROWS - 1) => Some('7'),
-            0 if self.solid(ROWS - 1) && self.right(1) && !self.right(ROWS - 2) => Some('2'),
+            0 if self.solid(0) && left_near_top && !self.right(1) => Some('5'),
+            0 if self.solid(0) && !left_near_top && self.sparse(rows - 1) => Some('7'),
+            0 if self.solid(rows - 1) && self.right(1) && !self.right(rows - 2) => Some('2'),
             0 if upper == (false, true) && lower == (false, true) => Some('3'),
             _ => None,
         }
@@ -121,7 +139,7 @@ impl<'a> Shape<'a> {
 
     fn value(&self) -> Option<char> {
         match self.top()? {
-            top if top >= ROWS - 2 => Some(if self.width == 1 { '.' } else { ',' }),
+            top if top >= self.font.rows - 2 => Some(if self.width == 1 { '.' } else { ',' }),
             _ if self.width >= PERCENT_WIDTH => Some('%'),
             1 => Some('/'),
             _ => self.digit(),
@@ -131,12 +149,32 @@ impl<'a> Shape<'a> {
 
 /// Reads gauge values and EXP: digits, `/`, separators and `%`. `None` if any can't be read.
 pub fn values(masks: &[Mask]) -> Option<String> {
-    masks.iter().map(|mask| Shape::new(mask)?.value()).collect()
+    masks.iter().map(|mask| Shape::new(mask, HUD)?.value()).collect()
 }
 
 /// Reads digits alone, such as the bold level digits. `None` if any can't be read.
 pub fn number(masks: &[Mask]) -> Option<String> {
-    masks.iter().map(|mask| Shape::new(mask)?.digit()).collect()
+    masks.iter().map(|mask| Shape::new(mask, HUD)?.digit()).collect()
+}
+
+/// Reads a number from a window. A slash or bracket is narrow like a 1, but a 1's right side has
+/// ink all the way down. `None` if any can't be read.
+pub fn window_number(masks: &[Mask]) -> Option<String> {
+    round_number(masks, WINDOW)
+}
+
+/// Reads a number from the Quest Helper. `None` if any can't be read.
+pub fn quest_number(masks: &[Mask]) -> Option<String> {
+    round_number(masks, QUEST)
+}
+
+fn round_number(masks: &[Mask], font: Font) -> Option<String> {
+    let digit = |mask: &Mask| {
+        let shape = Shape::new(mask, font)?;
+        let straight = shape.width > ONE_WIDTH || (0..font.rows).all(|y| shape.right(y));
+        shape.digit().filter(|_| straight)
+    };
+    masks.iter().map(digit).collect()
 }
 
 #[cfg(test)]
@@ -170,6 +208,65 @@ mod tests {
             '9' => ["####", "#..#", "#..#", "####", "...#", "...#", "####"],
             _ => [".#", ".#", ".#", ".#", ".#", ".#", ".#"],
         }
+    }
+
+    /// A mask of the taller window font, from rows of `#` and `.`.
+    fn tall(rows: [&str; 9]) -> Mask {
+        let doubled: Vec<String> = rows
+            .iter()
+            .flat_map(|row| {
+                let wide: String = row.chars().flat_map(|c| [c, c]).collect();
+                [wide.clone(), wide]
+            })
+            .collect();
+        Mask::try_from(doubled).unwrap()
+    }
+
+    // Made up, like the digits above, but with the corners cut and the 4 open at the bottom.
+    fn tall_digit(c: char) -> [&'static str; 9] {
+        match c {
+            '0' => [".###.", "#...#", "#...#", "#...#", "#...#", "#...#", "#...#", "#...#", ".###."],
+            '1' => ["..#", ".##", "#.#", "..#", "..#", "..#", "..#", "..#", "..#"],
+            '2' => [".###.", "#...#", "....#", "....#", "...#.", "..#..", "..#..", ".#...", "#####"],
+            '3' => [".###.", "#...#", "....#", "....#", ".###.", "....#", "....#", "#...#", ".###."],
+            '4' => ["...#.", "..##.", "..##.", ".#.#.", ".#.#.", "#..#.", "#####", "...#.", "...#."],
+            '5' => [".####", ".#...", "#....", "####.", "#...#", "....#", "....#", "#...#", ".###."],
+            '6' => [".###.", "#...#", "#....", "#.##.", "##..#", "#...#", "#...#", "#...#", ".###."],
+            '7' => ["#####", "...#.", "...#.", "..#..", "..#..", "..#..", ".#...", ".#...", ".#..."],
+            '8' => [".###.", "#...#", "#...#", ".###.", "#...#", "#...#", "#...#", "#...#", ".###."],
+            _ => [".###.", "#...#", "#...#", "#...#", ".####", "....#", "....#", "#...#", ".###."],
+        }
+    }
+
+    #[test]
+    fn every_window_digit_has_its_own_answer() {
+        for c in "0123456789".chars() {
+            assert_eq!(window_number(&[tall(tall_digit(c))]), Some(c.to_string()));
+        }
+    }
+
+    #[test]
+    fn the_quest_helpers_shorter_digits_read_too() {
+        let shorter = |rows: [&str; 8]| {
+            let doubled: Vec<String> = rows
+                .iter()
+                .flat_map(|row| {
+                    let wide: String = row.chars().flat_map(|c| [c, c]).collect();
+                    [wide.clone(), wide]
+                })
+                .collect();
+            Mask::try_from(doubled).unwrap()
+        };
+        let zero = shorter([".###.", "#...#", "#...#", "#...#", "#...#", "#...#", "#...#", ".###."]);
+        let one = shorter(["..#", ".##", "#.#", "..#", "..#", "..#", "..#", "..#"]);
+        assert_eq!(quest_number(&[one, zero]), Some("10".to_string()));
+    }
+
+    #[test]
+    fn a_window_number_stays_unread_with_anything_but_digits() {
+        let slash = tall(["..#", "..#", ".#.", ".#.", ".#.", ".#.", ".#.", "#..", "#.."]);
+        assert_eq!(window_number(&[tall(tall_digit('1')), slash]), None);
+        assert_eq!(window_number(&[]), Some(String::new()), "the caller's parse refuses this");
     }
 
     #[test]

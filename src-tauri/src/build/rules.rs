@@ -80,6 +80,21 @@ impl Default for Rules {
 }
 
 impl Rules {
+    /// The SP levels `from + 1` to `to` bring, as [`super::plan::expand`] counts them.
+    pub fn sp_earned(&self, from: u32, to: u32, has_job: bool) -> u32 {
+        let per_level = |level: u32| {
+            if level <= self.first_job_level {
+                self.beginner_sp_per_level
+            } else if has_job {
+                self.sp_per_level
+            } else {
+                0
+            }
+        };
+        let advanced = |level: u32| if has_job && (level == self.first_job_level || level == self.second_job_level) { self.advancement_sp } else { 0 };
+        (from + 1..=to).map(|level| per_level(level) + advanced(level)).sum()
+    }
+
     /// The same rules within what a hand-edited file or a mistyped field can sensibly mean.
     pub fn clamped(self) -> Self {
         let level = |v: u32| v.clamp(2, 200);

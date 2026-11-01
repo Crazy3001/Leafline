@@ -1,11 +1,29 @@
 <script lang="ts">
   import BuildFit from "./BuildFit.svelte";
   import Card from "./Card.svelte";
+  import ItemDetails from "./ItemDetails.svelte";
   import PriceLog from "./PriceLog.svelte";
   import { formatSigned, titleCase } from "$lib/format";
-  import type { ItemTooltip, Requirements } from "$lib/types";
+  import { tooltipOf } from "$lib/items.svelte";
+  import type { ItemRecord, ItemTooltip, MapReading, Requirements } from "$lib/types";
 
-  let { item, title = "Item", plain = false }: { item: ItemTooltip; title?: string; plain?: boolean } = $props();
+  let {
+    item: read,
+    record = null,
+    map = null,
+    title = "Item",
+    plain = false,
+  }: {
+    /** A copy read from the game, or null to show `record` from the data. */
+    item: ItemTooltip | null;
+    record?: ItemRecord | null;
+    map?: MapReading | null;
+    title?: string;
+    plain?: boolean;
+  } = $props();
+
+  const item = $derived(read ?? tooltipOf(record!));
+  const wearable = $derived(read ? !read.plain : record?.kind === "equip");
 
   const requirementKeys: [keyof Requirements, string][] = [
     ["level", "LEV"],
@@ -29,7 +47,7 @@
 <Card {title} {plain}>
   {#snippet aside()}
     <!-- Upgrades are read from the name's (+N) suffix, so say nothing when the name is unreadable. -->
-    {#if item.name && !item.plain}
+    {#if read && item.name && !item.plain}
       <span class="verdict" class:upgraded>
         {#if item.upgrades}Upgraded +{item.upgrades}{:else if upgraded}Upgraded{:else}No upgrades{/if}
       </span>
@@ -64,7 +82,7 @@
     <p class="property"><span>{property.label}</span>{property.value}</p>
   {/each}
 
-  {#if !item.plain}
+  {#if wearable}
     <div class="chips">
       {#each requirementKeys as [key, label] (key)}
         {@const value = item.requirements[key]}
@@ -83,7 +101,9 @@
     </div>
   {/if}
 
-  {#if !item.plain}<BuildFit {item} />{/if}
+  {#if wearable}<BuildFit {item} />{/if}
+
+  <ItemDetails item={read} {record} {map} />
 
   <PriceLog {item} />
 </Card>

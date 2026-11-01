@@ -3,7 +3,9 @@
 //! Settings, and only ever looks at the window; see [`crate::capture`]. Each session saves itself
 //! as it goes, so a crash or a closed window costs half a minute of it at most.
 //!
-//! Item tooltips are not part of this. A price check is one picture on the player's hotkey.
+//! Item tooltips are not part of this. A price check is one picture on the player's hotkey. The
+//! character's stat and skill windows are read from these same pictures while they are open, and
+//! from one picture on a hotkey otherwise.
 
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -15,6 +17,7 @@ use tauri::{AppHandle, Emitter, Manager};
 
 use super::mapdata::MapDataState;
 use super::records::{self, HISTORY_EVENT, UserDataState};
+use super::builds;
 use super::replay;
 use super::report;
 use super::settings::{self, SettingsState};
@@ -23,6 +26,7 @@ use crate::capture::{self, Capturer, GameWindow, Grab};
 use crate::error::{Error, Result};
 use crate::mapdata::QuestTitles;
 use crate::pipeline;
+use crate::readers::character::{self, Watch};
 use crate::readers::npc;
 use crate::readers::tooltip::ItemTooltip;
 use crate::session::{Sample, SessionSummary, SessionTracker, TrackerConfig};
@@ -34,6 +38,8 @@ pub const LIVE_EVENT: &str = "live";
 pub const FRAME_SAVED_EVENT: &str = "frame-saved";
 /// Emitted to every window when a price check ends.
 pub const ITEM_READ_EVENT: &str = "item-read";
+/// Emitted to every window when the character's windows have been read.
+pub const CHARACTER_READ_EVENT: &str = "character-read";
 
 /// How long a grab waits for the game to draw a fresh picture.
 const FRESH_FRAME_WAIT: Duration = Duration::from_millis(300);
@@ -90,6 +96,8 @@ pub struct LiveState {
     stop: AtomicBool,
     /// A price check is under way.
     reading_item: AtomicBool,
+    /// The stat and skill windows are being read.
+    reading_character: AtomicBool,
     /// The last price check's picture, and when it was taken.
     item_picture: Mutex<Option<(Instant, Arc<Frame>)>>,
     /// When the last picture was taken, for [`MIN_PICTURE_GAP`].
@@ -192,15 +200,47 @@ pub fn read_item(app: &AppHandle) -> Result<()> {
 }
 
 fn read_item_once(app: &AppHandle) -> Result<(u32, u32, Vec<ItemTooltip>)> {
+    let frame = Arc::new(one_picture(app)?);
+    *app.state::<LiveState>().item_picture.lock().expect("live lock") = Some((Instant::now(), frame.clone()));
+    let items = pipeline::read_items(&frame, &Ocr::new()?)?;
+    Ok((frame.width(), frame.height(), items))
+}
+
+/// One picture of the game, for something the player asked to read.
+fn one_picture(app: &AppHandle) -> Result<Frame> {
     let choice = app.state::<SettingsState>().get().live;
     let window = capture::find(choice.window.as_ref())?
         .ok_or_else(|| Error::Invalid("Leafline can't find the game window. Pick it in Settings.".into()))?;
-    let state = app.state::<LiveState>();
-    wait_for_picture(&state);
-    let frame = Arc::new(capture::picture(&window)?);
-    *state.item_picture.lock().expect("live lock") = Some((Instant::now(), frame.clone()));
-    let items = pipeline::read_items(&frame, &Ocr::new()?)?;
-    Ok((frame.width(), frame.height(), items))
+    wait_for_picture(&app.state::<LiveState>());
+    capture::picture(&window)
+}
+
+/// The hotkey: reads the stat and skill windows from one picture of the game and moves the
+/// build's starting point to match. The Settings switch covers this too.
+pub fn read_character(app: &AppHandle) -> Result<()> {
+    if !app.state::<SettingsState>().get().live.enabled {
+        return settings::open(app);
+    }
+    if app.state::<LiveState>().reading_character.swap(true, Ordering::SeqCst) {
+        return Ok(());
+    }
+    let handle = app.clone();
+    std::thread::Builder::new().name("character-read".into()).spawn(move || {
+        let read = one_picture(&handle).and_then(|frame| {
+            let scan = pipeline::read_character(&frame, &Ocr::new()?)?;
+            builds::catch_up(&handle, scan)
+        });
+        handle.state::<LiveState>().reading_character.store(false, Ordering::SeqCst);
+        let outcome = read.unwrap_or_else(|err| {
+            report::note(format!("Couldn't read the character's windows: {err}"));
+            builds::CharacterRead::failed(err.to_string())
+        });
+        if let Err(err) = overlay::show_full(&handle) {
+            report::note(err.to_string());
+        }
+        let _ = handle.emit(CHARACTER_READ_EVENT, &outcome);
+    })?;
+    Ok(())
 }
 
 /// Holds a new picture back until [`MIN_PICTURE_GAP`] has passed, and claims this moment for it.
@@ -212,6 +252,28 @@ fn wait_for_picture(state: &LiveState) {
 
 fn gap_left(last: Option<Instant>, now: Instant) -> Duration {
     last.map_or(Duration::ZERO, |at| MIN_PICTURE_GAP.saturating_sub(now.saturating_duration_since(at)))
+}
+
+/// Moves the build along when the stat or skill window in this picture has changed. The player's
+/// name has to be known: a window can't be matched to a build without it.
+fn follow_windows(app: &AppHandle, watch: &mut Watch, frame: &Frame, analysis: &pipeline::Analysis, ocr: &Ocr) {
+    let Some(layout) = &analysis.hud_layout else { return };
+    let hud = analysis.hud.as_ref();
+    let glance = character::glance(frame, layout, hud.and_then(|h| h.level));
+    let name = hud.and_then(|h| h.name.clone());
+    if !watch.settled(glance) || name.is_none() {
+        return;
+    }
+    let read = character::read(frame, Some(layout), ocr).and_then(|windows| {
+        builds::catch_up(app, pipeline::CharacterScan { name, level: hud.and_then(|h| h.level), windows })
+    });
+    match read {
+        Ok(read) if read.changed() => {
+            let _ = app.emit(CHARACTER_READ_EVENT, &read.on_its_own());
+        }
+        Ok(_) => {}
+        Err(err) => report::note(format!("Couldn't read the character's windows: {err}")),
+    }
 }
 
 /// Pauses or resumes tracking. Paused time doesn't count.
@@ -311,6 +373,7 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
     let mut tracker = fresh_tracker(app.state::<SettingsState>().get().live.pause_after);
     let mut keeper = Keeper::default();
     let mut titles = QuestTitles::default();
+    let mut windows = Watch::default();
     let mut twin = None;
     let mut held = false;
     let mut game: Option<(Capturer, GameWindow, bool)> = None;
@@ -426,10 +489,8 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
                         map.street = known.street;
                     }
                 }
-                if let Some(quest) = analysis.quest.as_mut()
-                    && let Some(atlas) = app.state::<MapDataState>().atlas()
-                {
-                    titles.settle(&atlas, &mut quest.quests);
+                if let Some(atlas) = app.state::<MapDataState>().atlas() {
+                    titles.hold(&atlas, &mut analysis.quest);
                 }
                 let read_ms = started.elapsed().as_secs_f32() * 1000.0;
                 let mut sample = Sample::from_analysis(unix_seconds(SystemTime::now()), &analysis);
@@ -443,6 +504,7 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
                     tracker.push(&sample);
                 }
                 let session = tracker.summary();
+                follow_windows(app, &mut windows, &frame, &analysis, &ocr);
                 readings::publish_live_analysis(app, analysis);
                 readings::publish_session(app, &session);
                 if keeper.due() {
@@ -529,6 +591,11 @@ fn file_stamp(time: SystemTime) -> String {
 #[tauri::command]
 pub fn live_status(app: AppHandle) -> LiveStatus {
     status(&app)
+}
+
+#[tauri::command]
+pub fn read_character_windows(app: AppHandle) -> Result<()> {
+    read_character(&app)
 }
 
 #[tauri::command]
