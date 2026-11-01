@@ -143,6 +143,7 @@ pub fn run() {
             builds::show_item,
             builds::set_gear_goal,
             builds::gear_suggestions,
+            builds::find_gear,
             live::read_character_windows,
             builds::list_builds,
             builds::build_plan,
@@ -169,6 +170,12 @@ pub fn run() {
             mapdata::find_monster,
             mapdata::monster_sheet,
             mapdata::show_monster,
+            mapdata::browse_maps,
+            mapdata::map_regions,
+            mapdata::search_npcs,
+            mapdata::find_npc,
+            mapdata::npc_sheet,
+            mapdata::show_place,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Leafline");

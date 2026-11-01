@@ -12,8 +12,8 @@ use super::{overlay, pins};
 use crate::build::plan::MAX_LEVEL;
 use crate::build::progress::{self, CatchUp};
 use crate::build::{
-    Branch, Build, Catalog, Expansion, GearSuggestions, ItemFilters, ItemFit, ItemJob, ItemPage, ItemQuery, JobChoice,
-    Rules, Starter, Wearer, expand, fit, share, starters, suggest,
+    Branch, Build, Catalog, Expansion, GearFor, GearFound, GearSuggestions, ItemFilters, ItemFit, ItemJob, ItemPage,
+    ItemQuery, JobChoice, Rules, Starter, Wearer, expand, fit, share, starters, suggest,
 };
 use crate::error::{Error, Result};
 use crate::mapdata::osms::{ItemRecord, SkillRecord};
@@ -237,6 +237,22 @@ pub fn gear_suggestions(app: AppHandle, state: State<UserDataState>, id: i64, le
     let rules = rules(&app);
     let expansion = expand(&build, &rules, &catalog);
     Ok(Some(suggest::suggest(&build, &expansion, &rules, &catalog, level.clamp(1, MAX_LEVEL))))
+}
+
+/// Gear for a character. `seen_job` is the job the HUD shows, for a character with no build.
+/// `None` until the map data is downloaded.
+#[tauri::command]
+pub fn find_gear(
+    app: AppHandle,
+    state: State<UserDataState>,
+    who: GearFor,
+    character: Option<String>,
+    seen_job: Option<String>,
+) -> Result<Option<GearFound>> {
+    let Some(catalog) = app.state::<MapDataState>().catalog() else { return Ok(None) };
+    let own = state.with(|db| db.active_build(character.as_deref()))?;
+    let seen = seen_job.and_then(|name| catalog.jobs().into_iter().find(|j| j.name.eq_ignore_ascii_case(name.trim())));
+    Ok(Some(suggest::find_gear(&who, own, seen.map(|j| j.id), &rules(&app), &catalog)))
 }
 
 #[tauri::command]

@@ -5,6 +5,7 @@
   import PlaceRoute from "./PlaceRoute.svelte";
   import { backend } from "$lib/api";
   import { formatMesos, formatNumber } from "$lib/format";
+  import { showNpcNamed } from "$lib/places.svelte";
   import type { MapRef, Objective, QuestSheet } from "$lib/types";
 
   let {
@@ -35,7 +36,7 @@
 <ol class="steps">
   {#if !tracked && info.giver}
     <li>
-      <p class="step">Talk to {info.giver}</p>
+      <p class="step">Talk to <button class="person" title="Show them in the Lookup tab" onclick={() => showNpcNamed(info.giver!)}>{info.giver}</button></p>
       <PlaceRoute maps={info.giverMaps} {from} />
     </li>
   {/if}
@@ -52,7 +53,7 @@
   {/each}
   <li class:next={finished}>
     {#if info.turnIn}
-      <p class="step">Turn in to {info.turnIn}</p>
+      <p class="step">Turn in to <button class="person" title="Show them in the Lookup tab" onclick={() => showNpcNamed(info.turnIn!)}>{info.turnIn}</button></p>
       <PlaceRoute maps={info.turnInMaps} {from} />
     {:else if info.giver}
       <p class="step">Turn it in</p>
@@ -99,6 +100,21 @@
 {/if}
 
 <style>
+  .person {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .person:hover,
+  .person:focus-visible {
+    color: var(--accent-strong);
+    text-decoration: underline;
+    outline: none;
+  }
+
   .story {
     margin: 6px 0 0;
     color: var(--muted);

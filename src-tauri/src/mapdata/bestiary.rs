@@ -144,7 +144,7 @@ fn row(monster: &MonsterRecord, note: Option<String>) -> MonsterRow {
 }
 
 /// How close `query` comes to a name, whole or one of its words.
-fn name_score(query: &str, name: &str) -> f64 {
+pub(super) fn name_score(query: &str, name: &str) -> f64 {
     let key = fold(name);
     key.split_whitespace().map(|word| similarity(query, word)).fold(similarity(query, &key), f64::max)
 }

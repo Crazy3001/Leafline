@@ -275,8 +275,8 @@ pub(super) fn main_first(monster: &MonsterRecord) -> (std::cmp::Reverse<u32>, u3
 /// What the guide knows about the player, beyond the map they are on.
 #[derive(Debug, Default)]
 pub(super) struct Context {
-    hops: HashMap<u32, u32>,
-    shortcuts: HashMap<u32, Shortcut>,
+    pub(super) hops: HashMap<u32, u32>,
+    pub(super) shortcuts: HashMap<u32, Shortcut>,
     measured: HashMap<u32, Measured>,
 }
 
@@ -564,7 +564,7 @@ impl Atlas {
     }
 
     /// Where an NPC stands.
-    fn npc_maps(&self, npc: u32) -> Vec<MapRef> {
+    pub(super) fn npc_maps(&self, npc: u32) -> Vec<MapRef> {
         let mut maps: Vec<MapRef> = self
             .npcs_on
             .iter()
@@ -580,7 +580,7 @@ impl Atlas {
     /// it: the next quest of a chain starts with them, or the title ends `to Heena`. Otherwise
     /// it stays unknown: the giver is not a safe guess, being someone else on over half the
     /// chained quests.
-    fn turn_in(&self, quest: &QuestRecord) -> Option<u32> {
+    pub(super) fn turn_in(&self, quest: &QuestRecord) -> Option<u32> {
         let next = quest.next_quest_id.and_then(|id| self.quests.get(&id)).and_then(|q| q.npc_id);
         next.or_else(|| {
             let (_, name) = quest.name.rsplit_once(" to ")?;

@@ -127,7 +127,7 @@
     <ul class="npcs">
       {#each details.npcs as npc (npc.id)}
         <li>
-          <span class="npc">{npc.name}</span>
+          <button class="inline npc" title="Open in Lookup" onclick={() => backend.showPlace("npcs", npc.id)}>{npc.name}</button>
           {#if npc.quests.length}
             <span class="gives" title={npc.quests.map((q) => q.name).join("\n")}>
               {npc.quests.length} quest{npc.quests.length === 1 ? "" : "s"}
@@ -301,6 +301,12 @@
     justify-content: space-between;
     gap: 8px;
     font-size: 12px;
+  }
+
+  .npc {
+    color: var(--text);
+    font-size: 12px;
+    text-align: left;
   }
 
   .gives {

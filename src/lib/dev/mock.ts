@@ -13,6 +13,7 @@ import type {
   GearItem,
   ItemLink,
   MonsterLink,
+  PlaceLink,
   ItemRecord,
   LevelStep,
   MapRoute,
@@ -40,8 +41,11 @@ import {
   sampleCard,
   sampleDrops,
   sampleGuide,
+  sampleMaps,
   sampleMonsterSheet,
   sampleMonsters,
+  sampleNpcSheet,
+  sampleNpcs,
   sampleRoute,
   sampleSearch,
   sampleSpots,
@@ -293,6 +297,7 @@ const mockItems: ItemRecord[] = [
 const showItemHandlers: ((link: ItemLink) => void)[] = [];
 const showQuestHandlers: ((id: number) => void)[] = [];
 const showMonsterHandlers: ((link: MonsterLink) => void)[] = [];
+const showPlaceHandlers: ((link: PlaceLink) => void)[] = [];
 const mockQuests: QuestRow[] = [
   { id: 71, name: "Slime Samples", region: "Fern Isle", levelMin: 1, giver: "Innkeeper Bo", repeat: null, exp: 30, mesos: 0 },
   { id: 70, name: "Shell Sorting", region: "Mossbank", levelMin: 3, giver: "Warden Ilse", repeat: "daily", exp: 120, mesos: 500 },
@@ -721,6 +726,21 @@ export const mockBackend: Backend = {
     showMonsterHandlers.push(handler);
     return () => {};
   },
+  browseMaps: async (query) => sampleMaps(query),
+  mapRegions: async () => ["Ashlands", "Fern Isle"],
+  searchNpcs: async (query) => sampleNpcs(query),
+  findNpc: async (name) => sampleNpcs({ text: name, kind: null, region: null, offset: 0 }).npcs[0]?.id ?? null,
+  async npcSheet(id, mapName) {
+    const sheet = sampleNpcSheet(id, mapName ? 2 : null);
+    return sheet && { from: mapName ? sampleCard(2)!.map : null, sheet };
+  },
+  async showPlace(mode, id) {
+    showPlaceHandlers.forEach((h) => h({ mode, id }));
+  },
+  async onShowPlace(handler) {
+    showPlaceHandlers.push(handler);
+    return () => {};
+  },
   async readCharacter() {
     const read = { stats: true, skills: true, build: newestBuild()?.name ?? null, result: { changes: ["LUK 92 → 97"], unknown: [] }, problem: null, automatic: false };
     characterHandlers.forEach((h) => h(read));
@@ -729,14 +749,32 @@ export const mockBackend: Backend = {
     characterHandlers.push(handler);
     return () => {};
   },
+  async findGear(who) {
+    if (!mapStatus.ready) return null;
+    const level = who.level ?? 1;
+    const wearable = mockItems.filter((item) => item.kind === "equip" && item.reqLevel <= level);
+    const slots = [...new Set(wearable.map((item) => item.slot))].map((slot) => {
+      const picks = wearable.filter((item) => item.slot === slot).map((item) => ({ item, goal: false }));
+      return { slot, picks, total: picks.length };
+    });
+    return {
+      level,
+      job: who.job ?? 420,
+      gender: who.gender,
+      build: "Fernblade, LUK heavy",
+      statsKnown: true,
+      firstJobLevel: 10,
+      gear: { level, rankedBy: ["Attack", "LUK", "DEX", "Weapon Def."], slots },
+    };
+  },
   async gearSuggestions(id, level) {
     const build = mockBuilds.find((b) => b.id === id);
     if (!build) return null;
     const wearable = mockItems.filter((item) => item.kind === "equip" && item.reqLevel <= level);
-    const slots = [...new Set(wearable.map((item) => item.slot))].map((slot) => ({
-      slot,
-      picks: wearable.filter((item) => item.slot === slot).map((item) => ({ item, goal: build.plan.gear.includes(item.id) })),
-    }));
+    const slots = [...new Set(wearable.map((item) => item.slot))].map((slot) => {
+      const picks = wearable.filter((item) => item.slot === slot).map((item) => ({ item, goal: build.plan.gear.includes(item.id) }));
+      return { slot, picks, total: picks.length };
+    });
     return { level, rankedBy: ["Attack", "LUK", "DEX", "Weapon Def."], slots };
   },
   listBuilds: async () =>

@@ -6,6 +6,8 @@ import type {
   Hunt,
   HuntingGround,
   MapDetails,
+  MapPage,
+  MapQuery,
   MapRef,
   MapRoute,
   MonsterDrops,
@@ -14,6 +16,9 @@ import type {
   MonsterPage,
   MonsterRow,
   MonsterSheet,
+  NpcPage,
+  NpcQuery,
+  NpcSheet,
   ObjectiveGuide,
   QuestQuery,
   TrainingSpots,
@@ -461,6 +466,48 @@ export function sampleMonsterSheet(id: number, from: number | null, hasDrops: bo
     versions: id === 11 ? [{ id: 12, level: 3, hp: 30, exp: 2, maps: [ref(4)] }] : [],
     splits: boss ? [{ id: 11, name: "Moss Slime", count: 6 }] : [],
     drops: hasDrops ? sampleDrops(id === 13 ? ["", "", name] : [name])[id === 13 ? 2 : 0] : null,
+  };
+}
+
+/** A rough stand-in for the map search, only for designing the pages. */
+export function sampleMaps(query: MapQuery): MapPage {
+  const text = query.text.trim().toLowerCase();
+  const maps = Object.keys(places)
+    .map(Number)
+    .map((id) => sampleCard(id)!)
+    .filter(
+      (card) =>
+        (!query.kind || (query.kind === "town") === card.isTown) &&
+        (!text || card.map.name.toLowerCase().includes(text)) &&
+        (query.levelMin == null || (card.levelRange != null && card.levelRange[1] >= query.levelMin)) &&
+        (query.levelMax == null || (card.levelRange != null && card.levelRange[0] <= query.levelMax)),
+    )
+    .map((card) => ({ map: card.map, region: card.region, isTown: card.isTown, levelRange: card.levelRange, note: null }));
+  return { maps: maps.slice(query.offset, query.offset + 40), total: maps.length, closest: false };
+}
+
+const npcs = Object.entries(places).flatMap(([id, p]) => p.npcs.map((npc) => ({ ...npc, mapId: Number(id) })));
+
+/** A rough stand-in for the NPC search, only for designing the pages. */
+export function sampleNpcs(query: NpcQuery): NpcPage {
+  const text = query.text.trim().toLowerCase();
+  const found = npcs
+    .filter((n) => (!text || n.name.toLowerCase().includes(text)) && (query.kind !== "quests" || n.quests.length > 0))
+    .map((n) => ({ id: n.id, name: n.name, map: places[n.mapId].name, maps: 1, quests: n.quests.length, note: null }));
+  return { npcs: found.slice(query.offset, query.offset + 40), total: found.length, closest: false };
+}
+
+/** A made-up sheet in the sheet's shape. */
+export function sampleNpcSheet(id: number, from: number | null): NpcSheet | null {
+  const npc = npcs.find((n) => n.id === id);
+  if (!npc) return null;
+  const route = from == null ? null : sampleRoute(from, npc.mapId);
+  return {
+    id,
+    name: npc.name,
+    maps: [{ map: ref(npc.mapId), hops: route ? route.steps.length : null, travel: null }],
+    quests: npc.quests.map((q) => ({ id: q.id, name: q.name, region: "Fern Isle", levelMin: q.levelMin, giver: npc.name, repeat: null, exp: 120, mesos: 0 })),
+    takes: [],
   };
 }
 

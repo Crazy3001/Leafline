@@ -18,4 +18,4 @@ pub use fit::{ItemFit, ItemJob};
 pub use plan::{Build, Expansion, Plan, SkillLevel, Start, Stat, StatGoal, Stats, expand};
 pub use rules::{Branch, Rules};
 pub use starters::Starter;
-pub use suggest::{GearSuggestions, Wearer};
+pub use suggest::{GearFor, GearFound, GearSuggestions, Wearer};

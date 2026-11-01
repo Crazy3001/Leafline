@@ -13,6 +13,7 @@ pub mod drops;
 pub mod fetch;
 pub mod guide;
 pub mod osms;
+pub mod places;
 pub mod questbook;
 pub mod store;
 pub mod training;
@@ -23,6 +24,7 @@ pub use bestiary::{MonsterFilters, MonsterPage, MonsterQuery, MonsterRow, Monste
 pub use drops::{ItemSources, MonsterDrops};
 pub use fetch::RefreshReport;
 pub use guide::{ItemOrigin, QuestGuide, QuestQuery, QuestTitles};
+pub use places::{MapPage, MapQuery, MapRow, NpcPage, NpcQuery, NpcRow, NpcSheet};
 pub use questbook::{QuestPage, QuestRow, QuestSearch, QuestSheet};
 pub use store::{DataStatus, Store};
 pub use training::{MeasuredRate, TrainingSpot};

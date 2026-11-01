@@ -16,9 +16,9 @@ use crate::error::{Error, Result};
 use crate::mapdata::fetch::{self, Http};
 use crate::mapdata::osms::Dataset;
 use crate::mapdata::{
-    Atlas, DataStatus, ItemOrigin, MapCard, MapMatch, MapRef, MeasuredRate, MonsterDrops, MonsterFilters, MonsterPage,
-    MonsterQuery, MonsterSheet, QuestGuide, QuestPage, QuestQuery, QuestSearch, QuestSheet, RefreshReport, Route, Store,
-    TrainingSpot, Travel, TravelFile, drops,
+    Atlas, DataStatus, ItemOrigin, MapCard, MapMatch, MapPage, MapQuery, MapRef, MeasuredRate, MonsterDrops, MonsterFilters,
+    MonsterPage, MonsterQuery, MonsterSheet, NpcPage, NpcQuery, NpcSheet, QuestGuide, QuestPage, QuestQuery, QuestSearch,
+    QuestSheet, RefreshReport, Route, Store, TrainingSpot, Travel, TravelFile, drops,
 };
 
 const FILE_NAME: &str = "map-data.sqlite3";
@@ -33,6 +33,8 @@ pub const MAP_DATA_EVENT: &str = "map-data";
 pub const SHOW_QUEST_EVENT: &str = "show-quest";
 /// Emitted to every window to bring up a monster in the Lookup tab.
 pub const SHOW_MONSTER_EVENT: &str = "show-monster";
+/// Emitted to every window to bring up a map or an NPC in the Lookup tab.
+pub const SHOW_PLACE_EVENT: &str = "show-place";
 
 /// Sites Leafline may open in the browser: the link-outs and the credits.
 const LINK_HOSTS: [&str; 9] = [
@@ -504,6 +506,71 @@ pub fn show_monster(app: AppHandle, id: Option<u32>, text: Option<String>) -> Re
         overlay::show_full(&app)?;
     }
     Ok(app.emit(SHOW_MONSTER_EVENT, MonsterLink { id, text })?)
+}
+
+/// One page of the map search.
+#[tauri::command]
+pub fn browse_maps(state: State<MapDataState>, query: MapQuery) -> MapPage {
+    state.atlas().map(|atlas| atlas.browse_maps(&query)).unwrap_or_default()
+}
+
+#[tauri::command]
+pub fn map_regions(state: State<MapDataState>) -> Vec<String> {
+    state.atlas().map(|atlas| atlas.map_regions()).unwrap_or_default()
+}
+
+/// One page of the NPC search.
+#[tauri::command]
+pub fn search_npcs(state: State<MapDataState>, query: NpcQuery) -> NpcPage {
+    state.atlas().map(|atlas| atlas.search_npcs(&query)).unwrap_or_default()
+}
+
+/// The NPC a name means.
+#[tauri::command]
+pub fn find_npc(state: State<MapDataState>, name: String) -> Option<u32> {
+    state.atlas()?.npc_like(&name)
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NpcWhere {
+    /// The map portals are counted from, when the minimap was read and matched.
+    from: Option<MapRef>,
+    sheet: NpcSheet,
+}
+
+/// All the data says about an NPC.
+#[tauri::command]
+pub fn npc_sheet(
+    app: AppHandle,
+    state: State<MapDataState>,
+    id: u32,
+    map_name: Option<String>,
+    map_street: Option<String>,
+    map_twin: Option<u32>,
+) -> Option<NpcWhere> {
+    let atlas = state.atlas()?;
+    let from = map_name.and_then(|name| atlas.find_twin(&name, map_street.as_deref(), map_twin)).map(|m| m.card.map);
+    let sheet = atlas.npc_sheet(id, from.as_ref().map(|m| m.id), &travel(&app, &atlas))?;
+    Some(NpcWhere { from, sheet })
+}
+
+/// What to bring up in the Lookup tab: a map or an NPC.
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PlaceLink {
+    mode: String,
+    id: u32,
+}
+
+/// Brings a map (`maps`) or an NPC (`npcs`) up in the Lookup tab, from whichever window asked.
+/// A pinned Lookup panel shows it by itself; otherwise the overlay has to.
+#[tauri::command]
+pub fn show_place(app: AppHandle, mode: String, id: u32) -> Result<()> {
+    if !pins::shows_item(&app) {
+        overlay::show_full(&app)?;
+    }
+    Ok(app.emit(SHOW_PLACE_EVENT, PlaceLink { mode, id })?)
 }
 
 /// Downloads the drop table from mapleclassic.wiki, for finding who drops a quest item. Only on

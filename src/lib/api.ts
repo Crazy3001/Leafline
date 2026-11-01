@@ -17,6 +17,8 @@ import type {
   CharacterRead,
   DisplaySettings,
   GameWindow,
+  GearFor,
+  GearFound,
   GearItem,
   GearSuggestions,
   ItemFilters,
@@ -36,6 +38,8 @@ import type {
   MapDataStatus,
   MapDetails,
   MapMatch,
+  MapPage,
+  MapQuery,
   MapRef,
   MapRoute,
   MeasuredRate,
@@ -46,9 +50,13 @@ import type {
   MonsterPage,
   MonsterQuery,
   MonsterWhere,
+  NpcPage,
+  NpcQuery,
+  NpcWhere,
   OverlayStatus,
   Panel,
   PinStatus,
+  PlaceLink,
   PriceLog,
   QuestPage,
   QuestQuery,
@@ -161,6 +169,19 @@ export interface Backend {
   /** Brings a monster, or a search for `text`, up in the Lookup tab from any window. */
   showMonster(id: number | null, text: string | null): Promise<void>;
   onShowMonster(handler: (link: MonsterLink) => void): Promise<UnlistenFn>;
+  /** One page of the map search. */
+  browseMaps(query: MapQuery): Promise<MapPage>;
+  /** The regions maps are filed under. */
+  mapRegions(): Promise<string[]>;
+  /** One page of the NPC search. */
+  searchNpcs(query: NpcQuery): Promise<NpcPage>;
+  /** The NPC a name means. */
+  findNpc(name: string): Promise<number | null>;
+  /** Where an NPC stands and the quests they give. */
+  npcSheet(id: number, mapName: string | null, mapStreet: string | null, mapTwin: number | null): Promise<NpcWhere | null>;
+  /** Brings a map or an NPC up in the Lookup tab from any window. */
+  showPlace(mode: PlaceLink["mode"], id: number): Promise<void>;
+  onShowPlace(handler: (link: PlaceLink) => void): Promise<UnlistenFn>;
   /** Opens one of the card's link-outs or credits in the browser. */
   openLink(url: string): Promise<void>;
   onMapData(handler: (status: MapDataStatus) => void): Promise<UnlistenFn>;
@@ -206,6 +227,8 @@ export interface Backend {
   /** Reads the open stat and skill windows once and moves the build to match. */
   readCharacter(): Promise<void>;
   onCharacterRead(handler: (read: CharacterRead) => void): Promise<UnlistenFn>;
+  /** Gear for a character. `seenJob` is the job the HUD shows. Null until map data is downloaded. */
+  findGear(who: GearFor, character: string | null, seenJob: string | null): Promise<GearFound | null>;
   /** Gear to look for at this level on this build. */
   gearSuggestions(build: number, level: number): Promise<GearSuggestions | null>;
   /** The plans written for Leafline, one for each second job. Empty until map data is downloaded. */
@@ -323,6 +346,13 @@ const tauriBackend: Backend = {
     invoke("monster_sheet", { id, mapName, mapStreet, mapTwin, measured }),
   showMonster: (id, text) => invoke("show_monster", { id, text }),
   onShowMonster: (handler) => listen<MonsterLink>("show-monster", (e) => handler(e.payload)),
+  browseMaps: (query) => invoke("browse_maps", { query }),
+  mapRegions: () => invoke("map_regions"),
+  searchNpcs: (query) => invoke("search_npcs", { query }),
+  findNpc: (name) => invoke("find_npc", { name }),
+  npcSheet: (id, mapName, mapStreet, mapTwin) => invoke("npc_sheet", { id, mapName, mapStreet, mapTwin }),
+  showPlace: (mode, id) => invoke("show_place", { mode, id }),
+  onShowPlace: (handler) => listen<PlaceLink>("show-place", (e) => handler(e.payload)),
   openLink: (url) => invoke("open_link", { url }),
   onMapData: (handler) => listen<MapDataStatus>("map-data", (e) => handler(e.payload)),
   priceLog: (item, upgrades, slots) => invoke("price_log", { item, upgrades, slots }),
@@ -355,6 +385,7 @@ const tauriBackend: Backend = {
   onShowItem: (handler) => listen<ItemLink>("show-item", (e) => handler(e.payload)),
   setGearGoal: (item, wanted, character) => invoke("set_gear_goal", { item, wanted, character }),
   gearSuggestions: (build, level) => invoke("gear_suggestions", { id: build, level }),
+  findGear: (who, character, seenJob) => invoke("find_gear", { who, character, seenJob }),
   readCharacter: () => invoke("read_character_windows"),
   onCharacterRead: (handler) => listen<CharacterRead>("character-read", (e) => handler(e.payload)),
   starterPlans: () => invoke("starter_plans"),

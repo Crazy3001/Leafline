@@ -1,29 +1,40 @@
 <script lang="ts">
-  // The maps a monster lives on, the best first, and the route to the one picked.
+  // The maps something can be found on, the best first, and the route to the one picked.
   import { backend } from "$lib/api";
-  import RouteSteps from "$lib/components/map/RouteSteps.svelte";
+  import RouteSteps from "./RouteSteps.svelte";
   import { formatCompact, groundDistance } from "$lib/format";
   import { travelKey } from "$lib/settings.svelte";
-  import type { HuntingGround, MapRef, MapRoute } from "$lib/types";
+  import type { MapRef, MapRoute, Pace, Shortcut } from "$lib/types";
 
-  let { maps, from }: { maps: HuntingGround[]; from: MapRef | null } = $props();
+  /** A map, how far it is, and for a monster, how many live there. */
+  interface Place {
+    map: MapRef;
+    hops: number | null;
+    travel: Shortcut | null;
+    count?: number;
+    mapTotal?: number;
+    pace?: Pace | null;
+  }
+
+  let { places, from }: { places: Place[]; from: MapRef | null } = $props();
 
   /** Enough to choose from without a long list pushing the drops off the panel. */
   const SHOWN = 5;
 
   let all = $state(false);
-  /** The closest maps first, instead of the ones with the most of it. */
+  /** The closest maps first, instead of the ones with the most. */
   let nearest = $state(false);
   /** The map whose route is shown: the best one until another is picked. */
   let picked = $state<number | null>(null);
   let route = $state<MapRoute | null>(null);
   let routing = $state(false);
 
-  const steps = (m: HuntingGround) => Math.min(m.hops ?? Infinity, m.travel?.hops ?? Infinity);
-  const ordered = $derived(nearest ? [...maps].sort((a, b) => steps(a) - steps(b)) : maps);
+  const steps = (m: Place) => Math.min(m.hops ?? Infinity, m.travel?.hops ?? Infinity);
+  const ordered = $derived(nearest ? [...places].sort((a, b) => steps(a) - steps(b)) : places);
+  const counted = $derived(places.some((m) => m.count != null));
   const shown = $derived(all ? ordered : ordered.slice(0, SHOWN));
   const target = $derived(picked ?? ordered[0]?.map.id ?? null);
-  const ground = $derived(maps.find((m) => m.map.id === target) ?? null);
+  const ground = $derived(places.find((m) => m.map.id === target) ?? null);
   const fromId = $derived(from?.id);
 
   $effect(() => {
@@ -41,15 +52,15 @@
       .finally(() => (routing = false));
   });
 
-  const share = (m: HuntingGround) => (m.mapTotal > m.count ? `of ${m.mapTotal} on the map` : "the only monster on the map");
+  const share = (m: Place) => (m.mapTotal! > m.count! ? `of ${m.mapTotal} on the map` : "the only monster on the map");
 </script>
 
-{#if maps.length}
+{#if places.length}
   <div class="legend">
     <span>Map</span>
-    <span title="How many of it spawn, out of every monster on the map">It / all</span>
-    {#if from}
-      <button class:on={nearest} title={nearest ? "Show the maps with the most of it first" : "Show the closest maps first"} aria-pressed={nearest} onclick={() => (nearest = !nearest)}>Nearest</button>
+    {#if counted}<span title="How many of it spawn, out of every monster on the map">It / all</span>{/if}
+    {#if from && places.length > 1}
+      <button class:on={nearest} title={nearest ? "Show the best maps first" : "Show the closest maps first"} aria-pressed={nearest} onclick={() => (nearest = !nearest)}>Nearest</button>
     {/if}
   </div>
   <ul class="maps">
@@ -57,7 +68,9 @@
       <li>
         <button class="ground" class:selected={map.map.id === target} aria-pressed={map.map.id === target} onclick={() => (picked = map.map.id)}>
           <span class="name">{map.map.name}</span>
-          <span class="count tabular" title="{map.count} spawn, {share(map)}">{map.count}<small>/{map.mapTotal}</small></span>
+          {#if map.count != null}
+            <span class="count tabular" title="{map.count} spawn, {share(map)}">{map.count}<small>/{map.mapTotal}</small></span>
+          {/if}
           <span
             class="dist tabular"
             class:shortcut={map.travel}
@@ -67,8 +80,8 @@
       </li>
     {/each}
   </ul>
-  {#if maps.length > SHOWN}
-    <button class="more" onclick={() => (all = !all)}>{all ? "Show fewer" : `Show all ${maps.length}`}</button>
+  {#if places.length > SHOWN}
+    <button class="more" onclick={() => (all = !all)}>{all ? "Show fewer" : `Show all ${places.length}`}</button>
   {/if}
 
   {#if ground?.pace}
@@ -84,8 +97,9 @@
   {:else if !routing}
     <p class="note">No route through portals is known from {from.name}.</p>
   {/if}
-{:else}
-  <p class="note">Not on any map in the data. It may be summoned, or not in the game yet.</p>
+  {#if ground}
+    <button class="more" title="See everything on this map" onclick={() => backend.showPlace("maps", ground.map.id)}>Open {ground.map.name}</button>
+  {/if}
 {/if}
 
 <style>

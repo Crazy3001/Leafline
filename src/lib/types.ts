@@ -1041,6 +1041,88 @@ export interface MonsterLink {
   text: string | null;
 }
 
+// The map and NPC searches (see src-tauri/src/mapdata/places.rs).
+
+export interface MapQuery {
+  /** A map, a street or region, a monster on it or an NPC on it. */
+  text: string;
+  /** `town` or `field`. */
+  kind: string | null;
+  region: string | null;
+  /** Maps with a monster in this range of levels. */
+  levelMin: number | null;
+  levelMax: number | null;
+  /** `level` for the lowest first. By name otherwise. */
+  sort: string | null;
+  offset: number;
+}
+
+export interface MapRow {
+  map: MapRef;
+  region: string | null;
+  isTown: boolean;
+  levelRange: [number, number] | null;
+  /** Why a search found it, when that isn't its name. */
+  note: string | null;
+}
+
+export interface MapPage {
+  maps: MapRow[];
+  total: number;
+  /** Nothing matched outright, so these are the closest names. */
+  closest: boolean;
+}
+
+export interface NpcQuery {
+  /** An NPC, a quest they give or a map they stand on. */
+  text: string;
+  /** `quests` for only those who give some. */
+  kind: string | null;
+  region: string | null;
+  offset: number;
+}
+
+export interface NpcRow {
+  id: number;
+  name: string;
+  /** The first map they stand on. */
+  map: string | null;
+  maps: number;
+  quests: number;
+  /** Why a search found them, when that isn't their name. */
+  note: string | null;
+}
+
+export interface NpcPage {
+  npcs: NpcRow[];
+  total: number;
+  /** Nothing matched outright, so these are the closest names. */
+  closest: boolean;
+}
+
+/** All the data says about one NPC. */
+export interface NpcSheet {
+  id: number;
+  name: string;
+  /** The closest first. */
+  maps: { map: MapRef; hops: number | null; travel: Shortcut | null }[];
+  quests: QuestRow[];
+  /** Quests someone else gives that go by what shows they are handed in here. */
+  takes: QuestRef[];
+}
+
+export interface NpcWhere {
+  /** The map portals are counted from, when the minimap was read and matched. */
+  from: MapRef | null;
+  sheet: NpcSheet;
+}
+
+/** What to bring up in the Lookup tab: a map or an NPC. */
+export interface PlaceLink {
+  mode: "maps" | "npcs";
+  id: number;
+}
+
 /** What the quest search asks for. */
 export interface QuestSearch {
   text: string;
@@ -1098,7 +1180,33 @@ export interface GearSuggestions {
   level: number;
   /** What the ranking counted, the heaviest first. */
   rankedBy: string[];
-  slots: { slot: string; picks: { item: ItemRecord; goal: boolean }[] }[];
+  slots: {
+    slot: string;
+    picks: { item: ItemRecord; goal: boolean }[];
+    /** How many fit, picked or not. */
+    total: number;
+  }[];
+}
+
+/** Who the gear finder looks for. Whatever is null comes from the character's build. */
+export interface GearFor {
+  level: number | null;
+  job: number | null;
+  gender: string | null;
+}
+
+/** What the gear finder found, and who for. */
+export interface GearFound {
+  level: number;
+  job: number;
+  gender: string | null;
+  /** The build whose stats and goals count. With none, only level and job are checked. */
+  build: string | null;
+  /** Stat requirements were checked. */
+  statsKnown: boolean;
+  /** Until this level a character wears only what anyone can. */
+  firstJobLevel: number;
+  gear: GearSuggestions;
 }
 
 export interface GearCheck {

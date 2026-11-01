@@ -9,6 +9,7 @@
   import { itemView, watchItems } from "$lib/items.svelte";
   import { monsterView, watchMonsters } from "$lib/monsters.svelte";
   import { PANELS, panelInfo, signature } from "$lib/panels";
+  import { placeLinks, watchPlaces } from "$lib/places.svelte";
   import { questView, watchQuests } from "$lib/quests.svelte";
   import { live, watchLive } from "$lib/readings.svelte";
   import { display, watchSettings } from "$lib/settings.svelte";
@@ -25,6 +26,7 @@
     watchSettings();
     watchItems();
     watchMonsters();
+    watchPlaces();
     watchQuests();
   });
 
@@ -53,9 +55,10 @@
     if (read && !read.problem && !read.automatic) select("build");
   });
 
-  // So is a link to an item, from the build planner or a list of drops, or to a monster.
+  // So is a link to an item, from the build planner or a list of drops, or to anything else in
+  // the Lookup tab.
   $effect(() => {
-    if (itemView.seen || monsterView.seen) select("item");
+    if (itemView.seen || monsterView.seen || placeLinks.seen) select("item");
   });
 
   $effect(() => {

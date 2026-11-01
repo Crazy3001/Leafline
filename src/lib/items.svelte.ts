@@ -20,8 +20,39 @@ export const blankQuery = (): ItemQuery => ({
   offset: 0,
 });
 
-/** Which half of the Lookup tab is showing. */
-export const lookup = $state<{ mode: "items" | "monsters" }>({ mode: "items" });
+/** Which part of the Lookup tab is showing. */
+export const lookup = $state<{ mode: "items" | "monsters" | "maps" | "npcs" }>({ mode: "items" });
+
+const GENDER_KEY = "leafline.gear.gender";
+
+function storedGender() {
+  try {
+    return localStorage.getItem(GENDER_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/** Who the Equip list is for. Nothing here is set until the player changes it. */
+export const gearView = $state<{ forMe: boolean; level: number | null; job: number | null; gender: string | null; ahead: number }>({
+  forMe: true,
+  level: null,
+  job: null,
+  gender: storedGender(),
+  /** Levels past the character's own to look at. */
+  ahead: 0,
+});
+
+/** The game doesn't show a character's gender, so the player's choice is remembered. */
+export function setGender(gender: string | null) {
+  gearView.gender = gender;
+  try {
+    if (gender) localStorage.setItem(GENDER_KEY, gender);
+    else localStorage.removeItem(GENDER_KEY);
+  } catch {
+    // A convenience only.
+  }
+}
 
 export const itemView = $state<{ id: number | null; query: ItemQuery; seen: number }>({
   /** The item open from the database. */

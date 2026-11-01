@@ -21,6 +21,8 @@ const MIN_WORD_SCORE: f64 = 0.7;
 const MIN_NAME_SCORE: f64 = 0.85;
 /// The slot all weapons share. Their kinds are in `weapon_type`.
 const WEAPON: &str = "Weapon";
+/// The data prices staff outfits and novelty items at a meso or less.
+const NOVELTY_PRICE: i64 = 1;
 
 /// What the item search asks for. Everything but `text` narrows it down.
 #[derive(Debug, Clone, Default, PartialEq, Deserialize)]
@@ -52,6 +54,12 @@ impl ItemQuery {
             && self.level_min.is_none_or(|level| equipment && item.req_level >= level)
             && self.level_max.is_none_or(|level| equipment && item.req_level <= level)
     }
+}
+
+/// Staff outfits, novelty tubes and the like, which players can't get or wouldn't want. The data
+/// has no other mark for them.
+pub fn novelty(item: &ItemRecord) -> bool {
+    item.kind == ItemKind::Equip && item.price.is_some_and(|price| price <= NOVELTY_PRICE)
 }
 
 /// Whether an item goes in `slot`, or for a scroll, goes on what does.
@@ -209,8 +217,21 @@ impl Catalog {
     /// Empty for a path with none, such as a first job or a Magician.
     pub fn weapons_of(&self, job: u32) -> Vec<String> {
         let path = path_of(job);
-        let trained = self.skills.iter().filter(|s| path.contains(&s.job_id));
-        let words: Vec<&str> = trained.filter_map(|s| s.name.strip_suffix(" Mastery")).collect();
+        self.mastered(|skill| path.contains(&skill.job_id))
+    }
+
+    /// The weapons a job or any job it can lead to trains in. A first job has no Mastery skill of
+    /// its own yet, so this says what it is working towards.
+    pub fn weapons_of_branch(&self, job: u32) -> Vec<String> {
+        if job == 0 {
+            return Vec::new();
+        }
+        self.mastered(|skill| skill.job_id / 100 == job / 100)
+    }
+
+    /// The weapon types named by the Mastery skills that `counts` lets through.
+    fn mastered(&self, counts: impl Fn(&SkillRecord) -> bool) -> Vec<String> {
+        let words: Vec<&str> = self.skills.iter().filter(|s| counts(s)).filter_map(|s| s.name.strip_suffix(" Mastery")).collect();
         self.weapon_types().into_iter().filter(|t| words.iter().any(|w| t.ends_with(w))).collect()
     }
 
@@ -227,10 +248,12 @@ impl Catalog {
         ItemFilters { slots, weapons: self.weapon_types() }
     }
 
-    /// One page of the items that `query` finds and `allowed` lets through.
+    /// One page of the items that `query` finds and `allowed` lets through. Novelty gear only
+    /// comes up by name, so it doesn't fill the lists.
     pub fn search_items(&self, query: &ItemQuery, allowed: impl Fn(&ItemRecord) -> bool) -> ItemPage {
         let words: Vec<String> = item_key(&query.text).split_whitespace().map(str::to_string).collect();
-        let candidates: Vec<&ItemRecord> = self.items.iter().filter(|i| query.admits(i) && allowed(i)).collect();
+        let shown = |i: &&ItemRecord| query.admits(i) && allowed(i) && (!words.is_empty() || !novelty(i));
+        let candidates: Vec<&ItemRecord> = self.items.iter().filter(shown).collect();
         let mut found: Vec<(u8, &ItemRecord)> =
             candidates.iter().filter_map(|i| Some((text_rank(i, &words)?, *i))).collect();
         let closest = found.is_empty() && !words.is_empty();

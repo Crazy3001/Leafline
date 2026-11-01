@@ -97,13 +97,19 @@ The Quests tab and its pinned window show each quest in the Quest Helper with it
 
 Once a tracked quest matches the data it stays locked in, so scenery moving behind the Quest Helper can't change it.
 
-### Item and monster lookup
+### Lookup
 
-The Lookup tab has two halves, Items and Monsters. Neither reads anything from the game, so both work with live reading off.
+The Lookup tab searches Items, Monsters, Maps and NPCs. None of it needs live reading.
 
 **Items** searches every item in the map data by name or by what it does, with categories and filters for slot, job, level and stat. An item's card shows its stats, whether your build can wear it, your logged prices, who players saw drop it and which quests give it. Names in a build, its suggestions and a map's drops open here.
 
+Under **Equip**, the list starts with gear for you, slot by slot, the best first. It goes by your level, your job and your build's stats, using the same ranking as the Build tab's suggestions. Your level and job come from the game or your build, and you can change either, pick a gender, or look 5 to 20 levels ahead. Without a build it can't check stat requirements, and says so. Staff and novelty items are left out unless you search for them by name. **Everything** lists all equipment. Nobody has checked these picks in game, and they don't take prices into account.
+
 **Monsters** opens with what's on your map and near your level, above every monster players meet. Search by name, by something it drops, or by a map, and narrow it by boss, undead, element weakness, region or level. A monster's card shows its stats, elements and what it can do, each map it lives on with a route from where you are, what players saw it drop, the quests that want it and any other versions of it. Monster names on the Map, Train and Quests tabs open here.
+
+**Maps** starts with the map you're on, above every map. Search by name, area, a monster that lives there or an NPC who stands there, and narrow it by towns or hunting maps, region or monster level. A map opens the same card as the Map tab, with a route from where you are.
+
+**NPCs** starts with who's on your map, above everyone. Search by name, a quest they give or a map they stand on. An NPC's card shows where they stand with a route there, the quests they give, and the ones handed in to them where the data shows it. NPC names on a map's card and in quest steps open here.
 
 The numbers are the data's base values. Leafline doesn't work out damage, hits to kill or hit chance, because those are unsettled for Classic. Few monsters have drops logged on mapleclassic.wiki so far, and a card says so when there are none. A boss's listed respawn is a raw value from the client data, and the game's servers decide the real timing.
 

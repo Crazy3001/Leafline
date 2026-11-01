@@ -50,6 +50,7 @@
     tooltips={analysis?.tooltips ?? []}
     level={analysis?.hud?.level ?? session?.level ?? null}
     character={analysis?.hud?.name ?? null}
+    job={analysis?.hud?.job ?? null}
     map={analysis?.map ?? null}
     quest={analysis?.quest ?? null}
     {session}

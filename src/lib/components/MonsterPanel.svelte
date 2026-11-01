@@ -1,10 +1,13 @@
 <script lang="ts">
   // The Monsters half of the Lookup tab: what is on this map and near the character's level, and
   // a search of every monster in the map data by name, drop or map.
-  import { ArrowLeft, LoaderCircle, Search, Skull, SlidersHorizontal, X } from "@lucide/svelte";
+  import { ArrowLeft, LoaderCircle, Skull } from "@lucide/svelte";
   import { untrack } from "svelte";
 
   import Card from "./Card.svelte";
+  import FilterBox from "./lookup/FilterBox.svelte";
+  import KindTabs from "./lookup/KindTabs.svelte";
+  import SearchBar from "./lookup/SearchBar.svelte";
   import MapDataPanel from "./map/MapDataPanel.svelte";
   import MonsterCard from "./MonsterCard.svelte";
   import Section from "./map/Section.svelte";
@@ -15,12 +18,15 @@
   import type { MapMatch, MapReading, MonsterFilters, MonsterPage, MonsterQuery, MonsterRow, MobRow, QuestReading, SessionSummary } from "$lib/types";
 
   let {
+    here = null,
     map = null,
     level = null,
     quest = null,
     session = null,
     pinned = false,
   }: {
+    /** The map the minimap header matched. */
+    here?: MapMatch | null;
     map?: MapReading | null;
     level?: number | null;
     quest?: QuestReading | null;
@@ -56,15 +62,11 @@
   let showFilters = $state(false);
   let page = $state<MonsterPage | null>(null);
   let searching = $state(false);
-  let here = $state<MapMatch | null>(null);
   let near = $state<MonsterRow[]>([]);
 
   const narrowed = $derived([query.weakTo, query.region, query.levelMin, query.levelMax, query.sort].filter((v) => v != null).length);
   const browsing = $derived(query.text.trim() !== "" || query.kind != null || narrowed > 0);
   const asked = $derived(JSON.stringify(query));
-  const mapName = $derived(map?.name ?? null);
-  const mapStreet = $derived(map?.street ?? null);
-  const mapTwin = $derived(map?.twin ?? null);
 
   $effect(() => {
     void mapData.status?.dataUpdatedAt;
@@ -92,16 +94,6 @@
         });
     }, SEARCH_DELAY);
     return () => clearTimeout(timer);
-  });
-
-  $effect(() => {
-    const name = mapName;
-    const twin = mapTwin;
-    here = null;
-    if (!name || !ready) return;
-    backend.findMap(name, untrack(() => mapStreet), twin).then((match) => {
-      if (mapName === name && mapTwin === twin) here = match;
-    });
   });
 
   $effect(() => {
@@ -203,42 +195,23 @@
   </Card>
 {:else}
   <div class="controls" class:pinned>
-    <div class="search">
-      <label class="field">
-        <Search size={13} />
-        <input
-          type="search"
-          placeholder="Monster, what it drops, or a map"
-          aria-label="Search monsters"
-          value={query.text}
-          oninput={(e) => setQuery({ text: e.currentTarget.value })}
-        />
-      </label>
-      <button
-        class="tool"
-        class:active={showFilters || narrowed > 0}
-        title="Filters"
-        aria-label="Filters"
-        aria-expanded={showFilters}
-        onclick={() => (showFilters = !showFilters)}
-      >
-        <SlidersHorizontal size={13} />{#if narrowed}<span class="tabular">{narrowed}</span>{/if}
-      </button>
-      {#if browsing || monsterView.id != null}
-        <button class="tool" title="Clear the search" aria-label="Clear the search" onclick={clear}><X size={13} /></button>
-      {/if}
-    </div>
+    <SearchBar
+      value={query.text}
+      placeholder="Monster, what it drops, or a map"
+      label="Search monsters"
+      {narrowed}
+      bind:filters={showFilters}
+      clearable={browsing || monsterView.id != null}
+      oninput={(text) => setQuery({ text })}
+      onclear={clear}
+    />
 
     {#if monsterView.id == null}
-      <div class="kinds" role="radiogroup" aria-label="Kind of monster">
-        {#each KINDS as kind (kind.label)}
-          <button role="radio" aria-checked={query.kind === kind.id} onclick={() => setQuery({ kind: kind.id })}>{kind.label}</button>
-        {/each}
-      </div>
+      <KindTabs label="Kind of monster" options={KINDS} value={query.kind} onselect={(kind) => setQuery({ kind })} />
     {/if}
 
     {#if showFilters}
-      <div class="filters">
+      <FilterBox>
         <label>
           <span>Weak to</span>
           <select value={query.weakTo ?? ""} onchange={(e) => setQuery({ weakTo: e.currentTarget.value || null })}>
@@ -265,7 +238,7 @@
             {#each SORTS as sort (sort.id)}<option value={sort.id}>{sort.label}</option>{/each}
           </select>
         </label>
-      </div>
+      </FilterBox>
     {/if}
   </div>
 
@@ -328,141 +301,6 @@
   .controls.pinned,
   .list.pinned {
     padding: 0;
-  }
-
-  .search {
-    display: flex;
-    gap: 4px;
-    margin-bottom: 6px;
-  }
-
-  .field {
-    display: flex;
-    flex: 1;
-    align-items: center;
-    gap: 6px;
-    min-width: 0;
-    height: 28px;
-    padding: 0 8px;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
-    background: var(--surface);
-    color: var(--faint);
-  }
-
-  .field:focus-within {
-    border-color: color-mix(in srgb, var(--accent) 60%, transparent);
-  }
-
-  .field input {
-    flex: 1;
-    min-width: 0;
-    border: 0;
-    outline: 0;
-    background: transparent;
-    color: var(--text);
-    font: inherit;
-    font-size: 12px;
-  }
-
-  .field input::-webkit-search-cancel-button {
-    display: none;
-  }
-
-  .tool {
-    display: inline-flex;
-    flex: none;
-    align-items: center;
-    justify-content: center;
-    gap: 3px;
-    min-width: 28px;
-    height: 28px;
-    padding: 0 6px;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--muted);
-    font-size: 11px;
-    cursor: pointer;
-  }
-
-  .tool:hover,
-  .tool:focus-visible {
-    color: var(--text);
-    outline: none;
-  }
-
-  .tool.active {
-    border-color: color-mix(in srgb, var(--accent) 45%, transparent);
-    color: var(--accent);
-  }
-
-  .kinds {
-    display: grid;
-    grid-template-columns: repeat(4, auto);
-    gap: 0;
-    margin-bottom: 8px;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .kinds button {
-    padding: 3px 2px 5px;
-    border: 0;
-    border-bottom: 2px solid transparent;
-    background: transparent;
-    color: var(--muted);
-    font-size: 11.5px;
-    cursor: pointer;
-  }
-
-  .kinds button:hover,
-  .kinds button:focus-visible {
-    color: var(--text);
-    outline: none;
-  }
-
-  .kinds [aria-checked="true"] {
-    border-bottom-color: var(--accent);
-    color: var(--accent-strong);
-  }
-
-  .filters {
-    display: grid;
-    gap: 5px;
-    margin-bottom: 8px;
-    padding: 8px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    font-size: 11.5px;
-  }
-
-  .filters label,
-  .levels {
-    display: grid;
-    grid-template-columns: 48px 1fr;
-    align-items: center;
-    gap: 6px;
-    color: var(--muted);
-  }
-
-  .levels {
-    grid-template-columns: 48px 1fr auto 1fr;
-  }
-
-  .to {
-    color: var(--faint);
-  }
-
-  .filters select,
-  .levels input {
-    min-width: 0;
-    height: 24px;
-    padding: 0 4px;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
-    background: var(--surface);
-    color: var(--text);
-    font: inherit;
   }
 
   .count {

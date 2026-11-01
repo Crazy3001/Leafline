@@ -6,7 +6,7 @@
 
   import Card from "./Card.svelte";
   import MonsterDropList from "./monster/MonsterDropList.svelte";
-  import MonsterMaps from "./monster/MonsterMaps.svelte";
+  import PlaceList from "./map/PlaceList.svelte";
   import Section from "./map/Section.svelte";
   import { backend } from "$lib/api";
   import { formatCompact, formatDuration, formatNumber } from "$lib/format";
@@ -186,7 +186,11 @@
     {/if}
 
     <Section title="Where to find it" count={sheet.maps.length}>
-      <MonsterMaps maps={sheet.maps} from={found?.from ?? null} />
+      {#if sheet.maps.length}
+        <PlaceList places={sheet.maps} from={found?.from ?? null} />
+      {:else}
+        <p class="soft note">Not on any map in the data. It may be summoned, or not in the game yet.</p>
+      {/if}
     </Section>
 
     <Section title="Drops">

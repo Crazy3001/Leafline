@@ -84,7 +84,7 @@ pub(super) fn has_words(text: &str, words: &[String]) -> bool {
 }
 
 impl Atlas {
-    fn quest_row(&self, quest: &QuestRecord) -> QuestRow {
+    pub(super) fn quest_row(&self, quest: &QuestRecord) -> QuestRow {
         QuestRow {
             id: quest.id,
             name: quest.name.clone(),

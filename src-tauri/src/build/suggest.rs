@@ -4,23 +4,23 @@
 
 use std::collections::HashMap;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-use super::catalog::{Catalog, usable_by};
+use super::catalog::{Catalog, novelty, usable_by};
 use super::fit::ARMOUR;
-use super::plan::{Build, Expansion, Stat, meets};
+use super::plan::{Build, Expansion, MAX_LEVEL, Plan, Start, Stat, expand, meets};
 use super::rules::{Branch, Rules};
 use crate::mapdata::osms::{ItemKind, ItemRecord};
 
 /// Items shown for each slot.
 const PICKS: usize = 3;
+/// The most the gear finder lists for a slot.
+const FOUND: usize = 60;
 /// How much a point of each counts: attack most, then the stat the plan puts the rest of its AP
 /// into, then stats it only raises to a target.
 const ATTACK_WEIGHT: i64 = 3;
 const MAIN_WEIGHT: i64 = 2;
 const SIDE_WEIGHT: i64 = 1;
-/// The data prices staff outfits and novelty items at a meso or less.
-const NOVELTY_PRICE: i64 = 1;
 /// Two-handed weapons have ids from 1400000 up.
 const TWO_HANDED_BLOCK: u32 = 14;
 
@@ -37,6 +37,8 @@ pub struct GearPick {
 pub struct SlotPicks {
     pub slot: String,
     pub picks: Vec<GearPick>,
+    /// How many fit, picked or not.
+    pub total: usize,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
@@ -47,6 +49,32 @@ pub struct GearSuggestions {
     pub ranked_by: Vec<String>,
     /// Slots with nothing to suggest are left out.
     pub slots: Vec<SlotPicks>,
+}
+
+/// Who the gear finder looks for. Whatever is left out comes from the character's build.
+#[derive(Debug, Clone, Default, PartialEq, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct GearFor {
+    pub level: Option<u32>,
+    pub job: Option<u32>,
+    /// `male` or `female`.
+    pub gender: Option<String>,
+}
+
+/// What the gear finder found, and who for, so the player can see what it went by.
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GearFound {
+    pub level: u32,
+    pub job: u32,
+    pub gender: Option<String>,
+    /// The build whose stats and goals count. With none, only level and job are checked.
+    pub build: Option<String>,
+    /// Stat requirements were checked.
+    pub stats_known: bool,
+    /// Until this level a character wears only what anyone can.
+    pub first_job_level: u32,
+    pub gear: GearSuggestions,
 }
 
 /// Whether a build can wear something at one level.
@@ -120,13 +148,48 @@ fn stat(item: &ItemRecord, label: &str) -> i64 {
     item.stats.iter().find(|s| s.label == label).map_or(0, |s| s.value)
 }
 
-/// Ranks what `build` can wear at `level`, slot by slot. Items at or under a meso are left out:
-/// the data has no other mark for gear that players can't get.
+/// The best few of what `build` can wear at `level`, slot by slot.
 pub fn suggest(build: &Build, expansion: &Expansion, rules: &Rules, catalog: &Catalog, level: u32) -> GearSuggestions {
+    ranked(build, expansion, rules, catalog, level, PICKS)
+}
+
+/// Gear for a character, from their build where it applies. `own` is their build, `seen_job`
+/// the job the HUD shows. A build that starts later than `level`, or is for another job, can't
+/// say what their stats are then, so only its job and gender count.
+pub fn find_gear(who: &GearFor, own: Option<Build>, seen_job: Option<u32>, rules: &Rules, catalog: &Catalog) -> GearFound {
+    let level = who.level.or(own.as_ref().map(|b| b.start.level)).unwrap_or(1).clamp(1, MAX_LEVEL);
+    let planned = own.as_ref().map(|b| b.plan.job).filter(|job| *job != 0);
+    let job = who.job.or(planned).or(seen_job).unwrap_or(0);
+    let gender = who.gender.clone().or(own.as_ref().and_then(|b| b.start.gender.clone()));
+    let own = own.filter(|b| b.plan.job == job && b.start.level <= level);
+    let name = own.as_ref().map(|b| b.name.clone());
+    let mut build = own.unwrap_or_else(|| Build {
+        start: Start { level, ..Start::default() },
+        plan: Plan { job, ..Plan::default() },
+        ..Build::default()
+    });
+    build.plan.plan_to = build.plan.plan_to.max(level);
+    build.start.gender.clone_from(&gender);
+    let expansion = expand(&build, rules, catalog);
+    GearFound {
+        level,
+        job,
+        gender,
+        build: name,
+        stats_known: build.start.stats.is_some(),
+        first_job_level: rules.first_job_level,
+        gear: ranked(&build, &expansion, rules, catalog, level, FOUND),
+    }
+}
+
+/// Ranks what `build` can wear at `level`, slot by slot, up to `limit` for each. Novelty items
+/// are left out: players can't get them or wouldn't want them.
+fn ranked(build: &Build, expansion: &Expansion, rules: &Rules, catalog: &Catalog, level: u32, limit: usize) -> GearSuggestions {
     let wearer = Wearer::new(build, expansion, rules, catalog, level);
     let magician = Branch::of_job(build.plan.job) == Some(Branch::Magician);
     let (attack, defence) = if magician { ("Magic", "Magic Def.") } else { ("Attack", "Weapon Def.") };
     let weights = weighted_stats(build);
+    let trained = catalog.weapons_of_branch(build.plan.job);
     let score = |item: &ItemRecord| {
         let stats: i64 = weights.iter().map(|(s, weight)| stat(item, s.label()) * weight).sum();
         (stat(item, attack) * ATTACK_WEIGHT + stats, stat(item, defence), item.req_level)
@@ -139,23 +202,27 @@ pub fn suggest(build: &Build, expansion: &Expansion, rules: &Rules, catalog: &Ca
         }
         let mut fits: Vec<&ItemRecord> = catalog
             .equipment()
-            .filter(|i| i.slot == slot && i.price.is_none_or(|p| p > NOVELTY_PRICE) && wearer.can_wear(i))
+            .filter(|i| i.slot == slot && !novelty(i) && wearer.can_wear(i))
             .collect();
         fits.sort_by(|a, b| score(b).cmp(&score(a)).then_with(|| a.name.cmp(&b.name)));
-        // Each kind of weapon gets its turn, so one kind's strongest don't fill the list.
+        // Each kind of weapon gets its turn, so one kind's strongest don't fill the list. Weapons
+        // the job trains in come first, however hard the others hit: a Thief wants a dagger, not
+        // the Pole Arm with the bigger number.
         let mut kinds: HashMap<&Option<String>, usize> = HashMap::new();
         fits.sort_by_cached_key(|i| {
             let turn = kinds.entry(&i.weapon_type).or_default();
             *turn += 1;
-            i.weapon_type.as_ref().map_or(0, |_| *turn)
+            let untrained = i.weapon_type.as_ref().is_some_and(|w| !trained.is_empty() && !trained.contains(w));
+            (untrained, i.weapon_type.as_ref().map_or(0, |_| *turn))
         });
+        let total = fits.len();
         let picks: Vec<GearPick> = fits
             .into_iter()
-            .take(PICKS)
+            .take(limit)
             .map(|item| GearPick { item: item.clone(), goal: build.plan.gear.contains(&item.id) })
             .collect();
         if !picks.is_empty() {
-            slots.push(SlotPicks { slot: slot.to_string(), picks });
+            slots.push(SlotPicks { slot: slot.to_string(), picks, total });
         }
     }
     let ranked_by = std::iter::once(attack.to_string())
@@ -255,7 +322,14 @@ mod tests {
         ]);
         assert_eq!(names(&at(&thief(), &catalog, 20), "Weapon"), ["Thorn Claw", "Old Claw"]);
         let first_job = Build { plan: Plan { job: 400, ..thief().plan }, ..thief() };
-        assert_eq!(names(&at(&first_job, &catalog, 20), "Weapon"), ["Fern Dagger", "Thorn Claw", "Old Claw"], "no Mastery yet");
+        assert_eq!(names(&at(&first_job, &catalog, 20), "Weapon"), ["Thorn Claw", "Old Claw", "Fern Dagger"], "what its second jobs train first");
+    }
+
+    #[test]
+    fn a_first_job_sees_what_it_will_train_in_before_what_hits_hardest() {
+        let catalog = catalog(vec![weapon(1, "Pole Arm", "Spear", 15, 90), weapon(2, "Thorn Claw", "Claw", 15, 20)]);
+        let first_job = Build { plan: Plan { job: 400, ..thief().plan }, ..thief() };
+        assert_eq!(names(&at(&first_job, &catalog, 20), "Weapon"), ["Thorn Claw", "Pole Arm"]);
     }
 
     #[test]
@@ -306,6 +380,73 @@ mod tests {
         assert_eq!(picks.slots.len(), 1);
         let goals: Vec<_> = picks.slots[0].picks.iter().map(|p| (p.item.name.as_str(), p.goal)).collect();
         assert_eq!(goals, [("Fern Hat", false), ("Moss Hat", true)]);
+    }
+
+    fn found(who: GearFor, own: Option<Build>, seen_job: Option<u32>, catalog: &Catalog) -> GearFound {
+        find_gear(&who, own, seen_job, &Rules::default(), catalog)
+    }
+
+    fn found_names(result: &GearFound, slot: &str) -> Vec<String> {
+        names(&result.gear, slot)
+    }
+
+    #[test]
+    fn with_no_build_the_finder_goes_by_level_and_job_alone() {
+        let mut strong = with(item(1, "Heavy Hat", 15, &["Thief"]), &[("LUK", 3)]);
+        strong.req_luk = 500;
+        let catalog = catalog(vec![strong, item(2, "Late Hat", 40, &[]), item(3, "Wizard Hat", 15, &["Magician"])]);
+        let result = found(GearFor { level: Some(20), job: Some(410), ..GearFor::default() }, None, None, &catalog);
+        assert_eq!(found_names(&result, "Hat"), ["Heavy Hat"], "stats aren't known, so they aren't held against it");
+        assert_eq!((result.level, result.job, result.stats_known, result.build.as_deref()), (20, 410, false, None));
+    }
+
+    #[test]
+    fn the_finder_uses_the_characters_build_and_its_stats() {
+        let mut strong = with(item(1, "Heavy Hat", 15, &[]), &[("LUK", 3)]);
+        strong.req_luk = 500;
+        let catalog = catalog(vec![strong, item(2, "Fern Hat", 15, &[])]);
+        let build = Build { name: "Claw thief".into(), ..thief() };
+        let result = found(GearFor { level: Some(20), ..GearFor::default() }, Some(build), None, &catalog);
+        assert_eq!(found_names(&result, "Hat"), ["Fern Hat"]);
+        assert_eq!((result.build.as_deref(), result.job, result.stats_known), (Some("Claw thief"), 410, true));
+    }
+
+    #[test]
+    fn a_build_that_starts_later_or_for_another_job_only_lends_what_it_can() {
+        let catalog = catalog(vec![item(1, "Fern Hat", 1, &[]), item(2, "Thief Hat", 1, &["Thief"]), item(3, "Mage Hat", 1, &["Magician"])]);
+        // The plan starts at Lv 20 and the character is Lv 2: a Beginner, whatever the plan says.
+        let early = found(GearFor { level: Some(2), ..GearFor::default() }, Some(thief()), None, &catalog);
+        assert_eq!((early.job, early.build.as_deref(), early.stats_known), (410, None, false));
+        assert_eq!(found_names(&early, "Hat"), ["Fern Hat"]);
+        // Looking ahead past the first job brings its gear in.
+        let ahead = found(GearFor { level: Some(15), ..GearFor::default() }, Some(thief()), None, &catalog);
+        assert_eq!(found_names(&ahead, "Hat"), ["Fern Hat", "Thief Hat"]);
+        // Asking about another job drops the build.
+        let mage = found(GearFor { level: Some(25), job: Some(200), ..GearFor::default() }, Some(thief()), None, &catalog);
+        assert_eq!((mage.build.as_deref(), found_names(&mage, "Hat")), (None, vec!["Fern Hat".to_string(), "Mage Hat".to_string()]));
+    }
+
+    #[test]
+    fn the_job_comes_from_the_hud_when_no_build_says() {
+        let catalog = catalog(vec![item(1, "Thief Hat", 1, &["Thief"])]);
+        assert_eq!(found(GearFor { level: Some(15), ..GearFor::default() }, None, Some(400), &catalog).job, 400);
+        assert_eq!(found(GearFor { level: Some(15), ..GearFor::default() }, Some(thief()), Some(100), &catalog).job, 410);
+        assert_eq!(found(GearFor::default(), None, None, &catalog).level, 1);
+    }
+
+    #[test]
+    fn the_finder_lists_past_the_top_few_and_counts_them() {
+        let hats = (1..=70).map(|i| item(i, &format!("Hat {i}"), 1, &[])).collect();
+        let result = found(GearFor { level: Some(5), ..GearFor::default() }, None, None, &catalog(hats));
+        assert_eq!((result.gear.slots[0].picks.len(), result.gear.slots[0].total), (FOUND, 70));
+    }
+
+    #[test]
+    fn gender_can_be_chosen_without_a_build() {
+        let made_for = |id, name, gender: &str| ItemRecord { gender: Some(gender.into()), ..item(id, name, 1, &[]) };
+        let catalog = catalog(vec![made_for(1, "His Hat", "male"), made_for(2, "Her Hat", "female")]);
+        let who = GearFor { level: Some(5), gender: Some("female".into()), ..GearFor::default() };
+        assert_eq!(found_names(&found(who, None, None, &catalog), "Hat"), ["Her Hat"]);
     }
 
     #[test]
