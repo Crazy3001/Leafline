@@ -79,7 +79,7 @@ pub struct QuestSheet {
 }
 
 /// Whether every word starts a word of `text`, which is already folded by [`item_key`].
-fn has_words(text: &str, words: &[String]) -> bool {
+pub(super) fn has_words(text: &str, words: &[String]) -> bool {
     words.iter().all(|word| text.split_whitespace().any(|w| w.starts_with(word.as_str())))
 }
 

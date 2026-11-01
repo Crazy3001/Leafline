@@ -74,7 +74,7 @@
     <ul class="links">
       {#each sheet.rewards as item (item.id)}
         <li>
-          <button title="Show it in the Item tab" onclick={() => backend.showItem(item.id, null)}>{item.name}</button>
+          <button title="Show it in the Lookup tab" onclick={() => backend.showItem(item.id, null)}>{item.name}</button>
           {#if item.count > 1}<span class="tabular">× {item.count}</span>{/if}
           {#if !item.sure}<span class="maybe">possible</span>{/if}
         </li>

@@ -31,6 +31,9 @@
 //!
 //! `--quests-for <text>` prints what the quest search finds, and the first one's sheet.
 //!
+//! `--monsters <text> [--from <map-id>]` prints what the monster search finds, and the first one's
+//! sheet.
+//!
 //! `--hold <folder>` reads the Quest Helper of each picture in turn, as live reading does, and
 //! prints what each shows raw and once held.
 
@@ -42,7 +45,7 @@ use leafline_lib::build::{
 };
 use leafline_lib::mapdata::fetch::{self, Http};
 use leafline_lib::mapdata::{
-    Atlas, MapCard, QuestQuery, QuestSearch, QuestTitles, Store, Travel, TravelChoice, TravelFile, drops,
+    Atlas, MapCard, MonsterQuery, QuestQuery, QuestSearch, QuestTitles, Store, Travel, TravelChoice, TravelFile, drops,
 };
 use leafline_lib::pipeline;
 use leafline_lib::readers::map;
@@ -96,6 +99,19 @@ fn main() {
             let catalog = Catalog::new(data.skills, data.items);
             let name = |id: u32| catalog.item(id).map(|i| i.name.clone());
             println!("{:#?}", atlas.quest_sheet(first.id, name, &[], None, &Travel::none()).map(|s| (s.story, s.after, s.next, s.rewards)));
+        }
+    }
+    if let Some(text) = value("--monsters", 1) {
+        let dropped = store.dropped_pairs().expect("drop table");
+        let page = atlas.search_monsters(&MonsterQuery { text, ..MonsterQuery::default() }, &dropped);
+        println!("{} found, closest: {}", page.total, page.closest);
+        for monster in page.monsters.iter().take(20) {
+            println!("{:<8} {:<26} Lv {:>3} HP {:>7} EXP {:>5} {:?}", monster.id, monster.name, monster.level, monster.hp, monster.exp, monster.note);
+        }
+        if let Some(first) = page.monsters.first() {
+            let from = value("--from", 1).map(|id| id.parse().expect("map id"));
+            let found = store.drops(&[first.name.clone()]).expect("drop table").pop();
+            println!("{:#?}", atlas.monster_sheet(first.id, found, from, &[], &Travel::none()));
         }
     }
     if let Some(level) = value("--gear", 1) {

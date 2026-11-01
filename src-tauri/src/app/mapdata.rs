@@ -16,8 +16,9 @@ use crate::error::{Error, Result};
 use crate::mapdata::fetch::{self, Http};
 use crate::mapdata::osms::Dataset;
 use crate::mapdata::{
-    Atlas, DataStatus, ItemOrigin, MapCard, MapMatch, MapRef, MeasuredRate, MonsterDrops, QuestGuide, QuestPage, QuestQuery,
-    QuestSearch, QuestSheet, RefreshReport, Route, Store, TrainingSpot, Travel, TravelFile, drops,
+    Atlas, DataStatus, ItemOrigin, MapCard, MapMatch, MapRef, MeasuredRate, MonsterDrops, MonsterFilters, MonsterPage,
+    MonsterQuery, MonsterSheet, QuestGuide, QuestPage, QuestQuery, QuestSearch, QuestSheet, RefreshReport, Route, Store,
+    TrainingSpot, Travel, TravelFile, drops,
 };
 
 const FILE_NAME: &str = "map-data.sqlite3";
@@ -30,6 +31,8 @@ const TRAVEL_CACHE: &str = "travel-wiki.json";
 pub const MAP_DATA_EVENT: &str = "map-data";
 /// Emitted to every window to bring up a quest in the Quests tab.
 pub const SHOW_QUEST_EVENT: &str = "show-quest";
+/// Emitted to every window to bring up a monster in the Lookup tab.
+pub const SHOW_MONSTER_EVENT: &str = "show-monster";
 
 /// Sites Leafline may open in the browser: the link-outs and the credits.
 const LINK_HOSTS: [&str; 9] = [
@@ -428,6 +431,79 @@ pub fn show_quest(app: AppHandle, id: u32) -> Result<()> {
         overlay::show_full(&app)?;
     }
     Ok(app.emit(SHOW_QUEST_EVENT, id)?)
+}
+
+/// One page of the monster search. Drops are matched from the downloaded table, if there is one.
+#[tauri::command]
+pub fn search_monsters(state: State<MapDataState>, query: MonsterQuery) -> Result<MonsterPage> {
+    let Some(atlas) = state.atlas() else { return Ok(MonsterPage::default()) };
+    Ok(atlas.search_monsters(&query, &Store::open(&state.path)?.dropped_pairs()?))
+}
+
+#[tauri::command]
+pub fn monster_filters(state: State<MapDataState>) -> MonsterFilters {
+    state.atlas().map(|atlas| atlas.monster_filters()).unwrap_or_default()
+}
+
+/// The monster a name means.
+#[tauri::command]
+pub fn find_monster(state: State<MapDataState>, name: String) -> Option<u32> {
+    state.atlas()?.monster_like(&name)
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MonsterWhere {
+    /// The map portals are counted from, when the minimap was read and matched.
+    from: Option<MapRef>,
+    sheet: MonsterSheet,
+}
+
+/// All the data says about a monster. The first call downloads the drop table; the monster's
+/// name is never sent. Without that table, the rest still shows.
+#[tauri::command]
+pub async fn monster_sheet(
+    app: AppHandle,
+    id: u32,
+    map_name: Option<String>,
+    map_street: Option<String>,
+    map_twin: Option<u32>,
+    measured: Vec<MeasuredRate>,
+) -> Result<Option<MonsterWhere>> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<MapDataState>();
+        let Some(atlas) = state.atlas() else { return Ok(None) };
+        let Some(name) = atlas.monster_name(id).map(str::to_string) else { return Ok(None) };
+        if let Err(err) = state.refresh_drops() {
+            eprintln!("drop table download failed: {err}");
+        }
+        let store = Store::open(&state.path)?;
+        let drops = if store.drops_fetched_at()?.is_some() { store.drops(&[name])?.pop() } else { None };
+        let from = map_name.and_then(|name| atlas.find_twin(&name, map_street.as_deref(), map_twin)).map(|m| m.card.map);
+        let start = from.as_ref().map(|m| m.id);
+        let sheet = atlas.monster_sheet(id, drops, start, &measured, &travel(&app, &atlas));
+        Ok(sheet.map(|sheet| MonsterWhere { from, sheet }))
+    })
+    .await
+    .map_err(|err| Error::Invalid(err.to_string()))?
+}
+
+/// What to bring up in the Lookup tab: one monster, or a search when no monster was matched.
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct MonsterLink {
+    id: Option<u32>,
+    text: Option<String>,
+}
+
+/// Brings a monster up in the Lookup tab, from whichever window asked. A pinned Lookup panel
+/// shows it by itself; otherwise the overlay has to.
+#[tauri::command]
+pub fn show_monster(app: AppHandle, id: Option<u32>, text: Option<String>) -> Result<()> {
+    if !pins::shows_item(&app) {
+        overlay::show_full(&app)?;
+    }
+    Ok(app.emit(SHOW_MONSTER_EVENT, MonsterLink { id, text })?)
 }
 
 /// Downloads the drop table from mapleclassic.wiki, for finding who drops a quest item. Only on

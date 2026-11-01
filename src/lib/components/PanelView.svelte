@@ -4,7 +4,7 @@
   import BuildCard from "./BuildCard.svelte";
   import CharacterCard from "./CharacterCard.svelte";
   import HistoryCard from "./HistoryCard.svelte";
-  import ItemPanel from "./ItemPanel.svelte";
+  import LookupPanel from "./LookupPanel.svelte";
   import MapCard from "./MapCard.svelte";
   import QuestPanel from "./QuestPanel.svelte";
   import SessionCard from "./SessionCard.svelte";
@@ -46,11 +46,13 @@
     {pinned}
   />
 {:else if panel === "item"}
-  <ItemPanel
+  <LookupPanel
     tooltips={analysis?.tooltips ?? []}
     level={analysis?.hud?.level ?? session?.level ?? null}
     character={analysis?.hud?.name ?? null}
     map={analysis?.map ?? null}
+    quest={analysis?.quest ?? null}
+    {session}
     {pinned}
   />
 {:else if panel === "build"}

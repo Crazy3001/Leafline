@@ -1,6 +1,6 @@
 <script lang="ts">
-  // The Item tab: the last price check, and a search of every item in the map data. Search needs
-  // nothing from the game, so it works with live reading off.
+  // The Items half of the Lookup tab: the last price check, and a search of every item in the map
+  // data. Search needs nothing from the game, so it works with live reading off.
   import { ArrowLeft, LoaderCircle, Search, SlidersHorizontal, X } from "@lucide/svelte";
   import { untrack } from "svelte";
 

@@ -526,6 +526,8 @@ export interface HuntingGround {
   map: MapRef;
   /** How many of the monster the map spawns. */
   count: number;
+  /** How many monsters of any kind the map spawns. */
+  mapTotal: number;
   /** Portals from the current map, when it is known and a route exists. */
   hops: number | null;
   /** Fewer steps with the travel the player turned on, when that is shorter. */
@@ -911,7 +913,7 @@ export interface ItemWhere {
   };
 }
 
-/** What to bring up in the Item tab: one item, or a search when no item was matched. */
+/** What to bring up in the Lookup tab: one item, or a search when no item was matched. */
 export interface ItemLink {
   id: number | null;
   text: string | null;
@@ -933,6 +935,110 @@ export interface CharacterRead {
   problem: string | null;
   /** It came from a live picture, not from the player asking. */
   automatic: boolean;
+}
+
+// The monster search (see src-tauri/src/mapdata/bestiary.rs).
+
+export interface MonsterQuery {
+  /** A monster, an item it drops, or a map it lives on. */
+  text: string;
+  kind: string | null;
+  weakTo: string | null;
+  region: string | null;
+  levelMin: number | null;
+  levelMax: number | null;
+  /** `name`, `hp`, `exp` or `efficiency`. By level otherwise. */
+  sort: string | null;
+  /** With no `sort`, the monsters nearest this level first. */
+  near: number | null;
+  offset: number;
+}
+
+export interface MonsterRow {
+  id: number;
+  name: string;
+  level: number;
+  hp: number;
+  exp: number;
+  boss: boolean;
+  undead: boolean;
+  /** Why a search found it, when that isn't its name. */
+  note: string | null;
+}
+
+export interface MonsterPage {
+  monsters: MonsterRow[];
+  total: number;
+  /** Nothing matched outright, so these are the closest names. */
+  closest: boolean;
+}
+
+export interface MonsterFilters {
+  regions: string[];
+  /** The elements some monster is weak to. */
+  elements: string[];
+}
+
+/** What the data says of a monster beyond its name, level, HP and EXP. Missing stats are null. */
+export interface MonsterDetails {
+  mp: number | null;
+  attack: number | null;
+  magic: number | null;
+  weaponDef: number | null;
+  magicDef: number | null;
+  accuracy: number | null;
+  evasion: number | null;
+  /** Added to its movement speed: below zero is slower. */
+  speed: number | null;
+  /** The damage one hit must deal to knock it back. */
+  knockback: number | null;
+  hpRecovery: number | null;
+  mpRecovery: number | null;
+  /** Comes at players on sight. */
+  aggressive: boolean;
+  invincible: boolean;
+  /** Weak ones first, then strong, then immune. */
+  elements: { element: string; effect: "Weak" | "Strong" | "Immune" }[];
+  magicAttacks: boolean;
+  /** The elements its attacks carry. */
+  attackElements: string[];
+  /** What its skills do: `self_buff` or `debuff`. */
+  casts: string[];
+}
+
+/** All the map data says about one monster, and what players logged of its drops. */
+export interface MonsterSheet {
+  id: number;
+  name: string;
+  level: number;
+  hp: number;
+  exp: number;
+  boss: boolean;
+  undead: boolean;
+  details: MonsterDetails;
+  /** A boss's longest respawn time as the file lists it, in seconds. Only a rough guide. */
+  respawn: number | null;
+  /** The best maps first. */
+  maps: HuntingGround[];
+  quests: { quest: QuestRef; giver: string | null; count: number }[];
+  /** Records with the same name and their own numbers, such as a party quest's copy. */
+  versions: { id: number; level: number; hp: number; exp: number; maps: MapRef[] }[];
+  /** What it turns into when defeated. */
+  splits: { id: number; name: string; count: number }[];
+  /** Null when the drop table isn't downloaded. */
+  drops: MonsterDrops | null;
+}
+
+export interface MonsterWhere {
+  /** The map portals are counted from, when the minimap was read and matched. */
+  from: MapRef | null;
+  sheet: MonsterSheet;
+}
+
+/** What to bring up in the Lookup tab: one monster, or a search when no monster was matched. */
+export interface MonsterLink {
+  id: number | null;
+  text: string | null;
 }
 
 /** What the quest search asks for. */

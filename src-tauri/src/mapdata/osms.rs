@@ -7,7 +7,7 @@
 
 use std::collections::HashMap;
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
 /// The files Leafline needs, in the order they are fetched.
 pub const FILES: [&str; 6] = ["maps.json", "monsters.json", "npcs.json", "quests.json", "skills.json", "items.json"];
@@ -174,22 +174,163 @@ pub struct Portal {
     pub height: Option<Height>,
 }
 
+#[derive(Deserialize)]
+struct RawMonster {
+    id: u32,
+    name: String,
+    #[serde(default)]
+    level: u32,
+    #[serde(default)]
+    hp: u32,
+    mp: Option<u32>,
+    #[serde(default)]
+    exp: u32,
+    #[serde(default)]
+    is_boss: bool,
+    #[serde(default)]
+    undead: bool,
+    #[serde(default)]
+    aggro: bool,
+    #[serde(default)]
+    invincible: bool,
+    hp_recovery: Option<u32>,
+    mp_recovery: Option<u32>,
+    #[serde(default)]
+    stats: HashMap<String, serde_json::Value>,
+    #[serde(default)]
+    elements: HashMap<String, String>,
+    #[serde(default)]
+    attacks: Vec<RawAttack>,
+    #[serde(default)]
+    skills: Vec<RawMobSkill>,
+    #[serde(default)]
+    revives_into: Vec<Split>,
+    #[serde(default)]
+    spawns: Vec<Spawn>,
+}
+
+#[derive(Deserialize)]
+struct RawAttack {
+    #[serde(default)]
+    magic: bool,
+    element: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct RawMobSkill {
+    kind: Option<String>,
+}
+
+/// In the order a card lists them.
+const ELEMENT_EFFECTS: [&str; 3] = ["Weak", "Strong", "Immune"];
+
+impl From<RawMonster> for MonsterRecord {
+    fn from(raw: RawMonster) -> Self {
+        let stat = |key: &str| raw.stats.get(key).and_then(number_in);
+        let mut elements: Vec<ElementEffect> = raw
+            .elements
+            .iter()
+            .map(|(element, effect)| ElementEffect { element: element.clone(), effect: effect.clone() })
+            .collect();
+        elements.sort_by_key(|e| (ELEMENT_EFFECTS.iter().position(|known| *known == e.effect), e.element.clone()));
+        let mut attack_elements: Vec<String> = raw.attacks.iter().filter_map(|a| a.element.clone()).collect();
+        attack_elements.sort();
+        attack_elements.dedup();
+        let mut casts: Vec<String> = raw.skills.iter().filter_map(|s| s.kind.clone()).collect();
+        casts.sort();
+        casts.dedup();
+        let details = MonsterDetails {
+            mp: raw.mp,
+            attack: stat("PADamage"),
+            magic: stat("MADamage"),
+            weapon_def: stat("PDDamage"),
+            magic_def: stat("MDDamage"),
+            accuracy: stat("acc"),
+            evasion: stat("eva"),
+            speed: stat("speed"),
+            knockback: stat("pushed"),
+            hp_recovery: raw.hp_recovery,
+            mp_recovery: raw.mp_recovery,
+            aggressive: raw.aggro,
+            invincible: raw.invincible,
+            elements,
+            magic_attacks: raw.attacks.iter().any(|a| a.magic),
+            attack_elements,
+            casts,
+            splits_into: raw.revives_into,
+        };
+        Self {
+            id: raw.id,
+            name: raw.name,
+            level: raw.level,
+            hp: raw.hp,
+            exp: raw.exp,
+            is_boss: raw.is_boss,
+            undead: raw.undead,
+            spawns: raw.spawns,
+            details,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(from = "RawMonster")]
 pub struct MonsterRecord {
     pub id: u32,
     pub name: String,
-    #[serde(default)]
     pub level: u32,
-    #[serde(default)]
     pub hp: u32,
-    #[serde(default)]
     pub exp: u32,
-    #[serde(default)]
     pub is_boss: bool,
-    #[serde(default)]
     pub undead: bool,
-    #[serde(default)]
     pub spawns: Vec<Spawn>,
+    pub details: MonsterDetails,
+}
+
+/// What the file says of a monster beyond the few numbers maps and routes use. Icon and animation
+/// URLs are left out, like every other image. A stat the file leaves out stays `None`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MonsterDetails {
+    pub mp: Option<u32>,
+    pub attack: Option<i64>,
+    pub magic: Option<i64>,
+    pub weapon_def: Option<i64>,
+    pub magic_def: Option<i64>,
+    pub accuracy: Option<i64>,
+    pub evasion: Option<i64>,
+    /// Added to its movement speed: below zero is slower.
+    pub speed: Option<i64>,
+    /// The damage one hit must deal to knock it back.
+    pub knockback: Option<i64>,
+    pub hp_recovery: Option<u32>,
+    pub mp_recovery: Option<u32>,
+    /// Comes at players on sight.
+    pub aggressive: bool,
+    pub invincible: bool,
+    /// Weak ones first, then strong, then immune.
+    pub elements: Vec<ElementEffect>,
+    pub magic_attacks: bool,
+    /// The elements its attacks carry.
+    pub attack_elements: Vec<String>,
+    /// What its skills do: `self_buff` or `debuff`. The file doesn't name the skills.
+    pub casts: Vec<String>,
+    /// What it turns into when defeated.
+    pub splits_into: Vec<Split>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ElementEffect {
+    pub element: String,
+    /// `Weak`, `Strong` or `Immune`.
+    pub effect: String,
+}
+
+/// `count` of a monster.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Split {
+    pub mob_id: u32,
+    pub count: u32,
 }
 
 /// How many of a monster a map spawns.
@@ -198,6 +339,17 @@ pub struct Spawn {
     pub map_id: u32,
     #[serde(default)]
     pub count: u32,
+    /// The respawn time the file lists, in seconds, when it is one plain number. The game's
+    /// server decides the real timing, so this is only a rough guide.
+    #[serde(default, rename = "mob_time", deserialize_with = "plain_seconds")]
+    pub respawn: Option<u32>,
+}
+
+/// A time written as `3600.00`. Some are ranges, which say nothing a card could use.
+fn plain_seconds<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<u32>, D::Error> {
+    let value = Option::<serde_json::Value>::deserialize(deserializer)?;
+    let seconds = value.and_then(|v| v.as_f64().or_else(|| v.as_str()?.trim().parse().ok()));
+    Ok(seconds.filter(|s| *s > 0.0).map(|s| s as u32))
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
@@ -737,6 +889,40 @@ mod tests {
         let fits: Vec<_> = items.iter().map(|i| i.scroll.as_ref().unwrap().fits.as_str()).collect();
         assert_eq!(fits, ["Hat", "Bottom", "1H Blunt Weapon", "Cape"]);
         assert_eq!(items[0].scroll.as_ref().unwrap().success_rate, Some(100));
+    }
+
+    #[test]
+    fn reads_what_a_monster_can_do_but_not_its_images() {
+        // A made-up monster in OSMS's shape.
+        let json = br#"[
+            {"id": 7, "name": "Moss Golem", "level": 30, "hp": 900, "mp": 40, "exp": 50, "is_boss": true, "aggro": true,
+             "hp_recovery": 12, "stats": {"PADamage": 80, "PDDamage": 0, "acc": 60, "speed": -20, "pushed": 75},
+             "elements": {"Ice": "Immune", "Holy": "Strong", "Fire": "Weak", "Earth": "Weak"},
+             "attacks": [{"index": 1, "ratio": 125}, {"index": 2, "magic": true, "element": "Ice"}],
+             "skills": [{"id": 1, "kind": "self_buff"}, {"id": 2, "kind": "debuff"}, {"id": 3, "kind": "debuff"}],
+             "revives_into": [{"mob_id": 8, "count": 3}],
+             "spawns": [{"map_id": 1, "count": 1, "mob_time": "3600.00"}, {"map_id": 2, "count": 2, "mob_time": "180.00-1800.00 [720.00]"},
+                        {"map_id": 3, "count": 4, "mob_time": null}, {"map_id": 4, "count": 1}],
+             "icon_url": "https://example.invalid/i.png", "animation_urls": {"move": "https://example.invalid/m.webp"}},
+            {"id": 8, "name": "Mossling"}]"#;
+        let Records::Monsters(monsters) = Records::parse("monsters.json", json).unwrap() else { panic!() };
+        let golem = &monsters[0];
+        let details = &golem.details;
+        assert_eq!((details.mp, details.attack, details.weapon_def, details.magic), (Some(40), Some(80), Some(0), None));
+        assert_eq!((details.speed, details.knockback, details.hp_recovery), (Some(-20), Some(75), Some(12)));
+        assert!(details.aggressive && details.magic_attacks && !details.invincible);
+        let elements: Vec<_> = details.elements.iter().map(|e| (e.element.as_str(), e.effect.as_str())).collect();
+        assert_eq!(elements, [("Earth", "Weak"), ("Fire", "Weak"), ("Holy", "Strong"), ("Ice", "Immune")]);
+        assert_eq!(details.attack_elements, ["Ice"]);
+        assert_eq!(details.casts, ["debuff", "self_buff"]);
+        assert_eq!(details.splits_into, [Split { mob_id: 8, count: 3 }]);
+        let times: Vec<_> = golem.spawns.iter().map(|s| s.respawn).collect();
+        assert_eq!(times, [Some(3600), None, None, None]);
+        assert_eq!(monsters[1].details, MonsterDetails::default());
+
+        let stored = serde_json::to_string(details).unwrap();
+        assert!(!stored.contains("http"));
+        assert_eq!(&serde_json::from_str::<MonsterDetails>(&stored).unwrap(), details, "the cache gets back what it stored");
     }
 
     #[test]

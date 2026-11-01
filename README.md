@@ -97,9 +97,15 @@ The Quests tab and its pinned window show each quest in the Quest Helper with it
 
 Once a tracked quest matches the data it stays locked in, so scenery moving behind the Quest Helper can't change it.
 
-### Item search
+### Item and monster lookup
 
-The Item tab searches every item in the map data by name or by what it does, with categories and filters for slot, job, level and stat. An item's card shows its stats, whether your build can wear it, your logged prices, who players saw drop it and which quests give it. Names in a build, its suggestions and a map's drops open here. Search reads nothing from the game, so it works with live reading off.
+The Lookup tab has two halves, Items and Monsters. Neither reads anything from the game, so both work with live reading off.
+
+**Items** searches every item in the map data by name or by what it does, with categories and filters for slot, job, level and stat. An item's card shows its stats, whether your build can wear it, your logged prices, who players saw drop it and which quests give it. Names in a build, its suggestions and a map's drops open here.
+
+**Monsters** opens with what's on your map and near your level, above every monster players meet. Search by name, by something it drops, or by a map, and narrow it by boss, undead, element weakness, region or level. A monster's card shows its stats, elements and what it can do, each map it lives on with a route from where you are, what players saw it drop, the quests that want it and any other versions of it. Monster names on the Map, Train and Quests tabs open here.
+
+The numbers are the data's base values. Leafline doesn't work out damage, hits to kill or hit chance, because those are unsettled for Classic. Few monsters have drops logged on mapleclassic.wiki so far, and a card says so when there are none. A boss's listed respawn is a raw value from the client data, and the game's servers decide the real timing.
 
 **Start from a plan** offers one ready-made Lv 1-70 plan for each 2nd job, and using one fills in goals you can then change. Leafline's plans were written for it from what each skill does and what each weapon needs. They aren't copied from any guide, and nobody has played them yet, so treat them as a starting point. A blank build is always there for your own.
 

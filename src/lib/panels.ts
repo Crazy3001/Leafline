@@ -1,6 +1,6 @@
 // The overlay's panels: one tab each, and each can be pinned into a window of its own.
 
-import { Activity, Map as MapIcon, Milestone, ScrollText, Swords, Tag } from "@lucide/svelte";
+import { Activity, Map as MapIcon, Milestone, ScrollText, Search, Swords } from "@lucide/svelte";
 
 import { mapLabel } from "./format";
 import type { Analysis, Panel, SessionSummary } from "./types";
@@ -19,7 +19,7 @@ export const PANELS: PanelInfo[] = [
   { id: "map", title: "Map", icon: MapIcon },
   { id: "train", title: "Train", icon: Swords },
   { id: "quests", title: "Quests", icon: ScrollText },
-  { id: "item", title: "Item", icon: Tag },
+  { id: "item", title: "Lookup", icon: Search },
   { id: "build", title: "Build", icon: Milestone },
 ];
 

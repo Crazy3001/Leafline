@@ -7,6 +7,7 @@
   import { backend } from "$lib/api";
   import { showItemNamed } from "$lib/items.svelte";
   import { WIKI_CREDIT, WIKI_URL } from "$lib/mapdata.svelte";
+  import { showMonsterNamed } from "$lib/monsters.svelte";
   import type { MonsterDrops } from "$lib/types";
 
   type Drop = MonsterDrops["drops"][number];
@@ -78,10 +79,6 @@
   /** Below this many kills, drops rarer than about 1 in N are likely missing from the log. */
   const FEW_KILLS = 200;
 
-  function wikiPage(monster: string) {
-    return `${WIKI_URL}/index.php?search=${encodeURIComponent(monster)}&go=Go`;
-  }
-
   function quantity(drop: Drop) {
     if (drop.minQuantity == null || drop.maxQuantity == null) return "";
     return ` ×${drop.minQuantity === drop.maxQuantity ? drop.minQuantity : `${drop.minQuantity}–${drop.maxQuantity}`}`;
@@ -105,18 +102,14 @@
       {#each items as item (item.name)}
         <li>
           <div class="item">
-            <button class="name" title="Show it in the Item tab" onclick={() => showItemNamed(item.name)}>{item.name}</button>
+            <button class="name" title="Show it in the Lookup tab" onclick={() => showItemNamed(item.name)}>{item.name}</button>
             {#if item.quest}<span class="tag">quest</span>{/if}
             {#if item.category}<span class="cat">{item.category}</span>{/if}
           </div>
           <div class="sources">
             {#each item.sources as source (source.monster)}
               <span class="source" class:unmeasured={source.rate == null} title={evidence(source)}>
-                <button
-                  class="monster"
-                  title="Open {source.monster} on mapleclassic.wiki"
-                  onclick={() => backend.openLink(wikiPage(source.monster))}>{source.monster}</button
-                >
+                <button class="monster" title="Show it in the Lookup tab" onclick={() => showMonsterNamed(source.monster)}>{source.monster}</button>
                 <span class="rate tabular">{percent(source.rate)}{quantity(source)}</span>
               </span>
             {/each}

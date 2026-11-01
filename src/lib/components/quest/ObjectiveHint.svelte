@@ -4,6 +4,8 @@
   import { ChevronRight, Crosshair } from "@lucide/svelte";
 
   import { backend } from "$lib/api";
+  import { groundDistance } from "$lib/format";
+  import { showMonsterNamed } from "$lib/monsters.svelte";
   import { travelKey } from "$lib/settings.svelte";
   import RouteSteps from "$lib/components/map/RouteSteps.svelte";
   import type { HuntingGround, MapRef, MapRoute, ObjectiveGuide } from "$lib/types";
@@ -51,12 +53,7 @@
     return parts.join(" ");
   }
 
-  function distance(ground: HuntingGround) {
-    if (ground.hops === 0) return "you're here";
-    const walk = ground.hops == null ? "no portal route" : `${ground.hops} portal${ground.hops === 1 ? "" : "s"}`;
-    if (ground.travel) return `${walk} · ${ground.travel.hops} with travel`;
-    return ground.hops == null && !from ? "" : walk;
-  }
+  const distance = (ground: HuntingGround) => groundDistance(ground, from != null);
 </script>
 
 {#if top && best}
@@ -83,7 +80,7 @@
       {#each hunts as hunt (hunt.monster.name)}
         <div class="hunt">
           <div class="mob">
-            <span class="name">{hunt.monster.name}</span>
+            <button class="name" title="Show it in the Lookup tab" onclick={() => showMonsterNamed(hunt.monster.name)}>{hunt.monster.name}</button>
             <span class="muted">Lv {hunt.monster.level}{hunt.monster.boss ? " · boss" : ""}</span>
             {#if hunt.drop}
               <span class="rate" title={rateTitle(hunt.drop)}>{rate(hunt.drop.rate)} drop</span>
@@ -231,7 +228,19 @@
   }
 
   .mob .name {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    font-size: 12px;
     font-weight: 600;
+    cursor: pointer;
+  }
+
+  .mob .name:hover,
+  .mob .name:focus-visible {
+    color: var(--accent-strong);
+    text-decoration: underline;
+    outline: none;
   }
 
   .rate {

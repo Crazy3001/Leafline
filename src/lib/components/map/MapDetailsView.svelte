@@ -82,7 +82,7 @@
         {#each details.mobs as mob (mob.id)}
           <tr>
             <td class="mob">
-              {mob.name}
+              <button class="inline mob-link" title="Open in Lookup" onclick={() => backend.showMonster(mob.id, null)}>{mob.name}</button>
               {#if mob.boss}<span class="boss" title="Boss"><Skull size={11} /></span>{/if}
               {#if mob.undead}<span class="tag" title="Undead">undead</span>{/if}
             </td>
@@ -230,6 +230,12 @@
 
   .mobs .mob {
     color: var(--text);
+  }
+
+  .mob-link {
+    color: var(--text);
+    font-size: 11.5px;
+    text-align: left;
   }
 
   .count {

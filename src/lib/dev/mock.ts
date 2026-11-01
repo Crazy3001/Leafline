@@ -12,6 +12,7 @@ import type {
   Expansion,
   GearItem,
   ItemLink,
+  MonsterLink,
   ItemRecord,
   LevelStep,
   MapRoute,
@@ -35,7 +36,16 @@ import type {
   SessionSummary,
 } from "../types";
 import sample from "./sample-analysis.json";
-import { sampleCard, sampleDrops, sampleGuide, sampleRoute, sampleSearch, sampleSpots } from "./sample-map";
+import {
+  sampleCard,
+  sampleDrops,
+  sampleGuide,
+  sampleMonsterSheet,
+  sampleMonsters,
+  sampleRoute,
+  sampleSearch,
+  sampleSpots,
+} from "./sample-map";
 import sampleSession from "./sample-session.json";
 
 const screenshots = import.meta.glob("/test-screenshots/*.{png,jpg,jpeg,webp}", {
@@ -282,6 +292,7 @@ const mockItems: ItemRecord[] = [
 ];
 const showItemHandlers: ((link: ItemLink) => void)[] = [];
 const showQuestHandlers: ((id: number) => void)[] = [];
+const showMonsterHandlers: ((link: MonsterLink) => void)[] = [];
 const mockQuests: QuestRow[] = [
   { id: 71, name: "Slime Samples", region: "Fern Isle", levelMin: 1, giver: "Innkeeper Bo", repeat: null, exp: 30, mesos: 0 },
   { id: 70, name: "Shell Sorting", region: "Mossbank", levelMin: 3, giver: "Warden Ilse", repeat: "daily", exp: 120, mesos: 500 },
@@ -693,6 +704,21 @@ export const mockBackend: Backend = {
   },
   async onShowQuest(handler) {
     showQuestHandlers.push(handler);
+    return () => {};
+  },
+  searchMonsters: async (query) => sampleMonsters(query),
+  monsterFilters: async () => ({ regions: ["Ashlands", "Fern Isle"], elements: ["Holy", "Ice"] }),
+  findMonster: async (name) => sampleMonsters({ text: name, kind: null, weakTo: null, region: null, levelMin: null, levelMax: null, sort: null, near: null, offset: 0 }).monsters[0]?.id ?? null,
+  async monsterSheet(id, mapName) {
+    await delay(150);
+    const sheet = sampleMonsterSheet(id, mapName ? 2 : null, dropsDownloaded);
+    return sheet && { from: mapName ? sampleCard(2)!.map : null, sheet };
+  },
+  async showMonster(id, text) {
+    showMonsterHandlers.forEach((h) => h({ id, text }));
+  },
+  async onShowMonster(handler) {
+    showMonsterHandlers.push(handler);
     return () => {};
   },
   async readCharacter() {

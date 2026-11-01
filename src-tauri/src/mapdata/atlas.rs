@@ -706,7 +706,9 @@ pub(super) fn similarity(a: &str, b: &str) -> f64 {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::mapdata::osms::{MobRequirement, MonsterRecord, NpcRecord, Portal, QuestRecord, RewardItem, Spawn};
+    use crate::mapdata::osms::{
+        MobRequirement, MonsterDetails, MonsterRecord, NpcRecord, Portal, QuestRecord, RewardItem, Spawn,
+    };
 
     // A small made-up world; none of it is real game data.
     //
@@ -758,7 +760,7 @@ pub(crate) mod tests {
         );
     }
 
-    fn map(id: u32, name: &str, street: &str, portals: Vec<Portal>) -> MapRecord {
+    pub(crate) fn map(id: u32, name: &str, street: &str, portals: Vec<Portal>) -> MapRecord {
         MapRecord {
             id,
             name: name.into(),
@@ -772,7 +774,7 @@ pub(crate) mod tests {
         }
     }
 
-    fn mob(id: u32, name: &str, level: u32, exp: u32, spawns: &[(u32, u32)]) -> MonsterRecord {
+    pub(crate) fn mob(id: u32, name: &str, level: u32, exp: u32, spawns: &[(u32, u32)]) -> MonsterRecord {
         MonsterRecord {
             id,
             name: name.into(),
@@ -781,7 +783,8 @@ pub(crate) mod tests {
             exp,
             is_boss: false,
             undead: false,
-            spawns: spawns.iter().map(|&(map_id, count)| Spawn { map_id, count }).collect(),
+            spawns: spawns.iter().map(|&(map_id, count)| Spawn { map_id, count, respawn: None }).collect(),
+            details: MonsterDetails::default(),
         }
     }
 

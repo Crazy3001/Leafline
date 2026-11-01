@@ -164,6 +164,11 @@ pub fn run() {
             mapdata::quest_regions,
             mapdata::quest_sheet,
             mapdata::show_quest,
+            mapdata::search_monsters,
+            mapdata::monster_filters,
+            mapdata::find_monster,
+            mapdata::monster_sheet,
+            mapdata::show_monster,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Leafline");

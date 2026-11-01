@@ -53,6 +53,14 @@ export function mapLabel(map: { street: string | null; name: string }): string {
   return map.street ? `${map.street} : ${map.name}` : map.name;
 }
 
+/** How far a map is from the player: portals, and steps with any travel turned on. */
+export function groundDistance(ground: { hops: number | null; travel: { hops: number } | null }, located: boolean): string {
+  if (ground.hops === 0) return "you're here";
+  const walk = ground.hops == null ? "no portal route" : `${ground.hops} portal${ground.hops === 1 ? "" : "s"}`;
+  if (ground.travel) return `${walk} · ${ground.travel.hops} with travel`;
+  return ground.hops == null && !located ? "" : walk;
+}
+
 /** A party size as the log shows it: `Solo`, `4 ppl`. Null when it wasn't read. */
 export function partyLabel(size: number | null | undefined): string | null {
   if (size == null) return null;

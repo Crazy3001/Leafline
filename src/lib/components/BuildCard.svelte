@@ -157,7 +157,7 @@
         <ul class="goals">
           {#each plan.expansion.gear as check (check.item.id)}
             <li>
-              <button title="Show it in the Item tab" onclick={() => backend.showItem(check.item.id, null)}>{check.item.name}</button>
+              <button title="Show it in the Lookup tab" onclick={() => backend.showItem(check.item.id, null)}>{check.item.name}</button>
               <span class="tabular" class:warn={!check.usable || check.level == null}>
                 {#if !check.usable}Wrong job{:else if check.level != null}Lv {check.level}{:else}Out of reach{/if}
               </span>

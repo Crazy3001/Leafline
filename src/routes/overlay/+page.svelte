@@ -7,6 +7,7 @@
   import Logo from "$lib/components/Logo.svelte";
   import PanelView from "$lib/components/PanelView.svelte";
   import { itemView, watchItems } from "$lib/items.svelte";
+  import { monsterView, watchMonsters } from "$lib/monsters.svelte";
   import { PANELS, panelInfo, signature } from "$lib/panels";
   import { questView, watchQuests } from "$lib/quests.svelte";
   import { live, watchLive } from "$lib/readings.svelte";
@@ -23,6 +24,7 @@
     watchLive();
     watchSettings();
     watchItems();
+    watchMonsters();
     watchQuests();
   });
 
@@ -51,9 +53,9 @@
     if (read && !read.problem && !read.automatic) select("build");
   });
 
-  // So is a link to an item, from the build planner or a list of drops.
+  // So is a link to an item, from the build planner or a list of drops, or to a monster.
   $effect(() => {
-    if (itemView.seen) select("item");
+    if (itemView.seen || monsterView.seen) select("item");
   });
 
   $effect(() => {
@@ -263,7 +265,7 @@
     </nav>
 
     <div class="main" id="panel" role="tabpanel" aria-labelledby="tab-{tab}">
-      <!-- A build can be planned and items and quests looked up with nothing read yet. -->
+      <!-- A build can be planned and items, monsters and quests looked up with nothing read yet. -->
       {#if live.analysis || live.session || tab === "build" || tab === "item" || tab === "quests"}
         {#key tab}
           <div class="panel"><PanelView panel={tab} analysis={live.analysis} session={live.session} /></div>
@@ -495,10 +497,10 @@
     flex: 1 1 auto;
     align-items: center;
     justify-content: center;
-    gap: 3px;
+    gap: 2px;
     min-width: 0;
     height: 34px;
-    padding: 0 2px;
+    padding: 0 1px;
     border: 0;
     border-bottom: 2px solid transparent;
     background: transparent;
@@ -513,7 +515,7 @@
   }
 
   /* Six titles don't fit a window dragged narrow, so only the open tab keeps its title. */
-  @media (max-width: 318px) {
+  @media (max-width: 330px) {
     [role="tab"]:not([aria-selected="true"]) .tab-title {
       display: none;
     }

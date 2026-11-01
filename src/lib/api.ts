@@ -41,6 +41,11 @@ import type {
   MeasuredRate,
   NewPrice,
   MonsterDrops,
+  MonsterFilters,
+  MonsterLink,
+  MonsterPage,
+  MonsterQuery,
+  MonsterWhere,
   OverlayStatus,
   Panel,
   PinStatus,
@@ -140,6 +145,22 @@ export interface Backend {
   /** Brings a quest up in the Quests tab from any window. */
   showQuest(id: number): Promise<void>;
   onShowQuest(handler: (id: number) => void): Promise<UnlistenFn>;
+  /** One page of the monster search. */
+  searchMonsters(query: MonsterQuery): Promise<MonsterPage>;
+  monsterFilters(): Promise<MonsterFilters>;
+  /** The monster a name means. */
+  findMonster(name: string): Promise<number | null>;
+  /** All the data says about a monster. Downloads the drop table the first time. */
+  monsterSheet(
+    id: number,
+    mapName: string | null,
+    mapStreet: string | null,
+    mapTwin: number | null,
+    measured: MeasuredRate[],
+  ): Promise<MonsterWhere | null>;
+  /** Brings a monster, or a search for `text`, up in the Lookup tab from any window. */
+  showMonster(id: number | null, text: string | null): Promise<void>;
+  onShowMonster(handler: (link: MonsterLink) => void): Promise<UnlistenFn>;
   /** Opens one of the card's link-outs or credits in the browser. */
   openLink(url: string): Promise<void>;
   onMapData(handler: (status: MapDataStatus) => void): Promise<UnlistenFn>;
@@ -177,7 +198,7 @@ export interface Backend {
   findItem(name: string, level: number | null): Promise<ItemRecord | null>;
   /** Who drops an item and which quests give it. Downloads the drop table the first time. */
   itemOrigin(id: number, mapName: string | null, mapStreet: string | null, mapTwin: number | null): Promise<ItemWhere | null>;
-  /** Brings an item, or a search for `text`, up in the Item tab from any window. */
+  /** Brings an item, or a search for `text`, up in the Lookup tab from any window. */
   showItem(id: number | null, text: string | null): Promise<void>;
   onShowItem(handler: (link: ItemLink) => void): Promise<UnlistenFn>;
   /** Adds an item to the gear goals of the build for this character, or takes it off. */
@@ -295,6 +316,13 @@ const tauriBackend: Backend = {
   questSheet: (id, mapName, mapStreet, mapTwin) => invoke("quest_sheet", { id, mapName, mapStreet, mapTwin }),
   showQuest: (id) => invoke("show_quest", { id }),
   onShowQuest: (handler) => listen<number>("show-quest", (e) => handler(e.payload)),
+  searchMonsters: (query) => invoke("search_monsters", { query }),
+  monsterFilters: () => invoke("monster_filters"),
+  findMonster: (name) => invoke("find_monster", { name }),
+  monsterSheet: (id, mapName, mapStreet, mapTwin, measured) =>
+    invoke("monster_sheet", { id, mapName, mapStreet, mapTwin, measured }),
+  showMonster: (id, text) => invoke("show_monster", { id, text }),
+  onShowMonster: (handler) => listen<MonsterLink>("show-monster", (e) => handler(e.payload)),
   openLink: (url) => invoke("open_link", { url }),
   onMapData: (handler) => listen<MapDataStatus>("map-data", (e) => handler(e.payload)),
   priceLog: (item, upgrades, slots) => invoke("price_log", { item, upgrades, slots }),

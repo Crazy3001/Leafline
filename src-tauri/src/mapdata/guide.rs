@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use super::atlas::{Atlas, MapRef, QuestRef, Shortcut, fold, similarity};
 use super::drops::{ItemSources, item_key};
-use super::osms::QuestRecord;
+use super::osms::{MonsterRecord, QuestRecord};
 use super::training::{Measured, MeasuredRate};
 use super::travel::Travel;
 use crate::readers::quest::{Objective, Quest, QuestReading};
@@ -21,7 +21,7 @@ const MIN_MONSTER_SCORE: f64 = 0.85;
 /// Looser when the quest the title matched asks for that monster.
 const MIN_QUEST_MONSTER_SCORE: f64 = 0.7;
 /// How closely a dropper's name on the wiki must match a monster in the map data.
-const MIN_DROPPER_SCORE: f64 = 0.9;
+pub(super) const MIN_DROPPER_SCORE: f64 = 0.9;
 const MIN_QUEST_SCORE: f64 = 0.8;
 /// Below this a title is another quest, not a bad reading of one already known.
 const MIN_HELD_SCORE: f64 = 0.6;
@@ -246,6 +246,8 @@ pub struct HuntingGround {
     pub map: MapRef,
     /// How many of the monster the map spawns.
     pub count: u32,
+    /// How many monsters of any kind the map spawns.
+    pub map_total: u32,
     /// Portals from the current map, when it is known and a route exists.
     pub hops: Option<u32>,
     /// Fewer steps with the travel the player turned on, when that is shorter.
@@ -265,15 +267,28 @@ pub struct Pace {
     pub kills_per_hour: f64,
 }
 
+/// Sorts the versions of one monster: the one that spawns most, which players meet, comes first.
+pub(super) fn main_first(monster: &MonsterRecord) -> (std::cmp::Reverse<u32>, u32) {
+    (std::cmp::Reverse(monster.spawns.iter().map(|s| s.count).sum()), monster.id)
+}
+
 /// What the guide knows about the player, beyond the map they are on.
 #[derive(Debug, Default)]
-struct Context {
+pub(super) struct Context {
     hops: HashMap<u32, u32>,
     shortcuts: HashMap<u32, Shortcut>,
     measured: HashMap<u32, Measured>,
 }
 
 impl Atlas {
+    /// What the guide can tell from the map the player is on, the rates they measured and the
+    /// rides and scrolls they turned on.
+    pub(super) fn context(&self, from: Option<u32>, measured: &[MeasuredRate], travel: &Travel) -> Context {
+        let hops = from.map(|id| self.hops_from(id)).unwrap_or_default();
+        let shortcuts = from.map(|id| self.shortcuts_from(id, travel, &hops)).unwrap_or_default();
+        Context { hops, shortcuts, measured: self.measured_by_map(measured) }
+    }
+
     /// A guide for each quest. `from` is the map the player is on, for portal counts; `items`
     /// holds the drop table's answers for item objectives; `measured` the EXP rates the
     /// player recorded, matched to maps by name; `travel` the rides and scrolls turned on.
@@ -285,9 +300,7 @@ impl Atlas {
         measured: &[MeasuredRate],
         travel: &Travel,
     ) -> Vec<QuestGuide> {
-        let hops = from.map(|id| self.hops_from(id)).unwrap_or_default();
-        let shortcuts = from.map(|id| self.shortcuts_from(id, travel, &hops)).unwrap_or_default();
-        let context = Context { hops, shortcuts, measured: self.measured_by_map(measured) };
+        let context = self.context(from, measured, travel);
         quests
             .iter()
             .map(|query| {
@@ -373,9 +386,7 @@ impl Atlas {
         from: Option<u32>,
         travel: &Travel,
     ) -> ItemOrigin {
-        let hops = from.map(|id| self.hops_from(id)).unwrap_or_default();
-        let shortcuts = from.map(|id| self.shortcuts_from(id, travel, &hops)).unwrap_or_default();
-        let context = Context { hops, shortcuts, ..Context::default() };
+        let context = self.context(from, &[], travel);
         let quests = self.quests_rewarding.get(&item).into_iter().flatten();
         ItemOrigin {
             drops: self.item_objective(name, sources, &context),
@@ -385,12 +396,12 @@ impl Atlas {
 
     /// The monsters (by ID) whose name best matches `name`, and how well. Several IDs can share
     /// a name; all of them are returned so their spawns add up. `among` limits the search.
-    fn monsters_named(&self, name: &str, among: Option<&[u32]>) -> Option<(f64, Vec<u32>)> {
+    pub(super) fn monsters_named(&self, name: &str, among: Option<&[u32]>) -> Option<(f64, Vec<u32>)> {
         let query = fold(name);
         if query.is_empty() {
             return None;
         }
-        let candidates: Vec<&super::osms::MonsterRecord> = match among {
+        let candidates: Vec<&MonsterRecord> = match among {
             Some(ids) => ids.iter().filter_map(|id| self.monsters.get(id)).collect(),
             None => self.monsters.values().collect(),
         };
@@ -408,12 +419,27 @@ impl Atlas {
 
     /// Where to hunt the monster with these IDs.
     fn hunt(&self, ids: &[u32], drop: Option<DropRate>, context: &Context) -> Hunt {
-        let records: Vec<&super::osms::MonsterRecord> = ids.iter().filter_map(|id| self.monsters.get(id)).collect();
+        let records: Vec<&MonsterRecord> = ids.iter().filter_map(|id| self.monsters.get(id)).collect();
         // Of IDs sharing a name, the one that spawns most is the one players meet.
-        let main = records
-            .iter()
-            .max_by_key(|m| (m.spawns.iter().map(|s| s.count).sum::<u32>(), std::cmp::Reverse(m.id)))
-            .expect("hunt needs a known monster");
+        let main = records.iter().copied().min_by_key(|m| main_first(m)).expect("hunt needs a known monster");
+        let mut maps = self.hunting_grounds(&records, context);
+        maps.truncate(MAPS_PER_MONSTER);
+        Hunt {
+            monster: MonsterRef {
+                name: main.name.clone(),
+                known: true,
+                level: main.level,
+                hp: main.hp,
+                exp: main.exp,
+                boss: main.is_boss,
+            },
+            drop,
+            maps,
+        }
+    }
+
+    /// Every map these monsters spawn on, the best first.
+    pub(super) fn hunting_grounds(&self, records: &[&MonsterRecord], context: &Context) -> Vec<HuntingGround> {
         let mut counts: HashMap<u32, u32> = HashMap::new();
         for spawn in records.iter().flat_map(|m| &m.spawns).filter(|s| s.count > 0) {
             *counts.entry(spawn.map_id).or_default() += spawn.count;
@@ -424,6 +450,7 @@ impl Atlas {
             .map(|(id, count)| HuntingGround {
                 map: self.map_ref(id),
                 count,
+                map_total: self.spawns.get(&id).into_iter().flatten().map(|(_, count)| count).sum(),
                 hops: context.hops.get(&id).copied(),
                 travel: context.shortcuts.get(&id).cloned(),
                 pace: self.pace(id, count, context),
@@ -439,19 +466,7 @@ impl Atlas {
                 .then(a.hops.unwrap_or(u32::MAX).cmp(&b.hops.unwrap_or(u32::MAX)))
                 .then_with(|| a.map.name.cmp(&b.map.name))
         });
-        maps.truncate(MAPS_PER_MONSTER);
-        Hunt {
-            monster: MonsterRef {
-                name: main.name.clone(),
-                known: true,
-                level: main.level,
-                hp: main.hp,
-                exp: main.exp,
-                boss: main.is_boss,
-            },
-            drop,
-            maps,
-        }
+        maps
     }
 
     /// Kills per hour of a monster that spawns `count` times on map `id`, from the EXP rate the

@@ -12,13 +12,13 @@ use serde::Serialize;
 
 use super::drops::{Drop, Dropper, MonsterDrops};
 use super::osms::{
-    Dataset, FILES, FileMeta, Height, ItemKind, ItemNeed, ItemRecord, MapRecord, Meta, MobRequirement, MonsterRecord,
-    NpcRecord, Portal, QuestRecord, Records, RewardItem, Side, SkillNeed, SkillRecord, Spawn,
+    Dataset, FILES, FileMeta, Height, ItemKind, ItemNeed, ItemRecord, MapRecord, Meta, MobRequirement, MonsterDetails,
+    MonsterRecord, NpcRecord, Portal, QuestRecord, Records, RewardItem, Side, SkillNeed, SkillRecord, Spawn,
 };
 use crate::error::{Error, Result};
 
 /// Bump when the tables change; an older cache is then dropped and downloaded again.
-const CACHE_VERSION: i32 = 7;
+const CACHE_VERSION: i32 = 8;
 
 const SCHEMA: &str = "
 CREATE TABLE source_files (
@@ -34,8 +34,9 @@ CREATE TABLE portals (
     dest_map_id INTEGER, dest_portal TEXT, side INTEGER, height INTEGER, PRIMARY KEY (map_id, seq));
 CREATE TABLE monsters (
     id INTEGER PRIMARY KEY, name TEXT NOT NULL, level INTEGER NOT NULL, hp INTEGER NOT NULL,
-    exp INTEGER NOT NULL, is_boss INTEGER NOT NULL, undead INTEGER NOT NULL);
-CREATE TABLE spawns (mob_id INTEGER NOT NULL, map_id INTEGER NOT NULL, count INTEGER NOT NULL, PRIMARY KEY (mob_id, map_id));
+    exp INTEGER NOT NULL, is_boss INTEGER NOT NULL, undead INTEGER NOT NULL, details TEXT NOT NULL);
+CREATE TABLE spawns (
+    mob_id INTEGER NOT NULL, map_id INTEGER NOT NULL, count INTEGER NOT NULL, respawn INTEGER, PRIMARY KEY (mob_id, map_id));
 CREATE TABLE npcs (id INTEGER PRIMARY KEY, name TEXT NOT NULL);
 CREATE TABLE npc_maps (npc_id INTEGER NOT NULL, map_id INTEGER NOT NULL, PRIMARY KEY (npc_id, map_id));
 CREATE TABLE quests (
@@ -388,16 +389,20 @@ impl Store {
 
     fn load_monsters(&self) -> Result<Vec<MonsterRecord>> {
         let mut spawns: HashMap<u32, Vec<Spawn>> = HashMap::new();
-        let mut stmt = self.conn.prepare("SELECT mob_id, map_id, count FROM spawns ORDER BY mob_id, map_id")?;
-        for row in stmt.query_map([], |row| Ok((row.get(0)?, Spawn { map_id: row.get(1)?, count: row.get(2)? })))? {
+        let mut stmt = self.conn.prepare("SELECT mob_id, map_id, count, respawn FROM spawns ORDER BY mob_id, map_id")?;
+        let rows = stmt.query_map([], |row| {
+            Ok((row.get(0)?, Spawn { map_id: row.get(1)?, count: row.get(2)?, respawn: row.get(3)? }))
+        })?;
+        for row in rows {
             let (mob, spawn) = row?;
             spawns.entry(mob).or_default().push(spawn);
         }
         let mut stmt =
-            self.conn.prepare("SELECT id, name, level, hp, exp, is_boss, undead FROM monsters ORDER BY id")?;
-        let monsters = stmt.query_map([], |row| {
+            self.conn.prepare("SELECT id, name, level, hp, exp, is_boss, undead, details FROM monsters ORDER BY id")?;
+        let rows = stmt.query_map([], |row| {
             let id: u32 = row.get(0)?;
-            Ok(MonsterRecord {
+            let details: String = row.get(7)?;
+            let monster = MonsterRecord {
                 id,
                 name: row.get(1)?,
                 level: row.get(2)?,
@@ -406,9 +411,17 @@ impl Store {
                 is_boss: row.get(5)?,
                 undead: row.get(6)?,
                 spawns: spawns.remove(&id).unwrap_or_default(),
-            })
+                details: MonsterDetails::default(),
+            };
+            Ok((monster, details))
         })?;
-        Ok(monsters.collect::<rusqlite::Result<_>>()?)
+        let mut monsters = Vec::new();
+        for row in rows {
+            let (mut monster, details) = row?;
+            monster.details = serde_json::from_str(&details).map_err(|err| Error::Invalid(err.to_string()))?;
+            monsters.push(monster);
+        }
+        Ok(monsters)
     }
 
     fn load_npcs(&self) -> Result<Vec<NpcRecord>> {
@@ -536,6 +549,13 @@ impl Store {
         Ok(drops.collect::<rusqlite::Result<_>>()?)
     }
 
+    /// Every monster and item pair the table lists, for finding monsters by what they drop.
+    pub fn dropped_pairs(&self) -> Result<Vec<(String, String)>> {
+        let mut stmt = self.conn.prepare("SELECT DISTINCT monster, item FROM drops ORDER BY monster, item")?;
+        let pairs = stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
+        Ok(pairs.collect::<rusqlite::Result<_>>()?)
+    }
+
     /// Every item the table lists, for matching what was read against.
     pub fn dropped_items(&self) -> Result<Vec<String>> {
         let mut stmt = self.conn.prepare("SELECT DISTINCT item FROM drops ORDER BY item")?;
@@ -630,16 +650,18 @@ fn insert_maps(tx: &Transaction, maps: &[MapRecord]) -> Result<()> {
 
 fn insert_monsters(tx: &Transaction, monsters: &[MonsterRecord]) -> Result<()> {
     let mut monster = tx.prepare(
-        "INSERT OR REPLACE INTO monsters (id, name, level, hp, exp, is_boss, undead) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        "INSERT OR REPLACE INTO monsters (id, name, level, hp, exp, is_boss, undead, details)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
     )?;
     let mut spawn = tx.prepare(
-        "INSERT INTO spawns (mob_id, map_id, count) VALUES (?1, ?2, ?3)
-         ON CONFLICT (mob_id, map_id) DO UPDATE SET count = count + excluded.count",
+        "INSERT INTO spawns (mob_id, map_id, count, respawn) VALUES (?1, ?2, ?3, ?4)
+         ON CONFLICT (mob_id, map_id) DO UPDATE SET count = count + excluded.count, respawn = MAX(respawn, excluded.respawn)",
     )?;
     for m in monsters {
-        monster.execute(params![m.id, m.name, m.level, m.hp, m.exp, m.is_boss, m.undead])?;
+        let details = serde_json::to_string(&m.details).map_err(|err| Error::Invalid(err.to_string()))?;
+        monster.execute(params![m.id, m.name, m.level, m.hp, m.exp, m.is_boss, m.undead, details])?;
         for s in &m.spawns {
-            spawn.execute(params![m.id, s.map_id, s.count])?;
+            spawn.execute(params![m.id, s.map_id, s.count, s.respawn])?;
         }
     }
     Ok(())

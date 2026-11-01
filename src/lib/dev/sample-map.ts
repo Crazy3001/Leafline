@@ -9,6 +9,11 @@ import type {
   MapRef,
   MapRoute,
   MonsterDrops,
+  MonsterDetails,
+  MonsterQuery,
+  MonsterPage,
+  MonsterRow,
+  MonsterSheet,
   ObjectiveGuide,
   QuestQuery,
   TrainingSpots,
@@ -266,7 +271,8 @@ function ground(id: number, count: number, from: number | null): HuntingGround {
   // The sample spots' measured rate on map 2, as kills of this monster.
   const perClear = sampleCard(id)?.expPerClear ?? 0;
   const pace = id === 2 && perClear ? { expPerHour: 1840, activeSeconds: 1260, killsPerHour: (1840 * count) / perClear } : null;
-  return { map: ref(id), count, hops: route ? route.steps.length : null, travel: null, pace };
+  const mapTotal = places[id].mobs.reduce((sum, m) => sum + m.count, 0);
+  return { map: ref(id), count, mapTotal, hops: route ? route.steps.length : null, travel: null, pace };
 }
 
 function hunt(id: number, from: number | null, rate: number | null): Hunt {
@@ -314,6 +320,147 @@ export function sampleGuide(quests: QuestQuery[], from: number | null, hasDrops:
         };
       }),
     })),
+  };
+}
+
+const noDetails: MonsterDetails = {
+  mp: 30,
+  attack: 14,
+  magic: null,
+  weaponDef: 0,
+  magicDef: 10,
+  accuracy: 22,
+  evasion: 4,
+  speed: -30,
+  knockback: 25,
+  hpRecovery: null,
+  mpRecovery: null,
+  aggressive: false,
+  invincible: false,
+  elements: [],
+  magicAttacks: false,
+  attackElements: [],
+  casts: [],
+};
+
+/** Beyond the monsters the sample maps have: a boss, an undead and one on no map. */
+const bestiary: (MonsterRow & { details: MonsterDetails; region: string | null })[] = [
+  ...[...new Map(Object.values(places).flatMap((p) => p.mobs).map((m) => [m.id, m])).values()].map((m) => ({
+    id: m.id,
+    name: m.name,
+    level: m.level,
+    hp: m.hp,
+    exp: m.exp,
+    boss: m.boss,
+    undead: m.undead,
+    note: null,
+    region: "Fern Isle",
+    details: noDetails,
+  })),
+  {
+    id: 20,
+    name: "Bog Ghoul",
+    level: 14,
+    hp: 310,
+    exp: 24,
+    boss: false,
+    undead: true,
+    note: null,
+    region: "Fern Isle",
+    details: { ...noDetails, attack: 42, magic: 51, magicAttacks: true, elements: [{ element: "Holy", effect: "Weak" }, { element: "Poison", effect: "Immune" }] },
+  },
+  {
+    id: 21,
+    name: "Ember Golem",
+    level: 40,
+    hp: 34500,
+    exp: 340,
+    boss: true,
+    undead: false,
+    note: null,
+    region: "Ashlands",
+    details: {
+      ...noDetails,
+      mp: 200,
+      attack: 532,
+      magic: 585,
+      weaponDef: 15,
+      magicDef: 15,
+      accuracy: 130,
+      evasion: 29,
+      speed: 5,
+      knockback: 2750,
+      hpRecovery: 344,
+      mpRecovery: 20,
+      aggressive: true,
+      elements: [{ element: "Ice", effect: "Weak" }, { element: "Fire", effect: "Immune" }],
+      attackElements: ["Fire"],
+      magicAttacks: true,
+      casts: ["debuff", "self_buff"],
+    },
+  },
+  { id: 23, name: "Cinder Bat", level: 28, hp: 640, exp: 52, boss: false, undead: false, note: null, region: "Ashlands", details: noDetails },
+  { id: 22, name: "Thorn Vine", level: 18, hp: 520, exp: 31, boss: false, undead: false, note: null, region: null, details: noDetails },
+];
+
+/** A rough stand-in for the monster search, only for designing the pages. */
+export function sampleMonsters(query: MonsterQuery): MonsterPage {
+  const text = query.text.trim().toLowerCase();
+  const found = bestiary
+    .filter(
+      (m) =>
+        (!query.kind || (query.kind === "boss" ? m.boss : query.kind === "undead" ? m.undead : !m.boss)) &&
+        (!query.weakTo || m.details.elements.some((e) => e.effect === "Weak" && e.element === query.weakTo)) &&
+        (!query.region || m.region === query.region) &&
+        (query.levelMin == null || m.level >= query.levelMin) &&
+        (query.levelMax == null || m.level <= query.levelMax) &&
+        (text ? m.name.toLowerCase().includes(text) : m.region != null),
+    )
+    .sort((a, b) =>
+      query.sort === "name"
+        ? a.name.localeCompare(b.name)
+        : query.sort === "hp"
+          ? b.hp - a.hp
+          : query.sort === "exp"
+            ? b.exp - a.exp
+            : query.sort === "efficiency"
+              ? b.exp / b.hp - a.exp / a.hp
+              : query.near != null
+                ? Math.abs(a.level - query.near) - Math.abs(b.level - query.near)
+                : a.level - b.level,
+    );
+  return { monsters: found.slice(query.offset, query.offset + 40).map(({ details: _, region: __, ...row }) => row), total: found.length, closest: false };
+}
+
+/** A made-up sheet in the sheet's shape. */
+export function sampleMonsterSheet(id: number, from: number | null, hasDrops: boolean): MonsterSheet | null {
+  const monster = bestiary.find((m) => m.id === id);
+  if (!monster) return null;
+  const { details, name, level, hp, exp, boss, undead } = monster;
+  const maps = Object.entries(places)
+    .flatMap(([mapId, p]) => p.mobs.filter((m) => m.id === id).map((m) => ground(Number(mapId), m.count, from)))
+    .sort((a, b) => b.count - a.count);
+  return {
+    id,
+    name,
+    level,
+    hp,
+    exp,
+    boss,
+    undead,
+    details,
+    respawn: boss ? 3600 : null,
+    maps,
+    quests:
+      id === 11
+        ? [
+            { quest: { id: 71, name: "Slime Samples", levelMin: 1 }, giver: "Innkeeper Bo", count: 25 },
+            { quest: { id: 72, name: "Undelivered Letters", levelMin: 6 }, giver: "Lost Courier", count: 10 },
+          ]
+        : [],
+    versions: id === 11 ? [{ id: 12, level: 3, hp: 30, exp: 2, maps: [ref(4)] }] : [],
+    splits: boss ? [{ id: 11, name: "Moss Slime", count: 6 }] : [],
+    drops: hasDrops ? sampleDrops(id === 13 ? ["", "", name] : [name])[id === 13 ? 2 : 0] : null,
   };
 }
 

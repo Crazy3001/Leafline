@@ -1,5 +1,5 @@
-//! Map, monster, NPC and quest facts for the map details card, and skill and equipment facts for
-//! the build planner.
+//! Map, monster, NPC and quest facts for the map details card and the lookups, and skill and
+//! equipment facts for the build planner.
 //!
 //! The facts come from OSMS Data Explorer's public JSON (CC BY 4.0), which is extracted from the
 //! Classic client. Leafline downloads it only after the user asks, keeps it in a local SQLite
@@ -8,6 +8,7 @@
 //! mapleclassic.wiki, where players log them.
 
 pub mod atlas;
+pub mod bestiary;
 pub mod drops;
 pub mod fetch;
 pub mod guide;
@@ -18,6 +19,7 @@ pub mod training;
 pub mod travel;
 
 pub use atlas::{Atlas, MapCard, MapMatch, MapRef, Route};
+pub use bestiary::{MonsterFilters, MonsterPage, MonsterQuery, MonsterRow, MonsterSheet};
 pub use drops::{ItemSources, MonsterDrops};
 pub use fetch::RefreshReport;
 pub use guide::{ItemOrigin, QuestGuide, QuestQuery, QuestTitles};

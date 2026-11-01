@@ -258,7 +258,7 @@
                 <tbody>
                   {#each spot.mobs as mob (mob.id)}
                     <tr>
-                      <td>{mob.name}{mob.boss ? " (boss)" : ""}</td>
+                      <td><button class="mob-link" title="Show it in the Lookup tab" onclick={() => backend.showMonster(mob.id, null)}>{mob.name}</button>{mob.boss ? " (boss)" : ""}</td>
                       <td class="tabular">{mob.level}</td>
                       <td class="tabular">{mob.count}</td>
                       <td class="tabular">{formatCompact(mob.exp)}</td>
@@ -534,6 +534,22 @@
   .mobs td:first-child {
     text-align: left;
     color: var(--text);
+  }
+
+  .mob-link {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    font-size: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .mob-link:hover,
+  .mob-link:focus-visible {
+    color: var(--map);
+    text-decoration: underline;
+    outline: none;
   }
 
   .mobs th:first-child {

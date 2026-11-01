@@ -55,7 +55,7 @@ impl Panel {
             Panel::Map => "Map",
             Panel::Train => "Train",
             Panel::Quests => "Quests",
-            Panel::Item => "Item",
+            Panel::Item => "Lookup",
             Panel::Build => "Build",
         }
     }
@@ -120,7 +120,7 @@ impl PinState {
     }
 }
 
-/// Whether a pinned Item panel is on screen.
+/// Whether a pinned Lookup panel, which shows items and monsters, is on screen.
 pub fn shows_item(app: &AppHandle) -> bool {
     shows(app, Panel::Item)
 }

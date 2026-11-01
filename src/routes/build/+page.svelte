@@ -99,7 +99,7 @@
     saveTimer = setTimeout(() => save(snapshot), SAVE_DELAY);
   });
 
-  // A gear goal can be set from the Item tab. Unsaved typing here comes first.
+  // A gear goal can be set from the Lookup tab. Unsaved typing here comes first.
   $effect(() => {
     void buildState.version;
     const id = untrack(() => draft?.id);
@@ -601,13 +601,13 @@
 
       <section>
         <h2>Gear to aim for</h2>
-        <p class="help">Shows the first level this plan can wear it, counting the stats on earlier gear goals. Names open in the Item tab.</p>
+        <p class="help">Shows the first level this plan can wear it, counting the stats on earlier gear goals. Names open in the Lookup tab.</p>
         {#if expansion?.gear.length}
           <ol class="goals">
             {#each expansion.gear as check (check.item.id)}
               <li>
                 <span class="goal-name">
-                  <button class="item-link" title="Show it in the Item tab" onclick={() => backend.showItem(check.item.id, null)}>{check.item.name}</button>
+                  <button class="item-link" title="Show it in the Lookup tab" onclick={() => backend.showItem(check.item.id, null)}>{check.item.name}</button>
                   <small>{check.item.slot} · {requires(check.item)}{gives(check.item) ? ` · ${gives(check.item)}` : ""}</small>
                 </span>
                 <span class="max tabular" class:warn={!check.usable || check.level == null}>

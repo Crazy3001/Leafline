@@ -1,4 +1,4 @@
-// The item database as the Item tab shows it. It lives here so that switching tabs keeps a search,
+// The item database as the Lookup tab shows it. It lives here so that switching tabs keeps a search,
 // and so a link from another window or panel can bring an item up.
 
 import { backend } from "./api";
@@ -20,6 +20,9 @@ export const blankQuery = (): ItemQuery => ({
   offset: 0,
 });
 
+/** Which half of the Lookup tab is showing. */
+export const lookup = $state<{ mode: "items" | "monsters" }>({ mode: "items" });
+
 export const itemView = $state<{ id: number | null; query: ItemQuery; seen: number }>({
   /** The item open from the database. */
   id: null,
@@ -36,6 +39,7 @@ export function watchItems() {
   backend.onShowItem((link) => {
     itemView.id = link.id;
     if (link.text != null) itemView.query = { ...blankQuery(), text: link.text };
+    lookup.mode = "items";
     itemView.seen += 1;
   });
   // A new price check takes over from whatever was open.
@@ -43,6 +47,7 @@ export function watchItems() {
     if (read.found) {
       itemView.id = null;
       itemView.query = blankQuery();
+      lookup.mode = "items";
     }
   });
 }

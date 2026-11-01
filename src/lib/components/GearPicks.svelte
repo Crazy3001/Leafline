@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Gear to look for at a level, on this build. Each name opens the item in the Item tab. The
+  // Gear to look for at a level, on this build. Each name opens the item in the Lookup tab. The
   // Build tab shows the top pick of each slot; the editor shows more, and can add them as goals.
   import { Plus } from "@lucide/svelte";
 
@@ -43,7 +43,7 @@
         <div class="picks">
           {#each full ? slot.picks : slot.picks.slice(0, 1) as pick (pick.item.id)}
             <div class="pick">
-              <button class="name" class:goal={pick.goal} title="Show it in the Item tab" onclick={() => backend.showItem(pick.item.id, null)}>
+              <button class="name" class:goal={pick.goal} title="Show it in the Lookup tab" onclick={() => backend.showItem(pick.item.id, null)}>
                 {pick.item.name}{#if pick.item.gender}<small>{pick.item.gender[0].toUpperCase()}</small>{/if}
               </button>
               <span class="gives">
