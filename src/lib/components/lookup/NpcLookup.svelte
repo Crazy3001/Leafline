@@ -4,6 +4,7 @@
   import { ArrowLeft, LoaderCircle } from "@lucide/svelte";
   import { untrack } from "svelte";
 
+  import Chips from "./Chips.svelte";
   import FilterBox from "./FilterBox.svelte";
   import KindTabs from "./KindTabs.svelte";
   import LookupRow from "./LookupRow.svelte";
@@ -35,17 +36,20 @@
   const query = $derived(npcView.query);
 
   let regions = $state<string[]>([]);
+  let areas = $state<string[]>([]);
   let showFilters = $state(false);
   let page = $state<NpcPage | null>(null);
   let searching = $state(false);
 
   const narrowed = $derived(query.region != null ? 1 : 0);
-  const browsing = $derived(query.text.trim() !== "" || query.kind != null || narrowed > 0);
+  const browsing = $derived(query.text.trim() !== "" || query.kind != null || query.area != null || narrowed > 0);
   const asked = $derived(JSON.stringify(query));
 
   $effect(() => {
     void mapData.status?.dataUpdatedAt;
-    if (ready) backend.mapRegions().then((r) => (regions = r));
+    if (!ready) return;
+    backend.mapRegions().then((r) => (regions = r));
+    backend.mapAreas().then((a) => (areas = a));
   });
 
   // Follows the query alone: every live reading brings new objects with the same content.
@@ -113,6 +117,7 @@
     />
     {#if npcView.id == null}
       <KindTabs label="Kind of NPC" options={KINDS} value={query.kind} onselect={(kind) => setQuery({ kind })} />
+      <Chips label="Area" options={areas} value={query.area} onselect={(area) => setQuery({ area })} />
     {/if}
     {#if showFilters}
       <FilterBox>

@@ -2,7 +2,7 @@
   // Equipment for one character, slot by slot, the best first: what their job can use at their
   // level, going by their build where they have one. Anything it assumes can be changed here.
   import LookupRow from "./LookupRow.svelte";
-  import SlotChips from "./SlotChips.svelte";
+  import Chips from "./Chips.svelte";
   import Section from "../map/Section.svelte";
   import { backend } from "$lib/api";
   import { buildState, watchBuilds } from "$lib/builds.svelte";
@@ -114,7 +114,7 @@
   <button class="plain everything" title="List all equipment, whoever it's for" onclick={() => (gearView.forMe = false)}>Everything</button>
 </div>
 
-<SlotChips slots={offered} value={slot} onselect={onslot} />
+<Chips label="Slot" options={offered} value={slot} onselect={onslot} />
 
 {#if found}
   {#if beginner && found.job && jobName}

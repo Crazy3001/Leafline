@@ -4,6 +4,7 @@
   import { ArrowLeft, LoaderCircle } from "@lucide/svelte";
   import { untrack } from "svelte";
 
+  import Chips from "./Chips.svelte";
   import FilterBox from "./FilterBox.svelte";
   import KindTabs from "./KindTabs.svelte";
   import LookupRow from "./LookupRow.svelte";
@@ -32,18 +33,21 @@
   const query = $derived(mapView.query);
 
   let regions = $state<string[]>([]);
+  let areas = $state<string[]>([]);
   let showFilters = $state(false);
   let page = $state<MapPage | null>(null);
   let searching = $state(false);
   let details = $state<MapDetails | null>(null);
 
   const narrowed = $derived([query.region, query.levelMin, query.levelMax].filter((v) => v != null).length);
-  const browsing = $derived(query.text.trim() !== "" || query.kind != null || query.sort != null || narrowed > 0);
+  const browsing = $derived(query.text.trim() !== "" || query.kind != null || query.area != null || query.sort != null || narrowed > 0);
   const asked = $derived(JSON.stringify(query));
 
   $effect(() => {
     void mapData.status?.dataUpdatedAt;
-    if (ready) backend.mapRegions().then((r) => (regions = r));
+    if (!ready) return;
+    backend.mapRegions().then((r) => (regions = r));
+    backend.mapAreas().then((a) => (areas = a));
   });
 
   // Follows the query alone: every live reading brings new objects with the same content.
@@ -127,6 +131,7 @@
     />
     {#if mapView.id == null}
       <KindTabs label="Kind of map" options={KINDS} value={query.kind} onselect={(kind) => setQuery({ kind })} />
+      <Chips label="Area" options={areas} value={query.area} onselect={(area) => setQuery({ area })} />
     {/if}
     {#if showFilters}
       <FilterBox>

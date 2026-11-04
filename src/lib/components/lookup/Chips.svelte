@@ -1,23 +1,25 @@
 <script lang="ts">
-  // Equipment slots to narrow a list to. Choosing the one that's on goes back to all of them.
+  // The finer groups under a kind, such as equipment slots or areas, to narrow a list to. Choosing
+  // the one that's on goes back to all of them.
   let {
-    slots,
+    label,
+    options,
     value,
     onselect,
-  }: { slots: string[]; value: string | null; onselect: (slot: string | null) => void } = $props();
+  }: { label: string; options: string[]; value: string | null; onselect: (option: string | null) => void } = $props();
 </script>
 
-{#if slots.length}
-  <div class="slots" role="radiogroup" aria-label="Slot">
+{#if options.length}
+  <div class="chips" role="radiogroup" aria-label={label}>
     <button role="radio" aria-checked={value == null} onclick={() => onselect(null)}>All</button>
-    {#each slots as slot (slot)}
-      <button role="radio" aria-checked={value === slot} onclick={() => onselect(value === slot ? null : slot)}>{slot}</button>
+    {#each options as option (option)}
+      <button role="radio" aria-checked={value === option} onclick={() => onselect(value === option ? null : option)}>{option}</button>
     {/each}
   </div>
 {/if}
 
 <style>
-  .slots {
+  .chips {
     display: flex;
     flex-wrap: wrap;
     gap: 3px;

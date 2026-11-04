@@ -181,6 +181,7 @@ pub fn run() {
             mapdata::show_monster,
             mapdata::browse_maps,
             mapdata::map_regions,
+            mapdata::map_areas,
             mapdata::search_npcs,
             mapdata::find_npc,
             mapdata::npc_sheet,

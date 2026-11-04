@@ -5,8 +5,8 @@ import { backend } from "./api";
 import { lookup } from "./items.svelte";
 import type { MapQuery, NpcQuery } from "./types";
 
-export const blankMapQuery = (): MapQuery => ({ text: "", kind: null, region: null, levelMin: null, levelMax: null, sort: null, offset: 0 });
-export const blankNpcQuery = (): NpcQuery => ({ text: "", kind: null, region: null, offset: 0 });
+export const blankMapQuery = (): MapQuery => ({ text: "", kind: null, region: null, area: null, levelMin: null, levelMax: null, sort: null, offset: 0 });
+export const blankNpcQuery = (): NpcQuery => ({ text: "", kind: null, region: null, area: null, offset: 0 });
 
 export const mapView = $state<{ id: number | null; trail: number[]; query: MapQuery }>({
   /** The map open. */

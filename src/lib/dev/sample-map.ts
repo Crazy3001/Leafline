@@ -417,6 +417,7 @@ export function sampleMonsters(query: MonsterQuery): MonsterPage {
         (!query.kind || (query.kind === "boss" ? m.boss : query.kind === "undead" ? m.undead : !m.boss)) &&
         (!query.weakTo || m.details.elements.some((e) => e.effect === "Weak" && e.element === query.weakTo)) &&
         (!query.region || m.region === query.region) &&
+        (!query.area || m.region === query.area) &&
         (query.levelMin == null || m.level >= query.levelMin) &&
         (query.levelMax == null || m.level <= query.levelMax) &&
         (text ? m.name.toLowerCase().includes(text) : m.region != null),

@@ -5,6 +5,7 @@
   import { untrack } from "svelte";
 
   import Card from "./Card.svelte";
+  import Chips from "./lookup/Chips.svelte";
   import FilterBox from "./lookup/FilterBox.svelte";
   import KindTabs from "./lookup/KindTabs.svelte";
   import SearchBar from "./lookup/SearchBar.svelte";
@@ -59,19 +60,21 @@
   const query = $derived(monsterView.query);
 
   let filters = $state<MonsterFilters | null>(null);
+  let areas = $state<string[]>([]);
   let showFilters = $state(false);
   let page = $state<MonsterPage | null>(null);
   let searching = $state(false);
   let near = $state<MonsterRow[]>([]);
 
   const narrowed = $derived([query.weakTo, query.region, query.levelMin, query.levelMax, query.sort].filter((v) => v != null).length);
-  const browsing = $derived(query.text.trim() !== "" || query.kind != null || narrowed > 0);
+  const browsing = $derived(query.text.trim() !== "" || query.kind != null || query.area != null || narrowed > 0);
   const asked = $derived(JSON.stringify(query));
 
   $effect(() => {
     void mapData.status?.dataUpdatedAt;
     if (!ready) return;
     backend.monsterFilters().then((f) => (filters = f));
+    backend.mapAreas().then((a) => (areas = a));
     // So a monster can be found by what it drops. Nothing is sent, and it renews weekly at most.
     backend.downloadDrops().catch(() => {});
   });
@@ -208,6 +211,7 @@
 
     {#if monsterView.id == null}
       <KindTabs label="Kind of monster" options={KINDS} value={query.kind} onselect={(kind) => setQuery({ kind })} />
+      <Chips label="Area" options={areas} value={query.area} onselect={(area) => setQuery({ area })} />
     {/if}
 
     {#if showFilters}

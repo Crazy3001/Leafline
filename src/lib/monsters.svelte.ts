@@ -10,6 +10,7 @@ export const blankMonsterQuery = (): MonsterQuery => ({
   kind: null,
   weakTo: null,
   region: null,
+  area: null,
   levelMin: null,
   levelMax: null,
   sort: null,

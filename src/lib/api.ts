@@ -174,6 +174,8 @@ export interface Backend {
   browseMaps(query: MapQuery): Promise<MapPage>;
   /** The regions maps are filed under. */
   mapRegions(): Promise<string[]>;
+  /** The areas Lookup narrows maps, monsters and NPCs to, Maple Island first. */
+  mapAreas(): Promise<string[]>;
   /** One page of the NPC search. */
   searchNpcs(query: NpcQuery): Promise<NpcPage>;
   /** The NPC a name means. */
@@ -353,6 +355,7 @@ const tauriBackend: Backend = {
   onShowMonster: (handler) => listen<MonsterLink>("show-monster", (e) => handler(e.payload)),
   browseMaps: (query) => invoke("browse_maps", { query }),
   mapRegions: () => invoke("map_regions"),
+  mapAreas: () => invoke("map_areas"),
   searchNpcs: (query) => invoke("search_npcs", { query }),
   findNpc: (name) => invoke("find_npc", { name }),
   npcSheet: (id, mapName, mapStreet, mapTwin) => invoke("npc_sheet", { id, mapName, mapStreet, mapTwin }),

@@ -539,6 +539,12 @@ pub fn map_regions(state: State<MapDataState>) -> Vec<String> {
     state.atlas().map(|atlas| atlas.map_regions()).unwrap_or_default()
 }
 
+/// The areas Lookup narrows maps, monsters and NPCs to.
+#[tauri::command]
+pub fn map_areas(state: State<MapDataState>) -> Vec<String> {
+    state.atlas().map(|atlas| atlas.map_areas()).unwrap_or_default()
+}
+
 /// One page of the NPC search.
 #[tauri::command]
 pub fn search_npcs(state: State<MapDataState>, query: NpcQuery) -> NpcPage {

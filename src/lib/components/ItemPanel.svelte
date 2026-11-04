@@ -10,7 +10,7 @@
   import GearFinder from "./lookup/GearFinder.svelte";
   import KindTabs from "./lookup/KindTabs.svelte";
   import SearchBar from "./lookup/SearchBar.svelte";
-  import SlotChips from "./lookup/SlotChips.svelte";
+  import Chips from "./lookup/Chips.svelte";
   import MapDataPanel from "./map/MapDataPanel.svelte";
   import { backend } from "$lib/api";
   import { JOBS, blankQuery, gearView, gives, itemSlot, itemView, lastLine, watchItems } from "$lib/items.svelte";
@@ -162,7 +162,7 @@
     <KindTabs label="Kind of item" options={KINDS} value={query.kind} onselect={(kind) => setQuery({ kind, slot: null })} />
     {#if query.kind === "equip" && !finding}
       <button class="for-me" onclick={() => (gearView.forMe = true)}>Show only gear for me</button>
-      <SlotChips slots={filters?.slots ?? []} value={query.slot} onselect={(slot) => setQuery({ slot })} />
+      <Chips label="Slot" options={filters?.slots ?? []} value={query.slot} onselect={(slot) => setQuery({ slot })} />
     {/if}
   {/if}
 

@@ -9,7 +9,8 @@ use serde::{Deserialize, Serialize};
 use super::atlas::{Atlas, MapRef, QuestRef, fold, similarity};
 use super::drops::{MonsterDrops, item_key};
 use super::guide::{HuntingGround, MIN_DROPPER_SCORE, main_first};
-use super::osms::{MonsterDetails, MonsterRecord};
+use super::osms::{MapRecord, MonsterDetails, MonsterRecord};
+use super::places::area_of;
 use super::questbook::has_words;
 use super::training::MeasuredRate;
 use super::travel::Travel;
@@ -28,6 +29,8 @@ pub struct MonsterQuery {
     pub kind: Option<String>,
     pub weak_to: Option<String>,
     pub region: Option<String>,
+    /// Monsters living on a map in one of [`Atlas::map_areas`].
+    pub area: Option<String>,
     pub level_min: Option<u32>,
     pub level_max: Option<u32>,
     /// `name`, `hp`, `exp` or `efficiency`. By level otherwise.
@@ -203,14 +206,18 @@ impl Atlas {
         }
         let admits = |family: &&Vec<&MonsterRecord>| {
             let main = family[0];
-            let in_region =
-                |region: &String| family.iter().flat_map(|m| &m.spawns).any(|s| self.maps.get(&s.map_id).is_some_and(|m| m.region.as_ref() == Some(region)));
+            let lives = |on: &dyn Fn(&MapRecord) -> bool| {
+                family.iter().flat_map(|m| &m.spawns).any(|s| self.maps.get(&s.map_id).is_some_and(on))
+            };
+            let in_region = |region: &String| lives(&|map| map.region.as_ref() == Some(region));
+            let in_area = |area: &String| lives(&|map| area_of(map).as_ref() == Some(area));
             let weak = |element: &String| main.details.elements.iter().any(|e| e.effect == "Weak" && e.element == *element);
             query.kind.as_ref().is_none_or(|kind| of_kind(main, kind))
                 && query.level_min.is_none_or(|level| main.level >= level)
                 && query.level_max.is_none_or(|level| main.level <= level)
                 && query.weak_to.as_ref().is_none_or(weak)
                 && query.region.as_ref().is_none_or(in_region)
+                && query.area.as_ref().is_none_or(in_area)
                 && (!words.is_empty() || self.met(family, items_of.contains_key(&fold(&main.name))))
         };
         let families = self.families();

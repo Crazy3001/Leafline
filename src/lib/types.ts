@@ -955,6 +955,8 @@ export interface MonsterQuery {
   kind: string | null;
   weakTo: string | null;
   region: string | null;
+  /** One of `mapAreas`. */
+  area: string | null;
   levelMin: number | null;
   levelMax: number | null;
   /** `name`, `hp`, `exp` or `efficiency`. By level otherwise. */
@@ -1059,6 +1061,8 @@ export interface MapQuery {
   /** `town` or `field`. */
   kind: string | null;
   region: string | null;
+  /** One of `mapAreas`. */
+  area: string | null;
   /** Maps with a monster in this range of levels. */
   levelMin: number | null;
   levelMax: number | null;
@@ -1089,6 +1093,8 @@ export interface NpcQuery {
   /** `quests` for only those who give some. */
   kind: string | null;
   region: string | null;
+  /** One of `mapAreas`. */
+  area: string | null;
   offset: number;
 }
 

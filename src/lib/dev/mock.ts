@@ -715,7 +715,7 @@ export const mockBackend: Backend = {
   },
   searchMonsters: async (query) => sampleMonsters(query),
   monsterFilters: async () => ({ regions: ["Ashlands", "Fern Isle"], elements: ["Holy", "Ice"] }),
-  findMonster: async (name) => sampleMonsters({ text: name, kind: null, weakTo: null, region: null, levelMin: null, levelMax: null, sort: null, near: null, offset: 0 }).monsters[0]?.id ?? null,
+  findMonster: async (name) => sampleMonsters({ text: name, kind: null, weakTo: null, region: null, area: null, levelMin: null, levelMax: null, sort: null, near: null, offset: 0 }).monsters[0]?.id ?? null,
   async monsterSheet(id, mapName) {
     await delay(150);
     const sheet = sampleMonsterSheet(id, mapName ? 2 : null, dropsDownloaded);
@@ -730,8 +730,9 @@ export const mockBackend: Backend = {
   },
   browseMaps: async (query) => sampleMaps(query),
   mapRegions: async () => ["Ashlands", "Fern Isle"],
+  mapAreas: async () => ["Fern Isle", "Ashlands"],
   searchNpcs: async (query) => sampleNpcs(query),
-  findNpc: async (name) => sampleNpcs({ text: name, kind: null, region: null, offset: 0 }).npcs[0]?.id ?? null,
+  findNpc: async (name) => sampleNpcs({ text: name, kind: null, region: null, area: null, offset: 0 }).npcs[0]?.id ?? null,
   async npcSheet(id, mapName) {
     const sheet = sampleNpcSheet(id, mapName ? 2 : null);
     return sheet && { from: mapName ? sampleCard(2)!.map : null, sheet };
