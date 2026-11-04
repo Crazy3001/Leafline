@@ -37,6 +37,10 @@ const TEXT_WIDTH: f32 = 290.0;
 /// Lines of one wrapped name are closer than this; a tag sits further down.
 const NAME_WRAP: f32 = 16.0;
 
+/// The bullet is a diamond this many game pixels across, 13 square game pixels in all.
+const BULLET_SIDE: f32 = 5.0;
+const BULLET_AREA: f32 = 13.0;
+
 /// Tags as printed in game; a reading close to one takes its spelling.
 const TAGS: [&str; 3] = ["Quest Item", "Untradable", "One-of-a-kind"];
 
@@ -87,7 +91,77 @@ pub fn read_all(frame: &Frame, overview: &[Line], panels: &[Panel], ocr: &Ocr) -
         }
         items.push(read(frame, line, ocr)?);
     }
+    // The whole-frame OCR can drop a short name outright (`Apple` on 2026-11-04, on plain dark
+    // purple), so a bullet with the box under it that no name line led to is read from its own
+    // spot as well.
+    for line in bullet_names(frame) {
+        if inside(&line) || items.iter().any(|item| item.panel.vertical_overlap(&line.rect) > 0.0) {
+            continue;
+        }
+        let item = read(frame, &line, ocr)?;
+        if !item.name.is_empty() {
+            items.push(item);
+        }
+    }
     Ok(items)
+}
+
+/// Where a tooltip's name would be, for each bullet in the frame with the icon box under it, as
+/// a line of the name's height starting at the bullet, the way OCR reports one.
+fn bullet_names(frame: &Frame) -> Vec<Line> {
+    blobs(frame, is_bullet)
+        .into_iter()
+        .filter_map(|(rect, area)| {
+            let unit = rect.w.max(rect.h) / BULLET_SIDE;
+            let expected = BULLET_AREA * unit * unit;
+            let square = (rect.w - rect.h).abs() <= 2.0 + rect.w / 4.0;
+            let sized = (0.8..=3.5).contains(&unit) && area >= 0.6 * expected && area <= 1.6 * expected;
+            (square && sized).then(|| {
+                let top = rect.center_y() - NAME_HEIGHT * unit / 2.0;
+                Line { text: String::new(), rect: Rect::new(rect.x, top, 60.0 * unit, NAME_HEIGHT * unit), words: vec![] }
+            })
+        })
+        .filter(|line| is_name(frame, line))
+        .collect()
+}
+
+/// Connected patches of pixels that `matches`, as their bounding box and pixel count. Only small
+/// patches are kept: big ones can't be a bullet and would only cost time.
+fn blobs(frame: &Frame, matches: fn(&Rgba<u8>) -> bool) -> Vec<(Rect, f32)> {
+    const MAX_PIXELS: usize = 400;
+    let (width, height) = (frame.width(), frame.height());
+    let mut seen = vec![false; (width * height) as usize];
+    let mut found = Vec::new();
+    for y in 0..height {
+        for x in 0..width {
+            let i = (y * width + x) as usize;
+            if seen[i] || !matches(frame.get_pixel(x, y)) {
+                continue;
+            }
+            seen[i] = true;
+            let mut stack = vec![(x, y)];
+            let (mut left, mut top, mut right, mut bottom, mut count) = (x, y, x, y, 0usize);
+            while let Some((px, py)) = stack.pop() {
+                count += 1;
+                (left, top, right, bottom) = (left.min(px), top.min(py), right.max(px), bottom.max(py));
+                for (nx, ny) in [(px.wrapping_sub(1), py), (px + 1, py), (px, py.wrapping_sub(1)), (px, py + 1)] {
+                    if nx >= width || ny >= height {
+                        continue;
+                    }
+                    let j = (ny * width + nx) as usize;
+                    if !seen[j] && matches(frame.get_pixel(nx, ny)) {
+                        seen[j] = true;
+                        stack.push((nx, ny));
+                    }
+                }
+            }
+            if count <= MAX_PIXELS {
+                let rect = Rect::new(left as f32, top as f32, (right - left + 1) as f32, (bottom - top + 1) as f32);
+                found.push((rect, count as f32));
+            }
+        }
+    }
+    found
 }
 
 fn read(frame: &Frame, name: &Line, ocr: &Ocr) -> Result<ItemTooltip> {
@@ -181,6 +255,36 @@ mod tests {
         // The Quest Helper has the box's shade but no bullet.
         assert!(!is_name(&scene(PANEL, false, true), &name));
         assert!(!is_name(&scene(PANEL, true, false), &name));
+    }
+
+    /// A frame of the panel's purple with a bullet drawn as the game draws it at 2x (a diamond
+    /// 10 pixels across, 52 pixels in all) at `(100, 100)`, and the icon box under it if `icon_box`.
+    fn diamond_scene(icon_box: bool) -> Frame {
+        const ROWS: [(u32, u32); 10] = [(4, 6), (4, 6), (2, 8), (2, 8), (0, 10), (0, 10), (2, 8), (2, 8), (4, 6), (4, 6)];
+        Frame::from_fn(400, 400, |x, y| {
+            let bullet = (100..110).contains(&y) && {
+                let (from, to) = ROWS[(y - 100) as usize];
+                (100 + from..100 + to).contains(&x)
+            };
+            if bullet {
+                Rgba([85, 204, 255, 255])
+            } else if icon_box && (100..236).contains(&x) && (135..271).contains(&y) {
+                Rgba([204, 204, 219, 255])
+            } else {
+                Rgba([74, 76, 120, 255])
+            }
+        })
+    }
+
+    #[test]
+    fn a_bullet_and_its_box_mark_a_name_that_ocr_missed() {
+        let found = bullet_names(&diamond_scene(true));
+        assert_eq!(found.len(), 1);
+        let rect = found[0].rect;
+        assert_eq!((rect.x, rect.h), (100.0, 20.0), "starts at the bullet, a name's height at 2x");
+        assert!((rect.center_y() - 105.0).abs() <= 1.0, "level with the bullet");
+        // A bullet-blue patch with no box under it is something else, such as a minimap mark.
+        assert!(bullet_names(&diamond_scene(false)).is_empty());
     }
 
     #[test]
