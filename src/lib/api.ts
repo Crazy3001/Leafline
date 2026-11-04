@@ -45,6 +45,7 @@ import type {
   MapRoute,
   MeasuredRate,
   NewPrice,
+  SavedSpot,
   UpdateStatus,
   ItemNote,
   MonsterDrops,
@@ -199,6 +200,11 @@ export interface Backend {
   priceLog(item: string, upgrades: number | null, slots: number | null): Promise<PriceLog>;
   recordPrice(price: NewPrice): Promise<PriceLog>;
   deletePrice(id: number): Promise<void>;
+  /** The training spots the player saved, the newest first. */
+  savedSpots(): Promise<SavedSpot[]>;
+  /** Saves a map as a training spot, or takes it off the list. Every window hears of it. */
+  setSpotSaved(mapId: number, name: string, saved: boolean): Promise<SavedSpot[]>;
+  onSavedSpots(handler: (spots: SavedSpot[]) => void): Promise<UnlistenFn>;
   /** The player's note on an item, matched like the price log. */
   itemNote(item: string): Promise<ItemNote | null>;
   /** Writes it; an empty note deletes it. */
@@ -390,6 +396,9 @@ const tauriBackend: Backend = {
   priceLog: (item, upgrades, slots) => invoke("price_log", { item, upgrades, slots }),
   recordPrice: (price) => invoke("record_price", { price }),
   deletePrice: (id) => invoke("delete_price", { id }),
+  savedSpots: () => invoke("saved_spots"),
+  setSpotSaved: (mapId, name, saved) => invoke("set_spot_saved", { mapId, name, saved }),
+  onSavedSpots: (handler) => listen<SavedSpot[]>("saved-spots", (e) => handler(e.payload)),
   itemNote: (item) => invoke("item_note", { item }),
   setItemNote: (item, note) => invoke("set_item_note", { item, note }),
   knownMesos: (name) => invoke("known_mesos", { name }),

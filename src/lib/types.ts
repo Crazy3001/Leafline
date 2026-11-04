@@ -639,6 +639,15 @@ export interface TrainingSpots {
   spots: TrainingSpot[];
 }
 
+/** A training spot the player saved (src-tauri/src/userdata/spots.rs). */
+export interface SavedSpot {
+  mapId: number;
+  /** The map's name when it was saved. */
+  name: string;
+  /** Unix seconds. */
+  savedAt: number;
+}
+
 /** The player's own note on an item (src-tauri/src/userdata/notes.rs). */
 export interface ItemNote {
   item: string;

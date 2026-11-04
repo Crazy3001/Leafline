@@ -1,8 +1,9 @@
 <script lang="ts">
   // Training spots for the character's level: maps ranked by the map data's base numbers, or
-  // by the EXP per hour the player measured there. No game formulas are modelled.
-  import { ChevronRight, Gauge, Minus, Plus } from "@lucide/svelte";
-  import { untrack } from "svelte";
+  // by the EXP per hour the player measured there, with the spots the player saved on top. No
+  // game formulas are modelled.
+  import { Bookmark, ChevronRight, Gauge, Minus, Plus } from "@lucide/svelte";
+  import { onMount, untrack } from "svelte";
 
   import Card from "./Card.svelte";
   import MapDataPanel from "./map/MapDataPanel.svelte";
@@ -12,7 +13,7 @@
   import { measuredRates, watchHistory } from "$lib/history.svelte";
   import { mapData, watchMapData } from "$lib/mapdata.svelte";
   import { travelKey } from "$lib/settings.svelte";
-  import type { MapReading, MapRoute, SessionSummary, TrainingSpot, TrainingSpots } from "$lib/types";
+  import type { MapReading, MapRoute, SavedSpot, SessionSummary, TrainingSpot, TrainingSpots } from "$lib/types";
 
   let {
     level: readLevel,
@@ -55,8 +56,24 @@
   let nearbyFirst = $state(stored(NEARBY_KEY, "true") === "true");
   let more = $state(false);
   let data = $state<TrainingSpots | null>(null);
-  let open = $state<number | null>(null);
+  /** The expanded row, as `group:mapId`, so a saved spot and its place in the list open apart. */
+  let open = $state<string | null>(null);
   let route = $state<MapRoute | null>(null);
+  let saved = $state<SavedSpot[]>([]);
+  let saveError = $state<string | null>(null);
+
+  const openId = $derived(open == null ? null : Number(open.split(":")[1]));
+
+  onMount(() => {
+    backend
+      .savedSpots()
+      .then((list) => (saved = list))
+      .catch(() => (saved = []));
+    const stop = backend.onSavedSpots((list) => (saved = list));
+    return () => {
+      stop.then((unlisten) => unlisten());
+    };
+  });
 
   const level = $derived(readLevel ?? manualLevel);
 
@@ -84,13 +101,13 @@
   });
 
   $effect(() => {
-    const id = open;
+    const id = openId;
     const from = fromId;
     void travelKey();
     route = null;
     if (id == null || from == null) return;
     backend.mapRoute(from, id).then((r) => {
-      if (open === id) route = r;
+      if (openId === id) route = r;
     });
   });
 
@@ -126,6 +143,25 @@
     return out;
   });
   const shown = $derived(ranked.slice(0, more ? 30 : SHOWN));
+  const savedIds = $derived(new Set(saved.map((s) => s.mapId)));
+  /** The saved spots in the current ranking's order, whatever their level; ones the map data
+   *  doesn't list (a map since dropped) keep their saved name at the end. */
+  const savedRows = $derived.by(() => {
+    const byId = new Map((data?.spots ?? []).map((s) => [s.map.id, s]));
+    const order = new Map(ranked.map((s, i) => [s.map.id, i]));
+    return saved
+      .map((s) => ({ saved: s, spot: byId.get(s.mapId) ?? null }))
+      .sort((a, b) => (order.get(a.saved.mapId) ?? 1e9) - (order.get(b.saved.mapId) ?? 1e9));
+  });
+
+  async function toggleSaved(mapId: number, name: string) {
+    saveError = null;
+    try {
+      saved = await backend.setSpotSaved(mapId, name, !savedIds.has(mapId));
+    } catch (e) {
+      saveError = String(e);
+    }
+  }
   const anyMeasured = $derived(data?.spots.some((s) => s.measured) ?? false);
 
   function stored(key: string, fallback: string) {
@@ -179,6 +215,90 @@
   }
 </script>
 
+{#snippet saveToggle(mapId: number, name: string)}
+  {@const isSaved = savedIds.has(mapId)}
+  <button
+    class="save"
+    class:on={isSaved}
+    aria-pressed={isSaved}
+    title={isSaved ? "Remove from your spots" : "Save to your spots, listed first whatever your level"}
+    aria-label={isSaved ? `Remove ${name} from your spots` : `Save ${name} to your spots`}
+    onclick={() => toggleSaved(mapId, name)}
+  >
+    <Bookmark size={12} fill={isSaved ? "currentColor" : "none"} />
+  </button>
+{/snippet}
+
+{#snippet spotItem(spot: TrainingSpot, rank: number | null, group: string)}
+  {@const m = metric(spot)}
+  {@const key = `${group}:${spot.map.id}`}
+  {@const expanded = open === key}
+  <li class:expanded>
+    <div class="line">
+      <button class="row" aria-expanded={expanded} onclick={() => (open = expanded ? null : key)}>
+        <span class="rank tabular">{rank ?? ""}</span>
+        <span class="names">
+          <span class="name">{spot.map.name}</span>
+          <span class="meta">
+            <span class="lv {levelTone(spot)}">Lv {spot.levelRange[0]}{spot.levelRange[1] !== spot.levelRange[0] ? `–${spot.levelRange[1]}` : ""}</span>
+            · {spot.mobTotal} mobs{#if spot.hops != null && (sort !== "near" || spot.travel)}{" · "}{spot.hops === 0
+                ? "here"
+                : `${spot.hops} portal${spot.hops === 1 ? "" : "s"}`}{/if}{#if spot.travel && sort !== "near"}<span
+                class="shortcut"
+                title="With the travel you turned on in Settings, via {spot.travel.via.name}"
+                >{" "}({spot.travel.hops} with travel)</span
+              >{/if}
+          </span>
+        </span>
+        <span class="metric">
+          <span class="value tabular">{m.value}</span>
+          <span class="unit">{m.unit}</span>
+        </span>
+        <span class="chevron" class:open={expanded}><ChevronRight size={11} /></span>
+      </button>
+      {@render saveToggle(spot.map.id, spot.map.name)}
+    </div>
+
+    {#if expanded}
+      <div class="detail">
+        <table class="mobs">
+          <thead>
+            <tr><th>Monster</th><th>Lv</th><th>×</th><th>EXP</th><th>HP</th></tr>
+          </thead>
+          <tbody>
+            {#each spot.mobs as mob (mob.id)}
+              <tr>
+                <td><button class="mob-link" title="Show it in the Lookup tab" onclick={() => backend.showMonster(mob.id, null)}>{mob.name}</button>{mob.boss ? " (boss)" : ""}</td>
+                <td class="tabular">{mob.level}</td>
+                <td class="tabular">{mob.count}</td>
+                <td class="tabular">{formatCompact(mob.exp)}</td>
+                <td class="tabular">{formatCompact(mob.hp)}</td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+        <p class="facts tabular">
+          {formatCompact(spot.expPerClear)} EXP / clear · {efficiency(spot).toFixed(0)} EXP per 1k HP
+          {#if spot.measured}
+            <br /><span class="yours"
+              ><Gauge size={11} /> You averaged {formatCompact(spot.measured.expPerHour)} EXP / hr over {formatDuration(
+                spot.measured.activeSeconds,
+              )}</span
+            >
+          {/if}
+        </p>
+        {#if data?.from && route}
+          <RouteSteps {route} />
+        {:else if !data?.from}
+          <p class="note">Routes appear when the minimap is in view.</p>
+        {:else if spot.hops == null}
+          <p class="note">No route through portals is known from {data.from.name}.</p>
+        {/if}
+      </div>
+    {/if}
+  </li>
+{/snippet}
+
 <Card title="Training spots" {plain}>
   {#snippet aside()}
     {#if readLevel != null}
@@ -222,71 +342,35 @@
       <p class="empty">Showing every level. Set your level above to see maps that suit it.</p>
     {/if}
 
+    {#if savedRows.length}
+      <h4 class="group">Your spots</h4>
+      <ol class="spots saved">
+        {#each savedRows as row (row.saved.mapId)}
+          {#if row.spot}
+            {@render spotItem(row.spot, null, "saved")}
+          {:else}
+            <li>
+              <div class="line">
+                <span class="row static">
+                  <span class="rank"></span>
+                  <span class="names">
+                    <span class="name">{row.saved.name}</span>
+                    <span class="meta">Not in the map data any more</span>
+                  </span>
+                </span>
+                {@render saveToggle(row.saved.mapId, row.saved.name)}
+              </div>
+            </li>
+          {/if}
+        {/each}
+      </ol>
+      <h4 class="group">{allLevels || level == null ? "Every level" : `Near Lv ${level}`}</h4>
+    {/if}
+    {#if saveError}<p class="note warn">{saveError}</p>{/if}
+
     <ol class="spots">
       {#each shown as spot, i (spot.map.id)}
-        {@const m = metric(spot)}
-        {@const expanded = open === spot.map.id}
-        <li class:expanded>
-          <button class="row" aria-expanded={expanded} onclick={() => (open = expanded ? null : spot.map.id)}>
-            <span class="rank tabular">{i + 1}</span>
-            <span class="names">
-              <span class="name">{spot.map.name}</span>
-              <span class="meta">
-                <span class="lv {levelTone(spot)}">Lv {spot.levelRange[0]}{spot.levelRange[1] !== spot.levelRange[0] ? `–${spot.levelRange[1]}` : ""}</span>
-                · {spot.mobTotal} mobs{#if spot.hops != null && (sort !== "near" || spot.travel)}{" · "}{spot.hops === 0
-                    ? "here"
-                    : `${spot.hops} portal${spot.hops === 1 ? "" : "s"}`}{/if}{#if spot.travel && sort !== "near"}<span
-                    class="shortcut"
-                    title="With the travel you turned on in Settings, via {spot.travel.via.name}"
-                    >{" "}({spot.travel.hops} with travel)</span
-                  >{/if}
-              </span>
-            </span>
-            <span class="metric">
-              <span class="value tabular">{m.value}</span>
-              <span class="unit">{m.unit}</span>
-            </span>
-            <span class="chevron" class:open={expanded}><ChevronRight size={11} /></span>
-          </button>
-
-          {#if expanded}
-            <div class="detail">
-              <table class="mobs">
-                <thead>
-                  <tr><th>Monster</th><th>Lv</th><th>×</th><th>EXP</th><th>HP</th></tr>
-                </thead>
-                <tbody>
-                  {#each spot.mobs as mob (mob.id)}
-                    <tr>
-                      <td><button class="mob-link" title="Show it in the Lookup tab" onclick={() => backend.showMonster(mob.id, null)}>{mob.name}</button>{mob.boss ? " (boss)" : ""}</td>
-                      <td class="tabular">{mob.level}</td>
-                      <td class="tabular">{mob.count}</td>
-                      <td class="tabular">{formatCompact(mob.exp)}</td>
-                      <td class="tabular">{formatCompact(mob.hp)}</td>
-                    </tr>
-                  {/each}
-                </tbody>
-              </table>
-              <p class="facts tabular">
-                {formatCompact(spot.expPerClear)} EXP / clear · {efficiency(spot).toFixed(0)} EXP per 1k HP
-                {#if spot.measured}
-                  <br /><span class="yours"
-                    ><Gauge size={11} /> You averaged {formatCompact(spot.measured.expPerHour)} EXP / hr over {formatDuration(
-                      spot.measured.activeSeconds,
-                    )}</span
-                  >
-                {/if}
-              </p>
-              {#if data.from && route}
-                <RouteSteps {route} />
-              {:else if !data.from}
-                <p class="note">Routes appear when the minimap is in view.</p>
-              {:else if spot.hops == null}
-                <p class="note">No route through portals is known from {data.from.name}.</p>
-              {/if}
-            </div>
-          {/if}
-        </li>
+        {@render spotItem(spot, i + 1, "list")}
       {:else}
         {#if level != null}
           <li class="empty">No maps with monsters near Lv {level}.</li>
@@ -416,11 +500,18 @@
     list-style: none;
   }
 
+  .line {
+    display: flex;
+    align-items: stretch;
+    gap: 2px;
+  }
+
   .row {
     display: flex;
+    flex: 1;
+    min-width: 0;
     align-items: center;
     gap: 8px;
-    width: 100%;
     padding: 5px 4px;
     border: 0;
     border-radius: var(--radius-sm);
@@ -432,6 +523,65 @@
   .row:hover,
   .expanded .row {
     background: rgba(255, 255, 255, 0.04);
+  }
+
+  .row.static {
+    cursor: default;
+  }
+
+  .row.static:hover {
+    background: transparent;
+  }
+
+  .save {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 24px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--faint);
+    opacity: 0.55;
+    cursor: pointer;
+  }
+
+  .line:hover .save,
+  .save:focus-visible,
+  .save.on {
+    opacity: 1;
+  }
+
+  .save:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text);
+  }
+
+  .save.on {
+    color: var(--accent);
+  }
+
+  .save:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
+
+  .group {
+    margin: 10px 0 4px;
+    color: var(--muted);
+    font-family: var(--font-display);
+    font-size: 12px;
+    font-weight: 400;
+  }
+
+  .group:first-of-type {
+    margin-top: 2px;
+  }
+
+  .spots.saved {
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
   }
 
   .rank {
@@ -614,6 +764,10 @@
     margin: 8px 0 0;
     color: var(--faint);
     font-size: 10.5px;
+  }
+
+  .note.warn {
+    color: var(--warn);
   }
 
   .empty {

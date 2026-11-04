@@ -6,6 +6,7 @@ import type {
   Analysis,
   BaseStats,
   ItemNote,
+  SavedSpot,
   UpdateStatus,
   Build,
   BuildCatalog,
@@ -97,6 +98,10 @@ let mapStatus: MapDataStatus = preview?.map
   ? { ready: true, clientBuild: "preview", dataUpdatedAt: null, checkedAt: null, files: [] }
   : { ready: false, clientBuild: null, dataUpdatedAt: null, checkedAt: null, files: [] };
 const mapDataHandlers: ((status: MapDataStatus) => void)[] = [];
+
+/** Training spots saved in this browser tab. */
+let savedSpots: SavedSpot[] = [];
+const spotHandlers: ((spots: SavedSpot[]) => void)[] = [];
 
 /** Notes the player wrote on items, by lower-case name. */
 const notes = new Map<string, ItemNote>([
@@ -594,6 +599,17 @@ export const mockBackend: Backend = {
   },
   async deletePrice(id) {
     prices = prices.filter((p) => p.id !== id);
+  },
+  savedSpots: async () => [...savedSpots],
+  async setSpotSaved(mapId, name, saved) {
+    savedSpots = savedSpots.filter((s) => s.mapId !== mapId);
+    if (saved) savedSpots.unshift({ mapId, name, savedAt: Date.now() / 1000 });
+    spotHandlers.forEach((h) => h([...savedSpots]));
+    return [...savedSpots];
+  },
+  async onSavedSpots(handler) {
+    spotHandlers.push(handler);
+    return () => {};
   },
   itemNote: async (item) => notes.get(item.toLowerCase()) ?? null,
   async setItemNote(item, note) {

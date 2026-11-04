@@ -88,6 +88,10 @@ OCR is sometimes wrong, so the tracker checks readings against each other rather
 - The clock pauses after 15 seconds without EXP (change it in Settings), and at once on a map change without EXP, so time in town does not dilute the rates. Rates appear after 30 seconds of active time.
 - A missing reading is skipped, never guessed. No EXP table is built in: each level's requirement is measured from the HUD, since Classic's table may differ from old GMS.
 
+### Training spots
+
+The **Train** tab ranks maps near your level by the map data's base EXP for a clear, EXP per monster HP, the EXP per hour you measured there, or how few portals away they are, with a route from where you are. The bookmark on a row saves it to **Your spots**, listed first whatever your level, so the places you like to grind stay one click away. Saved spots are kept on your PC with your other records.
+
 ### Build planner
 
 The **Character** tab is your character at a glance: level, job, HP, MP, EXP and mesos, this session's rates, and under them what your build plan says at your level: this level's AP and SP, the next job advancement and what comes after. **Edit** opens the planner. The session's totals, your history and your timers follow below.

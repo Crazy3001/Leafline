@@ -154,6 +154,8 @@ pub fn run() {
             records::record_price,
             records::delete_price,
             records::item_note,
+            records::saved_spots,
+            records::set_spot_saved,
             update::update_status,
             update::check_for_update,
             records::set_item_note,
