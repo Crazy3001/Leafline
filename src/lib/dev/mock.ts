@@ -479,7 +479,7 @@ export const mockBackend: Backend = {
   shortcuts: async () =>
     [
     { action: "ToggleOverlay", keys: "Super+F9", suggestedKeys: "Super+F9", label: "Show or hide the overlay", inSetup: true, taken: false },
-    { action: "ToggleClickThrough", keys: "Pause", suggestedKeys: "Pause", label: "Lock the overlay (click-through)", inSetup: true, taken: false },
+    { action: "ToggleClickThrough", keys: "Super+F7", suggestedKeys: "Super+F7", label: "Lock the overlay (click-through)", inSetup: true, taken: false },
     { action: "TogglePins", keys: "", suggestedKeys: "", label: "Show or hide pinned panels", inSetup: false, taken: false },
     { action: "ToggleCompact", keys: "", suggestedKeys: "", label: "Compact HUD", inSetup: true, taken: false },
     { action: "ToggleLive", keys: "", suggestedKeys: "", label: "Start or stop live reading", inSetup: false, taken: false },

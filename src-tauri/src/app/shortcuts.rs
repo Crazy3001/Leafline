@@ -8,9 +8,10 @@
 //! are emotes, F9 cash shop, F10 shortcut, F11 picture mode and Scroll Lock the screenshot by
 //! default; F8 and F12 start empty. Windows keeps F12 for its debugger and refuses it as a
 //! hotkey on every PC. On one test PC (2026-11-04) plain F8 never arrived, with nothing marked
-//! as taken, while Win+F8 and Num 5 did: some program grabs keys below RegisterHotKey, where
-//! Leafline can't see it. So the suggestions add Win, which the game can't bind, and setup has
-//! the player press each key to prove it arrives.
+//! as taken. Later the same day, with the game in front, Num 5, Num 0 and Pause never arrived
+//! either, though they did with Leafline in front, while Win+F8 and Ctrl+Alt+I did: the game
+//! keeps keys pressed without a modifier to itself while it has focus. So every suggestion adds
+//! Win, which the game can't bind, and setup has the player press each key in the game.
 
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -62,7 +63,7 @@ impl Action {
         match self {
             Action::ReadItem => "Super+F8",
             Action::ToggleOverlay => "Super+F9",
-            Action::ToggleClickThrough => "Pause",
+            Action::ToggleClickThrough => "Super+F7",
             _ => "",
         }
     }

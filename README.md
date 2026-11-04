@@ -33,13 +33,13 @@ No hotkey is set until you pick it in setup or Settings, and a hotkey takes its 
 |---|---|
 | `Win+F8` | Read the item you're hovering |
 | `Win+F9` | Show or hide the overlay |
-| `Pause` | Lock the overlay (clicks pass through to whatever is underneath) |
+| `Win+F7` | Lock the overlay (clicks pass through to whatever is underneath) |
 
 The game can't bind Win, and adding it also keeps a key away from programs that grab plain F-keys. Setup then asks you to click into the game and press each key there, and ticks the ones that arrive: the game can keep some keys to itself while it's in front, even ones it doesn't bind, so a key has to be tested with the game in front. F12 can't be a hotkey: Windows keeps it for itself.
 
 Setup also asks about the compact HUD, reading your Character Stat and Skill windows, and saving the picture last read. Settings has the rest: pinned panels, starting or stopping live reading, pausing tracking, a new session, keeping a run out of the history, and the workbench (development builds).
 
-F-keys, Pause and numpad keys work on their own; any other key needs Ctrl, Alt or Win with it, so it keeps working in chat. The game can't bind Pause, Win or the numpad, so Win+F9 or a numpad key never clashes with it. Avoid Ctrl and Alt: the game sees them while you hold them, so a hotkey with Ctrl can make your character attack. If another program on your PC already uses a key, setup and Settings say so.
+Use Win with each hotkey. While the game is in front it keeps keys pressed on their own to itself, even ones it doesn't bind such as Pause and the numpad, so those never reach Leafline; Win+F-keys and Ctrl+Alt combinations do. Avoid Ctrl and Alt: the game sees them while you hold them, so a hotkey with Ctrl can make your character attack. Leafline still accepts F-keys, Pause and numpad keys on their own, in case they get through on your PC. If another program on your PC already uses a key, setup and Settings say so.
 
 Closing a window hides it. Leafline keeps running in the tray until you choose **Quit**.
 

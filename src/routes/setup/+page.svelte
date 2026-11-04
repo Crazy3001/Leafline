@@ -215,8 +215,9 @@
           <p class="note good">All set.</p>
         {:else}
           <p class="note">
-            One that doesn't tick is taken by another program before Leafline sees it. Go back and pick another key;
-            adding Win, such as Win+F10, usually gets through.
+            One that doesn't tick never reached Leafline: the game keeps some keys to itself while it's in front, and
+            another program can take one first. Go back and pick another; one with Win, such as Win+F10, usually gets
+            through.
           </p>
         {/if}
       </section>
@@ -224,9 +225,9 @@
       <section>
         <h1>Hotkeys</h1>
         <p class="lead">
-          These work while the game has focus, and Leafline takes the key from the game. The game can't bind Win, Pause
-          or the numpad, so these stay clear of it. Click one to change it. Next sets them, then you press each to test
-          it.
+          These work while the game has focus, and Leafline takes the key from the game. Each adds Win, which the game
+          can't bind: a key on its own, even Pause or a numpad key, may never reach Leafline while the game is in front.
+          Click one to change it. Next sets them, then you press each in the game to test it.
         </p>
         <dl class="keys">
           {#each offered as shortcut (shortcut.action)}
@@ -244,9 +245,8 @@
           {/each}
         </dl>
         <p class="note">
-          Avoid Ctrl and Alt: the game sees them while you hold them, so a hotkey with Ctrl can make you attack. A numpad
-          key, such as Num 5, is one press and the game can't bind it. Esc cancels and Backspace clears. More hotkeys,
-          such as pausing tracking, are in Settings.
+          Avoid Ctrl and Alt: the game sees them while you hold them, so a hotkey with Ctrl can make you attack. Esc
+          cancels and Backspace clears. More hotkeys, such as pausing tracking, are in Settings.
         </p>
         {#if taken.length}
           <p class="note warn">

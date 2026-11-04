@@ -678,9 +678,9 @@
     <section id="hotkeys">
       <h2>Hotkeys</h2>
       <p class="lead">
-        They work while the game has focus, and Leafline takes the key from the game. F-keys, Pause and numpad keys
-        work on their own; other keys need Ctrl, Alt or Win with them, so they keep working in chat. The game can't bind
-        Pause, Win or the numpad. Leafline never sends keys to the game.
+        They work while the game has focus, and Leafline takes the key from the game. Add Win to each, such as Win+F8:
+        the game can't bind Win, and a key on its own, even Pause or a numpad key, may never reach Leafline while the
+        game is in front. Leafline never sends keys to the game.
       </p>
       <div class="row">
         <label for="hotkeys">
@@ -731,11 +731,14 @@
       {#if usesNumpad(display.hotkeys.keys)}
         <p class="note">Numpad keys only work while Num Lock is on.</p>
       {/if}
-      <p class="note">Press a hotkey with this window open to check it reaches Leafline: "Received" shows beside it.</p>
+      <p class="note">
+        To check a hotkey, click into the game and press it there: "Received" shows beside it here. One that only works
+        with this window in front won't work while you play.
+      </p>
       {#if gameModifiers.length}
         <p class="note warn">
           The game also sees Ctrl and Alt while you hold them, so {gameModifiers.map((s) => s.label.toLowerCase()).join(", ")}
-          can make your character attack or jump if those are your keys. An F-key, Pause or a numpad key avoids that.
+          can make your character attack or jump if those are your keys. Win with an F-key avoids that.
         </p>
       {/if}
       <div class="reset-keys">
