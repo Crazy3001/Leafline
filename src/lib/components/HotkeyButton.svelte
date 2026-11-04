@@ -1,6 +1,8 @@
 <script lang="ts">
   // One hotkey: click it, then press the keys. Esc cancels; Backspace clears it. Used by Settings
-  // and the first-launch setup.
+  // and the first-launch setup. Leafline lets go of its hotkeys while this waits, or Windows would
+  // swallow a key that is already one of them.
+  import { backend } from "$lib/api";
   import { keyName } from "$lib/settings.svelte";
 
   let {
@@ -12,6 +14,14 @@
   }: { keys: string; disabled?: boolean; taken?: boolean; label: string; onchange: (keys: string) => void } = $props();
 
   let listening = $state(false);
+
+  $effect(() => {
+    if (!listening) return;
+    backend.setHotkeysPaused(true);
+    return () => {
+      backend.setHotkeysPaused(false);
+    };
+  });
 
   /** A pressed key as Leafline writes it: `Ctrl+Shift+K`, `F5`, `Pause`, `Numpad5`. Null for a modifier alone. */
   function keysOf(event: KeyboardEvent): string | null {

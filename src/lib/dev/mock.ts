@@ -450,20 +450,34 @@ export const mockBackend: Backend = {
   async hideOverlay() {},
   async toggleOverlay() {},
   async showWorkbench() {},
-  shortcuts: async () => [
-    { action: "ToggleOverlay", keys: "Super+F8", suggestedKeys: "Super+F8", label: "Show or hide the overlay", inSetup: true, taken: false },
+  async setHotkeysPaused() {},
+  async onHotkey(handler) {
+    // In the browser, `__pressHotkey("ReadItem")` in the console stands in for pressing one.
+    const w = window as unknown as { __pressHotkey?: (action: string) => void };
+    w.__pressHotkey = handler;
+    return () => {
+      if (w.__pressHotkey === handler) delete w.__pressHotkey;
+    };
+  },
+  // Saved keys win over the starting ones, and F10 stands in for a key another program holds.
+  shortcuts: async () =>
+    [
+    { action: "ToggleOverlay", keys: "Super+F9", suggestedKeys: "Super+F9", label: "Show or hide the overlay", inSetup: true, taken: false },
     { action: "ToggleClickThrough", keys: "Pause", suggestedKeys: "Pause", label: "Lock the overlay (click-through)", inSetup: true, taken: false },
     { action: "TogglePins", keys: "", suggestedKeys: "", label: "Show or hide pinned panels", inSetup: false, taken: false },
     { action: "ToggleCompact", keys: "", suggestedKeys: "", label: "Compact HUD", inSetup: true, taken: false },
     { action: "ToggleLive", keys: "", suggestedKeys: "", label: "Start or stop live reading", inSetup: false, taken: false },
-    { action: "ReadItem", keys: "F10", suggestedKeys: "F8", label: "Read the item you're hovering", inSetup: true, taken: true },
+    { action: "ReadItem", keys: "F10", suggestedKeys: "Super+F8", label: "Read the item you're hovering", inSetup: true, taken: true },
     { action: "ReadCharacter", keys: "", suggestedKeys: "", label: "Read your stat and skill windows, to update your build", inSetup: true, taken: false },
     { action: "PauseTracking", keys: "", suggestedKeys: "", label: "Pause or resume tracking", inSetup: false, taken: false },
     { action: "NewSession", keys: "", suggestedKeys: "", label: "Start a new session", inSetup: false, taken: false },
     { action: "ToggleLogging", keys: "", suggestedKeys: "", label: "Log this run or not", inSetup: false, taken: false },
     { action: "SaveFrame", keys: "", suggestedKeys: "", label: "Save the picture last read", inSetup: true, taken: false },
     { action: "ShowWorkbench", keys: "", suggestedKeys: "", label: "Open the workbench", inSetup: false, taken: false },
-  ],
+    ].map((s) => {
+      const keys = displaySettings.hotkeys.keys[s.action] ?? s.keys;
+      return { ...s, keys, taken: keys === "F10" };
+    }),
   liveStatus: async () => liveStatus,
   async setLiveHeld(held) {
     if (liveStatus.state === "reading") setLive({ ...liveStatus, held });

@@ -124,6 +124,7 @@ pub fn run() {
             commands::open_data_folder,
             commands::frames_folder,
             commands::open_frames_folder,
+            shortcuts::set_hotkeys_paused,
             report::diagnostics,
             readings::current_readings,
             pins::pin_status,

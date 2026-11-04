@@ -20,19 +20,32 @@
   /** The keys being picked, by action, saved when the step is left. */
   let keys = $state<Record<string, string>>({});
   let keysError = $state<string | null>(null);
+  /** After the keys are saved, the player presses each to prove it reaches Leafline. */
+  let testing = $state(false);
+  let arrived = $state<Record<string, boolean>>({});
   let finishing = $state(false);
   let finishError = $state<string | null>(null);
 
-  onMount(async () => {
+  onMount(() => {
     watchSettings();
-    shortcuts = await backend.shortcuts();
-    // Keys already set win; otherwise offer the suggestions.
-    keys = Object.fromEntries(shortcuts.map((s) => [s.action, s.keys || s.suggestedKeys]));
+    backend.shortcuts().then((list) => {
+      shortcuts = list;
+      // Keys already set win; otherwise offer the suggestions.
+      keys = Object.fromEntries(list.map((s) => [s.action, s.keys || s.suggestedKeys]));
+    });
+    const stop = backend.onHotkey((action) => (arrived[action] = true));
+    return () => {
+      stop.then((unlisten) => unlisten());
+    };
   });
+
 
   /** The actions setup asks about: the main ones, plus any the player already set. */
   const offered = $derived(shortcuts.filter((s) => s.inSetup || s.keys));
   const taken = $derived(offered.filter((s) => s.taken && keys[s.action] === s.keys));
+  /** The keys to press in the test: every action with one set. */
+  const testRows = $derived(offered.filter((s) => s.keys));
+  const testedAll = $derived(testRows.length > 0 && testRows.every((s) => arrived[s.action] || s.taken));
   const clash = $derived.by(() => {
     const seen = new Map<string, string>();
     for (const s of offered) {
@@ -62,8 +75,19 @@
   }
 
   async function next() {
-    if (step === 1 && !(await saveKeys())) return;
+    if (step === 1 && !testing) {
+      if (!(await saveKeys())) return;
+      arrived = {};
+      testing = true;
+      return;
+    }
+    testing = false;
     step = Math.min(step + 1, STEPS.length - 1);
+  }
+
+  function back() {
+    if (step === 1 && testing) testing = false;
+    else step -= 1;
   }
 
   async function finish() {
@@ -135,13 +159,48 @@
           {#each never as item (item)}<li><span class="mark"><X size={12} /></span>{item}</li>{/each}
         </ul>
       </section>
+    {:else if step === 1 && testing}
+      <section>
+        <h1>Test your hotkeys</h1>
+        <p class="lead">
+          Press each one now, with this window or the game in front. While setup is open, a press only ticks it here;
+          nothing else happens.
+        </p>
+        <dl class="keys">
+          {#each testRows as shortcut (shortcut.action)}
+            <div>
+              <dt>{shortcut.label}</dt>
+              <dd class="test">
+                <kbd>{keyName(shortcut.keys)}</kbd>
+                {#if shortcut.taken}
+                  <span class="status warn">In use elsewhere</span>
+                {:else if arrived[shortcut.action]}
+                  <span class="status good"><Check size={12} />Works</span>
+                {:else}
+                  <span class="status">Press it</span>
+                {/if}
+              </dd>
+            </div>
+          {/each}
+        </dl>
+        {#if testRows.length === 0}
+          <p class="note">No hotkeys are set. You can add them later in Settings.</p>
+        {:else if testedAll}
+          <p class="note good">All set.</p>
+        {:else}
+          <p class="note">
+            One that doesn't tick is taken by another program before Leafline sees it. Go back and pick another key;
+            adding Win, such as Win+F10, usually gets through.
+          </p>
+        {/if}
+      </section>
     {:else if step === 1}
       <section>
         <h1>Hotkeys</h1>
         <p class="lead">
-          These work while the game has focus, and Leafline takes the key from the game. F8 is empty in the game's
-          default key bindings, and the game can't bind Pause, Win or the numpad. If you've put something on F8, click it
-          and press another. Nothing is set until you go on.
+          These work while the game has focus, and Leafline takes the key from the game. The game can't bind Win, Pause
+          or the numpad, so these stay clear of it. Click one to change it. Next sets them, then you press each to test
+          it.
         </p>
         <dl class="keys">
           {#each offered as shortcut (shortcut.action)}
@@ -159,9 +218,9 @@
           {/each}
         </dl>
         <p class="note">
-          Avoid Ctrl and Alt: the game sees them while you hold them, so a hotkey with Ctrl can make you attack. Adding
-          Win to a key, such as Win+F9, keeps it away from the game. Esc cancels and Backspace clears. More hotkeys, such
-          as pausing tracking, are in Settings.
+          Avoid Ctrl and Alt: the game sees them while you hold them, so a hotkey with Ctrl can make you attack. A numpad
+          key, such as Num 5, is one press and the game can't bind it. Esc cancels and Backspace clears. More hotkeys,
+          such as pausing tracking, are in Settings.
         </p>
         {#if taken.length}
           <p class="note warn">
@@ -237,11 +296,13 @@
     {#if finishError}<p class="note warn">{finishError}</p>{/if}
     <div class="nav">
       {#if step > 0}
-        <button class="button" onclick={() => (step -= 1)}><ArrowLeft size={13} />Back</button>
+        <button class="button" onclick={back}><ArrowLeft size={13} />{step === 1 && testing ? "Change keys" : "Back"}</button>
       {/if}
       <span class="spacer"></span>
       {#if step < STEPS.length - 1}
-        <button class="button primary" onclick={next}>Next<ArrowRight size={13} /></button>
+        <button class="button primary" onclick={next}>
+          {step === 1 && !testing ? "Set and test" : "Next"}<ArrowRight size={13} />
+        </button>
       {:else}
         <button class="button primary" onclick={finish} disabled={finishing}>
           <Check size={13} />{display.live.enabled ? "Start Leafline" : "Finish"}
@@ -415,6 +476,41 @@
 
   dd {
     margin: 0;
+  }
+
+  dd.test {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  kbd {
+    padding: 1px 6px;
+    border: 1px solid var(--border-strong);
+    border-bottom-width: 2px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 11.5px;
+  }
+
+  .status {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 92px;
+    color: var(--faint);
+    font-size: 12px;
+  }
+
+  .status.good,
+  .note.good {
+    color: var(--good);
+  }
+
+  .status.warn {
+    color: var(--warn);
   }
 
   .tips {

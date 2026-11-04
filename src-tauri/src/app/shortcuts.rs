@@ -7,18 +7,19 @@
 //! Tab, Caps Lock, Backspace, Enter and Win can't be bound in game, and it has no numpad. F1-F7
 //! are emotes, F9 cash shop, F10 shortcut, F11 picture mode and Scroll Lock the screenshot by
 //! default; F8 and F12 start empty. Windows keeps F12 for its debugger and refuses it as a
-//! hotkey on every PC (seen 2026-11-04), so F8 and Pause are the only free keys on every
-//! keyboard. The overlay gets Win+F8: the game can't see Win, and Leafline takes the F8. A player
-//! can still have bound F8, and another program can hold any key, which is why they confirm them.
+//! hotkey on every PC. On one test PC (2026-11-04) plain F8 never arrived, with nothing marked
+//! as taken, while Win+F8 and Num 5 did: some program grabs keys below RegisterHotKey, where
+//! Leafline can't see it. So the suggestions add Win, which the game can't bind, and setup has
+//! the player press each key to prove it arrives.
 
 use std::sync::Mutex;
 
 use serde::Serialize;
 use tauri::plugin::TauriPlugin;
-use tauri::{AppHandle, Manager, Wry};
+use tauri::{AppHandle, Emitter, Manager, Wry};
 use tauri_plugin_global_shortcut::{Builder, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
-use super::settings::HotkeyChoice;
+use super::settings::{HotkeyChoice, SETUP, SettingsState};
 use super::{live, overlay, pins, report};
 use crate::error::{Error, Result};
 
@@ -58,8 +59,8 @@ impl Action {
     /// The key offered at setup, or "" for none. Few keys are free in game by default.
     pub fn suggested_keys(self) -> &'static str {
         match self {
-            Action::ReadItem => "F8",
-            Action::ToggleOverlay => "Super+F8",
+            Action::ReadItem => "Super+F8",
+            Action::ToggleOverlay => "Super+F9",
             Action::ToggleClickThrough => "Pause",
             _ => "",
         }
@@ -167,11 +168,27 @@ pub fn list(app: &AppHandle, choice: &HotkeyChoice) -> Vec<ShortcutInfo> {
         .collect()
 }
 
+/// Emitted with the action's name whenever one of its hotkeys arrives, so setup can tick it.
+pub const HOTKEY_EVENT: &str = "hotkey";
+
 /// The hotkeys in force, for the handler to look up, and the ones another program holds.
 #[derive(Default)]
 pub struct Bindings {
     held: Mutex<Vec<(Shortcut, Action)>>,
     taken: Mutex<Vec<Action>>,
+}
+
+/// Lets go of every hotkey while the player picks a new one, so the keys they press reach the
+/// picker instead of being swallowed by Windows; then takes them back.
+#[tauri::command]
+pub fn set_hotkeys_paused(app: AppHandle, paused: bool) -> Result<()> {
+    if paused {
+        app.global_shortcut().unregister_all().map_err(|err| Error::Invalid(err.to_string()))?;
+        app.state::<Bindings>().held.lock().expect("hotkey lock").clear();
+        Ok(())
+    } else {
+        apply(&app, &app.state::<SettingsState>().get().hotkeys)
+    }
 }
 
 /// Keys that type nothing in chat, so they can be hotkeys on their own: F-keys, Pause, Scroll
@@ -249,9 +266,13 @@ pub fn plugin() -> TauriPlugin<Wry> {
             }
             let bindings = app.state::<Bindings>();
             let action = bindings.held.lock().expect("hotkey lock").iter().find(|(s, _)| s == shortcut).map(|(_, a)| *a);
-            if let Some(action) = action
-                && let Err(err) = action.run(app)
-            {
+            let Some(action) = action else { return };
+            let _ = app.emit(HOTKEY_EVENT, action.name());
+            // While setup is open, a press is only a test: setup ticks it, nothing runs.
+            if app.get_webview_window(SETUP).is_some_and(|w| w.is_visible().unwrap_or(false)) {
+                return;
+            }
+            if let Err(err) = action.run(app) {
                 log_error(&err);
             }
         })
@@ -310,7 +331,7 @@ mod tests {
         assert!(check(&with(Action::ToggleLive, "Shift+1")).is_err(), "it would stop ! working in chat");
         assert!(check(&with(Action::ToggleLive, "K")).is_err(), "it would stop k working in chat");
         let mut both = suggested();
-        both.keys.insert(Action::ToggleLive.name(), "F8".into());
+        both.keys.insert(Action::ToggleLive.name(), "Super+F8".into());
         assert!(check(&both).is_err(), "taken by another action");
         assert!(check(&with(Action::ToggleLive, "Banana")).is_err());
         assert!(check(&with(Action::ToggleLive, "F12")).is_err(), "Windows keeps F12");
