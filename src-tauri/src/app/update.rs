@@ -13,9 +13,9 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use super::settings::SettingsState;
 use crate::error::{Error, Result};
 
-/// Where releases are published, as `owner/repo`. A placeholder until the GitHub repository is
-/// made: while it is one, the check makes no request at all.
-pub const RELEASES_REPO: &str = "OWNER/leafline";
+/// Where releases are published, as `owner/repo`. While the repository is private, GitHub answers
+/// 404 to the check, which shows as "No release has been published yet".
+pub const RELEASES_REPO: &str = "Crazy3001/leafline";
 
 /// The owner part of [`RELEASES_REPO`] while it is still a placeholder.
 const PLACEHOLDER_OWNER: &str = "OWNER";
