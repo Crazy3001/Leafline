@@ -117,7 +117,7 @@
     if (live.itemRead?.found === 0)
       return {
         tone: "quiet",
-        text: `No equipment tooltip found. Hover a piece of equipment in game, then ${hotkey("ReadItem") ? `press ${hotkey("ReadItem")}` : "use the Read item hotkey"}.`,
+        text: `No item tooltip found. Hover an item in game, then ${hotkey("ReadItem") ? `press ${hotkey("ReadItem")}` : "use the Read item hotkey"}. If one was showing, the camera button saves that picture so it can be looked at.`,
       };
     if (live.characterRead?.problem) return { tone: "warn", text: live.characterRead.problem };
     if (live.characterRead) {

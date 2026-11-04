@@ -15,6 +15,7 @@
   import { backend } from "$lib/api";
   import { JOBS, blankQuery, gearView, gives, itemSlot, itemView, lastLine, watchItems } from "$lib/items.svelte";
   import { OSMS_CREDIT, OSMS_URL, mapData, watchMapData } from "$lib/mapdata.svelte";
+  import { live } from "$lib/readings.svelte";
   import { hotkey } from "$lib/settings.svelte";
   import type { ItemFilters, ItemKind, ItemPage, ItemRecord, ItemTooltip, MapReading } from "$lib/types";
 
@@ -58,6 +59,14 @@
   let page = $state<ItemPage | null>(null);
   let searching = $state(false);
   let record = $state<ItemRecord | null>(null);
+  /** The item check was put away with Back; the next read from the hotkey brings it back. */
+  let checkClosed = $state(false);
+
+  $effect(() => {
+    if (live.itemRead?.found) checkClosed = false;
+  });
+
+  const checks = $derived(checkClosed ? [] : tooltips);
 
   const narrowed = $derived(
     [query.slot, query.class, query.levelMin, query.levelMax, query.sort, query.mine || null].filter((v) => v != null).length,
@@ -251,11 +260,16 @@
     {/if}
     </div>
   {:else}
-    {#each tooltips as item, i}
+    {#if checks.length}
+      <button class="back" class:pinned title="Put the item check away; the next read brings it back" onclick={() => (checkClosed = true)}
+        ><ArrowLeft size={12} />Back to search</button
+      >
+    {/if}
+    {#each checks as item, i}
       <ItemCard {item} {map} title={i === 0 ? "Item check" : "Compared item"} plain={pinned && i === 0} />
     {:else}
       <p class="empty">
-        Search above, or hover a piece of equipment in game and {hotkey("ReadItem") ? `press ${hotkey("ReadItem")}` : "use the Read item hotkey"} to check that copy.
+        Search above, or hover an item in game and {hotkey("ReadItem") ? `press ${hotkey("ReadItem")}` : "use the Read item hotkey"} to check that copy.
       </p>
     {/each}
   {/if}
