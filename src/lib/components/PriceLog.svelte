@@ -1,7 +1,8 @@
 <script lang="ts">
-  // The player's own price records for the hovered item, and a form to add one. There is no
-  // market data: every number here is something the player logged. Market sites only open in
-  // the browser. Their terms bar reading their prices into an app without written permission.
+  // The player's own price records for an item, and a form to add one. There is no market data:
+  // every number here is something the player logged. Market sites only open in the browser;
+  // their terms bar reading their prices into an app without written permission. A price lookup
+  // can sit beside this once a price source gives permission.
   import { ExternalLink, Plus, X } from "@lucide/svelte";
   import { untrack } from "svelte";
 
@@ -182,7 +183,7 @@
 
   {#if item.name}
     <div class="markets">
-      <span class="muted">Market prices</span>
+      <span class="muted">Look it up on</span>
       {#each MARKETS as market (market.label)}
         <button
           title="Opens {market.label} in your browser and copies the item's name, ready to paste"

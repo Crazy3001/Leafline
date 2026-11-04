@@ -45,6 +45,7 @@ import type {
   MapRoute,
   MeasuredRate,
   NewPrice,
+  ItemNote,
   MonsterDrops,
   MonsterFilters,
   MonsterLink,
@@ -111,7 +112,7 @@ export interface Backend {
   saveLiveFrame(): Promise<string>;
   onLive(handler: (status: LiveStatus) => void): Promise<UnlistenFn>;
   onFrameSaved(handler: (path: string) => void): Promise<UnlistenFn>;
-  /** A price check from the hotkey has ended. */
+  /** An item check from the hotkey has ended. */
   onItemRead(handler: (read: ItemRead) => void): Promise<UnlistenFn>;
   /** An image passed on the command line at startup, once. */
   takeLaunchImage(): Promise<string | null>;
@@ -197,6 +198,10 @@ export interface Backend {
   priceLog(item: string, upgrades: number | null, slots: number | null): Promise<PriceLog>;
   recordPrice(price: NewPrice): Promise<PriceLog>;
   deletePrice(id: number): Promise<void>;
+  /** The player's note on an item, matched like the price log. */
+  itemNote(item: string): Promise<ItemNote | null>;
+  /** Writes it; an empty note deletes it. */
+  setItemNote(item: string, note: string): Promise<ItemNote | null>;
 
   /** The mesos last read for a character, or with no name, for the character seen last. */
   knownMesos(name: string | null): Promise<KnownMesos | null>;
@@ -379,6 +384,8 @@ const tauriBackend: Backend = {
   priceLog: (item, upgrades, slots) => invoke("price_log", { item, upgrades, slots }),
   recordPrice: (price) => invoke("record_price", { price }),
   deletePrice: (id) => invoke("delete_price", { id }),
+  itemNote: (item) => invoke("item_note", { item }),
+  setItemNote: (item, note) => invoke("set_item_note", { item, note }),
   knownMesos: (name) => invoke("known_mesos", { name }),
   onKnownMesos: (handler) => listen("known-mesos", () => handler()),
   saveSession: (label) => invoke("save_session", { label }),

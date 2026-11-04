@@ -51,6 +51,14 @@ It only looks at the window. It asks Windows for the window's title, class, posi
 
 Item tooltips aren't read as you play. Hover an item and press the Read item hotkey, and Leafline reads it from a single picture, whether live reading is running or not. The **Live reading** switch in Settings has to be on for this too.
 
+### Item check
+
+The Read item hotkey opens an **item check** in the Lookup tab: the hovered item's stats with their base and bonus, its requirements and jobs, whether it's clean or scrolled, whether your build can wear it, who drops it and which quests give it, and your own note and prices for it.
+
+Successful scrolls show in game as the `(+N)` after the name. Failed ones only show as fewer slots left than the item started with, so Leafline counts them against the slot count in the map data, and says that's where the number comes from, since Classic could differ. A copy with no `(+N)` reads as "No upgrades" until its slots can be checked.
+
+Leafline has no market prices. Write a note on any item (keep it, sell it, who wants one), and log prices you saw or paid, each marked traded or asking: the card shows their median, range and the ones for copies like this one. Links open price sites in your browser with the item's name copied, ready to paste. The note and prices stay on your PC and come back whenever you check or look up the item.
+
 The window is found by its title or class. If Leafline can't tell which window is the game, pick it in Settings; the choice is remembered. If Windows HDR is on for the game's display, the overlay warns you, because readings are unreliable until HDR is off and the game restarted.
 
 ### Reading the HUD
@@ -100,7 +108,7 @@ The game's data only says who gives a quest, so who takes it in comes from maple
 
 The Lookup tab searches Items, Monsters, Maps and NPCs. None of it needs live reading.
 
-**Items** searches every item in the map data by name or by what it does, with categories and filters for slot, job, level and stat. An item's card shows its stats, whether your build can wear it, your logged prices, who players saw drop it and which quests give it. Names in a build, its suggestions and a map's drops open here.
+**Items** searches every item in the map data by name or by what it does, with categories and filters for slot, job, level and stat. An item's card shows its stats, whether your build can wear it, your note and logged prices, who players saw drop it and which quests give it. Names in a build, its suggestions and a map's drops open here.
 
 Under **Equip**, the list starts with gear for you, slot by slot, the best first. It goes by your level, your job and your build's stats, using the same ranking as the Character tab's suggestions. Your level and job come from the game or your build, and you can change either, pick a gender, or look 5 to 20 levels ahead. Without a build it can't check stat requirements, and says so. Staff and novelty items are left out unless you search for them by name. **Everything** lists all equipment. Nobody has checked these picks in game, and they don't take prices into account.
 

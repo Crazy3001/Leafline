@@ -5,6 +5,7 @@ import type { Backend } from "../api";
 import type {
   Analysis,
   BaseStats,
+  ItemNote,
   Build,
   BuildCatalog,
   BuildPlan,
@@ -95,6 +96,11 @@ let mapStatus: MapDataStatus = preview?.map
   ? { ready: true, clientBuild: "preview", dataUpdatedAt: null, checkedAt: null, files: [] }
   : { ready: false, clientBuild: null, dataUpdatedAt: null, checkedAt: null, files: [] };
 const mapDataHandlers: ((status: MapDataStatus) => void)[] = [];
+
+/** Notes the player wrote on items, by lower-case name. */
+const notes = new Map<string, ItemNote>([
+  ["green robin hat", { item: "Green Robin Hat", note: "Keep for a 60% DEX scroll.", updatedAt: Date.now() / 1000 - 86_400 }],
+]);
 
 /** Prices logged in this browser tab; made-up starting records for one item. */
 const now = Date.now() / 1000;
@@ -586,6 +592,17 @@ export const mockBackend: Backend = {
   },
   async deletePrice(id) {
     prices = prices.filter((p) => p.id !== id);
+  },
+  itemNote: async (item) => notes.get(item.toLowerCase()) ?? null,
+  async setItemNote(item, note) {
+    const text = note.trim();
+    if (!text) {
+      notes.delete(item.toLowerCase());
+      return null;
+    }
+    const saved = { item, note: text, updatedAt: Date.now() / 1000 };
+    notes.set(item.toLowerCase(), saved);
+    return saved;
   },
   async saveSession(label) {
     const s = sampleSessionSummary;

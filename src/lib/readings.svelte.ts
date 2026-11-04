@@ -12,7 +12,7 @@ export const live = $state<{
   liveStatus: LiveStatus;
   /** The last picture saved with "Save frame", shown briefly. */
   savedFrame: string | null;
-  /** How the last price check went, shown briefly. */
+  /** How the last item check went, shown briefly. */
   itemRead: ItemRead | null;
   /** How the last read of the stat and skill windows went, for a moment. */
   characterRead: CharacterRead | null;

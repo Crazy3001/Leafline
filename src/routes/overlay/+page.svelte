@@ -43,7 +43,7 @@
     seen[tab] = current;
   });
 
-  // A price check is asked for by hotkey, so its result opens by itself.
+  // An item check is asked for by hotkey, so its result opens by itself.
   $effect(() => {
     if (live.itemRead?.found) select("item");
   });

@@ -10,6 +10,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use crate::error::{Error, Result};
 use crate::userdata::UserData;
 use crate::userdata::characters::KnownMesos;
+use crate::userdata::notes::ItemNote;
 use crate::userdata::prices::{NewPrice, PriceLog};
 use crate::userdata::sessions::{MapRate, SavedSession};
 
@@ -81,6 +82,18 @@ pub fn record_price(state: State<UserDataState>, price: NewPrice) -> Result<Pric
 #[tauri::command]
 pub fn delete_price(state: State<UserDataState>, id: i64) -> Result<()> {
     state.with(|db| db.delete_price(id))
+}
+
+/// The player's note on an item, if they wrote one.
+#[tauri::command]
+pub fn item_note(state: State<UserDataState>, item: String) -> Result<Option<ItemNote>> {
+    state.with(|db| db.item_note(&item))
+}
+
+/// Writes the player's note on an item; an empty one deletes it. Returns what is kept.
+#[tauri::command]
+pub fn set_item_note(state: State<UserDataState>, item: String, note: String) -> Result<Option<ItemNote>> {
+    state.with(|db| db.set_item_note(&item, &note, now()))
 }
 
 /// Saves the session the overlay is showing to the history. Live sessions save themselves; this

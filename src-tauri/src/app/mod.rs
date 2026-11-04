@@ -149,6 +149,8 @@ pub fn run() {
             records::price_log,
             records::record_price,
             records::delete_price,
+            records::item_note,
+            records::set_item_note,
             records::save_session,
             records::session_history,
             records::delete_session,

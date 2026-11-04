@@ -3,7 +3,7 @@
 //! Settings, and only ever looks at the window; see [`crate::capture`]. Each session saves itself
 //! as it goes, so a crash or a closed window costs half a minute of it at most.
 //!
-//! Item tooltips are not part of this. A price check is one picture on the player's hotkey. The
+//! Item tooltips are not part of this. An item check is one picture on the player's hotkey. The
 //! character's stat and skill windows are read from these same pictures while they are open, and
 //! from one picture on a hotkey otherwise.
 
@@ -36,16 +36,16 @@ use crate::vision::{Frame, Ocr};
 pub const LIVE_EVENT: &str = "live";
 /// Emitted with the path when a live picture is saved.
 pub const FRAME_SAVED_EVENT: &str = "frame-saved";
-/// Emitted to every window when a price check ends.
+/// Emitted to every window when an item check ends.
 pub const ITEM_READ_EVENT: &str = "item-read";
 /// Emitted to every window when the character's windows have been read.
 pub const CHARACTER_READ_EVENT: &str = "character-read";
 
 /// How long a grab waits for the game to draw a fresh picture.
 const FRESH_FRAME_WAIT: Duration = Duration::from_millis(300);
-/// The least time between two pictures of the game, live or for a price check.
+/// The least time between two pictures of the game, live or for an item check.
 const MIN_PICTURE_GAP: Duration = Duration::from_secs(1);
-/// How long a save takes the price check's picture over the last live one, so a tooltip that
+/// How long a save takes the item check's picture over the last live one, so a tooltip that
 /// read badly can be kept: live pictures come seconds apart and rarely catch one.
 const ITEM_PICTURE_KEPT: Duration = Duration::from_secs(15);
 /// How often HDR is checked again, in readings, in case the game moves to another display.
@@ -85,7 +85,7 @@ pub enum LiveStatus {
     Failed { message: String },
 }
 
-/// How a price check went.
+/// How an item check went.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ItemRead {
@@ -99,11 +99,11 @@ struct ItemRead {
 pub struct LiveState {
     running: AtomicBool,
     stop: AtomicBool,
-    /// A price check is under way.
+    /// An item check is under way.
     reading_item: AtomicBool,
     /// The stat and skill windows are being read.
     reading_character: AtomicBool,
-    /// The last price check's picture, and when it was taken.
+    /// The last item check's picture, and when it was taken.
     item_picture: Mutex<Option<(Instant, Arc<Frame>)>>,
     /// When the last picture was taken, for [`MIN_PICTURE_GAP`].
     last_picture: Mutex<Option<Instant>>,
@@ -393,7 +393,7 @@ pub fn frames_folder(app: &AppHandle) -> Result<PathBuf> {
 }
 
 /// Saves the last picture read as a PNG in the saved pictures folder, for the workbench or a bug
-/// report: a price check's for a moment after it, or else the last live one.
+/// report: an item check's for a moment after it, or else the last live one.
 pub fn save_frame(app: &AppHandle) -> Result<PathBuf> {
     let state = app.state::<LiveState>();
     let item = state.item_picture.lock().expect("live lock").clone();

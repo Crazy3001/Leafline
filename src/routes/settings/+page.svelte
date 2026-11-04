@@ -234,10 +234,10 @@
   }
 
   const does = [
-    "Reads what the game shows, from saved screenshots or, once you turn it on, the game window, with the OCR built into Windows on this PC.",
+    "Reads what the game window shows (or saved screenshots), with the OCR built into Windows on this PC. Turn live reading off below.",
     "Shows map, monster, quest, skill and equipment facts from community data, downloaded only when you ask.",
     "Downloads the player-logged drop table from mapleclassic.wiki when you first need it, and who takes each quest in along with the map data. Both renew weekly and are looked up on this PC.",
-    "Keeps your settings, sessions, price log and builds on this PC.",
+    "Keeps your settings, sessions, item notes, price log and builds on this PC.",
   ];
   const doesNot = [
     "Read or change the game's memory or files.",

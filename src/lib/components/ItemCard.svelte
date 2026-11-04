@@ -1,9 +1,17 @@
 <script lang="ts">
+  // The item check: one item, read from its tooltip or taken from the data. Its stats, whether
+  // it has been scrolled, where it comes from, and the player's own notes and prices. Leafline
+  // has no market prices: the prices here are only the ones the player logged.
+  import { untrack } from "svelte";
+
   import BuildFit from "./BuildFit.svelte";
   import Card from "./Card.svelte";
   import ItemDetails from "./ItemDetails.svelte";
+  import ItemNotes from "./ItemNotes.svelte";
   import PriceLog from "./PriceLog.svelte";
+  import { backend } from "$lib/api";
   import { formatSigned, titleCase } from "$lib/format";
+  import { mapData } from "$lib/mapdata.svelte";
   import { tooltipOf } from "$lib/items.svelte";
   import type { ItemRecord, ItemTooltip, MapReading, Requirements } from "$lib/types";
 
@@ -35,6 +43,57 @@
   ];
 
   const upgraded = $derived(item.upgraded);
+
+  /** The data's record for a copy read from the game, to count the slots it started with. */
+  let matched = $state<ItemRecord | null>(null);
+  const ready = $derived(mapData.status?.ready ?? false);
+  const nameKey = $derived(read && !read.plain ? JSON.stringify([read.name, read.requirements.level, ready]) : null);
+
+  // Follows the key alone: every live reading brings new objects with the same content.
+  $effect(() => {
+    const key = nameKey;
+    matched = null;
+    if (key == null || !ready) return;
+    untrack(() => (read?.name ? backend.findItem(read.name, read.requirements.level) : null))?.then((result) => {
+      if (key === nameKey) matched = result;
+    });
+  });
+
+  /**
+   * Clean or scrolled. Successful scrolls show as the name's (+N) and its amber colour; failed
+   * ones only as fewer slots left than the item has, which needs the data's slot count.
+   */
+  const scrolling = $derived.by(() => {
+    if (!read || read.plain || !item.name) return null;
+    const total = matched?.upgradeSlots ?? null;
+    const left = item.remainingEnhancements;
+    const used = total != null && left != null && left <= total ? total - left : null;
+    const passed = item.upgrades ?? (upgraded ? null : 0);
+    const failed = used != null && passed != null && used >= passed ? used - passed : null;
+    const counted = total != null ? `Counted from the data's ${total} upgrade slots, which Classic could change.` : "";
+    const plural = (n: number) => (n === 1 ? "" : "s");
+    let verdict: { label: string; tone: "clean" | "scrolled"; title: string };
+    if (item.upgrades) verdict = { label: `Scrolled +${item.upgrades}`, tone: "scrolled", title: "The (+N) after its name" };
+    else if (upgraded) verdict = { label: "Scrolled", tone: "scrolled", title: "Its name is amber, but the (+N) wasn't read" };
+    else if (failed)
+      verdict = {
+        label: "Failed scrolls",
+        tone: "scrolled",
+        title: `No upgrades, but ${failed} slot${plural(failed)} used. ${counted}`,
+      };
+    else if (used === 0) verdict = { label: "Clean", tone: "clean", title: `No upgrades, every slot left. ${counted}` };
+    else
+      verdict = {
+        label: "No upgrades",
+        tone: "clean",
+        title: "No (+N) after its name. Failed scrolls only show as missing slots, and this item's slot count isn't known.",
+      };
+    const line =
+      total != null && left != null && left <= total
+        ? `${left} of ${total} slots left` + (failed != null && used ? ` · ${passed} passed, ${failed} failed` : "")
+        : null;
+    return { verdict, line, counted };
+  });
   const summary = $derived(
     [
       item.itemType,
@@ -47,9 +106,9 @@
 <Card {title} {plain}>
   {#snippet aside()}
     <!-- Upgrades are read from the name's (+N) suffix, so say nothing when the name is unreadable. -->
-    {#if read && item.name && !item.plain}
-      <span class="verdict" class:upgraded>
-        {#if item.upgrades}Upgraded +{item.upgrades}{:else if upgraded}Upgraded{:else}No upgrades{/if}
+    {#if scrolling}
+      <span class="verdict" class:upgraded={scrolling.verdict.tone === "scrolled"} title={scrolling.verdict.title}>
+        {scrolling.verdict.label}
       </span>
     {/if}
   {/snippet}
@@ -57,6 +116,9 @@
   <h3 class="name" class:upgraded>{item.name || "Unreadable name"}</h3>
   {#if summary.length}
     <p class="summary">{summary.join(" · ")}</p>
+  {/if}
+  {#if scrolling?.line}
+    <p class="slots tabular" title={scrolling.counted}>{scrolling.line}</p>
   {/if}
 
   {#if item.stats.length}
@@ -103,8 +165,9 @@
 
   {#if wearable}<BuildFit {item} />{/if}
 
-  <ItemDetails item={read} {record} {map} />
+  <ItemDetails item={read} record={record ?? matched} {map} />
 
+  <ItemNotes name={item.name} />
   <PriceLog {item} />
 </Card>
 
@@ -125,6 +188,12 @@
     margin: 2px 0 10px;
     color: var(--muted);
     font-size: 12px;
+  }
+
+  .slots {
+    margin: -8px 0 10px;
+    color: var(--faint);
+    font-size: 11.5px;
   }
 
   .verdict {

@@ -158,7 +158,7 @@ export interface Analysis {
   failed: string[];
 }
 
-/** How a price check went. */
+/** How an item check from the hotkey went. */
 export interface ItemRead {
   /** Item tooltips found, the compared item included. */
   found: number;
@@ -637,6 +637,14 @@ export interface TrainingSpot {
 export interface TrainingSpots {
   from: MapRef | null;
   spots: TrainingSpot[];
+}
+
+/** The player's own note on an item (src-tauri/src/userdata/notes.rs). */
+export interface ItemNote {
+  item: string;
+  note: string;
+  /** Unix seconds. */
+  updatedAt: number;
 }
 
 // Price log (see src-tauri/src/userdata/prices.rs): only prices the player logged.

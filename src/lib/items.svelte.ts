@@ -73,7 +73,7 @@ export function watchItems() {
     lookup.mode = "items";
     itemView.seen += 1;
   });
-  // A new price check takes over from whatever was open.
+  // A new item check takes over from whatever was open.
   backend.onItemRead((read) => {
     if (read.found) {
       itemView.id = null;
