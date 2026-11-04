@@ -185,8 +185,9 @@
       <section>
         <h1>Test your hotkeys</h1>
         <p class="lead">
-          Press each one now, with this window or the game in front. While setup is open, a press only ticks it here;
-          nothing else happens.
+          Click into the game first, then press each one there. The game can keep some keys to itself while it's in
+          front, so a key that only works with this window in front won't work while you play. While setup is open, a
+          press only ticks it here; nothing else happens.
         </p>
         <dl class="keys">
           {#each testRows as shortcut (shortcut.action)}

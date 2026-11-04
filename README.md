@@ -35,7 +35,7 @@ No hotkey is set until you pick it in setup or Settings, and a hotkey takes its 
 | `Win+F9` | Show or hide the overlay |
 | `Pause` | Lock the overlay (clicks pass through to whatever is underneath) |
 
-The game can't bind Win, and adding it also keeps a key away from programs that grab plain F-keys. Setup then asks you to press each key, and ticks the ones that arrive. F12 can't be a hotkey: Windows keeps it for itself.
+The game can't bind Win, and adding it also keeps a key away from programs that grab plain F-keys. Setup then asks you to click into the game and press each key there, and ticks the ones that arrive: the game can keep some keys to itself while it's in front, even ones it doesn't bind, so a key has to be tested with the game in front. F12 can't be a hotkey: Windows keeps it for itself.
 
 Setup also asks about the compact HUD, reading your Character Stat and Skill windows, and saving the picture last read. Settings has the rest: pinned panels, starting or stopping live reading, pausing tracking, a new session, keeping a run out of the history, and the workbench (development builds).
 

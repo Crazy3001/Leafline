@@ -25,8 +25,10 @@ const BOX_SEARCH: f32 = 100.0;
 /// enough: it shows in pieces over scenery.
 const MIN_BOX_AREA: f32 = 125.0;
 /// The bullet is 13 square game pixels. OCR may read it as part of the line or leave it out, so
-/// this much space is searched left of the line's start, and some of the line.
-const MIN_BULLET_AREA: f32 = 6.0;
+/// this much space is searched left of the line's start, and some of the line. The scale comes
+/// from the line's height, which a name with a descender (`Egg`) stretches by about a third, so
+/// this asks for under a third of the bullet: 6 missed the Egg on a live frame (2026-11-04).
+const MIN_BULLET_AREA: f32 = 4.0;
 const BULLET_SEARCH: f32 = 14.0;
 /// The name and any tags sit in this much space below the top of the name.
 const HEADER_HEIGHT: f32 = 46.0;
