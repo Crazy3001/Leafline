@@ -10,8 +10,10 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use crate::error::{Error, Result};
 use crate::userdata::UserData;
 use crate::userdata::characters::KnownMesos;
+use crate::userdata::notes::ItemNote;
 use crate::userdata::prices::{NewPrice, PriceLog};
 use crate::userdata::sessions::{MapRate, SavedSession};
+use crate::userdata::spots::SavedSpot;
 
 const FILE_NAME: &str = "leafline.sqlite3";
 const BACKUP_FOLDER: &str = "backups";
@@ -81,6 +83,44 @@ pub fn record_price(state: State<UserDataState>, price: NewPrice) -> Result<Pric
 #[tauri::command]
 pub fn delete_price(state: State<UserDataState>, id: i64) -> Result<()> {
     state.with(|db| db.delete_price(id))
+}
+
+/// Emitted to every window when the saved training spots change, with the new list.
+const SPOTS_EVENT: &str = "saved-spots";
+
+/// The training spots the player saved, the newest first.
+#[tauri::command]
+pub fn saved_spots(state: State<UserDataState>) -> Result<Vec<SavedSpot>> {
+    state.with(|db| db.saved_spots())
+}
+
+/// Saves a map as a training spot, or with `saved` false takes it off the list.
+#[tauri::command]
+pub fn set_spot_saved(
+    app: AppHandle,
+    state: State<UserDataState>,
+    map_id: i64,
+    name: String,
+    saved: bool,
+) -> Result<Vec<SavedSpot>> {
+    let spots = state.with(|db| {
+        if saved { db.save_spot(map_id, &name, now())? } else { db.remove_spot(map_id)? }
+        db.saved_spots()
+    })?;
+    app.emit(SPOTS_EVENT, &spots)?;
+    Ok(spots)
+}
+
+/// The player's note on an item, if they wrote one.
+#[tauri::command]
+pub fn item_note(state: State<UserDataState>, item: String) -> Result<Option<ItemNote>> {
+    state.with(|db| db.item_note(&item))
+}
+
+/// Writes the player's note on an item; an empty one deletes it. Returns what is kept.
+#[tauri::command]
+pub fn set_item_note(state: State<UserDataState>, item: String, note: String) -> Result<Option<ItemNote>> {
+    state.with(|db| db.set_item_note(&item, &note, now()))
 }
 
 /// Saves the session the overlay is showing to the history. Live sessions save themselves; this

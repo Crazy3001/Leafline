@@ -5,6 +5,9 @@ import type { Backend } from "../api";
 import type {
   Analysis,
   BaseStats,
+  ItemNote,
+  SavedSpot,
+  UpdateStatus,
   Build,
   BuildCatalog,
   BuildPlan,
@@ -95,6 +98,15 @@ let mapStatus: MapDataStatus = preview?.map
   ? { ready: true, clientBuild: "preview", dataUpdatedAt: null, checkedAt: null, files: [] }
   : { ready: false, clientBuild: null, dataUpdatedAt: null, checkedAt: null, files: [] };
 const mapDataHandlers: ((status: MapDataStatus) => void)[] = [];
+
+/** Training spots saved in this browser tab. */
+let savedSpots: SavedSpot[] = [];
+const spotHandlers: ((spots: SavedSpot[]) => void)[] = [];
+
+/** Notes the player wrote on items, by lower-case name. */
+const notes = new Map<string, ItemNote>([
+  ["green robin hat", { item: "Green Robin Hat", note: "Keep for a 60% DEX scroll.", updatedAt: Date.now() / 1000 - 86_400 }],
+]);
 
 /** Prices logged in this browser tab; made-up starting records for one item. */
 const now = Date.now() / 1000;
@@ -234,6 +246,7 @@ let displaySettings: DisplaySettings = {
   live: { enabled: true, interval: 2, pauseAfter: 15, window: null },
   framesFolder: null,
   setupDone: true,
+  updateCheck: false,
   buildRules: { apPerLevel: 5, spPerLevel: 3, beginnerSpPerLevel: 1, advancementSp: 1, firstJobLevel: 10, secondJobLevel: 30, secondSpBuysFirst: false, gearCounts: true },
 };
 
@@ -303,6 +316,9 @@ const showPlaceHandlers: ((link: PlaceLink) => void)[] = [];
 const mockQuests: QuestRow[] = [
   { id: 71, name: "Slime Samples", region: "Fern Isle", levelMin: 1, giver: "Innkeeper Bo", repeat: null, exp: 30, mesos: 0 },
   { id: 70, name: "Shell Sorting", region: "Mossbank", levelMin: 3, giver: "Warden Ilse", repeat: "daily", exp: 120, mesos: 500 },
+  // Made-up stand-ins for the job advancement quests the checklist looks for.
+  { id: 90, name: "The Drifter's Next Journey", region: "Mossbank", levelMin: 30, giver: "Warden Ilse", repeat: null, exp: 0, mesos: 0 },
+  { id: 91, name: "Finding the Instructor", region: "Mossbank", levelMin: 30, giver: "Warden Ilse", repeat: null, exp: 0, mesos: 0 },
 ];
 const characterHandlers: ((read: CharacterRead) => void)[] = [];
 
@@ -587,6 +603,28 @@ export const mockBackend: Backend = {
   async deletePrice(id) {
     prices = prices.filter((p) => p.id !== id);
   },
+  savedSpots: async () => [...savedSpots],
+  async setSpotSaved(mapId, name, saved) {
+    savedSpots = savedSpots.filter((s) => s.mapId !== mapId);
+    if (saved) savedSpots.unshift({ mapId, name, savedAt: Date.now() / 1000 });
+    spotHandlers.forEach((h) => h([...savedSpots]));
+    return [...savedSpots];
+  },
+  async onSavedSpots(handler) {
+    spotHandlers.push(handler);
+    return () => {};
+  },
+  itemNote: async (item) => notes.get(item.toLowerCase()) ?? null,
+  async setItemNote(item, note) {
+    const text = note.trim();
+    if (!text) {
+      notes.delete(item.toLowerCase());
+      return null;
+    }
+    const saved = { item, note: text, updatedAt: Date.now() / 1000 };
+    notes.set(item.toLowerCase(), saved);
+    return saved;
+  },
   async saveSession(label) {
     const s = sampleSessionSummary;
     const id = Math.max(0, ...savedSessions.map((x) => x.id)) + 1;
@@ -867,8 +905,10 @@ export const mockBackend: Backend = {
   onPinResized: async () => () => {},
   settings: async () => displaySettings,
   async updateSettings(settings) {
+    const checkChanged = settings.updateCheck !== displaySettings.updateCheck;
     displaySettings = { ...settings };
     settingsHandlers.forEach((h) => h(displaySettings));
+    if (checkChanged) (settings.updateCheck ? mockUpdateCheck() : setUpdate({ state: "off" }));
     return displaySettings;
   },
   async onSettings(handler) {
@@ -894,5 +934,32 @@ export const mockBackend: Backend = {
   },
   async finishSetup() {},
   version: async () => "dev",
+  updateStatus: async () => updateStatus,
+  async checkForUpdate() {
+    if (!displaySettings.updateCheck) throw "Turn on the update check first.";
+    mockUpdateCheck();
+    return updateStatus;
+  },
+  async onUpdateStatus(handler) {
+    updateHandlers.push(handler);
+    return () => {};
+  },
   async fitWindow() {},
 };
+
+/** The update check in a browser: a made-up newer release, after a moment. */
+let updateStatus: UpdateStatus = { state: "off" };
+const updateHandlers: ((status: UpdateStatus) => void)[] = [];
+
+function setUpdate(status: UpdateStatus) {
+  updateStatus = status;
+  updateHandlers.forEach((h) => h(status));
+}
+
+function mockUpdateCheck() {
+  setUpdate({ state: "checking" });
+  setTimeout(() => {
+    if (displaySettings.updateCheck)
+      setUpdate({ state: "available", current: "0.1.0", latest: "0.2.0", url: "https://github.com/OWNER/leafline/releases" });
+  }, 700);
+}

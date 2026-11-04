@@ -1,6 +1,6 @@
 <script lang="ts">
   // Gear to look for at a level, on this build. Each name opens the item in the Lookup tab. The
-  // Build tab shows the top pick of each slot; the editor shows more, and can add them as goals.
+  // Character tab shows the top pick of each slot; the editor shows more, and can add them as goals.
   import { Plus } from "@lucide/svelte";
 
   import { backend } from "$lib/api";

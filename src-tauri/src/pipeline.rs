@@ -47,7 +47,7 @@ pub struct Timing {
 }
 
 impl Analysis {
-    /// Just these items, for a price check with nothing else read yet.
+    /// Just these items, for an item check with nothing else read yet.
     pub fn of_items(width: u32, height: u32, tooltips: Vec<ItemTooltip>) -> Self {
         Self { width, height, tooltips, party_size: 1, ..Self::default() }
     }

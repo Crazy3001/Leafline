@@ -1,5 +1,5 @@
 <script lang="ts">
-  // The Items half of the Lookup tab: the last price check, and a search of every item in the map
+  // The Items half of the Lookup tab: the last item check, and a search of every item in the map
   // data. Search needs nothing from the game, so it works with live reading off.
   import { ArrowLeft, LoaderCircle } from "@lucide/svelte";
   import { untrack } from "svelte";
@@ -139,7 +139,7 @@
 
 {#if !ready}
   {#each tooltips as item, i}
-    <ItemCard {item} title={i === 0 ? "Item" : "Compared item"} plain={pinned && i === 0} />
+    <ItemCard {item} title={i === 0 ? "Item check" : "Compared item"} plain={pinned && i === 0} />
   {/each}
   <Card title="Item search" plain={pinned}>
     <p class="lead">Search every item once the map data is downloaded.</p>
@@ -252,7 +252,7 @@
     </div>
   {:else}
     {#each tooltips as item, i}
-      <ItemCard {item} {map} title={i === 0 ? "Item" : "Compared item"} plain={pinned && i === 0} />
+      <ItemCard {item} {map} title={i === 0 ? "Item check" : "Compared item"} plain={pinned && i === 0} />
     {:else}
       <p class="empty">
         Search above, or hover a piece of equipment in game and {hotkey("ReadItem") ? `press ${hotkey("ReadItem")}` : "use the Read item hotkey"} to check that copy.

@@ -45,6 +45,9 @@ import type {
   MapRoute,
   MeasuredRate,
   NewPrice,
+  SavedSpot,
+  UpdateStatus,
+  ItemNote,
   MonsterDrops,
   MonsterFilters,
   MonsterLink,
@@ -111,7 +114,7 @@ export interface Backend {
   saveLiveFrame(): Promise<string>;
   onLive(handler: (status: LiveStatus) => void): Promise<UnlistenFn>;
   onFrameSaved(handler: (path: string) => void): Promise<UnlistenFn>;
-  /** A price check from the hotkey has ended. */
+  /** An item check from the hotkey has ended. */
   onItemRead(handler: (read: ItemRead) => void): Promise<UnlistenFn>;
   /** An image passed on the command line at startup, once. */
   takeLaunchImage(): Promise<string | null>;
@@ -197,6 +200,15 @@ export interface Backend {
   priceLog(item: string, upgrades: number | null, slots: number | null): Promise<PriceLog>;
   recordPrice(price: NewPrice): Promise<PriceLog>;
   deletePrice(id: number): Promise<void>;
+  /** The training spots the player saved, the newest first. */
+  savedSpots(): Promise<SavedSpot[]>;
+  /** Saves a map as a training spot, or takes it off the list. Every window hears of it. */
+  setSpotSaved(mapId: number, name: string, saved: boolean): Promise<SavedSpot[]>;
+  onSavedSpots(handler: (spots: SavedSpot[]) => void): Promise<UnlistenFn>;
+  /** The player's note on an item, matched like the price log. */
+  itemNote(item: string): Promise<ItemNote | null>;
+  /** Writes it; an empty note deletes it. */
+  setItemNote(item: string, note: string): Promise<ItemNote | null>;
 
   /** The mesos last read for a character, or with no name, for the character seen last. */
   knownMesos(name: string | null): Promise<KnownMesos | null>;
@@ -287,6 +299,11 @@ export interface Backend {
   finishSetup(): Promise<void>;
   /** Leafline's version, for the About section. */
   version(): Promise<string>;
+  /** Where the optional update check stands. */
+  updateStatus(): Promise<UpdateStatus>;
+  /** Checks now; refused while the check is turned off. */
+  checkForUpdate(): Promise<UpdateStatus>;
+  onUpdateStatus(handler: (status: UpdateStatus) => void): Promise<UnlistenFn>;
   /** The travel connections routes can use, and which file they come from. */
   travelInfo(): Promise<TravelInfo>;
   /** Downloads the taxis and return scrolls players recorded on mapleclassic.wiki. */
@@ -379,6 +396,11 @@ const tauriBackend: Backend = {
   priceLog: (item, upgrades, slots) => invoke("price_log", { item, upgrades, slots }),
   recordPrice: (price) => invoke("record_price", { price }),
   deletePrice: (id) => invoke("delete_price", { id }),
+  savedSpots: () => invoke("saved_spots"),
+  setSpotSaved: (mapId, name, saved) => invoke("set_spot_saved", { mapId, name, saved }),
+  onSavedSpots: (handler) => listen<SavedSpot[]>("saved-spots", (e) => handler(e.payload)),
+  itemNote: (item) => invoke("item_note", { item }),
+  setItemNote: (item, note) => invoke("set_item_note", { item, note }),
   knownMesos: (name) => invoke("known_mesos", { name }),
   onKnownMesos: (handler) => listen("known-mesos", () => handler()),
   saveSession: (label) => invoke("save_session", { label }),
@@ -436,6 +458,9 @@ const tauriBackend: Backend = {
   settings: () => invoke("get_settings"),
   updateSettings: (settings) => invoke("update_settings", { settings }),
   onSettings: (handler) => listen<DisplaySettings>("settings", (e) => handler(e.payload)),
+  updateStatus: () => invoke("update_status"),
+  checkForUpdate: () => invoke("check_for_update"),
+  onUpdateStatus: (handler) => listen<UpdateStatus>("update", (e) => handler(e.payload)),
   showSettings: () => invoke("show_settings"),
   showSetup: () => invoke("show_setup"),
   finishSetup: () => invoke("finish_setup"),

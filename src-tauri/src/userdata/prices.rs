@@ -10,7 +10,7 @@ use crate::error::{Error, Result};
 use crate::mapdata::drops::item_key;
 
 /// How closely a read name must match a logged one to count as the same item.
-const SAME_ITEM: f64 = 0.85;
+pub(super) const SAME_ITEM: f64 = 0.85;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]

@@ -158,7 +158,7 @@ export interface Analysis {
   failed: string[];
 }
 
-/** How a price check went. */
+/** How an item check from the hotkey went. */
 export interface ItemRead {
   /** Item tooltips found, the compared item included. */
   found: number;
@@ -167,7 +167,7 @@ export interface ItemRead {
 }
 
 /** The overlay's tabs, each of which can be pinned into a window of its own. */
-export type Panel = "stats" | "map" | "train" | "quests" | "item" | "build";
+export type Panel = "character" | "map" | "train" | "quests" | "item";
 
 export interface PinStatus {
   pinned: Panel[];
@@ -639,6 +639,23 @@ export interface TrainingSpots {
   spots: TrainingSpot[];
 }
 
+/** A training spot the player saved (src-tauri/src/userdata/spots.rs). */
+export interface SavedSpot {
+  mapId: number;
+  /** The map's name when it was saved. */
+  name: string;
+  /** Unix seconds. */
+  savedAt: number;
+}
+
+/** The player's own note on an item (src-tauri/src/userdata/notes.rs). */
+export interface ItemNote {
+  item: string;
+  note: string;
+  /** Unix seconds. */
+  updatedAt: number;
+}
+
 // Price log (see src-tauri/src/userdata/prices.rs): only prices the player logged.
 
 export type PriceKind = "traded" | "asking";
@@ -705,7 +722,18 @@ export interface DisplaySettings {
   framesFolder: string | null;
   /** The first-launch setup has been finished. */
   setupDone: boolean;
+  /** Ask GitHub for the latest version number at startup. Off until the player turns it on. */
+  updateCheck: boolean;
 }
+
+/** The optional update check (src-tauri/src/app/update.rs). */
+export type UpdateStatus =
+  | { state: "off" }
+  | { state: "checking" }
+  | { state: "upToDate"; current: string; latest: string }
+  | { state: "available"; current: string; latest: string; url: string }
+  | { state: "unavailable"; current: string; reason: string }
+  | { state: "failed"; current: string; message: string };
 
 // Session history (see src-tauri/src/userdata/sessions.rs).
 

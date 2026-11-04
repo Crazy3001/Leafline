@@ -1,5 +1,5 @@
 //! What Leafline remembers about each character between runs: for now, the mesos last read for
-//! them, so the Stats tab can show an amount before the inventory is opened again.
+//! them, so the Character tab can show an amount before the inventory is opened again.
 
 use rusqlite::{OptionalExtension, params};
 use serde::Serialize;

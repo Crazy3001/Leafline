@@ -26,6 +26,7 @@ export const display = $state<DisplaySettings>({
   buildRules: DEFAULT_RULES,
   framesFolder: null,
   setupDone: false,
+  updateCheck: false,
 });
 
 const NUMPAD: Record<string, string> = { Add: "+", Subtract: "-", Multiply: "*", Divide: "/", Decimal: ".", Enter: "Enter" };

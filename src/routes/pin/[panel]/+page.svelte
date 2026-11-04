@@ -7,7 +7,7 @@
   import { page } from "$app/state";
   import { backend } from "$lib/api";
   import PanelView from "$lib/components/PanelView.svelte";
-  import { PANELS, PIN_WIDTH, panelInfo } from "$lib/panels";
+  import { PIN_WIDTH, panelId, panelInfo } from "$lib/panels";
   import { live, watchLive } from "$lib/readings.svelte";
   import { display, watchSettings } from "$lib/settings.svelte";
   import type { Panel } from "$lib/types";
@@ -15,9 +15,7 @@
   /** Taller than this, the panel scrolls instead of growing. */
   const MAX_HEIGHT = 560;
 
-  const panel = $derived(
-    (PANELS.some((p) => p.id === page.params.panel) ? page.params.panel : "stats") as Panel,
-  );
+  const panel = $derived<Panel>(panelId(page.params.panel) ?? "character");
   const info = $derived(panelInfo(panel));
   const Icon = $derived(info.icon);
 
@@ -51,7 +49,7 @@
   }
 
   function sizeKey() {
-    return `leafline.pin.size.${page.params.panel}`;
+    return `leafline.pin.size.${panel}`;
   }
 
   function keepSize(size: typeof sized) {

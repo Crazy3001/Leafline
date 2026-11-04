@@ -10,6 +10,8 @@ Leafline only looks at your screen. It captures what is visible, reads it with O
 
 It never reads or writes game memory or files, never touches network traffic, never injects into or draws inside the game client, and never sends keyboard or mouse input to the game. There is no automation of any kind. No Nexon assets are included.
 
+Nothing read from the game leaves your PC. Leafline goes online only to download the community data below when you ask for it, and, if you turn it on in setup or Settings, to ask GitHub for the latest version number at startup. That request carries Leafline's name and version and nothing else; when a newer release is out, Settings → About says so and links to it. Nothing is downloaded or installed for you.
+
 **Use it at your own risk.** Leafline reads the game window from the moment it starts (you can turn that off in Settings). Nexon has not said whether read-only overlays are allowed. Its support replies quote the rule against unauthorised third-party software, and one player reported a two-week ban while running a similar screen-reading overlay (unconfirmed). Nexon's FAQ says a penalty in one of its games carries to the others on the same account. If that worries you, play on a character you can afford to lose, ideally on a separate Nexon account.
 
 ## Getting started (Windows)
@@ -51,6 +53,14 @@ It only looks at the window. It asks Windows for the window's title, class, posi
 
 Item tooltips aren't read as you play. Hover an item and press the Read item hotkey, and Leafline reads it from a single picture, whether live reading is running or not. The **Live reading** switch in Settings has to be on for this too.
 
+### Item check
+
+The Read item hotkey opens an **item check** in the Lookup tab: the hovered item's stats with their base and bonus, its requirements and jobs, whether it's clean or scrolled, whether your build can wear it, who drops it and which quests give it, and your own note and prices for it.
+
+Successful scrolls show in game as the `(+N)` after the name. Failed ones only show as fewer slots left than the item started with, so Leafline counts them against the slot count in the map data, and says that's where the number comes from, since Classic could differ. A copy with no `(+N)` reads as "No upgrades" until its slots can be checked.
+
+Leafline has no market prices. Write a note on any item (keep it, sell it, who wants one), and log prices you saw or paid, each marked traded or asking: the card shows their median, range and the ones for copies like this one. Links open price sites in your browser with the item's name copied, ready to paste. The note and prices stay on your PC and come back whenever you check or look up the item.
+
 The window is found by its title or class. If Leafline can't tell which window is the game, pick it in Settings; the choice is remembered. If Windows HDR is on for the game's display, the overlay warns you, because readings are unreliable until HDR is off and the game restarted.
 
 ### Reading the HUD
@@ -78,15 +88,21 @@ OCR is sometimes wrong, so the tracker checks readings against each other rather
 - The clock pauses after 15 seconds without EXP (change it in Settings), and at once on a map change without EXP, so time in town does not dilute the rates. Rates appear after 30 seconds of active time.
 - A missing reading is skipped, never guessed. No EXP table is built in: each level's requirement is measured from the HUD, since Classic's table may differ from old GMS.
 
+### Training spots
+
+The **Train** tab ranks maps near your level by the map data's base EXP for a clear, EXP per monster HP, the EXP per hour you measured there, or how few portals away they are, with a route from where you are. The bookmark on a row saves it to **Your spots**, listed first whatever your level, so the places you like to grind stay one click away. Saved spots are kept on your PC with your other records.
+
 ### Build planner
 
-The **Build** tab shows what your plan says at your level: this level's AP and SP, the next job advancement and what comes after. **Edit** opens the planner.
+The **Character** tab is your character at a glance: level, job, HP, MP, EXP and mesos, this session's rates, and under them what your build plan says at your level: this level's AP and SP, the next job advancement and what comes after. **Edit** opens the planner. The session's totals, your history and your timers follow below.
+
+When an advancement is coming up, a **job advancement checklist** under it says who to see and where they stand, with a route, and for the 2nd job the quests involved, each opening its steps in the Quests tab. Leafline finds these in the downloaded quest and NPC data by the job's name, so it is a pointer, not a rule: the data has no quest for the 1st job, and what the game's NPCs say comes first. Tick the steps as you go.
 
 A build is a job and a list of goals in order, the way written guides put them: this skill to 20, then that one; DEX to 25, the rest into LUK. Each new point goes to the first goal that can take it, and the planner lays the result out level by level. It says when a prerequisite comes too late, a goal can't finish in time, or 1st-job SP would be lost at the 2nd job advancement. Add gear to see the first level the plan can wear it, and a hovered item (the Read item hotkey) shows whether it suits the build.
 
-Starting late, or spent points your own way? While live reading runs, open your Character Stat or Skill window: when what it shows changes, Leafline moves the build's starting point to match and lays out the rest of the plan from there. These windows are read from the same pictures live reading already takes, and only while one is open. With live reading stopped, use **Read stats** in the Build tab or its hotkey to read them from a single picture. The skill window shows one job tab at a time, so open each tab you've spent points on.
+Starting late, or spent points your own way? While live reading runs, open your Character Stat or Skill window: when what it shows changes, Leafline moves the build's starting point to match and lays out the rest of the plan from there. These windows are read from the same pictures live reading already takes, and only while one is open. With live reading stopped, use **Read stats** in the Character tab or its hotkey to read them from a single picture. The skill window shows one job tab at a time, so open each tab you've spent points on.
 
-The Build tab also lists gear to look for at your level, ranked by the stats your plan raises. It doesn't know prices or how easy an item is to find, and nobody has checked its picks in game, so treat it as a list to look through.
+The Character tab also lists gear to look for at your level, ranked by the stats your plan raises. It doesn't know prices or how easy an item is to find, and nobody has checked its picks in game, so treat it as a list to look through.
 
 ### Quest search
 
@@ -100,9 +116,9 @@ The game's data only says who gives a quest, so who takes it in comes from maple
 
 The Lookup tab searches Items, Monsters, Maps and NPCs. None of it needs live reading.
 
-**Items** searches every item in the map data by name or by what it does, with categories and filters for slot, job, level and stat. An item's card shows its stats, whether your build can wear it, your logged prices, who players saw drop it and which quests give it. Names in a build, its suggestions and a map's drops open here.
+**Items** searches every item in the map data by name or by what it does, with categories and filters for slot, job, level and stat. An item's card shows its stats, whether your build can wear it, your note and logged prices, who players saw drop it and which quests give it. Names in a build, its suggestions and a map's drops open here.
 
-Under **Equip**, the list starts with gear for you, slot by slot, the best first. It goes by your level, your job and your build's stats, using the same ranking as the Build tab's suggestions. Your level and job come from the game or your build, and you can change either, pick a gender, or look 5 to 20 levels ahead. Without a build it can't check stat requirements, and says so. Staff and novelty items are left out unless you search for them by name. **Everything** lists all equipment. Nobody has checked these picks in game, and they don't take prices into account.
+Under **Equip**, the list starts with gear for you, slot by slot, the best first. It goes by your level, your job and your build's stats, using the same ranking as the Character tab's suggestions. Your level and job come from the game or your build, and you can change either, pick a gender, or look 5 to 20 levels ahead. Without a build it can't check stat requirements, and says so. Staff and novelty items are left out unless you search for them by name. **Everything** lists all equipment. Nobody has checked these picks in game, and they don't take prices into account.
 
 **Monsters** opens with what's on your map and near your level, above every monster players meet. Search by name, by something it drops, or by a map, and narrow it by boss, undead, element weakness, region or level. A monster's card shows its stats, elements and what it can do, each map it lives on with a route from where you are, what players saw it drop, the quests that want it and any other versions of it. Monster names on the Map, Train and Quests tabs open here.
 

@@ -44,7 +44,7 @@ pub fn publish_live_analysis(app: &AppHandle, mut analysis: Analysis) {
     *current = Some(analysis);
 }
 
-/// Shows the items a price check read, in place of the ones before.
+/// Shows the items an item check read, in place of the ones before.
 pub fn publish_items(app: &AppHandle, width: u32, height: u32, items: Vec<ItemTooltip>) {
     let state = app.state::<Readings>();
     let mut current = state.analysis.lock().expect("readings lock");

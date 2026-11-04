@@ -1,4 +1,4 @@
-// What the Build tab and the item check share with the editor window.
+// What the Character tab and the item check share with the editor window.
 
 import { backend } from "./api";
 import type { BaseStat } from "./types";
