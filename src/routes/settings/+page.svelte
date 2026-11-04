@@ -896,28 +896,6 @@
     background: var(--bg);
   }
 
-  .update {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 4px 12px;
-    margin: 0 0 14px;
-    padding: 8px 12px;
-    border-left: 2px solid var(--accent);
-    background: var(--accent-soft);
-    font-size: 12.5px;
-  }
-
-  .help.status {
-    margin-top: 4px;
-    color: var(--faint);
-  }
-
-  .help.warn {
-    margin-top: 4px;
-    color: var(--warn);
-  }
-
   .reset-keys {
     display: flex;
     gap: 6px;
@@ -1498,5 +1476,28 @@
     .lists {
       grid-template-columns: 1fr;
     }
+  }
+
+  /* The update check, in About. */
+  .update {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 12px;
+    margin: 0 0 14px;
+    padding: 8px 12px;
+    border-left: 2px solid var(--accent);
+    background: var(--accent-soft);
+    font-size: 12.5px;
+  }
+
+  .help.status {
+    margin-top: 4px;
+    color: var(--faint);
+  }
+
+  .help.warn {
+    margin-top: 4px;
+    color: var(--warn);
   }
 </style>
