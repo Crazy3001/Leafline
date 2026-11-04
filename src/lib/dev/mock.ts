@@ -316,6 +316,9 @@ const showPlaceHandlers: ((link: PlaceLink) => void)[] = [];
 const mockQuests: QuestRow[] = [
   { id: 71, name: "Slime Samples", region: "Fern Isle", levelMin: 1, giver: "Innkeeper Bo", repeat: null, exp: 30, mesos: 0 },
   { id: 70, name: "Shell Sorting", region: "Mossbank", levelMin: 3, giver: "Warden Ilse", repeat: "daily", exp: 120, mesos: 500 },
+  // Made-up stand-ins for the job advancement quests the checklist looks for.
+  { id: 90, name: "The Drifter's Next Journey", region: "Mossbank", levelMin: 30, giver: "Warden Ilse", repeat: null, exp: 0, mesos: 0 },
+  { id: 91, name: "Finding the Instructor", region: "Mossbank", levelMin: 30, giver: "Warden Ilse", repeat: null, exp: 0, mesos: 0 },
 ];
 const characterHandlers: ((read: CharacterRead) => void)[] = [];
 

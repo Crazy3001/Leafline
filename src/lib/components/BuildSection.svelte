@@ -5,6 +5,7 @@
   import { ExternalLink, Pencil, RefreshCw } from "@lucide/svelte";
   import { untrack } from "svelte";
 
+  import AdvancementChecklist from "./AdvancementChecklist.svelte";
   import GearPicks from "./GearPicks.svelte";
   import MapDataPanel from "./map/MapDataPanel.svelte";
   import Section from "./map/Section.svelte";
@@ -63,6 +64,8 @@
   const hasWork = (s: LevelStep) => s.ap.length > 0 || s.sp.length > 0 || s.advance != null || s.gear.length > 0;
   const coming = $derived(steps.filter((s) => s.level > at && hasWork(s)).slice(0, COMING));
   const advance = $derived(steps.find((s) => s.level > at && s.advance));
+  /** The advancement the checklist is for: the next one, or this level's until the next level. */
+  const nextAdvance = $derived(steps.find((s) => s.level >= at && s.advance));
   const warnings = $derived(plan?.expansion.problems.filter((p) => p.severity === "warning") ?? []);
   const past = $derived(level != null && steps.length > 0 && level > steps[steps.length - 1].level);
 </script>
@@ -134,6 +137,17 @@
       <p class="next">
         Next job advancement: <strong>{advance.advance}</strong> at Lv {advance.level}
       </p>
+    {/if}
+    {#if nextAdvance?.advance && plan.build.plan.job}
+      <Section title="Job advancement checklist">
+        <AdvancementChecklist
+          job={plan.build.plan.job}
+          tier={nextAdvance.advance.startsWith("1st") ? 1 : 2}
+          at={nextAdvance.level}
+          {level}
+          {character}
+        />
+      </Section>
     {/if}
 
     {#if coming.length}
