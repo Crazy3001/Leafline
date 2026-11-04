@@ -27,36 +27,36 @@ const RESIZED_EVENT: &str = "pin-resized";
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Panel {
-    Stats,
+    /// The character, this session and the build plan. Stats and Build were two tabs until
+    /// 2026-11-04, so either old id still opens this one.
+    #[serde(alias = "stats", alias = "build")]
+    Character,
     Map,
     Train,
     Quests,
     Item,
-    Build,
 }
 
 impl Panel {
-    const ALL: [Panel; 6] = [Panel::Stats, Panel::Map, Panel::Train, Panel::Quests, Panel::Item, Panel::Build];
+    const ALL: [Panel; 5] = [Panel::Character, Panel::Map, Panel::Train, Panel::Quests, Panel::Item];
 
     fn id(self) -> &'static str {
         match self {
-            Panel::Stats => "stats",
+            Panel::Character => "character",
             Panel::Map => "map",
             Panel::Train => "train",
             Panel::Quests => "quests",
             Panel::Item => "item",
-            Panel::Build => "build",
         }
     }
 
     fn title(self) -> &'static str {
         match self {
-            Panel::Stats => "Stats",
+            Panel::Character => "Character",
             Panel::Map => "Map",
             Panel::Train => "Train",
             Panel::Quests => "Quests",
             Panel::Item => "Lookup",
-            Panel::Build => "Build",
         }
     }
 
@@ -71,7 +71,7 @@ impl Panel {
 const WIDTH: f64 = 340.0;
 
 /// The smallest a pinned panel goes, before the size setting. Any narrower and the session
-/// history in Stats runs off the side.
+/// history in Character runs off the side.
 const MIN_SIZE: (f64, f64) = (320.0, 60.0);
 
 /// Space between the overlay and pinned panels placed beside it.
@@ -98,8 +98,7 @@ impl PinState {
     /// Loads which panels were pinned last time. A missing or unreadable file means none.
     pub fn load(app: &AppHandle) -> Result<Self> {
         let path = app.path().app_data_dir()?.join(FILE_NAME);
-        let pinned =
-            std::fs::read_to_string(&path).ok().and_then(|json| serde_json::from_str(&json).ok()).unwrap_or_default();
+        let pinned = std::fs::read_to_string(&path).ok().map(|json| parse(&json)).unwrap_or_default();
         Ok(Self { path, pinned: Mutex::new(pinned), hidden: AtomicBool::new(false) })
     }
 
@@ -118,6 +117,19 @@ impl PinState {
         std::fs::write(&self.path, json)?;
         Ok(())
     }
+}
+
+/// The pinned panels saved in `pins.json`, in order and each once. Unreadable means none. Older
+/// files can name both Stats and Build, which are one panel now.
+fn parse(json: &str) -> Vec<Panel> {
+    let mut pinned: Vec<Panel> = serde_json::from_str(json).unwrap_or_default();
+    let mut seen = Vec::new();
+    pinned.retain(|p| {
+        let first = !seen.contains(p);
+        seen.push(*p);
+        first
+    });
+    pinned
 }
 
 /// Whether a pinned Lookup panel, which shows items and monsters, is on screen.
@@ -271,4 +283,22 @@ pub fn toggle_visibility(app: &AppHandle) -> Result<()> {
 #[tauri::command]
 pub fn toggle_pins(app: AppHandle) -> Result<()> {
     toggle_visibility(&app)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn old_stats_and_build_pins_open_the_character_panel_once() {
+        assert_eq!(parse(r#"["stats","map","build"]"#), vec![Panel::Character, Panel::Map]);
+        assert_eq!(parse(r#"["build"]"#), vec![Panel::Character]);
+        assert_eq!(parse(r#"["character","item"]"#), vec![Panel::Character, Panel::Item]);
+        assert_eq!(parse("not json"), Vec::<Panel>::new());
+    }
+
+    #[test]
+    fn panels_are_saved_under_their_new_id() {
+        assert_eq!(serde_json::to_string(&[Panel::Character]).unwrap(), r#"["character"]"#);
+    }
 }

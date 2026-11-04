@@ -80,13 +80,13 @@ OCR is sometimes wrong, so the tracker checks readings against each other rather
 
 ### Build planner
 
-The **Build** tab shows what your plan says at your level: this level's AP and SP, the next job advancement and what comes after. **Edit** opens the planner.
+The **Character** tab is your character at a glance: level, job, HP, MP, EXP and mesos, this session's rates, and under them what your build plan says at your level: this level's AP and SP, the next job advancement and what comes after. **Edit** opens the planner. The session's totals, your history and your timers follow below.
 
 A build is a job and a list of goals in order, the way written guides put them: this skill to 20, then that one; DEX to 25, the rest into LUK. Each new point goes to the first goal that can take it, and the planner lays the result out level by level. It says when a prerequisite comes too late, a goal can't finish in time, or 1st-job SP would be lost at the 2nd job advancement. Add gear to see the first level the plan can wear it, and a hovered item (the Read item hotkey) shows whether it suits the build.
 
-Starting late, or spent points your own way? While live reading runs, open your Character Stat or Skill window: when what it shows changes, Leafline moves the build's starting point to match and lays out the rest of the plan from there. These windows are read from the same pictures live reading already takes, and only while one is open. With live reading stopped, use **Read stats** in the Build tab or its hotkey to read them from a single picture. The skill window shows one job tab at a time, so open each tab you've spent points on.
+Starting late, or spent points your own way? While live reading runs, open your Character Stat or Skill window: when what it shows changes, Leafline moves the build's starting point to match and lays out the rest of the plan from there. These windows are read from the same pictures live reading already takes, and only while one is open. With live reading stopped, use **Read stats** in the Character tab or its hotkey to read them from a single picture. The skill window shows one job tab at a time, so open each tab you've spent points on.
 
-The Build tab also lists gear to look for at your level, ranked by the stats your plan raises. It doesn't know prices or how easy an item is to find, and nobody has checked its picks in game, so treat it as a list to look through.
+The Character tab also lists gear to look for at your level, ranked by the stats your plan raises. It doesn't know prices or how easy an item is to find, and nobody has checked its picks in game, so treat it as a list to look through.
 
 ### Quest search
 
@@ -102,7 +102,7 @@ The Lookup tab searches Items, Monsters, Maps and NPCs. None of it needs live re
 
 **Items** searches every item in the map data by name or by what it does, with categories and filters for slot, job, level and stat. An item's card shows its stats, whether your build can wear it, your logged prices, who players saw drop it and which quests give it. Names in a build, its suggestions and a map's drops open here.
 
-Under **Equip**, the list starts with gear for you, slot by slot, the best first. It goes by your level, your job and your build's stats, using the same ranking as the Build tab's suggestions. Your level and job come from the game or your build, and you can change either, pick a gender, or look 5 to 20 levels ahead. Without a build it can't check stat requirements, and says so. Staff and novelty items are left out unless you search for them by name. **Everything** lists all equipment. Nobody has checked these picks in game, and they don't take prices into account.
+Under **Equip**, the list starts with gear for you, slot by slot, the best first. It goes by your level, your job and your build's stats, using the same ranking as the Character tab's suggestions. Your level and job come from the game or your build, and you can change either, pick a gender, or look 5 to 20 levels ahead. Without a build it can't check stat requirements, and says so. Staff and novelty items are left out unless you search for them by name. **Everything** lists all equipment. Nobody has checked these picks in game, and they don't take prices into account.
 
 **Monsters** opens with what's on your map and near your level, above every monster players meet. Search by name, by something it drops, or by a map, and narrow it by boss, undead, element weakness, region or level. A monster's card shows its stats, elements and what it can do, each map it lives on with a route from where you are, what players saw it drop, the quests that want it and any other versions of it. Monster names on the Map, Train and Quests tabs open here.
 

@@ -161,7 +161,7 @@ pub fn set_gear_goal(
     character: Option<String>,
 ) -> Result<()> {
     let Some(mut build) = state.with(|db| db.active_build(character.as_deref()))? else {
-        return Err(Error::Invalid("Plan a build first, in the Build tab.".into()));
+        return Err(Error::Invalid("Plan a build first, in the Character tab.".into()));
     };
     build.plan.gear.retain(|id| *id != item);
     if wanted {
@@ -215,7 +215,7 @@ pub fn catch_up(app: &AppHandle, scan: CharacterScan) -> Result<CharacterRead> {
     };
     let state = app.state::<UserDataState>();
     let Some(mut build) = state.with(|db| db.active_build(scan.name.as_deref()))? else {
-        return Ok(done("Plan a build first, in the Build tab."));
+        return Ok(done("Plan a build first, in the Character tab."));
     };
     if let (Some(owner), Some(name)) = (&build.character, &scan.name)
         && !owner.eq_ignore_ascii_case(name)

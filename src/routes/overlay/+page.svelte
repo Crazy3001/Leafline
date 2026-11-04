@@ -8,7 +8,7 @@
   import PanelView from "$lib/components/PanelView.svelte";
   import { itemView, watchItems } from "$lib/items.svelte";
   import { monsterView, watchMonsters } from "$lib/monsters.svelte";
-  import { PANELS, panelInfo, signature } from "$lib/panels";
+  import { PANELS, panelId, panelInfo, signature } from "$lib/panels";
   import { placeLinks, watchPlaces } from "$lib/places.svelte";
   import { questView, watchQuests } from "$lib/quests.svelte";
   import { live, watchLive } from "$lib/readings.svelte";
@@ -48,11 +48,11 @@
     if (live.itemRead?.found) select("item");
   });
 
-  // So is reading the character's windows, whose result is in the Build tab. When the live
+  // So is reading the character's windows, whose result is in the Character tab. When the live
   // pictures catch a change by themselves, a line says so and the tab stays where it is.
   $effect(() => {
     const read = live.characterRead;
-    if (read && !read.problem && !read.automatic) select("build");
+    if (read && !read.problem && !read.automatic) select("character");
   });
 
   // So is a link to an item, from the build planner or a list of drops, or to anything else in
@@ -79,12 +79,12 @@
 
   function storedTab(): Panel {
     try {
-      const saved = localStorage.getItem(TAB_KEY);
-      if (PANELS.some((p) => p.id === saved)) return saved as Panel;
+      const saved = panelId(localStorage.getItem(TAB_KEY));
+      if (saved) return saved;
     } catch {
       // Private mode or blocked storage: start on the first tab.
     }
-    return "stats";
+    return "character";
   }
 
   async function togglePin() {
@@ -275,7 +275,7 @@
 
     <div class="main" id="panel" role="tabpanel" aria-labelledby="tab-{tab}">
       <!-- A build can be planned and items, monsters and quests looked up with nothing read yet. -->
-      {#if live.analysis || live.session || tab === "build" || tab === "item" || tab === "quests"}
+      {#if live.analysis || live.session || tab === "character" || tab === "item" || tab === "quests"}
         {#key tab}
           <div class="panel"><PanelView panel={tab} analysis={live.analysis} session={live.session} /></div>
         {/key}
@@ -298,11 +298,16 @@
             </li>
             <li>
               <span class="n">3</span>
-              <span
-                ><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>O</kbd> shows or hides this window; <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd
-                  >L</kbd
-                > lets clicks pass through it.</span
-              >
+              <!-- No hotkey is bound until the player picks one, so name only the ones they have. -->
+              {#if hotkey("ToggleOverlay") || hotkey("ToggleClickThrough")}
+                <span
+                  >{#if hotkey("ToggleOverlay")}<kbd>{hotkey("ToggleOverlay")}</kbd> shows or hides this window.{/if}
+                  {#if hotkey("ToggleClickThrough")}<kbd>{hotkey("ToggleClickThrough")}</kbd> lets clicks pass through
+                    it.{/if}</span
+                >
+              {:else}
+                <span>Pick hotkeys in Settings to show, hide or lock this window without leaving the game.</span>
+              {/if}
             </li>
           </ol>
           <button class="inline small" onclick={() => backend.showSettings()}>Settings and what Leafline does</button>
@@ -523,7 +528,7 @@
       border-color 0.12s ease;
   }
 
-  /* Six titles don't fit a window dragged narrow, so only the open tab keeps its title. */
+  /* Five titles don't fit a window dragged narrow, so only the open tab keeps its title. */
   @media (max-width: 330px) {
     [role="tab"]:not([aria-selected="true"]) .tab-title {
       display: none;

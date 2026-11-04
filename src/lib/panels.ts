@@ -1,6 +1,6 @@
 // The overlay's panels: one tab each, and each can be pinned into a window of its own.
 
-import { Activity, Map as MapIcon, Milestone, ScrollText, Search, Swords } from "@lucide/svelte";
+import { Map as MapIcon, ScrollText, Search, Swords, UserRound } from "@lucide/svelte";
 
 import { mapLabel } from "./format";
 import type { Analysis, Panel, SessionSummary } from "./types";
@@ -8,20 +8,30 @@ import type { Analysis, Panel, SessionSummary } from "./types";
 export interface PanelInfo {
   id: Panel;
   title: string;
-  icon: typeof Activity;
+  icon: typeof UserRound;
 }
 
 /** Width of a pinned window, matching `WIDTH` in src-tauri/src/app/pins.rs. */
 export const PIN_WIDTH = 340;
 
 export const PANELS: PanelInfo[] = [
-  { id: "stats", title: "Stats", icon: Activity },
+  { id: "character", title: "Character", icon: UserRound },
   { id: "map", title: "Map", icon: MapIcon },
   { id: "train", title: "Train", icon: Swords },
   { id: "quests", title: "Quests", icon: ScrollText },
   { id: "item", title: "Lookup", icon: Search },
-  { id: "build", title: "Build", icon: Milestone },
 ];
+
+/** Stats and Build were tabs of their own until 2026-11-04; remembered tabs and pinned
+ *  windows can still name them. */
+const RENAMED: Record<string, Panel> = { stats: "character", build: "character" };
+
+/** The panel an id names, old ones included, or null for one that isn't a panel. */
+export function panelId(id: string | null | undefined): Panel | null {
+  if (id == null) return null;
+  if (id in RENAMED) return RENAMED[id];
+  return PANELS.some((p) => p.id === id) ? (id as Panel) : null;
+}
 
 export function panelInfo(id: Panel): PanelInfo {
   return PANELS.find((p) => p.id === id) ?? PANELS[0];
@@ -33,12 +43,12 @@ export function panelInfo(id: Panel): PanelInfo {
  */
 export function signature(panel: Panel, analysis: Analysis | null, session: SessionSummary | null): string | null {
   switch (panel) {
-    case "stats":
-      return analysis?.hud || session ? `${analysis?.hud?.level}` : null;
+    case "character":
+      // Changes with the character's level, which moves the build plan on too.
+      return analysis?.hud || session ? `${analysis?.hud?.level ?? session?.level}` : null;
     case "map":
       return analysis?.map ? mapLabel(analysis.map) : null;
     case "train":
-    case "build":
       // Changes with the character's level; the list itself is looked up, not read.
       return (analysis?.hud?.level ?? session?.level) != null ? `${analysis?.hud?.level ?? session?.level}` : null;
     case "quests":

@@ -1,10 +1,10 @@
 <script lang="ts">
-  // What the build says at the character's level. It moves on with the level, and catches up
-  // with what was really spent whenever the stat and skill windows are read.
+  // The build plan's part of the Character tab: what the plan says at the character's level. It
+  // moves on with the level, and catches up with what was really spent whenever the stat and
+  // skill windows are read. The level itself is shown once, in the character's header above.
   import { ExternalLink, Pencil, RefreshCw } from "@lucide/svelte";
   import { untrack } from "svelte";
 
-  import Card from "./Card.svelte";
   import GearPicks from "./GearPicks.svelte";
   import MapDataPanel from "./map/MapDataPanel.svelte";
   import Section from "./map/Section.svelte";
@@ -17,12 +17,10 @@
   let {
     level,
     character = null,
-    plain = false,
   }: {
     /** Read from the HUD or the session. */
     level: number | null;
     character?: string | null;
-    plain?: boolean;
   } = $props();
 
   /** How many later levels with something to do are shown. */
@@ -69,36 +67,36 @@
   const past = $derived(level != null && steps.length > 0 && level > steps[steps.length - 1].level);
 </script>
 
-{#if !ready}
-  <Card title="Build" {plain}>
-    <p class="lead">Plan your AP and SP level by level. Builds use the skills and equipment in the map data.</p>
-    <MapDataPanel compact />
-  </Card>
-{:else if error}
-  <Card title="Build" {plain}><p class="lead">{error}</p></Card>
-{:else if loaded && !plan}
-  <Card title="Build" {plain}>
-    <p class="lead">
-      Choose a job and write your goals in order, from a guide or your own idea. Leafline lays them out level by level.
-    </p>
-    <button class="action" onclick={() => backend.showBuild()}><Pencil size={13} />Plan a build</button>
-  </Card>
-{:else if plan && step}
-  <Card title="Build" {plain}>
-    {#snippet aside()}
+<section class="build" aria-label="Build plan">
+  <header class="head">
+    <span class="title">Build</span>
+    {#if plan && step}<span class="plan" title={plan.build.name}>{plan.build.name}</span>{/if}
+    {#if plan && step}
       <span class="tools">
-        <button class="link" title="Live reading follows your Character Stat and Skill windows while they're open. With it off, open them and read them once here{keyHint('ReadCharacter')}" onclick={() => backend.readCharacter()}><RefreshCw size={12} />Read stats</button>
+        <button
+          class="link"
+          title="Live reading follows your Character Stat and Skill windows while they're open. With it off, open them and read them once here{keyHint('ReadCharacter')}"
+          onclick={() => backend.readCharacter()}><RefreshCw size={12} />Read stats</button
+        >
         <button class="link" title="Edit this build" onclick={() => backend.showBuild()}><Pencil size={12} />Edit</button>
       </span>
-    {/snippet}
+    {/if}
+  </header>
 
-    <h3 class="name">{plan.build.name}</h3>
-
+  {#if !ready}
+    <p class="lead">Plan your AP and SP level by level. Builds use the skills and equipment in the map data.</p>
+    <MapDataPanel compact />
+  {:else if error}
+    <p class="lead">{error}</p>
+  {:else if loaded && !plan}
+    <p class="lead">
+      No build yet. Choose a job and write your goals in order, from a guide or your own idea, and Leafline lays them out
+      level by level.
+    </p>
+    <button class="action" onclick={() => backend.showBuild()}><Pencil size={13} />Plan a build</button>
+  {:else if plan && step}
     <div class="now">
-      <div class="level">
-        <span class="lv">LV</span>
-        <span class="tabular">{level ?? step.level}</span>
-      </div>
+      <span class="at tabular">Lv {level ?? step.level}</span>
       <div class="todo">
         {#if past}
           <p class="quiet">Past the end of this plan (Lv {step.level}).</p>
@@ -108,7 +106,10 @@
         {#if !past}
           {#if step.advance}<p class="advance">{step.advance}</p>{/if}
           {#each step.sp as gain (gain.skillId)}
-            <p><span class="tag">{gain.to - gain.from} SP</span>{gain.name} <span class="tabular dim">{gain.from} → {gain.to}</span></p>
+            <p>
+              <span class="tag">{gain.to - gain.from} SP</span>{gain.name}
+              <span class="tabular dim">{gain.from} → {gain.to}</span>
+            </p>
           {/each}
           {#each step.ap as gain (gain.stat)}
             <p><span class="tag">{gain.amount} AP</span>{statLabel(gain.stat)} <span class="tabular dim">to {gain.total}</span></p>
@@ -136,20 +137,21 @@
     {/if}
 
     {#if coming.length}
-      <h4>Coming up</h4>
-      <ul class="coming">
-        {#each coming as s (s.level)}
-          <li>
-            <span class="at tabular">Lv {s.level}</span>
-            <span class="what">
-              {#if s.advance}<span class="advance">{s.advance}</span>{/if}
-              {#each s.sp as gain (gain.skillId)}<span>{gain.name} {gain.to}</span>{/each}
-              {#each s.ap as gain (gain.stat)}<span class="tabular">{statLabel(gain.stat)} {gain.total}</span>{/each}
-              {#each s.gear as name (name)}<span>{name}</span>{/each}
-            </span>
-          </li>
-        {/each}
-      </ul>
+      <Section title="Coming up" count={coming.length}>
+        <ul class="coming">
+          {#each coming as s (s.level)}
+            <li>
+              <span class="when tabular">Lv {s.level}</span>
+              <span class="what">
+                {#if s.advance}<span class="advance">{s.advance}</span>{/if}
+                {#each s.sp as gain (gain.skillId)}<span>{gain.name} {gain.to}</span>{/each}
+                {#each s.ap as gain (gain.stat)}<span class="tabular">{statLabel(gain.stat)} {gain.total}</span>{/each}
+                {#each s.gear as name (name)}<span>{name}</span>{/each}
+              </span>
+            </li>
+          {/each}
+        </ul>
+      </Section>
     {/if}
 
     {#if plan.expansion.gear.length}
@@ -157,7 +159,9 @@
         <ul class="goals">
           {#each plan.expansion.gear as check (check.item.id)}
             <li>
-              <button title="Show it in the Lookup tab" onclick={() => backend.showItem(check.item.id, null)}>{check.item.name}</button>
+              <button title="Show it in the Lookup tab" onclick={() => backend.showItem(check.item.id, null)}
+                >{check.item.name}</button
+              >
               <span class="tabular" class:warn={!check.usable || check.level == null}>
                 {#if !check.usable}Wrong job{:else if check.level != null}Lv {check.level}{:else}Out of reach{/if}
               </span>
@@ -166,7 +170,7 @@
         </ul>
       </Section>
     {/if}
-    <Section title="Gear to look for">
+    <Section title="Gear to look for" open={false}>
       <GearPicks build={plan.build.id} level={at} />
     </Section>
 
@@ -184,10 +188,48 @@
       {/if}
       <button class="credit" onclick={() => backend.openLink(OSMS_URL)}>{OSMS_CREDIT}</button>
     </footer>
-  </Card>
-{/if}
+  {/if}
+</section>
 
 <style>
+  .build {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+  }
+
+  .head {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .title {
+    flex: none;
+    font-family: var(--font-display);
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+
+  .plan {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .tools {
+    display: inline-flex;
+    flex: none;
+    gap: 10px;
+    margin-left: auto;
+  }
+
   .lead {
     margin: 0 0 10px;
     color: var(--muted);
@@ -229,44 +271,20 @@
     outline: none;
   }
 
-  .tools {
-    display: inline-flex;
-    gap: 10px;
-  }
-
-  .name {
-    margin: 0 0 10px;
-    font-family: var(--font-display);
-    font-size: 15px;
-    font-weight: 600;
-  }
-
+  /* The level's to-do list, set against the level like a row of the plan. */
   .now {
     display: flex;
-    gap: 12px;
-    align-items: flex-start;
+    gap: 10px;
+    align-items: baseline;
   }
 
-  .level {
-    display: grid;
+  .at {
     flex: none;
-    place-items: center;
-    width: 48px;
-    height: 48px;
-    border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
-    border-radius: var(--radius-sm);
-    background: var(--accent-soft);
-    color: var(--accent-strong);
-    font-family: var(--font-display);
-    font-size: 20px;
-    font-weight: 700;
-    line-height: 1;
-  }
-
-  .lv {
+    width: 42px;
     color: var(--accent);
-    font-size: 9px;
-    opacity: 0.8;
+    font-family: var(--font-display);
+    font-size: 12.5px;
+    font-weight: 600;
   }
 
   .todo {
@@ -308,7 +326,7 @@
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 6px;
-    margin: 12px 0 0;
+    margin: 10px 0 0;
   }
 
   .stats div {
@@ -340,7 +358,6 @@
 
   h4 {
     margin: 12px 0 4px;
-    color: var(--muted);
     font-family: var(--font-display);
     font-size: 12px;
     font-weight: 400;
@@ -359,7 +376,7 @@
 
   .coming li {
     display: flex;
-    gap: 8px;
+    gap: 10px;
     padding: 3px 0;
   }
 
@@ -367,7 +384,7 @@
     border-top: 1px solid var(--border);
   }
 
-  .at {
+  .when {
     flex: none;
     width: 42px;
     color: var(--faint);

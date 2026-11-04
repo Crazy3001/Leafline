@@ -167,7 +167,7 @@ export interface ItemRead {
 }
 
 /** The overlay's tabs, each of which can be pinned into a window of its own. */
-export type Panel = "stats" | "map" | "train" | "quests" | "item" | "build";
+export type Panel = "character" | "map" | "train" | "quests" | "item";
 
 export interface PinStatus {
   pinned: Panel[];

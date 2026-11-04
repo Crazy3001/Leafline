@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, type Snippet } from "svelte";
 
   import Card from "./Card.svelte";
   import Gauge from "./Gauge.svelte";
@@ -13,12 +13,17 @@
     mesos,
     session = null,
     remember = false,
+    plain = false,
+    children,
   }: {
     hud: HudReading | null;
     mesos: MesoReading | null;
     session?: SessionSummary | null;
     /** Show the mesos remembered from earlier runs when none are on screen. Off for replays. */
     remember?: boolean;
+    plain?: boolean;
+    /** More about the character under the rates, in the same card: the overlay puts the build plan here. */
+    children?: Snippet;
   } = $props();
 
   /** The name read this run: the tracker's settled one, else the HUD's latest. */
@@ -72,7 +77,7 @@
   });
 </script>
 
-<Card title="Character">
+<Card title="Character" {plain}>
   {#snippet aside()}
     {#if hud?.job}<span>{hud.job}</span>{/if}
   {/snippet}
@@ -155,6 +160,7 @@
   {:else if session.expPerHour == null}
     <p class="hint">Rates need at least 30 s of EXP gains with the HUD in view.</p>
   {/if}
+  {@render children?.()}
 </Card>
 
 <style>

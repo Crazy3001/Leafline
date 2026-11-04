@@ -1,7 +1,7 @@
 <script lang="ts">
   // What one panel shows, the same as a tab of the overlay or pinned into its own window. A
   // pinned window names the panel itself, so single cards drop their frame there.
-  import BuildCard from "./BuildCard.svelte";
+  import BuildSection from "./BuildSection.svelte";
   import CharacterCard from "./CharacterCard.svelte";
   import HistoryCard from "./HistoryCard.svelte";
   import LookupPanel from "./LookupPanel.svelte";
@@ -24,8 +24,11 @@
   <p class="empty">{text}</p>
 {/snippet}
 
-{#if panel === "stats"}
-  <CharacterCard hud={analysis?.hud ?? null} mesos={analysis?.mesos ?? null} {session} remember />
+{#if panel === "character"}
+  <!-- One card for who the character is and where the build plan has them, so the level shows once. -->
+  <CharacterCard hud={analysis?.hud ?? null} mesos={analysis?.mesos ?? null} {session} remember plain={pinned}>
+    <BuildSection level={analysis?.hud?.level ?? session?.level ?? null} character={analysis?.hud?.name ?? null} />
+  </CharacterCard>
   {#if session}<SessionCard {session} compact />{/if}
   <HistoryCard />
   <TimersCard />
@@ -56,8 +59,6 @@
     {session}
     {pinned}
   />
-{:else if panel === "build"}
-  <BuildCard level={analysis?.hud?.level ?? session?.level ?? null} character={analysis?.hud?.name ?? null} plain={pinned} />
 {/if}
 
 <style>
