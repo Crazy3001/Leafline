@@ -231,9 +231,10 @@ export interface LiveChoice {
 
 export interface ShortcutInfo {
   action: string;
-  /** Empty when this hotkey is turned off. */
+  /** Empty when this action has no hotkey. */
   keys: string;
-  defaultKeys: string;
+  /** The key setup offers, or "" for none. */
+  suggestedKeys: string;
   label: string;
 }
 
@@ -696,6 +697,10 @@ export interface DisplaySettings {
   live: LiveChoice;
   /** How the build planner counts points. The player can correct these. */
   buildRules: BuildRules;
+  /** Where saved game pictures go; null is the app's local folder, which never syncs. */
+  framesFolder: string | null;
+  /** The first-launch setup has been finished. */
+  setupDone: boolean;
 }
 
 // Session history (see src-tauri/src/userdata/sessions.rs).

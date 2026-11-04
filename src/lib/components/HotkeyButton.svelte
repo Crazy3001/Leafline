@@ -1,0 +1,114 @@
+<script lang="ts">
+  // One hotkey: click it, then press the keys. Esc cancels; Backspace clears it. Used by Settings
+  // and the first-launch setup.
+  import { keyName } from "$lib/settings.svelte";
+
+  let {
+    keys,
+    disabled = false,
+    label,
+    onchange,
+  }: { keys: string; disabled?: boolean; label: string; onchange: (keys: string) => void } = $props();
+
+  let listening = $state(false);
+
+  /** A pressed key as Leafline writes it: `Ctrl+Shift+K`, `F5`, `Pause`. Null for a modifier alone. */
+  function keysOf(event: KeyboardEvent): string | null {
+    const code = event.code;
+    const key = code.startsWith("Key")
+      ? code.slice(3)
+      : code.startsWith("Digit")
+        ? code.slice(5)
+        : /^(F\d{1,2}|Pause|ScrollLock|Space|Home|End|Insert|Delete|PageUp|PageDown|Arrow(Up|Down|Left|Right))$/.test(code)
+          ? code
+          : null;
+    if (!key) return null;
+    const held = [event.ctrlKey && "Ctrl", event.altKey && "Alt", event.shiftKey && "Shift", event.metaKey && "Super"];
+    return [...held.filter(Boolean), key].join("+");
+  }
+
+  function onkeydown(event: KeyboardEvent) {
+    if (!listening) return;
+    event.preventDefault();
+    if (event.key === "Escape") {
+      listening = false;
+    } else if (event.key === "Backspace") {
+      listening = false;
+      onchange("");
+    } else {
+      const pressed = keysOf(event);
+      if (!pressed) return;
+      listening = false;
+      onchange(pressed);
+    }
+  }
+</script>
+
+<button
+  class="hotkey"
+  class:listening
+  {disabled}
+  aria-label="{label}: {listening ? 'press keys' : keys ? keyName(keys) : 'no hotkey'}"
+  onclick={() => (listening = !listening)}
+  onblur={() => (listening = false)}
+  {onkeydown}
+>
+  {#if listening}
+    Press keys…
+  {:else if keys}
+    {#each keyName(keys).split("+") as key, i}{#if i}<span class="plus">+</span>{/if}<kbd>{key}</kbd>{/each}
+  {:else}
+    None
+  {/if}
+</button>
+
+<style>
+  .hotkey {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    min-width: 54px;
+    justify-content: center;
+    padding: 2px 6px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--muted);
+    font: inherit;
+    font-size: 11.5px;
+    cursor: pointer;
+  }
+
+  .hotkey:hover:enabled {
+    border-color: var(--border-strong);
+  }
+
+  .hotkey:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  .hotkey.listening {
+    border-color: var(--accent);
+    color: var(--accent-strong);
+  }
+
+  .hotkey:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+
+  kbd {
+    padding: 0 4px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 11px;
+  }
+
+  .plus {
+    color: var(--faint);
+  }
+</style>

@@ -75,6 +75,16 @@ pub fn run() {
             pins::restore(app.handle())?;
             tray::create(app)?;
             overlay::create_workbench(app.handle())?;
+            // Setup comes first on a new install. After it, live reading starts with Leafline and
+            // waits for the game window if the game isn't open.
+            let settings = app.state::<SettingsState>().get();
+            if !settings.setup_done {
+                settings::open_setup(app.handle())?;
+            } else if settings.live.enabled
+                && let Err(err) = live::start(app.handle())
+            {
+                shortcuts::log_error(&err);
+            }
             Ok(())
         })
         .on_window_event(|window, event| match event {
@@ -112,6 +122,8 @@ pub fn run() {
             commands::show_workbench,
             commands::shortcut_list,
             commands::open_data_folder,
+            commands::frames_folder,
+            commands::open_frames_folder,
             report::diagnostics,
             readings::current_readings,
             pins::pin_status,
@@ -168,6 +180,8 @@ pub fn run() {
             settings::get_settings,
             settings::update_settings,
             settings::show_settings,
+            settings::show_setup,
+            settings::finish_setup,
             mapdata::open_link,
             mapdata::item_origin,
             mapdata::search_quests,

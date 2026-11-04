@@ -11,7 +11,7 @@
   import { backend } from "$lib/api";
   import { STATS, buildState, statLabel, watchBuilds } from "$lib/builds.svelte";
   import { OSMS_CREDIT, OSMS_URL, mapData, watchMapData } from "$lib/mapdata.svelte";
-  import { display } from "$lib/settings.svelte";
+  import { display, keyHint } from "$lib/settings.svelte";
   import type { BuildPlan, LevelStep } from "$lib/types";
 
   let {
@@ -87,7 +87,7 @@
   <Card title="Build" {plain}>
     {#snippet aside()}
       <span class="tools">
-        <button class="link" title="Live reading follows your Character Stat and Skill windows while they're open. With it off, open them and read them once here (Ctrl+Alt+B)" onclick={() => backend.readCharacter()}><RefreshCw size={12} />Read stats</button>
+        <button class="link" title="Live reading follows your Character Stat and Skill windows while they're open. With it off, open them and read them once here{keyHint('ReadCharacter')}" onclick={() => backend.readCharacter()}><RefreshCw size={12} />Read stats</button>
         <button class="link" title="Edit this build" onclick={() => backend.showBuild()}><Pencil size={12} />Edit</button>
       </span>
     {/snippet}

@@ -17,6 +17,7 @@ use crate::mapdata::TravelChoice;
 
 const FILE_NAME: &str = "settings.json";
 pub const SETTINGS: &str = "settings";
+pub const SETUP: &str = "setup";
 
 /// Emitted to every window when the settings change.
 pub const SETTINGS_EVENT: &str = "settings";
@@ -37,6 +38,10 @@ pub struct Settings {
     pub live: LiveChoice,
     /// How points are earned, as the build planner counts them. The player can correct these.
     pub build_rules: Rules,
+    /// Where saved game pictures go. None means the app's local folder, which never syncs.
+    pub frames_folder: Option<String>,
+    /// The first-launch setup has been finished. Until then it opens at every start.
+    pub setup_done: bool,
 }
 
 impl Default for Settings {
@@ -50,6 +55,8 @@ impl Default for Settings {
             travel: TravelChoice::default(),
             live: LiveChoice::default(),
             build_rules: Rules::default(),
+            frames_folder: None,
+            setup_done: false,
         }
     }
 }
@@ -81,7 +88,8 @@ impl Default for HotkeyChoice {
     }
 }
 
-/// Live reading of the game window. Off until the player has read the warning and turned it on.
+/// Live reading of the game window. On from the start (decided 2026-11-04); setup says in one line
+/// that Leafline is unofficial, and the player can turn it off.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct LiveChoice {
@@ -96,7 +104,7 @@ pub struct LiveChoice {
 
 impl Default for LiveChoice {
     fn default() -> Self {
-        Self { enabled: false, interval: 2.0, pause_after: 15.0, window: None }
+        Self { enabled: true, interval: 2.0, pause_after: 15.0, window: None }
     }
 }
 
@@ -202,6 +210,43 @@ pub fn update_settings(app: AppHandle, state: State<SettingsState>, settings: Se
 #[tauri::command]
 pub async fn show_settings(app: AppHandle) -> Result<()> {
     open(&app)
+}
+
+/// Opens the first-launch setup, or brings it forward.
+pub fn open_setup(app: &AppHandle) -> Result<()> {
+    if let Some(window) = app.get_webview_window(SETUP) {
+        window.show()?;
+        window.unminimize()?;
+        window.set_focus()?;
+        return Ok(());
+    }
+    WebviewWindowBuilder::new(app, SETUP, WebviewUrl::App("setup".into()))
+        .title("Leafline — Setup")
+        .inner_size(600.0, 640.0)
+        .min_inner_size(520.0, 520.0)
+        .center()
+        .background_color(tauri::window::Color(20, 20, 18, 255))
+        .additional_browser_args(super::BROWSER_ARGS)
+        .build()?;
+    Ok(())
+}
+
+/// Opens the first-launch setup again, from Settings.
+#[tauri::command]
+pub async fn show_setup(app: AppHandle) -> Result<()> {
+    open_setup(&app)
+}
+
+/// Finishes setup: closes its window and starts live reading if it is on.
+#[tauri::command]
+pub fn finish_setup(app: AppHandle) -> Result<()> {
+    if let Some(window) = app.get_webview_window(SETUP) {
+        window.close()?;
+    }
+    if app.state::<SettingsState>().get().live.enabled && !super::live::running(&app) {
+        super::live::start(&app)?;
+    }
+    Ok(())
 }
 
 pub fn open(app: &AppHandle) -> Result<()> {

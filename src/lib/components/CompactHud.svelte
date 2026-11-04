@@ -8,7 +8,7 @@
   import Logo from "$lib/components/Logo.svelte";
   import { formatCompact, formatDuration, objectiveProgress } from "$lib/format";
   import { live } from "$lib/readings.svelte";
-  import { display } from "$lib/settings.svelte";
+  import { display, keyHint } from "$lib/settings.svelte";
 
   /** Width in screen units at Normal size; the window grows with the Size setting. */
   const WIDTHS = { card: 248, wide: 400, bar: 460 };
@@ -102,7 +102,7 @@
     {#if reading}
       <button
         class="expand"
-        title="{reading.held ? 'Resume' : 'Pause'} tracking (Ctrl+Alt+K)"
+        title="{reading.held ? 'Resume' : 'Pause'} tracking{keyHint('PauseTracking')}"
         aria-label={reading.held ? "Resume tracking" : "Pause tracking"}
         onclick={() => backend.setLiveHeld(!reading.held)}
       >
@@ -111,7 +111,7 @@
     {/if}
     <button
       class="expand"
-      title="Full overlay (Ctrl+Alt+H)"
+      title="Full overlay{keyHint('ToggleCompact')}"
       aria-label="Full overlay"
       onclick={() => backend.setCompact(false)}
     >

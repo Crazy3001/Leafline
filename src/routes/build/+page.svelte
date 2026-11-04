@@ -23,7 +23,7 @@
   import { guideLinks } from "$lib/guides";
   import { OSMS_CREDIT, OSMS_URL, mapData, watchMapData } from "$lib/mapdata.svelte";
   import { live, watchLive } from "$lib/readings.svelte";
-  import { DEFAULT_RULES, changeSettings, display, watchSettings } from "$lib/settings.svelte";
+  import { DEFAULT_RULES, changeSettings, display, keyHint, watchSettings } from "$lib/settings.svelte";
   import type {
     BaseStat,
     Build,
@@ -467,7 +467,7 @@
 
       <section>
         <h2>Where you are now</h2>
-        <p class="help">Live reading fills these in while your Character Stat and Skill windows are open in game. You can also press Ctrl+Alt+B to read them once, or type them here. The plan carries on from whatever they say.</p>
+        <p class="help">Live reading fills these in while your Character Stat and Skill windows are open in game. With it off, use Read stats in the overlay{keyHint("ReadCharacter")}, or type them here. The plan carries on from whatever they say.</p>
         <div class="fields">
           <label><span>Level</span><input class="number" type="number" min="1" max="200" bind:value={draft.start.level} /></label>
           {#each STATS as stat (stat.id)}

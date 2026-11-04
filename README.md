@@ -1,6 +1,6 @@
 # Leafline
 
-An unofficial, read-only overlay for **MapleStory Classic World**: price checks, EXP tracking, routes, quest help and build planning, beside what is visible on screen.
+An unofficial, read-only overlay for **MapleStory Classic World**: EXP and meso tracking, item checks, routes, quest help and build planning, beside what is visible on screen. Windows only for now.
 
 > The project is not affiliated with or endorsed by Nexon.
 
@@ -10,7 +10,7 @@ Leafline only looks at your screen. It captures what is visible, reads it with O
 
 It never reads or writes game memory or files, never touches network traffic, never injects into or draws inside the game client, and never sends keyboard or mouse input to the game. There is no automation of any kind. No Nexon assets are included.
 
-**Current status: live reading is opt-in, and at your own risk.** Leafline reads saved screenshots by default. Nexon has not said whether read-only overlays are allowed, and one player reported a two-week ban while running a similar overlay (unconfirmed), so live reading stays off until you turn it on in Settings. If you do, use a character you can afford to lose, ideally on a separate Nexon account.
+**Use it at your own risk.** Leafline reads the game window from the moment it starts (you can turn that off in Settings). Nexon has not said whether read-only overlays are allowed. Its support replies quote the rule against unauthorised third-party software, and one player reported a two-week ban while running a similar screen-reading overlay (unconfirmed). Nexon's FAQ says a penalty in one of its games carries to the others on the same account. If that worries you, play on a character you can afford to lose, ideally on a separate Nexon account.
 
 ## Getting started (Windows)
 
@@ -21,26 +21,22 @@ npm install
 npm run tauri dev
 ```
 
-The **overlay** opens: the compact, transparent, always-on-top panel. Drag it by its title bar.
+The first launch opens **setup**: a line on what Leafline is, the hotkeys, game settings that help it read, and the map data download. Run it again from Settings → About. Then the **overlay** is there: the compact, transparent, always-on-top panel. Drag it by its title bar.
 
 Development builds also open the **workbench**, a tool for working on Leafline that release builds don't have. Open a screenshot or a folder of them; the pipeline runs on each, outlines what it found and shows the readings. The overlay updates too, as it would during play. With a folder open, **Replay as session** reads every frame in order as one play session and shows EXP/hour, mesos/hour and time to level, overall and per map (see below). You can also pass it an image on the command line (`leafline.exe shot.png`), or use *Open with*.
 
-| Hotkey | Action |
-|---|---|
-| `Ctrl+Alt+O` | Show or hide the overlay |
-| `Ctrl+Alt+L` | Lock the overlay (clicks pass through to whatever is underneath) |
-| `Ctrl+Alt+P` | Show or hide pinned panels |
-| `Ctrl+Alt+H` | Compact HUD |
-| `Ctrl+Alt+R` | Start or stop live reading |
-| `Ctrl+Alt+I` | Read the item you're hovering, for a price check |
-| `Ctrl+Alt+B` | Read your Character Stat and Skill windows, to update your build |
-| `Ctrl+Alt+K` | Pause or resume tracking |
-| `Ctrl+Alt+N` | Start a new session |
-| `Ctrl+Alt+J` | Keep this run in the history or out of it |
-| `Ctrl+Alt+F` | Save the picture last read, to `Pictures\Leafline` |
-| `Ctrl+Alt+W` | Open the workbench (development builds) |
+No hotkey is set until you pick it in setup or Settings. Setup suggests these, because they type nothing in chat; change any you already use in game:
 
-Change any hotkey, turn one off or turn them all off in Settings.
+| Suggested | Action |
+|---|---|
+| `F9` | Show or hide the overlay |
+| `Scroll Lock` | Lock the overlay (clicks pass through to whatever is underneath) |
+| `Pause` | Compact HUD |
+| `F10` | Read the item you're hovering |
+| `F11` | Read your Character Stat and Skill windows, to update your build |
+| `F12` | Save the picture last read |
+
+Settings has more with no suggested key: show or hide pinned panels, start or stop live reading, pause or resume tracking, start a new session, keep this run in the history or out of it, and the workbench (development builds). Avoid Ctrl and Alt: the game sees them while you hold them, so a hotkey with Ctrl can make your character attack.
 
 Closing a window hides it. Leafline keeps running in the tray until you choose **Quit**.
 
@@ -48,11 +44,11 @@ On Windows, the overlay and pinned panels snap to the edges of the screen and to
 
 ### Live reading
 
-Turn it on under **Settings → Live reading**, then press `Ctrl+Alt+R` or the **Offline** badge on the overlay. Every few seconds Leafline takes a picture of the game window with Windows Graphics Capture, the API OBS and Discord use, and runs it through the same pipeline and session tracker as the workbench. The picture comes from the window itself, so the overlay and anything else in front of it are never in it, and a covered game is still read.
+It starts with Leafline and waits for the game window if the game isn't open. Turn it off under **Settings → Live reading**, or stop it with the **Live** badge on the overlay. Every few seconds Leafline takes a picture of the game window with Windows Graphics Capture, the API OBS and Discord use, and runs it through the same pipeline and session tracker as the workbench. The picture comes from the window itself, so the overlay and anything else in front of it are never in it, and a covered game is still read.
 
-It only looks at the window. It asks Windows for the window's title, class, position and size, and never sends the game a message or opens its process. Pictures stay in memory unless you press **Save frame**. A picture that hasn't changed isn't read again, and pictures are always at least a second apart.
+It only looks at the window. It asks Windows for the window's title, class, position and size, and never sends the game a message or opens its process. Pictures stay in memory unless you press **Save frame**, which saves one to a local folder that doesn't sync (Settings → Data shows it and lets you choose another). A picture that hasn't changed isn't read again, and pictures are always at least a second apart.
 
-Item tooltips aren't read as you play. Hover an item and press `Ctrl+Alt+I`, and Leafline reads it from a single picture, whether live reading is running or not. The **Live reading** switch in Settings has to be on for this too.
+Item tooltips aren't read as you play. Hover an item and press the Read item hotkey, and Leafline reads it from a single picture, whether live reading is running or not. The **Live reading** switch in Settings has to be on for this too.
 
 The window is found by its title or class. If Leafline can't tell which window is the game, pick it in Settings; the choice is remembered. If Windows HDR is on for the game's display, the overlay warns you, because readings are unreliable until HDR is off and the game restarted.
 
@@ -85,9 +81,9 @@ OCR is sometimes wrong, so the tracker checks readings against each other rather
 
 The **Build** tab shows what your plan says at your level: this level's AP and SP, the next job advancement and what comes after. **Edit** opens the planner.
 
-A build is a job and a list of goals in order, the way written guides put them: this skill to 20, then that one; DEX to 25, the rest into LUK. Each new point goes to the first goal that can take it, and the planner lays the result out level by level. It says when a prerequisite comes too late, a goal can't finish in time, or 1st-job SP would be lost at the 2nd job advancement. Add gear to see the first level the plan can wear it, and a hovered item (Ctrl+Alt+I) shows whether it suits the build.
+A build is a job and a list of goals in order, the way written guides put them: this skill to 20, then that one; DEX to 25, the rest into LUK. Each new point goes to the first goal that can take it, and the planner lays the result out level by level. It says when a prerequisite comes too late, a goal can't finish in time, or 1st-job SP would be lost at the 2nd job advancement. Add gear to see the first level the plan can wear it, and a hovered item (the Read item hotkey) shows whether it suits the build.
 
-Starting late, or spent points your own way? While live reading runs, open your Character Stat or Skill window: when what it shows changes, Leafline moves the build's starting point to match and lays out the rest of the plan from there. These windows are read from the same pictures live reading already takes, and only while one is open. With live reading stopped, press `Ctrl+Alt+B` or **Read stats** in the Build tab to read them from a single picture. The skill window shows one job tab at a time, so open each tab you've spent points on.
+Starting late, or spent points your own way? While live reading runs, open your Character Stat or Skill window: when what it shows changes, Leafline moves the build's starting point to match and lays out the rest of the plan from there. These windows are read from the same pictures live reading already takes, and only while one is open. With live reading stopped, use **Read stats** in the Build tab or its hotkey to read them from a single picture. The skill window shows one job tab at a time, so open each tab you've spent points on.
 
 The Build tab also lists gear to look for at your level, ranked by the stats your plan raises. It doesn't know prices or how easy an item is to find, and nobody has checked its picks in game, so treat it as a list to look through.
 

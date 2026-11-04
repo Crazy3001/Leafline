@@ -89,3 +89,17 @@ pub fn open_data_folder(app: AppHandle) -> Result<()> {
     let folder = app.path().app_data_dir()?;
     app.opener().open_path(folder.to_string_lossy(), None::<&str>).map_err(|err| Error::Invalid(err.to_string()))
 }
+
+/// The folder saved game pictures go to, as the Settings window shows it.
+#[tauri::command]
+pub fn frames_folder(app: AppHandle) -> Result<String> {
+    Ok(super::live::frames_folder(&app)?.display().to_string())
+}
+
+/// Opens the folder saved game pictures go to, making it first if needed.
+#[tauri::command]
+pub fn open_frames_folder(app: AppHandle) -> Result<()> {
+    let folder = super::live::frames_folder(&app)?;
+    std::fs::create_dir_all(&folder)?;
+    app.opener().open_path(folder.to_string_lossy(), None::<&str>).map_err(|err| Error::Invalid(err.to_string()))
+}

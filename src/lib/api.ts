@@ -103,7 +103,7 @@ export interface Backend {
   stopLive(): Promise<void>;
   /** Windows that could be the game, likely ones first. */
   liveWindows(): Promise<GameWindow[]>;
-  /** Saves the last live picture to Pictures\Leafline and returns its path. */
+  /** Saves the last live picture to the saved pictures folder and returns its path. */
   saveLiveFrame(): Promise<string>;
   onLive(handler: (status: LiveStatus) => void): Promise<UnlistenFn>;
   onFrameSaved(handler: (path: string) => void): Promise<UnlistenFn>;
@@ -207,6 +207,9 @@ export interface Backend {
   renameMap(from: string, to: string): Promise<void>;
   /** Opens the folder that holds the player's records, settings and backups. */
   openDataFolder(): Promise<void>;
+  /** The folder saved game pictures go to. */
+  framesFolder(): Promise<string>;
+  openFramesFolder(): Promise<void>;
   /** How Leafline is doing, for a bug report. Holds no names, chat or file paths. */
   diagnostics(): Promise<string>;
   onHistory(handler: () => void): Promise<UnlistenFn>;
@@ -274,6 +277,10 @@ export interface Backend {
   updateSettings(settings: DisplaySettings): Promise<DisplaySettings>;
   onSettings(handler: (settings: DisplaySettings) => void): Promise<UnlistenFn>;
   showSettings(): Promise<void>;
+  /** Opens the first-launch setup again. */
+  showSetup(): Promise<void>;
+  /** Closes setup and starts live reading if it is on. Save `setupDone` first. */
+  finishSetup(): Promise<void>;
   /** Leafline's version, for the About section. */
   version(): Promise<string>;
   /** The travel connections routes can use, and which file they come from. */
@@ -372,6 +379,8 @@ const tauriBackend: Backend = {
   setSessionNote: (id, note) => invoke("set_session_note", { id, note }),
   renameMap: (from, to) => invoke("rename_map", { from, to }),
   openDataFolder: () => invoke("open_data_folder"),
+  framesFolder: () => invoke("frames_folder"),
+  openFramesFolder: () => invoke("open_frames_folder"),
   diagnostics: () => invoke("diagnostics"),
   sessionHistory: () => invoke("session_history"),
   deleteSession: (id) => invoke("delete_session", { id }),
@@ -422,6 +431,8 @@ const tauriBackend: Backend = {
   updateSettings: (settings) => invoke("update_settings", { settings }),
   onSettings: (handler) => listen<DisplaySettings>("settings", (e) => handler(e.payload)),
   showSettings: () => invoke("show_settings"),
+  showSetup: () => invoke("show_setup"),
+  finishSetup: () => invoke("finish_setup"),
   travelInfo: () => invoke("travel_info"),
   downloadTravel: () => invoke("download_travel"),
   editTravelFile: () => invoke("edit_travel_file"),

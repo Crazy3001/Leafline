@@ -1,8 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Permissions for the overlay, workbench, settings, build planner and pinned panel windows",
-  "windows": ["overlay", "workbench", "settings", "build", "pin-*"],
+  "description": "Permissions for the overlay, workbench, settings, setup, build planner and pinned panel windows",
+  "windows": ["overlay", "workbench", "settings", "setup", "build", "pin-*"],
   "permissions": [
     "core:default",
     "core:window:allow-start-dragging",

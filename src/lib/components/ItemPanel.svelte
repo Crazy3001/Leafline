@@ -15,6 +15,7 @@
   import { backend } from "$lib/api";
   import { JOBS, blankQuery, gearView, gives, itemSlot, itemView, lastLine, watchItems } from "$lib/items.svelte";
   import { OSMS_CREDIT, OSMS_URL, mapData, watchMapData } from "$lib/mapdata.svelte";
+  import { hotkey } from "$lib/settings.svelte";
   import type { ItemFilters, ItemKind, ItemPage, ItemRecord, ItemTooltip, MapReading } from "$lib/types";
 
   let {
@@ -253,7 +254,9 @@
     {#each tooltips as item, i}
       <ItemCard {item} {map} title={i === 0 ? "Item" : "Compared item"} plain={pinned && i === 0} />
     {:else}
-      <p class="empty">Search above, or hover a piece of equipment in game and press Ctrl+Alt+I to check that copy.</p>
+      <p class="empty">
+        Search above, or hover a piece of equipment in game and {hotkey("ReadItem") ? `press ${hotkey("ReadItem")}` : "use the Read item hotkey"} to check that copy.
+      </p>
     {/each}
   {/if}
 {/if}

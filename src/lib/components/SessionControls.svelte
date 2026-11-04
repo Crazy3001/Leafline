@@ -4,6 +4,7 @@
 
   import { backend } from "$lib/api";
   import { live } from "$lib/readings.svelte";
+  import { keyHint } from "$lib/settings.svelte";
 
   const status = $derived(live.liveStatus.state === "reading" ? live.liveStatus : null);
 </script>
@@ -12,18 +13,18 @@
   <div class="controls">
     <button
       class:active={status.held}
-      title="{status.held ? 'Resume' : 'Pause'} tracking. Paused time doesn't count. (Ctrl+Alt+K)"
+      title="{status.held ? 'Resume' : 'Pause'} tracking. Paused time doesn't count.{keyHint('PauseTracking')}"
       onclick={() => backend.setLiveHeld(!status.held)}
     >
       {#if status.held}<Play size={12} />Resume{:else}<Pause size={12} />Pause{/if}
     </button>
     <button
-      title="Start a new session from zero. The one before stays in your history. (Ctrl+Alt+N)"
+      title="Start a new session from zero. The one before stays in your history.{keyHint('NewSession')}"
       onclick={() => backend.resetSession()}
     >
       <RotateCcw size={12} />New session
     </button>
-    <label title="Turn off to keep this run out of your history. It turns back on with the next session. (Ctrl+Alt+J)">
+    <label title="Turn off to keep this run out of your history. It turns back on with the next session.{keyHint('ToggleLogging')}">
       <input type="checkbox" checked={status.logging} onchange={(e) => backend.setLiveLogging(e.currentTarget.checked)} />
       Log this run
     </label>

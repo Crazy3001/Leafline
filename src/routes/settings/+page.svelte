@@ -13,19 +13,20 @@
     RefreshCw,
     ScrollText,
     Play,
+    RotateCcw,
     ShieldCheck,
     Square,
-    TriangleAlert,
     X,
   } from "@lucide/svelte";
   import { onMount } from "svelte";
 
   import { backend } from "$lib/api";
+  import HotkeyButton from "$lib/components/HotkeyButton.svelte";
   import Logo from "$lib/components/Logo.svelte";
   import MapDataPanel from "$lib/components/map/MapDataPanel.svelte";
   import { OSMS_URL, WIKI_URL } from "$lib/mapdata.svelte";
   import { live, watchLive } from "$lib/readings.svelte";
-  import { changeSettings, display, watchSettings } from "$lib/settings.svelte";
+  import { changeSettings, display, hotkey, keyHint, watchSettings } from "$lib/settings.svelte";
   import type {
     CompactShape,
     GameWindow,
@@ -58,9 +59,8 @@
   let size = $state(100);
   let saveTimer: ReturnType<typeof setTimeout> | undefined;
   let sizeTimer: ReturnType<typeof setTimeout> | undefined;
-  /** The hotkey waiting for keys, by action. */
-  let listening = $state<string | null>(null);
   let hotkeyError = $state<string | null>(null);
+  let framesFolder = $state("");
   let copiedReport = $state<string | null>(null);
   let exported = $state<string | null>(null);
   let travel = $state<TravelInfo | null>(null);
@@ -170,6 +170,20 @@
     loadTravel();
   });
 
+  // The folder follows the setting, including a change made in setup.
+  $effect(() => {
+    void display.framesFolder;
+    backend.framesFolder().then((f) => (framesFolder = f));
+  });
+
+  async function pickFramesFolder() {
+    const picked = await backend.pickFolder();
+    if (picked) changeSettings({ framesFolder: picked });
+  }
+
+  /** OneDrive, Dropbox and Google Drive folders sync what is put in them off this PC. */
+  const framesSync = $derived(/[\\/](OneDrive|Dropbox|Google Drive)[^\\/]*([\\/]|$)/i.test(framesFolder));
+
   $effect(() => {
     opacity = Math.round(display.opacity * 100);
     size = Math.round(display.scale * 100);
@@ -192,35 +206,16 @@
     shortcuts = await backend.shortcuts();
   }
 
-  /** A pressed key as Leafline writes it: `Ctrl+Alt+K`, `F5`. Null for a modifier alone. */
-  function keysOf(event: KeyboardEvent): string | null {
-    const code = event.code;
-    const key = code.startsWith("Key")
-      ? code.slice(3)
-      : code.startsWith("Digit")
-        ? code.slice(5)
-        : /^(F\d{1,2}|Space|Home|End|Insert|Delete|PageUp|PageDown|Arrow(Up|Down|Left|Right))$/.test(code)
-          ? code
-          : null;
-    if (!key) return null;
-    const held = [event.ctrlKey && "Ctrl", event.altKey && "Alt", event.shiftKey && "Shift", event.metaKey && "Super"];
-    return [...held.filter(Boolean), key].join("+");
+  function setKey(action: string, keys: string) {
+    setHotkeys({ keys: { ...display.hotkeys.keys, [action]: keys } });
   }
 
-  function onHotkey(event: KeyboardEvent, action: string) {
-    event.preventDefault();
-    if (event.key === "Escape") {
-      listening = null;
-    } else if (event.key === "Backspace") {
-      listening = null;
-      setHotkeys({ keys: { ...display.hotkeys.keys, [action]: "" } });
-    } else {
-      const keys = keysOf(event);
-      if (!keys) return;
-      listening = null;
-      setHotkeys({ keys: { ...display.hotkeys.keys, [action]: keys } });
-    }
+  function useSuggested() {
+    setHotkeys({ keys: Object.fromEntries(shortcuts.filter((s) => s.suggestedKeys).map((s) => [s.action, s.suggestedKeys])) });
   }
+
+  /** Hotkeys holding Ctrl or Alt, which the game also sees while they are held. */
+  const gameModifiers = $derived(shortcuts.filter((s) => /(^|\+)(Ctrl|Alt)\+/.test(s.keys)));
 
   async function copyReport() {
     try {
@@ -289,20 +284,10 @@
         or network traffic.
       </p>
 
-      <div class="risk">
-        <TriangleAlert size={16} />
-        <p>
-          <strong>Use at your own risk.</strong> Nexon hasn't said whether overlays like this are allowed. Its support
-          replies quote the rule against unauthorised third-party software, and one player reported a two-week ban while
-          running a similar screen-reading overlay (unconfirmed). Play with live reading on a character you can afford to
-          lose, ideally on a separate Nexon account.
-        </p>
-      </div>
-
       <div class="row">
         <label for="live">
           <span class="name">Live reading</span>
-          <span class="help">I understand the risk. Off until you turn it on.</span>
+          <span class="help">Leafline is unofficial and Nexon hasn't approved overlays, so use it at your own risk.</span>
         </label>
         <div class="control">
           <input
@@ -408,7 +393,8 @@
               {:else if live.liveStatus.state === "failed"}
                 Stopped by an error: {live.liveStatus.message}
               {:else}
-                Starting begins a new session. Ctrl+Alt+R starts and stops it from the game.
+                Starting begins a new session.{#if hotkey("ToggleLive")}
+                  {hotkey("ToggleLive")} starts and stops it from the game.{/if} It starts by itself with Leafline.
               {/if}
             </span>
           </div>
@@ -428,9 +414,9 @@
       {/if}
       <p class="note">
         Works in windowed mode, and in Full Screen as long as the overlay shows above the game. Pictures stay in memory
-        and are never saved, unless you press Save frame (Ctrl+Alt+F) to keep one. Items are read one
-        at a time when you hover one and press Ctrl+Alt+I, whether live reading is running or not. This switch has to be
-        on for that too.
+        and are never saved, unless you press Save frame{keyHint("SaveFrame")} to keep one. Items are read one at a time
+        when you hover one and use the Read item hotkey{keyHint("ReadItem")}, whether live reading is running or not. This
+        switch has to be on for that too.
       </p>
     </section>
 
@@ -642,11 +628,14 @@
 
     <section id="hotkeys">
       <h2>Hotkeys</h2>
-      <p class="lead">They work while the game has focus. Leafline never sends keys to the game.</p>
+      <p class="lead">
+        They work while the game has focus. Leafline never sends keys to the game. F-keys, Pause and Scroll Lock work
+        on their own. Other keys need Ctrl, Alt or Win with them, so they keep working in chat.
+      </p>
       <div class="row">
         <label for="hotkeys">
           <span class="name">Hotkeys</span>
-          <span class="help">Click one to change it, then press the keys. Esc cancels; Backspace turns it off.</span>
+          <span class="help">Click one to change it, then press the keys. Esc cancels; Backspace clears it.</span>
         </label>
         <div class="control">
           <input
@@ -664,34 +653,29 @@
           <div>
             <dt>{shortcut.label}</dt>
             <dd>
-              <button
-                class="hotkey"
-                class:listening={listening === shortcut.action}
+              <HotkeyButton
+                keys={shortcut.keys}
+                label={shortcut.label}
                 disabled={!display.hotkeys.enabled}
-                onclick={() => (listening = listening === shortcut.action ? null : shortcut.action)}
-                onblur={() => {
-                  if (listening === shortcut.action) listening = null;
-                }}
-                onkeydown={(e) => {
-                  if (listening === shortcut.action) onHotkey(e, shortcut.action);
-                }}
-              >
-                {#if listening === shortcut.action}
-                  Press keys…
-                {:else if shortcut.keys}
-                  {#each shortcut.keys.split("+") as key, i}{#if i}<span class="plus">+</span>{/if}<kbd>{key}</kbd>{/each}
-                {:else}
-                  Off
-                {/if}
-              </button>
+                onchange={(keys) => setKey(shortcut.action, keys)}
+              />
             </dd>
           </div>
         {/each}
       </dl>
       {#if hotkeyError}<p class="note warn">{hotkeyError}</p>{/if}
-      {#if Object.keys(display.hotkeys.keys).length}
-        <button class="button reset-keys" onclick={() => setHotkeys({ keys: {} })}>Back to the defaults</button>
+      {#if gameModifiers.length}
+        <p class="note warn">
+          The game also sees Ctrl and Alt while you hold them, so {gameModifiers.map((s) => s.label.toLowerCase()).join(", ")}
+          can make your character attack or jump if those are your keys. An F-key, Pause or Scroll Lock avoids that.
+        </p>
       {/if}
+      <div class="reset-keys">
+        <button class="button" onclick={useSuggested}>Use the suggested keys</button>
+        {#if Object.values(display.hotkeys.keys).some(Boolean)}
+          <button class="button" onclick={() => setHotkeys({ keys: {} })}>Clear all</button>
+        {/if}
+      </div>
     </section>
 
     <section id="data">
@@ -726,6 +710,33 @@
 
       <div class="row">
         <div class="label">
+          <span class="name">Saved pictures</span>
+          <span class="help">
+            Where Save frame puts pictures of the game{display.framesFolder ? "" : ", a folder on this PC that doesn't sync"}:
+            <span class="path">{framesFolder}</span>
+          </span>
+        </div>
+        <div class="control exports">
+          <button class="button" onclick={() => backend.openFramesFolder()}><FolderOpen size={13} />Open</button>
+          <button class="button" onclick={pickFramesFolder}>Change…</button>
+          {#if display.framesFolder}
+            <button
+              class="button icon-only"
+              title="Back to the local folder"
+              aria-label="Back to the local folder"
+              onclick={() => changeSettings({ framesFolder: null })}><RotateCcw size={13} /></button
+            >
+          {/if}
+        </div>
+      </div>
+      {#if framesSync}
+        <p class="note warn">
+          This folder looks like it syncs to the cloud, so saved pictures of your game would leave this PC.
+        </p>
+      {/if}
+
+      <div class="row">
+        <div class="label">
           <span class="name">Bug report details</span>
           <span class="help">
             Copies how Leafline is doing, for a bug report. Sent nowhere, and no names, chat or file paths.
@@ -748,8 +759,8 @@
       <div class="policy">
         <ShieldCheck size={16} />
         <p>
-          <strong>Read-only.</strong> Leafline reads saved screenshots, and the game window only if you turn on live
-          reading. Nexon hasn't said whether read-only overlays are allowed; use Leafline at your own risk.
+          <strong>Read-only.</strong> Leafline reads the game window while live reading is on, and saved screenshots.
+          Nexon hasn't said whether read-only overlays are allowed; use Leafline at your own risk.
         </p>
       </div>
 
@@ -765,6 +776,16 @@
           <ul>
             {#each doesNot as item}<li><span class="mark bad"><X size={12} /></span>{item}</li>{/each}
           </ul>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="label">
+          <span class="name">First-launch setup</span>
+          <span class="help">Hotkeys, game settings that help Leafline read, and the map data, in four steps.</span>
+        </div>
+        <div class="control">
+          <button class="button" onclick={() => backend.showSetup()}>Run setup again</button>
         </div>
       </div>
 
@@ -797,36 +818,16 @@
     background: var(--bg);
   }
 
-  .hotkey {
-    display: inline-flex;
-    align-items: center;
-    gap: 2px;
-    padding: 2px 6px;
-    border: 1px solid transparent;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--muted);
-    font: inherit;
-    font-size: 11.5px;
-    cursor: pointer;
-  }
-
-  .hotkey:hover:enabled {
-    border-color: var(--border-strong);
-  }
-
-  .hotkey:disabled {
-    opacity: 0.5;
-    cursor: default;
-  }
-
-  .hotkey.listening {
-    border-color: var(--accent);
-    color: var(--accent-strong);
-  }
-
   .reset-keys {
+    display: flex;
+    gap: 6px;
     margin-top: 8px;
+  }
+
+  .path {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    word-break: break-all;
   }
 
   .page {
@@ -1205,24 +1206,6 @@
     margin: 0;
   }
 
-  kbd {
-    min-width: 22px;
-    padding: 1px 6px;
-    border: 1px solid var(--border-strong);
-    border-bottom-width: 2px;
-    border-radius: var(--radius-sm);
-    background: var(--surface-2);
-    color: var(--muted);
-    font-family: var(--font-sans);
-    font-size: 11.5px;
-    text-align: center;
-  }
-
-  .plus {
-    color: var(--faint);
-    font-size: 11px;
-  }
-
   .note {
     margin: 10px 0 12px;
     color: var(--faint);
@@ -1259,31 +1242,6 @@
 
   .policy strong {
     color: var(--good);
-  }
-
-  .risk {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 4px;
-    padding: 12px;
-    border: 1px solid color-mix(in srgb, var(--warn) 32%, transparent);
-    border-radius: var(--radius);
-    background: var(--warn-soft);
-    color: var(--muted);
-  }
-
-  .risk :global(svg) {
-    flex: none;
-    margin-top: 2px;
-    color: var(--warn);
-  }
-
-  .risk p {
-    margin: 0;
-  }
-
-  .risk strong {
-    color: var(--warn);
   }
 
   .live-options {

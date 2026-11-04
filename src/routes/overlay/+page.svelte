@@ -12,7 +12,7 @@
   import { placeLinks, watchPlaces } from "$lib/places.svelte";
   import { questView, watchQuests } from "$lib/quests.svelte";
   import { live, watchLive } from "$lib/readings.svelte";
-  import { display, watchSettings } from "$lib/settings.svelte";
+  import { display, hotkey, keyHint, watchSettings } from "$lib/settings.svelte";
   import type { Panel } from "$lib/types";
 
   const TAB_KEY = "leafline.overlay.tab";
@@ -101,10 +101,11 @@
 
   const liveTitle = $derived.by(() => {
     const s = live.liveStatus;
-    if (s.state === "reading") return `Reading ${s.window} every ${display.live.interval} s. Click to stop (Ctrl+Alt+R).`;
-    if (s.state === "waiting") return `${s.reason} Click to stop (Ctrl+Alt+R).`;
+    const key = keyHint("ToggleLive");
+    if (s.state === "reading") return `Reading ${s.window} every ${display.live.interval} s. Click to stop${key}.`;
+    if (s.state === "waiting") return `${s.reason} Click to stop${key}.`;
     if (!display.live.enabled) return "Reading saved screenshots only. Live reading is off; turn it on in Settings.";
-    return "Start reading the game window (Ctrl+Alt+R)";
+    return `Start reading the game window${key}`;
   });
 
   /** One line under the header for what needs the player's attention, most urgent first. */
@@ -114,7 +115,10 @@
     if (s.state === "failed") return { tone: "bad", text: `Live reading stopped: ${s.message}` };
     if (live.itemRead?.problem) return { tone: "warn", text: `Couldn't read the item: ${live.itemRead.problem}` };
     if (live.itemRead?.found === 0)
-      return { tone: "quiet", text: "No equipment tooltip found. Hover a piece of equipment in game, then press Ctrl+Alt+I." };
+      return {
+        tone: "quiet",
+        text: `No equipment tooltip found. Hover a piece of equipment in game, then ${hotkey("ReadItem") ? `press ${hotkey("ReadItem")}` : "use the Read item hotkey"}.`,
+      };
     if (live.characterRead?.problem) return { tone: "warn", text: live.characterRead.problem };
     if (live.characterRead) {
       const { build, result } = live.characterRead;
@@ -122,7 +126,7 @@
       const changed = result.changes.length ? `${build} updated: ${result.changes.join(", ")}.` : `${build} already matches your windows.`;
       return { tone: "good", text: changed + unknown };
     }
-    if (live.savedFrame) return { tone: "good", text: `Saved ${fileName(live.savedFrame)} to Pictures\\Leafline.` };
+    if (live.savedFrame) return { tone: "good", text: `Saved ${fileName(live.savedFrame)}. Settings → Data opens the folder.` };
     if (s.state === "waiting") return { tone: "quiet", text: s.reason };
     if (s.state === "reading" && s.hdr)
       return { tone: "warn", text: "Windows HDR is on for the game's display, so readings will be off. Turn HDR off, then restart the game." };
@@ -186,7 +190,7 @@
       <span class="actions">
         {#if live.liveStatus.state === "reading"}
           <button
-            title="Save this game picture to Pictures\Leafline, to report a misread (Ctrl+Alt+F)"
+            title="Save this game picture on this PC, to report a misread{keyHint('SaveFrame')}"
             aria-label="Save game picture"
             onclick={saveFrame}
           >
@@ -194,7 +198,7 @@
           </button>
         {/if}
         {#if import.meta.env.DEV}
-          <button title="Open workbench (Ctrl+Alt+W)" aria-label="Open workbench" onclick={() => backend.showWorkbench()}>
+          <button title="Open workbench{keyHint('ShowWorkbench')}" aria-label="Open workbench" onclick={() => backend.showWorkbench()}>
             <PanelsTopLeft size={14} />
           </button>
         {/if}
@@ -202,7 +206,7 @@
           <Settings size={14} />
         </button>
         <button
-          title="Compact HUD (Ctrl+Alt+H)"
+          title="Compact HUD{keyHint('ToggleCompact')}"
           aria-label="Compact HUD"
           onclick={() => backend.setCompact(true)}
         >
@@ -210,14 +214,16 @@
         </button>
         <button
           title={live.status.clickThrough
-            ? "Unlock with Ctrl+Alt+L"
-            : "Lock: clicks pass through to the game (Ctrl+Alt+L)"}
+            ? hotkey("ToggleClickThrough")
+              ? `Unlock with ${hotkey("ToggleClickThrough")}`
+              : "Unlock: set a Lock hotkey in Settings, or use the tray menu"
+            : `Lock: clicks pass through to the game${keyHint("ToggleClickThrough")}`}
           class:active={live.status.clickThrough}
           onclick={toggleLock}
         >
           {#if live.status.clickThrough}<Lock size={14} />{:else}<LockOpen size={14} />{/if}
         </button>
-        <button title="Hide (Ctrl+Alt+O). Pinned panels stay." aria-label="Hide overlay" onclick={() => backend.hideOverlay()}>
+        <button title="Hide{keyHint('ToggleOverlay')}. Pinned panels stay." aria-label="Hide overlay" onclick={() => backend.hideOverlay()}>
           <X size={14} />
         </button>
       </span>

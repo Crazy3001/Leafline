@@ -22,9 +22,31 @@ export const display = $state<DisplaySettings>({
   compactShape: "card",
   hotkeys: { enabled: true, keys: {} },
   travel: { enabled: false, cabs: true, vipCabs: false, scrolls: true },
-  live: { enabled: false, interval: 2, pauseAfter: 15, window: null },
+  live: { enabled: true, interval: 2, pauseAfter: 15, window: null },
   buildRules: DEFAULT_RULES,
+  framesFolder: null,
+  setupDone: false,
 });
+
+/** How a key is written for people: `ScrollLock` as `Scroll Lock`, `Super` as `Win`. */
+export function keyName(keys: string): string {
+  return keys
+    .split("+")
+    .map((k) => ({ ScrollLock: "Scroll Lock", Super: "Win", PageUp: "Page Up", PageDown: "Page Down" })[k] ?? k)
+    .join("+");
+}
+
+/** The hotkey for an action as people read it, or "" if it has none or hotkeys are off. */
+export function hotkey(action: string): string {
+  const keys = display.hotkeys.enabled ? (display.hotkeys.keys[action] ?? "") : "";
+  return keys ? keyName(keys) : "";
+}
+
+/** ` (F10)` after a button's title, or nothing when that action has no hotkey. */
+export function keyHint(action: string): string {
+  const keys = hotkey(action);
+  return keys ? ` (${keys})` : "";
+}
 
 /** Changes whenever the travel routes may use changes, for effects that ask for routes. */
 export function travelKey(): string {

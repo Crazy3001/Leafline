@@ -1,7 +1,9 @@
 //! Global hotkeys. They work while the game has focus, without sending it any input.
 //!
-//! Ctrl+Alt combinations are the default because the game binds single keys, Ctrl and Alt alone.
-//! The player can change them, turn one off, or turn them all off.
+//! None are bound until the player picks them at setup or in Settings. Ctrl and Alt reach the
+//! game while held (attack and jump on many characters), so the suggestions are keys that type
+//! nothing in chat: F-keys, Pause and Scroll Lock. A suggestion can still be one the player has
+//! bound in game, which is why the player confirms them.
 
 use std::sync::Mutex;
 
@@ -47,20 +49,21 @@ impl Action {
         Action::ShowWorkbench,
     ];
 
-    pub fn default_keys(self) -> &'static str {
+    /// The key offered at setup, or "" for none. Only the actions used most get one.
+    pub fn suggested_keys(self) -> &'static str {
         match self {
-            Action::ToggleOverlay => "Ctrl+Alt+O",
-            Action::ToggleClickThrough => "Ctrl+Alt+L",
-            Action::TogglePins => "Ctrl+Alt+P",
-            Action::ToggleCompact => "Ctrl+Alt+H",
-            Action::ToggleLive => "Ctrl+Alt+R",
-            Action::ReadItem => "Ctrl+Alt+I",
-            Action::ReadCharacter => "Ctrl+Alt+B",
-            Action::PauseTracking => "Ctrl+Alt+K",
-            Action::NewSession => "Ctrl+Alt+N",
-            Action::ToggleLogging => "Ctrl+Alt+J",
-            Action::SaveFrame => "Ctrl+Alt+F",
-            Action::ShowWorkbench => "Ctrl+Alt+W",
+            Action::ToggleOverlay => "F9",
+            Action::ReadItem => "F10",
+            Action::ReadCharacter => "F11",
+            Action::SaveFrame => "F12",
+            Action::ToggleClickThrough => "ScrollLock",
+            Action::ToggleCompact => "Pause",
+            Action::TogglePins
+            | Action::ToggleLive
+            | Action::PauseTracking
+            | Action::NewSession
+            | Action::ToggleLogging
+            | Action::ShowWorkbench => "",
         }
     }
 
@@ -71,12 +74,12 @@ impl Action {
             Action::TogglePins => "Show or hide pinned panels",
             Action::ToggleCompact => "Compact HUD",
             Action::ToggleLive => "Start or stop live reading",
-            Action::ReadItem => "Read the item you're hovering, for a price check",
+            Action::ReadItem => "Read the item you're hovering",
             Action::ReadCharacter => "Read your stat and skill windows, to update your build",
             Action::PauseTracking => "Pause or resume tracking",
             Action::NewSession => "Start a new session",
             Action::ToggleLogging => "Log this run or not",
-            Action::SaveFrame => "Save the picture last read, to Pictures\\Leafline",
+            Action::SaveFrame => "Save the picture last read",
             Action::ShowWorkbench => "Open the workbench",
         }
     }
@@ -91,9 +94,9 @@ impl Action {
         format!("{self:?}")
     }
 
-    /// The keys set for this action; empty if it is turned off.
+    /// The keys set for this action; empty if it has none.
     fn keys(self, choice: &HotkeyChoice) -> String {
-        choice.keys.get(&self.name()).cloned().unwrap_or_else(|| self.default_keys().to_string())
+        choice.keys.get(&self.name()).cloned().unwrap_or_default()
     }
 
     pub fn run(self, app: &AppHandle) -> Result<()> {
@@ -127,9 +130,9 @@ impl Action {
 #[serde(rename_all = "camelCase")]
 pub struct ShortcutInfo {
     pub action: String,
-    /// Empty when this hotkey is turned off.
+    /// Empty when this action has no hotkey.
     pub keys: String,
-    pub default_keys: &'static str,
+    pub suggested_keys: &'static str,
     pub label: &'static str,
 }
 
@@ -140,7 +143,7 @@ pub fn list(choice: &HotkeyChoice) -> Vec<ShortcutInfo> {
         .map(|&action| ShortcutInfo {
             action: action.name(),
             keys: action.keys(choice),
-            default_keys: action.default_keys(),
+            suggested_keys: action.suggested_keys(),
             label: action.label(),
         })
         .collect()
@@ -150,8 +153,9 @@ pub fn list(choice: &HotkeyChoice) -> Vec<ShortcutInfo> {
 #[derive(Default)]
 pub struct Bindings(Mutex<Vec<(Shortcut, Action)>>);
 
-/// Parses every hotkey. A key without Ctrl, Alt or Win would stop working in the game's chat,
-/// and two actions can't share one.
+/// Parses every hotkey. A key that types something needs Ctrl, Alt or Win, or it would stop
+/// working in the game's chat; F-keys, Pause and Scroll Lock type nothing. Two actions can't
+/// share one.
 fn parsed(choice: &HotkeyChoice) -> Result<Vec<(Shortcut, Action)>> {
     let mut bindings: Vec<(Shortcut, Action)> = Vec::new();
     for action in Action::ALL.into_iter().filter(|action| action.available()) {
@@ -161,11 +165,14 @@ fn parsed(choice: &HotkeyChoice) -> Result<Vec<(Shortcut, Action)>> {
         }
         let shortcut: Shortcut =
             keys.parse().map_err(|_| Error::Invalid(format!("{keys} isn't a hotkey Leafline can use.")))?;
-        let function_key = keys.rsplit('+').next().is_some_and(|key| {
-            key.strip_prefix('F').is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
+        let types_nothing = keys.rsplit('+').next().is_some_and(|key| {
+            matches!(key, "Pause" | "ScrollLock")
+                || key.strip_prefix('F').is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
         });
-        if !function_key && !shortcut.mods.intersects(Modifiers::CONTROL | Modifiers::ALT | Modifiers::SUPER) {
-            return Err(Error::Invalid(format!("{keys} would stop that key working in the game. Add Ctrl or Alt.")));
+        if !types_nothing && !shortcut.mods.intersects(Modifiers::CONTROL | Modifiers::ALT | Modifiers::SUPER) {
+            return Err(Error::Invalid(format!(
+                "{keys} would stop that key working in the game's chat. Use an F-key, Pause or Scroll Lock, or add Win."
+            )));
         }
         if bindings.iter().any(|(other, _)| *other == shortcut) {
             return Err(Error::Invalid(format!("{keys} is already used by another hotkey.")));
@@ -229,23 +236,44 @@ mod tests {
         HotkeyChoice { enabled: true, keys: BTreeMap::from([(action.name(), keys.to_string())]) }
     }
 
-    #[test]
-    fn the_default_hotkeys_are_all_usable() {
-        assert_eq!(parsed(&HotkeyChoice::default()).unwrap().len(), Action::ALL.len());
+    fn suggested() -> HotkeyChoice {
+        let keys = Action::ALL
+            .iter()
+            .filter(|a| !a.suggested_keys().is_empty())
+            .map(|a| (a.name(), a.suggested_keys().to_string()))
+            .collect();
+        HotkeyChoice { enabled: true, keys }
     }
 
     #[test]
-    fn a_hotkey_can_be_changed_or_turned_off() {
-        let changed = parsed(&with(Action::ToggleLive, "Ctrl+Shift+F5")).unwrap();
-        assert_eq!(changed.len(), Action::ALL.len());
-        assert_eq!(parsed(&with(Action::ToggleLive, "")).unwrap().len(), Action::ALL.len() - 1);
+    fn nothing_is_bound_until_the_player_picks() {
+        assert!(parsed(&HotkeyChoice::default()).unwrap().is_empty());
+    }
+
+    #[test]
+    fn the_suggested_hotkeys_are_all_usable_and_use_no_ctrl_or_alt() {
+        let bound = parsed(&suggested()).unwrap();
+        assert_eq!(bound.len(), suggested().keys.len());
+        assert!(bound.iter().all(|(s, _)| !s.mods.intersects(Modifiers::CONTROL | Modifiers::ALT)));
+    }
+
+    #[test]
+    fn a_hotkey_can_be_set_or_turned_off() {
+        assert_eq!(parsed(&with(Action::ToggleLive, "Ctrl+Shift+F5")).unwrap().len(), 1);
+        assert!(parsed(&with(Action::ToggleLive, "")).unwrap().is_empty());
         assert!(check(&with(Action::ToggleLive, "F9")).is_ok());
+        assert!(check(&with(Action::ToggleLive, "Pause")).is_ok());
+        assert!(check(&with(Action::ToggleLive, "ScrollLock")).is_ok());
+        assert!(check(&with(Action::ToggleLive, "Super+Shift+K")).is_ok());
     }
 
     #[test]
     fn keys_that_would_get_in_the_way_are_refused() {
         assert!(check(&with(Action::ToggleLive, "Shift+1")).is_err(), "it would stop ! working in chat");
-        assert!(check(&with(Action::ToggleLive, "Ctrl+Alt+O")).is_err(), "taken by another action");
+        assert!(check(&with(Action::ToggleLive, "K")).is_err(), "it would stop k working in chat");
+        let mut both = suggested();
+        both.keys.insert(Action::ToggleLive.name(), "F9".into());
+        assert!(check(&both).is_err(), "taken by another action");
         assert!(check(&with(Action::ToggleLive, "Banana")).is_err());
     }
 }

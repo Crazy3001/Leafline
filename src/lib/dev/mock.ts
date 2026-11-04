@@ -231,7 +231,9 @@ let displaySettings: DisplaySettings = {
   compactShape: "card",
   hotkeys: { enabled: true, keys: {} },
   travel: { enabled: false, cabs: true, vipCabs: false, scrolls: true },
-  live: { enabled: false, interval: 2, pauseAfter: 15, window: null },
+  live: { enabled: true, interval: 2, pauseAfter: 15, window: null },
+  framesFolder: null,
+  setupDone: true,
   buildRules: { apPerLevel: 5, spPerLevel: 3, beginnerSpPerLevel: 1, advancementSp: 1, firstJobLevel: 10, secondJobLevel: 30, secondSpBuysFirst: false, gearCounts: true },
 };
 
@@ -449,17 +451,18 @@ export const mockBackend: Backend = {
   async toggleOverlay() {},
   async showWorkbench() {},
   shortcuts: async () => [
-    { action: "ToggleOverlay", keys: "Ctrl+Alt+O", defaultKeys: "Ctrl+Alt+O", label: "Show or hide the overlay" },
-    { action: "ToggleClickThrough", keys: "Ctrl+Alt+L", defaultKeys: "Ctrl+Alt+L", label: "Lock the overlay (click-through)" },
-    { action: "TogglePins", keys: "Ctrl+Alt+P", defaultKeys: "Ctrl+Alt+P", label: "Show or hide pinned panels" },
-    { action: "ToggleCompact", keys: "Ctrl+Alt+H", defaultKeys: "Ctrl+Alt+H", label: "Compact HUD" },
-    { action: "ToggleLive", keys: "Ctrl+Alt+R", defaultKeys: "Ctrl+Alt+R", label: "Start or stop live reading" },
-    { action: "ReadItem", keys: "Ctrl+Alt+I", defaultKeys: "Ctrl+Alt+I", label: "Read the item you're hovering, for a price check" },
-    { action: "PauseTracking", keys: "Ctrl+Alt+K", defaultKeys: "Ctrl+Alt+K", label: "Pause or resume tracking" },
-    { action: "NewSession", keys: "Ctrl+Alt+N", defaultKeys: "Ctrl+Alt+N", label: "Start a new session" },
-    { action: "ToggleLogging", keys: "Ctrl+Alt+J", defaultKeys: "Ctrl+Alt+J", label: "Log this run or not" },
-    { action: "SaveFrame", keys: "Ctrl+Alt+F", defaultKeys: "Ctrl+Alt+F", label: "Save the picture last read, to Pictures\\Leafline" },
-    { action: "ShowWorkbench", keys: "Ctrl+Alt+W", defaultKeys: "Ctrl+Alt+W", label: "Open the workbench" },
+    { action: "ToggleOverlay", keys: "F9", suggestedKeys: "F9", label: "Show or hide the overlay" },
+    { action: "ToggleClickThrough", keys: "ScrollLock", suggestedKeys: "ScrollLock", label: "Lock the overlay (click-through)" },
+    { action: "TogglePins", keys: "", suggestedKeys: "", label: "Show or hide pinned panels" },
+    { action: "ToggleCompact", keys: "Pause", suggestedKeys: "Pause", label: "Compact HUD" },
+    { action: "ToggleLive", keys: "", suggestedKeys: "", label: "Start or stop live reading" },
+    { action: "ReadItem", keys: "F10", suggestedKeys: "F10", label: "Read the item you're hovering" },
+    { action: "ReadCharacter", keys: "F11", suggestedKeys: "F11", label: "Read your stat and skill windows, to update your build" },
+    { action: "PauseTracking", keys: "", suggestedKeys: "", label: "Pause or resume tracking" },
+    { action: "NewSession", keys: "", suggestedKeys: "", label: "Start a new session" },
+    { action: "ToggleLogging", keys: "", suggestedKeys: "", label: "Log this run or not" },
+    { action: "SaveFrame", keys: "F12", suggestedKeys: "F12", label: "Save the picture last read" },
+    { action: "ShowWorkbench", keys: "", suggestedKeys: "", label: "Open the workbench" },
   ],
   liveStatus: async () => liveStatus,
   async setLiveHeld(held) {
@@ -485,7 +488,7 @@ export const mockBackend: Backend = {
     setLive({ state: "off" });
   },
   liveWindows: async () => mockWindows,
-  saveLiveFrame: async () => "C:\\Users\\you\\Pictures\\Leafline\\leafline-2026-10-30_13-05-09.png",
+  saveLiveFrame: async () => "C:\\Users\\you\\AppData\\Local\\app.leafline.overlay\\frames\\leafline-2026-10-30_13-05-09.png",
   async onLive(handler) {
     liveHandlers.push(handler);
     return () => {};
@@ -614,6 +617,8 @@ export const mockBackend: Backend = {
     historyHandlers.forEach((h) => h());
   },
   async openDataFolder() {},
+  framesFolder: async () => displaySettings.framesFolder ?? "C:\\Users\\you\\AppData\\Local\\app.leafline.overlay\\frames",
+  async openFramesFolder() {},
   diagnostics: async () => "Leafline dev (mock)",
   async deleteSession(id) {
     savedSessions = savedSessions.filter((s) => s.id !== id);
@@ -870,6 +875,10 @@ export const mockBackend: Backend = {
   async showSettings() {
     window.open("/settings", "_blank");
   },
+  async showSetup() {
+    window.open("/setup", "_blank");
+  },
+  async finishSetup() {},
   version: async () => "dev",
   async fitWindow() {},
 };

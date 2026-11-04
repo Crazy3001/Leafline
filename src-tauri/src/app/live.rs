@@ -382,15 +382,25 @@ impl MesoMemory {
     }
 }
 
-/// Saves the last picture read as a PNG in Pictures\Leafline, for the workbench or a bug report:
-/// a price check's for a moment after it, or else the last live one.
+/// Where saved game pictures go: the player's chosen folder, or else `frames` in the app's local
+/// data folder. Not Pictures, which OneDrive often syncs, and saved pictures must stay on this PC
+/// unless the player moves them.
+pub fn frames_folder(app: &AppHandle) -> Result<PathBuf> {
+    match app.state::<SettingsState>().get().frames_folder.filter(|f| !f.trim().is_empty()) {
+        Some(folder) => Ok(PathBuf::from(folder)),
+        None => Ok(app.path().app_local_data_dir()?.join("frames")),
+    }
+}
+
+/// Saves the last picture read as a PNG in the saved pictures folder, for the workbench or a bug
+/// report: a price check's for a moment after it, or else the last live one.
 pub fn save_frame(app: &AppHandle) -> Result<PathBuf> {
     let state = app.state::<LiveState>();
     let item = state.item_picture.lock().expect("live lock").clone();
     let item = item.filter(|(at, _)| at.elapsed() < ITEM_PICTURE_KEPT).map(|(_, frame)| frame);
     let frame = item.or_else(|| state.frame.lock().expect("live lock").clone());
     let frame = frame.ok_or_else(|| Error::Invalid("There is no live picture yet.".into()))?;
-    let folder = app.path().picture_dir()?.join("Leafline");
+    let folder = frames_folder(app)?;
     std::fs::create_dir_all(&folder)?;
     let path = folder.join(format!("leafline-{}.png", file_stamp(SystemTime::now())));
     frame.save(&path)?;
