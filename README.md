@@ -25,13 +25,15 @@ The first launch opens **setup**: a line on what Leafline is, the hotkeys, game 
 
 Development builds also open the **workbench**, a tool for working on Leafline that release builds don't have. Open a screenshot or a folder of them; the pipeline runs on each, outlines what it found and shows the readings. The overlay updates too, as it would during play. With a folder open, **Replay as session** reads every frame in order as one play session and shows EXP/hour, mesos/hour and time to level, overall and per map (see below). You can also pass it an image on the command line (`leafline.exe shot.png`), or use *Open with*.
 
-No hotkey is set until you pick it in setup or Settings, and a hotkey takes its key from the game. Setup suggests three keys that are free in the game's default key bindings:
+No hotkey is set until you pick it in setup or Settings, and a hotkey takes its key from the game. Setup suggests keys that are free in the game's default key bindings:
 
 | Suggested | Action |
 |---|---|
-| `F12` | Read the item you're hovering |
-| `F8` | Show or hide the overlay |
+| `F8` | Read the item you're hovering |
+| `Win+F8` | Show or hide the overlay |
 | `Pause` | Lock the overlay (clicks pass through to whatever is underneath) |
+
+F12 can't be a hotkey: Windows keeps it for itself.
 
 Setup also asks about the compact HUD, reading your Character Stat and Skill windows, and saving the picture last read. Settings has the rest: pinned panels, starting or stopping live reading, pausing tracking, a new session, keeping a run out of the history, and the workbench (development builds).
 

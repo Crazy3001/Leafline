@@ -6,8 +6,10 @@
 //! From the game's Key Bindings window on a fresh character (2026-11-04): Pause/Break, PrtSc,
 //! Tab, Caps Lock, Backspace, Enter and Win can't be bound in game, and it has no numpad. F1-F7
 //! are emotes, F9 cash shop, F10 shortcut, F11 picture mode and Scroll Lock the screenshot by
-//! default; F8 and F12 start empty. So the suggestions are F8, F12 and Pause. A player can still
-//! have bound F8 or F12, and another program can hold any key, which is why they confirm them.
+//! default; F8 and F12 start empty. Windows keeps F12 for its debugger and refuses it as a
+//! hotkey on every PC (seen 2026-11-04), so F8 and Pause are the only free keys on every
+//! keyboard. The overlay gets Win+F8: the game can't see Win, and Leafline takes the F8. A player
+//! can still have bound F8, and another program can hold any key, which is why they confirm them.
 
 use std::sync::Mutex;
 
@@ -53,11 +55,11 @@ impl Action {
         Action::ShowWorkbench,
     ];
 
-    /// The key offered at setup, or "" for none. Only three keys are free in game by default.
+    /// The key offered at setup, or "" for none. Few keys are free in game by default.
     pub fn suggested_keys(self) -> &'static str {
         match self {
-            Action::ReadItem => "F12",
-            Action::ToggleOverlay => "F8",
+            Action::ReadItem => "F8",
+            Action::ToggleOverlay => "Super+F8",
             Action::ToggleClickThrough => "Pause",
             _ => "",
         }
@@ -206,8 +208,12 @@ fn parsed(choice: &HotkeyChoice) -> Result<Vec<(Shortcut, Action)>> {
     Ok(bindings)
 }
 
-/// Whether these hotkeys can be used, before they are saved.
+/// Whether these hotkeys can be used, before they are saved. F12 alone is refused here rather
+/// than in `parsed`, so a settings file that already has it still loads its other hotkeys.
 pub fn check(choice: &HotkeyChoice) -> Result<()> {
+    if choice.keys.values().any(|keys| keys == "F12") {
+        return Err(Error::Invalid("Windows keeps F12 for itself, so no program can use it as a hotkey. Pick another key.".into()));
+    }
     parsed(choice).map(|_| ())
 }
 
@@ -307,5 +313,7 @@ mod tests {
         both.keys.insert(Action::ToggleLive.name(), "F8".into());
         assert!(check(&both).is_err(), "taken by another action");
         assert!(check(&with(Action::ToggleLive, "Banana")).is_err());
+        assert!(check(&with(Action::ToggleLive, "F12")).is_err(), "Windows keeps F12");
+        assert!(parsed(&with(Action::ToggleLive, "F12")).is_ok(), "an old settings file with F12 still loads");
     }
 }

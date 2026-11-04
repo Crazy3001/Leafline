@@ -139,9 +139,9 @@
       <section>
         <h1>Hotkeys</h1>
         <p class="lead">
-          These work while the game has focus, and Leafline takes the key from the game. F8 and F12 are empty in the
-          game's default key bindings, and the game can't bind Pause or the numpad. If you've put something on one of
-          these, click it and press another. Nothing is set until you go on.
+          These work while the game has focus, and Leafline takes the key from the game. F8 is empty in the game's
+          default key bindings, and the game can't bind Pause, Win or the numpad. If you've put something on F8, click it
+          and press another. Nothing is set until you go on.
         </p>
         <dl class="keys">
           {#each offered as shortcut (shortcut.action)}
