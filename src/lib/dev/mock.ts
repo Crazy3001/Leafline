@@ -450,7 +450,7 @@ export const mockBackend: Backend = {
   async hideOverlay() {},
   async toggleOverlay() {},
   async showWorkbench() {},
-  async setHotkeysPaused() {},
+  async setHotkeysQuiet() {},
   async onHotkey(handler) {
     // In the browser, `__pressHotkey("ReadItem")` in the console stands in for pressing one.
     const w = window as unknown as { __pressHotkey?: (action: string) => void };

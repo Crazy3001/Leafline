@@ -90,8 +90,8 @@ export interface Backend {
   toggleOverlay(): Promise<void>;
   showWorkbench(): Promise<void>;
   shortcuts(): Promise<ShortcutInfo[]>;
-  /** Lets go of the hotkeys while one is being picked, so its keys reach the page; false takes them back. */
-  setHotkeysPaused(paused: boolean): Promise<void>;
+  /** While true, a hotkey press only reports itself and runs nothing; it lapses after 30 s unless renewed. */
+  setHotkeysQuiet(quiet: boolean): Promise<void>;
   /** Each time a hotkey arrives, with its action's name. */
   onHotkey(handler: (action: string) => void): Promise<UnlistenFn>;
   liveStatus(): Promise<LiveStatus>;
@@ -323,7 +323,7 @@ const tauriBackend: Backend = {
   toggleOverlay: () => invoke("toggle_overlay"),
   showWorkbench: () => invoke("show_workbench"),
   shortcuts: () => invoke("shortcut_list"),
-  setHotkeysPaused: (paused) => invoke("set_hotkeys_paused", { paused }),
+  setHotkeysQuiet: (quiet) => invoke("set_hotkeys_quiet", { quiet }),
   onHotkey: (handler) => listen<string>("hotkey", (e) => handler(e.payload)),
   liveStatus: () => invoke("live_status"),
   setLiveHeld: (held) => invoke("set_live_held", { held }),

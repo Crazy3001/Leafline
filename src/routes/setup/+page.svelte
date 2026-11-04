@@ -10,7 +10,7 @@
   import Logo from "$lib/components/Logo.svelte";
   import MapDataPanel from "$lib/components/map/MapDataPanel.svelte";
   import { WIKI_URL, mapData } from "$lib/mapdata.svelte";
-  import { changeSettings, display, keyName, watchSettings } from "$lib/settings.svelte";
+  import { changeSettings, display, keyName, quietHotkeys, usesNumpad, watchSettings } from "$lib/settings.svelte";
   import type { ShortcutInfo } from "$lib/types";
 
   const STEPS = ["Welcome", "Hotkeys", "Game settings", "Map data"];
@@ -22,6 +22,10 @@
   let keysError = $state<string | null>(null);
   /** After the keys are saved, the player presses each to prove it reaches Leafline. */
   let testing = $state(false);
+  // A press during the test only ticks; the hotkeys work normally again when it ends.
+  $effect(() => {
+    if (testing) return quietHotkeys();
+  });
   let arrived = $state<Record<string, boolean>>({});
   let finishing = $state(false);
   let finishError = $state<string | null>(null);
@@ -183,6 +187,9 @@
             </div>
           {/each}
         </dl>
+        {#if usesNumpad(display.hotkeys.keys)}
+          <p class="note">Numpad keys only work while Num Lock is on.</p>
+        {/if}
         {#if testRows.length === 0}
           <p class="note">No hotkeys are set. You can add them later in Settings.</p>
         {:else if testedAll}

@@ -26,7 +26,7 @@
   import MapDataPanel from "$lib/components/map/MapDataPanel.svelte";
   import { OSMS_URL, WIKI_URL } from "$lib/mapdata.svelte";
   import { live, watchLive } from "$lib/readings.svelte";
-  import { changeSettings, display, hotkey, keyHint, keyName, watchSettings } from "$lib/settings.svelte";
+  import { changeSettings, display, hotkey, keyHint, keyName, usesNumpad, watchSettings } from "$lib/settings.svelte";
   import type {
     CompactShape,
     GameWindow,
@@ -160,6 +160,21 @@
       exported = `Couldn't export: ${e}`;
     }
   }
+
+  /** When each hotkey last arrived, so the list can show it was received. */
+  let received = $state<Record<string, number>>({});
+  let now = $state(Date.now());
+
+  onMount(() => {
+    const stopHotkeys = backend.onHotkey((action) => {
+      received[action] = Date.now();
+      now = Date.now();
+      setTimeout(() => (now = Date.now()), 3100);
+    });
+    return () => {
+      stopHotkeys.then((unlisten) => unlisten());
+    };
+  });
 
   onMount(() => {
     watchSettings();
@@ -652,7 +667,12 @@
       <dl class="keys">
         {#each shortcuts as shortcut (shortcut.action)}
           <div>
-            <dt>{shortcut.label}</dt>
+            <dt>
+              {shortcut.label}
+              {#if received[shortcut.action] && now - received[shortcut.action] < 3000}
+                <span class="received"><Check size={11} />Received</span>
+              {/if}
+            </dt>
             <dd>
               <HotkeyButton
                 keys={shortcut.keys}
@@ -674,6 +694,10 @@
             .join(", ")}, so those hotkeys do nothing. Pick other keys.
         </p>
       {/if}
+      {#if usesNumpad(display.hotkeys.keys)}
+        <p class="note">Numpad keys only work while Num Lock is on.</p>
+      {/if}
+      <p class="note">Press a hotkey with this window open to check it reaches Leafline: "Received" shows beside it.</p>
       {#if gameModifiers.length}
         <p class="note warn">
           The game also sees Ctrl and Alt while you hold them, so {gameModifiers.map((s) => s.label.toLowerCase()).join(", ")}
@@ -826,6 +850,15 @@
 <style>
   :global(body) {
     background: var(--bg);
+  }
+
+  .received {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    margin-left: 8px;
+    color: var(--good);
+    font-size: 11.5px;
   }
 
   .reset-keys {

@@ -51,6 +51,8 @@ pub fn diagnostics(app: AppHandle) -> String {
         }
     }
     let _ = writeln!(text, "Reading every {} s, pause after {} s", settings.live.interval, settings.live.pause_after);
+    let _ = writeln!(text, "Hotkeys: {}", super::shortcuts::held_summary(&app));
+    let _ = writeln!(text, "Hotkeys pressed: {}", super::shortcuts::pressed_summary(&app));
     if let Some(analysis) = readings::current_analysis(&app) {
         let hud = analysis.hud.as_ref();
         let _ = writeln!(text, "Last picture: {}x{}", analysis.width, analysis.height);

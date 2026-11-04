@@ -1,9 +1,10 @@
 <script lang="ts">
   // One hotkey: click it, then press the keys. Esc cancels; Backspace clears it. Used by Settings
-  // and the first-launch setup. Leafline lets go of its hotkeys while this waits, or Windows would
-  // swallow a key that is already one of them.
+  // and the first-launch setup. A key that is already a hotkey never reaches the page (Windows
+  // gives it to Leafline), so while this waits, hotkeys are kept quiet and one that arrives is
+  // taken as the key pressed.
   import { backend } from "$lib/api";
-  import { keyName } from "$lib/settings.svelte";
+  import { display, keyName, quietHotkeys } from "$lib/settings.svelte";
 
   let {
     keys,
@@ -17,9 +18,16 @@
 
   $effect(() => {
     if (!listening) return;
-    backend.setHotkeysPaused(true);
+    const loud = quietHotkeys();
+    const stop = backend.onHotkey((action) => {
+      const pressed = display.hotkeys.keys[action];
+      if (!listening || !pressed) return;
+      listening = false;
+      onchange(pressed);
+    });
     return () => {
-      backend.setHotkeysPaused(false);
+      loud();
+      stop.then((unlisten) => unlisten());
     };
   });
 

@@ -48,6 +48,24 @@ export function hotkey(action: string): string {
   return keys ? keyName(keys) : "";
 }
 
+/**
+ * Keeps hotkey presses quiet (reported, not run) until the returned function is called, renewing
+ * the backend's 30-second hold so a page that disappears can't leave hotkeys dead.
+ */
+export function quietHotkeys(): () => void {
+  backend.setHotkeysQuiet(true);
+  const renew = setInterval(() => backend.setHotkeysQuiet(true), 10_000);
+  return () => {
+    clearInterval(renew);
+    backend.setHotkeysQuiet(false);
+  };
+}
+
+/** Whether any hotkey is a numpad key, which only arrives while Num Lock is on. */
+export function usesNumpad(keys: Record<string, string>): boolean {
+  return Object.values(keys).some((k) => /(^|\+)Numpad/.test(k));
+}
+
 /** ` (F10)` after a button's title, or nothing when that action has no hotkey. */
 export function keyHint(action: string): string {
   const keys = hotkey(action);

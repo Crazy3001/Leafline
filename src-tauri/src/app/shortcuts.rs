@@ -13,13 +13,14 @@
 //! the player press each key to prove it arrives.
 
 use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 use serde::Serialize;
 use tauri::plugin::TauriPlugin;
 use tauri::{AppHandle, Emitter, Manager, Wry};
 use tauri_plugin_global_shortcut::{Builder, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
-use super::settings::{HotkeyChoice, SETUP, SettingsState};
+use super::settings::HotkeyChoice;
 use super::{live, overlay, pins, report};
 use crate::error::{Error, Result};
 
@@ -168,27 +169,48 @@ pub fn list(app: &AppHandle, choice: &HotkeyChoice) -> Vec<ShortcutInfo> {
         .collect()
 }
 
-/// Emitted with the action's name whenever one of its hotkeys arrives, so setup can tick it.
+/// Emitted with the action's name whenever one of its hotkeys arrives: setup ticks it, Settings
+/// shows it was received, and a key picker takes it as the key pressed.
 pub const HOTKEY_EVENT: &str = "hotkey";
 
-/// The hotkeys in force, for the handler to look up, and the ones another program holds.
+/// How long one call to [`set_hotkeys_quiet`] keeps hotkeys quiet. The page renews it while it
+/// needs them quiet, so a window that closes without saying so can't leave them dead.
+const QUIET_FOR: Duration = Duration::from_secs(30);
+
+/// The hotkeys in force, for the handler to look up, the ones another program holds, and how
+/// often each arrived, for the bug report.
 #[derive(Default)]
 pub struct Bindings {
     held: Mutex<Vec<(Shortcut, Action)>>,
     taken: Mutex<Vec<Action>>,
+    /// Until when a press only reports itself and runs nothing.
+    quiet_until: Mutex<Option<Instant>>,
+    pressed: Mutex<Vec<(Action, u32)>>,
 }
 
-/// Lets go of every hotkey while the player picks a new one, so the keys they press reach the
-/// picker instead of being swallowed by Windows; then takes them back.
+/// While setup tests the keys or a key is being picked, a press only reports itself (the
+/// `hotkey` event) and runs nothing. The hotkeys stay registered throughout, so nothing can be
+/// left unregistered; quiet ends by itself after [`QUIET_FOR`] unless renewed.
 #[tauri::command]
-pub fn set_hotkeys_paused(app: AppHandle, paused: bool) -> Result<()> {
-    if paused {
-        app.global_shortcut().unregister_all().map_err(|err| Error::Invalid(err.to_string()))?;
-        app.state::<Bindings>().held.lock().expect("hotkey lock").clear();
-        Ok(())
-    } else {
-        apply(&app, &app.state::<SettingsState>().get().hotkeys)
+pub fn set_hotkeys_quiet(app: AppHandle, quiet: bool) {
+    *app.state::<Bindings>().quiet_until.lock().expect("hotkey lock") = quiet.then(|| Instant::now() + QUIET_FOR);
+}
+
+/// How often each hotkey arrived since Leafline started, for the bug report.
+pub fn pressed_summary(app: &AppHandle) -> String {
+    let pressed = app.state::<Bindings>().pressed.lock().expect("hotkey lock").clone();
+    if pressed.is_empty() {
+        return "none".into();
     }
+    pressed.iter().map(|(action, n)| format!("{} {n}", action.name())).collect::<Vec<_>>().join(", ")
+}
+
+/// The hotkeys set and held, for the bug report: which are in force and which another program has.
+pub fn held_summary(app: &AppHandle) -> String {
+    let bindings = app.state::<Bindings>();
+    let held = bindings.held.lock().expect("hotkey lock").iter().map(|(_, a)| a.name()).collect::<Vec<_>>();
+    let taken = bindings.taken.lock().expect("hotkey lock").iter().map(|a| a.name()).collect::<Vec<_>>();
+    format!("held [{}], taken by another program [{}]", held.join(", "), taken.join(", "))
 }
 
 /// Keys that type nothing in chat, so they can be hotkeys on their own: F-keys, Pause, Scroll
@@ -267,9 +289,16 @@ pub fn plugin() -> TauriPlugin<Wry> {
             let bindings = app.state::<Bindings>();
             let action = bindings.held.lock().expect("hotkey lock").iter().find(|(s, _)| s == shortcut).map(|(_, a)| *a);
             let Some(action) = action else { return };
+            {
+                let mut pressed = bindings.pressed.lock().expect("hotkey lock");
+                match pressed.iter_mut().find(|(a, _)| *a == action) {
+                    Some((_, n)) => *n += 1,
+                    None => pressed.push((action, 1)),
+                }
+            }
             let _ = app.emit(HOTKEY_EVENT, action.name());
-            // While setup is open, a press is only a test: setup ticks it, nothing runs.
-            if app.get_webview_window(SETUP).is_some_and(|w| w.is_visible().unwrap_or(false)) {
+            let quiet = bindings.quiet_until.lock().expect("hotkey lock").is_some_and(|until| Instant::now() < until);
+            if quiet {
                 return;
             }
             if let Err(err) = action.run(app) {
