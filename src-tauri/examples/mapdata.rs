@@ -110,7 +110,7 @@ fn main() {
         }
         if let Some(first) = page.monsters.first() {
             let from = value("--from", 1).map(|id| id.parse().expect("map id"));
-            let found = store.drops(&[first.name.clone()]).expect("drop table").pop();
+            let found = store.drops(std::slice::from_ref(&first.name)).expect("drop table").pop();
             println!("{:#?}", atlas.monster_sheet(first.id, found, from, &[], &Travel::none()));
         }
     }

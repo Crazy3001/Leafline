@@ -1,0 +1,54 @@
+# Unit tests, lints and type checks on Windows, the one platform v1 supports.
+#
+# The reader accuracy check (`cargo run --example check`) is not here on purpose: it scores the
+# readers against game screenshots, which are Nexon's images and never go on GitHub. Run it
+# locally with the screenshots in test-screenshots/. No unit test reads that folder.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Test and lint (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install npm packages
+        run: npm ci
+
+      - name: Svelte and TypeScript check
+        run: npm run check
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Rust unit tests
+        working-directory: src-tauri
+        run: cargo test --lib
+
+      - name: Clippy
+        working-directory: src-tauri
+        run: cargo clippy --all-targets -- -D warnings

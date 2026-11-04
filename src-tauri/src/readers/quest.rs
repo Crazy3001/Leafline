@@ -584,7 +584,7 @@ mod tests {
             }]
         );
         // A counter OCR read past its target is still a counter, for the shapes to settle.
-        assert_eq!(parse(&[vec![line("31 / 30 Evil Eye", 50.0)]], 30.0, 32.0), [Quest::default(); 0]);
+        assert_eq!(parse(&[vec![line("31 / 30 Evil Eye", 50.0)]], 30.0, 32.0), Vec::<Quest>::new());
     }
 
     #[test]

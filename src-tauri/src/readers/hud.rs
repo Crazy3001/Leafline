@@ -77,10 +77,11 @@ fn canonical(frame: &Frame, layout: HudLayout) -> Option<(Glyphs, HudLayout)> {
 pub fn read(frame: &Frame, ocr: &Ocr) -> Result<Option<(HudLayout, HudReading)>> {
     let Some(located) = locate(frame) else { return Ok(None) };
     let Some((glyphs, layout)) = canonical(frame, located) else { return Ok(None) };
-    let mut reading = HudReading::default();
-
-    reading.hp = digits::values(&glyphs.hp).and_then(|t| parse_gauge(&t));
-    reading.mp = digits::values(&glyphs.mp).and_then(|t| parse_gauge(&t));
+    let mut reading = HudReading {
+        hp: digits::values(&glyphs.hp).and_then(|t| parse_gauge(&t)),
+        mp: digits::values(&glyphs.mp).and_then(|t| parse_gauge(&t)),
+        ..HudReading::default()
+    };
     let points = digits::values(&glyphs.before_percent).filter(|t| !t.is_empty());
     reading.exp =
         points.zip(digits::values(&glyphs.percent)).and_then(|(points, percent)| parse_exp(&points, &percent));

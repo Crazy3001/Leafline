@@ -159,7 +159,7 @@ fn one_copy(text: &str) -> Option<String> {
     };
     let chars: Vec<char> = digits.chars().filter(|c| !c.is_whitespace()).map(as_digit).collect();
     let size = chars.len() / COPIES;
-    let whole = size > 0 && chars.len() % COPIES == 0;
+    let whole = size > 0 && chars.len().is_multiple_of(COPIES);
     (whole && chars.chunks(size).all(|copy| copy == &chars[..size])).then(|| chars[..size].iter().collect())
 }
 
@@ -257,11 +257,11 @@ mod tests {
         let (six, eight) = (mask(&six), mask(&eight));
         assert!(!inked_upper_right(&six));
         assert!(inked_upper_right(&eight));
-        assert_eq!(settle_sixes("6", &[eight.clone()]), "8");
-        assert_eq!(settle_sixes("8", &[six.clone()]), "6");
+        assert_eq!(settle_sixes("6", std::slice::from_ref(&eight)), "8");
+        assert_eq!(settle_sixes("8", std::slice::from_ref(&six)), "6");
         assert_eq!(settle_sixes("68", &[eight.clone(), six.clone()]), "86");
         // Anything else, or a reading that doesn't line up with the glyphs, is left alone.
-        assert_eq!(settle_sixes("3", &[six.clone()]), "3");
+        assert_eq!(settle_sixes("3", std::slice::from_ref(&six)), "3");
         assert_eq!(settle_sixes("66", &[six]), "66");
     }
 
