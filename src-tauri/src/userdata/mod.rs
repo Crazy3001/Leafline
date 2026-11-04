@@ -1,8 +1,10 @@
 //! What the player records themselves: prices they saw or paid, sessions they saved and builds
-//! they planned. Kept in its own SQLite file, apart from the map data cache, because that cache
-//! can be thrown away and downloaded again while these records cannot.
+//! they planned, and each character's last known mesos. Kept in its own SQLite file, apart from
+//! the map data cache, because that cache can be thrown away and downloaded again while these
+//! records cannot.
 
 pub mod builds;
+pub mod characters;
 pub mod prices;
 pub mod sessions;
 
@@ -80,6 +82,12 @@ CREATE TABLE builds (
     body TEXT NOT NULL,
     updated_at INTEGER NOT NULL,
     used_at INTEGER NOT NULL);
+",
+    "
+CREATE TABLE characters (
+    name TEXT PRIMARY KEY COLLATE NOCASE,
+    mesos INTEGER NOT NULL,
+    mesos_seen_at INTEGER NOT NULL);
 ",
 ];
 

@@ -9,6 +9,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::error::{Error, Result};
 use crate::userdata::UserData;
+use crate::userdata::characters::KnownMesos;
 use crate::userdata::prices::{NewPrice, PriceLog};
 use crate::userdata::sessions::{MapRate, SavedSession};
 
@@ -17,6 +18,9 @@ const BACKUP_FOLDER: &str = "backups";
 
 /// Emitted to every window when a session is saved or deleted.
 pub const HISTORY_EVENT: &str = "history";
+
+/// Emitted to every window when a character's mesos are remembered.
+pub const MESOS_EVENT: &str = "known-mesos";
 
 /// The user's records, or why they couldn't be opened. A damaged file must not stop the app;
 /// the commands report it instead.
@@ -46,6 +50,12 @@ impl UserDataState {
             Err(message) => Err(Error::Invalid(message.clone())),
         }
     }
+}
+
+/// The mesos last read for a character, or with no name, for the one seen last.
+#[tauri::command]
+pub fn known_mesos(state: State<UserDataState>, name: Option<String>) -> Result<Option<KnownMesos>> {
+    state.with(|db| db.known_mesos(name.as_deref()))
 }
 
 /// What has been logged for an item, summarised for a copy with these upgrades and slots.

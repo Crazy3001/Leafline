@@ -25,7 +25,7 @@
 {/snippet}
 
 {#if panel === "stats"}
-  <CharacterCard hud={analysis?.hud ?? null} mesos={analysis?.mesos ?? null} {session} />
+  <CharacterCard hud={analysis?.hud ?? null} mesos={analysis?.mesos ?? null} {session} remember />
   {#if session}<SessionCard {session} compact />{/if}
   <HistoryCard />
   <TimersCard />

@@ -220,6 +220,7 @@ pub fn create_workbench(app: &AppHandle) -> Result<()> {
         .min_inner_size(960.0, 600.0)
         .center()
         .background_color(Color(13, 16, 23, 255))
+        .additional_browser_args(super::BROWSER_ARGS)
         .build()?;
     fit_workbench(&workbench)
 }

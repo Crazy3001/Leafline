@@ -16,7 +16,7 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
 
 use super::mapdata::MapDataState;
-use super::records::{self, HISTORY_EVENT, UserDataState};
+use super::records::{self, HISTORY_EVENT, MESOS_EVENT, UserDataState};
 use super::builds;
 use super::replay;
 use super::report;
@@ -53,6 +53,11 @@ const HDR_CHECK_EVERY: u64 = 30;
 /// Active seconds before a session is worth keeping, and how often it is saved from then on.
 const SAVE_AFTER_ACTIVE: f64 = 60.0;
 const SAVE_EVERY: Duration = Duration::from_secs(30);
+/// A meso amount is remembered for its character only while it is on screen, at most this long
+/// after it was last read.
+const MESOS_FRESH: f64 = 5.0;
+/// How often an unchanged amount still on screen refreshes when it was last seen.
+const MESOS_SEEN_EVERY: Duration = Duration::from_secs(60);
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", rename_all_fields = "camelCase", tag = "state")]
@@ -348,6 +353,35 @@ impl Keeper {
     }
 }
 
+/// Remembers each character's mesos between runs, once the tracker has confirmed both the name
+/// and the amount.
+#[derive(Default)]
+struct MesoMemory {
+    saved: Option<(String, u64)>,
+    saved_at: Option<Instant>,
+}
+
+impl MesoMemory {
+    fn note(&mut self, app: &AppHandle, session: &SessionSummary) {
+        let (Some(name), Some(mesos)) = (&session.name, session.mesos) else { return };
+        if session.mesos_age.is_none_or(|age| age > MESOS_FRESH) {
+            return;
+        }
+        let same = self.saved.as_ref().is_some_and(|(n, m)| n == name && *m == mesos);
+        if same && self.saved_at.is_some_and(|at| at.elapsed() < MESOS_SEEN_EVERY) {
+            return;
+        }
+        match app.state::<UserDataState>().with(|db| db.save_mesos(name, mesos, records::now())) {
+            Ok(()) => {
+                self.saved = Some((name.clone(), mesos));
+                self.saved_at = Some(Instant::now());
+                let _ = app.emit(MESOS_EVENT, ());
+            }
+            Err(err) => report::note(format!("Couldn't remember the mesos: {err}")),
+        }
+    }
+}
+
 /// Saves the last picture read as a PNG in Pictures\Leafline, for the workbench or a bug report:
 /// a price check's for a moment after it, or else the last live one.
 pub fn save_frame(app: &AppHandle) -> Result<PathBuf> {
@@ -372,6 +406,7 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
         |idle_after| SessionTracker::new(TrackerConfig { confirmations: 2, idle_after, ..TrackerConfig::default() });
     let mut tracker = fresh_tracker(app.state::<SettingsState>().get().live.pause_after);
     let mut keeper = Keeper::default();
+    let mut memory = MesoMemory::default();
     let mut titles = QuestTitles::default();
     let mut windows = Watch::default();
     let mut twin = None;
@@ -510,6 +545,7 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
                 if keeper.due() {
                     keeper.save(app, &session);
                 }
+                memory.note(app, &session);
 
                 frames += 1;
                 if frames.is_multiple_of(HDR_CHECK_EVERY) {

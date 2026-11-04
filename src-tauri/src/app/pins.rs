@@ -167,6 +167,7 @@ fn open(app: &AppHandle, panel: Panel, slot: usize) -> Result<()> {
         .maximizable(false)
         .focused(false)
         .visible(!app.state::<PinState>().hidden.load(Ordering::Relaxed))
+        .additional_browser_args(super::BROWSER_ARGS)
         .build()?;
     zoom(&window, app.state::<SettingsState>().get().scale)?;
     snap::attach(&window)?;

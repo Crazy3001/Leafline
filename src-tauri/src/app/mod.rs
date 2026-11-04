@@ -19,6 +19,14 @@ mod tray;
 
 use tauri::{Manager, WindowEvent};
 
+/// WebView2 options for every Leafline window. All windows share one browser, which refuses a
+/// window asking for different ones, so the overlay's entry in tauri.conf.json carries the same
+/// string (a test checks). The first feature list is wry's default, kept. Leafline's windows sit
+/// over a game that has focus, and Edge would take them for hidden and stop drawing them until
+/// clicked: occlusion detection and background throttling are turned off for that.
+pub const BROWSER_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,CalculateNativeWinOcclusion \
+     --disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows";
+
 use launch::LaunchImage;
 use live::LiveState;
 use mapdata::MapDataState;
@@ -124,6 +132,7 @@ pub fn run() {
             mapdata::quest_guide,
             mapdata::download_drops,
             mapdata::training_spots,
+            records::known_mesos,
             records::price_log,
             records::record_price,
             records::delete_price,
@@ -179,4 +188,17 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running Leafline");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::BROWSER_ARGS;
+
+    #[test]
+    fn the_overlay_asks_for_the_same_browser_as_every_other_window() {
+        let config: serde_json::Value = serde_json::from_str(include_str!("../../tauri.conf.json")).unwrap();
+        for window in config["app"]["windows"].as_array().unwrap() {
+            assert_eq!(window["additionalBrowserArgs"].as_str(), Some(BROWSER_ARGS), "{}", window["label"]);
+        }
+    }
 }

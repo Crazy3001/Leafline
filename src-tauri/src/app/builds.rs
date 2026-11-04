@@ -351,6 +351,7 @@ pub async fn show_build(app: AppHandle) -> Result<()> {
         .min_inner_size(760.0, 520.0)
         .center()
         .background_color(tauri::window::Color(20, 20, 18, 255))
+        .additional_browser_args(super::BROWSER_ARGS)
         .build()?;
     Ok(())
 }

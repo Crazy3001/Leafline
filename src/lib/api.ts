@@ -34,6 +34,7 @@ import type {
   TravelInfo,
   Guide,
   History,
+  KnownMesos,
   MapDataDownload,
   MapDataStatus,
   MapDetails,
@@ -190,6 +191,10 @@ export interface Backend {
   priceLog(item: string, upgrades: number | null, slots: number | null): Promise<PriceLog>;
   recordPrice(price: NewPrice): Promise<PriceLog>;
   deletePrice(id: number): Promise<void>;
+
+  /** The mesos last read for a character, or with no name, for the character seen last. */
+  knownMesos(name: string | null): Promise<KnownMesos | null>;
+  onKnownMesos(handler: () => void): Promise<UnlistenFn>;
 
   /** Saves the session the overlay shows (the last replay) to the history. */
   saveSession(label: string): Promise<number>;
@@ -358,6 +363,8 @@ const tauriBackend: Backend = {
   priceLog: (item, upgrades, slots) => invoke("price_log", { item, upgrades, slots }),
   recordPrice: (price) => invoke("record_price", { price }),
   deletePrice: (id) => invoke("delete_price", { id }),
+  knownMesos: (name) => invoke("known_mesos", { name }),
+  onKnownMesos: (handler) => listen("known-mesos", () => handler()),
   saveSession: (label) => invoke("save_session", { label }),
   setSessionNote: (id, note) => invoke("set_session_note", { id, note }),
   renameMap: (from, to) => invoke("rename_map", { from, to }),

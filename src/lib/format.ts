@@ -48,6 +48,15 @@ export function formatDuration(seconds: number | null | undefined): string {
   return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m`;
 }
 
+/** How long ago something was, roughly: `just now`, `12m ago`, `3h ago`, `2d ago`. */
+export function formatAgo(seconds: number): string {
+  const total = Math.max(0, Math.round(seconds));
+  if (total < 60) return "just now";
+  if (total < 3600) return `${Math.floor(total / 60)}m ago`;
+  if (total < 86400) return `${Math.floor(total / 3600)}h ago`;
+  return `${Math.floor(total / 86400)}d ago`;
+}
+
 /** A map as the collapsed minimap writes it, `Victoria Road : Henesys`, which is how the session tracker keys maps. */
 export function mapLabel(map: { street: string | null; name: string }): string {
   return map.street ? `${map.street} : ${map.name}` : map.name;

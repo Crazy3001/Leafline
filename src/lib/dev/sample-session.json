@@ -80,6 +80,7 @@
   "percentLost": 2.4,
   "mesosAge": 12.0,
   "mapHidden": false,
+  "name": null,
   "job": "Bandit",
   "party": 1,
   "lines": [

@@ -213,6 +213,8 @@ pub struct SessionSummary {
     pub map: Option<String>,
     /// The minimap's name has not been seen for a while, so the map may be out of date.
     pub map_hidden: bool,
+    /// The character's name, once read the same a few times in a row.
+    pub name: Option<String>,
     pub job: Option<String>,
     pub party: Option<u32>,
     /// Per map, most active time first.
@@ -1067,6 +1069,7 @@ impl SessionTracker {
                 .map_seen_at
                 .zip(self.updated_at)
                 .is_some_and(|(seen, now)| now - seen >= MAP_HIDDEN_SECONDS),
+            name: self.name.value.clone(),
             job: self.job.value.clone(),
             party: self.party.value,
             maps,

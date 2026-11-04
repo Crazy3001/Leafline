@@ -1,15 +1,61 @@
 <script lang="ts">
+  import { onMount } from "svelte";
+
   import Card from "./Card.svelte";
   import Gauge from "./Gauge.svelte";
   import Trend from "./Trend.svelte";
-  import { formatCompact, formatDuration, formatNumber, formatPercent } from "$lib/format";
-  import type { Gauge as GaugeReading, HudReading, MesoReading, SessionSummary } from "$lib/types";
+  import { backend } from "$lib/api";
+  import { formatAgo, formatCompact, formatDuration, formatNumber, formatPercent } from "$lib/format";
+  import type { Gauge as GaugeReading, HudReading, KnownMesos, MesoReading, SessionSummary } from "$lib/types";
 
   let {
     hud,
     mesos,
     session = null,
-  }: { hud: HudReading | null; mesos: MesoReading | null; session?: SessionSummary | null } = $props();
+    remember = false,
+  }: {
+    hud: HudReading | null;
+    mesos: MesoReading | null;
+    session?: SessionSummary | null;
+    /** Show the mesos remembered from earlier runs when none are on screen. Off for replays. */
+    remember?: boolean;
+  } = $props();
+
+  /** The name read this run: the tracker's settled one, else the HUD's latest. */
+  const readName = $derived(session?.name ?? hud?.name ?? null);
+  /** The mesos remembered for that character, or with no name read, for the one seen last. */
+  let known = $state<KnownMesos | null>(null);
+  let now = $state(Date.now() / 1000);
+  let asked = 0;
+
+  async function recall(name: string | null) {
+    const ask = ++asked;
+    try {
+      const found = await backend.knownMesos(name);
+      if (ask === asked) known = found;
+    } catch {
+      if (ask === asked) known = null;
+    }
+  }
+
+  $effect(() => {
+    const name = readName;
+    if (remember) recall(name);
+    else known = null;
+  });
+
+  onMount(() => {
+    const clock = setInterval(() => (now = Date.now() / 1000), 30_000);
+    const stop = remember ? backend.onKnownMesos(() => recall(readName)) : null;
+    return () => {
+      clearInterval(clock);
+      stop?.then((unlisten) => unlisten());
+    };
+  });
+
+  /** A remembered character stands in only until a name is read this run. */
+  const lastPlayed = $derived(readName == null ? known : null);
+  const displayName = $derived(readName ?? lastPlayed?.name ?? null);
 
   const fraction = (g: GaugeReading | null | undefined) => (g ? g.current / g.max : null);
   const gaugeText = (g: GaugeReading | null | undefined) =>
@@ -37,7 +83,10 @@
       <span class="tabular">{hud?.level ?? session?.level ?? "—"}</span>
     </div>
     <div class="who">
-      <div class="name">{hud?.name ?? "Unknown character"}</div>
+      <div class="name">
+        {displayName ?? "Unknown character"}
+        {#if lastPlayed}<span class="seen" title="No character read yet: the one Leafline saw last">last played</span>{/if}
+      </div>
       <div class="mesos tabular">
         <span class="coin" aria-hidden="true"></span>
         {#if mesos}
@@ -45,6 +94,9 @@
         {:else if session?.mesos != null}
           {formatNumber(session.mesos)} mesos
           <span class="seen">(last seen {formatDuration(session.mesosAge)} ago)</span>
+        {:else if known}
+          <span title="Remembered from when your inventory last showed them">{formatNumber(known.mesos)} mesos</span>
+          <span class="seen">(last seen {formatAgo(now - known.seenAt)})</span>
         {:else}
           Mesos not visible
         {/if}
@@ -181,6 +233,13 @@
 
   .seen {
     color: var(--faint);
+  }
+
+  .name .seen {
+    margin-left: 6px;
+    font-family: var(--font-sans);
+    font-size: 11px;
+    font-weight: 400;
   }
 
   .coin {

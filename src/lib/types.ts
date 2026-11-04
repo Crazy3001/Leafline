@@ -102,6 +102,14 @@ export interface MesoReading {
   rect: Rect;
 }
 
+/** A character's mesos the last time they were on screen, remembered between runs. */
+export interface KnownMesos {
+  name: string;
+  mesos: number;
+  /** Unix seconds. */
+  seenAt: number;
+}
+
 export interface MapReading {
   /** The street or area above the map's name, such as `Victoria Road`, when it was read. */
   street: string | null;
@@ -298,6 +306,8 @@ export interface SessionSummary {
   map: string | null;
   /** The minimap's name has not been seen for a while, so the map may be out of date. */
   mapHidden: boolean;
+  /** The character's name, once read the same a few times in a row. */
+  name: string | null;
   job: string | null;
   party: number | null;
   maps: MapSummary[];

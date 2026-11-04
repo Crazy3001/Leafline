@@ -217,6 +217,7 @@ pub fn open(app: &AppHandle) -> Result<()> {
         .min_inner_size(520.0, 480.0)
         .center()
         .background_color(tauri::window::Color(13, 16, 23, 255))
+        .additional_browser_args(super::BROWSER_ARGS)
         .build()?;
     Ok(())
 }

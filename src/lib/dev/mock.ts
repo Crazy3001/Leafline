@@ -599,6 +599,8 @@ export const mockBackend: Backend = {
     return id;
   },
   sessionHistory: async () => mockHistory(),
+  knownMesos: async () => ({ name: "Mossbank", mesos: 36_644, seenAt: Math.floor(Date.now() / 1000) - 26 * 3600 }),
+  onKnownMesos: async () => () => {},
   async setSessionNote(id, note) {
     savedSessions = savedSessions.map((s) => (s.id === id ? { ...s, note } : s));
     historyHandlers.forEach((h) => h());
