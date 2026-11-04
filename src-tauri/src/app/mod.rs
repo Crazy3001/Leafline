@@ -16,6 +16,7 @@ mod settings;
 mod shortcuts;
 mod snap;
 mod tray;
+mod update;
 
 use tauri::{Manager, WindowEvent};
 
@@ -37,6 +38,7 @@ use records::UserDataState;
 use replay::ReplayState;
 use settings::SettingsState;
 use shortcuts::Bindings;
+use update::UpdateState;
 
 pub fn run() {
     let args: Vec<String> = std::env::args().collect();
@@ -61,6 +63,7 @@ pub fn run() {
         .manage(Readings::default())
         .manage(Bindings::default())
         .manage(LaunchImage::new(&args))
+        .manage(UpdateState::default())
         .setup(|app| {
             app.manage(MapDataState::load(app.handle())?);
             app.manage(UserDataState::load(app.handle())?);
@@ -75,6 +78,7 @@ pub fn run() {
             pins::restore(app.handle())?;
             tray::create(app)?;
             overlay::create_workbench(app.handle())?;
+            update::check_at_startup(app.handle());
             // Setup comes first on a new install. After it, live reading starts with Leafline and
             // waits for the game window if the game isn't open.
             let settings = app.state::<SettingsState>().get();
@@ -150,6 +154,8 @@ pub fn run() {
             records::record_price,
             records::delete_price,
             records::item_note,
+            update::update_status,
+            update::check_for_update,
             records::set_item_note,
             records::save_session,
             records::session_history,

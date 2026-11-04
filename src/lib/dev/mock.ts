@@ -6,6 +6,7 @@ import type {
   Analysis,
   BaseStats,
   ItemNote,
+  UpdateStatus,
   Build,
   BuildCatalog,
   BuildPlan,
@@ -240,6 +241,7 @@ let displaySettings: DisplaySettings = {
   live: { enabled: true, interval: 2, pauseAfter: 15, window: null },
   framesFolder: null,
   setupDone: true,
+  updateCheck: false,
   buildRules: { apPerLevel: 5, spPerLevel: 3, beginnerSpPerLevel: 1, advancementSp: 1, firstJobLevel: 10, secondJobLevel: 30, secondSpBuysFirst: false, gearCounts: true },
 };
 
@@ -884,8 +886,10 @@ export const mockBackend: Backend = {
   onPinResized: async () => () => {},
   settings: async () => displaySettings,
   async updateSettings(settings) {
+    const checkChanged = settings.updateCheck !== displaySettings.updateCheck;
     displaySettings = { ...settings };
     settingsHandlers.forEach((h) => h(displaySettings));
+    if (checkChanged) (settings.updateCheck ? mockUpdateCheck() : setUpdate({ state: "off" }));
     return displaySettings;
   },
   async onSettings(handler) {
@@ -911,5 +915,32 @@ export const mockBackend: Backend = {
   },
   async finishSetup() {},
   version: async () => "dev",
+  updateStatus: async () => updateStatus,
+  async checkForUpdate() {
+    if (!displaySettings.updateCheck) throw "Turn on the update check first.";
+    mockUpdateCheck();
+    return updateStatus;
+  },
+  async onUpdateStatus(handler) {
+    updateHandlers.push(handler);
+    return () => {};
+  },
   async fitWindow() {},
 };
+
+/** The update check in a browser: a made-up newer release, after a moment. */
+let updateStatus: UpdateStatus = { state: "off" };
+const updateHandlers: ((status: UpdateStatus) => void)[] = [];
+
+function setUpdate(status: UpdateStatus) {
+  updateStatus = status;
+  updateHandlers.forEach((h) => h(status));
+}
+
+function mockUpdateCheck() {
+  setUpdate({ state: "checking" });
+  setTimeout(() => {
+    if (displaySettings.updateCheck)
+      setUpdate({ state: "available", current: "0.1.0", latest: "0.2.0", url: "https://github.com/OWNER/leafline/releases" });
+  }, 700);
+}

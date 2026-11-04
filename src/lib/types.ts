@@ -713,7 +713,18 @@ export interface DisplaySettings {
   framesFolder: string | null;
   /** The first-launch setup has been finished. */
   setupDone: boolean;
+  /** Ask GitHub for the latest version number at startup. Off until the player turns it on. */
+  updateCheck: boolean;
 }
+
+/** The optional update check (src-tauri/src/app/update.rs). */
+export type UpdateStatus =
+  | { state: "off" }
+  | { state: "checking" }
+  | { state: "upToDate"; current: string; latest: string }
+  | { state: "available"; current: string; latest: string; url: string }
+  | { state: "unavailable"; current: string; reason: string }
+  | { state: "failed"; current: string; message: string };
 
 // Session history (see src-tauri/src/userdata/sessions.rs).
 

@@ -42,6 +42,9 @@ pub struct Settings {
     pub frames_folder: Option<String>,
     /// The first-launch setup has been finished. Until then it opens at every start.
     pub setup_done: bool,
+    /// Ask GitHub for the latest version number at startup. Off until the player turns it on, in
+    /// setup or Settings; sends nothing about the game or the player (see `update.rs`).
+    pub update_check: bool,
 }
 
 impl Default for Settings {
@@ -57,6 +60,7 @@ impl Default for Settings {
             build_rules: Rules::default(),
             frames_folder: None,
             setup_done: false,
+            update_check: false,
         }
     }
 }
@@ -201,6 +205,9 @@ pub fn update_settings(app: AppHandle, state: State<SettingsState>, settings: Se
     }
     if old.live.enabled && !settings.live.enabled {
         super::live::stop(&app);
+    }
+    if old.update_check != settings.update_check {
+        if settings.update_check { super::update::start(&app) } else { super::update::turn_off(&app) }
     }
     app.emit(SETTINGS_EVENT, &settings)?;
     Ok(settings)

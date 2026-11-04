@@ -36,6 +36,7 @@
     TravelChoice,
     TravelFile,
     TravelInfo,
+    UpdateStatus,
   } from "$lib/types";
 
   const SECTIONS = [
@@ -55,6 +56,8 @@
 
   let shortcuts = $state<ShortcutInfo[]>([]);
   let version = $state("");
+  let update = $state<UpdateStatus>({ state: "off" });
+  let updateError = $state<string | null>(null);
   let opacity = $state(100);
   let size = $state(100);
   let saveTimer: ReturnType<typeof setTimeout> | undefined;
@@ -167,7 +170,37 @@
     loadWindows();
     backend.shortcuts().then((s) => (shortcuts = s));
     backend.version().then((v) => (version = v));
+    backend.updateStatus().then((s) => (update = s));
+    const stopUpdate = backend.onUpdateStatus((s) => (update = s));
     loadTravel();
+    return () => {
+      stopUpdate.then((stop) => stop());
+    };
+  });
+
+  async function checkNow() {
+    updateError = null;
+    try {
+      update = await backend.checkForUpdate();
+    } catch (e) {
+      updateError = String(e);
+    }
+  }
+
+  /** One quiet line on where the update check stands, or null when there's nothing to say. */
+  const updateLine = $derived.by(() => {
+    switch (update.state) {
+      case "checking":
+        return "Checking GitHub…";
+      case "upToDate":
+        return `Up to date: ${update.latest} is the latest release.`;
+      case "unavailable":
+        return update.reason;
+      case "failed":
+        return `Couldn't check: ${update.message} It tries again at the next start.`;
+      default:
+        return null;
+    }
   });
 
   // The folder follows the setting, including a change made in setup.
@@ -234,10 +267,11 @@
   }
 
   const does = [
-    "Reads what the game window shows (or saved screenshots), with the OCR built into Windows on this PC. Turn live reading off below.",
+    "Reads what the game window shows (or saved screenshots), with the OCR built into Windows on this PC. Live reading can be turned off at the top of Settings.",
     "Shows map, monster, quest, skill and equipment facts from community data, downloaded only when you ask.",
     "Downloads the player-logged drop table from mapleclassic.wiki when you first need it, and who takes each quest in along with the map data. Both renew weekly and are looked up on this PC.",
     "Keeps your settings, sessions, item notes, price log and builds on this PC.",
+    "Asks GitHub for the latest version number at startup, only if you turn the update check on below. That request carries nothing about the game or you.",
   ];
   const doesNot = [
     "Read or change the game's memory or files.",
@@ -766,6 +800,15 @@
         endorsed or supported by Nexon.
       </p>
 
+      {#if update.state === "available"}
+        <div class="update" role="status">
+          <span>Leafline {update.latest} is out. You have {update.current}.</span>
+          <button class="link" onclick={() => backend.openLink(update.state === "available" ? update.url : "")}>
+            Release notes and download<ExternalLink size={11} />
+          </button>
+        </div>
+      {/if}
+
       <div class="policy">
         <ShieldCheck size={16} />
         <p>
@@ -786,6 +829,31 @@
           <ul>
             {#each doesNot as item}<li><span class="mark bad"><X size={12} /></span>{item}</li>{/each}
           </ul>
+        </div>
+      </div>
+
+      <div class="row">
+        <label for="update-check">
+          <span class="name">Check for updates</span>
+          <span class="help">
+            At startup, asks GitHub for the number of the latest release and says here if it's newer. Nothing about the
+            game or you is sent, and nothing is downloaded or installed.
+          </span>
+          {#if display.updateCheck && updateLine}<span class="help status">{updateLine}</span>{/if}
+          {#if updateError}<span class="help warn">{updateError}</span>{/if}
+        </label>
+        <div class="control">
+          {#if display.updateCheck}
+            <button class="button" onclick={checkNow} disabled={update.state === "checking"}>Check now</button>
+          {/if}
+          <input
+            id="update-check"
+            class="switch"
+            type="checkbox"
+            role="switch"
+            checked={display.updateCheck}
+            onchange={(e) => changeSettings({ updateCheck: e.currentTarget.checked })}
+          />
         </div>
       </div>
 
@@ -826,6 +894,28 @@
 <style>
   :global(body) {
     background: var(--bg);
+  }
+
+  .update {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 12px;
+    margin: 0 0 14px;
+    padding: 8px 12px;
+    border-left: 2px solid var(--accent);
+    background: var(--accent-soft);
+    font-size: 12.5px;
+  }
+
+  .help.status {
+    margin-top: 4px;
+    color: var(--faint);
+  }
+
+  .help.warn {
+    margin-top: 4px;
+    color: var(--warn);
   }
 
   .reset-keys {

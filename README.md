@@ -10,6 +10,8 @@ Leafline only looks at your screen. It captures what is visible, reads it with O
 
 It never reads or writes game memory or files, never touches network traffic, never injects into or draws inside the game client, and never sends keyboard or mouse input to the game. There is no automation of any kind. No Nexon assets are included.
 
+Nothing read from the game leaves your PC. Leafline goes online only to download the community data below when you ask for it, and, if you turn it on in setup or Settings, to ask GitHub for the latest version number at startup. That request carries Leafline's name and version and nothing else; when a newer release is out, Settings → About says so and links to it. Nothing is downloaded or installed for you.
+
 **Use it at your own risk.** Leafline reads the game window from the moment it starts (you can turn that off in Settings). Nexon has not said whether read-only overlays are allowed. Its support replies quote the rule against unauthorised third-party software, and one player reported a two-week ban while running a similar screen-reading overlay (unconfirmed). Nexon's FAQ says a penalty in one of its games carries to the others on the same account. If that worries you, play on a character you can afford to lose, ideally on a separate Nexon account.
 
 ## Getting started (Windows)

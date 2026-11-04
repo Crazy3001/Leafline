@@ -45,6 +45,7 @@ import type {
   MapRoute,
   MeasuredRate,
   NewPrice,
+  UpdateStatus,
   ItemNote,
   MonsterDrops,
   MonsterFilters,
@@ -292,6 +293,11 @@ export interface Backend {
   finishSetup(): Promise<void>;
   /** Leafline's version, for the About section. */
   version(): Promise<string>;
+  /** Where the optional update check stands. */
+  updateStatus(): Promise<UpdateStatus>;
+  /** Checks now; refused while the check is turned off. */
+  checkForUpdate(): Promise<UpdateStatus>;
+  onUpdateStatus(handler: (status: UpdateStatus) => void): Promise<UnlistenFn>;
   /** The travel connections routes can use, and which file they come from. */
   travelInfo(): Promise<TravelInfo>;
   /** Downloads the taxis and return scrolls players recorded on mapleclassic.wiki. */
@@ -443,6 +449,9 @@ const tauriBackend: Backend = {
   settings: () => invoke("get_settings"),
   updateSettings: (settings) => invoke("update_settings", { settings }),
   onSettings: (handler) => listen<DisplaySettings>("settings", (e) => handler(e.payload)),
+  updateStatus: () => invoke("update_status"),
+  checkForUpdate: () => invoke("check_for_update"),
+  onUpdateStatus: (handler) => listen<UpdateStatus>("update", (e) => handler(e.payload)),
   showSettings: () => invoke("show_settings"),
   showSetup: () => invoke("show_setup"),
   finishSetup: () => invoke("finish_setup"),

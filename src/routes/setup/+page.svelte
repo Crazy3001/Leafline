@@ -154,6 +154,24 @@
           />
         </div>
 
+        <div class="row">
+          <label for="update-check">
+            <span class="name">Check for updates at startup</span>
+            <span class="help">
+              Asks GitHub for the latest version number and says in Settings if there's a newer one. Nothing about the
+              game or you is sent. Change it any time in Settings → About.
+            </span>
+          </label>
+          <input
+            id="update-check"
+            class="switch"
+            type="checkbox"
+            role="switch"
+            checked={display.updateCheck}
+            onchange={(e) => changeSettings({ updateCheck: e.currentTarget.checked })}
+          />
+        </div>
+
         <h2>What Leafline never does</h2>
         <ul class="never">
           {#each never as item (item)}<li><span class="mark"><X size={12} /></span>{item}</li>{/each}
