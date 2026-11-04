@@ -6,20 +6,21 @@
   let {
     keys,
     disabled = false,
+    taken = false,
     label,
     onchange,
-  }: { keys: string; disabled?: boolean; label: string; onchange: (keys: string) => void } = $props();
+  }: { keys: string; disabled?: boolean; taken?: boolean; label: string; onchange: (keys: string) => void } = $props();
 
   let listening = $state(false);
 
-  /** A pressed key as Leafline writes it: `Ctrl+Shift+K`, `F5`, `Pause`. Null for a modifier alone. */
+  /** A pressed key as Leafline writes it: `Ctrl+Shift+K`, `F5`, `Pause`, `Numpad5`. Null for a modifier alone. */
   function keysOf(event: KeyboardEvent): string | null {
     const code = event.code;
     const key = code.startsWith("Key")
       ? code.slice(3)
       : code.startsWith("Digit")
         ? code.slice(5)
-        : /^(F\d{1,2}|Pause|ScrollLock|Space|Home|End|Insert|Delete|PageUp|PageDown|Arrow(Up|Down|Left|Right))$/.test(code)
+        : /^(F\d{1,2}|Pause|ScrollLock|Numpad(\d|Add|Subtract|Multiply|Divide|Decimal|Enter)|Space|Home|End|Insert|Delete|PageUp|PageDown|Arrow(Up|Down|Left|Right))$/.test(code)
           ? code
           : null;
     if (!key) return null;
@@ -47,8 +48,10 @@
 <button
   class="hotkey"
   class:listening
+  class:taken={taken && !listening}
   {disabled}
-  aria-label="{label}: {listening ? 'press keys' : keys ? keyName(keys) : 'no hotkey'}"
+  title={taken ? "Another program on this PC uses this key, so Leafline can't. Pick another." : undefined}
+  aria-label="{label}: {listening ? 'press keys' : keys ? keyName(keys) : 'no hotkey'}{taken ? ', in use by another program' : ''}"
   onclick={() => (listening = !listening)}
   onblur={() => (listening = false)}
   {onkeydown}
@@ -91,6 +94,24 @@
   .hotkey.listening {
     border-color: var(--accent);
     color: var(--accent-strong);
+  }
+
+  .hotkey.taken {
+    border-color: var(--warn);
+  }
+
+  .hotkey.taken kbd {
+    color: var(--warn);
+    text-decoration: line-through;
+  }
+
+  .hotkey.taken {
+    border-color: var(--warn);
+  }
+
+  .hotkey.taken kbd {
+    color: var(--warn);
+    text-decoration: line-through;
   }
 
   .hotkey:focus-visible {

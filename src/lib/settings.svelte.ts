@@ -28,11 +28,17 @@ export const display = $state<DisplaySettings>({
   setupDone: false,
 });
 
-/** How a key is written for people: `ScrollLock` as `Scroll Lock`, `Super` as `Win`. */
+const NUMPAD: Record<string, string> = { Add: "+", Subtract: "-", Multiply: "*", Divide: "/", Decimal: ".", Enter: "Enter" };
+
+/** How a key is written for people: `ScrollLock` as `Scroll Lock`, `Super` as `Win`, `Numpad5` as `Num 5`. */
 export function keyName(keys: string): string {
   return keys
     .split("+")
-    .map((k) => ({ ScrollLock: "Scroll Lock", Super: "Win", PageUp: "Page Up", PageDown: "Page Down" })[k] ?? k)
+    .map((k) =>
+      k.startsWith("Numpad")
+        ? `Num ${NUMPAD[k.slice(6)] ?? k.slice(6)}`
+        : ({ ScrollLock: "Scroll Lock", Super: "Win", PageUp: "Page Up", PageDown: "Page Down" }[k] ?? k),
+    )
     .join("+");
 }
 

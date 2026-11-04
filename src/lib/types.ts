@@ -236,6 +236,10 @@ export interface ShortcutInfo {
   /** The key setup offers, or "" for none. */
   suggestedKeys: string;
   label: string;
+  /** Setup asks about it. */
+  inSetup: boolean;
+  /** Its keys are set but another program on this PC holds them, so they do nothing. */
+  taken: boolean;
 }
 
 /** A stretch of play on one map at one level, party size and job. */

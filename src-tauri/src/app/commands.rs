@@ -80,7 +80,7 @@ pub fn show_workbench(app: AppHandle) -> Result<()> {
 
 #[tauri::command]
 pub fn shortcut_list(app: AppHandle) -> Vec<ShortcutInfo> {
-    shortcuts::list(&app.state::<SettingsState>().get().hotkeys)
+    shortcuts::list(&app, &app.state::<SettingsState>().get().hotkeys)
 }
 
 /// Opens the folder that holds the player's records, settings and backups.

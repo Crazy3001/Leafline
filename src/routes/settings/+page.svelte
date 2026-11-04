@@ -26,7 +26,7 @@
   import MapDataPanel from "$lib/components/map/MapDataPanel.svelte";
   import { OSMS_URL, WIKI_URL } from "$lib/mapdata.svelte";
   import { live, watchLive } from "$lib/readings.svelte";
-  import { changeSettings, display, hotkey, keyHint, watchSettings } from "$lib/settings.svelte";
+  import { changeSettings, display, hotkey, keyHint, keyName, watchSettings } from "$lib/settings.svelte";
   import type {
     CompactShape,
     GameWindow,
@@ -629,8 +629,9 @@
     <section id="hotkeys">
       <h2>Hotkeys</h2>
       <p class="lead">
-        They work while the game has focus. Leafline never sends keys to the game. F-keys, Pause and Scroll Lock work
-        on their own. Other keys need Ctrl, Alt or Win with them, so they keep working in chat.
+        They work while the game has focus, and Leafline takes the key from the game. F-keys, Pause and numpad keys
+        work on their own; other keys need Ctrl, Alt or Win with them, so they keep working in chat. The game can't bind
+        Pause, Win or the numpad. Leafline never sends keys to the game.
       </p>
       <div class="row">
         <label for="hotkeys">
@@ -655,6 +656,7 @@
             <dd>
               <HotkeyButton
                 keys={shortcut.keys}
+                taken={shortcut.taken}
                 label={shortcut.label}
                 disabled={!display.hotkeys.enabled}
                 onchange={(keys) => setKey(shortcut.action, keys)}
@@ -664,10 +666,18 @@
         {/each}
       </dl>
       {#if hotkeyError}<p class="note warn">{hotkeyError}</p>{/if}
+      {#if shortcuts.some((s) => s.taken)}
+        <p class="note warn">
+          Another program on this PC already uses {shortcuts
+            .filter((s) => s.taken)
+            .map((s) => keyName(s.keys))
+            .join(", ")}, so those hotkeys do nothing. Pick other keys.
+        </p>
+      {/if}
       {#if gameModifiers.length}
         <p class="note warn">
           The game also sees Ctrl and Alt while you hold them, so {gameModifiers.map((s) => s.label.toLowerCase()).join(", ")}
-          can make your character attack or jump if those are your keys. An F-key, Pause or Scroll Lock avoids that.
+          can make your character attack or jump if those are your keys. An F-key, Pause or a numpad key avoids that.
         </p>
       {/if}
       <div class="reset-keys">

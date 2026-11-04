@@ -10,7 +10,7 @@
   import Logo from "$lib/components/Logo.svelte";
   import MapDataPanel from "$lib/components/map/MapDataPanel.svelte";
   import { WIKI_URL, mapData } from "$lib/mapdata.svelte";
-  import { changeSettings, display, watchSettings } from "$lib/settings.svelte";
+  import { changeSettings, display, keyName, watchSettings } from "$lib/settings.svelte";
   import type { ShortcutInfo } from "$lib/types";
 
   const STEPS = ["Welcome", "Hotkeys", "Game settings", "Map data"];
@@ -30,8 +30,9 @@
     keys = Object.fromEntries(shortcuts.map((s) => [s.action, s.keys || s.suggestedKeys]));
   });
 
-  /** The actions setup asks about: the ones with a suggestion, plus any the player already set. */
-  const offered = $derived(shortcuts.filter((s) => s.suggestedKeys || s.keys));
+  /** The actions setup asks about: the main ones, plus any the player already set. */
+  const offered = $derived(shortcuts.filter((s) => s.inSetup || s.keys));
+  const taken = $derived(offered.filter((s) => s.taken && keys[s.action] === s.keys));
   const clash = $derived.by(() => {
     const seen = new Map<string, string>();
     for (const s of offered) {
@@ -50,9 +51,10 @@
       return false;
     }
     try {
-      const chosen = Object.fromEntries(Object.entries(keys).filter(([, k]) => k));
-      await changeSettings({ hotkeys: { enabled: true, keys: { ...display.hotkeys.keys, ...chosen } } });
-      return true;
+      await changeSettings({ hotkeys: { enabled: true, keys: { ...display.hotkeys.keys, ...keys } } });
+      // A key another program holds can't be ours; say so before going on.
+      shortcuts = await backend.shortcuts();
+      return !shortcuts.some((s) => s.taken);
     } catch (e) {
       keysError = String(e);
       return false;
@@ -137,8 +139,9 @@
       <section>
         <h1>Hotkeys</h1>
         <p class="lead">
-          These work while the game has focus. Nothing is set until you go on, and these are only suggestions: if you use
-          one of these keys in game, click it and press another.
+          These work while the game has focus, and Leafline takes the key from the game. F8 and F12 are empty in the
+          game's default key bindings, and the game can't bind Pause or the numpad. If you've put something on one of
+          these, click it and press another. Nothing is set until you go on.
         </p>
         <dl class="keys">
           {#each offered as shortcut (shortcut.action)}
@@ -147,6 +150,7 @@
               <dd>
                 <HotkeyButton
                   keys={keys[shortcut.action] ?? ""}
+                  taken={shortcut.taken && keys[shortcut.action] === shortcut.keys}
                   label={shortcut.label}
                   onchange={(k) => (keys[shortcut.action] = k)}
                 />
@@ -155,9 +159,16 @@
           {/each}
         </dl>
         <p class="note">
-          Avoid Ctrl and Alt: the game sees them while you hold them, so a hotkey with Ctrl can make you attack. Esc
-          cancels and Backspace clears. More hotkeys, such as pausing tracking, are in Settings.
+          Avoid Ctrl and Alt: the game sees them while you hold them, so a hotkey with Ctrl can make you attack. Adding
+          Win to a key, such as Win+F9, keeps it away from the game. Esc cancels and Backspace clears. More hotkeys, such
+          as pausing tracking, are in Settings.
         </p>
+        {#if taken.length}
+          <p class="note warn">
+            Another program on this PC already uses {taken.map((s) => keyName(s.keys)).join(" and ")}, so Leafline can't.
+            Pick {taken.length === 1 ? "another key" : "other keys"}, or clear {taken.length === 1 ? "it" : "them"}.
+          </p>
+        {/if}
         {#if keysError || clash}<p class="note warn">{keysError ?? clash}</p>{/if}
       </section>
     {:else if step === 2}

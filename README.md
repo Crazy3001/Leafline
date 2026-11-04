@@ -25,18 +25,17 @@ The first launch opens **setup**: a line on what Leafline is, the hotkeys, game 
 
 Development builds also open the **workbench**, a tool for working on Leafline that release builds don't have. Open a screenshot or a folder of them; the pipeline runs on each, outlines what it found and shows the readings. The overlay updates too, as it would during play. With a folder open, **Replay as session** reads every frame in order as one play session and shows EXP/hour, mesos/hour and time to level, overall and per map (see below). You can also pass it an image on the command line (`leafline.exe shot.png`), or use *Open with*.
 
-No hotkey is set until you pick it in setup or Settings. Setup suggests these, because they type nothing in chat; change any you already use in game:
+No hotkey is set until you pick it in setup or Settings, and a hotkey takes its key from the game. Setup suggests three keys that are free in the game's default key bindings:
 
 | Suggested | Action |
 |---|---|
-| `F9` | Show or hide the overlay |
-| `Scroll Lock` | Lock the overlay (clicks pass through to whatever is underneath) |
-| `Pause` | Compact HUD |
-| `F10` | Read the item you're hovering |
-| `F11` | Read your Character Stat and Skill windows, to update your build |
-| `F12` | Save the picture last read |
+| `F12` | Read the item you're hovering |
+| `F8` | Show or hide the overlay |
+| `Pause` | Lock the overlay (clicks pass through to whatever is underneath) |
 
-Settings has more with no suggested key: show or hide pinned panels, start or stop live reading, pause or resume tracking, start a new session, keep this run in the history or out of it, and the workbench (development builds). Avoid Ctrl and Alt: the game sees them while you hold them, so a hotkey with Ctrl can make your character attack.
+Setup also asks about the compact HUD, reading your Character Stat and Skill windows, and saving the picture last read. Settings has the rest: pinned panels, starting or stopping live reading, pausing tracking, a new session, keeping a run out of the history, and the workbench (development builds).
+
+F-keys, Pause and numpad keys work on their own; any other key needs Ctrl, Alt or Win with it, so it keeps working in chat. The game can't bind Pause, Win or the numpad, so Win+F9 or a numpad key never clashes with it. Avoid Ctrl and Alt: the game sees them while you hold them, so a hotkey with Ctrl can make your character attack. If another program on your PC already uses a key, setup and Settings say so.
 
 Closing a window hides it. Leafline keeps running in the tray until you choose **Quit**.
 
