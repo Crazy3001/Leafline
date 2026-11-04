@@ -27,6 +27,20 @@
 
   /** A size set by hand, in the page's own units so it follows the size setting. */
   let sized = $state<{ width: number; height: number } | null>(storedSize());
+  /** Content taller than MAX_HEIGHT: the body scrolls. Otherwise it never shows a scrollbar,
+   *  because the window can come out a fraction of a pixel short of the content (display scaling
+   *  rounds it), and a scrollbar narrows the content, which refits the window, which can drop the
+   *  scrollbar again: the content then shakes sideways while the window keeps its size. */
+  let capped = $state(false);
+  /** The last size asked for, so an unchanged fit doesn't set the window again. */
+  let lastFit = "";
+
+  function setWindow(width: number, height: number) {
+    const key = `${width}x${height}`;
+    if (key === lastFit) return;
+    lastFit = key;
+    backend.fitWindow(width, height);
+  }
 
   function storedSize() {
     try {
@@ -42,6 +56,8 @@
 
   function keepSize(size: typeof sized) {
     sized = size;
+    // The window was sized by hand: whatever was last asked for no longer holds.
+    lastFit = "";
     try {
       if (size) localStorage.setItem(sizeKey(), JSON.stringify(size));
       else localStorage.removeItem(sizeKey());
@@ -60,12 +76,13 @@
   /** Sizes the window to the content, or to the player's size if they set one. The window is sized in screen units, the page in zoomed ones. */
   function fit() {
     if (sized) {
-      backend.fitWindow(sized.width * display.scale, sized.height * display.scale);
+      setWindow(sized.width * display.scale, sized.height * display.scale);
       return;
     }
     if (!frame || !body) return;
-    const natural = frame.offsetHeight - body.clientHeight + body.scrollHeight;
-    backend.fitWindow(PIN_WIDTH * display.scale, Math.min(MAX_HEIGHT, Math.ceil(natural)) * display.scale);
+    const natural = Math.ceil(frame.offsetHeight - body.clientHeight + body.scrollHeight);
+    capped = natural > MAX_HEIGHT;
+    setWindow(PIN_WIDTH * display.scale, Math.min(MAX_HEIGHT, natural) * display.scale);
   }
 
   onMount(() => {
@@ -111,7 +128,7 @@
       <button class="action" title="Unpin" onclick={() => backend.unpinPanel(panel)}><PinOff size={12} /></button>
     </span>
   </header>
-  <div class="body" bind:this={body}>
+  <div class="body" class:scrolls={capped} bind:this={body}>
     <div bind:this={content}>
       <PanelView {panel} analysis={live.analysis} session={live.session} pinned />
     </div>
@@ -198,6 +215,11 @@
   .body {
     min-height: 0;
     padding: 2px 10px 10px;
+    overflow-y: hidden;
+  }
+
+  .body.scrolls,
+  .sized .body {
     overflow-y: auto;
   }
 </style>

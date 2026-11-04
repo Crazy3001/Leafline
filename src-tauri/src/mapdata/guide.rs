@@ -1,5 +1,5 @@
 //! Where to go for the quests the Quest Helper shows: which monster each objective needs, the
-//! maps with the most of it, and how many portals away each map is.
+//! nearest maps with a fair number of it, and how many portals away each map is.
 //!
 //! An objective names either a monster to defeat or an item to collect. It is taken for a
 //! monster when it reads like one in the data; otherwise it is an item, and the monsters that
@@ -211,7 +211,7 @@ pub struct Hunt {
     pub monster: MonsterRef,
     /// For an item: how often players saw this monster drop it.
     pub drop: Option<DropRate>,
-    /// Maps with the most of this monster first.
+    /// The nearest maps with a fair number of this monster first (see `nearest_first`).
     pub maps: Vec<HuntingGround>,
 }
 
@@ -270,6 +270,29 @@ pub struct Pace {
 /// Sorts the versions of one monster: the one that spawns most, which players meet, comes first.
 pub(super) fn main_first(monster: &MonsterRecord) -> (std::cmp::Reverse<u32>, u32) {
     (std::cmp::Reverse(monster.spawns.iter().map(|s| s.count).sum()), monster.id)
+}
+
+/// A map with fewer than this share of the richest map's spawns is listed after the others,
+/// however close: a quest's few kills go faster on a fuller map a few portals further.
+const THIN_SHARE: u32 = 4;
+
+/// Orders hunting grounds for someone about to walk there: maps they can reach first, then the
+/// fewest steps away (counting travel they turned on), and most spawns among equals. Maps with
+/// only a few of the monster go after the rest. Without a known position no map has a route,
+/// and count alone decides.
+pub(super) fn nearest_first(maps: &mut [HuntingGround]) {
+    let richest = maps.iter().map(|m| m.count).max().unwrap_or(0);
+    let thin = |m: &HuntingGround| m.count * THIN_SHARE < richest;
+    let steps = |m: &HuntingGround| m.travel.as_ref().map(|t| t.hops).or(m.hops);
+    maps.sort_by(|a, b| {
+        steps(a)
+            .is_none()
+            .cmp(&steps(b).is_none())
+            .then(thin(a).cmp(&thin(b)))
+            .then(steps(a).unwrap_or(u32::MAX).cmp(&steps(b).unwrap_or(u32::MAX)))
+            .then(b.count.cmp(&a.count))
+            .then_with(|| a.map.name.cmp(&b.map.name))
+    });
 }
 
 /// What the guide knows about the player, beyond the map they are on.
@@ -456,16 +479,7 @@ impl Atlas {
                 pace: self.pace(id, count, context),
             })
             .collect();
-        // Maps the player can get to come first, however rich the others are. Without a known
-        // position none has a route, and count alone decides.
-        let stranded = |m: &HuntingGround| m.hops.is_none() && m.travel.is_none();
-        maps.sort_by(|a, b| {
-            stranded(a)
-                .cmp(&stranded(b))
-                .then(b.count.cmp(&a.count))
-                .then(a.hops.unwrap_or(u32::MAX).cmp(&b.hops.unwrap_or(u32::MAX)))
-                .then_with(|| a.map.name.cmp(&b.map.name))
-        });
+        nearest_first(&mut maps);
         maps
     }
 
@@ -646,6 +660,38 @@ mod tests {
         let maps: Vec<(&str, u32, Option<u32>)> =
             hunt.maps.iter().map(|g| (g.map.name.as_str(), g.count, g.hops)).collect();
         assert_eq!(maps, [("Mossbank Meadow I", 6, Some(2)), ("Mossbank Meadow II", 2, Some(3))]);
+    }
+
+    fn ground(name: &str, count: u32, hops: Option<u32>) -> HuntingGround {
+        HuntingGround {
+            map: MapRef { id: 0, name: name.into(), street: None, known: true },
+            count,
+            map_total: count,
+            hops,
+            travel: None,
+            pace: None,
+        }
+    }
+
+    #[test]
+    fn hunting_grounds_list_the_nearest_fair_map_first() {
+        // Made-up maps: a rich one far off, fair ones near, a thin one next door, one with no route.
+        let mut maps = vec![
+            ground("Far Grove", 28, Some(19)),
+            ground("Lost Isle", 30, None),
+            ground("Next Door", 2, Some(1)),
+            ground("Shore II", 10, Some(4)),
+            ground("Shore I", 11, Some(2)),
+            ground("Shore Twin", 12, Some(2)),
+        ];
+        nearest_first(&mut maps);
+        let names: Vec<&str> = maps.iter().map(|m| m.map.name.as_str()).collect();
+        assert_eq!(names, ["Shore Twin", "Shore I", "Shore II", "Far Grove", "Next Door", "Lost Isle"]);
+
+        // With no position known, the richest comes first.
+        let mut unplaced = vec![ground("Shore I", 11, None), ground("Far Grove", 28, None)];
+        nearest_first(&mut unplaced);
+        assert_eq!(unplaced[0].map.name, "Far Grove");
     }
 
     #[test]
