@@ -78,7 +78,7 @@
     align-items: baseline;
     gap: 5px;
     padding: 2px 0;
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   li + li {
@@ -90,7 +90,7 @@
     padding: 0;
     border: 0;
     background: transparent;
-    font-size: 12px;
+    font-size: var(--text-sm);
     font-weight: 500;
     text-align: left;
     cursor: pointer;
@@ -109,8 +109,9 @@
 
   .rate {
     margin-left: auto;
-    color: var(--accent);
-    font-size: 11.5px;
+    color: var(--text);
+    font-weight: 600;
+    font-size: var(--text-sm);
     font-weight: 600;
     white-space: nowrap;
   }
@@ -122,9 +123,9 @@
   .tag {
     padding: 0 4px;
     border-radius: var(--radius-sm);
-    background: var(--accent-soft);
-    color: var(--accent);
-    font-size: 9.5px;
+    background: var(--surface-3);
+    color: var(--muted);
+    font-size: var(--text-xs);
   }
 
   .few {
@@ -133,19 +134,19 @@
     border-radius: var(--radius-sm);
     background: var(--warn-soft);
     color: var(--muted);
-    font-size: 10.5px;
+    font-size: var(--text-xs);
   }
 
   .note {
     margin: 0;
     color: var(--faint);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
   }
 
   .credit {
     margin: 8px 0 0;
     color: var(--faint);
-    font-size: 10.5px;
+    font-size: var(--text-xs);
   }
 
   .credit button {
@@ -155,7 +156,7 @@
     border: 0;
     background: transparent;
     color: var(--muted);
-    font-size: 10.5px;
+    font-size: var(--text-xs);
     text-align: left;
     text-decoration: underline;
     text-decoration-color: var(--border-strong);

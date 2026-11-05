@@ -3,13 +3,10 @@
   // pinned window names the panel itself, so single cards drop their frame there.
   import BuildSection from "./BuildSection.svelte";
   import CharacterCard from "./CharacterCard.svelte";
-  import HistoryCard from "./HistoryCard.svelte";
   import LookupPanel from "./LookupPanel.svelte";
   import MapCard from "./MapCard.svelte";
   import QuestPanel from "./QuestPanel.svelte";
-  import SessionCard from "./SessionCard.svelte";
-  import TimersCard from "./TimersCard.svelte";
-  import TrainCard from "./TrainCard.svelte";
+  import TrainPanel from "./TrainPanel.svelte";
   import type { Analysis, Panel, SessionSummary } from "$lib/types";
 
   let {
@@ -26,12 +23,9 @@
 
 {#if panel === "character"}
   <!-- One card for who the character is and where the build plan has them, so the level shows once. -->
-  <CharacterCard hud={analysis?.hud ?? null} mesos={analysis?.mesos ?? null} {session} remember plain={pinned}>
+  <CharacterCard hud={analysis?.hud ?? null} mesos={analysis?.mesos ?? null} {session} remember plain={pinned} linkTrain={!pinned}>
     <BuildSection level={analysis?.hud?.level ?? session?.level ?? null} character={analysis?.hud?.name ?? null} />
   </CharacterCard>
-  {#if session}<SessionCard {session} compact />{/if}
-  <HistoryCard />
-  <TimersCard />
 {:else if panel === "map"}
   {#if analysis?.map}
     <MapCard map={analysis.map} {session} variant="compact" plain={pinned} />
@@ -39,7 +33,7 @@
     {@render empty("The minimap isn't in view. Its map's details show here when it is.")}
   {/if}
 {:else if panel === "train"}
-  <TrainCard level={analysis?.hud?.level ?? session?.level ?? null} map={analysis?.map ?? null} {session} plain={pinned} />
+  <TrainPanel level={analysis?.hud?.level ?? session?.level ?? null} map={analysis?.map ?? null} {session} />
 {:else if panel === "quests"}
   <QuestPanel
     quest={analysis?.quest ?? null}
@@ -66,7 +60,7 @@
     margin: 0;
     padding: 18px 10px;
     color: var(--faint);
-    font-size: 12px;
+    font-size: var(--text-sm);
     text-align: center;
   }
 </style>

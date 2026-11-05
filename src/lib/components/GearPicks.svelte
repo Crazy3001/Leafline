@@ -71,7 +71,7 @@
     margin: 0;
     padding: 0;
     list-style: none;
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   .slots > li {
@@ -87,7 +87,7 @@
 
   .slot {
     color: var(--faint);
-    font-size: 11px;
+    font-size: var(--text-xs);
     line-height: 1.5;
   }
 
@@ -109,7 +109,7 @@
     padding: 0;
     border: 0;
     background: transparent;
-    font-size: 12px;
+    font-size: var(--text-sm);
     font-weight: 600;
     text-align: left;
     cursor: pointer;
@@ -129,13 +129,13 @@
   .name small {
     margin-left: 4px;
     color: var(--faint);
-    font-size: 10px;
+    font-size: var(--text-xs);
     font-weight: 500;
   }
 
   .gives {
     color: var(--muted);
-    font-size: 11px;
+    font-size: var(--text-xs);
   }
 
   .add {
@@ -164,6 +164,6 @@
   .how {
     margin: 6px 0 0;
     color: var(--faint);
-    font-size: 10.5px;
+    font-size: var(--text-xs);
   }
 </style>

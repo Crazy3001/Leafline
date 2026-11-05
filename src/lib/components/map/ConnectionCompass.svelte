@@ -246,7 +246,7 @@
     border: 1px solid color-mix(in srgb, var(--map) 45%, transparent);
     background: color-mix(in srgb, var(--map) 16%, transparent);
     color: var(--map);
-    font-size: 11px;
+    font-size: var(--text-xs);
     font-weight: 600;
     line-height: 1.25;
     text-align: center;
@@ -309,7 +309,7 @@
     display: flex;
     align-items: center;
     gap: 2px;
-    font-size: 9px;
+    font-size: var(--text-xs);
     font-weight: 600;
     white-space: nowrap;
     color: var(--faint);
@@ -321,7 +321,7 @@
     line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
-    font-size: 11.5px;
+    font-size: var(--text-sm);
     font-weight: 500;
     line-height: 1.25;
     overflow-wrap: anywhere;
@@ -346,7 +346,7 @@
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--muted);
-    font-size: 10.5px;
+    font-size: var(--text-xs);
     cursor: pointer;
   }
 
@@ -378,7 +378,7 @@
   }
 
   .others-label {
-    font-size: 10.5px;
+    font-size: var(--text-xs);
     color: var(--faint);
   }
 
@@ -394,7 +394,7 @@
 
   .none {
     margin: 0;
-    font-size: 12px;
+    font-size: var(--text-sm);
     color: var(--faint);
   }
 </style>

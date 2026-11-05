@@ -88,7 +88,7 @@
     align-items: baseline;
     gap: 8px;
     padding: 3px 0;
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   .n {
@@ -100,7 +100,7 @@
     border-radius: var(--radius-sm);
     background: color-mix(in srgb, var(--map) 16%, transparent);
     color: var(--map);
-    font-size: 10px;
+    font-size: var(--text-xs);
     font-weight: 600;
   }
 
@@ -135,7 +135,7 @@
 
   .fare {
     color: var(--faint);
-    font-size: 11px;
+    font-size: var(--text-xs);
   }
 
   .hidden {
@@ -167,7 +167,7 @@
 
   .note {
     margin: 6px 0 0;
-    font-size: 11px;
+    font-size: var(--text-xs);
     color: var(--faint);
   }
 </style>

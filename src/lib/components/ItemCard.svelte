@@ -175,7 +175,7 @@
   .name {
     margin: 0;
     font-family: var(--font-display);
-    font-size: 16px;
+    font-size: var(--text-lg);
     font-weight: 600;
     line-height: 1.25;
   }
@@ -187,19 +187,19 @@
   .summary {
     margin: 2px 0 10px;
     color: var(--muted);
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   .slots {
     margin: -8px 0 10px;
     color: var(--faint);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
   }
 
   .verdict {
     padding: 2px 8px;
     border-radius: var(--radius-sm);
-    font-size: 11px;
+    font-size: var(--text-xs);
     font-weight: 600;
     color: var(--good);
     background: var(--good-soft);
@@ -240,7 +240,7 @@
     text-align: right;
     white-space: nowrap;
     color: var(--faint);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
   }
 
   .bonus {
@@ -274,7 +274,7 @@
     border-radius: var(--radius-sm);
     background: rgba(255, 255, 255, 0.04);
     border: 1px solid var(--border);
-    font-size: 11px;
+    font-size: var(--text-xs);
     color: var(--muted);
   }
 

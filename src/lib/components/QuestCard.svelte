@@ -300,8 +300,8 @@
     align-items: baseline;
     gap: 5px;
     margin: 7px 0 0;
-    color: var(--accent);
-    font-size: 11.5px;
+    color: var(--muted);
+    font-size: var(--text-sm);
   }
 
   .payout :global(svg) {
@@ -324,7 +324,7 @@
   .title {
     margin: 0 0 8px;
     font-family: var(--font-display);
-    font-size: 14px;
+    font-size: var(--text-lg);
     font-weight: 600;
   }
 
@@ -334,7 +334,7 @@
     gap: 5px;
     margin: -5px 0 8px;
     color: var(--muted);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
   }
 
   .giver.finished {
@@ -376,9 +376,10 @@
     overflow: hidden;
   }
 
+  /* Quest progress is neutral; green once done. Amber stays for selection, yellow for EXP. */
   .fill {
     height: 100%;
-    background: var(--accent);
+    background: var(--muted);
   }
 
   .eta {
@@ -387,7 +388,7 @@
     gap: 5px;
     margin: 4px 0 0;
     color: var(--muted);
-    font-size: 11px;
+    font-size: var(--text-xs);
   }
 
   .eta :global(svg) {
@@ -406,7 +407,7 @@
   /* Pinned: the same layout, packed tighter. */
   .dense .title {
     margin-bottom: 4px;
-    font-size: 12.5px;
+    font-size: var(--text-md);
   }
 
   .dense .giver {
@@ -419,7 +420,7 @@
 
   .dense .row {
     margin-bottom: 2px;
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   .dense .track {
@@ -434,7 +435,7 @@
   .empty {
     margin: 0;
     color: var(--faint);
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   .footer {
@@ -442,7 +443,7 @@
     padding-top: 10px;
     border-top: 1px solid var(--border);
     color: var(--faint);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
   }
 
   .lookup {
@@ -461,7 +462,7 @@
     border-radius: var(--radius-sm);
     background: rgba(255, 255, 255, 0.04);
     color: var(--text);
-    font-size: 12px;
+    font-size: var(--text-sm);
     cursor: pointer;
   }
 
@@ -495,7 +496,7 @@
   .credit {
     margin: 10px 0 0;
     color: var(--faint);
-    font-size: 10.5px;
+    font-size: var(--text-xs);
   }
 
   .credit button {

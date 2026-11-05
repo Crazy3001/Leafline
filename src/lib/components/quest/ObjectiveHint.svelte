@@ -147,7 +147,7 @@
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--muted);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
     text-align: left;
     cursor: pointer;
   }
@@ -195,7 +195,7 @@
   .far {
     flex: none;
     color: var(--faint);
-    font-size: 11px;
+    font-size: var(--text-xs);
   }
 
   .chevron {
@@ -224,14 +224,14 @@
     flex-wrap: wrap;
     align-items: baseline;
     gap: 6px;
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   .mob .name {
     padding: 0;
     border: 0;
     background: transparent;
-    font-size: 12px;
+    font-size: var(--text-sm);
     font-weight: 600;
     cursor: pointer;
   }
@@ -245,8 +245,8 @@
 
   .rate {
     margin-left: auto;
-    color: var(--accent-strong);
-    font-size: 11px;
+    color: var(--muted);
+    font-size: var(--text-xs);
   }
 
   .maps {
@@ -267,7 +267,7 @@
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--muted);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
     text-align: left;
     cursor: pointer;
   }
@@ -312,7 +312,7 @@
 
   .note {
     margin: 6px 0 0;
-    font-size: 11px;
+    font-size: var(--text-xs);
     color: var(--faint);
   }
 </style>

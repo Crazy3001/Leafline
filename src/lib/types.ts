@@ -295,6 +295,10 @@ export interface SessionSummary {
   recentMesosPerHour: number | null;
   /** The recent EXP rate (or percent rate at high levels) over time, oldest first. */
   trend: number[];
+  /** The recent rates over the whole session, oldest first, for graphs. */
+  timeline: TimelinePoint[];
+  /** Level-ups and deaths, in order. */
+  events: SessionEvent[];
   levelUps: number;
   deaths: number;
   /** EXP lost to deaths, left out of the rates. */
@@ -321,6 +325,31 @@ export interface SessionSummary {
   /** Quest counter gains per objective and map, most active time first. */
   counters: CounterRate[];
   rejected: { exp: number; mesos: number };
+}
+
+/** The recent rates at one moment of a session (see src-tauri/src/session.rs). */
+export interface TimelinePoint {
+  /** Active seconds into the session. */
+  at: number;
+  expPerHour: number | null;
+  percentPerHour: number | null;
+  mesosPerHour: number | null;
+  level: number | null;
+  map: string | null;
+}
+
+export interface SessionEvent {
+  /** Active seconds into the session. */
+  at: number;
+  kind: "levelUp" | "death";
+  /** The level reached, for a level-up. */
+  level: number | null;
+}
+
+/** A saved session's graph data. Sessions saved before timelines were kept have none. */
+export interface SessionTimeline {
+  points: TimelinePoint[];
+  events: SessionEvent[];
 }
 
 /** How fast one quest counter went up on one map (see src-tauri/src/session.rs). */
@@ -753,6 +782,8 @@ export interface SavedSession {
   mesosPerHour: number | null;
   percentPerHour: number | null;
   job: string | null;
+  /** The character's name, when the tracker read it. */
+  character: string | null;
   deaths: number;
   /** The player's own note. It stays on this PC. */
   note: string;

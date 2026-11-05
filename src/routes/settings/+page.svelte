@@ -27,6 +27,7 @@
   import { OSMS_URL, WIKI_URL } from "$lib/mapdata.svelte";
   import { live, watchLive } from "$lib/readings.svelte";
   import { changeSettings, display, hotkey, keyHint, keyName, usesNumpad, watchSettings } from "$lib/settings.svelte";
+  import Segmented from "$lib/ui/Segmented.svelte";
   import type {
     CompactShape,
     GameWindow,
@@ -236,6 +237,19 @@
     opacity = Math.round(display.opacity * 100);
     size = Math.round(display.scale * 100);
   });
+
+  /** The text sizes on offer, as a share of the normal size. */
+  const SIZES = [
+    { id: 90, label: "Small" },
+    { id: 100, label: "Normal" },
+    { id: 115, label: "Large" },
+    { id: 130, label: "Larger" },
+  ];
+
+  /** The offered size closest to the one set, for sizes picked before there were four. */
+  function nearestSize(value: number) {
+    return SIZES.reduce((best, s) => (Math.abs(s.id - value) < Math.abs(best - value) ? s.id : best), 100);
+  }
 
   function slideSize(value: number) {
     size = value;
@@ -493,21 +507,17 @@
       </div>
 
       <div class="row">
-        <label for="size">
-          <span class="name">Size</span>
+        <div class="label">
+          <span class="name">Text size</span>
           <span class="help">Text and controls in the overlay and pinned panels.</span>
-        </label>
-        <div class="control slider">
-          <input
-            id="size"
-            type="range"
-            min="60"
-            max="200"
-            step="5"
-            value={size}
-            oninput={(e) => slideSize(Number(e.currentTarget.value))}
+        </div>
+        <div class="control">
+          <Segmented
+            label="Text size"
+            value={nearestSize(size)}
+            options={SIZES}
+            onchange={(value) => slideSize(value)}
           />
-          <span class="value tabular">{size}%</span>
         </div>
       </div>
 
@@ -929,7 +939,7 @@
     gap: 3px;
     margin-left: 8px;
     color: var(--good);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
   }
 
   .reset-keys {
@@ -940,7 +950,7 @@
 
   .path {
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: var(--text-xs);
     word-break: break-all;
   }
 
@@ -1000,13 +1010,13 @@
   h2 {
     margin: 0 0 4px;
     font-family: var(--font-display);
-    font-size: 17px;
+    font-size: var(--text-xl);
     font-weight: 600;
   }
 
   h3 {
     margin: 18px 0 8px;
-    font-size: 12.5px;
+    font-size: var(--text-md);
     font-weight: 600;
   }
 
@@ -1039,7 +1049,7 @@
 
   .help {
     color: var(--faint);
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   .control {
@@ -1090,16 +1100,19 @@
     outline-offset: 1px;
   }
 
+  /* The same square switch as src/lib/ui/Switch.svelte, on a checkbox so labels still work. */
   .switch {
     appearance: none;
     position: relative;
-    width: 34px;
-    height: 19px;
+    flex: none;
+    width: 36px;
+    height: 20px;
     margin: 0;
+    border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
-    background: var(--surface-3, rgba(255, 255, 255, 0.12));
+    background: var(--surface-3);
     cursor: pointer;
-    transition: background 0.15s ease;
+    transition: background 0.12s ease;
   }
 
   .switch::after {
@@ -1107,19 +1120,28 @@
     position: absolute;
     top: 2px;
     left: 2px;
-    width: 15px;
-    height: 15px;
-    border-radius: var(--radius-sm);
-    background: var(--text);
-    transition: transform 0.15s ease;
+    width: 14px;
+    height: 14px;
+    border-radius: 1px;
+    background: var(--muted);
+    transition: transform 0.12s ease;
   }
 
   .switch:checked {
-    background: var(--travel);
+    border-color: var(--accent);
+    background: var(--accent);
   }
 
   .switch:checked::after {
-    transform: translateX(15px);
+    transform: translateX(16px);
+    background: var(--bg);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .switch,
+    .switch::after {
+      transition: none;
+    }
   }
 
   .switch:focus-visible {
@@ -1149,7 +1171,7 @@
 
   .kind input {
     margin: 2px 0 0;
-    accent-color: var(--travel);
+    accent-color: var(--accent);
   }
 
   .kind > span:last-child {
@@ -1197,7 +1219,7 @@
 
   .source {
     margin-left: auto;
-    font-size: 11.5px;
+    font-size: var(--text-sm);
   }
 
   .connections .help,
@@ -1207,7 +1229,7 @@
 
   .route-line {
     color: var(--muted);
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   .route-line .from {
@@ -1220,7 +1242,7 @@
     border-radius: var(--radius-sm);
     background: color-mix(in srgb, var(--travel) 16%, transparent);
     color: var(--travel);
-    font-size: 11px;
+    font-size: var(--text-xs);
   }
 
   .note.warn {
@@ -1323,7 +1345,7 @@
   .note {
     margin: 10px 0 12px;
     color: var(--faint);
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   .box {
@@ -1401,7 +1423,7 @@
     border-radius: var(--radius-sm);
     background: rgba(255, 255, 255, 0.06);
     color: var(--muted);
-    font-size: 11px;
+    font-size: var(--text-xs);
     font-weight: 600;
   }
 
@@ -1433,7 +1455,7 @@
     display: flex;
     gap: 8px;
     color: var(--muted);
-    font-size: 12.5px;
+    font-size: var(--text-md);
   }
 
   .mark {
@@ -1458,7 +1480,7 @@
   .credits {
     width: 100%;
     border-collapse: collapse;
-    font-size: 12.5px;
+    font-size: var(--text-md);
   }
 
   .credits td {
@@ -1524,7 +1546,7 @@
     padding: 8px 12px;
     border-left: 2px solid var(--accent);
     background: var(--accent-soft);
-    font-size: 12.5px;
+    font-size: var(--text-md);
   }
 
   .help.status {

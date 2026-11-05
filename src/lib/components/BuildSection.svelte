@@ -222,7 +222,7 @@
   .title {
     flex: none;
     font-family: var(--font-display);
-    font-size: 12.5px;
+    font-size: var(--text-md);
     color: var(--muted);
   }
 
@@ -231,7 +231,7 @@
     min-width: 0;
     overflow: hidden;
     font-family: var(--font-display);
-    font-size: 13px;
+    font-size: var(--text-md);
     font-weight: 600;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -247,19 +247,21 @@
   .lead {
     margin: 0 0 10px;
     color: var(--muted);
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   .action {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 5px 10px;
-    border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+    height: var(--control-h);
+    padding: 0 10px;
+    border: 1px solid var(--accent);
     border-radius: var(--radius-sm);
-    background: var(--accent-soft);
-    color: var(--accent-strong);
-    font-size: 12px;
+    background: var(--accent);
+    color: var(--bg);
+    font-size: var(--text-sm);
+    font-weight: 600;
     cursor: pointer;
   }
 
@@ -275,7 +277,7 @@
     border: 0;
     background: transparent;
     color: var(--muted);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
     cursor: pointer;
   }
 
@@ -295,9 +297,9 @@
   .at {
     flex: none;
     width: 42px;
-    color: var(--accent);
+    color: var(--muted);
     font-family: var(--font-display);
-    font-size: 12.5px;
+    font-size: var(--text-md);
     font-weight: 600;
   }
 
@@ -311,7 +313,7 @@
     align-items: baseline;
     gap: 6px;
     margin: 0 0 3px;
-    font-size: 12.5px;
+    font-size: var(--text-md);
   }
 
   .todo .quiet {
@@ -321,8 +323,8 @@
   .tag {
     flex: none;
     width: 38px;
-    color: var(--accent);
-    font-size: 11px;
+    color: var(--muted);
+    font-size: var(--text-xs);
     font-weight: 600;
   }
 
@@ -332,7 +334,7 @@
   }
 
   .advance {
-    color: var(--accent-strong);
+    color: var(--text);
     font-weight: 600;
   }
 
@@ -351,7 +353,7 @@
 
   dt {
     color: var(--faint);
-    font-size: 10.5px;
+    font-size: var(--text-xs);
   }
 
   dd {
@@ -362,7 +364,7 @@
   .next {
     margin: 10px 0 0;
     color: var(--muted);
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   .next strong {
@@ -373,7 +375,7 @@
   h4 {
     margin: 12px 0 4px;
     font-family: var(--font-display);
-    font-size: 12px;
+    font-size: var(--text-sm);
     font-weight: 400;
   }
 
@@ -385,7 +387,7 @@
     margin: 0;
     padding: 0;
     list-style: none;
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   .coming li {
@@ -422,7 +424,7 @@
     padding: 0;
     border: 0;
     background: transparent;
-    font-size: 12px;
+    font-size: var(--text-sm);
     font-weight: 600;
     text-align: left;
     cursor: pointer;
@@ -469,7 +471,7 @@
     border: 0;
     background: transparent;
     color: var(--faint);
-    font-size: 10.5px;
+    font-size: var(--text-xs);
     text-align: left;
     cursor: pointer;
   }

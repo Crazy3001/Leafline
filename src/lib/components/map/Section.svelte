@@ -77,7 +77,7 @@
 
   .title {
     font-family: var(--font-display);
-    font-size: 12.5px;
+    font-size: var(--text-md);
     font-weight: 400;
     color: var(--muted);
   }
@@ -86,13 +86,13 @@
     padding: 0 5px;
     border-radius: var(--radius-sm);
     background: rgba(255, 255, 255, 0.06);
-    font-size: 10px;
+    font-size: var(--text-xs);
     color: var(--faint);
   }
 
   .aside {
     margin-left: auto;
-    font-size: 11px;
+    font-size: var(--text-xs);
     color: var(--faint);
   }
 

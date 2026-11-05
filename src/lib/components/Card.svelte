@@ -52,7 +52,7 @@
     gap: 6px;
     margin-bottom: 6px;
     color: var(--muted);
-    font-size: 11px;
+    font-size: var(--text-xs);
   }
 
   .aside {
@@ -60,6 +60,6 @@
     align-items: center;
     gap: 6px;
     color: var(--muted);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
   }
 </style>

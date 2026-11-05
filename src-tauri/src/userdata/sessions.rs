@@ -6,7 +6,7 @@ use serde::Serialize;
 
 use super::UserData;
 use crate::error::{Error, Result};
-use crate::session::{SessionLine, SessionSummary};
+use crate::session::{EventKind, SessionEvent, SessionLine, SessionSummary, TimelinePoint};
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -27,6 +27,8 @@ pub struct SavedSession {
     pub mesos_per_hour: Option<f64>,
     pub percent_per_hour: Option<f64>,
     pub job: Option<String>,
+    /// The character's name, when the tracker read it.
+    pub character: Option<String>,
     pub deaths: u32,
     /// The player's own note. It stays on this PC.
     pub note: String,
@@ -44,6 +46,14 @@ pub struct SavedMap {
     pub active_seconds: f64,
     pub exp_gained: i64,
     pub mesos_gained: i64,
+}
+
+/// How a saved session's rates moved over time, for its graph.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionTimeline {
+    pub points: Vec<TimelinePoint>,
+    pub events: Vec<SessionEvent>,
 }
 
 /// One map's rates over every saved session that spent time there.
@@ -93,6 +103,7 @@ impl UserData {
         let tx = self.conn.transaction()?;
         tx.execute("UPDATE session_maps SET map = ?2 WHERE map = ?1", params![from, to])?;
         tx.execute("UPDATE session_lines SET map = ?2 WHERE map = ?1", params![from, to])?;
+        tx.execute("UPDATE session_points SET map = ?2 WHERE map = ?1", params![from, to])?;
         tx.execute("UPDATE map_renames SET name = ?2 WHERE name = ?1", params![from, to])?;
         tx.execute("INSERT OR REPLACE INTO map_renames (read_as, name) VALUES (?1, ?2)", params![from, to])?;
         tx.commit()?;
@@ -101,6 +112,8 @@ impl UserData {
 
     pub fn delete_session(&mut self, id: i64) -> Result<()> {
         let tx = self.conn.transaction()?;
+        tx.execute("DELETE FROM session_points WHERE session_id = ?1", [id])?;
+        tx.execute("DELETE FROM session_events WHERE session_id = ?1", [id])?;
         tx.execute("DELETE FROM session_maps WHERE session_id = ?1", [id])?;
         tx.execute("DELETE FROM session_lines WHERE session_id = ?1", [id])?;
         tx.execute("DELETE FROM sessions WHERE id = ?1", [id])?;
@@ -112,7 +125,7 @@ impl UserData {
     pub fn sessions(&self) -> Result<Vec<SavedSession>> {
         let mut stmt = self.conn.prepare(
             "SELECT id, label, saved_at, started_at, level, level_ups, active_seconds, elapsed_seconds, exp_gained,
-                    exp_per_hour, mesos_gained, mesos_per_hour, percent_per_hour, job, deaths, note
+                    exp_per_hour, mesos_gained, mesos_per_hour, percent_per_hour, job, deaths, note, character
              FROM sessions ORDER BY COALESCE(started_at, saved_at) DESC, id DESC",
         )?;
         let mut sessions: Vec<SavedSession> = stmt
@@ -134,6 +147,7 @@ impl UserData {
                     job: row.get(13)?,
                     deaths: row.get(14)?,
                     note: row.get(15)?,
+                    character: row.get(16)?,
                     maps: Vec::new(),
                     lines: Vec::new(),
                 })
@@ -178,6 +192,39 @@ impl UserData {
         Ok(sessions)
     }
 
+    /// A saved session's timeline. Sessions saved before timelines were kept have none.
+    pub fn session_timeline(&self, id: i64) -> Result<SessionTimeline> {
+        let mut points = self.conn.prepare(
+            "SELECT at, exp_per_hour, percent_per_hour, mesos_per_hour, level, map FROM session_points
+             WHERE session_id = ?1 ORDER BY at",
+        )?;
+        let points = points
+            .query_map([id], |row| {
+                Ok(TimelinePoint {
+                    at: row.get(0)?,
+                    exp_per_hour: row.get(1)?,
+                    percent_per_hour: row.get(2)?,
+                    mesos_per_hour: row.get(3)?,
+                    level: row.get(4)?,
+                    map: row.get(5)?,
+                })
+            })?
+            .collect::<rusqlite::Result<_>>()?;
+        let mut events =
+            self.conn.prepare("SELECT at, kind, level FROM session_events WHERE session_id = ?1 ORDER BY at")?;
+        let events = events
+            .query_map([id], |row| {
+                let kind: String = row.get(1)?;
+                Ok(SessionEvent {
+                    at: row.get(0)?,
+                    kind: if kind == "death" { EventKind::Death } else { EventKind::LevelUp },
+                    level: row.get(2)?,
+                })
+            })?
+            .collect::<rusqlite::Result<_>>()?;
+        Ok(SessionTimeline { points, events })
+    }
+
     /// Each map's EXP and mesos per hour over all saved sessions, weighted by time spent there.
     /// Most time first.
     pub fn map_rates(&self) -> Result<Vec<MapRate>> {
@@ -205,7 +252,8 @@ fn write_session(tx: &rusqlite::Transaction, id: i64, session: &SessionSummary, 
     tx.execute(
         "UPDATE sessions SET saved_at = ?2, started_at = ?3, level = ?4, level_ups = ?5, active_seconds = ?6,
                              elapsed_seconds = ?7, exp_gained = ?8, exp_per_hour = ?9, mesos_gained = ?10,
-                             mesos_per_hour = ?11, percent_per_hour = ?12, job = ?13, deaths = ?14
+                             mesos_per_hour = ?11, percent_per_hour = ?12, job = ?13, deaths = ?14,
+                             character = COALESCE(?15, character)
          WHERE id = ?1",
         params![
             id,
@@ -221,11 +269,14 @@ fn write_session(tx: &rusqlite::Transaction, id: i64, session: &SessionSummary, 
             session.mesos_per_hour,
             session.percent_per_hour,
             session.job,
-            session.deaths
+            session.deaths,
+            session.name
         ],
     )?;
     tx.execute("DELETE FROM session_maps WHERE session_id = ?1", [id])?;
     tx.execute("DELETE FROM session_lines WHERE session_id = ?1", [id])?;
+    tx.execute("DELETE FROM session_points WHERE session_id = ?1", [id])?;
+    tx.execute("DELETE FROM session_events WHERE session_id = ?1", [id])?;
     let renamed = |map: &str| -> rusqlite::Result<String> {
         match tx.query_row("SELECT name FROM map_renames WHERE read_as = ?1", [map], |row| row.get(0)) {
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(map.to_string()),
@@ -239,6 +290,24 @@ fn write_session(tx: &rusqlite::Transaction, id: i64, session: &SessionSummary, 
             "INSERT INTO session_maps (session_id, map, active_seconds, exp_gained, mesos_gained)
              VALUES (?1, ?2, ?3, ?4, ?5)",
             params![id, renamed(name)?, map.active_seconds, map.exp_gained, map.mesos_gained],
+        )?;
+    }
+    for point in &session.timeline {
+        let map = point.map.as_deref().map(renamed).transpose()?;
+        tx.execute(
+            "INSERT INTO session_points (session_id, at, exp_per_hour, percent_per_hour, mesos_per_hour, level, map)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![id, point.at, point.exp_per_hour, point.percent_per_hour, point.mesos_per_hour, point.level, map],
+        )?;
+    }
+    for event in &session.events {
+        let kind = match event.kind {
+            EventKind::LevelUp => "levelUp",
+            EventKind::Death => "death",
+        };
+        tx.execute(
+            "INSERT INTO session_events (session_id, at, kind, level) VALUES (?1, ?2, ?3, ?4)",
+            params![id, event.at, kind, event.level],
         )?;
     }
     for line in session.lines.iter().filter(|l| !l.town && l.active_seconds > 0.0) {
@@ -340,6 +409,42 @@ mod tests {
         db.update_session(id, &session(20.0, 2000, &[(Some(wrong), 20.0, 2000)]), 2).unwrap();
         assert_eq!(db.sessions().unwrap()[0].maps[0].map, right, "the same misread later on is corrected too");
         assert!(db.rename_map(right, "  ").is_err());
+    }
+
+    #[test]
+    fn keeps_the_timeline_events_and_character() {
+        let mut db = UserData::open_in_memory().unwrap();
+        let meadow = "Fern Road : Mossbank Meadow I";
+        let mut summary = session(10.0, 1000, &[(Some(meadow), 10.0, 1000)]);
+        summary.name = Some("Leafling".into());
+        summary.timeline = (1..=3)
+            .map(|i| TimelinePoint {
+                at: f64::from(i) * 30.0,
+                exp_per_hour: Some(f64::from(i) * 1000.0),
+                level: Some(30),
+                map: Some(meadow.into()),
+                ..TimelinePoint::default()
+            })
+            .collect();
+        summary.events = vec![SessionEvent { at: 45.0, kind: EventKind::LevelUp, level: Some(31) }];
+        let id = db.save_session(&summary, "", 1).unwrap();
+        db.rename_map(meadow, "Fern Road : Mossbank Meadow").unwrap();
+
+        let timeline = db.session_timeline(id).unwrap();
+        assert_eq!(timeline.points.len(), 3);
+        assert_eq!(timeline.points[2].exp_per_hour, Some(3000.0));
+        assert_eq!(timeline.points[0].map.as_deref(), Some("Fern Road : Mossbank Meadow"));
+        assert_eq!(timeline.events, summary.events);
+        assert_eq!(db.sessions().unwrap()[0].character.as_deref(), Some("Leafling"));
+
+        // A later save without a name read keeps the one saved.
+        summary.name = None;
+        db.update_session(id, &summary, 2).unwrap();
+        assert_eq!(db.sessions().unwrap()[0].character.as_deref(), Some("Leafling"));
+        assert_eq!(db.session_timeline(id).unwrap().points.len(), 3, "points are replaced, not added");
+
+        db.delete_session(id).unwrap();
+        assert!(db.session_timeline(id).unwrap().points.is_empty());
     }
 
     #[test]

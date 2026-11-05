@@ -7,6 +7,7 @@
   import MapLookup from "./lookup/MapLookup.svelte";
   import NpcLookup from "./lookup/NpcLookup.svelte";
   import MonsterPanel from "./MonsterPanel.svelte";
+  import Segmented from "$lib/ui/Segmented.svelte";
   import { backend } from "$lib/api";
   import { lookup } from "$lib/items.svelte";
   import { mapData, watchMapData } from "$lib/mapdata.svelte";
@@ -65,10 +66,8 @@
   });
 </script>
 
-<div class="modes" class:pinned role="radiogroup" aria-label="What to look up">
-  {#each MODES as mode (mode.id)}
-    <button role="radio" aria-checked={lookup.mode === mode.id} onclick={() => (lookup.mode = mode.id)}>{mode.label}</button>
-  {/each}
+<div class="modes" class:pinned>
+  <Segmented label="What to look up" options={[...MODES]} value={lookup.mode} stretch onchange={(mode) => (lookup.mode = mode)} />
 </div>
 
 {#if lookup.mode === "monsters"}
@@ -83,41 +82,11 @@
 
 <style>
   .modes {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 0;
-    margin: 10px 12px 0;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
+    display: flex;
+    margin: var(--space-3) var(--space-3) 0;
   }
 
   .modes.pinned {
-    margin: 0 0 8px;
-  }
-
-  .modes button {
-    height: 26px;
-    padding: 0 8px;
-    border: 0;
-    background: transparent;
-    color: var(--muted);
-    font-size: 12px;
-    cursor: pointer;
-  }
-
-  .modes button + button {
-    border-left: 1px solid var(--border-strong);
-  }
-
-  .modes button:hover,
-  .modes button:focus-visible {
-    color: var(--text);
-    outline: none;
-  }
-
-  .modes [aria-checked="true"] {
-    background: var(--accent-soft);
-    color: var(--accent-strong);
-    font-weight: 600;
+    margin: 0 0 var(--space-2);
   }
 </style>

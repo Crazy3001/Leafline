@@ -69,6 +69,7 @@ import type {
   ReplayOrder,
   ReplayProgress,
   SessionSummary,
+  SessionTimeline,
   ShortcutInfo,
   StarterPlan,
   TrainingSpots,
@@ -217,6 +218,10 @@ export interface Backend {
   /** Saves the session the overlay shows (the last replay) to the history. */
   saveSession(label: string): Promise<number>;
   sessionHistory(): Promise<History>;
+  /** How a saved session's rates moved over time. */
+  sessionTimeline(id: number): Promise<SessionTimeline>;
+  /** Opens the training log window, or brings it forward. */
+  showTraining(): Promise<void>;
   deleteSession(id: number): Promise<void>;
   setSessionNote(id: number, note: string): Promise<void>;
   /** Corrects a misread map name, in what is saved and whenever it is read that way again. */
@@ -411,6 +416,8 @@ const tauriBackend: Backend = {
   openFramesFolder: () => invoke("open_frames_folder"),
   diagnostics: () => invoke("diagnostics"),
   sessionHistory: () => invoke("session_history"),
+  sessionTimeline: (id) => invoke("session_timeline", { id }),
+  showTraining: () => invoke("show_training"),
   deleteSession: (id) => invoke("delete_session", { id }),
   onHistory: (handler) => listen("history", () => handler()),
   async exportCsv(what) {

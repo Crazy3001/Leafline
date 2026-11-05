@@ -5,14 +5,14 @@ use std::sync::{Mutex, MutexGuard};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
 
 use crate::error::{Error, Result};
 use crate::userdata::UserData;
 use crate::userdata::characters::KnownMesos;
 use crate::userdata::notes::ItemNote;
 use crate::userdata::prices::{NewPrice, PriceLog};
-use crate::userdata::sessions::{MapRate, SavedSession};
+use crate::userdata::sessions::{MapRate, SavedSession, SessionTimeline};
 use crate::userdata::spots::SavedSpot;
 
 const FILE_NAME: &str = "leafline.sqlite3";
@@ -146,6 +146,35 @@ pub struct History {
 #[tauri::command]
 pub fn session_history(state: State<UserDataState>) -> Result<History> {
     state.with(|db| Ok(History { sessions: db.sessions()?, maps: db.map_rates()? }))
+}
+
+/// The training log window's label.
+pub const TRAINING: &str = "training";
+
+/// Opens the training log, or brings it forward.
+#[tauri::command]
+pub async fn show_training(app: AppHandle) -> Result<()> {
+    if let Some(window) = app.get_webview_window(TRAINING) {
+        window.show()?;
+        window.unminimize()?;
+        window.set_focus()?;
+        return Ok(());
+    }
+    WebviewWindowBuilder::new(&app, TRAINING, WebviewUrl::App("training".into()))
+        .title("Leafline — Training log")
+        .inner_size(1180.0, 800.0)
+        .min_inner_size(760.0, 520.0)
+        .center()
+        .background_color(tauri::window::Color(20, 20, 18, 255))
+        .additional_browser_args(super::BROWSER_ARGS)
+        .build()?;
+    Ok(())
+}
+
+/// How a saved session's rates moved over time.
+#[tauri::command]
+pub fn session_timeline(state: State<UserDataState>, id: i64) -> Result<SessionTimeline> {
+    state.with(|db| db.session_timeline(id))
 }
 
 #[tauri::command]

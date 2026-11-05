@@ -40,7 +40,7 @@
   .note {
     margin: 0;
     color: var(--faint);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
     line-height: 1.4;
   }
 </style>

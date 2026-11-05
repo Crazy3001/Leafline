@@ -118,14 +118,14 @@
   .story {
     margin: 6px 0 0;
     color: var(--muted);
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   h4 {
     margin: 10px 0 4px;
     color: var(--muted);
     font-family: var(--font-display);
-    font-size: 12px;
+    font-size: var(--text-sm);
     font-weight: 400;
   }
 
@@ -149,13 +149,13 @@
     position: absolute;
     left: 0;
     color: var(--faint);
-    font-size: 11px;
+    font-size: var(--text-xs);
     font-variant-numeric: tabular-nums;
   }
 
   .step {
     margin: 0;
-    font-size: 12px;
+    font-size: var(--text-sm);
     font-weight: 600;
   }
 
@@ -172,7 +172,7 @@
   .unsure {
     margin: 1px 0 0;
     color: var(--faint);
-    font-size: 11px;
+    font-size: var(--text-xs);
   }
 
   .pay {
@@ -190,7 +190,7 @@
 
   dt {
     color: var(--faint);
-    font-size: 10.5px;
+    font-size: var(--text-xs);
   }
 
   dd {
@@ -203,14 +203,14 @@
     padding: 0;
     list-style: none;
     color: var(--muted);
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   .links button {
     padding: 2px 0;
     border: 0;
     background: transparent;
-    font-size: 12px;
+    font-size: var(--text-sm);
     font-weight: 600;
     text-align: left;
     cursor: pointer;
@@ -226,6 +226,6 @@
   .maybe {
     margin-left: 4px;
     color: var(--faint);
-    font-size: 10.5px;
+    font-size: var(--text-xs);
   }
 </style>

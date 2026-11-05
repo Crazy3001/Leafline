@@ -173,7 +173,7 @@
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    font-size: 10px;
+    font-size: var(--text-xs);
     font-weight: 600;
     color: var(--faint);
   }

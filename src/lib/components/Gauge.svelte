@@ -34,14 +34,14 @@
   }
 
   .label {
-    font-size: 11px;
+    font-size: var(--text-xs);
     font-weight: 700;
     color: var(--muted);
   }
 
   .value {
     font-family: var(--font-display);
-    font-size: 13px;
+    font-size: var(--text-md);
     color: var(--text);
   }
 

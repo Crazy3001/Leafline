@@ -229,7 +229,7 @@
     margin: 0;
     padding: 0;
     list-style: none;
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   .steps li {
@@ -275,7 +275,7 @@
     padding: 0;
     border: 0;
     background: transparent;
-    font-size: 12px;
+    font-size: var(--text-sm);
     font-weight: 600;
     text-align: left;
     cursor: pointer;
@@ -295,13 +295,13 @@
 
   .quiet {
     margin: 0;
-    font-size: 11.5px;
+    font-size: var(--text-sm);
   }
 
   .hedge {
     margin: 8px 0 0;
     color: var(--faint);
-    font-size: 10.5px;
+    font-size: var(--text-xs);
     line-height: 1.4;
   }
 </style>

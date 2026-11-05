@@ -359,7 +359,7 @@
   }
 
   .brand .name {
-    font-size: 15px;
+    font-size: var(--text-lg);
     font-weight: 700;
   }
 
@@ -492,7 +492,7 @@
     margin: 0;
     padding: 0 6px;
     color: var(--faint);
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   kbd {
@@ -501,7 +501,7 @@
     border-bottom-width: 2px;
     border-radius: var(--radius-sm);
     font-family: var(--font-sans);
-    font-size: 10.5px;
+    font-size: var(--text-xs);
   }
 
   .replay {
@@ -528,7 +528,7 @@
     border-radius: var(--radius-sm);
     background: none;
     color: var(--muted);
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   .segmented button[aria-checked="true"] {
@@ -541,7 +541,7 @@
     align-items: center;
     gap: 6px;
     color: var(--muted);
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   .interval input {
@@ -564,7 +564,7 @@
     height: 24px;
     padding: 0 8px;
     gap: 5px;
-    font-size: 11.5px;
+    font-size: var(--text-sm);
   }
 
   .meter {
@@ -586,7 +586,7 @@
     align-items: center;
     justify-content: space-between;
     color: var(--muted);
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   .replaying {
@@ -614,7 +614,7 @@
   .policy p {
     margin: 0;
     color: var(--muted);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
   }
 
   .policy strong {
@@ -710,7 +710,7 @@
     border-top: 1px solid var(--border);
     background: var(--surface);
     color: var(--faint);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
   }
 
   .grow {

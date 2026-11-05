@@ -1,10 +1,12 @@
 <script lang="ts">
   import { onMount, type Snippet } from "svelte";
 
+  import { ChevronRight } from "@lucide/svelte";
+
   import Card from "./Card.svelte";
   import Gauge from "./Gauge.svelte";
-  import Trend from "./Trend.svelte";
   import { backend } from "$lib/api";
+  import { openPanel } from "$lib/nav.svelte";
   import { formatAgo, formatCompact, formatDuration, formatNumber, formatPercent } from "$lib/format";
   import type { Gauge as GaugeReading, HudReading, KnownMesos, MesoReading, SessionSummary } from "$lib/types";
 
@@ -14,6 +16,7 @@
     session = null,
     remember = false,
     plain = false,
+    linkTrain = false,
     children,
   }: {
     hud: HudReading | null;
@@ -22,6 +25,8 @@
     /** Show the mesos remembered from earlier runs when none are on screen. Off for replays. */
     remember?: boolean;
     plain?: boolean;
+    /** Link the session's rate to the Train tab, which has the rest. Off where there is no tab. */
+    linkTrain?: boolean;
     /** More about the character under the rates, in the same card: the overlay puts the build plan here. */
     children?: Snippet;
   } = $props();
@@ -68,12 +73,11 @@
 
   const expPercent = $derived(hud?.exp?.percent ?? hud?.expPercent ?? null);
   const percentOnly = $derived(session?.percentOnly ?? false);
-  /** How the last five minutes compare with the whole session. */
-  const pace = $derived.by(() => {
-    const recent = percentOnly ? session?.recentPercentPerHour : session?.recentExpPerHour;
-    const whole = percentOnly ? session?.percentPerHour : session?.expPerHour;
-    if (recent == null || !whole) return null;
-    return Math.round((recent / whole - 1) * 100);
+  /** The session's rate in a line: EXP an hour, or percent at levels where the HUD shows only that. */
+  const rateLine = $derived.by(() => {
+    if (!session) return null;
+    if (percentOnly) return session.percentPerHour != null ? `${session.percentPerHour.toFixed(1)}% / hr` : null;
+    return session.expPerHour != null ? `${formatCompact(session.expPerHour)} EXP / hr` : null;
   });
 </script>
 
@@ -84,7 +88,7 @@
 
   <div class="identity">
     <div class="level">
-      <span class="lv">LV</span>
+      <span class="lv">Lv</span>
       <span class="tabular">{hud?.level ?? session?.level ?? "—"}</span>
     </div>
     <div class="who">
@@ -120,79 +124,68 @@
     />
   </div>
 
-  <dl class="rates" class:live={session != null}>
-    {#if percentOnly}
-      <div title="Percent of a level per hour of active time. The HUD shows no EXP amount at this level.">
-        <dt>% / hr</dt>
-        <dd class="tabular">{session?.percentPerHour?.toFixed(1) ?? "—"}%</dd>
-      </div>
+  {#if rateLine}
+    {#if linkTrain}
+      <button class="to-train" onclick={() => openPanel("train")} title="Rates, the session graph and where to train are in the Train tab">
+        <span>
+          <span class="tabular strong">{rateLine}</span>
+          {#if session?.secondsToLevel != null && hud?.level != null}<span class="muted"> · Lv {hud.level + 1} in {formatDuration(session.secondsToLevel)}</span>{/if}
+        </span>
+        <span class="muted go">Train <ChevronRight size={12} /></span>
+      </button>
     {:else}
-      <div title="EXP gained per hour of active time">
-        <dt>EXP / hr</dt>
-        <dd class="tabular">{formatCompact(session?.expPerHour)}</dd>
-        {#if session?.percentPerHour != null}<dd class="sub tabular">{session.percentPerHour.toFixed(1)}%</dd>{/if}
-      </div>
+      <p class="rate-line tabular">
+        {rateLine}{#if session?.secondsToLevel != null}<span class="muted"> · {formatDuration(session.secondsToLevel)} to level</span>{/if}
+      </p>
     {/if}
-    <div title="Mesos gained per hour of active time, leaving out shops, storage and trades">
-      <dt>Mesos / hr</dt>
-      <dd class="tabular">{formatCompact(session?.mesosPerHour)}</dd>
-    </div>
-    <div title="At the current EXP rate">
-      <dt>To level</dt>
-      <dd class="tabular">{formatDuration(session?.secondsToLevel)}</dd>
-    </div>
-  </dl>
-  {#if session?.recentExpPerHour != null || session?.recentPercentPerHour != null}
-    <div class="recent" title="Over the last five minutes of active time, against the whole session">
-      <span class="recent-label">Last 5 min</span>
-      <span class="tabular">
-        {percentOnly ? `${session.recentPercentPerHour?.toFixed(1)}%` : formatCompact(session.recentExpPerHour)}
-      </span>
-      {#if pace != null}<span class="pace tabular" class:up={pace > 0} class:down={pace < 0}>
-          {pace > 0 ? "+" : ""}{pace}%
-        </span>{/if}
-      <span class="tabular muted">{formatCompact(session.recentMesosPerHour)} mesos</span>
-      <span class="trend"><Trend points={session.trend} /></span>
-    </div>
-  {/if}
-  {#if !session}
-    <p class="hint">Rates appear once a session is tracked.</p>
-  {:else if session.expPerHour == null}
-    <p class="hint">Rates need at least 30 s of EXP gains with the HUD in view.</p>
   {/if}
   {@render children?.()}
 </Card>
 
 <style>
-  .recent {
+  .to-train {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin-top: 8px;
-    font-size: 11.5px;
+    justify-content: space-between;
+    gap: var(--space-2);
+    width: 100%;
+    margin-top: var(--space-3);
+    padding: var(--space-2) 10px;
+    border: 0;
+    background: var(--surface-2);
+    color: var(--text);
+    font-size: var(--text-sm);
+    text-align: left;
+    cursor: pointer;
   }
 
-  .recent-label,
+  .to-train:hover {
+    background: var(--surface-3);
+  }
+
+  .to-train:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
+
+  .go {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .strong {
+    font-weight: 600;
+  }
+
   .muted {
-    color: var(--faint);
-    white-space: nowrap;
-  }
-
-  .pace {
     color: var(--muted);
   }
 
-  .pace.up {
-    color: var(--good);
-  }
-
-  .pace.down {
-    color: var(--warn);
-  }
-
-  .trend {
-    flex: 1;
-    min-width: 40px;
+  .rate-line {
+    margin: var(--space-3) 0 0;
+    font-size: var(--text-sm);
   }
 
   .identity {
@@ -211,21 +204,21 @@
     background: var(--accent-soft);
     border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
     font-family: var(--font-display);
-    font-size: 20px;
+    font-size: var(--text-xl);
     font-weight: 700;
     line-height: 1;
-    color: var(--accent-strong);
+    color: var(--text);
   }
 
   .lv {
-    font-size: 9px;
-    color: var(--accent);
-    opacity: 0.8;
+    font-size: var(--text-xs);
+    font-weight: 400;
+    color: var(--muted);
   }
 
   .name {
     font-family: var(--font-display);
-    font-size: 16px;
+    font-size: var(--text-lg);
     font-weight: 600;
   }
 
@@ -234,7 +227,7 @@
     align-items: center;
     gap: 6px;
     color: var(--muted);
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   .seen {
@@ -244,7 +237,7 @@
   .name .seen {
     margin-left: 6px;
     font-family: var(--font-sans);
-    font-size: 11px;
+    font-size: var(--text-xs);
     font-weight: 400;
   }
 
@@ -258,51 +251,5 @@
   .gauges {
     display: grid;
     gap: 8px;
-  }
-
-  .rates {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 6px;
-    margin: 12px 0 0;
-  }
-
-  .rates div {
-    padding: 6px 8px;
-    border-radius: var(--radius-sm);
-    background: rgba(255, 255, 255, 0.03);
-  }
-
-  dt {
-    font-size: 10.5px;
-    color: var(--faint);
-  }
-
-  dd {
-    margin: 0;
-    font-weight: 600;
-    color: var(--muted);
-  }
-
-  .live dd {
-    color: var(--text);
-  }
-
-  dd.sub {
-    display: inline;
-    margin-left: 5px;
-    font-size: 11px;
-    font-weight: 400;
-    color: var(--muted);
-  }
-
-  .live dt + dd {
-    display: inline;
-  }
-
-  .hint {
-    margin: 8px 0 0;
-    color: var(--faint);
-    font-size: 11.5px;
   }
 </style>

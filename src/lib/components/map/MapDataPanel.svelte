@@ -28,10 +28,11 @@
         />Check for updates{/if}
     </button>
   {:else}
-    <p class="explain">
-      Map details (monsters, NPCs, quests and exits) and the skills and equipment for builds come from OSMS Data
-      Explorer, a community dataset taken from the Classic client. About 2 MB is downloaded once, kept on this PC, and
-      checked for changes at most daily.
+    <p
+      class="explain"
+      title="Monsters, NPCs, quests, exits, skills and equipment come from OSMS Data Explorer, a community dataset taken from the Classic client. About 2 MB is downloaded once, kept on this PC, and checked for changes at most daily."
+    >
+      Maps, monsters, quests and items need the community map data: about 2 MB, downloaded once.
     </p>
     <button class="action primary" onclick={() => downloadMapData(false)} disabled={mapData.downloading}>
       {#if mapData.downloading}<span class="spin"><LoaderCircle size={13} /></span>Downloading…{:else}<Database
@@ -57,14 +58,14 @@
     display: flex;
     gap: 6px;
     margin: 0;
-    font-size: 11.5px;
+    font-size: var(--text-sm);
     color: var(--muted);
   }
 
   .state :global(svg) {
     flex: none;
     margin-top: 2px;
-    color: var(--map);
+    color: var(--muted);
   }
 
   .state strong {
@@ -81,12 +82,12 @@
     align-items: center;
     justify-content: center;
     gap: 7px;
-    height: 30px;
-    padding: 0 12px;
+    height: var(--control-h);
+    padding: 0 10px;
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: transparent;
-    font-size: 12px;
+    font-size: var(--text-sm);
     font-weight: 500;
     cursor: pointer;
   }
@@ -95,14 +96,17 @@
     background: var(--surface-2);
   }
 
+  /* The one main action where it shows, so the primary button style. */
   .action.primary {
-    border-color: color-mix(in srgb, var(--map) 50%, transparent);
-    background: color-mix(in srgb, var(--map) 14%, transparent);
-    color: var(--text);
+    border-color: var(--accent);
+    background: var(--accent);
+    color: var(--bg);
+    font-weight: 600;
   }
 
   .action.primary:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--map) 22%, transparent);
+    border-color: var(--accent-strong);
+    background: var(--accent-strong);
   }
 
   .action:disabled {
@@ -128,7 +132,7 @@
   .error,
   .message {
     margin: 0;
-    font-size: 11.5px;
+    font-size: var(--text-sm);
   }
 
   .error {
@@ -144,7 +148,7 @@
     border: 0;
     background: transparent;
     color: var(--faint);
-    font-size: 10.5px;
+    font-size: var(--text-xs);
     line-height: 1.4;
     text-align: left;
     text-decoration: underline;

@@ -47,7 +47,7 @@
 
   .name {
     overflow: hidden;
-    font-size: 12.5px;
+    font-size: var(--text-md);
     font-weight: 600;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -60,13 +60,13 @@
   small {
     margin-left: 5px;
     color: var(--faint);
-    font-size: 10px;
+    font-size: var(--text-xs);
     font-weight: 500;
   }
 
   .aside {
     color: var(--muted);
-    font-size: 11px;
+    font-size: var(--text-xs);
     white-space: nowrap;
   }
 
@@ -74,7 +74,7 @@
     grid-column: 1 / -1;
     overflow: hidden;
     color: var(--muted);
-    font-size: 11px;
+    font-size: var(--text-xs);
     text-overflow: ellipsis;
     white-space: nowrap;
   }

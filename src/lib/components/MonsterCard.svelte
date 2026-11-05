@@ -244,7 +244,7 @@
   .name {
     margin: 0;
     font-family: var(--font-display);
-    font-size: 16px;
+    font-size: var(--text-lg);
     font-weight: 600;
     line-height: 1.25;
   }
@@ -252,7 +252,7 @@
   .meta {
     margin: 2px 0 8px;
     color: var(--muted);
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   .soft {
@@ -283,7 +283,7 @@
 
   dt {
     color: var(--faint);
-    font-size: 10.5px;
+    font-size: var(--text-xs);
   }
 
   dd {
@@ -294,14 +294,14 @@
   .kills {
     margin: 6px 0 0;
     color: var(--muted);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
   }
 
   .elements {
     display: grid;
     gap: 1px;
     margin-top: 8px;
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   .good {
@@ -329,12 +329,12 @@
     gap: 8px;
     padding: 2px 0;
     border-top: 1px solid var(--border);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
   }
 
   .stats dt {
     color: var(--muted);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
   }
 
   .stats dd {
@@ -344,7 +344,7 @@
   .traits {
     margin: 6px 0 0;
     color: var(--muted);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
   }
 
   .link {
@@ -365,7 +365,7 @@
   }
 
   .link.strong {
-    font-size: 12px;
+    font-size: var(--text-sm);
     font-weight: 600;
   }
 
@@ -374,7 +374,7 @@
     margin: 0;
     padding: 0;
     list-style: none;
-    font-size: 11.5px;
+    font-size: var(--text-sm);
   }
 
   .quests li,
@@ -406,7 +406,7 @@
     grid-column: 1 / -1;
     display: block;
     color: var(--faint);
-    font-size: 11px;
+    font-size: var(--text-xs);
   }
 
   .links {
@@ -426,7 +426,7 @@
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--muted);
-    font-size: 11px;
+    font-size: var(--text-xs);
     cursor: pointer;
   }
 
@@ -442,7 +442,7 @@
     border: 0;
     background: transparent;
     color: var(--faint);
-    font-size: 10.5px;
+    font-size: var(--text-xs);
     text-align: left;
     cursor: pointer;
   }
@@ -455,7 +455,7 @@
 
   .note {
     margin: 0;
-    font-size: 11.5px;
+    font-size: var(--text-sm);
   }
 
   .spin {

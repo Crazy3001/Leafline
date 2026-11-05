@@ -361,7 +361,7 @@
     gap: 8px;
     margin-bottom: 14px;
     font-family: var(--font-display);
-    font-size: 15px;
+    font-size: var(--text-lg);
     font-weight: 600;
   }
 
@@ -372,7 +372,7 @@
     padding: 0;
     list-style: none;
     color: var(--faint);
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   .steps li {
@@ -396,7 +396,7 @@
     height: 18px;
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
-    font-size: 11px;
+    font-size: var(--text-xs);
   }
 
   .current .num {
@@ -416,13 +416,13 @@
   h1 {
     margin: 0 0 6px;
     font-family: var(--font-display);
-    font-size: 19px;
+    font-size: var(--text-xl);
     font-weight: 600;
   }
 
   h2 {
     margin: 22px 0 8px;
-    font-size: 12.5px;
+    font-size: var(--text-md);
     font-weight: 600;
   }
 
@@ -460,7 +460,7 @@
   .help {
     display: block;
     color: var(--faint);
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   .never {
@@ -518,7 +518,7 @@
     background: var(--surface-2);
     color: var(--text);
     font-family: var(--font-sans);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
   }
 
   .status {
@@ -527,7 +527,7 @@
     gap: 4px;
     min-width: 92px;
     color: var(--faint);
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   .status.good,
@@ -574,7 +574,7 @@
   .note {
     margin: 12px 0 0;
     color: var(--faint);
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   .note.warn {
@@ -649,17 +649,18 @@
     cursor: pointer;
   }
 
+  /* The same square switch as src/lib/ui/Switch.svelte, on a checkbox so labels still work. */
   .switch {
     appearance: none;
     position: relative;
     flex: none;
-    width: 34px;
-    height: 19px;
+    width: 36px;
+    height: 20px;
     margin: 0;
+    border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--surface-3);
     cursor: pointer;
-    transition: background 0.15s ease;
   }
 
   .switch::after {
@@ -667,18 +668,19 @@
     position: absolute;
     top: 2px;
     left: 2px;
-    width: 15px;
-    height: 15px;
-    border-radius: var(--radius-sm);
-    background: var(--text);
-    transition: transform 0.15s ease;
+    width: 14px;
+    height: 14px;
+    border-radius: 1px;
+    background: var(--muted);
   }
 
   .switch:checked {
-    background: var(--travel);
+    border-color: var(--accent);
+    background: var(--accent);
   }
 
   .switch:checked::after {
-    transform: translateX(15px);
+    transform: translateX(16px);
+    background: var(--bg);
   }
 </style>

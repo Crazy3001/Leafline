@@ -154,7 +154,7 @@
   .about {
     margin: 8px 0 0;
     color: var(--muted);
-    font-size: 12px;
+    font-size: var(--text-sm);
     white-space: pre-line;
   }
 
@@ -173,7 +173,7 @@
 
   dt {
     color: var(--faint);
-    font-size: 10.5px;
+    font-size: var(--text-xs);
   }
 
   dd {
@@ -184,7 +184,7 @@
   .tags {
     margin: 6px 0 0;
     color: var(--warn);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
   }
 
   .actions {
@@ -203,7 +203,7 @@
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--muted);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
     cursor: pointer;
   }
 
@@ -222,7 +222,7 @@
   h5 {
     margin: 8px 0 3px;
     color: var(--muted);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
     font-weight: 500;
   }
 
@@ -230,7 +230,7 @@
     margin: 0;
     padding: 0;
     list-style: none;
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   .quests li {
@@ -246,7 +246,7 @@
     padding: 0;
     border: 0;
     background: transparent;
-    font-size: 12px;
+    font-size: var(--text-sm);
     font-weight: 600;
     text-align: left;
     cursor: pointer;
@@ -261,13 +261,13 @@
 
   .who {
     color: var(--muted);
-    font-size: 11px;
+    font-size: var(--text-xs);
   }
 
   .note {
     margin: 4px 0 0;
     color: var(--faint);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
   }
 
   .spin {
@@ -292,7 +292,7 @@
     border: 0;
     background: transparent;
     color: var(--faint);
-    font-size: 10.5px;
+    font-size: var(--text-xs);
     text-align: left;
     cursor: pointer;
   }

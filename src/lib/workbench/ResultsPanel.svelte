@@ -107,7 +107,7 @@
     padding: 0 5px;
     border-radius: var(--radius-sm);
     background: var(--surface-3);
-    font-size: 10.5px;
+    font-size: var(--text-xs);
     color: var(--muted);
   }
 
@@ -126,7 +126,7 @@
     margin: 0;
     padding: 0 2px;
     color: var(--faint);
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   .timings {
@@ -141,7 +141,7 @@
     align-items: center;
     gap: 8px;
     color: var(--muted);
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   .timing .tabular {
@@ -174,7 +174,7 @@
     padding: 5px 8px;
     border-radius: var(--radius-sm);
     font-family: var(--font-mono);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
   }
 
   .lines li:hover {

@@ -177,11 +177,11 @@
 
   .stat-label {
     color: var(--faint);
-    font-size: 10px;
+    font-size: var(--text-xs);
   }
 
   .stat-value {
-    font-size: 12px;
+    font-size: var(--text-sm);
     font-weight: 600;
   }
 
@@ -222,7 +222,7 @@
   }
 
   .value {
-    font-size: 14px;
+    font-size: var(--text-lg);
     font-weight: 600;
     color: var(--exp);
   }
@@ -230,7 +230,7 @@
   .unit,
   .sub {
     color: var(--muted);
-    font-size: 11px;
+    font-size: var(--text-xs);
   }
 
   .sub {
@@ -270,7 +270,7 @@
     align-items: baseline;
     column-gap: 8px;
     row-gap: 2px;
-    font-size: 11.5px;
+    font-size: var(--text-sm);
   }
 
   .target {
@@ -315,6 +315,6 @@
     padding: 6px 10px 9px;
     border-top: 1px solid var(--border);
     color: var(--faint);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
   }
 </style>

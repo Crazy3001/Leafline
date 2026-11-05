@@ -171,7 +171,7 @@
   .lead {
     margin: 0 0 10px;
     color: var(--muted);
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   /* A card pads itself; these sit beside cards, so they match it. A pinned window pads its body. */
@@ -192,13 +192,13 @@
     margin: 8px 0 3px;
     color: var(--muted);
     font-family: var(--font-display);
-    font-size: 12.5px;
+    font-size: var(--text-md);
   }
 
   .count {
     margin: 0 0 4px;
     color: var(--faint);
-    font-size: 11px;
+    font-size: var(--text-xs);
   }
 
   .rows {
@@ -220,7 +220,7 @@
     border: 0;
     background: transparent;
     color: var(--muted);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
     cursor: pointer;
   }
 
@@ -242,7 +242,7 @@
   .quiet {
     margin: 10px 0 6px;
     color: var(--faint);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
   }
 
   .spin {
@@ -263,7 +263,7 @@
     border: 0;
     background: transparent;
     color: var(--faint);
-    font-size: 10.5px;
+    font-size: var(--text-xs);
     text-align: left;
     cursor: pointer;
   }

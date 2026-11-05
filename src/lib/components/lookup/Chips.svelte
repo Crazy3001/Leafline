@@ -33,7 +33,7 @@
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--muted);
-    font-size: 11px;
+    font-size: var(--text-xs);
     cursor: pointer;
   }
 

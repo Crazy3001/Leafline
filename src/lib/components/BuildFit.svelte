@@ -61,7 +61,7 @@
     border-left: 2px solid var(--border-strong);
     background: rgba(255, 255, 255, 0.03);
     color: var(--muted);
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   .fit.good {

@@ -82,7 +82,7 @@
     background: transparent;
     color: var(--text);
     font: inherit;
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   .field input::-webkit-search-cancel-button {
@@ -102,7 +102,7 @@
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--muted);
-    font-size: 11px;
+    font-size: var(--text-xs);
     cursor: pointer;
   }
 

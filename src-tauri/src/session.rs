@@ -32,7 +32,7 @@
 
 use std::collections::VecDeque;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::pipeline::Analysis;
 use crate::readers::hud::{self, Exp};
@@ -118,6 +118,10 @@ const RECENT_SECONDS: f64 = 300.0;
 /// Active seconds between points on the trend line, and how many it keeps.
 const TREND_STEP: f64 = 15.0;
 const TREND_POINTS: usize = 60;
+/// Active seconds between points on the whole-session timeline, at first. When the timeline
+/// fills, every other point goes and the step doubles, so a long session still fits.
+const TIMELINE_STEP: f64 = 30.0;
+const TIMELINE_POINTS: usize = 960;
 /// Seconds without a look at the mesos after which a big change is believed at the usual count.
 const MESO_GAP: f64 = 120.0;
 /// Seconds without the minimap's name before gains stop going to the last map read.
@@ -195,6 +199,10 @@ pub struct SessionSummary {
     pub recent_mesos_per_hour: Option<f64>,
     /// The recent EXP rate (or percent rate at high levels) over time, oldest first.
     pub trend: Vec<f64>,
+    /// The recent rates over the whole session, oldest first, for graphs.
+    pub timeline: Vec<TimelinePoint>,
+    /// Level-ups and deaths, in order.
+    pub events: Vec<SessionEvent>,
     pub level_ups: u32,
     pub deaths: u32,
     /// EXP lost to deaths, left out of the rates.
@@ -268,6 +276,37 @@ pub struct CounterRate {
     pub active_seconds: f64,
     /// Shown once the counter went up at least twice over enough active time.
     pub per_hour: Option<f64>,
+}
+
+/// The recent rates at one moment of a session.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TimelinePoint {
+    /// Active seconds into the session.
+    pub at: f64,
+    pub exp_per_hour: Option<f64>,
+    pub percent_per_hour: Option<f64>,
+    pub mesos_per_hour: Option<f64>,
+    pub level: Option<u32>,
+    pub map: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum EventKind {
+    LevelUp,
+    Death,
+}
+
+/// Something that happened at one moment of a session.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionEvent {
+    /// Active seconds into the session.
+    pub at: f64,
+    pub kind: EventKind,
+    /// The level reached, for a level-up.
+    pub level: Option<u32>,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize)]
@@ -429,6 +468,11 @@ pub struct SessionTracker {
     marks: VecDeque<Mark>,
     trend: VecDeque<f64>,
     trend_clock: f64,
+    timeline: Vec<TimelinePoint>,
+    timeline_clock: f64,
+    /// Active seconds between timeline points now; 0 until the first point.
+    timeline_step: f64,
+    events: Vec<SessionEvent>,
 
     /// The amount being read and how many readings in a row agree on it.
     meso_run: Option<(MesoPoint, usize)>,
@@ -664,6 +708,9 @@ impl SessionTracker {
         self.exp_gained += gain.unwrap_or(0);
         self.percent_gained += percent;
         self.level_ups += next.level - last.level;
+        if next.level > last.level && self.level_known {
+            self.event(EventKind::LevelUp, Some(next.level));
+        }
 
         if counted > 0.0 || gain.is_some_and(|g| g != 0) {
             let map = if moved { None } else { last.map.clone().or_else(|| next.map.clone()) };
@@ -688,6 +735,7 @@ impl SessionTracker {
         let dt = (next.at - last.at).max(0.0);
         self.run_clock(Some(false), dt, false);
         self.deaths += 1;
+        self.event(EventKind::Death, None);
         self.exp_lost += last.exp.points.saturating_sub(next.exp.points);
         self.percent_lost += f64::from(last.exp.percent - next.exp.percent).max(0.0);
         self.exp = Some(next);
@@ -765,6 +813,7 @@ impl SessionTracker {
                 self.deaths += 1;
                 self.percent_lost += f64::from(last.percent - percent);
                 self.run_clock(Some(false), (point.at - last.at).max(0.0), false);
+                self.event(EventKind::Death, None);
                 self.percent_point = Some(point);
             } else {
                 self.advance_percent(&last, point);
@@ -787,6 +836,9 @@ impl SessionTracker {
         let counted = self.run_clock(Some(gain > 0.0), dt, moved);
         self.percent_gained += gain;
         self.level_ups += next.level.saturating_sub(last.level);
+        if next.level > last.level && self.level_known {
+            self.event(EventKind::LevelUp, Some(next.level));
+        }
         if counted > 0.0 || gain > 0.0 {
             let map = if moved { None } else { last.map.clone().or_else(|| next.map.clone()) };
             self.totals(map.clone()).active_seconds += counted;
@@ -821,6 +873,44 @@ impl SessionTracker {
                 }
             }
         }
+        self.timeline_point();
+    }
+
+    /// Adds a point to the whole-session timeline once enough active time has passed.
+    fn timeline_point(&mut self) {
+        let step = if self.timeline_step > 0.0 { self.timeline_step } else { TIMELINE_STEP };
+        if self.clock - self.timeline_clock < step {
+            return;
+        }
+        let percent_only = self.percent_point.is_some();
+        let exp = self.recent_rate(|m| m.exp as f64).filter(|_| !percent_only);
+        let percent = self.recent_rate(|m| m.percent);
+        if exp.is_none() && percent.is_none() {
+            return;
+        }
+        self.timeline_clock = self.clock;
+        self.timeline_step = step;
+        let level = self.level().filter(|_| self.level_known);
+        self.timeline.push(TimelinePoint {
+            at: self.clock,
+            exp_per_hour: exp,
+            percent_per_hour: percent,
+            mesos_per_hour: self.recent_rate(|m| m.mesos as f64),
+            level,
+            map: self.map.clone().filter(|_| !self.town),
+        });
+        if self.timeline.len() > TIMELINE_POINTS {
+            let mut i = 0;
+            self.timeline.retain(|_| {
+                i += 1;
+                i % 2 == 1
+            });
+            self.timeline_step *= 2.0;
+        }
+    }
+
+    fn event(&mut self, kind: EventKind, level: Option<u32>) {
+        self.events.push(SessionEvent { at: self.clock, kind, level });
     }
 
     /// The rate of a running total over the last five minutes of active time.
@@ -1055,6 +1145,8 @@ impl SessionTracker {
             recent_percent_per_hour: self.recent_rate(|m| m.percent),
             recent_mesos_per_hour: self.recent_rate(|m| m.mesos as f64),
             trend: self.trend.iter().copied().collect(),
+            timeline: self.timeline.clone(),
+            events: self.events.clone(),
             level_ups: self.level_ups,
             deaths: self.deaths,
             exp_lost: self.exp_lost,
@@ -1105,6 +1197,42 @@ mod tests {
     fn on(mut sample: Sample, map: &str) -> Sample {
         sample.map = Some(map.into());
         sample
+    }
+
+    #[test]
+    fn keeps_a_timeline_with_level_ups_and_deaths() {
+        let mut samples = vec![sample(0.0, 30, 100, 0.01)];
+        let mut points = 100;
+        for second in 1..=600 {
+            points += 20;
+            samples.push(sample(f64::from(second), 30, points, points as f32 / 10_000.0));
+        }
+        // A death, then a level-up.
+        samples.push(sample(601.0, 30, points - 500, (points - 500) as f32 / 10_000.0));
+        samples.push(sample(602.0, 30, points - 500, (points - 500) as f32 / 10_000.0));
+        samples.push(sample(603.0, 31, 50, 0.01));
+        let summary = track(&samples);
+        assert!(summary.timeline.len() >= 15, "{}", summary.timeline.len());
+        assert!(summary.timeline.windows(2).all(|w| w[1].at - w[0].at >= TIMELINE_STEP - 1e-9));
+        assert!(summary.timeline.last().unwrap().exp_per_hour.unwrap() > 50_000.0);
+        let kinds: Vec<EventKind> = summary.events.iter().map(|e| e.kind).collect();
+        assert_eq!(kinds, [EventKind::Death, EventKind::LevelUp]);
+        assert_eq!(summary.events[1].level, Some(31));
+    }
+
+    #[test]
+    fn a_long_timeline_thins_out() {
+        let mut tracker = SessionTracker::new(TrackerConfig::default());
+        let mut points = 100;
+        tracker.push(&sample(0.0, 30, points, 0.01));
+        let seconds = (TIMELINE_STEP as usize) * (TIMELINE_POINTS + 10);
+        for second in 1..=seconds {
+            points += 20;
+            tracker.push(&sample(second as f64, 30, points, points as f32 / 10_000.0));
+        }
+        let summary = tracker.summary();
+        assert!(summary.timeline.len() <= TIMELINE_POINTS);
+        assert!(summary.timeline.len() > TIMELINE_POINTS / 2 - 10);
     }
 
     fn track(samples: &[Sample]) -> SessionSummary {

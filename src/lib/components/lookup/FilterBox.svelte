@@ -15,7 +15,7 @@
     padding: 8px;
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
   }
 
   .filters :global(label),

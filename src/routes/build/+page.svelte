@@ -826,7 +826,7 @@
 
   .build-who {
     color: var(--faint);
-    font-size: 11px;
+    font-size: var(--text-xs);
   }
 
   .side {
@@ -838,7 +838,7 @@
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--muted);
-    font-size: 12px;
+    font-size: var(--text-sm);
     cursor: pointer;
   }
 
@@ -875,7 +875,7 @@
   h1 {
     margin: 0 0 6px;
     font-family: var(--font-display);
-    font-size: 18px;
+    font-size: var(--text-xl);
     font-weight: 600;
   }
 
@@ -919,14 +919,14 @@
   h2 {
     margin: 0 0 3px;
     font-family: var(--font-display);
-    font-size: 14px;
+    font-size: var(--text-lg);
     font-weight: 600;
   }
 
   .help {
     margin: 0 0 8px;
     color: var(--faint);
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   .fields {
@@ -940,7 +940,7 @@
     display: grid;
     gap: 3px;
     color: var(--muted);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
   }
 
   label.check {
@@ -970,7 +970,7 @@
     background: var(--surface-2);
     color: var(--text);
     font: inherit;
-    font-size: 12.5px;
+    font-size: var(--text-md);
   }
 
   input:focus-visible,
@@ -996,7 +996,7 @@
 
   summary {
     color: var(--muted);
-    font-size: 12px;
+    font-size: var(--text-sm);
     cursor: pointer;
   }
 
@@ -1067,14 +1067,14 @@
 
   small {
     color: var(--faint);
-    font-size: 11px;
+    font-size: var(--text-xs);
     overflow-wrap: anywhere;
   }
 
   .max {
     flex: none;
     color: var(--faint);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
   }
 
   .max.warn {
@@ -1201,7 +1201,7 @@
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--muted);
-    font-size: 12px;
+    font-size: var(--text-sm);
     white-space: nowrap;
     cursor: pointer;
   }
@@ -1236,7 +1236,7 @@
     padding: 6px 10px;
     background: color-mix(in srgb, var(--bad) 12%, transparent);
     color: var(--bad);
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   .credit {
@@ -1245,7 +1245,7 @@
     border: 0;
     background: transparent;
     color: var(--faint);
-    font-size: 10.5px;
+    font-size: var(--text-xs);
     cursor: pointer;
   }
 
@@ -1267,7 +1267,7 @@
     margin-bottom: 14px;
     padding-bottom: 12px;
     border-bottom: 1px solid var(--border);
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   .problems p {
@@ -1293,7 +1293,7 @@
     margin: 8px 0 0;
     padding: 0;
     list-style: none;
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   .levels li {
@@ -1325,7 +1325,7 @@
     flex: none;
     width: 34px;
     color: var(--accent);
-    font-size: 10.5px;
+    font-size: var(--text-xs);
     font-weight: 600;
   }
 

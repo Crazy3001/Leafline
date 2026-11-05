@@ -58,12 +58,12 @@
     gap: 2px 8px;
     margin: 2px 0 0;
     color: var(--muted);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
   }
 
   .here {
     color: var(--good);
-    font-size: 11px;
+    font-size: var(--text-xs);
   }
 
   button {
@@ -74,7 +74,7 @@
     border: 0;
     background: transparent;
     color: var(--accent);
-    font-size: 11px;
+    font-size: var(--text-xs);
     cursor: pointer;
   }
 
@@ -91,6 +91,6 @@
   .none {
     margin: 4px 0 0;
     color: var(--faint);
-    font-size: 11px;
+    font-size: var(--text-xs);
   }
 </style>

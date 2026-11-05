@@ -147,7 +147,7 @@
     {/if}
   </Card>
 {:else}
-  <button class="add" onclick={() => (adding = true)}><Timer size={12} /> Timer</button>
+  <div class="add-row"><button class="add" onclick={() => (adding = true)}><Timer size={12} /> Start a timer</button></div>
 {/if}
 
 <style>
@@ -196,7 +196,7 @@
 
   .fill {
     height: 100%;
-    background: var(--map);
+    background: var(--muted);
     transition: width 1s linear;
   }
 
@@ -218,23 +218,28 @@
     color: var(--text);
   }
 
+  .add-row {
+    padding: var(--space-2) var(--space-3) var(--space-3);
+    border-top: 1px solid var(--border);
+  }
+
   .add {
     display: inline-flex;
     align-items: center;
-    justify-self: start;
-    gap: 5px;
-    padding: 3px 8px;
-    border: 1px dashed var(--border-strong);
+    gap: 6px;
+    height: var(--control-h-sm);
+    padding: 0 8px;
+    border: 0;
     border-radius: var(--radius-sm);
     background: transparent;
-    color: var(--faint);
-    font-size: 11.5px;
+    color: var(--muted);
+    font-size: var(--text-sm);
     cursor: pointer;
   }
 
   .add:hover {
+    background: rgba(255, 255, 255, 0.07);
     color: var(--text);
-    border-color: var(--muted);
   }
 
   .form {
@@ -250,7 +255,7 @@
     background: var(--bg);
     color: var(--text);
     font: inherit;
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   input:focus {
@@ -269,7 +274,7 @@
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--muted);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
     cursor: pointer;
   }
 
@@ -295,7 +300,7 @@
     border: 0;
     background: transparent;
     color: var(--muted);
-    font-size: 12px;
+    font-size: var(--text-sm);
     cursor: pointer;
   }
 
@@ -305,7 +310,7 @@
     border-radius: var(--radius-sm);
     background: var(--accent);
     color: #1a1204;
-    font-size: 12px;
+    font-size: var(--text-sm);
     font-weight: 600;
     cursor: pointer;
   }

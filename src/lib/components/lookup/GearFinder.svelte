@@ -168,7 +168,7 @@
     align-items: center;
     gap: 4px;
     color: var(--muted);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
   }
 
   .level input {
@@ -185,7 +185,7 @@
     background: var(--surface);
     color: var(--text);
     font: inherit;
-    font-size: 11.5px;
+    font-size: var(--text-sm);
   }
 
   .ahead {
@@ -194,7 +194,7 @@
     gap: 3px;
     margin-bottom: 5px;
     color: var(--faint);
-    font-size: 11px;
+    font-size: var(--text-xs);
   }
 
   .ahead > div {
@@ -210,7 +210,7 @@
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--muted);
-    font-size: 11px;
+    font-size: var(--text-xs);
     cursor: pointer;
   }
 
@@ -251,7 +251,7 @@
     border: 0;
     background: transparent;
     color: var(--muted);
-    font-size: 11px;
+    font-size: var(--text-xs);
     cursor: pointer;
   }
 
@@ -264,18 +264,18 @@
   .count {
     margin: 0 0 4px;
     color: var(--faint);
-    font-size: 11px;
+    font-size: var(--text-xs);
   }
 
   .note {
     margin: 4px 0 6px;
     color: var(--muted);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
   }
 
   .how {
     margin: 10px 0 0;
     color: var(--faint);
-    font-size: 10.5px;
+    font-size: var(--text-xs);
   }
 </style>

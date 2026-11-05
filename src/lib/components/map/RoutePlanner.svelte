@@ -66,7 +66,7 @@
     align-items: center;
     gap: 6px;
     color: var(--muted);
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   .to {
@@ -98,7 +98,7 @@
 
   .note {
     margin: 6px 0 0;
-    font-size: 11px;
+    font-size: var(--text-xs);
     color: var(--faint);
   }
 </style>

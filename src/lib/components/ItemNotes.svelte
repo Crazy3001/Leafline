@@ -130,7 +130,7 @@
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--muted);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
     cursor: pointer;
   }
 
@@ -143,7 +143,7 @@
 
   .text {
     margin: 0;
-    font-size: 12.5px;
+    font-size: var(--text-md);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
@@ -151,7 +151,7 @@
   .when {
     margin: 2px 0 0;
     color: var(--faint);
-    font-size: 10.5px;
+    font-size: var(--text-xs);
   }
 
   textarea {
@@ -163,7 +163,7 @@
     background: rgba(0, 0, 0, 0.25);
     color: var(--text);
     font: inherit;
-    font-size: 12.5px;
+    font-size: var(--text-md);
     resize: vertical;
   }
 
@@ -182,7 +182,7 @@
   .keys {
     flex: 1;
     color: var(--faint);
-    font-size: 10.5px;
+    font-size: var(--text-xs);
   }
 
   .link {
@@ -190,7 +190,7 @@
     border: 0;
     background: transparent;
     color: var(--muted);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
     cursor: pointer;
   }
 
@@ -204,7 +204,7 @@
     border-radius: var(--radius-sm);
     background: var(--accent-soft);
     color: var(--accent-strong);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
     cursor: pointer;
   }
 
@@ -216,6 +216,6 @@
   .error {
     margin: 6px 0 0;
     color: var(--bad);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
   }
 </style>

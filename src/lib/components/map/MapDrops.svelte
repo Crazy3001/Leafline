@@ -154,7 +154,7 @@
     display: flex;
     align-items: baseline;
     gap: 4px;
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   .name {
@@ -162,7 +162,7 @@
     padding: 0;
     border: 0;
     background: transparent;
-    font-size: 12px;
+    font-size: var(--text-sm);
     font-weight: 600;
     text-align: left;
     cursor: pointer;
@@ -177,7 +177,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: 0 10px;
-    font-size: 11px;
+    font-size: var(--text-xs);
   }
 
   .source {
@@ -191,7 +191,7 @@
     border: 0;
     background: transparent;
     color: var(--muted);
-    font-size: 11px;
+    font-size: var(--text-xs);
     text-align: left;
     cursor: pointer;
   }
@@ -202,7 +202,8 @@
   }
 
   .rate {
-    color: var(--accent);
+    color: var(--text);
+    font-weight: 600;
     font-weight: 600;
   }
 
@@ -216,27 +217,27 @@
     border-radius: var(--radius-sm);
     background: var(--warn-soft);
     color: var(--muted);
-    font-size: 10.5px;
+    font-size: var(--text-xs);
   }
 
   .tag {
     margin-left: 4px;
     padding: 0 4px;
     border-radius: var(--radius-sm);
-    background: var(--accent-soft);
-    color: var(--accent);
-    font-size: 9.5px;
+    background: var(--surface-3);
+    color: var(--muted);
+    font-size: var(--text-xs);
   }
 
   .cat {
     margin-left: auto;
-    font-size: 10px;
+    font-size: var(--text-xs);
     color: var(--faint);
   }
 
   .note {
     margin: 0;
-    font-size: 11.5px;
+    font-size: var(--text-sm);
     color: var(--faint);
   }
 
@@ -253,7 +254,7 @@
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: transparent;
-    font-size: 12px;
+    font-size: var(--text-sm);
     cursor: pointer;
   }
 
@@ -279,7 +280,7 @@
 
   .credit {
     margin: 10px 0 0;
-    font-size: 10.5px;
+    font-size: var(--text-xs);
     color: var(--faint);
   }
 
@@ -290,7 +291,7 @@
     border: 0;
     background: transparent;
     color: var(--muted);
-    font-size: 10.5px;
+    font-size: var(--text-xs);
     text-align: left;
     text-decoration: underline;
     text-decoration-color: var(--border-strong);
@@ -299,7 +300,7 @@
 
   .error {
     margin: 0 0 6px;
-    font-size: 11.5px;
+    font-size: var(--text-sm);
     color: var(--bad);
   }
 </style>

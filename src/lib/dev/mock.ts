@@ -54,6 +54,7 @@ import {
   sampleSpots,
 } from "./sample-map";
 import sampleSession from "./sample-session.json";
+import { sampleSavedSessions, sampleTimelines, withTimeline } from "./sample-training";
 
 const screenshots = import.meta.glob("/test-screenshots/*.{png,jpg,jpeg,webp}", {
   query: "?url",
@@ -79,7 +80,7 @@ interface Preview {
 }
 const preview = (globalThis as { __LEAFLINE_PREVIEW__?: Preview }).__LEAFLINE_PREVIEW__;
 const sampleAnalysis = preview?.analysis ?? (sample as unknown as Analysis);
-const sampleSessionSummary = preview?.session ?? (sampleSession as SessionSummary);
+const sampleSessionSummary = preview?.session ?? withTimeline(sampleSession as unknown as SessionSummary);
 
 const status: OverlayStatus = {
   visible: true,
@@ -140,45 +141,8 @@ function mockLog(item: string, upgrades: number | null, slots: number | null): P
   };
 }
 
-/** Saved sessions; one made-up session on the sample world's maps to start with. */
-let savedSessions: SavedSession[] = [
-  {
-    id: 1,
-    label: "",
-    savedAt: now - 86400 * 2,
-    startedAt: now - 86400 * 2 - 5400,
-    level: 29,
-    levelUps: 1,
-    activeSeconds: 4200,
-    elapsedSeconds: 5400,
-    expGained: 25_400,
-    expPerHour: 21_771,
-    mesosGained: 11_200,
-    mesosPerHour: 9_600,
-    percentPerHour: 22.4,
-    job: "Bandit",
-    deaths: 1,
-    note: "",
-    lines: [
-      {
-        map: "Fern Road : Mossbank Meadow II",
-        town: false,
-        level: 29,
-        party: 1,
-        job: "Bandit",
-        activeSeconds: 3000,
-        expGained: 19_600,
-        percentGained: 18.4,
-        mesosGained: 8_100,
-        mesosSeconds: 3000,
-      },
-    ],
-    maps: [
-      { map: "Fern Road : Mossbank Meadow II", activeSeconds: 3000, expGained: 19_600, mesosGained: 8_100 },
-      { map: "Fern Road : Burrow Den", activeSeconds: 1200, expGained: 5_800, mesosGained: 3_100 },
-    ],
-  },
-];
+/** Saved sessions: a made-up week on the sample world's maps. */
+let savedSessions: SavedSession[] = [...sampleSavedSessions];
 const historyHandlers: (() => void)[] = [];
 
 function mockHistory(): History {
@@ -584,9 +548,9 @@ export const mockBackend: Backend = {
     await delay(900);
     dropsDownloaded = true;
   },
-  async trainingSpots() {
+  async trainingSpots(_name, _street, _twin, measured) {
     if (!mapStatus.ready) return null;
-    return preview?.spots ?? sampleSpots(2);
+    return preview?.spots ?? sampleSpots(2, measured);
   },
   async openLink(url) {
     window.open(url, "_blank", "noopener");
@@ -643,6 +607,7 @@ export const mockBackend: Backend = {
       mesosPerHour: s.mesosPerHour,
       percentPerHour: s.percentPerHour,
       job: s.job,
+      character: s.name,
       deaths: s.deaths,
       note: "",
       lines: s.lines,
@@ -650,10 +615,15 @@ export const mockBackend: Backend = {
         .filter((m) => m.map && m.activeSeconds > 0)
         .map((m) => ({ map: m.map!, activeSeconds: m.activeSeconds, expGained: m.expGained, mesosGained: m.mesosGained })),
     });
+    sampleTimelines.set(id, { points: s.timeline, events: s.events });
     historyHandlers.forEach((h) => h());
     return id;
   },
   sessionHistory: async () => mockHistory(),
+  sessionTimeline: async (id) => sampleTimelines.get(id) ?? { points: [], events: [] },
+  async showTraining() {
+    window.open("/training", "_blank");
+  },
   knownMesos: async () => ({ name: "Mossbank", mesos: 36_644, seenAt: Math.floor(Date.now() / 1000) - 26 * 3600 }),
   onKnownMesos: async () => () => {},
   async setSessionNote(id, note) {

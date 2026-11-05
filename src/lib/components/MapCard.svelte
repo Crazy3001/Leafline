@@ -178,14 +178,14 @@
 
   .street {
     color: var(--muted);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
   }
 
   .name {
     font-family: var(--font-display);
-    font-size: 15px;
+    font-size: var(--text-xl);
     font-weight: 600;
-    line-height: 1.25;
+    line-height: 1.2;
   }
 
   .here {
@@ -195,27 +195,29 @@
     margin: 10px 0 0;
   }
 
+  /* The same tiles as src/lib/ui/Stat.svelte. */
   .here div {
-    padding: 5px 8px;
-    border-radius: var(--radius-sm);
-    background: rgba(255, 255, 255, 0.03);
+    padding: var(--space-2);
+    background: var(--surface-2);
   }
 
   dt {
-    font-size: 10.5px;
-    color: var(--faint);
+    font-size: var(--text-xs);
+    color: var(--muted);
   }
 
   dd {
     margin: 0;
+    font-family: var(--font-display);
+    font-size: var(--text-lg);
     font-weight: 600;
-    color: var(--muted);
+    color: var(--text);
   }
 
   .empty {
     margin: 0;
     color: var(--faint);
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   .miss {
@@ -237,7 +239,7 @@
     border-radius: var(--radius-sm);
     background: color-mix(in srgb, var(--map) 16%, var(--surface-3));
     color: var(--map);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
     text-align: left;
     cursor: pointer;
     transition:
@@ -278,7 +280,7 @@
     border-radius: var(--radius-sm);
     background: var(--warn-soft);
     color: var(--muted);
-    font-size: 11px;
+    font-size: var(--text-xs);
   }
 
   .alt {
@@ -287,7 +289,7 @@
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: transparent;
-    font-size: 11px;
+    font-size: var(--text-xs);
     cursor: pointer;
   }
 

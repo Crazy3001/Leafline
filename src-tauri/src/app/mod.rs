@@ -161,6 +161,8 @@ pub fn run() {
             records::set_item_note,
             records::save_session,
             records::session_history,
+            records::session_timeline,
+            records::show_training,
             records::delete_session,
             records::set_session_note,
             records::rename_map,

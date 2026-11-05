@@ -127,7 +127,7 @@
   .party {
     margin-right: 6px;
     color: var(--muted);
-    font-size: 11px;
+    font-size: var(--text-xs);
   }
 
   .attention {
@@ -137,7 +137,7 @@
   .state {
     padding: 1px 7px;
     border-radius: var(--radius-sm);
-    font-size: 10.5px;
+    font-size: var(--text-xs);
     font-weight: 600;
   }
 
@@ -169,7 +169,7 @@
   }
 
   dt {
-    font-size: 10.5px;
+    font-size: var(--text-xs);
     color: var(--faint);
   }
 
@@ -179,7 +179,7 @@
   }
 
   dd.sub {
-    font-size: 11px;
+    font-size: var(--text-xs);
     font-weight: 400;
     color: var(--muted);
   }
@@ -188,12 +188,12 @@
     width: 100%;
     margin-top: 10px;
     border-collapse: collapse;
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   .maps thead th {
     padding: 0 0 4px;
-    font-size: 10.5px;
+    font-size: var(--text-xs);
     font-weight: 500;
     color: var(--faint);
     text-align: right;
@@ -233,7 +233,7 @@
   .map-street {
     display: block;
     color: var(--faint);
-    font-size: 11px;
+    font-size: var(--text-xs);
   }
 
   .current .map-name::before {
@@ -253,6 +253,6 @@
     padding: 0;
     list-style: none;
     color: var(--faint);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
   }
 </style>

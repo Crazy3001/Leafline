@@ -88,7 +88,7 @@
   .name {
     margin: 0;
     font-family: var(--font-display);
-    font-size: 16px;
+    font-size: var(--text-lg);
     font-weight: 600;
     line-height: 1.25;
   }
@@ -112,7 +112,7 @@
     padding: 0;
     border: 0;
     background: transparent;
-    font-size: 12px;
+    font-size: var(--text-sm);
     font-weight: 600;
     text-align: left;
     cursor: pointer;
@@ -127,13 +127,13 @@
 
   .who {
     color: var(--faint);
-    font-size: 11px;
+    font-size: var(--text-xs);
   }
 
   .note {
     margin: 0;
     color: var(--faint);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
   }
 
   .spin {
@@ -154,7 +154,7 @@
     border: 0;
     background: transparent;
     color: var(--faint);
-    font-size: 10.5px;
+    font-size: var(--text-xs);
     text-align: left;
     cursor: pointer;
   }

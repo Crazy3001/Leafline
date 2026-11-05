@@ -96,7 +96,7 @@
     background: transparent;
     color: var(--muted);
     font: inherit;
-    font-size: 11.5px;
+    font-size: var(--text-sm);
     cursor: pointer;
   }
 
@@ -144,7 +144,7 @@
     background: var(--surface-2);
     color: var(--text);
     font-family: var(--font-sans);
-    font-size: 11px;
+    font-size: var(--text-xs);
   }
 
   .plus {

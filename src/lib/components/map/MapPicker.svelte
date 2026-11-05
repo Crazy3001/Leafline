@@ -103,7 +103,7 @@
     background: transparent;
     color: var(--text);
     font: inherit;
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   input::-webkit-search-cancel-button {
@@ -144,17 +144,17 @@
   }
 
   .name {
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   .street {
-    font-size: 10.5px;
+    font-size: var(--text-xs);
     color: var(--faint);
   }
 
   .empty {
     padding: 6px 8px;
-    font-size: 12px;
+    font-size: var(--text-sm);
     color: var(--faint);
   }
 </style>

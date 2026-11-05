@@ -8,6 +8,7 @@
   import PanelView from "$lib/components/PanelView.svelte";
   import { itemView, watchItems } from "$lib/items.svelte";
   import { monsterView, watchMonsters } from "$lib/monsters.svelte";
+  import { tabRequest } from "$lib/nav.svelte";
   import { PANELS, panelId, panelInfo, signature } from "$lib/panels";
   import { placeLinks, watchPlaces } from "$lib/places.svelte";
   import { questView, watchQuests } from "$lib/quests.svelte";
@@ -63,6 +64,11 @@
 
   $effect(() => {
     if (questView.seen) select("quests");
+  });
+
+  // A panel's link to another tab, such as the Character tab's line to Train.
+  $effect(() => {
+    if (tabRequest.seq && tabRequest.panel) select(tabRequest.panel);
   });
 
   const fresh = (panel: Panel) => panel !== tab && signatures[panel] != null && signatures[panel] !== seen[panel];
@@ -359,18 +365,20 @@
     font-weight: 600;
   }
 
+  /* Live reading's state: outlined, in the colour of what it means. Offline is plain. */
   .mode {
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    padding: 1px 7px;
-    border: 0;
+    height: 20px;
+    padding: 0 7px;
+    border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     font-family: var(--font-sans);
-    font-size: 10px;
+    font-size: var(--text-xs);
     font-weight: 600;
-    color: var(--accent);
-    background: var(--accent-soft);
+    color: var(--muted);
+    background: transparent;
     cursor: pointer;
     transition: filter 0.12s ease;
   }
@@ -385,13 +393,13 @@
   }
 
   .mode.on {
+    border-color: color-mix(in srgb, var(--good) 45%, transparent);
     color: var(--good);
-    background: var(--good-soft);
   }
 
   .mode.waiting {
+    border-color: color-mix(in srgb, var(--warn) 45%, transparent);
     color: var(--warn);
-    background: var(--warn-soft);
   }
 
   .live-dot {
@@ -423,7 +431,7 @@
     gap: 6px;
     padding: 6px 10px 6px 12px;
     border-top: 1px solid var(--border);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
     line-height: 1.4;
     color: var(--muted);
   }
@@ -519,7 +527,7 @@
     border-bottom: 2px solid transparent;
     background: transparent;
     color: var(--muted);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
     font-weight: 500;
     white-space: nowrap;
     cursor: pointer;
@@ -605,7 +613,7 @@
   .welcome h1 {
     margin: 6px 0 0;
     font-family: var(--font-display);
-    font-size: 15px;
+    font-size: var(--text-lg);
     font-weight: 600;
     color: var(--text);
   }
@@ -616,7 +624,7 @@
 
   .hint {
     max-width: 260px;
-    font-size: 12px;
+    font-size: var(--text-sm);
     color: var(--faint);
   }
 
@@ -627,7 +635,7 @@
     padding: 0;
     list-style: none;
     text-align: left;
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   .steps li {
@@ -644,7 +652,7 @@
     border-radius: var(--radius-sm);
     background: var(--accent-soft);
     color: var(--accent);
-    font-size: 10.5px;
+    font-size: var(--text-xs);
     font-weight: 600;
   }
 
@@ -664,7 +672,7 @@
   }
 
   .inline.small {
-    font-size: 11.5px;
+    font-size: var(--text-sm);
     color: var(--muted);
   }
 
@@ -674,7 +682,7 @@
     border-bottom-width: 2px;
     border-radius: var(--radius-sm);
     font-family: var(--font-sans);
-    font-size: 10.5px;
+    font-size: var(--text-xs);
     color: var(--muted);
   }
 </style>

@@ -1,0 +1,632 @@
+<script lang="ts">
+  // Where to train: maps near the character's level, ranked for this player. "For you" uses the
+  // EXP per hour measured on each map, and for maps not tried yet an estimate: the map's base
+  // EXP per clear times how the player's measured maps compare with theirs. No game formulas
+  // are modelled. Saved spots stay in the list whatever their level.
+  import { Bookmark, ChevronRight, CircleHelp, ExternalLink, Minus, Plus } from "@lucide/svelte";
+  import { onMount, untrack } from "svelte";
+
+  import MapDataPanel from "./map/MapDataPanel.svelte";
+  import RouteSteps from "./map/RouteSteps.svelte";
+  import { backend } from "$lib/api";
+  import { formatCompact, formatDuration } from "$lib/format";
+  import { measuredRates, watchHistory } from "$lib/history.svelte";
+  import { mapData, watchMapData } from "$lib/mapdata.svelte";
+  import { travelKey } from "$lib/settings.svelte";
+  import { rateRatio } from "$lib/training";
+  import type { MapReading, MapRoute, SavedSpot, SessionSummary, TrainingSpot, TrainingSpots } from "$lib/types";
+  import Block from "$lib/ui/Block.svelte";
+  import Button from "$lib/ui/Button.svelte";
+  import Segmented from "$lib/ui/Segmented.svelte";
+
+  let {
+    level: readLevel,
+    map = null,
+    session = null,
+  }: {
+    /** Read from the HUD or the session; the player can set it when it isn't. */
+    level: number | null;
+    map?: MapReading | null;
+    session?: SessionSummary | null;
+  } = $props();
+
+  type Sort = "you" | "exp" | "near";
+  const SORTS: { id: Sort; label: string; title: string }[] = [
+    { id: "you", label: "For you", title: "Your EXP per hour where you have played, an estimate where you haven't" },
+    { id: "exp", label: "EXP / clear", title: "Base EXP for defeating every monster on the map once" },
+    { id: "near", label: "Nearest", title: "Fewest portals from where you are" },
+  ];
+  /** Maps whose average monster level is this far below or above the character count as near. */
+  const BELOW = 8;
+  const ABOVE = 3;
+  const SHOWN = 6;
+  /** Maps scoring within this share of each other are a close call, listed nearest first. */
+  const CLOSE_CALL = 0.1;
+
+  const SORT_KEY = "leafline.train.sort";
+  const LEVEL_KEY = "leafline.train.level";
+  const ALL_LEVELS_KEY = "leafline.train.allLevels";
+
+  watchMapData();
+  watchHistory();
+  const ready = $derived(mapData.status?.ready ?? false);
+
+  let sort = $state<Sort>(storedSort());
+  let manualLevel = $state<number | null>(Number(stored(LEVEL_KEY, "")) || null);
+  let allLevels = $state(stored(ALL_LEVELS_KEY, "false") === "true");
+  let more = $state(false);
+  let data = $state<TrainingSpots | null>(null);
+  let open = $state<number | null>(null);
+  let route = $state<MapRoute | null>(null);
+  let saved = $state<SavedSpot[]>([]);
+  let saveError = $state<string | null>(null);
+
+  onMount(() => {
+    backend
+      .savedSpots()
+      .then((list) => (saved = list))
+      .catch(() => (saved = []));
+    const stop = backend.onSavedSpots((list) => (saved = list));
+    return () => {
+      stop.then((unlisten) => unlisten());
+    };
+  });
+
+  const level = $derived(readLevel ?? manualLevel);
+  const measured = $derived(measuredRates(session));
+  const queryKey = $derived(JSON.stringify([map?.name, map?.street, map?.twin, measured, travelKey()]));
+  const fromId = $derived(data?.from?.id);
+
+  // Follows the key alone: every live reading brings new objects with the same content.
+  $effect(() => {
+    const key = queryKey;
+    void mapData.status?.dataUpdatedAt;
+    if (!ready) {
+      data = null;
+      return;
+    }
+    untrack(() => backend.trainingSpots(map?.name ?? null, map?.street ?? null, map?.twin ?? null, measured))
+      .then((result) => {
+        if (key === queryKey) data = result;
+      })
+      .catch(() => (data = null));
+  });
+
+  $effect(() => {
+    const id = open;
+    const from = fromId;
+    void travelKey();
+    route = null;
+    if (id == null || from == null) return;
+    backend.mapRoute(from, id).then((r) => {
+      if (open === id) route = r;
+    });
+  });
+
+  const steps = (s: TrainingSpot) => s.travel?.hops ?? s.hops;
+  const near = (s: TrainingSpot) => level == null || (s.averageLevel >= level - BELOW && s.averageLevel <= level + ABOVE);
+  const savedIds = $derived(new Set(saved.map((s) => s.mapId)));
+
+  /** EXP an hour per base EXP point, from the maps the player measured. */
+  const ratio = $derived(
+    rateRatio(
+      (data?.spots ?? [])
+        .filter((s) => s.measured)
+        .map((s) => ({ expPerClear: s.expPerClear, expPerHour: s.measured!.expPerHour, activeSeconds: s.measured!.activeSeconds })),
+    ),
+  );
+  const estimate = (s: TrainingSpot) => (s.measured ? null : ratio != null ? s.expPerClear * ratio : null);
+  const forYou = (s: TrainingSpot) => s.measured?.expPerHour ?? estimate(s) ?? -1;
+
+  const ranked = $derived.by(() => {
+    const spots = (data?.spots ?? []).filter((s) => s.reachable && (allLevels || near(s) || savedIds.has(s.map.id)));
+    const by: Record<Sort, (s: TrainingSpot) => number> = {
+      you: (s) => (ratio == null && !s.measured ? s.expPerClear / 1e6 - 1 : forYou(s)),
+      exp: (s) => s.expPerClear,
+      near: (s) => -(steps(s) ?? 9999),
+    };
+    const value = by[sort];
+    const sorted = [...spots].sort((a, b) => value(b) - value(a) || b.expPerClear - a.expPerClear);
+    if (sort === "near") return sorted;
+    // Walk down in bands of close calls and order each band by portals, so a slightly smaller
+    // map next door isn't buried.
+    const out: TrainingSpot[] = [];
+    let band: TrainingSpot[] = [];
+    const flush = () => out.push(...band.sort((a, b) => (steps(a) ?? Infinity) - (steps(b) ?? Infinity)));
+    for (const spot of sorted) {
+      if (band.length && value(spot) < value(band[0]) - Math.abs(value(band[0])) * CLOSE_CALL) {
+        flush();
+        band = [];
+      }
+      band.push(spot);
+    }
+    flush();
+    return out;
+  });
+  const shown = $derived(ranked.slice(0, more ? 30 : SHOWN));
+  const missingSaved = $derived(saved.filter((s) => !(data?.spots ?? []).some((spot) => spot.map.id === s.mapId)));
+
+  async function toggleSaved(mapId: number, name: string) {
+    saveError = null;
+    try {
+      saved = await backend.setSpotSaved(mapId, name, !savedIds.has(mapId));
+    } catch (e) {
+      saveError = String(e);
+    }
+  }
+
+  function stored(key: string, fallback: string) {
+    try {
+      return localStorage.getItem(key) ?? fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
+  function storedSort(): Sort {
+    const value = stored(SORT_KEY, "you");
+    // "EXP / HP" and "Your rate" were sorts of their own until the Train tab was redone.
+    return value === "exp" || value === "near" ? value : "you";
+  }
+
+  function remember(key: string, value: string) {
+    try {
+      localStorage.setItem(key, value);
+    } catch {
+      // A convenience only.
+    }
+  }
+
+  function pickSort(next: Sort) {
+    sort = next;
+    remember(SORT_KEY, next);
+  }
+
+  function setLevel(next: number) {
+    manualLevel = Math.max(1, Math.min(200, next));
+    remember(LEVEL_KEY, String(manualLevel));
+  }
+
+  function where(spot: TrainingSpot) {
+    const hops = steps(spot);
+    if (hops == null) return "no route known";
+    if (hops === 0) return "here";
+    return `${hops} portal${hops === 1 ? "" : "s"}`;
+  }
+
+  function levels(spot: TrainingSpot) {
+    const [low, high] = spot.levelRange;
+    return `Lv ${low}${high !== low ? `–${high}` : ""}`;
+  }
+
+  function metric(spot: TrainingSpot): { value: string; unit: string; quiet: boolean } {
+    if (sort === "exp") return { value: formatCompact(spot.expPerClear), unit: "EXP / clear", quiet: false };
+    if (sort === "near") {
+      const hops = steps(spot);
+      if (hops == null) return { value: "—", unit: "no route", quiet: true };
+      return { value: String(hops), unit: hops === 0 ? "you are here" : spot.travel ? "with travel" : hops === 1 ? "portal" : "portals", quiet: false };
+    }
+    if (spot.measured) return { value: formatCompact(spot.measured.expPerHour), unit: "your EXP / hr", quiet: false };
+    const guess = estimate(spot);
+    if (guess != null) return { value: `≈${formatCompact(guess)}`, unit: "estimate", quiet: true };
+    return { value: formatCompact(spot.expPerClear), unit: "EXP / clear", quiet: true };
+  }
+
+  function why(spot: TrainingSpot) {
+    if (spot.measured) return `Your rate over ${formatDuration(spot.measured.activeSeconds)} of play here.`;
+    if (estimate(spot) != null)
+      return "Not tried yet. The estimate scales its base EXP by how your measured maps compare with theirs, so it doesn't know how tough or spread out the monsters are.";
+    return "Not tried yet. Play a while on any map and Leafline can estimate this one from your own rate.";
+  }
+</script>
+
+{#snippet saveToggle(mapId: number, name: string)}
+  {@const isSaved = savedIds.has(mapId)}
+  <button
+    class="save"
+    class:on={isSaved}
+    aria-pressed={isSaved}
+    title={isSaved ? "Remove from your spots" : "Save to your spots: kept in this list whatever your level"}
+    aria-label={isSaved ? `Remove ${name} from your spots` : `Save ${name} to your spots`}
+    onclick={() => toggleSaved(mapId, name)}
+  >
+    <Bookmark size={13} fill={isSaved ? "currentColor" : "none"} />
+  </button>
+{/snippet}
+
+<Block title="Where to train" last>
+  {#snippet aside()}
+    <span
+      class="help"
+      title="Your rate is what Leafline measured in your own sessions. Estimates scale a map's base EXP by how your measured maps compare with theirs. Base numbers come from OSMS map data and leave out EXP events, party bonus and respawn speed. Maps reached only through an NPC, such as party quests, are left out."
+    >
+      <CircleHelp size={13} />
+    </span>
+    {#if readLevel != null}
+      <span class="tabular">For Lv {readLevel}</span>
+    {:else}
+      <span class="stepper" title="The HUD isn't in view, so set your level">
+        Lv
+        <button aria-label="Lower level" onclick={() => setLevel((manualLevel ?? 2) - 1)}><Minus size={10} /></button>
+        <input
+          type="number"
+          min="1"
+          max="200"
+          aria-label="Character level"
+          value={manualLevel ?? ""}
+          placeholder="?"
+          onchange={(e) => setLevel(Number(e.currentTarget.value) || 1)}
+        />
+        <button aria-label="Raise level" onclick={() => setLevel((manualLevel ?? 0) + 1)}><Plus size={10} /></button>
+      </span>
+    {/if}
+  {/snippet}
+
+  {#if !ready}
+    {#if mapData.status}<MapDataPanel compact />{/if}
+  {:else if !data}
+    <p class="quiet">Loading maps…</p>
+  {:else}
+    <Segmented options={SORTS} value={sort} label="Rank by" stretch onchange={pickSort} />
+    {#if saveError}<p class="warn">{saveError}</p>{/if}
+
+    <ol class="spots">
+      {#each shown as spot, i (spot.map.id)}
+        {@const m = metric(spot)}
+        {@const expanded = open === spot.map.id}
+        <li>
+          <div class="line">
+            <button class="row" aria-expanded={expanded} onclick={() => (open = expanded ? null : spot.map.id)}>
+              <span class="rank tabular">{i + 1}</span>
+              <span class="names">
+                <span class="name">{spot.map.name}</span>
+                <span class="meta">
+                  {levels(spot)} · {where(spot)}{#if spot.measured}{" "}· played {formatDuration(spot.measured.activeSeconds)}{/if}
+                </span>
+              </span>
+              <span class="metric">
+                <span class="value num">{m.value}</span>
+                <span class="unit" class:quiet={m.quiet}>{m.unit}</span>
+              </span>
+              <span class="chevron" class:open={expanded}><ChevronRight size={12} /></span>
+            </button>
+            {@render saveToggle(spot.map.id, spot.map.name)}
+          </div>
+          {#if expanded}
+            <div class="detail">
+              <p class="why">{why(spot)}</p>
+              <table>
+                <thead><tr><th>Monster</th><th>Lv</th><th>Count</th><th>EXP</th></tr></thead>
+                <tbody>
+                  {#each spot.mobs as mob (mob.id)}
+                    <tr>
+                      <td>
+                        <button class="link" title="Show it in the Lookup tab" onclick={() => backend.showMonster(mob.id, null)}>{mob.name}</button
+                        >{mob.boss ? " (boss)" : ""}
+                      </td>
+                      <td class="tabular">{mob.level}</td>
+                      <td class="tabular">{mob.count}</td>
+                      <td class="tabular">{formatCompact(mob.exp)}</td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
+              <p class="facts tabular">{formatCompact(spot.expPerClear)} base EXP per clear · {spot.mobTotal} monsters</p>
+              {#if data.from && route}
+                <RouteSteps {route} />
+              {:else if !data.from}
+                <p class="quiet">Routes show once the minimap is in view.</p>
+              {:else if spot.hops == null}
+                <p class="quiet">No route through portals is known from {data.from.name}.</p>
+              {/if}
+            </div>
+          {/if}
+        </li>
+      {:else}
+        <li class="quiet empty">
+          {level != null ? `No maps with monsters near Lv ${level}. Tick Every level to see the rest.` : "Set your level to see maps that suit it."}
+        </li>
+      {/each}
+      {#each missingSaved as spot (spot.mapId)}
+        <li>
+          <div class="line">
+            <span class="row static">
+              <span class="rank"></span>
+              <span class="names"><span class="name">{spot.name}</span><span class="meta">Not in the map data any more</span></span>
+            </span>
+            {@render saveToggle(spot.mapId, spot.name)}
+          </div>
+        </li>
+      {/each}
+    </ol>
+
+    <div class="footer">
+      <label class="check">
+        <input
+          type="checkbox"
+          checked={allLevels}
+          onchange={(e) => {
+            allLevels = e.currentTarget.checked;
+            remember(ALL_LEVELS_KEY, String(allLevels));
+          }}
+        />
+        Every level
+      </label>
+      {#if ranked.length > SHOWN}
+        <Button variant="ghost" size="sm" onclick={() => (more = !more)}>
+          {more ? "Fewer" : `${Math.min(30, ranked.length) - SHOWN} more`}
+        </Button>
+      {/if}
+      <span class="grow"></span>
+      <Button variant="primary" onclick={() => backend.showTraining()}>Training log <ExternalLink size={12} /></Button>
+    </div>
+  {/if}
+</Block>
+
+<style>
+  .help {
+    display: inline-grid;
+    place-items: center;
+    color: var(--faint);
+    cursor: help;
+  }
+
+  .stepper {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+  }
+
+  .stepper button {
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    color: var(--text);
+    cursor: pointer;
+  }
+
+  .stepper input {
+    width: 34px;
+    height: 20px;
+    padding: 0 2px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: var(--text-sm);
+    text-align: center;
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+
+  .stepper input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+  }
+
+  .spots {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .spots > li {
+    border-top: 1px solid var(--border);
+  }
+
+  .spots > li:first-child {
+    border-top: 0;
+  }
+
+  .line {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .row {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+    padding: var(--space-2) 0;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .row.static {
+    cursor: default;
+  }
+
+  .row:hover .name {
+    color: var(--accent-strong);
+  }
+
+  .rank {
+    width: 14px;
+    flex: none;
+    font-size: var(--text-xs);
+    color: var(--faint);
+  }
+
+  .names {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .name {
+    overflow: hidden;
+    font-size: var(--text-md);
+    font-weight: 600;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .meta {
+    font-size: var(--text-xs);
+    color: var(--muted);
+  }
+
+  .metric {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    align-items: flex-end;
+  }
+
+  .value {
+    font-size: var(--text-lg);
+    font-weight: 600;
+    line-height: 1.2;
+  }
+
+  .unit {
+    font-size: var(--text-xs);
+    color: var(--muted);
+  }
+
+  .unit.quiet {
+    color: var(--faint);
+  }
+
+  .chevron {
+    display: inline-grid;
+    color: var(--faint);
+    transition: transform 0.12s ease;
+  }
+
+  .chevron.open {
+    transform: rotate(90deg);
+  }
+
+  .save {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+  }
+
+  .save:hover {
+    background: rgba(255, 255, 255, 0.07);
+    color: var(--text);
+  }
+
+  .save.on {
+    color: var(--accent);
+  }
+
+  .detail {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 2px 0 var(--space-3) 22px;
+  }
+
+  .why,
+  .facts {
+    margin: 0;
+    font-size: var(--text-xs);
+    color: var(--muted);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--text-sm);
+  }
+
+  th {
+    padding: 0 0 4px;
+    font-size: var(--text-xs);
+    font-weight: 400;
+    color: var(--faint);
+    text-align: right;
+  }
+
+  td {
+    padding: 4px 0;
+    border-top: 1px solid var(--border);
+    text-align: right;
+  }
+
+  th:first-child,
+  td:first-child {
+    text-align: left;
+  }
+
+  .link {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--accent-strong);
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .link:hover {
+    text-decoration: underline;
+  }
+
+  .footer {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .grow {
+    flex: 1;
+  }
+
+  .check {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--text-sm);
+    color: var(--muted);
+    cursor: pointer;
+  }
+
+  .check input {
+    margin: 0;
+    accent-color: var(--accent);
+  }
+
+  .quiet {
+    margin: 0;
+    font-size: var(--text-sm);
+    color: var(--faint);
+  }
+
+  .empty {
+    padding: var(--space-3) 0;
+  }
+
+  .warn {
+    margin: 0;
+    font-size: var(--text-sm);
+    color: var(--warn);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .chevron {
+      transition: none;
+    }
+  }
+</style>

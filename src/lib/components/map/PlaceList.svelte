@@ -109,7 +109,7 @@
     gap: 8px;
     padding: 0 6px 3px;
     color: var(--faint);
-    font-size: 10px;
+    font-size: var(--text-xs);
   }
 
   .legend span:first-child {
@@ -122,7 +122,7 @@
     border: 0;
     background: transparent;
     color: inherit;
-    font-size: 10px;
+    font-size: var(--text-xs);
     text-align: right;
     cursor: pointer;
   }
@@ -155,7 +155,7 @@
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--muted);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
     text-align: left;
     cursor: pointer;
   }
@@ -195,7 +195,7 @@
 
   .count small {
     color: var(--faint);
-    font-size: 10px;
+    font-size: var(--text-xs);
   }
 
   .dist {
@@ -213,7 +213,7 @@
     border: 0;
     background: transparent;
     color: var(--muted);
-    font-size: 11px;
+    font-size: var(--text-xs);
     cursor: pointer;
   }
 
@@ -230,6 +230,6 @@
   .note {
     margin: 6px 0 0;
     color: var(--faint);
-    font-size: 11px;
+    font-size: var(--text-xs);
   }
 </style>

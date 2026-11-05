@@ -105,6 +105,24 @@ CREATE TABLE saved_spots (
     name TEXT NOT NULL,
     saved_at INTEGER NOT NULL);
 ",
+    "
+ALTER TABLE sessions ADD COLUMN character TEXT;
+CREATE TABLE session_points (
+    session_id INTEGER NOT NULL,
+    at REAL NOT NULL,
+    exp_per_hour REAL,
+    percent_per_hour REAL,
+    mesos_per_hour REAL,
+    level INTEGER,
+    map TEXT);
+CREATE INDEX session_points_by_session ON session_points (session_id);
+CREATE TABLE session_events (
+    session_id INTEGER NOT NULL,
+    at REAL NOT NULL,
+    kind TEXT NOT NULL,
+    level INTEGER);
+CREATE INDEX session_events_by_session ON session_events (session_id);
+",
 ];
 
 /// Daily copies of the records that are kept.

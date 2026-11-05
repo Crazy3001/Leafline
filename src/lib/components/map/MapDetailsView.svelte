@@ -161,7 +161,7 @@
     align-items: center;
     gap: 4px 6px;
     margin-top: 8px;
-    font-size: 11px;
+    font-size: var(--text-xs);
   }
 
   .fact {
@@ -188,7 +188,7 @@
     border: 0;
     background: transparent;
     color: var(--muted);
-    font-size: 11px;
+    font-size: var(--text-xs);
     cursor: pointer;
   }
 
@@ -200,12 +200,12 @@
   .mobs {
     width: 100%;
     border-collapse: collapse;
-    font-size: 11.5px;
+    font-size: var(--text-sm);
   }
 
   .mobs th {
     padding: 0 0 3px;
-    font-size: 10px;
+    font-size: var(--text-xs);
     font-weight: 500;
     color: var(--faint);
     text-align: right;
@@ -234,7 +234,7 @@
 
   .mob-link {
     color: var(--text);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
     text-align: left;
   }
 
@@ -253,7 +253,7 @@
     padding: 0 4px;
     border-radius: var(--radius-sm);
     background: rgba(255, 255, 255, 0.06);
-    font-size: 9.5px;
+    font-size: var(--text-xs);
     color: var(--faint);
   }
 
@@ -270,7 +270,7 @@
     display: flex;
     justify-content: space-between;
     gap: 8px;
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   .quest-name {
@@ -280,11 +280,11 @@
   .lv {
     flex: none;
     color: var(--faint);
-    font-size: 11px;
+    font-size: var(--text-xs);
   }
 
   .quest-sub {
-    font-size: 11px;
+    font-size: var(--text-xs);
     color: var(--muted);
   }
 
@@ -300,18 +300,18 @@
     display: flex;
     justify-content: space-between;
     gap: 8px;
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   .npc {
     color: var(--text);
-    font-size: 12px;
+    font-size: var(--text-sm);
     text-align: left;
   }
 
   .gives {
     color: var(--faint);
-    font-size: 11px;
+    font-size: var(--text-xs);
   }
 
   .links {
@@ -331,7 +331,7 @@
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--muted);
-    font-size: 11px;
+    font-size: var(--text-xs);
     cursor: pointer;
   }
 
@@ -347,7 +347,7 @@
     border: 0;
     background: transparent;
     color: var(--faint);
-    font-size: 10px;
+    font-size: var(--text-xs);
     line-height: 1.4;
     text-align: left;
     cursor: pointer;

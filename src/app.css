@@ -17,7 +17,8 @@
 
   --text: #ece6d8;
   --muted: #a8a193;
-  --faint: #767064;
+  /* 5.3:1 on the surface, the dimmest text that stays readable at 11 px. */
+  --faint: #938c7e;
 
   --accent: #e0a030;
   --accent-strong: #f0b848;
@@ -33,15 +34,37 @@
   --good-soft: rgba(111, 191, 115, 0.14);
   --warn: #e8893a;
   --warn-soft: rgba(232, 137, 58, 0.14);
-  --bad: #d9534f;
+  /* Lighter than the HP red, so it reads as text on the dark surface (5.4:1). */
+  --bad: #e06a66;
+  --bad-soft: rgba(224, 106, 102, 0.12);
 
   --radius-sm: 2px;
   --radius: 2px;
   --radius-lg: 3px;
   --shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
 
+  /* Type scale: seven sizes and no others. */
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-md: 13px;
+  --text-lg: 15px;
+  --text-xl: 18px;
+  --text-2xl: 22px;
+  --text-hero: 30px;
+
+  /* Spacing scale. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+
+  /* Controls. */
+  --control-h: 28px;
+  --control-h-sm: 24px;
+
   font-family: var(--font-sans);
-  font-size: 13px;
+  font-size: var(--text-md);
   line-height: 1.45;
   color: var(--text);
   -webkit-font-smoothing: antialiased;
@@ -71,9 +94,13 @@ button {
 
 .eyebrow {
   font-family: var(--font-display);
-  font-size: 12.5px;
+  font-size: var(--text-md);
   font-weight: 400;
   color: var(--muted);
+}
+
+.num {
+  font-family: var(--font-display);
 }
 
 ::-webkit-scrollbar {

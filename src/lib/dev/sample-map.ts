@@ -3,6 +3,7 @@
 
 import type {
   Guide,
+  MeasuredRate,
   Hunt,
   HuntingGround,
   MapDetails,
@@ -513,7 +514,13 @@ export function sampleNpcSheet(id: number, from: number | null): NpcSheet | null
 }
 
 /** Every sample map with monsters, as the training spot finder lists them. */
-export function sampleSpots(from: number | null): TrainingSpots {
+export function sampleSpots(from: number | null, rates: MeasuredRate[] = []): TrainingSpots {
+  // The player's measured rates on a map, weighted by time, as the backend sums them.
+  const measured = (name: string) => {
+    const mine = rates.filter((r) => r.label === name || r.label.endsWith(` : ${name}`));
+    const seconds = mine.reduce((a, r) => a + r.activeSeconds, 0);
+    return seconds > 0 ? { expPerHour: mine.reduce((a, r) => a + r.expPerHour * r.activeSeconds, 0) / seconds, activeSeconds: seconds } : null;
+  };
   const spots = Object.keys(places)
     .map(Number)
     .filter((id) => !places[id].isTown && places[id].mobs.length)
@@ -533,7 +540,7 @@ export function sampleSpots(from: number | null): TrainingSpots {
         hops: route ? route.steps.length : null,
         travel: null,
         reachable: true,
-        measured: id === 2 ? { expPerHour: 1840, activeSeconds: 1260 } : null,
+        measured: measured(card.map.name),
       };
     });
   return { from: from == null ? null : ref(from), spots };

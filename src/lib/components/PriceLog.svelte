@@ -251,7 +251,7 @@
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--muted);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
     cursor: pointer;
   }
 
@@ -284,7 +284,7 @@
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--muted);
-    font-size: 11px;
+    font-size: var(--text-xs);
     cursor: pointer;
   }
 
@@ -295,7 +295,7 @@
 
   .median {
     font-family: var(--font-display);
-    font-size: 17px;
+    font-size: var(--text-xl);
     font-weight: 600;
   }
 
@@ -303,7 +303,7 @@
   .spread,
   .muted {
     color: var(--faint);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
   }
 
   p {
@@ -312,7 +312,7 @@
 
   .like {
     margin-top: 3px;
-    font-size: 11.5px;
+    font-size: var(--text-sm);
     color: var(--muted);
   }
 
@@ -334,7 +334,7 @@
     align-items: baseline;
     gap: 8px;
     padding: 2px 0;
-    font-size: 11.5px;
+    font-size: var(--text-sm);
   }
 
   .day {
@@ -353,7 +353,7 @@
   .kind {
     flex: none;
     color: var(--good);
-    font-size: 10.5px;
+    font-size: var(--text-xs);
   }
 
   .kind.asking {
@@ -398,7 +398,7 @@
     border: 0;
     background: transparent;
     color: var(--muted);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
     cursor: pointer;
   }
 
@@ -436,7 +436,7 @@
     background: var(--bg);
     color: var(--text);
     font: inherit;
-    font-size: 12.5px;
+    font-size: var(--text-md);
   }
 
   input:focus {
@@ -455,7 +455,7 @@
     right: 8px;
     transform: translateY(-50%);
     color: var(--faint);
-    font-size: 11px;
+    font-size: var(--text-xs);
     pointer-events: none;
   }
 
@@ -473,7 +473,7 @@
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--muted);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
     cursor: pointer;
   }
 
@@ -483,12 +483,12 @@
   }
 
   .note {
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   .for {
     color: var(--faint);
-    font-size: 11px;
+    font-size: var(--text-xs);
   }
 
   .actions {
@@ -508,7 +508,7 @@
     border-radius: var(--radius-sm);
     background: var(--accent);
     color: #1a1204;
-    font-size: 12px;
+    font-size: var(--text-sm);
     font-weight: 600;
     cursor: pointer;
   }
@@ -529,7 +529,7 @@
   .error {
     margin-top: 6px;
     color: var(--bad);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
   }
 
   .sr {

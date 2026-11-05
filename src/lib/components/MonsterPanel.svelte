@@ -290,7 +290,7 @@
   .lead {
     margin: 0 0 10px;
     color: var(--muted);
-    font-size: 12px;
+    font-size: var(--text-sm);
   }
 
   /* A card pads itself; these sit beside cards, so they match it. A pinned window pads its body. */
@@ -310,7 +310,7 @@
   .count {
     margin: 10px 0 4px;
     color: var(--faint);
-    font-size: 11px;
+    font-size: var(--text-xs);
   }
 
   .place {
@@ -338,7 +338,7 @@
     border: 0;
     background: transparent;
     color: var(--muted);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
     text-align: right;
   }
 
@@ -359,7 +359,7 @@
   .head {
     padding-block: 0 3px;
     color: var(--faint);
-    font-size: 10px;
+    font-size: var(--text-xs);
     font-weight: 500;
   }
 
@@ -372,7 +372,7 @@
     border: 0;
     background: transparent;
     color: inherit;
-    font-size: 10px;
+    font-size: var(--text-xs);
     text-align: right;
     cursor: pointer;
   }
@@ -393,7 +393,7 @@
     gap: 3px;
     min-width: 0;
     color: var(--text);
-    font-size: 12px;
+    font-size: var(--text-sm);
     font-weight: 500;
     text-align: left;
   }
@@ -417,7 +417,7 @@
     border-radius: var(--radius-sm);
     background: rgba(255, 255, 255, 0.06);
     color: var(--faint);
-    font-size: 9.5px;
+    font-size: var(--text-xs);
     font-weight: 400;
   }
 
@@ -425,7 +425,7 @@
     grid-column: 1 / -1;
     overflow: hidden;
     color: var(--faint);
-    font-size: 10.5px;
+    font-size: var(--text-xs);
     text-align: left;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -440,7 +440,7 @@
     border: 0;
     background: transparent;
     color: var(--muted);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
     cursor: pointer;
   }
 
@@ -462,7 +462,7 @@
   .quiet {
     margin: 10px 0 6px;
     color: var(--faint);
-    font-size: 11.5px;
+    font-size: var(--text-sm);
   }
 
   .spin {
@@ -483,7 +483,7 @@
     border: 0;
     background: transparent;
     color: var(--faint);
-    font-size: 10.5px;
+    font-size: var(--text-xs);
     text-align: left;
     cursor: pointer;
   }
