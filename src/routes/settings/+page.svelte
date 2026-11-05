@@ -616,7 +616,7 @@
                     >{#if service.kind === "scroll"}<ScrollText size={12} />{:else}<CarTaxiFront size={12} />{/if}</span
                   >
                   <span class="name">{service.name}</span>
-                  <button class="link source" onclick={() => backend.openLink(service.source)} title={service.source}>
+                  <button class="link source" onclick={() => backend.openLink(service.source)}>
                     Source<ExternalLink size={11} />
                   </button>
                 </div>

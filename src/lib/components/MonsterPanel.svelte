@@ -139,7 +139,7 @@
   <span class="name">
     <span class="label">{mob.name}</span>
     {#if mob.boss}<span class="boss" title="Boss"><Skull size={11} /></span>{/if}
-    {#if mob.undead}<span class="tag" title="Undead">undead</span>{/if}
+    {#if mob.undead}<span class="tag">undead</span>{/if}
   </span>
 {/snippet}
 
@@ -153,9 +153,9 @@
   <div class="row head">
     <span>Monster</span>
     {#if sortable}
-      <button class:on={query.sort == null} title="Lowest level first" onclick={() => sortBy(null)}>Lv</button>
-      <button class:on={query.sort === "hp"} title="Most HP first" onclick={() => sortBy("hp")}>HP</button>
-      <button class:on={query.sort === "exp"} title="Most EXP first" onclick={() => sortBy("exp")}>EXP</button>
+      <button class:on={query.sort == null} onclick={() => sortBy(null)}>Lv</button>
+      <button class:on={query.sort === "hp"} onclick={() => sortBy("hp")}>HP</button>
+      <button class:on={query.sort === "exp"} onclick={() => sortBy("exp")}>EXP</button>
     {:else}
       <span>Lv</span><span>HP</span><span>EXP</span>
     {/if}

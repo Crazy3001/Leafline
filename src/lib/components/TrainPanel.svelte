@@ -162,7 +162,7 @@
 </script>
 
 {#snippet jump()}
-  <Button variant="ghost" size="sm" title="Jump to the maps that suit your level" onclick={jumpToSpots}>
+  <Button variant="ghost" size="sm" onclick={jumpToSpots}>
     Where to train <ArrowDown size={12} />
   </Button>
 {/snippet}
@@ -170,7 +170,7 @@
 <Block title="Session">
   {#snippet aside()}
     {#if session?.held}
-      <span class="state paused" title="Paused by hand">Paused</span>
+      <span class="state paused">Paused</span>
     {:else if tracking && session?.paused}
       <span class="state idle" title="No EXP for a while, or the map changed: the clock waits for your next gain">Idle</span>
     {:else if tracking}

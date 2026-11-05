@@ -139,7 +139,7 @@
     role="checkbox"
     aria-checked={done}
     disabled={auto}
-    title={auto ? "Ticks itself when the HUD shows the level" : done ? "Not done yet" : "Done"}
+    title={auto ? "Ticks itself when the HUD shows the level" : undefined}
     onclick={() => toggle(step)}
   >
     {#if done}<Check size={10} />{/if}
@@ -163,7 +163,7 @@
         {@render tick("instructor", !!ticks.instructor)}
         <span class="what">
           {tier === 1 ? "See" : "Talk to"}
-          <button class="link" title="Show them in the Lookup tab" onclick={() => backend.showPlace("npcs", found!.instructor!.npcId)}
+          <button class="link ref ref-npc" onclick={() => backend.showPlace("npcs", found!.instructor!.npcId)}
             >{found.instructor.name}</button
           >
           {#if found.instructor.map}<span class="dim">in {found.instructor.map}{away(found.instructor.hops)}</span>{/if}
@@ -176,7 +176,7 @@
         <li>
           {@render tick(`quest-${quest.id}`, !!ticks[`quest-${quest.id}`])}
           <span class="what">
-            <button class="link" title="Open its steps in the Quests tab" onclick={() => backend.showQuest(quest.id)}>{quest.name}</button>
+            <button class="link ref ref-quest" onclick={() => backend.showQuest(quest.id)}>{quest.name}</button>
             <span class="dim">quest{quest.levelMin ? `, Lv ${quest.levelMin}` : ""}</span>
           </span>
         </li>
@@ -185,7 +185,7 @@
         <li>
           {@render tick("tester", !!ticks.tester)}
           <span class="what">
-            <button class="link" title="Show them in the Lookup tab" onclick={() => backend.showPlace("npcs", found!.tester!.npcId)}
+            <button class="link ref ref-npc" onclick={() => backend.showPlace("npcs", found!.tester!.npcId)}
               >{found.tester.name}</button
             >
             {#if found.tester.map}<span class="dim">in {found.tester.map}{away(found.tester.hops)}</span>{/if}
@@ -272,20 +272,10 @@
   }
 
   .link {
-    padding: 0;
-    border: 0;
-    background: transparent;
     font-size: var(--text-sm);
     font-weight: 600;
     text-align: left;
     cursor: pointer;
-  }
-
-  .link:hover,
-  .link:focus-visible {
-    color: var(--accent-strong);
-    text-decoration: underline;
-    outline: none;
   }
 
   .dim,

@@ -110,7 +110,7 @@
   </div>
 
   <div class="tiles" data-tauri-drag-region>
-    <span class="tile" title="Over the last five minutes of active time" data-tauri-drag-region>
+    <span class="tile" data-tauri-drag-region>
       <span class="label" data-tauri-drag-region>Last 5 min</span>
       <span class="tile-value num" data-tauri-drag-region>
         {recent}{#if pace != null && pace !== 0}<span class="pace" class:up={pace > 0} class:down={pace < 0}

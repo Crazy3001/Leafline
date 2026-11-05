@@ -5,6 +5,8 @@
   import PlaceRoute from "./PlaceRoute.svelte";
   import { backend } from "$lib/api";
   import { formatMesos, formatNumber } from "$lib/format";
+  import { showItemNamed } from "$lib/items.svelte";
+  import { showMonsterNamed } from "$lib/monsters.svelte";
   import { showNpcNamed } from "$lib/places.svelte";
   import type { MapRef, Objective, QuestSheet } from "$lib/types";
 
@@ -36,7 +38,7 @@
 <ol class="steps">
   {#if !tracked && info.giver}
     <li>
-      <p class="step">Talk to <button class="person" title="Show them in the Lookup tab" onclick={() => showNpcNamed(info.giver!)}>{info.giver}</button></p>
+      <p class="step">Talk to <button class="ref ref-npc" onclick={() => showNpcNamed(info.giver!)}>{info.giver}</button></p>
       <PlaceRoute maps={info.giverMaps} {from} />
     </li>
   {/if}
@@ -46,18 +48,22 @@
       <p class="step">
         {objective.guide.kind === "monster" ? "Defeat" : "Bring"}
         {objective.count}
-        {objective.guide.target}
+        {#if objective.guide.kind === "monster"}
+          <button class="ref ref-mob" onclick={() => showMonsterNamed(objective.guide.target)}>{objective.guide.target}</button>
+        {:else}
+          <button class="ref ref-item" onclick={() => showItemNamed(objective.guide.item ?? objective.guide.target)}>{objective.guide.target}</button>
+        {/if}
       </p>
       {#if !finishedStep}<ObjectiveHint guide={objective.guide} {from} />{/if}
     </li>
   {/each}
   <li class:next={finished}>
     {#if info.turnIn}
-      <p class="step">Turn in to <button class="person" title="Show them in the Lookup tab" onclick={() => showNpcNamed(info.turnIn!)}>{info.turnIn}</button></p>
+      <p class="step">Turn in to <button class="ref ref-npc" onclick={() => showNpcNamed(info.turnIn!)}>{info.turnIn}</button></p>
       <PlaceRoute maps={info.turnInMaps} {from} />
     {:else if info.giver}
       <p class="step">Turn it in</p>
-      <p class="unsure">Nothing says to whom yet. It came from {info.giver}.</p>
+      <p class="unsure">Nothing says to whom yet. It came from <button class="ref ref-npc" onclick={() => showNpcNamed(info.giver!)}>{info.giver}</button>.</p>
       <PlaceRoute maps={info.giverMaps} {from} />
     {:else}
       <p class="step">Turn it in</p>
@@ -68,15 +74,15 @@
 {#if sheet.row.exp || sheet.row.mesos || sheet.rewards.length}
   <h4>Pays</h4>
   <dl class="pay">
-    {#if sheet.row.exp}<div><dt>EXP</dt><dd class="tabular">{formatNumber(sheet.row.exp)}</dd></div>{/if}
-    {#if sheet.row.mesos}<div><dt>Mesos</dt><dd class="tabular">{formatMesos(sheet.row.mesos)}</dd></div>{/if}
+    {#if sheet.row.exp}<div><dt>EXP</dt><dd class="tabular exp">{formatNumber(sheet.row.exp)}</dd></div>{/if}
+    {#if sheet.row.mesos}<div><dt>Mesos</dt><dd class="tabular mesos">{formatMesos(sheet.row.mesos)}</dd></div>{/if}
   </dl>
   {#if sheet.rewards.length}
     <ul class="links">
       {#each sheet.rewards as item (item.id)}
         <li>
-          <button title="Show it in the Lookup tab" onclick={() => backend.showItem(item.id, null)}>{item.name}</button>
-          {#if item.count > 1}<span class="tabular">× {item.count}</span>{/if}
+          <button class="ref ref-item" onclick={() => backend.showItem(item.id, null)}>{item.name}</button>
+          {#if item.count > 1}<span class="tabular">×{item.count}</span>{/if}
           {#if !item.sure}<span class="maybe">possible</span>{/if}
         </li>
       {/each}
@@ -88,33 +94,18 @@
   <h4>Comes after</h4>
   <ul class="links">
     {#each sheet.after as quest (quest.id)}
-      <li><button onclick={() => backend.showQuest(quest.id)}>{quest.name}</button></li>
+      <li><button class="ref ref-quest" onclick={() => backend.showQuest(quest.id)}>{quest.name}</button></li>
     {/each}
   </ul>
 {/if}
 {#if sheet.next}
   <h4>Leads to</h4>
   <ul class="links">
-    <li><button onclick={() => backend.showQuest(sheet.next!.id)}>{sheet.next.name}</button></li>
+    <li><button class="ref ref-quest" onclick={() => backend.showQuest(sheet.next!.id)}>{sheet.next.name}</button></li>
   </ul>
 {/if}
 
 <style>
-  .person {
-    padding: 0;
-    border: 0;
-    background: transparent;
-    font: inherit;
-    cursor: pointer;
-  }
-
-  .person:hover,
-  .person:focus-visible {
-    color: var(--accent-strong);
-    text-decoration: underline;
-    outline: none;
-  }
-
   .story {
     margin: 6px 0 0;
     color: var(--muted);
@@ -159,7 +150,8 @@
     font-weight: 600;
   }
 
-  .done .step {
+  .done .step,
+  .done .step .ref {
     color: var(--faint);
     font-weight: 500;
     text-decoration: line-through;
@@ -198,6 +190,14 @@
     font-weight: 600;
   }
 
+  dd.exp {
+    color: var(--exp);
+  }
+
+  dd.mesos {
+    color: var(--mesos);
+  }
+
   .links {
     margin: 0;
     padding: 0;
@@ -206,21 +206,9 @@
     font-size: var(--text-sm);
   }
 
-  .links button {
+  .links .ref {
     padding: 2px 0;
-    border: 0;
-    background: transparent;
-    font-size: var(--text-sm);
     font-weight: 600;
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .links button:hover,
-  .links button:focus-visible {
-    color: var(--accent-strong);
-    text-decoration: underline;
-    outline: none;
   }
 
   .maybe {

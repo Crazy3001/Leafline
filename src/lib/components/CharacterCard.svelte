@@ -126,7 +126,7 @@
 
   {#if rateLine}
     {#if linkTrain}
-      <button class="to-train" onclick={() => openPanel("train")} title="Rates, the session graph and where to train are in the Train tab">
+      <button class="to-train" onclick={() => openPanel("train")}>
         <span>
           <span class="tabular strong">{rateLine}</span>
           {#if session?.secondsToLevel != null && hud?.level != null}<span class="muted"> · Lv {hud.level + 1} in {formatDuration(session.secondsToLevel)}</span>{/if}

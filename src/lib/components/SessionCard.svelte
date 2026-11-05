@@ -18,7 +18,7 @@
   {#snippet aside()}
     {#if session.party != null && session.party > 1}<span class="party tabular">{partyLabel(session.party)}</span>{/if}
     {#if session.held}
-      <span class="state paused" title="Paused by hand">Paused</span>
+      <span class="state paused">Paused</span>
     {:else if session.paused}
       <span class="state paused" title="No EXP for a while, or the map changed: the clock waits for the next gain">
         Paused

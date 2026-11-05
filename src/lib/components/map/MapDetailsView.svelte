@@ -5,6 +5,7 @@
   import { backend } from "$lib/api";
   import { formatCompact, formatNumber } from "$lib/format";
   import { OSMS_CREDIT, OSMS_URL } from "$lib/mapdata.svelte";
+  import { showNpcNamed } from "$lib/places.svelte";
   import type { MapDetails, MapRef } from "$lib/types";
   import ConnectionCompass from "./ConnectionCompass.svelte";
   import MapDrops from "./MapDrops.svelte";
@@ -50,7 +51,7 @@
     {#if details.returnMap}
       <span class="return">
         Returns to
-        <button class="inline" onclick={() => onnavigate(details.returnMap!.id)}>{details.returnMap.name}</button>
+        <button class="inline ref ref-map" onclick={() => onnavigate(details.returnMap!.id)}>{details.returnMap.name}</button>
       </span>
     {/if}
   </div>
@@ -82,9 +83,9 @@
         {#each details.mobs as mob (mob.id)}
           <tr>
             <td class="mob">
-              <button class="inline mob-link" title="Open in Lookup" onclick={() => backend.showMonster(mob.id, null)}>{mob.name}</button>
+              <button class="ref ref-mob" onclick={() => backend.showMonster(mob.id, null)}>{mob.name}</button>
               {#if mob.boss}<span class="boss" title="Boss"><Skull size={11} /></span>{/if}
-              {#if mob.undead}<span class="tag" title="Undead">undead</span>{/if}
+              {#if mob.undead}<span class="tag">undead</span>{/if}
             </td>
             <td class="tabular">{mob.level}</td>
             <td class="tabular">{formatCompact(mob.hp)}</td>
@@ -109,12 +110,12 @@
       {#each details.quests as need (need.quest.id)}
         <li>
           <div class="quest-head">
-            <span class="quest-name">{need.quest.name}</span>
+            <button class="quest-name ref ref-quest" onclick={() => backend.showQuest(need.quest.id)}>{need.quest.name}</button>
             {#if need.quest.levelMin}<span class="lv">Lv {need.quest.levelMin}+</span>{/if}
           </div>
           <div class="quest-sub">
             {need.targets.map((t) => `${t.count} ${t.name}`).join(", ")}
-            {#if need.giver}<span class="giver">· from {need.giver}</span>{/if}
+            {#if need.giver}<span class="giver">· from <button class="ref ref-npc" onclick={() => showNpcNamed(need.giver!)}>{need.giver}</button></span>{/if}
           </div>
         </li>
       {/each}
@@ -127,7 +128,7 @@
     <ul class="npcs">
       {#each details.npcs as npc (npc.id)}
         <li>
-          <button class="inline npc" title="Open in Lookup" onclick={() => backend.showPlace("npcs", npc.id)}>{npc.name}</button>
+          <button class="ref ref-npc" onclick={() => backend.showPlace("npcs", npc.id)}>{npc.name}</button>
           {#if npc.quests.length}
             <span class="gives" title={npc.quests.map((q) => q.name).join("\n")}>
               {npc.quests.length} quest{npc.quests.length === 1 ? "" : "s"}
@@ -147,7 +148,7 @@
 
 <div class="links">
   {#each details.links as link}
-    <button class="out" onclick={() => backend.openLink(link.url)} title={link.url}>
+    <button class="out" onclick={() => backend.openLink(link.url)}>
       {link.label}<ExternalLink size={11} />
     </button>
   {/each}
@@ -184,17 +185,7 @@
   }
 
   .inline {
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--muted);
     font-size: var(--text-xs);
-    cursor: pointer;
-  }
-
-  .inline:hover {
-    color: var(--map);
-    text-decoration: underline;
   }
 
   .mobs {
@@ -232,11 +223,6 @@
     color: var(--text);
   }
 
-  .mob-link {
-    color: var(--text);
-    font-size: var(--text-sm);
-    text-align: left;
-  }
 
   .count {
     color: var(--text) !important;
@@ -303,11 +289,6 @@
     font-size: var(--text-sm);
   }
 
-  .npc {
-    color: var(--text);
-    font-size: var(--text-sm);
-    text-align: left;
-  }
 
   .gives {
     color: var(--faint);

@@ -130,7 +130,7 @@
         <ul class="quests">
           {#each found.origin.quests as quest (quest.quest.id)}
             <li>
-              <button class="quest" title="Show it in the Quests tab" onclick={() => backend.showQuest(quest.quest.id)}>{quest.quest.name}</button>
+              <button class="quest" onclick={() => backend.showQuest(quest.quest.id)}>{quest.quest.name}</button>
               <span class="who">
                 {[quest.quest.levelMin ? `Lv ${quest.quest.levelMin}` : null, quest.giver, quest.giverMaps[0]?.name].filter(Boolean).join(" · ")}
               </span>

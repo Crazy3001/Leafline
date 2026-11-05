@@ -45,7 +45,7 @@
         {#if drop.category === "meso"}
           <span class="mesos">{drop.item}</span>
         {:else}
-          <button title="Show it in the Lookup tab" onclick={() => showItemNamed(drop.item)}>{drop.item}</button>
+          <button class="ref ref-item" onclick={() => showItemNamed(drop.item)}>{drop.item}</button>
         {/if}
         {#if drop.quest}<span class="tag">quest</span>{/if}
         <span class="rate tabular">{percent(drop.rate)}{quantity(drop)}</span>
@@ -85,26 +85,13 @@
     border-top: 1px solid var(--border);
   }
 
-  li button {
+  li .ref {
     min-width: 0;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    font-size: var(--text-sm);
     font-weight: 500;
-    text-align: left;
-    cursor: pointer;
-  }
-
-  li button:hover,
-  li button:focus-visible {
-    color: var(--accent-strong);
-    text-decoration: underline;
-    outline: none;
   }
 
   .mesos {
-    color: var(--muted);
+    color: var(--mesos);
   }
 
   .rate {

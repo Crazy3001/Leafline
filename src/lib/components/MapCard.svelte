@@ -82,7 +82,7 @@
   {/snippet}
 
   {#if browsing}
-    <button class="back" title="Go back to the map you are on" onclick={() => (browsing = null)}>
+    <button class="back" onclick={() => (browsing = null)}>
       <MapPin size={13} />
       <span class="back-to">{#if currentName}Back to <strong>{currentName}</strong>{:else}Back{/if}</span>
     </button>

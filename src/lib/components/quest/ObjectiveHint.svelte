@@ -80,7 +80,7 @@
       {#each hunts as hunt (hunt.monster.name)}
         <div class="hunt">
           <div class="mob">
-            <button class="name" title="Show it in the Lookup tab" onclick={() => showMonsterNamed(hunt.monster.name)}>{hunt.monster.name}</button>
+            <button class="ref ref-mob" onclick={() => showMonsterNamed(hunt.monster.name)}>{hunt.monster.name}</button>
             <span class="muted">Lv {hunt.monster.level}{hunt.monster.boss ? " · boss" : ""}</span>
             {#if hunt.drop}
               <span class="rate" title={rateTitle(hunt.drop)}>{rate(hunt.drop.rate)} drop</span>
@@ -96,7 +96,7 @@
                   onclick={() => (picked = ground.map.id)}
                 >
                   <span class="map">{ground.map.name}</span>
-                  <span class="count tabular" title="How many spawn on the map">×{ground.count}</span>
+                  <span class="count tabular">×{ground.count} spawn</span>
                   <span
                     class="dist tabular"
                     class:shortcut={ground.travel}
@@ -227,20 +227,8 @@
     font-size: var(--text-sm);
   }
 
-  .mob .name {
-    padding: 0;
-    border: 0;
-    background: transparent;
-    font-size: var(--text-sm);
+  .mob .ref {
     font-weight: 600;
-    cursor: pointer;
-  }
-
-  .mob .name:hover,
-  .mob .name:focus-visible {
-    color: var(--accent-strong);
-    text-decoration: underline;
-    outline: none;
   }
 
   .rate {

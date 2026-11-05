@@ -325,7 +325,7 @@
                   {#each spot.mobs as mob (mob.id)}
                     <tr>
                       <td>
-                        <button class="link" title="Show it in the Lookup tab" onclick={() => backend.showMonster(mob.id, null)}>{mob.name}</button
+                        <button class="ref ref-mob" onclick={() => backend.showMonster(mob.id, null)}>{mob.name}</button
                         >{mob.boss ? " (boss)" : ""}
                       </td>
                       <td class="tabular">{mob.level}</td>
@@ -606,18 +606,6 @@
     text-align: left;
   }
 
-  .link {
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--accent-strong);
-    font: inherit;
-    cursor: pointer;
-  }
-
-  .link:hover {
-    text-decoration: underline;
-  }
 
   .footer {
     display: flex;
