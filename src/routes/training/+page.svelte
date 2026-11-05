@@ -6,6 +6,8 @@
 
   import { backend } from "$lib/api";
   import Logo from "$lib/components/Logo.svelte";
+  import MapNote from "$lib/components/MapNote.svelte";
+  import { watchMapData, mapData } from "$lib/mapdata.svelte";
   import { formatCompact, formatDuration, formatNumber, partyLabel, splitMapLabel } from "$lib/format";
   import { history, watchHistory } from "$lib/history.svelte";
   import { live, watchLive } from "$lib/readings.svelte";
@@ -22,6 +24,7 @@
     pointDetail,
     rateFormat,
     shortDay,
+    showUnplaced,
     type LineFilter,
     type Metric,
   } from "$lib/training";
@@ -41,6 +44,7 @@
 
   onMount(() => {
     watchHistory();
+    watchMapData();
     watchLive();
     watchSettings();
   });
@@ -209,6 +213,22 @@
   const stats = $derived(mapStats(sessions, filter));
   const bars = $derived(mapBars(stats, metric));
   const picked = $derived(stats.find((m) => m.map === pickedMap) ?? stats[0] ?? null);
+
+  // The picked map's id in the map data, which notes are kept by. Sessions name maps as read.
+  let pickedId = $state<number | null>(null);
+  $effect(() => {
+    const label = picked?.map ?? null;
+    void mapData.status?.ready;
+    pickedId = null;
+    if (!label || !mapData.status?.ready) return;
+    const { street, name } = splitMapLabel(label);
+    backend
+      .findMap(name, street, null)
+      .then((match) => {
+        if (picked?.map === label) pickedId = match?.card.map.id ?? null;
+      })
+      .catch(() => {});
+  });
 
   // Progress view.
   const dayRows = $derived(days(sessions));
@@ -416,7 +436,7 @@
                   <table>
                     <thead><tr><th>Map</th><th>Level</th><th>Party</th><th>Time</th><th>EXP / hr</th><th>Mesos / hr</th></tr></thead>
                     <tbody>
-                      {#each s.lines as l, i (i)}
+                      {#each s.lines.filter((l) => showUnplaced(l, s.activeSeconds)) as l, i (i)}
                         <tr>
                           <td>
                             {#if l.map && renaming === l.map}
@@ -434,7 +454,7 @@
                                 }}
                               />
                             {:else}
-                              {l.map ? splitMapLabel(l.map).name : "Between maps"}
+                              {l.map ? splitMapLabel(l.map).name : "Not placed on a map"}
                               {#if l.map}
                                 {@const map = l.map}
                                 <button class="pen" title="Fix a misread name; the same misread is fixed from now on" aria-label="Rename map" onclick={() => startRename(map)}
@@ -539,6 +559,7 @@
                   <Stat size="lg" label="Played" value={dur(picked.activeSeconds)} />
                   <Stat size="lg" label="Sessions" value={String(picked.sessions)} />
                 </div>
+                {#if pickedId != null}<MapNote mapId={pickedId} name={picked.name} flush />{/if}
                 <div>
                   <h3>By your level</h3>
                   <table>

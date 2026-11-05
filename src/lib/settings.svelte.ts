@@ -19,6 +19,7 @@ export const display = $state<DisplaySettings>({
   opacity: 1,
   scale: 1,
   alwaysOnTop: true,
+  keepGameFocus: true,
   compactShape: "card",
   hotkeys: { enabled: true, keys: {} },
   travel: { enabled: false, cabs: true, vipCabs: false, scrolls: true },

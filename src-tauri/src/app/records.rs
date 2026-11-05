@@ -10,7 +10,7 @@ use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder
 use crate::error::{Error, Result};
 use crate::userdata::UserData;
 use crate::userdata::characters::KnownMesos;
-use crate::userdata::notes::ItemNote;
+use crate::userdata::notes::{ItemNote, MapNote};
 use crate::userdata::prices::{NewPrice, PriceLog};
 use crate::userdata::sessions::{MapRate, SavedSession, SessionTimeline};
 use crate::userdata::spots::SavedSpot;
@@ -121,6 +121,29 @@ pub fn item_note(state: State<UserDataState>, item: String) -> Result<Option<Ite
 #[tauri::command]
 pub fn set_item_note(state: State<UserDataState>, item: String, note: String) -> Result<Option<ItemNote>> {
     state.with(|db| db.set_item_note(&item, &note, now()))
+}
+
+/// Emitted to every window when a map note changes, with the map's id.
+const MAP_NOTE_EVENT: &str = "map-note";
+
+/// The player's note on a map, if they wrote one.
+#[tauri::command]
+pub fn map_note(state: State<UserDataState>, map_id: i64) -> Result<Option<MapNote>> {
+    state.with(|db| db.map_note(map_id))
+}
+
+/// Writes the player's note on a map; an empty one deletes it. Returns what is kept.
+#[tauri::command]
+pub fn set_map_note(
+    app: AppHandle,
+    state: State<UserDataState>,
+    map_id: i64,
+    map: String,
+    note: String,
+) -> Result<Option<MapNote>> {
+    let kept = state.with(|db| db.set_map_note(map_id, &map, &note, now()))?;
+    app.emit(MAP_NOTE_EVENT, map_id)?;
+    Ok(kept)
 }
 
 /// Saves the session the overlay is showing to the history. Live sessions save themselves; this

@@ -123,6 +123,13 @@ CREATE TABLE session_events (
     level INTEGER);
 CREATE INDEX session_events_by_session ON session_events (session_id);
 ",
+    "
+CREATE TABLE map_notes (
+    map_id INTEGER PRIMARY KEY,
+    map TEXT NOT NULL,
+    note TEXT NOT NULL,
+    updated_at INTEGER NOT NULL);
+",
 ];
 
 /// Daily copies of the records that are kept.

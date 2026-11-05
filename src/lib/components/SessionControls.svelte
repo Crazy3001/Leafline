@@ -1,5 +1,6 @@
 <script lang="ts">
-  // Pause, a new session, and whether this run goes to the log, while live reading is on.
+  // Pause and a new session, while live reading is on. Every session of 5 minutes or more saves
+  // itself; ones the player doesn't want are deleted in the training log.
   import { Pause, Play, RotateCcw } from "@lucide/svelte";
 
   import { backend } from "$lib/api";
@@ -25,10 +26,9 @@
     >
       <RotateCcw size={12} />New session
     </Button>
-    <label title="Turn off to keep this run out of your log. It turns back on with the next session.{keyHint('ToggleLogging')}">
-      <input type="checkbox" checked={status.logging} onchange={(e) => backend.setLiveLogging(e.currentTarget.checked)} />
-      Save to log
-    </label>
+    <span class="saved" title="Sessions of 5 minutes or more save themselves; delete any you don't want in the training log. A break of 30 minutes ends a session.">
+      Saves itself
+    </span>
   </div>
 {/if}
 
@@ -39,18 +39,10 @@
     gap: 6px;
   }
 
-  label {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
+  .saved {
     margin-left: auto;
-    font-size: var(--text-sm);
-    color: var(--muted);
-    cursor: pointer;
-  }
-
-  input {
-    margin: 0;
-    accent-color: var(--accent);
+    font-size: var(--text-xs);
+    color: var(--faint);
+    cursor: help;
   }
 </style>

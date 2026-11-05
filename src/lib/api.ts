@@ -70,6 +70,7 @@ import type {
   ReplayProgress,
   SessionSummary,
   SessionTimeline,
+  MapNote,
   ShortcutInfo,
   StarterPlan,
   TrainingSpots,
@@ -104,7 +105,6 @@ export interface Backend {
   /** Starts a new session. The one before stays in the history. */
   resetSession(): Promise<void>;
   /** Keeps this run in or out of the history. */
-  setLiveLogging(logging: boolean): Promise<void>;
   /** Starts reading the game window; a new session starts with it. */
   startLive(): Promise<void>;
   /** Stops after the reading in progress; the session stays, ready to save. */
@@ -147,6 +147,8 @@ export interface Backend {
   ): Promise<Guide | null>;
   /** Downloads mapleclassic.wiki's whole drop table, so quest items can be looked up on this PC. */
   downloadDrops(): Promise<void>;
+  /** When the drop table was last downloaded, in Unix seconds, or null before the first time. */
+  dropsFetchedAt(): Promise<number | null>;
   /** Every map with monsters to hunt, with the rates the player measured. Null until map data is downloaded. */
   trainingSpots(
     mapName: string | null,
@@ -210,6 +212,12 @@ export interface Backend {
   itemNote(item: string): Promise<ItemNote | null>;
   /** Writes it; an empty note deletes it. */
   setItemNote(item: string, note: string): Promise<ItemNote | null>;
+  /** The player's note on a map, if any. */
+  mapNote(mapId: number): Promise<MapNote | null>;
+  /** Writes it; an empty note deletes it. */
+  setMapNote(mapId: number, map: string, note: string): Promise<MapNote | null>;
+  /** Follows map notes written in any window, with the map's id. */
+  onMapNote(handler: (mapId: number) => void): Promise<UnlistenFn>;
 
   /** The mesos last read for a character, or with no name, for the character seen last. */
   knownMesos(name: string | null): Promise<KnownMesos | null>;
@@ -222,6 +230,8 @@ export interface Backend {
   sessionTimeline(id: number): Promise<SessionTimeline>;
   /** Opens the training log window, or brings it forward. */
   showTraining(): Promise<void>;
+  /** Lets this window take focus while a box in it is typed in, or gives the focus back up. */
+  setTyping(typing: boolean): Promise<void>;
   deleteSession(id: number): Promise<void>;
   setSessionNote(id: number, note: string): Promise<void>;
   /** Corrects a misread map name, in what is saved and whenever it is read that way again. */
@@ -350,7 +360,6 @@ const tauriBackend: Backend = {
   liveStatus: () => invoke("live_status"),
   setLiveHeld: (held) => invoke("set_live_held", { held }),
   resetSession: () => invoke("reset_session"),
-  setLiveLogging: (logging) => invoke("set_live_logging", { logging }),
   startLive: () => invoke("start_live"),
   stopLive: () => invoke("stop_live"),
   liveWindows: () => invoke("live_windows"),
@@ -374,6 +383,7 @@ const tauriBackend: Backend = {
   questGuide: (quests, mapName, mapStreet, mapTwin, measured) =>
     invoke("quest_guide", { quests, mapName, mapStreet, mapTwin, measured }),
   downloadDrops: () => invoke("download_drops"),
+  dropsFetchedAt: () => invoke("drops_fetched_at"),
   trainingSpots: (mapName, mapStreet, mapTwin, measured) =>
     invoke("training_spots", { mapName, mapStreet, mapTwin, measured }),
   searchQuests: (search) => invoke("search_quests", { search }),
@@ -406,6 +416,9 @@ const tauriBackend: Backend = {
   onSavedSpots: (handler) => listen<SavedSpot[]>("saved-spots", (e) => handler(e.payload)),
   itemNote: (item) => invoke("item_note", { item }),
   setItemNote: (item, note) => invoke("set_item_note", { item, note }),
+  mapNote: (mapId) => invoke("map_note", { mapId }),
+  setMapNote: (mapId, map, note) => invoke("set_map_note", { mapId, map, note }),
+  onMapNote: (handler) => listen<number>("map-note", (e) => handler(e.payload)),
   knownMesos: (name) => invoke("known_mesos", { name }),
   onKnownMesos: (handler) => listen("known-mesos", () => handler()),
   saveSession: (label) => invoke("save_session", { label }),
@@ -418,6 +431,7 @@ const tauriBackend: Backend = {
   sessionHistory: () => invoke("session_history"),
   sessionTimeline: (id) => invoke("session_timeline", { id }),
   showTraining: () => invoke("show_training"),
+  setTyping: (typing) => invoke("set_typing", { typing }),
   deleteSession: (id) => invoke("delete_session", { id }),
   onHistory: (handler) => listen("history", () => handler()),
   async exportCsv(what) {

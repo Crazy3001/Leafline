@@ -10,6 +10,15 @@ export const SHORT_SECONDS = 30 * 60;
 
 export type Metric = "exp" | "mesos";
 
+/**
+ * Time the tracker couldn't place on one map (before the minimap was read, or gains that spanned
+ * a map change) gets a row only when there is enough of it to matter; it always counts in the
+ * session's totals.
+ */
+export function showUnplaced(row: { map: string | null; activeSeconds: number }, sessionSeconds: number): boolean {
+  return row.map != null || (row.activeSeconds >= 120 && row.activeSeconds >= sessionSeconds * 0.1);
+}
+
 /** What a session's graph plots. At high levels the HUD shows only a percent, so EXP is in %. */
 export function chartPoints(timeline: TimelinePoint[], metric: Metric, percentOnly: boolean): ChartPoint[] {
   return timeline.map((p) => ({

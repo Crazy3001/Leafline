@@ -1,6 +1,7 @@
 <script lang="ts">
-  // The compact HUD: the session's main numbers in a small window that fits what it shows, in the
-  // shape chosen in Settings. Everything else stays in the full overlay.
+  // The compact HUD: the numbers worth a glance while playing, in a small window that fits what it
+  // shows. One layout: EXP per hour, the last five minutes, mesos per hour, time to level, then
+  // the quest counters. Everything else stays in the full overlay.
   import { Check, Maximize2, Pause, Play } from "@lucide/svelte";
   import { onMount } from "svelte";
 
@@ -10,30 +11,39 @@
   import { live } from "$lib/readings.svelte";
   import { display, keyHint } from "$lib/settings.svelte";
 
-  /** Width in screen units at Normal size; the window grows with the Size setting. */
-  const WIDTHS = { card: 248, wide: 400, bar: 460 };
+  /** Width in screen units at Normal size; the window grows with the text size. */
+  const WIDTH = 260;
   /** More counters than this scroll instead of growing the window. */
   const MAX_HEIGHT = 320;
 
   let frame = $state<HTMLElement>();
 
   const session = $derived(live.session);
-  const shape = $derived(display.compactShape);
   const reading = $derived(live.liveStatus.state === "reading" ? live.liveStatus : null);
   const percent = $derived(
     live.analysis?.hud?.exp?.percent ?? live.analysis?.hud?.expPercent ?? session?.percent ?? null,
   );
   const percentOnly = $derived(session?.percentOnly ?? false);
-  const stats = $derived([
-    {
-      label: "Last 5 min",
-      value: percentOnly
-        ? `${session?.recentPercentPerHour?.toFixed(1) ?? "—"}%`
-        : formatCompact(session?.recentExpPerHour),
-    },
-    { label: "Mesos / hr", value: formatCompact(session?.mesosPerHour) },
-    { label: "To level", value: formatDuration(session?.secondsToLevel) },
-  ]);
+
+  const rate = $derived.by(() => {
+    if (!session) return null;
+    if (percentOnly) return session.percentPerHour != null ? { value: `${session.percentPerHour.toFixed(1)}%`, unit: "/ hr" } : null;
+    return session.expPerHour != null ? { value: formatCompact(session.expPerHour), unit: "EXP / hr" } : null;
+  });
+  /** The last five minutes against the whole session, in percent. */
+  const pace = $derived.by(() => {
+    const recent = percentOnly ? session?.recentPercentPerHour : session?.recentExpPerHour;
+    const whole = percentOnly ? session?.percentPerHour : session?.expPerHour;
+    if (recent == null || !whole) return null;
+    return Math.round((recent / whole - 1) * 100);
+  });
+  const recent = $derived(
+    percentOnly
+      ? session?.recentPercentPerHour != null
+        ? `${session.recentPercentPerHour.toFixed(1)}%`
+        : "—"
+      : formatCompact(session?.recentExpPerHour),
+  );
   const objectives = $derived(
     (live.analysis?.quest?.quests ?? []).flatMap((q) => q.objectives.map((o) => ({ ...o, quest: q.title }))),
   );
@@ -47,7 +57,7 @@
    */
   function fit() {
     if (!frame) return;
-    const size = [WIDTHS[shape] * display.scale, Math.min(MAX_HEIGHT, Math.ceil(frame.scrollHeight)) * display.scale];
+    const size = [WIDTH * display.scale, Math.min(MAX_HEIGHT, Math.ceil(frame.scrollHeight)) * display.scale];
     if (size.join() === asked) return;
     asked = size.join();
     backend.fitWindow(size[0], size[1]);
@@ -62,46 +72,29 @@
 
   $effect(() => {
     void display.scale;
-    void shape;
     fit();
   });
 </script>
 
-{#snippet tiles()}
-  {#each stats as stat (stat.label)}
-    <span class="stat" title={stat.label} data-tauri-drag-region>
-      <span class="stat-label" data-tauri-drag-region>{stat.label}</span>
-      <span class="stat-value tabular" data-tauri-drag-region>{stat.value}</span>
-    </span>
-  {/each}
-{/snippet}
-
-<div class="hud {shape}" bind:this={frame}>
-  <div class="level-track" title="Toward the next level">
+<div class="hud" bind:this={frame}>
+  <div class="level-track" title={percent != null ? `${percent.toFixed(2)}% toward the next level` : "Toward the next level"}>
     <span class="level-fill" style:width="{Math.min(100, percent ?? 0)}%"></span>
   </div>
-  <div class="bar" data-tauri-drag-region>
+
+  <div class="top" data-tauri-drag-region>
     <span class="logo" data-tauri-drag-region><Logo size={13} /></span>
     <span class="rate" data-tauri-drag-region>
-      {#if session?.expPerHour != null}
-        <span class="value tabular" data-tauri-drag-region>{formatCompact(session.expPerHour)}</span>
-        <span class="unit" data-tauri-drag-region>EXP / hr</span>
-        {#if session.percentPerHour != null && shape === "card"}
-          <span class="sub tabular" data-tauri-drag-region>{session.percentPerHour.toFixed(1)}%</span>
-        {/if}
-        {#if session.paused}<span class="sub" data-tauri-drag-region>· paused</span>{/if}
-      {:else if percentOnly && session?.percentPerHour != null}
-        <span class="value tabular" data-tauri-drag-region>{session.percentPerHour.toFixed(1)}%</span>
-        <span class="unit" data-tauri-drag-region>/ hr</span>
-        {#if session.paused}<span class="sub" data-tauri-drag-region>· paused</span>{/if}
+      {#if rate}
+        <span class="value num" data-tauri-drag-region>{rate.value}</span>
+        <span class="unit" data-tauri-drag-region>{rate.unit}</span>
+        {#if session?.held || session?.paused}<span class="paused" data-tauri-drag-region>Paused</span>{/if}
       {:else}
-        <span class="unit" data-tauri-drag-region>{session ? "Measuring EXP / hr…" : "No EXP readings yet"}</span>
+        <span class="unit" data-tauri-drag-region>{session && session.activeSeconds > 0 ? "Measuring…" : "Starts with your first EXP"}</span>
       {/if}
     </span>
-    {#if shape === "bar"}{@render tiles()}{/if}
     {#if reading}
       <button
-        class="expand"
+        class="icon"
         title="{reading.held ? 'Resume' : 'Pause'} tracking{keyHint('PauseTracking')}"
         aria-label={reading.held ? "Resume tracking" : "Pause tracking"}
         onclick={() => backend.setLiveHeld(!reading.held)}
@@ -109,21 +102,31 @@
         {#if reading.held}<Play size={12} />{:else}<Pause size={12} />{/if}
       </button>
     {/if}
-    <button
-      class="expand"
-      title="Full overlay{keyHint('ToggleCompact')}"
-      aria-label="Full overlay"
-      onclick={() => backend.setCompact(false)}
-    >
+    <button class="icon" title="Full overlay{keyHint('ToggleCompact')}" aria-label="Full overlay" onclick={() => backend.setCompact(false)}>
       <Maximize2 size={12} />
     </button>
   </div>
 
-  {#if shape !== "bar"}<div class="stats" data-tauri-drag-region>{@render tiles()}</div>{/if}
+  <div class="tiles" data-tauri-drag-region>
+    <span class="tile" title="Over the last five minutes of active time" data-tauri-drag-region>
+      <span class="label" data-tauri-drag-region>Last 5 min</span>
+      <span class="tile-value num" data-tauri-drag-region>
+        {recent}{#if pace != null && pace !== 0}<span class="pace" class:up={pace > 0} class:down={pace < 0}
+            >{pace > 0 ? "▲" : "▼"}{Math.abs(pace)}%</span
+          >{/if}
+      </span>
+    </span>
+    <span class="tile" data-tauri-drag-region>
+      <span class="label" data-tauri-drag-region>Mesos / hr</span>
+      <span class="tile-value num" data-tauri-drag-region>{formatCompact(session?.mesosPerHour)}</span>
+    </span>
+    <span class="tile" data-tauri-drag-region>
+      <span class="label" data-tauri-drag-region>To level</span>
+      <span class="tile-value num" data-tauri-drag-region>{formatDuration(session?.secondsToLevel)}</span>
+    </span>
+  </div>
 
-  {#if shape !== "card"}
-    <!-- Wide and Bar are for the numbers alone. -->
-  {:else if objectives.length}
+  {#if objectives.length}
     <ul class="counters">
       {#each objectives as objective, i (i)}
         {@const progress = objectiveProgress(objective)}
@@ -138,8 +141,6 @@
         </li>
       {/each}
     </ul>
-  {:else}
-    <p class="empty">{live.analysis?.quest ? "No counters read." : "Quest Helper not in view."}</p>
   {/if}
 </div>
 
@@ -147,11 +148,12 @@
   .hud {
     max-height: 100vh;
     overflow-y: auto;
+    user-select: none;
   }
 
   .level-track {
-    height: 2px;
-    background: rgba(255, 255, 255, 0.06);
+    height: 3px;
+    background: var(--surface-3);
   }
 
   .level-fill {
@@ -160,49 +162,11 @@
     background: var(--exp);
   }
 
-  .stats {
-    display: flex;
-    gap: 12px;
-    padding: 2px 10px 7px;
-    user-select: none;
-    cursor: grab;
-  }
-
-  .stat {
-    display: grid;
-    flex: 1;
-    min-width: 0;
-    white-space: nowrap;
-  }
-
-  .stat-label {
-    color: var(--faint);
-    font-size: var(--text-xs);
-  }
-
-  .stat-value {
-    font-size: var(--text-sm);
-    font-weight: 600;
-  }
-
-  .hud.bar .stat {
-    flex: none;
-    display: inline-flex;
-    align-items: baseline;
-    gap: 4px;
-  }
-
-  .hud.bar .stat-label {
-    display: none;
-  }
-
-  .bar {
+  .top {
     display: flex;
     align-items: center;
-    gap: 7px;
-    height: 30px;
-    padding: 0 4px 0 9px;
-    user-select: none;
+    gap: var(--space-2);
+    padding: 6px 4px 2px 10px;
     cursor: grab;
   }
 
@@ -212,71 +176,113 @@
   }
 
   .rate {
-    display: inline-flex;
+    display: flex;
     flex: 1;
     align-items: baseline;
-    gap: 5px;
+    gap: 6px;
     min-width: 0;
     white-space: nowrap;
-    overflow: hidden;
   }
 
   .value {
-    font-size: var(--text-lg);
+    font-size: var(--text-xl);
     font-weight: 600;
-    color: var(--exp);
+    line-height: 1.1;
   }
 
-  .unit,
-  .sub {
-    color: var(--muted);
+  .unit {
     font-size: var(--text-xs);
+    color: var(--muted);
   }
 
-  .sub {
-    color: var(--faint);
+  .paused {
+    font-size: var(--text-xs);
+    color: var(--warn);
   }
 
-  .expand {
+  .icon {
     display: grid;
     flex: none;
     place-items: center;
-    width: 22px;
-    height: 22px;
+    width: 24px;
+    height: 24px;
+    padding: 0;
     border: 0;
     border-radius: var(--radius-sm);
     background: transparent;
-    color: var(--faint);
+    color: var(--muted);
     cursor: pointer;
   }
 
-  .expand:hover {
+  .icon:hover {
     background: rgba(255, 255, 255, 0.07);
     color: var(--text);
+  }
+
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+    padding: 4px var(--space-2) var(--space-2);
+    cursor: grab;
+  }
+
+  .tile {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    padding: 4px 6px;
+    background: var(--surface-2);
+  }
+
+  .label {
+    font-size: 10px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .tile-value {
+    font-size: var(--text-sm);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .pace {
+    margin-left: 3px;
+    font-family: var(--font-sans);
+    font-size: 10px;
+    font-weight: 400;
+    color: var(--muted);
+  }
+
+  .pace.up {
+    color: var(--good);
+  }
+
+  .pace.down {
+    color: var(--warn);
   }
 
   .counters {
     display: grid;
     gap: 5px;
     margin: 0;
-    padding: 4px 10px 9px;
+    padding: 6px 10px 8px;
     border-top: 1px solid var(--border);
     list-style: none;
+    font-size: var(--text-xs);
   }
 
-  li {
+  .counters li {
     display: grid;
-    grid-template-columns: 1fr auto;
-    align-items: baseline;
-    column-gap: 8px;
-    row-gap: 2px;
-    font-size: var(--text-sm);
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 2px 8px;
   }
 
   .target {
     display: inline-flex;
     align-items: center;
-    gap: 3px;
+    gap: 4px;
     min-width: 0;
     overflow: hidden;
     white-space: nowrap;
@@ -290,15 +296,13 @@
   .track {
     grid-column: 1 / -1;
     height: 2px;
-    border-radius: var(--radius-sm);
-    background: rgba(255, 255, 255, 0.06);
-    overflow: hidden;
+    background: var(--surface-3);
   }
 
   .fill {
     display: block;
     height: 100%;
-    background: var(--accent);
+    background: var(--muted);
   }
 
   .done .target,
@@ -308,13 +312,5 @@
 
   .done .fill {
     background: var(--good);
-  }
-
-  .empty {
-    margin: 0;
-    padding: 6px 10px 9px;
-    border-top: 1px solid var(--border);
-    color: var(--faint);
-    font-size: var(--text-sm);
   }
 </style>

@@ -8,12 +8,12 @@
   import AdvancementChecklist from "./AdvancementChecklist.svelte";
   import GearPicks from "./GearPicks.svelte";
   import MapDataPanel from "./map/MapDataPanel.svelte";
-  import Section from "./map/Section.svelte";
   import { backend } from "$lib/api";
   import { STATS, buildState, statLabel, watchBuilds } from "$lib/builds.svelte";
   import { OSMS_CREDIT, OSMS_URL, mapData, watchMapData } from "$lib/mapdata.svelte";
   import { display, keyHint } from "$lib/settings.svelte";
   import type { BuildPlan, LevelStep } from "$lib/types";
+  import Segmented from "$lib/ui/Segmented.svelte";
 
   let {
     level,
@@ -68,6 +68,37 @@
   const nextAdvance = $derived(steps.find((s) => s.level >= at && s.advance));
   const warnings = $derived(plan?.expansion.problems.filter((p) => p.severity === "warning") ?? []);
   const past = $derived(level != null && steps.length > 0 && level > steps[steps.length - 1].level);
+
+  // The plan, the next job advancement and gear each get a view of their own, so the tab stays
+  // short. The one last picked is remembered.
+  type View = "plan" | "advance" | "gear";
+  const VIEW_KEY = "leafline.build.view";
+  let view = $state<View>(storedView());
+  const canAdvance = $derived(!!nextAdvance?.advance && !!plan?.build.plan.job);
+  const views = $derived([
+    { id: "plan" as View, label: "Plan" },
+    ...(canAdvance ? [{ id: "advance" as View, label: "Advancement" }] : []),
+    { id: "gear" as View, label: "Gear" },
+  ]);
+  const shown = $derived(view === "advance" && !canAdvance ? "plan" : view);
+
+  function storedView(): View {
+    try {
+      const saved = localStorage.getItem(VIEW_KEY);
+      return saved === "advance" || saved === "gear" ? saved : "plan";
+    } catch {
+      return "plan";
+    }
+  }
+
+  function pickView(next: View) {
+    view = next;
+    try {
+      localStorage.setItem(VIEW_KEY, next);
+    } catch {
+      // A convenience only.
+    }
+  }
 </script>
 
 <section class="build" aria-label="Build plan">
@@ -98,6 +129,8 @@
     </p>
     <button class="action" onclick={() => backend.showBuild()}><Pencil size={13} />Plan a build</button>
   {:else if plan && step}
+    <div class="views"><Segmented label="Build view" options={views} value={shown} stretch size="sm" onchange={pickView} /></div>
+    {#if shown === "plan"}
     <div class="now">
       <span class="at tabular">Lv {level ?? step.level}</span>
       <div class="todo">
@@ -138,20 +171,9 @@
         Next job advancement: <strong>{advance.advance}</strong> at Lv {advance.level}
       </p>
     {/if}
-    {#if nextAdvance?.advance && plan.build.plan.job}
-      <Section title="Job advancement checklist">
-        <AdvancementChecklist
-          job={plan.build.plan.job}
-          tier={nextAdvance.advance.startsWith("1st") ? 1 : 2}
-          at={nextAdvance.level}
-          {level}
-          {character}
-        />
-      </Section>
-    {/if}
 
     {#if coming.length}
-      <Section title="Coming up" count={coming.length}>
+      <h4 class="sub">Coming up</h4>
         <ul class="coming">
           {#each coming as s (s.level)}
             <li>
@@ -165,11 +187,29 @@
             </li>
           {/each}
         </ul>
-      </Section>
     {/if}
 
+    {#if warnings.length}
+      <h4 class="warn-title">{warnings.length === 1 ? "1 thing to fix" : `${warnings.length} things to fix`}</h4>
+      <ul class="warnings">
+        {#each warnings.slice(0, 3) as problem (problem.message)}<li>{problem.message}</li>{/each}
+      </ul>
+      {#if warnings.length > 3}<button class="link" onclick={() => backend.showBuild()}>See all in the editor</button>{/if}
+    {/if}
+    {:else if shown === "advance" && nextAdvance?.advance && plan.build.plan.job}
+      <p class="next">
+        <strong>{nextAdvance.advance}</strong> at Lv {nextAdvance.level}
+      </p>
+      <AdvancementChecklist
+        job={plan.build.plan.job}
+        tier={nextAdvance.advance.startsWith("1st") ? 1 : 2}
+        at={nextAdvance.level}
+        {level}
+        {character}
+      />
+    {:else}
     {#if plan.expansion.gear.length}
-      <Section title="Gear goals" count={plan.expansion.gear.length}>
+      <h4 class="sub">Gear goals</h4>
         <ul class="goals">
           {#each plan.expansion.gear as check (check.item.id)}
             <li>
@@ -182,18 +222,9 @@
             </li>
           {/each}
         </ul>
-      </Section>
     {/if}
-    <Section title="Gear to look for" open={false}>
-      <GearPicks build={plan.build.id} level={at} />
-    </Section>
-
-    {#if warnings.length}
-      <h4 class="warn-title">{warnings.length === 1 ? "1 thing to fix" : `${warnings.length} things to fix`}</h4>
-      <ul class="warnings">
-        {#each warnings.slice(0, 3) as problem (problem.message)}<li>{problem.message}</li>{/each}
-      </ul>
-      {#if warnings.length > 3}<button class="link" onclick={() => backend.showBuild()}>See all in the editor</button>{/if}
+    <h4 class="sub">Gear to look for</h4>
+    <GearPicks build={plan.build.id} level={at} />
     {/if}
 
     <footer>
@@ -206,6 +237,19 @@
 </section>
 
 <style>
+  .views {
+    display: flex;
+    margin: 8px 0 10px;
+  }
+
+  .sub {
+    margin: 12px 0 6px;
+    font-family: var(--font-display);
+    font-size: var(--text-sm);
+    font-weight: 400;
+    color: var(--muted);
+  }
+
   .build {
     margin-top: 12px;
     padding-top: 10px;

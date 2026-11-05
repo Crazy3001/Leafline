@@ -9,6 +9,7 @@
   import { itemView, watchItems } from "$lib/items.svelte";
   import { monsterView, watchMonsters } from "$lib/monsters.svelte";
   import { tabRequest } from "$lib/nav.svelte";
+  import { watchTyping } from "$lib/typing";
   import { PANELS, panelId, panelInfo, signature } from "$lib/panels";
   import { placeLinks, watchPlaces } from "$lib/places.svelte";
   import { questView, watchQuests } from "$lib/quests.svelte";
@@ -21,6 +22,9 @@
   let tab = $state<Panel>(storedTab());
   /** What each panel showed when last looked at, to mark tabs with something new. */
   let seen = $state<Partial<Record<Panel, string | null>>>({});
+
+  // Clicks leave the game focused; typing in a box takes focus while it lasts.
+  onMount(() => watchTyping());
 
   onMount(() => {
     watchLive();

@@ -1,4 +1,7 @@
 <script lang="ts">
+  // Not shown since 2026-11-05: hidden for v1 until a price source gives permission (see
+  // ItemCard.svelte). Kept so the records already logged can be shown again.
+  //
   // The player's own price records for an item, and a form to add one. There is no market data:
   // every number here is something the player logged. Market sites only open in the browser;
   // their terms bar reading their prices into an app without written permission. A price lookup

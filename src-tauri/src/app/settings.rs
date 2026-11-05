@@ -31,6 +31,9 @@ pub struct Settings {
     pub scale: f64,
     /// Keep the overlay and pinned panels above the game.
     pub always_on_top: bool,
+    /// Clicking the overlay or a pinned panel leaves the game focused, so play goes on without
+    /// clicking back into it. Typing in a box still takes focus while the box is in use.
+    pub keep_game_focus: bool,
     pub compact_shape: CompactShape,
     pub hotkeys: HotkeyChoice,
     /// Taxis and return scrolls in routes. Off until the player turns it on.
@@ -53,6 +56,7 @@ impl Default for Settings {
             opacity: 1.0,
             scale: 1.0,
             always_on_top: true,
+            keep_game_focus: true,
             compact_shape: CompactShape::default(),
             hotkeys: HotkeyChoice::default(),
             travel: TravelChoice::default(),
@@ -65,7 +69,8 @@ impl Default for Settings {
     }
 }
 
-/// How the compact HUD is laid out.
+/// How the compact HUD was laid out. Since 2026-11-05 it has one layout and this is no longer
+/// offered; it stays so settings files that name a shape still load.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum CompactShape {
@@ -157,10 +162,30 @@ pub fn apply(app: &AppHandle) -> Result<()> {
     if let Some(overlay) = app.get_webview_window(OVERLAY) {
         overlay.set_zoom(settings.scale)?;
         overlay.set_always_on_top(settings.always_on_top)?;
+        overlay.set_focusable(!settings.keep_game_focus)?;
     }
     // A bad hand-edited hotkey must not stop the app from starting.
     if let Err(err) = shortcuts::apply(app, &settings.hotkeys) {
         shortcuts::log_error(&err);
+    }
+    Ok(())
+}
+
+/// The windows that sit over the game: the overlay and the pinned panels.
+fn game_side_windows(app: &AppHandle) -> Vec<tauri::WebviewWindow> {
+    app.get_webview_window(OVERLAY).into_iter().chain(pins::windows(app)).collect()
+}
+
+/// While the player types in a box on the overlay or a pinned panel, that window takes focus so
+/// the keys reach it; afterwards clicks leave the game focused again. Nothing is sent to the game.
+#[tauri::command]
+pub fn set_typing(app: AppHandle, window: tauri::WebviewWindow, typing: bool) -> Result<()> {
+    if !app.state::<SettingsState>().get().keep_game_focus {
+        return Ok(());
+    }
+    window.set_focusable(typing)?;
+    if typing {
+        window.set_focus()?;
     }
     Ok(())
 }
@@ -198,6 +223,11 @@ pub fn update_settings(app: AppHandle, state: State<SettingsState>, settings: Se
         }
         for window in pins::windows(&app) {
             window.set_always_on_top(settings.always_on_top)?;
+        }
+    }
+    if old.keep_game_focus != settings.keep_game_focus {
+        for window in game_side_windows(&app) {
+            window.set_focusable(!settings.keep_game_focus)?;
         }
     }
     if old.hotkeys != settings.hotkeys {

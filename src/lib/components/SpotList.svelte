@@ -6,6 +6,7 @@
   import { Bookmark, ChevronRight, CircleHelp, ExternalLink, Minus, Plus } from "@lucide/svelte";
   import { onMount, untrack } from "svelte";
 
+  import MapNote from "./MapNote.svelte";
   import MapDataPanel from "./map/MapDataPanel.svelte";
   import RouteSteps from "./map/RouteSteps.svelte";
   import { backend } from "$lib/api";
@@ -295,6 +296,7 @@
           {#if expanded}
             <div class="detail">
               <p class="why">{why(spot)}</p>
+              <MapNote mapId={spot.map.id} name={spot.map.name} flush />
               <table>
                 <thead><tr><th>Monster</th><th>Lv</th><th>Count</th><th>EXP</th></tr></thead>
                 <tbody>

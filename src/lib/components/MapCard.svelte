@@ -2,6 +2,7 @@
   import { Map as MapIcon, MapPin } from "@lucide/svelte";
 
   import Card from "./Card.svelte";
+  import MapNote from "./MapNote.svelte";
   import MapDataPanel from "./map/MapDataPanel.svelte";
   import MapDetailsView from "./map/MapDetailsView.svelte";
   import MapPicker from "./map/MapPicker.svelte";
@@ -129,6 +130,7 @@
   {/if}
 
   {#if shown}
+    <MapNote mapId={shown.map.id} name={shown.map.name} />
     {#key shown.map.id}
       <MapDetailsView details={shown} {current} {variant} onnavigate={navigate} />
     {/key}

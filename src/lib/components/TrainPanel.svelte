@@ -17,6 +17,7 @@
     pointDetail,
     rateFormat,
     shortDay,
+    showUnplaced,
     type Metric,
   } from "$lib/training";
   import type { MapReading, SessionSummary } from "$lib/types";
@@ -78,7 +79,9 @@
 
   // Rows worth showing: some time or some gain, towns marked.
   const sessionMaps = $derived(
-    (session?.maps ?? []).filter((m) => m.activeSeconds > 0 || m.expGained !== 0 || m.mesosGained !== 0),
+    (session?.maps ?? []).filter(
+      (m) => (m.activeSeconds > 0 || m.expGained !== 0 || m.mesosGained !== 0) && showUnplaced(m, session?.activeSeconds ?? 0),
+    ),
   );
   const towns = $derived(new Set((session?.lines ?? []).filter((l) => l.town).map((l) => l.map)));
 
@@ -267,7 +270,11 @@
             <tr class:town>
               <td>
                 {#if row.map === session.map}<span class="here" title="You are here"></span>{/if}
-                {row.map ? splitMapLabel(row.map).name : "Between maps"}
+                {#if row.map}{splitMapLabel(row.map).name}{:else}<span
+                    class="unplaced"
+                    title="Gains between two readings on different maps, or before the minimap was read. They count in the totals."
+                    >Not placed on a map</span
+                  >{/if}
               </td>
               <td class="tabular">{formatDuration(row.activeSeconds)}</td>
               <td class="tabular">{town ? "town" : formatCompact(row.expPerHour)}</td>
@@ -490,6 +497,11 @@
     overflow: hidden;
     text-align: left;
     text-overflow: ellipsis;
+  }
+
+  .unplaced {
+    color: var(--muted);
+    cursor: help;
   }
 
   .town td {

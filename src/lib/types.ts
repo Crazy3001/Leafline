@@ -197,11 +197,8 @@ export type LiveStatus =
       readMs: number;
       /** Windows HDR is on for the game's display, which washes the picture out. */
       hdr: boolean;
-      /** Without a taught HUD font, EXP, HP and MP aren't read. */
       /** Tracking is paused by hand. */
       held: boolean;
-      /** This run goes to the log. */
-      logging: boolean;
     }
   | { state: "failed"; message: string };
 
@@ -678,6 +675,16 @@ export interface SavedSpot {
 }
 
 /** The player's own note on an item (src-tauri/src/userdata/notes.rs). */
+/** The player's note on a map (src-tauri/src/userdata/notes.rs). */
+export interface MapNote {
+  mapId: number;
+  /** The map's name when the note was written. */
+  map: string;
+  note: string;
+  /** Unix seconds. */
+  updatedAt: number;
+}
+
 export interface ItemNote {
   item: string;
   note: string;
@@ -740,6 +747,8 @@ export interface DisplaySettings {
   scale: number;
   /** Keep the overlay and pinned panels above the game. */
   alwaysOnTop: boolean;
+  /** Clicking the overlay or a pinned panel leaves the game focused. */
+  keepGameFocus: boolean;
   compactShape: CompactShape;
   hotkeys: HotkeyChoice;
   /** Taxis and return scrolls in routes; off by default. */

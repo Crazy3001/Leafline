@@ -23,13 +23,12 @@
   import { backend } from "$lib/api";
   import HotkeyButton from "$lib/components/HotkeyButton.svelte";
   import Logo from "$lib/components/Logo.svelte";
-  import MapDataPanel from "$lib/components/map/MapDataPanel.svelte";
+  import DataSources from "$lib/components/DataSources.svelte";
   import { OSMS_URL, WIKI_URL } from "$lib/mapdata.svelte";
   import { live, watchLive } from "$lib/readings.svelte";
   import { changeSettings, display, hotkey, keyHint, keyName, usesNumpad, watchSettings } from "$lib/settings.svelte";
   import Segmented from "$lib/ui/Segmented.svelte";
   import type {
-    CompactShape,
     GameWindow,
     HotkeyChoice,
     LiveChoice,
@@ -47,11 +46,6 @@
     { id: "hotkeys", title: "Hotkeys" },
     { id: "data", title: "Data" },
     { id: "about", title: "About" },
-  ];
-  const SHAPES: { shape: CompactShape; label: string }[] = [
-    { shape: "card", label: "Card" },
-    { shape: "wide", label: "Wide" },
-    { shape: "bar", label: "Bar" },
   ];
   const PAUSE_AFTER = [10, 15, 30, 60, 120];
 
@@ -342,9 +336,8 @@
     <section id="live">
       <h2>Live reading</h2>
       <p class="lead">
-        Reads the game window every few seconds, the way OBS or Discord capture it, and keeps the overlay up to date as
-        you play. Leafline only looks: it sends the game no keys, clicks or messages, and never touches its memory, files
-        or network traffic.
+        Leafline reads the game window the way OBS or Discord capture it. It only looks: no keys, clicks, memory, files or
+        network traffic.
       </p>
 
       <div class="row">
@@ -403,38 +396,6 @@
         </div>
 
         <div class="row">
-          <div class="label" id="interval-label">
-            <span class="name">Read every</span>
-            <span class="help">Shorter catches quick changes; longer uses less CPU.</span>
-          </div>
-          <div class="control segmented" role="radiogroup" aria-labelledby="interval-label">
-            {#each INTERVALS as seconds (seconds)}
-              <button
-                role="radio"
-                aria-checked={display.live.interval === seconds}
-                onclick={() => setLive({ interval: seconds })}>{seconds} s</button
-              >
-            {/each}
-          </div>
-        </div>
-
-        <div class="row">
-          <div class="label" id="pause-label">
-            <span class="name">Pause tracking after</span>
-            <span class="help">How long without EXP before the clock stops, so breaks don't lower your rates.</span>
-          </div>
-          <div class="control segmented" role="radiogroup" aria-labelledby="pause-label">
-            {#each PAUSE_AFTER as seconds (seconds)}
-              <button
-                role="radio"
-                aria-checked={display.live.pauseAfter === seconds}
-                onclick={() => setLive({ pauseAfter: seconds })}>{seconds} s</button
-              >
-            {/each}
-          </div>
-        </div>
-
-        <div class="row">
           <div class="label">
             <span class="name">
               {#if live.liveStatus.state === "reading"}
@@ -467,6 +428,41 @@
             </button>
           </div>
         </div>
+        <details class="advanced">
+          <summary>Advanced</summary>
+        <div class="row">
+          <div class="label" id="interval-label">
+            <span class="name">Read every</span>
+            <span class="help">Shorter catches quick changes; longer uses less CPU.</span>
+          </div>
+          <div class="control segmented" role="radiogroup" aria-labelledby="interval-label">
+            {#each INTERVALS as seconds (seconds)}
+              <button
+                role="radio"
+                aria-checked={display.live.interval === seconds}
+                onclick={() => setLive({ interval: seconds })}>{seconds} s</button
+              >
+            {/each}
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="label" id="pause-label">
+            <span class="name">Pause tracking after</span>
+            <span class="help">How long without EXP before the clock stops, so breaks don't lower your rates.</span>
+          </div>
+          <div class="control segmented" role="radiogroup" aria-labelledby="pause-label">
+            {#each PAUSE_AFTER as seconds (seconds)}
+              <button
+                role="radio"
+                aria-checked={display.live.pauseAfter === seconds}
+                onclick={() => setLive({ pauseAfter: seconds })}>{seconds} s</button
+              >
+            {/each}
+          </div>
+        </div>
+
+        </details>
       </fieldset>
       {#if liveError}<p class="note warn">{liveError}</p>{/if}
       {#if live.liveStatus.state === "reading" && live.liveStatus.hdr}
@@ -476,10 +472,7 @@
         </p>
       {/if}
       <p class="note">
-        Works in windowed mode, and in Full Screen as long as the overlay shows above the game. Pictures stay in memory
-        and are never saved, unless you press Save frame{keyHint("SaveFrame")} to keep one. Items are read one at a time
-        when you hover one and use the Read item hotkey{keyHint("ReadItem")}, whether live reading is running or not. This
-        switch has to be on for that too.
+        Works windowed and in Full Screen. Pictures stay in memory unless you save one{keyHint("SaveFrame")}.
       </p>
     </section>
 
@@ -539,18 +532,19 @@
       </div>
 
       <div class="row">
-        <div class="label" id="shape-label">
-          <span class="name">Compact shape</span>
-          <span class="help">Card has your quest counters. Wide is a row of four numbers. Bar is one thin strip.</span>
-        </div>
-        <div class="control segmented" role="radiogroup" aria-labelledby="shape-label">
-          {#each SHAPES as { shape, label } (shape)}
-            <button
-              role="radio"
-              aria-checked={display.compactShape === shape}
-              onclick={() => changeSettings({ compactShape: shape })}>{label}</button
-            >
-          {/each}
+        <label for="keep-focus">
+          <span class="name">Keep the game focused</span>
+          <span class="help">Clicking the overlay doesn't take you out of the game. Typing in a box still works.</span>
+        </label>
+        <div class="control">
+          <input
+            id="keep-focus"
+            class="switch"
+            type="checkbox"
+            role="switch"
+            checked={display.keepGameFocus}
+            onchange={(e) => changeSettings({ keepGameFocus: e.currentTarget.checked })}
+          />
         </div>
       </div>
 
@@ -602,33 +596,11 @@
         {/each}
       </fieldset>
 
-      {#if travel}
-        <div class="row">
-          <div class="label">
-            <span class="name">Taxi routes and scrolls</span>
-            <span class="help">
-              {#if travel.origin === "custom"}
-                Your own copy is in use.
-              {:else if travel.origin === "wiki"}
-                Downloaded from mapleclassic.wiki{travel.file?.fetchedAt ? ` on ${fetchedOn(travel.file.fetchedAt)}` : ""}.
-              {:else}
-                Not downloaded yet. They come from what players recorded on mapleclassic.wiki, fetched only when you ask.
-              {/if}
-            </span>
-          </div>
-          <div class="control">
-            <button class="button" onclick={downloadTravel} disabled={downloading}>
-              {#if downloading}<span class="spin"><LoaderCircle size={13} /></span>{:else if travel.origin === "none"}<Download
-                  size={13}
-                />{:else}<RefreshCw size={13} />{/if}
-              {travel.origin === "none" ? "Download" : "Update"}
-            </button>
-          </div>
-        </div>
-        {#if travelError}<p class="note warn">{travelError}</p>{/if}
-        {#if travel.origin === "custom"}
-          <p class="note">Update refreshes the download, but your own copy stays in use until you delete it.</p>
-        {/if}
+      {#if travel && display.travel.enabled}
+        <p class="note">
+          {#if travel.origin === "none"}Download the taxis and scrolls under <a href="#data">Data</a> to use them.{:else}Taxis and
+            scrolls are kept up to date under <a href="#data">Data</a>.{/if}
+        </p>
       {/if}
 
       {#if travel?.file}
@@ -688,9 +660,8 @@
     <section id="hotkeys">
       <h2>Hotkeys</h2>
       <p class="lead">
-        They work while the game has focus, and Leafline takes the key from the game. Add Win to each, such as Win+F8:
-        the game can't bind Win, and a key on its own, even Pause or a numpad key, may never reach Leafline while the
-        game is in front. Leafline never sends keys to the game.
+        They work while you play. Use Win with an F-key, such as Win+F8: the game can't bind Win, and a key on its own
+        may never reach Leafline while the game is in front.
       </p>
       <div class="row">
         <label for="hotkeys">
@@ -708,8 +679,7 @@
           />
         </div>
       </div>
-      <dl class="keys">
-        {#each shortcuts as shortcut (shortcut.action)}
+      {#snippet keyRow(shortcut: (typeof shortcuts)[number])}
           <div>
             <dt>
               {shortcut.label}
@@ -727,8 +697,16 @@
               />
             </dd>
           </div>
-        {/each}
+      {/snippet}
+      <dl class="keys">
+        {#each shortcuts.filter((s) => s.inSetup) as shortcut (shortcut.action)}{@render keyRow(shortcut)}{/each}
       </dl>
+      <details class="advanced">
+        <summary>More hotkeys ({shortcuts.filter((s) => !s.inSetup).length})</summary>
+        <dl class="keys">
+          {#each shortcuts.filter((s) => !s.inSetup) as shortcut (shortcut.action)}{@render keyRow(shortcut)}{/each}
+        </dl>
+      </details>
       {#if hotkeyError}<p class="note warn">{hotkeyError}</p>{/if}
       {#if shortcuts.some((s) => s.taken)}
         <p class="note warn">
@@ -761,19 +739,14 @@
 
     <section id="data">
       <h2>Data</h2>
-      <p class="lead">
-        Map data powers the Map, Train and Quests tabs. Nothing is downloaded until you press the button, and nothing
-        you record leaves this PC.
-      </p>
-      <div class="box"><MapDataPanel /></div>
+      <DataSources bind:travel />
 
       <div class="row">
         <div class="label">
           <span class="name">Your records</span>
-          <span class="help">The price log and saved sessions, as CSV for a spreadsheet.</span>
+          <span class="help">Your saved sessions, as CSV for a spreadsheet.</span>
         </div>
         <div class="control exports">
-          <button class="button" onclick={() => exportCsv("prices")}><Download size={13} />Price log</button>
           <button class="button" onclick={() => exportCsv("sessions")}><Download size={13} />Sessions</button>
         </div>
       </div>
@@ -1149,6 +1122,45 @@
     outline-offset: 2px;
   }
 
+  /* Settings most players never need, folded away. */
+  .advanced {
+    margin: 4px 0 0;
+    border-top: 1px solid var(--border);
+  }
+
+  .advanced > summary {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 0;
+    color: var(--muted);
+    font-size: var(--text-sm);
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .advanced > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .advanced > summary::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    transform: rotate(-45deg);
+    transition: transform 0.12s ease;
+  }
+
+  .advanced[open] > summary::before {
+    transform: rotate(45deg);
+  }
+
+  .advanced > summary:hover {
+    color: var(--text);
+  }
+
   .kinds {
     display: grid;
     gap: 2px;
@@ -1249,10 +1261,6 @@
     color: var(--warn);
   }
 
-  .spin {
-    display: inline-grid;
-    animation: spin 0.9s linear infinite;
-  }
 
   @keyframes spin {
     to {
@@ -1348,13 +1356,6 @@
     font-size: var(--text-sm);
   }
 
-  .box {
-    padding: 12px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--surface-2);
-    margin-bottom: 12px;
-  }
 
   .policy {
     display: flex;

@@ -9,6 +9,7 @@
   import PanelView from "$lib/components/PanelView.svelte";
   import { PIN_WIDTH, panelId, panelInfo } from "$lib/panels";
   import { live, watchLive } from "$lib/readings.svelte";
+  import { watchTyping } from "$lib/typing";
   import { display, watchSettings } from "$lib/settings.svelte";
   import type { Panel } from "$lib/types";
 
@@ -82,6 +83,9 @@
     capped = natural > MAX_HEIGHT;
     setWindow(PIN_WIDTH * display.scale, Math.min(MAX_HEIGHT, natural) * display.scale);
   }
+
+  // Clicks leave the game focused; typing in a box takes focus while it lasts.
+  onMount(() => watchTyping());
 
   onMount(() => {
     watchLive();

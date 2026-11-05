@@ -37,13 +37,12 @@ pub enum Action {
     ReadCharacter,
     PauseTracking,
     NewSession,
-    ToggleLogging,
     SaveFrame,
     ShowWorkbench,
 }
 
 impl Action {
-    pub const ALL: [Action; 12] = [
+    pub const ALL: [Action; 11] = [
         Action::ToggleOverlay,
         Action::ToggleClickThrough,
         Action::TogglePins,
@@ -53,7 +52,6 @@ impl Action {
         Action::ReadCharacter,
         Action::PauseTracking,
         Action::NewSession,
-        Action::ToggleLogging,
         Action::SaveFrame,
         Action::ShowWorkbench,
     ];
@@ -68,17 +66,10 @@ impl Action {
         }
     }
 
-    /// Whether setup asks about this action. The rest are in Settings.
+    /// Whether setup asks about this action, and Settings lists it first. The rest wait under
+    /// "More hotkeys": most players only need these three.
     pub fn in_setup(self) -> bool {
-        matches!(
-            self,
-            Action::ReadItem
-                | Action::ToggleOverlay
-                | Action::ToggleClickThrough
-                | Action::ToggleCompact
-                | Action::ReadCharacter
-                | Action::SaveFrame
-        )
+        matches!(self, Action::ReadItem | Action::ToggleOverlay | Action::ToggleClickThrough)
     }
 
     pub fn label(self) -> &'static str {
@@ -92,7 +83,6 @@ impl Action {
             Action::ReadCharacter => "Read your stat and skill windows, to update your build",
             Action::PauseTracking => "Pause or resume tracking",
             Action::NewSession => "Start a new session",
-            Action::ToggleLogging => "Log this run or not",
             Action::SaveFrame => "Save the picture last read",
             Action::ShowWorkbench => "Open the workbench",
         }
@@ -128,10 +118,6 @@ impl Action {
             }
             Action::NewSession => {
                 live::reset(app);
-                Ok(())
-            }
-            Action::ToggleLogging => {
-                live::toggle_logging(app);
                 Ok(())
             }
             Action::SaveFrame => live::save_frame(app).map(|_| ()),

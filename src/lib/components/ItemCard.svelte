@@ -8,7 +8,6 @@
   import Card from "./Card.svelte";
   import ItemDetails from "./ItemDetails.svelte";
   import ItemNotes from "./ItemNotes.svelte";
-  import PriceLog from "./PriceLog.svelte";
   import { backend } from "$lib/api";
   import { formatSigned, titleCase } from "$lib/format";
   import { mapData } from "$lib/mapdata.svelte";
@@ -167,8 +166,9 @@
 
   <ItemDetails item={read} record={record ?? matched} {map} />
 
+  <!-- The price log (PriceLog.svelte) is hidden for v1: with no price source it was all typing.
+       Its records stay in the file, ready for when a price source gives permission. -->
   <ItemNotes name={item.name} />
-  <PriceLog {item} />
 </Card>
 
 <style>

@@ -6,6 +6,7 @@ import type {
   Analysis,
   BaseStats,
   ItemNote,
+  MapNote,
   SavedSpot,
   UpdateStatus,
   Build,
@@ -143,6 +144,9 @@ function mockLog(item: string, upgrades: number | null, slots: number | null): P
 
 /** Saved sessions: a made-up week on the sample world's maps. */
 let savedSessions: SavedSession[] = [...sampleSavedSessions];
+/** The player's map notes; one to start with on Mossbank Meadow II. */
+const mapNotes = new Map<number, MapNote>([[3, { mapId: 3, map: "Mossbank Meadow II", note: "Left platform is best. Channel 4 is quiet after 9.", updatedAt: Date.now() / 1000 - 86400 }]]);
+const mapNoteHandlers: ((mapId: number) => void)[] = [];
 const historyHandlers: (() => void)[] = [];
 
 function mockHistory(): History {
@@ -204,6 +208,7 @@ let displaySettings: DisplaySettings = {
   opacity: 1,
   scale: 1,
   alwaysOnTop: true,
+  keepGameFocus: true,
   compactShape: "card",
   hotkeys: { enabled: true, keys: {} },
   travel: { enabled: false, cabs: true, vipCabs: false, scrolls: true },
@@ -451,7 +456,6 @@ export const mockBackend: Backend = {
     { action: "ReadCharacter", keys: "", suggestedKeys: "", label: "Read your stat and skill windows, to update your build", inSetup: true, taken: false },
     { action: "PauseTracking", keys: "", suggestedKeys: "", label: "Pause or resume tracking", inSetup: false, taken: false },
     { action: "NewSession", keys: "", suggestedKeys: "", label: "Start a new session", inSetup: false, taken: false },
-    { action: "ToggleLogging", keys: "", suggestedKeys: "", label: "Log this run or not", inSetup: false, taken: false },
     { action: "SaveFrame", keys: "", suggestedKeys: "", label: "Save the picture last read", inSetup: true, taken: false },
     { action: "ShowWorkbench", keys: "", suggestedKeys: "", label: "Open the workbench", inSetup: false, taken: false },
     ].map((s) => {
@@ -463,9 +467,6 @@ export const mockBackend: Backend = {
     if (liveStatus.state === "reading") setLive({ ...liveStatus, held });
   },
   async resetSession() {},
-  async setLiveLogging(logging) {
-    if (liveStatus.state === "reading") setLive({ ...liveStatus, logging });
-  },
   async startLive() {
     if (!displaySettings.live.enabled) throw "Turn on live reading in Settings first.";
     setLive({ state: "waiting", reason: "Starting…" });
@@ -473,7 +474,7 @@ export const mockBackend: Backend = {
     clearInterval(liveTimer);
     liveTimer = setInterval(() => {
       frames += 1;
-      setLive({ state: "reading", window: "MapleStory", width: 2560, height: 1440, frames, readMs: 412, hdr: false, held: false, logging: true });
+      setLive({ state: "reading", window: "MapleStory", width: 2560, height: 1440, frames, readMs: 412, hdr: false, held: false });
       analysisHandlers.forEach((h) => h(sampleAnalysis));
     }, displaySettings.live.interval * 1000);
   },
@@ -524,9 +525,13 @@ export const mockBackend: Backend = {
     mapDataHandlers.forEach((h) => h(mapStatus));
     return { report: { checked: true, downloaded: files }, status: mapStatus };
   },
-  async findMap() {
+  async findMap(name) {
     if (!mapStatus.ready) return null;
     if (preview?.map) return preview.map;
+    // An exact name finds its own map; anything else stands for the minimap's slightly misread
+    // header, which matches the sample's current map.
+    const exact = sampleSearch(name).find((m) => m.name === name);
+    if (exact) return { score: 1, card: sampleCard(exact.id)!, alternatives: [] };
     const card = sampleCard(2)!;
     return { score: 0.93, card, alternatives: [sampleSearch("Meadow II")[0]] };
   },
@@ -544,6 +549,7 @@ export const mockBackend: Backend = {
     if (preview?.guide) return preview.guide;
     return sampleGuide(quests, 2, dropsDownloaded);
   },
+  dropsFetchedAt: async () => (dropsDownloaded ? Date.now() / 1000 - 86400 : null),
   async downloadDrops() {
     await delay(900);
     dropsDownloaded = true;
@@ -621,6 +627,19 @@ export const mockBackend: Backend = {
   },
   sessionHistory: async () => mockHistory(),
   sessionTimeline: async (id) => sampleTimelines.get(id) ?? { points: [], events: [] },
+  setTyping: async () => {},
+  mapNote: async (mapId) => mapNotes.get(mapId) ?? null,
+  async setMapNote(mapId, map, note) {
+    const text = note.trim();
+    if (!text) mapNotes.delete(mapId);
+    else mapNotes.set(mapId, { mapId, map, note: text, updatedAt: Date.now() / 1000 });
+    mapNoteHandlers.forEach((h) => h(mapId));
+    return mapNotes.get(mapId) ?? null;
+  },
+  async onMapNote(handler) {
+    mapNoteHandlers.push(handler);
+    return () => {};
+  },
   async showTraining() {
     window.open("/training", "_blank");
   },

@@ -608,6 +608,15 @@ pub async fn download_drops(app: AppHandle) -> Result<()> {
         .map_err(|err| Error::Invalid(err.to_string()))?
 }
 
+/// When the drop table was last downloaded, in Unix seconds, or `None` before the first time.
+#[tauri::command]
+pub fn drops_fetched_at(state: State<MapDataState>) -> Result<Option<i64>> {
+    if !state.path.exists() {
+        return Ok(None);
+    }
+    Store::open(&state.path)?.drops_fetched_at()
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Spots {

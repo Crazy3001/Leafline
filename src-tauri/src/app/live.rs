@@ -50,8 +50,12 @@ const MIN_PICTURE_GAP: Duration = Duration::from_secs(1);
 const ITEM_PICTURE_KEPT: Duration = Duration::from_secs(15);
 /// How often HDR is checked again, in readings, in case the game moves to another display.
 const HDR_CHECK_EVERY: u64 = 30;
-/// Active seconds before a session is worth keeping, and how often it is saved from then on.
-const SAVE_AFTER_ACTIVE: f64 = 60.0;
+/// Active seconds before a session is worth keeping, and how often it is saved from then on. A
+/// quick login to sell or chat isn't a training session.
+const SAVE_AFTER_ACTIVE: f64 = 300.0;
+/// A break this long with no EXP ends the session; the next gain starts a new one. Paused by hand
+/// is left alone: the player said they are coming back.
+const BREAK_ENDS_SESSION: Duration = Duration::from_secs(30 * 60);
 const SAVE_EVERY: Duration = Duration::from_secs(30);
 /// A meso amount is remembered for its character only while it is on screen, at most this long
 /// after it was last read.
@@ -78,8 +82,6 @@ pub enum LiveStatus {
         hdr: bool,
         /// Tracking is paused by hand.
         held: bool,
-        /// This run goes to the log.
-        logging: bool,
     },
     /// Stopped by an error.
     Failed { message: String },
@@ -111,8 +113,6 @@ pub struct LiveState {
     held: AtomicBool,
     /// A new session was asked for.
     reset: AtomicBool,
-    /// This run stays out of the log. It ends with the session.
-    log_off: AtomicBool,
     status: Mutex<LiveStatus>,
     /// The last picture read, kept in memory only, for "Save frame".
     frame: Mutex<Option<Arc<Frame>>>,
@@ -300,23 +300,12 @@ pub fn reset(app: &AppHandle) {
     }
 }
 
-/// Keeps this run in or out of the log.
-pub fn set_logging(app: &AppHandle, logging: bool) {
-    app.state::<LiveState>().log_off.store(!logging, Ordering::SeqCst);
-    show_controls(app);
-}
-
-pub fn toggle_logging(app: &AppHandle) {
-    set_logging(app, app.state::<LiveState>().log_off.load(Ordering::SeqCst));
-}
-
 /// Shows a change of the controls right away, without waiting for a new picture.
 fn show_controls(app: &AppHandle) {
     let state = app.state::<LiveState>();
     let mut current = state.status.lock().expect("live lock");
-    if let LiveStatus::Reading { held, logging, .. } = &mut *current {
+    if let LiveStatus::Reading { held, .. } = &mut *current {
         *held = state.held.load(Ordering::SeqCst);
-        *logging = !state.log_off.load(Ordering::SeqCst);
         let _ = app.emit(LIVE_EVENT, &*current);
     }
 }
@@ -334,7 +323,7 @@ impl Keeper {
     }
 
     fn save(&mut self, app: &AppHandle, session: &SessionSummary) {
-        if session.active_seconds < SAVE_AFTER_ACTIVE || app.state::<LiveState>().log_off.load(Ordering::SeqCst) {
+        if session.active_seconds < SAVE_AFTER_ACTIVE {
             return;
         }
         self.saved_at = Some(Instant::now());
@@ -423,8 +412,9 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
     let mut held = false;
     let mut game: Option<(Capturer, GameWindow, bool)> = None;
     let mut frames = 0u64;
+    // The session's active time when it last grew, and when that was.
+    let mut last_active = (0.0f64, Instant::now());
     state.held.store(false, Ordering::SeqCst);
-    state.log_off.store(false, Ordering::SeqCst);
 
     while !state.stop.load(Ordering::SeqCst) {
         let tick = Instant::now();
@@ -438,11 +428,20 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
             keeper.save(app, &tracker.summary());
             keeper = Keeper::default();
             tracker = fresh_tracker(choice.pause_after);
-            state.log_off.store(false, Ordering::SeqCst);
+            last_active = (0.0, Instant::now());
             held = false;
             state.held.store(false, Ordering::SeqCst);
             readings::publish_session(app, &tracker.summary());
             show_controls(app);
+        }
+        // A long break, game open or not, ends the session so tonight's play isn't added to
+        // this afternoon's.
+        if !held && last_active.0 > 0.0 && last_active.1.elapsed() >= BREAK_ENDS_SESSION {
+            keeper.save(app, &tracker.summary());
+            keeper = Keeper::default();
+            tracker = fresh_tracker(choice.pause_after);
+            last_active = (0.0, Instant::now());
+            readings::publish_session(app, &tracker.summary());
         }
         let now_held = state.held.load(Ordering::SeqCst);
         if now_held != held {
@@ -545,10 +544,14 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
                         keeper.save(app, &tracker.summary());
                         keeper = Keeper::default();
                         tracker = fresh_tracker(choice.pause_after);
+                        last_active = (0.0, Instant::now());
                     }
                     tracker.push(&sample);
                 }
                 let session = tracker.summary();
+                if session.active_seconds > last_active.0 {
+                    last_active = (session.active_seconds, Instant::now());
+                }
                 follow_windows(app, &mut windows, &frame, &analysis, &ocr);
                 readings::publish_live_analysis(app, analysis);
                 readings::publish_session(app, &session);
@@ -571,7 +574,6 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
                         read_ms,
                         hdr: *hdr,
                         held,
-                        logging: !state.log_off.load(Ordering::SeqCst),
                     },
                 );
                 *state.frame.lock().expect("live lock") = Some(Arc::new(frame));
@@ -657,11 +659,6 @@ pub fn set_live_held(app: AppHandle, held: bool) {
 #[tauri::command]
 pub fn reset_session(app: AppHandle) {
     reset(&app);
-}
-
-#[tauri::command]
-pub fn set_live_logging(app: AppHandle, logging: bool) {
-    set_logging(&app, logging);
 }
 
 #[tauri::command]

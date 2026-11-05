@@ -178,6 +178,7 @@ fn open(app: &AppHandle, panel: Panel, slot: usize) -> Result<()> {
         // Double-clicking the header would otherwise fill the screen.
         .maximizable(false)
         .focused(false)
+        .focusable(!app.state::<SettingsState>().get().keep_game_focus)
         .visible(!app.state::<PinState>().hidden.load(Ordering::Relaxed))
         .additional_browser_args(super::BROWSER_ARGS)
         .build()?;
