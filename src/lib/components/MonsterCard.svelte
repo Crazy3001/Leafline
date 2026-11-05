@@ -13,6 +13,7 @@
   import { measuredRates, watchHistory } from "$lib/history.svelte";
   import { OSMS_CREDIT, OSMS_URL, WIKI_URL } from "$lib/mapdata.svelte";
   import { openMonster } from "$lib/monsters.svelte";
+  import { showNpcNamed } from "$lib/places.svelte";
   import { travelKey } from "$lib/settings.svelte";
   import type { MapReading, MonsterSheet, MonsterWhere, QuestReading, SessionSummary } from "$lib/types";
 
@@ -208,7 +209,12 @@
             <li>
               <button class="link strong" onclick={() => backend.showQuest(need.quest.id)}>{need.quest.name}</button>
               <span class="tabular" class:yours-now={counted}>{counted ?? `×${need.count}`}</span>
-              <span class="who">{[need.quest.levelMin ? `Lv ${need.quest.levelMin}` : null, need.giver].filter(Boolean).join(" · ")}</span>
+              <span class="who"
+                >{#if need.quest.levelMin}Lv {need.quest.levelMin}{/if}{#if need.giver}{need.quest.levelMin ? " · " : ""}<button
+                    class="ref ref-npc"
+                    onclick={() => showNpcNamed(need.giver!)}>{need.giver}</button
+                  >{/if}</span
+              >
             </li>
           {/each}
         </ul>
@@ -223,7 +229,12 @@
               <button class="link strong tabular" onclick={() => openMonster(version.id)}>
                 Lv {version.level} · {formatCompact(version.hp)} HP · {formatNumber(version.exp)} EXP
               </button>
-              <span class="who">{version.maps.length ? version.maps.slice(0, 2).map((m) => m.name).join(", ") : "Not on any map"}</span>
+              <span class="who"
+                >{#each version.maps.slice(0, 2) as m, k (m.id)}{k ? ", " : ""}{#if m.known}<button
+                      class="ref ref-map"
+                      onclick={() => backend.showPlace("maps", m.id)}>{m.name}</button
+                    >{:else}{m.name}{/if}{:else}Not on any map{/each}</span
+              >
             </li>
           {/each}
         </ul>

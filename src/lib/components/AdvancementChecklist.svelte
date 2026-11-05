@@ -8,7 +8,7 @@
 
   import { backend } from "$lib/api";
   import { live } from "$lib/readings.svelte";
-  import type { QuestRow } from "$lib/types";
+  import type { MapRef, QuestRow } from "$lib/types";
 
   let {
     job,
@@ -30,7 +30,8 @@
   interface Place {
     npcId: number;
     name: string;
-    map: string | null;
+    /** The nearest map they stand on, which opens in Lookup with a route from here. */
+    map: MapRef | null;
     hops: number | null;
   }
 
@@ -116,7 +117,7 @@
     const map = live.analysis?.map ?? null;
     const where = await backend.npcSheet(npcId, map?.name ?? null, map?.street ?? null, map?.twin ?? null);
     const nearest = where?.sheet.maps[0] ?? null;
-    return { npcId, name, map: nearest?.map.name ?? null, hops: nearest?.travel?.hops ?? nearest?.hops ?? null };
+    return { npcId, name, map: nearest?.map ?? null, hops: nearest?.travel?.hops ?? nearest?.hops ?? null };
   }
 
   function toggle(step: string) {
@@ -131,6 +132,13 @@
   const reached = $derived(level != null && level >= at);
   const away = (hops: number | null) => (hops == null ? "" : hops === 0 ? " · here" : ` · ${hops} portal${hops === 1 ? "" : "s"}`);
 </script>
+
+{#snippet where(map: MapRef, hops: number | null)}
+  <span class="dim"
+    >in {#if map.known}<button class="ref ref-map" onclick={() => backend.showPlace("maps", map.id)}>{map.name}</button
+      >{:else}{map.name}{/if}{away(hops)}</span
+  >
+{/snippet}
 
 {#snippet tick(step: string, done: boolean, auto = false)}
   <button
@@ -166,7 +174,7 @@
           <button class="link ref ref-npc" onclick={() => backend.showPlace("npcs", found!.instructor!.npcId)}
             >{found.instructor.name}</button
           >
-          {#if found.instructor.map}<span class="dim">in {found.instructor.map}{away(found.instructor.hops)}</span>{/if}
+          {#if found.instructor.map}{@render where(found.instructor.map, found.instructor.hops)}{/if}
         </span>
       </li>
     {/if}
@@ -188,7 +196,7 @@
             <button class="link ref ref-npc" onclick={() => backend.showPlace("npcs", found!.tester!.npcId)}
               >{found.tester.name}</button
             >
-            {#if found.tester.map}<span class="dim">in {found.tester.map}{away(found.tester.hops)}</span>{/if}
+            {#if found.tester.map}{@render where(found.tester.map, found.tester.hops)}{/if}
           </span>
         </li>
       {/if}
