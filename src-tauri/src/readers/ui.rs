@@ -74,29 +74,44 @@ pub struct Canonical {
 
 impl Canonical {
     pub fn new(frame: &Frame, scale: f32) -> Self {
-        Self::drawn(frame, scale, sample)
+        Self::drawn(frame, scale, None, sample)
     }
 
-    /// A view for readers that key on pure black text (the Quest Helper, the meso box). Each
-    /// design pixel takes the window pixel at its centre, not a blend, so UI Size Default Ratio's
-    /// unsmoothed black stays pure black. With Filter Applied the game has already blurred it,
-    /// so near-black is taken back to black.
-    pub fn sharp(frame: &Frame, scale: f32, near_black: u8) -> Self {
-        Self::drawn(frame, scale, |frame, x, y| {
+    /// Only the part of the window around `area`, which is quicker to draw than all of it.
+    /// Rectangles still map back with [`Self::to_window`].
+    pub fn within(frame: &Frame, scale: f32, area: Rect) -> Self {
+        Self::drawn(frame, scale, Some(area), sample)
+    }
+
+    /// A view of `area` for readers that key on pure black text (the Quest Helper). With Filter
+    /// Applied the game blurs its black text, so near-black is taken back to black.
+    pub fn sharp(frame: &Frame, scale: f32, area: Rect, near_black: u8) -> Self {
+        Self::drawn(frame, scale, Some(area), |frame, x, y| {
             let px = sample(frame, x, y);
             if px.0[..3].iter().all(|&c| c <= near_black) { Rgba([0, 0, 0, 255]) } else { px }
         })
     }
 
-    fn drawn(frame: &Frame, scale: f32, sample: impl Fn(&Frame, f32, f32) -> Rgba<u8>) -> Self {
+    fn drawn(frame: &Frame, scale: f32, area: Option<Rect>, sample: impl Fn(&Frame, f32, f32) -> Rgba<u8>) -> Self {
         let (width, height) = (frame.width() as f32, frame.height() as f32);
         // Everything within the window, on the same grid as the design area, which is centred
         // along the bottom edge. Off that grid, each pixel would blend two design pixels.
         let origin = (width - DESIGN_WIDTH * scale) / 2.0;
-        let left = origin.rem_euclid(scale);
-        let columns = ((width - left) / scale).floor();
-        let rows = (height / scale).floor();
-        let top = height - rows * scale;
+        let grid_left = origin.rem_euclid(scale);
+        let (all_columns, all_rows) = (((width - grid_left) / scale).floor(), (height / scale).floor());
+        let grid_top = height - all_rows * scale;
+        // The design pixels `area` touches, or all of them.
+        let (first_column, last_column, first_row, last_row) = match area {
+            Some(area) => (
+                ((area.x - grid_left) / scale).floor().clamp(0.0, all_columns),
+                ((area.right() - grid_left) / scale).ceil().clamp(0.0, all_columns),
+                ((area.y - grid_top) / scale).floor().clamp(0.0, all_rows),
+                ((area.bottom() - grid_top) / scale).ceil().clamp(0.0, all_rows),
+            ),
+            None => (0.0, all_columns, 0.0, all_rows),
+        };
+        let (columns, rows) = (last_column - first_column, last_row - first_row);
+        let (left, top) = (grid_left + first_column * scale, grid_top + first_row * scale);
         let block = CANONICAL_SCALE as u32;
         let (out_width, out_height) = (columns as u32 * block, rows as u32 * block);
         let sampled = Frame::from_fn(columns as u32, rows as u32, |x, y| {
@@ -206,6 +221,22 @@ mod tests {
         assert_eq!(smoothed(&panel([0, 0, 0]), whole), Some(false));
         assert_eq!(smoothed(&panel([40, 40, 44]), whole), Some(true));
         assert_eq!(smoothed(&Frame::from_pixel(60, 40, Rgba([200, 210, 220, 255])), whole), None);
+    }
+
+    #[test]
+    fn a_part_of_the_window_is_drawn_like_the_whole() {
+        let scale = 1.875;
+        let frame = lit_cell(scale, 1920, 1080, (300, 200));
+        let whole = Canonical::new(&frame, scale);
+        let part = Canonical::within(&frame, scale, Rect::new(500.0, 300.0, 200.0, 150.0));
+        assert!(part.frame.width() < 250 && part.frame.height() < 200);
+        let lit = |view: &Canonical| {
+            let (x, y) =
+                view.frame.enumerate_pixels().find(|(_, _, px)| px.0[0] > 150).map(|(x, y, _)| (x, y)).unwrap();
+            view.to_window(Rect::new(x as f32, y as f32, 1.0, 1.0))
+        };
+        let (a, b) = (lit(&whole), lit(&part));
+        assert!((a.x - b.x).abs() < 1e-3 && (a.y - b.y).abs() < 1e-3);
     }
 
     #[test]

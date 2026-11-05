@@ -68,6 +68,11 @@ windows = { version = "0.62.2", features = [
     "Win32_UI_WindowsAndMessaging",
 ] }
 
-# Image processing is far too slow unoptimised; keep dependencies fast in dev builds.
+# Image processing is far too slow unoptimised; keep dependencies fast in dev builds, and the
+# readers fast enough that a dev build keeps up with the game (unoptimised, a frame at UI Size
+# Default took seconds).
+[profile.dev]
+opt-level = 1
+
 [profile.dev.package."*"]
 opt-level = 3

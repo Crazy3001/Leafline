@@ -13,7 +13,7 @@ use crate::readers::quest::QuestReading;
 use crate::readers::tooltip::ItemTooltip;
 use crate::readers::ui::{self, CANONICAL_SCALE, Canonical};
 use crate::readers::{character, hud, map, mesos, party, quest, shop, tooltip};
-use crate::vision::{Frame, Line, Ocr, Word, group_lines};
+use crate::vision::{Frame, Line, Ocr, Rect, Word, group_lines};
 
 #[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -163,10 +163,14 @@ fn redrawn_scale(frame: &Frame, hud: Option<&HudLayout>) -> Option<f32> {
     ((scale - CANONICAL_SCALE).abs() > 0.005).then_some(scale)
 }
 
-/// Lines found in the window, moved onto `view`.
-fn lines_in_view(lines: &[Line], view: &Canonical) -> Vec<Line> {
+/// Lines found in the window that lie within `area`, moved onto `view`.
+fn lines_in_view(lines: &[Line], area: Rect, view: &Canonical) -> Vec<Line> {
+    let inside = |rect: &Rect| {
+        rect.x >= area.x && rect.y >= area.y && rect.right() <= area.right() && rect.bottom() <= area.bottom()
+    };
     lines
         .iter()
+        .filter(|line| inside(&line.rect))
         .map(|line| Line {
             text: line.text.clone(),
             rect: view.to_view(line.rect),
@@ -176,23 +180,34 @@ fn lines_in_view(lines: &[Line], view: &Canonical) -> Vec<Line> {
 }
 
 fn read_quests(frame: &Frame, scale: Option<f32>, overview: &[Line], ocr: &Ocr) -> Result<Option<QuestReading>> {
-    let (Some(scale), Some((_, panel))) = (scale, quest::panel(overview)) else {
+    let (Some(scale), Some((header, panel))) = (scale, quest::panel(overview)) else {
         return quest::read(frame, overview, ocr);
     };
     let smoothed = ui::smoothed(frame, panel).unwrap_or(false);
-    let view = Canonical::sharp(frame, scale, if smoothed { ui::NEAR_BLACK_SMOOTHED } else { ui::NEAR_BLACK });
-    Ok(match quest::read(&view.frame, &lines_in_view(overview, &view), ocr)? {
+    // The header and the panel under it, with room for the panel's edges.
+    let margin = header.rect.h;
+    let area =
+        Rect::from_edges(panel.x - margin, header.rect.y - margin, panel.right() + margin, panel.bottom() + margin);
+    let near_black = if smoothed { ui::NEAR_BLACK_SMOOTHED } else { ui::NEAR_BLACK };
+    let view = Canonical::sharp(frame, scale, area, near_black);
+    Ok(match quest::read(&view.frame, &lines_in_view(overview, area, &view), ocr)? {
         Some(reading) => Some(QuestReading { panel: view.to_window(reading.panel), ..reading }),
         None => quest::read(frame, overview, ocr)?,
     })
 }
 
+/// At UI Size Default Ratio the digits are read as drawn, with the ink thresholds for thin
+/// smoothed strokes. Redrawn on the design grid they smear across two columns wherever the
+/// inventory sits off that grid, so the redraw is only tried when that fails with the box shown.
 fn read_mesos(frame: &Frame, scale: Option<f32>, ocr: &Ocr) -> Result<(Option<MesoReading>, usize)> {
     let Some(scale) = scale else { return mesos::read(frame, ocr) };
-    let view = Canonical::new(frame, scale);
-    let (reading, boxes) = mesos::read_with(&view.frame, ocr, mesos::Ink::SMOOTHED)?;
+    let (reading, boxes) = mesos::read_with(frame, ocr, mesos::Ink::SMOOTHED)?;
     if reading.is_some() || boxes == 0 {
-        return Ok((reading.map(|r| MesoReading { rect: view.to_window(r.rect), ..r }), boxes));
+        return Ok((reading, boxes));
+    }
+    let view = Canonical::new(frame, scale);
+    if let (Some(reading), _) = mesos::read_with(&view.frame, ocr, mesos::Ink::SMOOTHED)? {
+        return Ok((Some(MesoReading { rect: view.to_window(reading.rect), ..reading }), boxes));
     }
     mesos::read(frame, ocr)
 }

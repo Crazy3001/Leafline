@@ -69,7 +69,10 @@ fn canonical(frame: &Frame, layout: HudLayout) -> Option<(Glyphs, HudLayout)> {
     if (scale - CANONICAL_SCALE).abs() <= 0.005 {
         return Some((Glyphs::extract(frame, &layout), layout));
     }
-    let view = Canonical::new(frame, scale);
+    // Only the bottom of the window, where the HUD is. Full width, since `locate` measures
+    // against the width.
+    let (width, height) = (frame.width() as f32, frame.height() as f32);
+    let view = Canonical::within(frame, scale, Rect::new(0.0, 0.6 * height, width, 0.4 * height));
     let found = locate(&view.frame)?;
     Some((Glyphs::extract(&view.frame, &found), view.layout_to_window(&found)))
 }

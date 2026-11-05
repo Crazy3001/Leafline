@@ -188,7 +188,7 @@ fn amber_name(frame: &Frame, area: Rect, ocr: &Ocr) -> Result<Option<String>> {
         let words = ocr.words_in(frame, line, AMBER_SCALE as f32, |crop| {
             // Looser than the check for amber: text over a dark patch of scenery comes out dimmer.
             let keyed = preprocess::keep(crop, |px| {
-                let [r, g, b, _] = px.0;
+                let [r, g, b, _] = px.0.map(i16::from);
                 r >= 150 && g >= 90 && b <= 70 && r >= g + 40
             });
             let (w, h) = (keyed.width() * AMBER_SCALE, keyed.height() * AMBER_SCALE);
