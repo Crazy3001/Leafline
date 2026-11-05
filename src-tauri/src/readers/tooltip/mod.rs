@@ -332,7 +332,8 @@ fn frame_top(frame: &Frame, separator: Rect, unit: f32) -> Option<f32> {
     let on_frame = |y: u32| {
         columns.clone().any(|x| {
             let (edge, inside) = (frame.get_pixel(x, y), frame.get_pixel((x + inset).min(frame.width() - 1), y));
-            is_panel_frame(edge) && preprocess::luminance(edge) >= preprocess::luminance(inside) + 30
+            let lighter = u16::from(preprocess::luminance(edge)) >= u16::from(preprocess::luminance(inside)) + 30;
+            is_panel_frame(edge) && lighter
         })
     };
     let max_gap = (4.0 * unit) as u32;

@@ -394,6 +394,7 @@ function partialSession(fraction: number, frames: number): SessionSummary {
     activeSeconds: full.activeSeconds * fraction,
     expGained: part(full.expGained),
     mesosGained: part(full.mesosGained),
+    mesosSeconds: full.mesosSeconds * fraction,
     maps: full.maps.map((m) => ({ ...m, activeSeconds: m.activeSeconds * fraction, expGained: part(m.expGained), mesosGained: part(m.mesosGained) })),
   };
 }

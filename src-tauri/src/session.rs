@@ -15,7 +15,9 @@
 //!   and the first level actually read lines the count up.
 //! - **Mesos count once several readings in a row agree**, and a big jump needs more of them.
 //!   Changes while a shop, storage or trade window is open are kept apart, since they are not
-//!   loot.
+//!   loot. The first amount such a window shows is from before anything was bought, so the
+//!   change up to it is loot and one reading of it is enough. The mesos need not stay on
+//!   screen: a gain counts over the active time between the two looks either side of it.
 //! - **Quest counters count the same way**, and only going up: a counter that drops (a quest
 //!   handed in and taken again) starts afresh. Their gains over active time give the player's
 //!   own pace on each objective, per map.
@@ -124,6 +126,10 @@ const TIMELINE_STEP: f64 = 30.0;
 const TIMELINE_POINTS: usize = 960;
 /// Seconds without a look at the mesos after which a big change is believed at the usual count.
 const MESO_GAP: f64 = 120.0;
+/// Seconds after a shop, storage or trade window opens in which the first amount read in it is
+/// still taken as the one from before the window. Buying takes a click and a confirmation, so a
+/// first reading this soon almost always comes before it.
+const FRESH_WINDOW: f64 = 10.0;
 /// Seconds without the minimap's name before gains stop going to the last map read.
 const MAP_BLIND_SECONDS: f64 = 45.0;
 /// ...and before the player is told.
@@ -216,9 +222,17 @@ pub struct SessionSummary {
     /// Net mesos gained outside shop, storage and trade windows.
     pub mesos_gained: i64,
     pub mesos_per_hour: Option<f64>,
+    /// The active time the meso rate is over: from one look at the mesos to a later one that
+    /// shows a change. Less than `active_seconds` when the mesos were not looked at for a while.
+    pub mesos_seconds: f64,
+    /// Active seconds since the mesos were last on screen, or since the start when they never
+    /// were. Mesos gained in that time are not counted yet.
+    pub mesos_unseen_seconds: f64,
     /// Net change while one of those windows was open, left out of the rates.
     pub mesos_excluded: i64,
     pub map: Option<String>,
+    /// The map is a town.
+    pub town: bool,
     /// The minimap's name has not been seen for a while, so the map may be out of date.
     pub map_hidden: bool,
     /// The character's name, once read the same a few times in a row.
@@ -394,6 +408,16 @@ struct MesoPoint {
     map: Option<String>,
 }
 
+/// A shop, storage or trade window that is open now.
+#[derive(Debug, Clone)]
+struct OpenWindow {
+    opened_at: f64,
+    /// An amount has been read in it.
+    read: bool,
+    /// The amount read in its latest frame, if one was.
+    last: Option<u64>,
+}
+
 #[derive(Debug, Clone, Default)]
 struct MapTotals {
     map: Option<String>,
@@ -455,6 +479,8 @@ pub struct SessionTracker {
     /// When the map's name was last seen, and the same for the mesos.
     map_seen_at: Option<f64>,
     mesos_seen_at: Option<f64>,
+    /// The active clock when the mesos were last seen.
+    mesos_seen_clock: Option<f64>,
     town: bool,
     party: Steady<u32>,
     job: Steady<String>,
@@ -479,6 +505,7 @@ pub struct SessionTracker {
     mesos: Option<MesoPoint>,
     /// A shop, storage or trade window was seen since the last confirmed amount.
     exchange_seen: bool,
+    window: Option<OpenWindow>,
     mesos_gained: i64,
     meso_seconds: f64,
     mesos_excluded: i64,
@@ -525,13 +552,43 @@ impl SessionTracker {
         if let Some(name) = &sample.name {
             self.name.see(name.clone(), OTHER_CHARACTER_READS);
         }
-        self.exchange_seen |= sample.exchange;
         self.push_exp(sample);
         if let Some(percent) = sample.percent {
             self.push_percent(sample, percent);
         }
+        self.follow_window(sample);
         self.push_mesos(sample);
+        if let Some(window) = &mut self.window {
+            window.read |= sample.mesos.is_some();
+            window.last = sample.mesos;
+        }
+        self.exchange_seen |= sample.exchange;
         self.push_counters(sample);
+    }
+
+    /// Notes a shop, storage or trade window opening or closing.
+    fn follow_window(&mut self, sample: &Sample) {
+        if sample.exchange {
+            if self.window.is_none() {
+                self.window = Some(OpenWindow { opened_at: sample.at, read: false, last: None });
+            }
+            return;
+        }
+        // A window that closed showing the amount counted last changed nothing after it, so the
+        // next change is loot again, even if the inventory was not opened in between.
+        if let Some(window) = self.window.take()
+            && window.last.is_some()
+            && window.last == self.mesos.as_ref().map(|m| m.mesos)
+        {
+            self.exchange_seen = false;
+        }
+    }
+
+    /// The first amount read in a window that has just opened: it is from before anything in
+    /// the window was bought, sold or moved.
+    fn first_in_window(&self, sample: &Sample) -> bool {
+        sample.exchange
+            && self.window.as_ref().is_some_and(|w| !w.read && sample.at - w.opened_at <= FRESH_WINDOW)
     }
 
     /// Takes a new "seconds without EXP" setting.
@@ -923,11 +980,14 @@ impl SessionTracker {
 
     /// How many readings in a row a new amount needs. A big change is usually a digit misread,
     /// and a tenfold one nearly always is, unless the mesos have been out of sight for a while.
-    fn meso_confirmations(&self, mesos: u64, at: f64) -> usize {
+    /// The first amount in a window that has just opened needs only one, since the player may
+    /// buy something before a second.
+    fn meso_confirmations(&self, mesos: u64, at: f64, first_in_window: bool) -> usize {
         let base = self.config.confirmations.max(1);
-        let Some(last) = self.mesos.as_ref().filter(|_| base >= 2) else { return base };
+        let usual = if first_in_window { 1 } else { base };
+        let Some(last) = self.mesos.as_ref().filter(|_| base >= 2) else { return usual };
         if self.mesos_seen_at.is_none_or(|seen| at - seen > MESO_GAP) {
-            return base;
+            return usual;
         }
         let (old, new) = (last.mesos as f64, mesos as f64);
         let ratio = if old > 0.0 { new / old } else { 1.0 };
@@ -936,13 +996,14 @@ impl SessionTracker {
         } else if (new - old).abs() > 10_000f64.max(0.05 * old.max(new)) {
             base.max(3)
         } else {
-            base
+            usual
         }
     }
 
     fn push_mesos(&mut self, sample: &Sample) {
         let Some(mesos) = sample.mesos else { return };
-        let needed = self.meso_confirmations(mesos, sample.at);
+        let first_in_window = self.first_in_window(sample);
+        let needed = self.meso_confirmations(mesos, sample.at, first_in_window);
         let count = match &mut self.meso_run {
             Some((run, count)) if run.mesos == mesos => {
                 *count += 1;
@@ -961,6 +1022,7 @@ impl SessionTracker {
         // it, unless it is still open.
         if self.mesos.as_ref().is_some_and(|m| m.mesos == mesos) {
             self.mesos_seen_at = Some(sample.at);
+            self.mesos_seen_clock = Some(self.clock);
             self.exchange_seen = sample.exchange;
             return;
         }
@@ -969,9 +1031,12 @@ impl SessionTracker {
         }
         let run = self.meso_run.as_ref().map(|(run, _)| run.clone()).expect("a run was just updated");
         self.mesos_seen_at = Some(sample.at);
+        self.mesos_seen_clock = Some(self.clock);
         if let Some(previous) = self.mesos.replace(run.clone()) {
             let delta = run.mesos as i64 - previous.mesos as i64;
-            if self.exchange_seen {
+            // Read in a window: not loot, unless it is the window's first amount, from before
+            // anything in it changed hands.
+            if self.exchange_seen || (sample.exchange && !first_in_window) {
                 self.mesos_excluded += delta;
             } else if delta != 0 {
                 let seconds = run.clock - previous.clock;
@@ -1155,8 +1220,11 @@ impl SessionTracker {
             mesos_age: self.mesos_seen_at.zip(self.updated_at).map(|(seen, now)| (now - seen).max(0.0)),
             mesos_gained: self.mesos_gained,
             mesos_per_hour: rate(self.mesos_gained, self.meso_seconds),
+            mesos_seconds: self.meso_seconds,
+            mesos_unseen_seconds: (self.clock - self.mesos_seen_clock.unwrap_or(0.0)).max(0.0),
             mesos_excluded: self.mesos_excluded,
             map: self.map.clone(),
+            town: self.town,
             map_hidden: self
                 .map_seen_at
                 .zip(self.updated_at)
@@ -1664,6 +1732,70 @@ mod tests {
         assert_eq!(summary.mesos_gained, 1_360 + 1_000);
         assert_eq!(summary.mesos_excluded, 20_000);
         assert_eq!(summary.rejected.mesos, 1);
+    }
+
+    /// Thirty minutes of hunting from `from`, a kill every 30 s, the mesos out of sight.
+    fn hunt(from: f64, exp: &mut u64, samples: &mut Vec<Sample>) {
+        for i in 1..=60 {
+            *exp += 100;
+            samples.push(sample(from + f64::from(i) * 30.0, 30, *exp, (*exp as f64 * 100.0 / 95_710.0) as f32));
+        }
+    }
+
+    /// A frame with a shop open, at the EXP last reached.
+    fn in_shop(at: f64, exp: u64, mesos: Option<u64>) -> Sample {
+        let mut s = sample(at, 30, exp, (exp as f64 * 100.0 / 95_710.0) as f32);
+        s.mesos = mesos;
+        s.exchange = true;
+        s
+    }
+
+    #[test]
+    fn a_town_trip_counts_the_loot_before_the_shop_and_not_the_shopping() {
+        let mut exp = 24_331;
+        let first = sample(0.0, 30, exp, (exp as f64 * 100.0 / 95_710.0) as f32);
+        let mut samples = vec![with_mesos(first.clone(), 100_000), with_mesos(Sample { at: 1.0, ..first }, 100_000)];
+        hunt(0.0, &mut exp, &mut samples);
+        // The shop's first frame shows the mesos from before buying; two potion buys follow.
+        for (at, mesos) in [(1801.0, 130_000), (1803.0, 120_000), (1805.0, 120_000), (1807.0, 110_000), (1809.0, 110_000)] {
+            samples.push(in_shop(at, exp, Some(mesos)));
+        }
+        // Closed, and back to hunting without opening the inventory.
+        hunt(1811.0, &mut exp, &mut samples);
+        for (at, mesos) in [(3612.0, 135_000), (3614.0, 135_000), (3616.0, 125_000), (3618.0, 125_000)] {
+            samples.push(in_shop(at, exp, Some(mesos)));
+        }
+        let summary = track(&samples);
+        assert_eq!(summary.mesos_gained, 30_000 + 25_000);
+        assert_eq!(summary.mesos_excluded, -20_000 - 10_000);
+        assert!(summary.mesos_seconds > summary.active_seconds - 60.0, "{} of {}", summary.mesos_seconds, summary.active_seconds);
+        assert!(close(summary.mesos_per_hour, 55_000.0 * 3600.0 / summary.mesos_seconds, 1.0));
+    }
+
+    #[test]
+    fn a_shop_read_late_is_not_trusted_as_loot() {
+        let mut exp = 24_331;
+        let first = sample(0.0, 30, exp, (exp as f64 * 100.0 / 95_710.0) as f32);
+        let mut samples = vec![with_mesos(first.clone(), 100_000), with_mesos(Sample { at: 1.0, ..first }, 100_000)];
+        hunt(0.0, &mut exp, &mut samples);
+        // The amount is first read 12 s into the window, time enough to have bought something.
+        samples.push(in_shop(1801.0, exp, None));
+        samples.push(in_shop(1813.0, exp, Some(130_000)));
+        samples.push(in_shop(1815.0, exp, Some(130_000)));
+        let summary = track(&samples);
+        assert_eq!((summary.mesos_gained, summary.mesos_excluded), (0, 30_000));
+    }
+
+    #[test]
+    fn mesos_out_of_sight_are_not_counted_yet() {
+        let mut exp = 24_331;
+        let first = sample(0.0, 30, exp, (exp as f64 * 100.0 / 95_710.0) as f32);
+        let mut samples = vec![with_mesos(first.clone(), 100_000), with_mesos(Sample { at: 1.0, ..first }, 100_000)];
+        hunt(0.0, &mut exp, &mut samples);
+        let summary = track(&samples);
+        assert!(close(Some(summary.mesos_unseen_seconds), summary.active_seconds, 1.0), "{summary:?}");
+        assert!(summary.active_seconds > 1700.0);
+        assert_eq!((summary.mesos_seconds, summary.mesos_per_hour), (0.0, None));
     }
 
     fn with_counter(mut sample: Sample, current: u32) -> Sample {

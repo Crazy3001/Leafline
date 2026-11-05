@@ -4,14 +4,15 @@
   import type { Snippet } from "svelte";
 
   let {
+    id,
     title,
     aside,
     last = false,
     children,
-  }: { title?: string; aside?: Snippet; last?: boolean; children: Snippet } = $props();
+  }: { id?: string; title?: string; aside?: Snippet; last?: boolean; children: Snippet } = $props();
 </script>
 
-<section class="block" class:last>
+<section {id} class="block" class:last>
   {#if title || aside}
     <header>
       {#if title}<h2>{title}</h2>{/if}

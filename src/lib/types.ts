@@ -307,9 +307,18 @@ export interface SessionSummary {
   mesosAge: number | null;
   mesosGained: number;
   mesosPerHour: number | null;
+  /**
+   * The active time the meso rate is over: from one look at the mesos to a later one showing a
+   * change. Less than `activeSeconds` when the mesos went unlooked-at for a while.
+   */
+  mesosSeconds: number;
+  /** Active seconds since the mesos were last on screen; mesos gained since then aren't counted yet. */
+  mesosUnseenSeconds: number;
   /** Net change while a shop, storage or trade window was open, left out of the rates. */
   mesosExcluded: number;
   map: string | null;
+  /** The map is a town. */
+  town: boolean;
   /** The minimap's name has not been seen for a while, so the map may be out of date. */
   mapHidden: boolean;
   /** The character's name, once read the same a few times in a row. */

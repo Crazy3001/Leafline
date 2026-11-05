@@ -3,10 +3,39 @@
 
 import type { Bar, ChartPoint } from "./ui/types";
 import { formatCompact, formatDuration, splitMapLabel } from "./format";
-import type { SavedSession, SessionEvent, SessionLine, TimelinePoint } from "./types";
+import type { SavedSession, SessionEvent, SessionLine, SessionSummary, TimelinePoint } from "./types";
 
 /** Less time than this on a map makes its rate a rough guess. */
 export const SHORT_SECONDS = 30 * 60;
+
+/** Active time with the mesos out of sight before the player is reminded, once they stop. */
+const MESOS_UNSEEN_REMINDER = 5 * 60;
+
+/**
+ * How much of the session Mesos / hr covers. The rate is only over the time between looks at
+ * the mesos, so it can cover less than the EXP rate beside it: `partial` says to show how much,
+ * `thin` to grey the number out.
+ */
+export function mesosCoverage(s: SessionSummary): { partial: boolean; thin: boolean; label: string } {
+  const share = s.activeSeconds > 0 ? Math.min(1, s.mesosSeconds / s.activeSeconds) : 0;
+  return {
+    partial: s.activeSeconds >= 120 && share < 0.9,
+    thin: share < 0.5,
+    label: `over ${formatDuration(s.mesosSeconds)} of ${formatDuration(s.activeSeconds)}`,
+  };
+}
+
+/**
+ * A reminder to look at the mesos, once the player stops hunting (in town or not) with a good
+ * stretch of hunting not counted yet. While they hunt, the coverage label says enough.
+ */
+export function mesosReminder(s: SessionSummary): string | null {
+  if (s.held || !s.paused || s.mesosUnseenSeconds < MESOS_UNSEEN_REMINDER) return null;
+  const counted = `Your last ${formatDuration(s.mesosUnseenSeconds)} of hunting isn't in Mesos / hr yet.`;
+  return s.town
+    ? `${counted} Open your inventory before you spend, or give a shop a moment before buying.`
+    : `${counted} Open your inventory to count it.`;
+}
 
 export type Metric = "exp" | "mesos";
 
