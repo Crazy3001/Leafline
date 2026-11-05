@@ -177,17 +177,68 @@ fn game_side_windows(app: &AppHandle) -> Vec<tauri::WebviewWindow> {
 }
 
 /// While the player types in a box on the overlay or a pinned panel, that window takes focus so
-/// the keys reach it; afterwards clicks leave the game focused again. Nothing is sent to the game.
+/// the keys reach it. When they leave the box, the window that was in front before (the game,
+/// usually) is put back in front, so play goes on without clicking it. That is a window-manager
+/// call only: nothing is sent to the game.
 #[tauri::command]
 pub fn set_typing(app: AppHandle, window: tauri::WebviewWindow, typing: bool) -> Result<()> {
     if !app.state::<SettingsState>().get().keep_game_focus {
         return Ok(());
     }
+    if typing {
+        foreground::remember();
+    }
     window.set_focusable(typing)?;
     if typing {
         window.set_focus()?;
+    } else {
+        foreground::give_back();
     }
     Ok(())
+}
+
+/// The window in front before Leafline took focus for typing.
+#[cfg(windows)]
+mod foreground {
+    use std::sync::atomic::{AtomicIsize, Ordering};
+
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::UI::WindowsAndMessaging::{
+        GetForegroundWindow, GetWindowThreadProcessId, IsWindow, SetForegroundWindow,
+    };
+
+    static BEFORE: AtomicIsize = AtomicIsize::new(0);
+
+    fn ours(hwnd: HWND) -> bool {
+        let mut pid = 0;
+        unsafe { GetWindowThreadProcessId(hwnd, Some(&mut pid)) };
+        pid == std::process::id()
+    }
+
+    /// Notes the window in front, unless it is one of Leafline's (moving from one box to another
+    /// across windows keeps the first one noted).
+    pub fn remember() {
+        let hwnd = unsafe { GetForegroundWindow() };
+        if !hwnd.is_invalid() && !ours(hwnd) {
+            BEFORE.store(hwnd.0 as isize, Ordering::Relaxed);
+        }
+    }
+
+    /// Puts the noted window back in front, if Leafline still has the front.
+    pub fn give_back() {
+        let before = HWND(BEFORE.load(Ordering::Relaxed) as *mut _);
+        let now = unsafe { GetForegroundWindow() };
+        if before.is_invalid() || !ours(now) || !unsafe { IsWindow(Some(before)) }.as_bool() {
+            return;
+        }
+        let _ = unsafe { SetForegroundWindow(before) };
+    }
+}
+
+#[cfg(not(windows))]
+mod foreground {
+    pub fn remember() {}
+    pub fn give_back() {}
 }
 
 #[tauri::command]

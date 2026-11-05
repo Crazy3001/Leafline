@@ -14,9 +14,10 @@ use super::drops::{WIKI_API, encode};
 use super::fetch::Source;
 use crate::error::{Error, Result};
 
-/// The wiki's Route Planner settings, which list its fast-travel services and their fares.
-pub const ROUTE_PLANNER_RAW: &str =
-    "https://mapleclassic.wiki/index.php?title=Module:RoutePlanner/config.json&action=raw";
+/// The wiki's Route Planner settings, which list its fast-travel services and their fares. Asked
+/// through the API: the wiki answers `index.php?action=raw` with 403 for programs (seen 2026-11-05).
+pub const ROUTE_PLANNER_QUERY: &str = "https://mapleclassic.wiki/api.php?action=query&prop=revisions\
+    &titles=Module:RoutePlanner/config.json&rvprop=content&rvslots=main&format=json&formatversion=2";
 const ROUTE_PLANNER_PAGE: &str = "https://mapleclassic.wiki/wiki/Module:RoutePlanner/config.json";
 const WIKI_PAGE: &str = "https://mapleclassic.wiki/wiki/";
 /// Return scrolls are named after where they go.
@@ -116,7 +117,7 @@ impl TravelFile {
     /// The paid rides from the wiki's Route Planner, leaving out the ferries and gates it marks
     /// as required (trips of another kind), and every item named "Return Scroll to <town>".
     pub fn fetch(source: &dyn Source, now: i64) -> Result<Self> {
-        let config: PlannerConfig = serde_json::from_slice(&source.get(ROUTE_PLANNER_RAW)?)
+        let config = planner_config(&source.get(ROUTE_PLANNER_QUERY)?)
             .map_err(|err| Error::Download(format!("the wiki's Route Planner settings: {err}")))?;
         let reply: ScrollReply = serde_json::from_slice(&source.get(&scroll_query_url())?)
             .map_err(|err| Error::Download(format!("the wiki's return scrolls: {err}")))?;
@@ -124,6 +125,16 @@ impl TravelFile {
         services.extend(reply.cargoquery.into_iter().filter_map(|row| scroll(&row.title.name?)));
         Ok(Self { about: ABOUT.to_string(), fetched_at: Some(now), services })
     }
+}
+
+/// The page's text taken out of the API's reply and read as the Route Planner settings.
+fn planner_config(reply: &[u8]) -> std::result::Result<PlannerConfig, String> {
+    let reply: serde_json::Value = serde_json::from_slice(reply).map_err(|err| err.to_string())?;
+    let content = reply
+        .pointer("/query/pages/0/revisions/0/slots/main/content")
+        .and_then(|content| content.as_str())
+        .ok_or("the page wasn't in the reply")?;
+    serde_json::from_str(content).map_err(|err| err.to_string())
 }
 
 #[derive(Deserialize)]
@@ -368,7 +379,8 @@ mod tests {
         let scrolls = r#"{"cargoquery": [{"title": {"name": "Return Scroll to Mossbank"}},
             {"title": {"name": "Return Scroll - Nearest Village"}}]}"#;
         let mut source = FakeSource::default();
-        source.files.insert(ROUTE_PLANNER_RAW.into(), config.as_bytes().to_vec());
+        let page = serde_json::json!({"query": {"pages": [{"revisions": [{"slots": {"main": {"content": config}}}]}]}});
+        source.files.insert(ROUTE_PLANNER_QUERY.into(), page.to_string().into_bytes());
         source.files.insert(scroll_query_url(), scrolls.as_bytes().to_vec());
 
         let file = TravelFile::fetch(&source, 1234).unwrap();

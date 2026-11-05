@@ -2,7 +2,7 @@
   // Where to train: maps near the character's level, ranked for this player. "For you" uses the
   // EXP per hour measured on each map, and for maps not tried yet an estimate: the map's base
   // EXP per clear times how the player's measured maps compare with theirs. No game formulas
-  // are modelled. Saved spots stay in the list whatever their level.
+  // are modelled. "Saved" lists the maps the player bookmarked, whatever their level.
   import { Bookmark, ChevronRight, CircleHelp, ExternalLink, Minus, Plus } from "@lucide/svelte";
   import { onMount, untrack } from "svelte";
 
@@ -31,12 +31,7 @@
     session?: SessionSummary | null;
   } = $props();
 
-  type Sort = "you" | "exp" | "near";
-  const SORTS: { id: Sort; label: string; title: string }[] = [
-    { id: "you", label: "For you", title: "Your EXP per hour where you have played, an estimate where you haven't" },
-    { id: "exp", label: "EXP / clear", title: "Base EXP for defeating every monster on the map once" },
-    { id: "near", label: "Nearest", title: "Fewest portals from where you are" },
-  ];
+  type Sort = "you" | "exp" | "near" | "saved";
   /** Maps whose average monster level is this far below or above the character count as near. */
   const BELOW = 8;
   const ABOVE = 3;
@@ -107,6 +102,16 @@
   const steps = (s: TrainingSpot) => s.travel?.hops ?? s.hops;
   const near = (s: TrainingSpot) => level == null || (s.averageLevel >= level - BELOW && s.averageLevel <= level + ABOVE);
   const savedIds = $derived(new Set(saved.map((s) => s.mapId)));
+  const sorts = $derived<{ id: Sort; label: string; title: string }[]>([
+    { id: "you", label: "For you", title: "Your EXP per hour where you have played, an estimate where you haven't" },
+    { id: "exp", label: "EXP / clear", title: "Base EXP for defeating every monster on the map once" },
+    { id: "near", label: "Nearest", title: "Fewest portals from where you are" },
+    {
+      id: "saved",
+      label: saved.length ? `Saved ${saved.length}` : "Saved",
+      title: "The maps you bookmarked, whatever their level, best for you first",
+    },
+  ]);
 
   /** EXP an hour per base EXP point, from the maps the player measured. */
   const ratio = $derived(
@@ -120,11 +125,15 @@
   const forYou = (s: TrainingSpot) => s.measured?.expPerHour ?? estimate(s) ?? -1;
 
   const ranked = $derived.by(() => {
-    const spots = (data?.spots ?? []).filter((s) => s.reachable && (allLevels || near(s) || savedIds.has(s.map.id)));
+    const spots = (data?.spots ?? []).filter((s) =>
+      sort === "saved" ? savedIds.has(s.map.id) : s.reachable && (allLevels || near(s) || savedIds.has(s.map.id)),
+    );
+    const you = (s: TrainingSpot) => (ratio == null && !s.measured ? s.expPerClear / 1e6 - 1 : forYou(s));
     const by: Record<Sort, (s: TrainingSpot) => number> = {
-      you: (s) => (ratio == null && !s.measured ? s.expPerClear / 1e6 - 1 : forYou(s)),
+      you,
       exp: (s) => s.expPerClear,
       near: (s) => -(steps(s) ?? 9999),
+      saved: you,
     };
     const value = by[sort];
     const sorted = [...spots].sort((a, b) => value(b) - value(a) || b.expPerClear - a.expPerClear);
@@ -144,7 +153,7 @@
     flush();
     return out;
   });
-  const shown = $derived(ranked.slice(0, more ? 30 : SHOWN));
+  const shown = $derived(sort === "saved" ? ranked : ranked.slice(0, more ? 30 : SHOWN));
   const missingSaved = $derived(saved.filter((s) => !(data?.spots ?? []).some((spot) => spot.map.id === s.mapId)));
 
   async function toggleSaved(mapId: number, name: string) {
@@ -167,7 +176,7 @@
   function storedSort(): Sort {
     const value = stored(SORT_KEY, "you");
     // "EXP / HP" and "Your rate" were sorts of their own until the Train tab was redone.
-    return value === "exp" || value === "near" ? value : "you";
+    return value === "exp" || value === "near" || value === "saved" ? value : "you";
   }
 
   function remember(key: string, value: string) {
@@ -268,7 +277,7 @@
   {:else if !data}
     <p class="quiet">Loading maps…</p>
   {:else}
-    <Segmented options={SORTS} value={sort} label="Rank by" stretch onchange={pickSort} />
+    <Segmented options={sorts} value={sort} label="Rank by" stretch onchange={pickSort} />
     {#if saveError}<p class="warn">{saveError}</p>{/if}
 
     <ol class="spots">
@@ -325,11 +334,15 @@
           {/if}
         </li>
       {:else}
-        <li class="quiet empty">
-          {level != null ? `No maps with monsters near Lv ${level}. Tick Every level to see the rest.` : "Set your level to see maps that suit it."}
-        </li>
+        {#if sort !== "saved"}
+          <li class="quiet empty">
+            {level != null ? `No maps with monsters near Lv ${level}. Tick Every level to see the rest.` : "Set your level to see maps that suit it."}
+          </li>
+        {:else if !missingSaved.length}
+          <li class="quiet empty">No saved spots yet. Click the bookmark beside a map to keep it here.</li>
+        {/if}
       {/each}
-      {#each missingSaved as spot (spot.mapId)}
+      {#each sort === "saved" ? missingSaved : [] as spot (spot.mapId)}
         <li>
           <div class="line">
             <span class="row static">
@@ -343,7 +356,7 @@
     </ol>
 
     <div class="footer">
-      <label class="check">
+      <label class="check" class:hidden={sort === "saved"}>
         <input
           type="checkbox"
           checked={allLevels}
@@ -354,7 +367,7 @@
         />
         Every level
       </label>
-      {#if ranked.length > SHOWN}
+      {#if sort !== "saved" && ranked.length > SHOWN}
         <Button variant="ghost" size="sm" onclick={() => (more = !more)}>
           {more ? "Fewer" : `${Math.min(30, ranked.length) - SHOWN} more`}
         </Button>
@@ -603,6 +616,10 @@
     font-size: var(--text-sm);
     color: var(--muted);
     cursor: pointer;
+  }
+
+  .check.hidden {
+    visibility: hidden;
   }
 
   .check input {
