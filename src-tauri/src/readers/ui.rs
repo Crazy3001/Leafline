@@ -20,6 +20,15 @@ const GAUGE_PITCH: f32 = 108.0;
 const GAUGE_REACH: f32 = 20.0;
 /// Two scales this close are the same scale.
 const SAME: f32 = 0.03;
+/// Channels at or below this are taken as black in a [`Canonical::sharp`] view: the game's own
+/// text darkness at Default Ratio, where it is drawn unsmoothed, and with Filter Applied, which
+/// smooths it. Tried on one frame of each: the Quest Helper read every row at these, and lost
+/// rows the other way round.
+pub const NEAR_BLACK: u8 = 40;
+pub const NEAR_BLACK_SMOOTHED: u8 = 70;
+/// Of a panel's dark grey pixels, the share that are pure black: about 0.9 at Ideal Ratio, 0.6
+/// at Default Ratio and 0.3 with Filter Applied (one frame each).
+const SMOOTHED_BELOW: f32 = 0.42;
 
 /// The scales the UI may be drawn at in this frame, most likely first.
 pub fn scales(frame: &Frame, hud: Option<&HudLayout>) -> Vec<f32> {
@@ -65,6 +74,21 @@ pub struct Canonical {
 
 impl Canonical {
     pub fn new(frame: &Frame, scale: f32) -> Self {
+        Self::drawn(frame, scale, sample)
+    }
+
+    /// A view for readers that key on pure black text (the Quest Helper, the meso box). Each
+    /// design pixel takes the window pixel at its centre, not a blend, so UI Size Default Ratio's
+    /// unsmoothed black stays pure black. With Filter Applied the game has already blurred it,
+    /// so near-black is taken back to black.
+    pub fn sharp(frame: &Frame, scale: f32, near_black: u8) -> Self {
+        Self::drawn(frame, scale, |frame, x, y| {
+            let px = sample(frame, x, y);
+            if px.0[..3].iter().all(|&c| c <= near_black) { Rgba([0, 0, 0, 255]) } else { px }
+        })
+    }
+
+    fn drawn(frame: &Frame, scale: f32, sample: impl Fn(&Frame, f32, f32) -> Rgba<u8>) -> Self {
         let (width, height) = (frame.width() as f32, frame.height() as f32);
         // Everything within the window, on the same grid as the design area, which is centred
         // along the bottom edge. Off that grid, each pixel would blend two design pixels.
@@ -88,6 +112,11 @@ impl Canonical {
         rect.scaled(factor).translated(self.left, self.top)
     }
 
+    /// Where a rectangle of the window is in this view.
+    pub fn to_view(&self, rect: Rect) -> Rect {
+        rect.translated(-self.left, -self.top).scaled(CANONICAL_SCALE / self.scale)
+    }
+
     pub fn layout_to_window(&self, layout: &HudLayout) -> HudLayout {
         HudLayout {
             hp: self.to_window(layout.hp),
@@ -98,6 +127,25 @@ impl Canonical {
             identity: self.to_window(layout.identity),
         }
     }
+}
+
+/// Whether the game smoothed its UI (UI Size "Default Ratio (Filter Applied)"), judged by how much
+/// of the black text in `rect` (a panel with black text on a light ground) is still pure black.
+/// `None` when there is too little dark to tell.
+pub fn smoothed(frame: &Frame, rect: Rect) -> Option<bool> {
+    let (x, y, w, h) = rect.to_pixels(frame.width(), frame.height());
+    let (mut pure, mut dark) = (0u32, 0u32);
+    for py in y..y + h {
+        for px in x..x + w {
+            let [r, g, b, _] = frame.get_pixel(px, py).0;
+            let (high, low) = (r.max(g).max(b), r.min(g).min(b));
+            if high <= 80 && high - low <= 30 {
+                dark += 1;
+                pure += u32::from(high <= 8);
+            }
+        }
+    }
+    (dark >= 200).then(|| (pure as f32 / dark as f32) < SMOOTHED_BELOW)
 }
 
 /// The colour at a point, blended from the four nearest pixels.
@@ -144,6 +192,20 @@ mod tests {
             assert!(view.frame.get_pixel(26, 40).0[0] < 100, "scale {scale}");
             assert!(view.frame.get_pixel(20, 46).0[0] < 100, "scale {scale}");
         }
+    }
+
+    #[test]
+    fn smoothed_text_is_told_from_crisp() {
+        // Made-up text strokes on a light panel: crisp ones are pure black, smoothed ones grey.
+        let panel = |stroke: [u8; 3]| {
+            Frame::from_fn(60, 40, |x, _| {
+                if x % 3 == 0 { Rgba([stroke[0], stroke[1], stroke[2], 255]) } else { Rgba([200, 210, 220, 255]) }
+            })
+        };
+        let whole = Rect::new(0.0, 0.0, 60.0, 40.0);
+        assert_eq!(smoothed(&panel([0, 0, 0]), whole), Some(false));
+        assert_eq!(smoothed(&panel([40, 40, 44]), whole), Some(true));
+        assert_eq!(smoothed(&Frame::from_pixel(60, 40, Rgba([200, 210, 220, 255])), whole), None);
     }
 
     #[test]

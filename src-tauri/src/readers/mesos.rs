@@ -30,17 +30,44 @@ const SHORT_AMOUNT: usize = 3;
 /// own `0`: OCR read fewer copies only some of the time, and these every time.
 const COPIES: usize = 5;
 const COPY_GAP: u32 = 2;
+/// Left off the box's right end, in box heights: past the border, short of the last digit,
+/// which ends about 0.35 box heights from the edge.
+const BORDER: f32 = 0.15;
 
 /// Reads every meso box on screen. Storage and trade windows show more boxes (the storage's
 /// own mesos, for one), so the amount most boxes agree on is taken as the player's. Also
 /// returns how many boxes there were, read or not.
+/// How dark a pixel must be to count as the amount's ink.
+#[derive(Debug, Clone, Copy)]
+pub struct Ink {
+    /// Kept for OCR, at or below this luminance.
+    pub ocr: u8,
+    /// Used to cut the digits apart and compare their shapes. Lower than `ocr` where the strokes
+    /// are smoothed, so that touching edges don't join two digits.
+    pub shape: u8,
+}
+
+impl Ink {
+    /// The game's crisp digits as drawn at Ideal Ratio.
+    pub const CRISP: Ink = Ink { ocr: 80, shape: 80 };
+    /// Thin smoothed strokes, as in a frame redrawn from UI Size Default Ratio. Tried on one
+    /// frame with Filter Applied: OCR read the amount at 180 but not at 150, and the digits
+    /// came apart at 150 but touched at 180.
+    pub const SMOOTHED: Ink = Ink { ocr: 180, shape: 150 };
+}
+
 pub fn read(frame: &Frame, ocr: &Ocr) -> Result<(Option<MesoReading>, usize)> {
+    read_with(frame, ocr, Ink::CRISP)
+}
+
+pub fn read_with(frame: &Frame, ocr: &Ocr, ink: Ink) -> Result<(Option<MesoReading>, usize)> {
     let boxes = locate(frame);
     let mut readings = Vec::new();
     for &rect in &boxes {
         // The amount is right-aligned; the empty left of the box and its border only confuse OCR.
-        let amount = Rect::from_edges(rect.x + 0.4 * rect.w, rect.y, rect.right(), rect.bottom());
-        if let Some(mesos) = read_amount(frame, amount, ocr)? {
+        // Redrawn from UI Size Default Ratio, the box can take in its dark right border too.
+        let amount = Rect::from_edges(rect.x + 0.4 * rect.w, rect.y, rect.right() - BORDER * rect.h, rect.bottom());
+        if let Some(mesos) = read_amount(frame, amount, ocr, ink)? {
             readings.push(MesoReading { mesos, rect });
         }
     }
@@ -58,13 +85,13 @@ pub fn read(frame: &Frame, ocr: &Ocr) -> Result<(Option<MesoReading>, usize)> {
 /// OCR of the box's dark digits at several sizes. The pixel font's 6 and 8 are easily
 /// confused, so an amount counts only when at least two readings agree on it, no other
 /// amount is read as often, and it fits the digits' shapes.
-fn read_amount(frame: &Frame, rect: Rect, ocr: &Ocr) -> Result<Option<u64>> {
+fn read_amount(frame: &Frame, rect: Rect, ocr: &Ocr, ink: Ink) -> Result<Option<u64>> {
     use imageops::FilterType::{CatmullRom, Triangle};
-    let glyphs = glyphs(frame, rect);
+    let glyphs = glyphs(frame, rect, ink.shape);
     let mut readings = Vec::new();
     for (scale, filter) in [(1, Triangle), (2, Triangle), (2, CatmullRom), (3, Triangle), (3, CatmullRom)] {
         let words = ocr.words_in(frame, rect, scale as f32, |crop| {
-            let keyed = preprocess::keep(crop, |p| preprocess::luminance(p) <= 80);
+            let keyed = preprocess::keep(crop, |p| preprocess::luminance(p) <= ink.ocr);
             let (w, h) = (keyed.width() * scale, keyed.height() * scale);
             preprocess::pad(&imageops::resize(&keyed, w, h, filter), 40)
         })?;
@@ -78,7 +105,7 @@ fn read_amount(frame: &Frame, rect: Rect, ocr: &Ocr) -> Result<Option<u64>> {
         }
     }
     if readings.is_empty() && (1..=SHORT_AMOUNT).contains(&glyphs.len()) {
-        readings = read_repeated(frame, rect, &glyphs, ocr)?;
+        readings = read_repeated(frame, rect, &glyphs, ocr, ink.shape)?;
     }
     let votes = |amount: u64| readings.iter().filter(|&&r| r == amount).count();
     let most = readings.iter().map(|&r| votes(r)).max().unwrap_or(0);
@@ -88,7 +115,8 @@ fn read_amount(frame: &Frame, rect: Rect, ocr: &Ocr) -> Result<Option<u64>> {
 
 /// OCR of a short amount drawn several times over, since OCR skips a lone digit as not being
 /// text. Every copy must read the same.
-fn read_repeated(frame: &Frame, rect: Rect, glyphs: &[Mask], ocr: &Ocr) -> Result<Vec<u64>> {
+fn read_repeated(frame: &Frame, rect: Rect, glyphs: &[Mask], ocr: &Ocr, shape: u8) -> Result<Vec<u64>> {
+    let is_digit = |px: &Rgba<u8>| is_digit(px, shape);
     use imageops::FilterType::Triangle;
     let columns = ink_columns(frame, rect, is_digit);
     let (Some(rows), Some(first), Some(last)) = (ink_rows(frame, rect, is_digit), columns.first(), columns.last())
@@ -164,13 +192,14 @@ fn one_copy(text: &str) -> Option<String> {
 }
 
 /// The amount's characters (digits and separators), cut out by shape.
-fn glyphs(frame: &Frame, rect: Rect) -> Vec<Mask> {
+fn glyphs(frame: &Frame, rect: Rect, shape: u8) -> Vec<Mask> {
+    let is_digit = |px: &Rgba<u8>| is_digit(px, shape);
     let Some(rows) = ink_rows(frame, rect, is_digit) else { return Vec::new() };
     ink_columns(frame, rect, is_digit).into_iter().map(|cols| Mask::new(frame, cols, rows, is_digit)).collect()
 }
 
-fn is_digit(px: &Rgba<u8>) -> bool {
-    preprocess::luminance(px) <= 80
+fn is_digit(px: &Rgba<u8>, shape: u8) -> bool {
+    preprocess::luminance(px) <= shape
 }
 
 /// Whether a reading agrees with the drawn characters: one per glyph, and since the pixel
@@ -253,7 +282,9 @@ mod tests {
         // Made-up glyphs shaped like the real thing: a 6 is open at the upper right.
         let six = ["....####..", "..##......", "##........", "########..", "##......##", "##......##", "..######.."];
         let eight = ["..######..", "##......##", "##......##", "..######..", "##......##", "##......##", "..######.."];
-        let mask = |rows: &[&str]| Mask::try_from(rows.iter().flat_map(|r| [r.to_string(), r.to_string()]).collect::<Vec<_>>()).unwrap();
+        let mask = |rows: &[&str]| {
+            Mask::try_from(rows.iter().flat_map(|r| [r.to_string(), r.to_string()]).collect::<Vec<_>>()).unwrap()
+        };
         let (six, eight) = (mask(&six), mask(&eight));
         assert!(!inked_upper_right(&six));
         assert!(inked_upper_right(&eight));
@@ -283,7 +314,7 @@ mod tests {
     #[test]
     fn readings_must_fit_the_digit_shapes() {
         let (frame, rect) = amount("8,646");
-        let shapes = glyphs(&frame, rect);
+        let shapes = glyphs(&frame, rect, Ink::CRISP.shape);
         assert_eq!(shapes.len(), 5);
         assert!(fits_shapes("8,646", &shapes));
         // A 6 read as 8: the two 6s no longer agree with each other, or the 8 with the 6.

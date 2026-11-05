@@ -263,7 +263,9 @@ fn near(px: &Rgba<u8>, target: [u8; 3], tolerance: u8) -> bool {
 
 /// The WORLD button's orange, (221, 153, 17) on a clean capture.
 fn is_button_orange(px: &Rgba<u8>) -> bool {
-    near(px, [221, 153, 17], 16)
+    // Usually flat (221, 153, 17); at UI Size Default Ratio the button's gradient shows, down
+    // to (215, 139, 0).
+    near(px, [221, 153, 17], 16) || near(px, [216, 141, 2], 8)
 }
 
 /// The expanded name band, (153, 187, 204).

@@ -12,4 +12,4 @@ pub mod quest;
 pub mod shop;
 mod text;
 pub mod tooltip;
-mod ui;
+pub mod ui;
