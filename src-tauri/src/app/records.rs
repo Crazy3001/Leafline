@@ -10,6 +10,7 @@ use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder
 use crate::error::{Error, Result};
 use crate::userdata::UserData;
 use crate::userdata::characters::KnownMesos;
+use crate::userdata::drops::{LoggedDrop, NewDrop};
 use crate::userdata::notes::{ItemNote, MapNote};
 use crate::userdata::prices::{NewPrice, PriceLog};
 use crate::userdata::sessions::{MapRate, SavedSession, SessionTimeline};
@@ -146,6 +147,30 @@ pub fn set_map_note(
     Ok(kept)
 }
 
+/// Emitted to every window when the drop log changes.
+const DROPS_EVENT: &str = "drops";
+
+/// Every drop the player logged, the newest first.
+#[tauri::command]
+pub fn drop_log(state: State<UserDataState>) -> Result<Vec<LoggedDrop>> {
+    state.with(|db| db.drops())
+}
+
+/// Logs a drop the player got and says which monster dropped. Returns its id.
+#[tauri::command]
+pub fn log_drop(app: AppHandle, state: State<UserDataState>, drop: NewDrop) -> Result<i64> {
+    let id = state.with(|db| db.log_drop(&drop, now()))?;
+    app.emit(DROPS_EVENT, ())?;
+    Ok(id)
+}
+
+#[tauri::command]
+pub fn delete_drop(app: AppHandle, state: State<UserDataState>, id: i64) -> Result<()> {
+    state.with(|db| db.delete_drop(id))?;
+    app.emit(DROPS_EVENT, ())?;
+    Ok(())
+}
+
 /// Saves the session the overlay is showing to the history. Live sessions save themselves; this
 /// is for the last replay.
 #[tauri::command]
@@ -227,9 +252,10 @@ pub fn rename_map(app: AppHandle, state: State<UserDataState>, from: String, to:
 pub enum Export {
     Prices,
     Sessions,
+    Drops,
 }
 
-/// Writes the price log or the session history as CSV to `path`, which the user picked in a
+/// Writes the price log, the session history or the drop log as CSV to `path`, which the user picked in a
 /// save dialog. Returns how many rows were written.
 #[tauri::command]
 pub fn export_csv(state: State<UserDataState>, what: Export, path: std::path::PathBuf) -> Result<usize> {
@@ -237,6 +263,7 @@ pub fn export_csv(state: State<UserDataState>, what: Export, path: std::path::Pa
         Ok(match what {
             Export::Prices => (PRICE_COLUMNS, db.all_prices()?.into_iter().map(price_row).collect::<Vec<_>>()),
             Export::Sessions => (SESSION_COLUMNS, db.sessions()?.into_iter().flat_map(session_rows).collect()),
+            Export::Drops => (DROP_COLUMNS, db.drops()?.into_iter().map(drop_row).collect()),
         })
     })?;
     let mut csv = header.join(",") + "\r\n";
@@ -264,6 +291,35 @@ const SESSION_COLUMNS: &[&str] = &[
     "mesos_per_hour",
     "note",
 ];
+
+/// The largest picture `save_image` writes: a share card is well under 1 MB.
+const MAX_IMAGE: usize = 8 * 1024 * 1024;
+
+/// Writes a picture the app drew, such as a session's share card, to `path`, which the player
+/// picked in a save dialog. Only PNG files.
+#[tauri::command]
+pub fn save_image(path: std::path::PathBuf, png: Vec<u8>) -> Result<()> {
+    if !path.extension().is_some_and(|e| e.eq_ignore_ascii_case("png")) {
+        return Err(Error::Invalid("Save the picture as a .png file.".into()));
+    }
+    if png.len() > MAX_IMAGE || !png.starts_with(b"\x89PNG\r\n\x1a\n") {
+        return Err(Error::Invalid("That isn't a picture Leafline drew.".into()));
+    }
+    std::fs::write(path, png)?;
+    Ok(())
+}
+
+const DROP_COLUMNS: &[&str] = &["date", "item", "monster", "map", "character"];
+
+fn drop_row(d: LoggedDrop) -> Vec<String> {
+    vec![
+        date(d.seen_at as f64),
+        d.item,
+        d.monster,
+        d.map.unwrap_or_default(),
+        d.character.unwrap_or_default(),
+    ]
+}
 
 fn price_row(p: crate::userdata::prices::PriceEntry) -> Vec<String> {
     vec![

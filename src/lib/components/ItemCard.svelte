@@ -6,6 +6,7 @@
 
   import BuildFit from "./BuildFit.svelte";
   import Card from "./Card.svelte";
+  import DropLogger from "./DropLogger.svelte";
   import ItemDetails from "./ItemDetails.svelte";
   import ItemNotes from "./ItemNotes.svelte";
   import { backend } from "$lib/api";
@@ -165,6 +166,9 @@
   {#if wearable}<BuildFit {item} />{/if}
 
   <ItemDetails item={read} record={record ?? matched} {map} />
+
+  <!-- Only for a copy read from the game: that's the one the player just got. -->
+  {#if read}<DropLogger item={item.name} itemId={matched?.id ?? null} {map} />{/if}
 
   <!-- The price log (PriceLog.svelte) is hidden for v1: with no price source it was all typing.
        Its records stay in the file, ready for when a price source gives permission. -->

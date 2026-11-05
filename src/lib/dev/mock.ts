@@ -6,6 +6,7 @@ import type {
   Analysis,
   BaseStats,
   ItemNote,
+  LoggedDrop,
   MapNote,
   SavedSpot,
   UpdateStatus,
@@ -147,6 +148,26 @@ let savedSessions: SavedSession[] = [...sampleSavedSessions];
 /** The player's map notes; one to start with on Mossbank Meadow II. */
 const mapNotes = new Map<number, MapNote>([[3, { mapId: 3, map: "Mossbank Meadow II", note: "Left platform is best. Channel 4 is quiet after 9.", updatedAt: Date.now() / 1000 - 86400 }]]);
 const mapNoteHandlers: ((mapId: number) => void)[] = [];
+/** The drop log: a few made-up drops inside the newest sample session. */
+const dropStart = (sampleSavedSessions[0]?.startedAt ?? Date.now() / 1000 - 7200) + 600;
+const sampleDrop = (id: number, item: string, monster: string, monsterId: number, minutes: number): LoggedDrop => ({
+  id,
+  item,
+  itemId: null,
+  monster,
+  monsterId,
+  map: "Mossbank Meadow I",
+  mapId: 2,
+  character: "Leafling",
+  seenAt: dropStart + minutes * 60,
+});
+let drops: LoggedDrop[] = [
+  sampleDrop(1, "Fern Dagger", "Moss Slime", 11, 4),
+  sampleDrop(2, "Blue Tonic", "Pebble Snail", 10, 9),
+  sampleDrop(3, "Blue Tonic", "Moss Slime", 11, 17),
+  sampleDrop(4, "Thistle Cap", "Thistle Sprite", 13, 26),
+];
+const dropHandlers: (() => void)[] = [];
 const historyHandlers: (() => void)[] = [];
 
 function mockHistory(): History {
@@ -640,6 +661,28 @@ export const mockBackend: Backend = {
     mapNoteHandlers.push(handler);
     return () => {};
   },
+  dropLog: async () => [...drops].sort((a, b) => b.seenAt - a.seenAt || b.id - a.id),
+  async logDrop(drop) {
+    const id = Math.max(0, ...drops.map((d) => d.id)) + 1;
+    drops.push({ ...drop, id, seenAt: Date.now() / 1000 });
+    dropHandlers.forEach((h) => h());
+    return id;
+  },
+  async deleteDrop(id) {
+    drops = drops.filter((d) => d.id !== id);
+    dropHandlers.forEach((h) => h());
+  },
+  async onDrops(handler) {
+    dropHandlers.push(handler);
+    return () => {};
+  },
+  async saveImage(png, name) {
+    const url = URL.createObjectURL(new Blob([png as BlobPart], { type: "image/png" }));
+    const link = Object.assign(document.createElement("a"), { href: url, download: name });
+    link.click();
+    URL.revokeObjectURL(url);
+    return true;
+  },
   async showTraining() {
     window.open("/training", "_blank");
   },
@@ -670,7 +713,7 @@ export const mockBackend: Backend = {
     return () => {};
   },
   async exportCsv(what) {
-    return what === "prices" ? prices.length : savedSessions.length;
+    return what === "prices" ? prices.length : what === "drops" ? drops.length : savedSessions.length;
   },
   buildCatalog: async () => (mapStatus.ready ? mockCatalog : null),
   starterPlans: async () =>

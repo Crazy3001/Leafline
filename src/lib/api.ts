@@ -35,6 +35,8 @@ import type {
   Guide,
   History,
   KnownMesos,
+  LoggedDrop,
+  NewDrop,
   MapDataDownload,
   MapDataStatus,
   MapDetails,
@@ -218,6 +220,14 @@ export interface Backend {
   setMapNote(mapId: number, map: string, note: string): Promise<MapNote | null>;
   /** Follows map notes written in any window, with the map's id. */
   onMapNote(handler: (mapId: number) => void): Promise<UnlistenFn>;
+  /** Every drop the player logged, the newest first. Kept on this PC. */
+  dropLog(): Promise<LoggedDrop[]>;
+  /** Logs a drop; returns its id. Every window hears of it. */
+  logDrop(drop: NewDrop): Promise<number>;
+  deleteDrop(id: number): Promise<void>;
+  onDrops(handler: () => void): Promise<UnlistenFn>;
+  /** Asks where to save, then writes a PNG the app drew. False if cancelled. */
+  saveImage(png: Uint8Array, name: string): Promise<boolean>;
 
   /** The mesos last read for a character, or with no name, for the character seen last. */
   knownMesos(name: string | null): Promise<KnownMesos | null>;
@@ -245,7 +255,7 @@ export interface Backend {
   diagnostics(): Promise<string>;
   onHistory(handler: () => void): Promise<UnlistenFn>;
   /** Asks where to save, then writes the price log or session history as CSV. Null if cancelled. */
-  exportCsv(what: "prices" | "sessions"): Promise<number | null>;
+  exportCsv(what: "prices" | "sessions" | "drops"): Promise<number | null>;
 
   /** The jobs and skills to plan with. Null until map data is downloaded. */
   buildCatalog(): Promise<BuildCatalog | null>;
@@ -419,6 +429,16 @@ const tauriBackend: Backend = {
   mapNote: (mapId) => invoke("map_note", { mapId }),
   setMapNote: (mapId, map, note) => invoke("set_map_note", { mapId, map, note }),
   onMapNote: (handler) => listen<number>("map-note", (e) => handler(e.payload)),
+  dropLog: () => invoke("drop_log"),
+  logDrop: (drop) => invoke("log_drop", { drop }),
+  deleteDrop: (id) => invoke("delete_drop", { id }),
+  onDrops: (handler) => listen("drops", () => handler()),
+  async saveImage(png, name) {
+    const path = await save({ defaultPath: name, filters: [{ name: "PNG picture", extensions: ["png"] }] });
+    if (!path) return false;
+    await invoke("save_image", { path, png: Array.from(png) });
+    return true;
+  },
   knownMesos: (name) => invoke("known_mesos", { name }),
   onKnownMesos: (handler) => listen("known-mesos", () => handler()),
   saveSession: (label) => invoke("save_session", { label }),
@@ -437,7 +457,7 @@ const tauriBackend: Backend = {
   async exportCsv(what) {
     const stamp = new Date().toISOString().slice(0, 10);
     const path = await save({
-      defaultPath: `leafline-${what === "prices" ? "price-log" : "sessions"}-${stamp}.csv`,
+      defaultPath: `leafline-${what === "prices" ? "price-log" : what === "drops" ? "drop-log" : "sessions"}-${stamp}.csv`,
       filters: [{ name: "CSV", extensions: ["csv"] }],
     });
     return path ? invoke<number>("export_csv", { what, path }) : null;

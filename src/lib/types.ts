@@ -692,6 +692,24 @@ export interface ItemNote {
   updatedAt: number;
 }
 
+/** A drop the player is logging (src-tauri/src/userdata/drops.rs). */
+export interface NewDrop {
+  item: string;
+  itemId: number | null;
+  monster: string;
+  monsterId: number | null;
+  map: string | null;
+  mapId: number | null;
+  character: string | null;
+}
+
+/** A drop in the player's log: their own word on which monster dropped it. */
+export interface LoggedDrop extends NewDrop {
+  id: number;
+  /** Unix seconds. */
+  seenAt: number;
+}
+
 // Price log (see src-tauri/src/userdata/prices.rs): only prices the player logged.
 
 export type PriceKind = "traded" | "asking";

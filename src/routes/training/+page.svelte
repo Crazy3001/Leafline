@@ -1,12 +1,15 @@
 <script lang="ts">
   // The training log: every saved session with its graph, rates per map by level and party, and
   // progress over days. Opens from the Train tab; everything here stays on this PC.
-  import { Check, Copy, Download, PenLine } from "@lucide/svelte";
+  import { Download, PenLine, Share2 } from "@lucide/svelte";
   import { onMount, untrack } from "svelte";
 
   import { backend } from "$lib/api";
+  import DropLogView from "$lib/components/DropLogView.svelte";
   import Logo from "$lib/components/Logo.svelte";
   import MapNote from "$lib/components/MapNote.svelte";
+  import ShareDialog from "$lib/components/ShareDialog.svelte";
+  import { dropsBetween, watchDrops } from "$lib/drops.svelte";
   import { watchMapData, mapData } from "$lib/mapdata.svelte";
   import { formatCompact, formatDuration, formatNumber, partyLabel, splitMapLabel } from "$lib/format";
   import { history, watchHistory } from "$lib/history.svelte";
@@ -37,13 +40,14 @@
   import Segmented from "$lib/ui/Segmented.svelte";
   import Stat from "$lib/ui/Stat.svelte";
 
-  type View = "sessions" | "maps" | "progress";
+  type View = "sessions" | "maps" | "progress" | "drops";
   type Range = "7" | "30" | "all";
 
   const VIEW_KEY = "leafline.training.view";
 
   onMount(() => {
     watchHistory();
+    watchDrops();
     watchMapData();
     watchLive();
     watchSettings();
@@ -58,7 +62,7 @@
   let note = $state("");
   let noteTimer: ReturnType<typeof setTimeout> | undefined;
   let confirmDelete = $state(false);
-  let copied = $state(false);
+  let sharing = $state(false);
   let problem = $state<string | null>(null);
   let exported = $state<string | null>(null);
 
@@ -101,6 +105,23 @@
   );
   const totalSeconds = $derived(sessions.reduce((a, s) => a + s.activeSeconds, 0));
   const selected = $derived(sessions.find((s) => s.id === selectedId) ?? sessions[0] ?? null);
+  /** Drops logged while the session shown was running. */
+  const sessionDrops = $derived.by(() => {
+    const s = selected;
+    if (!s) return [];
+    const start = s.startedAt ?? s.savedAt - s.elapsedSeconds;
+    return dropsBetween(start, start + s.elapsedSeconds + 60, s.character);
+  });
+  const sessionDropRows = $derived.by(() => {
+    const rows = new Map<string, { item: string; monster: string; count: number }>();
+    for (const d of sessionDrops) {
+      const key = `${d.item}|${d.monster}`.toLowerCase();
+      const row = rows.get(key) ?? { item: d.item, monster: d.monster, count: 0 };
+      row.count += 1;
+      rows.set(key, row);
+    }
+    return [...rows.values()].sort((x, y) => y.count - x.count);
+  });
 
   // Load the graph for the session shown.
   $effect(() => {
@@ -168,32 +189,10 @@
     }
   }
 
-  async function copySummary() {
-    if (!selected) return;
-    const s = selected;
-    const text = [
-      `${longDay(s.startedAt ?? s.savedAt)} · ${title(s)}`,
-      [levelText(s), s.job, dur(s.activeSeconds)].filter(Boolean).join(" · "),
-      `${expRate(s)} EXP/hr · ${formatCompact(s.mesosPerHour)} mesos/hr`,
-      ...s.lines.map((l) =>
-        [l.map ? splitMapLabel(l.map).name : "Between maps", l.level != null ? `Lv ${l.level}` : null, partyLabel(l.party), dur(l.activeSeconds), `${formatCompact((l.expGained * 3600) / l.activeSeconds)} EXP/hr`]
-          .filter(Boolean)
-          .join(" · "),
-      ),
-    ].join("\n");
-    try {
-      await navigator.clipboard.writeText(text);
-      copied = true;
-      setTimeout(() => (copied = false), 1500);
-    } catch (e) {
-      problem = `Couldn't copy: ${e}`;
-    }
-  }
-
   async function exportCsv() {
     exported = null;
     try {
-      const rows = await backend.exportCsv("sessions");
+      const rows = await backend.exportCsv(view === "drops" ? "drops" : "sessions");
       if (rows != null) exported = `Saved ${rows} row${rows === 1 ? "" : "s"}.`;
     } catch (e) {
       problem = String(e);
@@ -291,6 +290,10 @@
 
 <svelte:head><title>Leafline — Training log</title></svelte:head>
 
+{#if sharing && selected}
+  <ShareDialog session={selected} {timeline} drops={sessionDrops} onclose={() => (sharing = false)} />
+{/if}
+
 <div class="page">
   <header>
     <span class="brand"><Logo size={18} /><h1 class="num">Training log</h1></span>
@@ -322,7 +325,7 @@
 
   <div class="body">
     <nav aria-label="Training log">
-      {#each [["sessions", "Sessions"], ["maps", "Maps"], ["progress", "Progress"]] as [id, name] (id)}
+      {#each [["sessions", "Sessions"], ["maps", "Maps"], ["progress", "Progress"], ["drops", "Drops"]] as [id, name] (id)}
         <button class="nav" aria-current={view === id ? "page" : undefined} onclick={() => pickView(id as View)}>{name}</button>
       {/each}
     </nav>
@@ -330,7 +333,9 @@
     <main>
       {#if problem}<p class="problem" role="alert">{problem}</p>{/if}
 
-      {#if !history.value}
+      {#if view === "drops"}
+        <DropLogView {character} {since} />
+      {:else if !history.value}
         <p class="quiet">Loading…</p>
       {:else if !sessions.length}
         <div class="empty">
@@ -377,7 +382,7 @@
                   </p>
                 </div>
                 <div class="actions">
-                  <Button onclick={copySummary}>{#if copied}<Check size={13} />Copied{:else}<Copy size={13} />Copy summary{/if}</Button>
+                  <Button onclick={() => (sharing = true)}><Share2 size={13} />Share</Button>
                   <Button variant="danger" onclick={remove}>{confirmDelete ? "Delete for good?" : "Delete"}</Button>
                 </div>
               </div>
@@ -474,6 +479,14 @@
                   </table>
                 </div>
                 <div class="grow1">
+                  {#if sessionDropRows.length}
+                    <h3>Drops you logged</h3>
+                    <ul class="drops">
+                      {#each sessionDropRows as d (d.item + d.monster)}
+                        <li><span>{d.item}</span><span class="muted">{d.monster}{d.count > 1 ? ` ×${d.count}` : ""}</span></li>
+                      {/each}
+                    </ul>
+                  {/if}
                   <label for="note"><h3>Note</h3></label>
                   <textarea
                     id="note"
@@ -670,6 +683,21 @@
 </div>
 
 <style>
+  .drops {
+    margin: 0 0 12px;
+    padding: 0;
+    list-style: none;
+    font-size: var(--text-sm);
+  }
+
+  .drops li {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 3px 0;
+    border-top: 1px solid var(--border);
+  }
+
   :global(body) {
     background: var(--bg);
   }
