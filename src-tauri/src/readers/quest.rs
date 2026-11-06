@@ -106,20 +106,24 @@ pub fn read_with_digits(frame: &Frame, digits: &Frame, overview: &[Line], ocr: &
     rows.retain(|row| has_text(frame, panel, row.y(), h));
     // OCR can lose a counter altogether, leaving `O Snail` looking like a title, but a row that
     // starts `digits / digits` as drawn is an objective, whatever is behind the panel.
-    // The digits cut from the view that keeps thin strokes, where they read as a counter with
-    // as many digits as the plain cut-out: there an 8 keeps the bar the plain view can lose.
+    // The digits cut from the view that keeps thin strokes, where they read as a counter: there
+    // an 8 keeps the bar the plain view can lose, and a 0 its top and bottom. Elsewhere the
+    // plain cut-out, as OCR's readings are checked against it.
     let glyphs: Vec<Option<CounterGlyphs>> = rows
         .iter()
         .map(|row| {
             let plain = CounterGlyphs::read(frame, panel, row.y(), h)?;
-            let inked = CounterGlyphs::read(digits, panel, row.y(), h)
-                .filter(|inked| inked.shaped().is_some_and(|counter| plain.fits(counter)));
+            let inked = CounterGlyphs::read(digits, panel, row.y(), h).filter(|inked| inked.shaped().is_some());
             Some(inked.unwrap_or(plain))
         })
         .collect();
     for (row, glyphs) in rows.iter_mut().zip(&glyphs) {
-        if let (Row::Title { y, title }, Some(_)) = (&*row, glyphs) {
-            *row = Row::Objective { y: *y, target: after_counter(title), counters: Vec::new() };
+        match (&mut *row, glyphs) {
+            (Row::Title { y, title }, Some(_)) => {
+                *row = Row::Objective { y: *y, target: past_counter_debris(&after_counter(title)), counters: Vec::new() };
+            }
+            (Row::Objective { target, .. }, Some(_)) => *target = past_counter_debris(target),
+            _ => {}
         }
     }
     let mut quests = assemble(&rows, &settle_counters(&rows, &glyphs));
@@ -436,7 +440,15 @@ impl CounterGlyphs {
             }
             required.extend(word);
         }
-        Some(Self { current: current.iter().map(mask).collect(), required: required.iter().map(mask).collect() })
+        // At Default Ratio the target's first letter can stand as close to the last digit as
+        // digits stand to each other (`10Slime`), so the count ends at the first shape that is
+        // no digit.
+        let mut required: Vec<Mask> = required.iter().map(mask).collect();
+        let digits = required.iter().take_while(|m| digits::quest_number(std::slice::from_ref(*m)).is_some()).count();
+        if digits > 0 {
+            required.truncate(digits);
+        }
+        Some(Self { current: current.iter().map(mask).collect(), required })
     }
 
     fn fits(&self, (current, required): (u32, u32)) -> bool {
@@ -447,6 +459,17 @@ impl CounterGlyphs {
     fn shaped(&self) -> Option<(u32, u32)> {
         let number = |masks: &[Mask]| digits::quest_number(masks)?.parse().ok();
         Some((number(&self.current)?, number(&self.required)?))
+    }
+}
+
+/// A target with OCR's leftovers of the counter drawn before it taken off: in `g '10 Slime` the
+/// `9 /` became letters, so it reads as part of the name. Words up to the last of the first three
+/// holding a digit go; a name has none there.
+fn past_counter_debris(target: &str) -> String {
+    let words: Vec<&str> = target.split_whitespace().collect();
+    match words.iter().take(3).rposition(|w| w.contains(|c: char| c.is_ascii_digit())) {
+        Some(last) if last + 1 < words.len() => words[last + 1..].join(" "),
+        _ => target.to_string(),
     }
 }
 
@@ -605,6 +628,14 @@ mod tests {
         );
         // A counter OCR read past its target is still a counter, for the shapes to settle.
         assert_eq!(parse(&[vec![line("31 / 30 Evil Eye", 50.0)]], 30.0, 32.0), Vec::<Quest>::new());
+    }
+
+    #[test]
+    fn counter_leftovers_come_off_a_target() {
+        assert_eq!(past_counter_debris("g '10 Slime"), "Slime");
+        assert_eq!(past_counter_debris("A rainbow snail shell"), "A rainbow snail shell");
+        assert_eq!(past_counter_debris("Slime 81413171"), "Slime 81413171", "digits after the name are noise for later");
+        assert_eq!(past_counter_debris("8 10"), "8 10", "nothing left to name");
     }
 
     #[test]
