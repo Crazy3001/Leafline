@@ -231,6 +231,8 @@ pub struct Atlas {
     pub(super) maps: BTreeMap<u32, MapRecord>,
     pub(super) monsters: HashMap<u32, MonsterRecord>,
     pub(super) npc_names: HashMap<u32, String>,
+    /// Item names, for the items a quest asks to bring.
+    pub(super) item_names: HashMap<u32, String>,
     pub(super) quests: BTreeMap<u32, QuestRecord>,
     /// Map → (monster, count), from the monsters' spawn lists.
     pub(super) spawns: HashMap<u32, Vec<(u32, u32)>>,
@@ -289,6 +291,7 @@ impl Atlas {
         let mut atlas = Self {
             monsters: data.monsters.into_iter().map(|m| (m.id, m)).collect(),
             npc_names: data.npcs.into_iter().map(|n| (n.id, n.name)).collect(),
+            item_names: data.items.into_iter().map(|i| (i.id, i.name)).collect(),
             quests: data.quests.into_iter().map(|q| (q.id, q)).collect(),
             maps,
             spawns,

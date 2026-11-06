@@ -44,6 +44,9 @@ const HELD_READINGS: u32 = 4;
 /// A quest matched in this live run and what it last counted.
 struct Known {
     name: String,
+    /// The quest in the data, once the title or counts matched one. Its lines then come from
+    /// the data, and readings only give the counts.
+    id: Option<u32>,
     objectives: Vec<Objective>,
     unread: u32,
 }
@@ -112,28 +115,18 @@ impl QuestTitles {
         read.quests.sort_by_key(place);
     }
 
-    /// Gives each quest the data's name and counts, from its title and what it counts, or the
-    /// known quest it most resembles.
+    /// Gives each quest the data's name and lines, from its title and what it counts, or the
+    /// known quest it most resembles. A quest the data has shows the data's lines, with the
+    /// counts read; one it lacks shows the lines read, steadied.
     pub fn settle(&mut self, atlas: &Atlas, quests: &mut [Quest]) {
         for quest in quests {
-            let matched = atlas.quest_for(&quest.title, &quest.objectives);
-            // How many lines the quest shows, when the data says.
-            let mut lines = None;
-            let mut spelled = Vec::new();
             quest.objectives.retain(|o| !is_noise(&o.target));
-            if let Some(id) = matched {
-                let record = &atlas.quests[&id];
-                quest.title = record.name.clone();
-                lines = Some(record.requirements.len() + record.items.len()).filter(|n| *n > 0);
-                spelled = record
-                    .requirements
-                    .iter()
-                    .filter_map(|r| atlas.monsters.get(&r.mob_id))
-                    .map(|m| m.name.clone())
-                    .collect();
-                atlas.fit_counts(id, &mut quest.objectives);
-            } else if let Some(name) = self.closest(&quest.title, &quest.objectives) {
-                quest.title = name.to_string();
+            let mut id = atlas.quest_for(&quest.title, &quest.objectives);
+            if let Some(found) = id {
+                quest.title = atlas.quests[&found].name.clone();
+            } else if let Some(i) = self.closest(&quest.title, &quest.objectives) {
+                quest.title = self.known[i].name.clone();
+                id = self.known[i].id;
             } else {
                 // A title near a quest in the data, but not near enough, is a garbled reading of
                 // it: too rough to show until it matches. One like no quest there (an event quest
@@ -143,29 +136,48 @@ impl QuestTitles {
                 }
                 continue;
             }
-            match self.known.iter_mut().find(|k| k.name == quest.title) {
-                Some(known) => {
-                    merge_lines(&mut known.objectives, &quest.objectives, lines, &spelled);
-                    quest.objectives.clone_from(&known.objectives);
+            let lines = id.and_then(|id| atlas.quest_lines(id));
+            let position = self.known.iter().position(|k| k.name == quest.title);
+            let known = match position {
+                Some(i) => &mut self.known[i],
+                None => {
+                    let objectives = lines.clone().unwrap_or_default();
+                    self.known.push(Known { name: quest.title.clone(), id, objectives, unread: 0 });
+                    self.known.last_mut().expect("just pushed")
                 }
-                None => self.known.push(Known { name: quest.title.clone(), objectives: quest.objectives.clone(), unread: 0 }),
+            };
+            if let Some(lines) = lines {
+                if known.id.is_none() || known.objectives.len() != lines.len() {
+                    // Matched in the data only now: start from its lines, keeping counts read.
+                    let before = std::mem::replace(&mut known.objectives, lines);
+                    fill_counts(&mut known.objectives, &before);
+                }
+                known.id = id;
+                fill_counts(&mut known.objectives, &quest.objectives);
+            } else {
+                if let Some(found) = id {
+                    atlas.fit_counts(found, &mut quest.objectives);
+                }
+                merge_lines(&mut known.objectives, &quest.objectives);
             }
+            quest.objectives.clone_from(&known.objectives);
         }
     }
 
     /// The known quest counting the same things, or else with the most similar name.
-    fn closest(&self, title: &str, objectives: &[Objective]) -> Option<&str> {
+    fn closest(&self, title: &str, objectives: &[Objective]) -> Option<usize> {
         let query = fold(title);
         let targets: Vec<&str> = objectives.iter().map(|o| o.target.as_str()).collect();
         self.known
             .iter()
-            .map(|known| {
+            .enumerate()
+            .map(|(i, known)| {
                 let same = !targets.is_empty() && known.targets().eq(targets.iter().copied());
-                (if same { 1.0 } else { similarity(&query, &fold(&known.name)) }, known.name.as_str())
+                (if same { 1.0 } else { similarity(&query, &fold(&known.name)) }, i)
             })
             .filter(|(score, _)| *score >= MIN_HELD_SCORE)
             .max_by(|a, b| a.0.total_cmp(&b.0))
-            .map(|(_, name)| name)
+            .map(|(_, i)| i)
     }
 }
 
@@ -182,41 +194,68 @@ fn is_noise(target: &str) -> bool {
     target.chars().filter(|c| c.is_alphabetic()).count() < 3
 }
 
-/// Updates a known quest's lines from a reading, which may have lost some or misread others:
-/// each line read takes the known line it resembles, a line not read this time keeps its last
-/// count, and a new line is added only while the quest has fewer than the data says it shows.
-/// A name the data spells (`spelled`) is kept; another is replaced by a close reading of it. A
-/// count above the line's target is a misread, since the game stops counting there.
-fn merge_lines(known: &mut Vec<Objective>, read: &[Objective], lines: Option<usize>, spelled: &[String]) {
+/// The known line each line read resembles closest, in read order: `(read, known)` pairs.
+/// Each known line is taken at most once.
+fn pair_lines(known: &[Objective], read: &[Objective]) -> Vec<(usize, usize)> {
     let mut taken = vec![false; known.len()];
-    for line in read {
+    let mut pairs = Vec::new();
+    for (r, line) in read.iter().enumerate() {
         let target = fold(&line.target);
         let best = known
             .iter()
             .enumerate()
-            .filter(|(i, _)| !taken[*i])
-            .map(|(i, k)| {
-                let score = similarity(&target, &fold(&k.target));
-                (score + if k.required == line.required { 0.1 } else { 0.0 }, score, i)
-            })
-            .max_by(|a, b| a.0.total_cmp(&b.0));
-        match best {
-            Some((_, score, i)) if score >= MIN_LINE_SCORE => {
-                taken[i] = true;
-                let cap = if spelled.contains(&known[i].target) { known[i].required } else { line.required };
-                if line.current <= cap {
-                    known[i].current = line.current;
+            .filter(|(k, _)| !taken[*k])
+            .map(|(k, old)| (similarity(&target, &fold(&old.target)), old.required == line.required, k))
+            .filter(|(score, _, _)| *score >= MIN_LINE_SCORE)
+            .max_by(|a, b| (a.0 + f64::from(u8::from(a.1)) * 0.1).total_cmp(&(b.0 + f64::from(u8::from(b.1)) * 0.1)));
+        if let Some((_, _, k)) = best {
+            taken[k] = true;
+            pairs.push((r, k));
+        }
+    }
+    pairs
+}
+
+/// Takes the counts read into a quest's lines from the data, whose names and targets stay. A
+/// line not read keeps its count, and a count above its line's target is a misread, since the
+/// game stops counting there. Once a reading shows every line, the lines take its order, the
+/// Quest Helper's.
+fn fill_counts(lines: &mut [Objective], read: &[Objective]) {
+    let pairs = pair_lines(lines, read);
+    for &(r, k) in &pairs {
+        if read[r].current <= lines[k].required {
+            lines[k].current = read[r].current;
+        }
+    }
+    if pairs.len() == lines.len() {
+        let mut order = vec![0; lines.len()];
+        for &(r, k) in &pairs {
+            order[k] = r;
+        }
+        let mut keyed: Vec<(usize, Objective)> = order.into_iter().zip(lines.iter().cloned()).collect();
+        keyed.sort_by_key(|(r, _)| *r);
+        for (slot, (_, line)) in lines.iter_mut().zip(keyed) {
+            *slot = line;
+        }
+    }
+}
+
+/// Steadies the lines of a quest the data lacks: a line read updates the line it resembles, a
+/// line not read keeps its last count, and a new line is added.
+fn merge_lines(known: &mut Vec<Objective>, read: &[Objective]) {
+    let pairs = pair_lines(known, read);
+    for (r, line) in read.iter().enumerate() {
+        match pairs.iter().find(|(pr, _)| *pr == r) {
+            Some(&(_, k)) => {
+                if line.current <= line.required {
+                    known[k].current = line.current;
                 }
-                if score >= MIN_QUEST_SCORE && !spelled.contains(&known[i].target) {
-                    known[i].target.clone_from(&line.target);
-                    known[i].required = line.required;
+                if similarity(&fold(&line.target), &fold(&known[k].target)) >= MIN_QUEST_SCORE {
+                    known[k].target.clone_from(&line.target);
+                    known[k].required = line.required;
                 }
             }
-            _ if lines.is_none_or(|n| known.len() < n) => {
-                known.push(line.clone());
-                taken.push(true);
-            }
-            _ => {}
+            None => known.push(line.clone()),
         }
     }
 }
@@ -610,6 +649,18 @@ impl Atlas {
         self.wanted(quest, target).map(|(_, count)| count)
     }
 
+    /// The lines the Quest Helper shows for a quest, from the data: the monsters to defeat, then
+    /// the items to bring, each with its target and a count of 0. `None` when the data names
+    /// none, or misses a name.
+    fn quest_lines(&self, id: u32) -> Option<Vec<Objective>> {
+        let quest = self.quests.get(&id)?;
+        let line = |target: &String, required| Objective { target: target.clone(), current: 0, required };
+        let mobs = quest.requirements.iter().map(|r| Some(line(&self.monsters.get(&r.mob_id)?.name, r.count)));
+        let items = quest.items.iter().map(|i| Some(line(self.item_names.get(&i.item_id)?, i.count)));
+        let lines: Option<Vec<Objective>> = mobs.chain(items).collect();
+        lines.filter(|l| !l.is_empty())
+    }
+
     /// Corrects what a quest counts to what the data says it asks for, spelled the data's way.
     fn fit_counts(&self, id: u32, objectives: &mut [Objective]) {
         let Some(quest) = self.quests.get(&id) else { return };
@@ -708,6 +759,7 @@ mod tests {
     use super::*;
     use crate::mapdata::atlas::tests::{island_world, world};
     use crate::mapdata::drops::Dropper;
+    use crate::mapdata::osms::ItemNeed;
     use crate::readers::quest::Objective;
 
     fn query(title: &str, objectives: &[&str]) -> QuestQuery {
@@ -860,6 +912,24 @@ mod tests {
     }
 
     #[test]
+    fn a_quest_held_by_resemblance_takes_the_datas_lines_and_targets() {
+        // Seen live after a restart: rough readings were held before the data matched, and kept
+        // targets of 0 and 50 and two junk lines.
+        let (mut atlas, mut titles) = (world(), QuestTitles::default());
+        atlas.item_names.insert(95, "Snail Shell".into());
+        atlas.quests.get_mut(&70).unwrap().items.push(ItemNeed { item_id: 95, count: 1 });
+        let rough = quest("Sheli Sor 101ng", &[("Pebble Snail", 1, 0), ("Stl.tmr", 1, 3), ("Tillie", 2, 0)]);
+        held(&mut titles, &atlas, reading(vec![rough], None));
+        let garbled = quest("Shell Sortinq", &[("Snail Shel", 0, 1), ("Pebble Snail", 2, 50), ("Burrow Rot", 1, 2)]);
+        let read = held(&mut titles, &atlas, reading(vec![garbled], None)).unwrap();
+        let lines = [("Snail Shell", 0, 1), ("Pebble Snail", 2, 8), ("Burrow Rat", 1, 2)];
+        assert_eq!(read.quests, [quest("Shell Sorting", &lines)], "the data's lines, in the order read");
+        let junk = quest("Shell Sorting", &[("Tillie", 9, 9), ("Pebble Snail", 9, 8)]);
+        let read = held(&mut titles, &atlas, reading(vec![junk], None)).unwrap();
+        assert_eq!(read.quests, [quest("Shell Sorting", &lines)], "no junk line, no count over its target");
+    }
+
+    #[test]
     fn a_line_missed_on_the_first_reading_is_added_later() {
         let (atlas, mut titles) = (world(), QuestTitles::default());
         held(&mut titles, &atlas, reading(vec![quest("Shell Sorting", &[("Pebble Snail", 1, 8)])], None));
@@ -877,7 +947,10 @@ mod tests {
     #[test]
     fn a_row_that_is_no_quest_goes_and_a_lost_quest_comes_back_in_order() {
         let (atlas, mut titles) = (world(), QuestTitles::default());
-        let both = vec![quest("Shell Sorting", &[("Pebble Snail", 1, 8)]), quest("Slime Samples", &[("Moss Slime", 2, 5)])];
+        let both = vec![
+            quest("Shell Sorting", &[("Pebble Snail", 1, 8), ("Burrow Rat", 0, 2)]),
+            quest("Slime Samples", &[("Moss Slime", 2, 5)]),
+        ];
         held(&mut titles, &atlas, reading(both.clone(), None));
         let rough = vec![quest("O Slime", &[]), quest("Slime Samples", &[("Moss Slime", 2, 5)])];
         assert_eq!(held(&mut titles, &atlas, reading(rough, None)).unwrap().quests, both);
