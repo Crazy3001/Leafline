@@ -266,6 +266,10 @@
   {/each}
 
   {#if quest.quests.length}
+    {#if quest.quests.some((q) => !q.title || q.objectives.some((o) => o.unread))}
+      <!-- Only while something can't be read, so it says why without nagging. -->
+      <p class="footer faint">Scenery behind the Quest Helper can hide its text for a moment. UI Size: Ideal Ratio reads best.</p>
+    {/if}
     {#if !ready}
       <p class="footer">Download map data from the Map tab to see where to hunt for each objective.</p>
     {:else if unknownItems.length}

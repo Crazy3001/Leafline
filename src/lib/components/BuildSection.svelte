@@ -151,7 +151,7 @@
             <p><span class="tag">{gain.amount} AP</span>{statLabel(gain.stat)} <span class="tabular dim">to {gain.total}</span></p>
           {/each}
           {#each step.gear as name (name)}
-            <p><span class="tag">Gear</span>{name}</p>
+            <p><span class="tag">Gear</span><button class="ref ref-item" onclick={() => backend.showItem(null, name)}>{name}</button></p>
           {/each}
         {/if}
       </div>
@@ -183,7 +183,7 @@
                 <!-- What the level adds, then the total it makes: "Double Stab +3 (4)". -->
                 {#each s.sp as gain (gain.skillId)}<span>{gain.name} <span class="tabular">+{gain.to - gain.from}</span> <span class="total tabular">({gain.to})</span></span>{/each}
                 {#each s.ap as gain (gain.stat)}<span>{statLabel(gain.stat)} <span class="tabular">+{gain.amount}</span> <span class="total tabular">({gain.total})</span></span>{/each}
-                {#each s.gear as name (name)}<span>{name}</span>{/each}
+                {#each s.gear as name (name)}<button class="ref ref-item" onclick={() => backend.showItem(null, name)}>{name}</button>{/each}
               </span>
             </li>
           {/each}
