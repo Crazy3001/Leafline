@@ -41,9 +41,10 @@ impl MapReading {
 /// The WORLD button's size in its own heights, measured on Classic's minimap (34 x 10 canvas
 /// pixels), with some slack for other UI sizes.
 const BUTTON_ASPECT: std::ops::RangeInclusive<f32> = 2.9..=4.0;
-/// Below this share of orange pixels a block is not the button (its white lettering takes up
-/// about a third).
-const BUTTON_FILL: f32 = 0.5;
+/// Below this share of orange pixels a block is not the button. Its white lettering takes up
+/// about a third, and more at 1.41x (1080p, Default Ratio), where the letters blend into the
+/// orange around them: 0.47 there.
+const BUTTON_FILL: f32 = 0.4;
 /// How far left of the button a header can reach, in button heights. Wide enough for any
 /// name that fits on screen at 2x UI.
 const MAX_WIDTH: f32 = 60.0;
