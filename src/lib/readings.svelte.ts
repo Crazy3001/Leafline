@@ -2,7 +2,16 @@
 // window asks for the current state once and then follows the backend's events.
 
 import { backend } from "./api";
-import type { Analysis, CharacterRead, ItemRead, LiveStatus, OverlayStatus, PinStatus, SessionSummary } from "./types";
+import type {
+  Analysis,
+  CharacterRead,
+  HudReading,
+  ItemRead,
+  LiveStatus,
+  OverlayStatus,
+  PinStatus,
+  SessionSummary,
+} from "./types";
 
 export const live = $state<{
   analysis: Analysis | null;
@@ -47,7 +56,7 @@ export function watchLive() {
     live.pins = p;
   });
   backend.onAnalysis((a) => {
-    live.analysis = a;
+    live.analysis = a && { ...a, hud: steadyHud(a.hud, live.analysis?.hud ?? null) };
   });
   backend.onSession((s) => {
     live.session = s;
@@ -79,4 +88,26 @@ export function watchLive() {
     clearTimeout(characterTimer);
     characterTimer = setTimeout(() => (live.characterRead = null), 6000);
   });
+}
+
+/**
+ * The HUD with what it last showed filled in where this reading has nothing: loading a map, the
+ * Cash Shop or a window over the status bar hides it for a moment, and HP, MP and EXP shouldn't
+ * drop to nothing and fill up again. Another character's name starts afresh.
+ */
+export function steadyHud(next: HudReading | null, last: HudReading | null): HudReading | null {
+  if (!last) return next;
+  if (!next) return last;
+  if (next.name && last.name && next.name !== last.name && next.level != null) return next;
+  // EXP shows as points and percent, or as percent alone at high levels; keep one form.
+  const exp = next.exp ?? (next.expPercent == null ? last.exp : null);
+  return {
+    level: next.level ?? last.level,
+    job: next.job ?? last.job,
+    name: next.name ?? last.name,
+    hp: next.hp ?? last.hp,
+    mp: next.mp ?? last.mp,
+    exp,
+    expPercent: next.expPercent ?? (exp == null ? last.expPercent : null),
+  };
 }

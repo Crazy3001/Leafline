@@ -180,8 +180,9 @@
               <span class="when tabular">Lv {s.level}</span>
               <span class="what">
                 {#if s.advance}<span class="advance">{s.advance}</span>{/if}
-                {#each s.sp as gain (gain.skillId)}<span>{gain.name} {gain.to}</span>{/each}
-                {#each s.ap as gain (gain.stat)}<span class="tabular">{statLabel(gain.stat)} {gain.total}</span>{/each}
+                <!-- What the level adds, then the total it makes: "Double Stab +3 (4)". -->
+                {#each s.sp as gain (gain.skillId)}<span>{gain.name} <span class="tabular">+{gain.to - gain.from}</span> <span class="total tabular">({gain.to})</span></span>{/each}
+                {#each s.ap as gain (gain.stat)}<span>{statLabel(gain.stat)} <span class="tabular">+{gain.amount}</span> <span class="total tabular">({gain.total})</span></span>{/each}
                 {#each s.gear as name (name)}<span>{name}</span>{/each}
               </span>
             </li>
@@ -453,8 +454,12 @@
   .what {
     display: flex;
     flex-wrap: wrap;
-    gap: 2px 10px;
+    gap: 2px 14px;
     min-width: 0;
+  }
+
+  .what .total {
+    color: var(--muted);
   }
 
   .goals li {
