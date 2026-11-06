@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ChevronRight, Gift, Hourglass, LoaderCircle, Search, UserRound } from "@lucide/svelte";
+  import { Check, ChevronRight, Gift, Hourglass, LoaderCircle, Search, UserRound } from "@lucide/svelte";
   import { untrack } from "svelte";
 
   import Card from "./Card.svelte";
@@ -166,7 +166,7 @@
 
   {#each quest.quests as { title, objectives }, i}
     {@const info = guide?.quests[i]}
-    {@const finished = objectives.length > 0 && objectives.every((o) => objectiveProgress(o) >= 1)}
+    {@const finished = objectives.length > 0 && objectives.every((o) => objectiveProgress(o) >= 1 && !o.unread)}
     {@const id = info?.quest?.quest.id}
     {@const sheet = id != null ? sheets[id] : null}
     {@const expanded = id != null && questView.expanded.includes(id)}
@@ -209,7 +209,7 @@
         <ul>
           {#each objectives as objective, j}
             {@const progress = objectiveProgress(objective)}
-            {@const done = progress >= 1}
+            {@const done = progress >= 1 && !objective.unread}
             {@const hint = info?.objectives[j]}
             {@const eta = timeLeft(objective, hint)}
             <li class:done>
@@ -221,10 +221,8 @@
                 {:else}
                   <span>{objective.target}</span>
                 {/if}
-                <span class="count tabular">{objective.unread ? "–" : objective.current} / {objective.required}</span>
-              </div>
-              <div class="track">
-                <div class="fill" style:width="{progress * 100}%"></div>
+                <!-- The game's Quest Helper shows the counts; here only that a line is done. -->
+                {#if done}<span class="count" aria-label="Done"><Check size={13} /></span>{/if}
               </div>
               {#if eta}
                 <p class="eta" title={eta.title}>
@@ -240,7 +238,7 @@
           {/each}
         </ul>
       {:else if !expanded}
-        <p class="empty">Counters could not be read.</p>
+        <p class="empty">Its lines could not be read.</p>
       {/if}
       {#if sheet && payout(sheet.sheet).length}
         <p class="payout">
@@ -266,7 +264,7 @@
   {/each}
 
   {#if quest.quests.length}
-    {#if quest.quests.some((q) => !q.title || q.objectives.some((o) => o.unread))}
+    {#if quest.quests.some((q) => !q.title)}
       <!-- Only while something can't be read, so it says why without nagging. -->
       <p class="footer faint">Scenery behind the Quest Helper can hide its text for a moment. UI Size: Ideal Ratio reads best.</p>
     {/if}
@@ -428,25 +426,14 @@
   }
 
   .count {
+    display: flex;
     flex: none;
+    align-items: center;
     color: var(--muted);
   }
 
   .done .count {
     color: var(--good);
-  }
-
-  .track {
-    height: 4px;
-    border-radius: var(--radius-sm);
-    background: rgba(255, 255, 255, 0.06);
-    overflow: hidden;
-  }
-
-  /* Quest progress is neutral; green once done. Amber stays for selection, yellow for EXP. */
-  .fill {
-    height: 100%;
-    background: var(--muted);
   }
 
   .eta {
@@ -467,10 +454,6 @@
     color: var(--faint);
   }
 
-  .done .fill {
-    background: var(--good);
-  }
-
   /* Pinned: the same layout, packed tighter. */
   .dense .title {
     margin-bottom: 4px;
@@ -488,10 +471,6 @@
   .dense .row {
     margin-bottom: 2px;
     font-size: var(--text-sm);
-  }
-
-  .dense .track {
-    height: 3px;
   }
 
   .quest.dense + .quest.dense {
