@@ -29,6 +29,13 @@ impl UserData {
         Ok(())
     }
 
+    /// Every character Leafline has a record for.
+    pub fn character_names(&self) -> Result<Vec<String>> {
+        let mut stmt = self.conn.prepare("SELECT name FROM characters ORDER BY mesos_seen_at DESC")?;
+        let names = stmt.query_map([], |row| row.get(0))?.collect::<std::result::Result<_, _>>()?;
+        Ok(names)
+    }
+
     /// The mesos last seen for `name`, or with no name, for whichever character was seen last.
     pub fn known_mesos(&self, name: Option<&str>) -> Result<Option<KnownMesos>> {
         let row = |row: &rusqlite::Row| {

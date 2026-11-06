@@ -342,6 +342,54 @@ impl Keeper {
     }
 }
 
+/// Puts a name read with a letter or two wrong back to the character it is. The name's font is
+/// small, and at smaller window sizes OCR reads `Swiftleaf` as `Swiftleat`, which would
+/// start a new session and keep mesos under a character that doesn't exist. A known name of the
+/// same length that differs in at most two letters is taken as the one meant; a longer or
+/// shorter name (`Swiftleaf2`, an alt) is another character.
+struct NameSnap {
+    /// Names with a record first, then those read in this run.
+    known: Vec<String>,
+}
+
+impl NameSnap {
+    const MAX_WRONG: usize = 2;
+    const MIN_LENGTH: usize = 5;
+
+    /// `known` most recently seen first. Of two recorded names that differ in a letter or two,
+    /// one is a misread kept before this, and the later one stands for both.
+    fn new(known: Vec<String>) -> Self {
+        let mut snap = Self { known: Vec::new() };
+        for name in known {
+            if snap.closest(&name).is_none() {
+                snap.known.push(name);
+            }
+        }
+        snap
+    }
+
+    fn snap(&mut self, name: &mut Option<String>) {
+        let Some(read) = name.as_deref() else { return };
+        if let Some(known) = self.closest(read) {
+            *name = Some(known.clone());
+        } else if !read.is_empty() {
+            self.known.push(read.to_string());
+        }
+    }
+
+    fn closest(&self, read: &str) -> Option<&String> {
+        let read: Vec<char> = read.to_lowercase().chars().collect();
+        let wrong = |known: &String| {
+            let known: Vec<char> = known.to_lowercase().chars().collect();
+            (known.len() == read.len() && read.len() >= Self::MIN_LENGTH)
+                .then(|| known.iter().zip(&read).filter(|(a, b)| a != b).count())
+                .filter(|&n| n <= Self::MAX_WRONG)
+        };
+        // The first known name that fits closest, so a recorded name wins over one read today.
+        self.known.iter().filter_map(|k| wrong(k).map(|n| (n, k))).min_by_key(|(n, _)| *n).map(|(_, k)| k)
+    }
+}
+
 /// Remembers each character's mesos between runs, once the tracker has confirmed both the name
 /// and the amount.
 #[derive(Default)]
@@ -407,6 +455,7 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
     let mut keeper = Keeper::default();
     let mut memory = MesoMemory::default();
     let mut titles = QuestTitles::default();
+    let mut names = NameSnap::new(app.state::<UserDataState>().with(|db| db.character_names()).unwrap_or_default());
     let mut windows = Watch::default();
     let mut twin = None;
     let mut held = false;
@@ -535,6 +584,9 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
                 }
                 if let Some(atlas) = app.state::<MapDataState>().atlas() {
                     titles.hold(&atlas, &mut analysis.quest);
+                }
+                if let Some(hud) = analysis.hud.as_mut() {
+                    names.snap(&mut hud.name);
                 }
                 let read_ms = started.elapsed().as_secs_f32() * 1000.0;
                 let mut sample = Sample::from_analysis(unix_seconds(SystemTime::now()), &analysis);
@@ -681,7 +733,31 @@ pub fn save_live_frame(app: AppHandle) -> Result<PathBuf> {
 mod tests {
     use std::time::{Duration, Instant, UNIX_EPOCH};
 
-    use super::{MIN_PICTURE_GAP, file_stamp, gap_left};
+    use super::{MIN_PICTURE_GAP, NameSnap, file_stamp, gap_left};
+
+    #[test]
+    fn a_name_read_a_letter_wrong_is_the_character_it_resembles() {
+        let mut names = NameSnap::new(vec!["PebbleThief".into()]);
+        let mut snap = |read: &str| {
+            let mut name = Some(read.to_string());
+            names.snap(&mut name);
+            name.unwrap()
+        };
+        assert_eq!(snap("PebbleThiet"), "PebbleThief", "seen live at 1366x768");
+        assert_eq!(snap("pebbleThief"), "PebbleThief");
+        assert_eq!(snap("PebbleThief2"), "PebbleThief2", "a longer name is an alt");
+        assert_eq!(snap("MossWarden"), "MossWarden");
+        assert_eq!(snap("MossWardon"), "MossWarden", "names read this run count too");
+        assert_eq!(snap("Pebb"), "Pebb", "too short to tell");
+    }
+
+    #[test]
+    fn a_misread_name_already_recorded_gives_way_to_the_one_seen_since() {
+        let mut names = NameSnap::new(vec!["PebbleThief".into(), "PebbleThiet".into()]);
+        let mut name = Some("PebbleThiet".to_string());
+        names.snap(&mut name);
+        assert_eq!(name.as_deref(), Some("PebbleThief"));
+    }
 
     #[test]
     fn pictures_stay_a_second_apart() {
