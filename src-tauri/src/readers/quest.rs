@@ -60,8 +60,9 @@ static PAGE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\(\s*(\d)\s*.?\s*(\
 static OBJECTIVE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^((?:[0-9OoIlSB$!|\\/r ]|C[lI])*(?:[0-9OoIlSB]|C[lI]))\s+([A-Za-z].*)$").unwrap());
 
-pub fn read(frame: &Frame, overview: &[Line], ocr: &Ocr) -> Result<Option<QuestReading>> {
-    let Some(header) = overview.iter().find(|l| is_header(&l.text)) else { return Ok(None) };
+/// The Quest Helper's header line and the panel under it, if the overview found the header.
+pub fn panel(overview: &[Line]) -> Option<(&Line, Rect)> {
+    let header = overview.iter().find(|l| is_header(&l.text))?;
     let h = header.rect.h;
     let panel = Rect::from_edges(
         header.rect.x - 0.8 * h,
@@ -69,6 +70,12 @@ pub fn read(frame: &Frame, overview: &[Line], ocr: &Ocr) -> Result<Option<QuestR
         header.rect.x + WIDTH_IN_LINES * h,
         header.rect.bottom() + HEIGHT_IN_LINES * h,
     );
+    Some((header, panel))
+}
+
+pub fn read(frame: &Frame, overview: &[Line], ocr: &Ocr) -> Result<Option<QuestReading>> {
+    let Some((header, panel)) = panel(overview) else { return Ok(None) };
+    let h = header.rect.h;
     const SCALE: f32 = 2.0;
     let enlarge = |img: &Frame, filter| {
         let (w, h) = ((img.width() as f32 * SCALE) as u32, (img.height() as f32 * SCALE) as u32);
@@ -93,7 +100,8 @@ pub fn read(frame: &Frame, overview: &[Line], ocr: &Ocr) -> Result<Option<QuestR
     rows.retain(|row| has_text(frame, panel, row.y(), h));
     // OCR can lose a counter altogether, leaving `O Snail` looking like a title, but a row that
     // starts `digits / digits` as drawn is an objective, whatever is behind the panel.
-    let glyphs: Vec<Option<CounterGlyphs>> = rows.iter().map(|row| CounterGlyphs::read(frame, panel, row.y(), h)).collect();
+    let glyphs: Vec<Option<CounterGlyphs>> =
+        rows.iter().map(|row| CounterGlyphs::read(frame, panel, row.y(), h)).collect();
     for (row, glyphs) in rows.iter_mut().zip(&glyphs) {
         if let (Row::Title { y, title }, Some(_)) = (&*row, glyphs) {
             *row = Row::Objective { y: *y, target: after_counter(title), counters: Vec::new() };
@@ -578,10 +586,7 @@ mod tests {
         let split = vec![line("B ringing a Mirror to Heena", 50.0)];
         assert_eq!(
             parse(&[plain, split], 30.0, 32.0),
-            [Quest {
-                title: "Bringing a Mirror to Heena".into(),
-                objectives: vec![objective("Sera's Mirror", 1, 1)]
-            }]
+            [Quest { title: "Bringing a Mirror to Heena".into(), objectives: vec![objective("Sera's Mirror", 1, 1)] }]
         );
         // A counter OCR read past its target is still a counter, for the shapes to settle.
         assert_eq!(parse(&[vec![line("31 / 30 Evil Eye", 50.0)]], 30.0, 32.0), Vec::<Quest>::new());

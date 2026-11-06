@@ -130,7 +130,7 @@
             <td class="value tabular">{formatSigned(stat.value)}</td>
             <td class="detail tabular">
               {#if stat.base != null && stat.bonus != null}
-                <span title="Base value and bonus as shown in the tooltip">{stat.base} base</span>
+                <span>{stat.base} base</span>
                 <span class="bonus" class:negative={stat.bonus < 0}>{formatSigned(stat.bonus)}</span>
               {/if}
             </td>

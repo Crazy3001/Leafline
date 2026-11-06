@@ -19,8 +19,11 @@
   "mesos": 42944,
   "mesosGained": 9904,
   "mesosPerHour": 10475.668791490958,
+  "mesosSeconds": 1980.0,
+  "mesosUnseenSeconds": 1450.0,
   "mesosExcluded": 0,
   "map": "Victoria Road : Kerning City",
+  "town": false,
   "maps": [
     {
       "map": null,

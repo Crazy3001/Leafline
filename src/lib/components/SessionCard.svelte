@@ -2,6 +2,7 @@
   import Card from "./Card.svelte";
   import SessionControls from "./SessionControls.svelte";
   import { formatCompact, formatDuration, formatNumber, partyLabel, splitMapLabel } from "$lib/format";
+  import { mesosReminder } from "$lib/training";
   import type { SessionSummary } from "$lib/types";
 
   let { session, compact = false }: { session: SessionSummary; compact?: boolean } = $props();
@@ -9,17 +10,15 @@
   const signed = (value: number) => (value > 0 ? `+${formatNumber(value)}` : formatNumber(value));
   const maps = $derived(session.maps.filter((m) => m.activeSeconds > 0 || m.expGained !== 0 || m.mesosGained !== 0));
   const dropped = $derived(session.rejected.exp + session.rejected.mesos);
-  /** How long the mesos can stay out of sight before the player is reminded. */
-  const MESOS_STALE = 300;
-  const mesosStale = $derived(!session.paused && (session.mesosAge ?? 0) >= MESOS_STALE);
-  const hasNotes = $derived(session.deaths > 0 || session.mapHidden || mesosStale);
+  const reminder = $derived(mesosReminder(session));
+  const hasNotes = $derived(session.deaths > 0 || session.mapHidden || reminder != null);
 </script>
 
 <Card title="Session">
   {#snippet aside()}
     {#if session.party != null && session.party > 1}<span class="party tabular">{partyLabel(session.party)}</span>{/if}
     {#if session.held}
-      <span class="state paused" title="Paused by hand">Paused</span>
+      <span class="state paused">Paused</span>
     {:else if session.paused}
       <span class="state paused" title="No EXP for a while, or the map changed: the clock waits for the next gain">
         Paused
@@ -95,7 +94,7 @@
       {#if session.mapHidden}
         <li class="attention">Can't see the minimap's name, so new gains may not go to the right map.</li>
       {/if}
-      {#if mesosStale}<li class="attention">Open your inventory now and then so mesos stay up to date.</li>{/if}
+      {#if reminder}<li class="attention">{reminder}</li>{/if}
       {#if session.deaths > 0}
         <li>
           {session.deaths} death{session.deaths === 1 ? "" : "s"}, {session.percentOnly

@@ -13,6 +13,7 @@
   import { measuredRates, watchHistory } from "$lib/history.svelte";
   import { OSMS_CREDIT, OSMS_URL, WIKI_URL } from "$lib/mapdata.svelte";
   import { openMonster } from "$lib/monsters.svelte";
+  import { showNpcNamed } from "$lib/places.svelte";
   import { travelKey } from "$lib/settings.svelte";
   import type { MapReading, MonsterSheet, MonsterWhere, QuestReading, SessionSummary } from "$lib/types";
 
@@ -59,6 +60,9 @@
   });
 
   const sheet = $derived(found?.sheet.id === id ? found.sheet : null);
+
+  /** The three headline numbers in the HUD's colours; HP uses the lighter red that reads as text. */
+  const TINT: Record<string, string> = { HP: "var(--bad)", MP: "var(--mp)", EXP: "var(--exp)" };
 
   const facts = $derived(
     sheet
@@ -140,7 +144,7 @@
 
     <dl class="facts">
       {#each facts as fact (fact.label)}
-        <div title={fact.title}><dt>{fact.label}</dt><dd class="tabular">{fact.value}</dd></div>
+        <div title={fact.title}><dt>{fact.label}</dt><dd class="tabular" style:color={TINT[fact.label]}>{fact.value}</dd></div>
       {/each}
     </dl>
 
@@ -203,9 +207,14 @@
           {#each sheet.quests as need (need.quest.id)}
             {@const counted = tracked(need.quest.name, sheet.name)}
             <li>
-              <button class="link strong" title="Show it in the Quests tab" onclick={() => backend.showQuest(need.quest.id)}>{need.quest.name}</button>
+              <button class="link strong" onclick={() => backend.showQuest(need.quest.id)}>{need.quest.name}</button>
               <span class="tabular" class:yours-now={counted}>{counted ?? `×${need.count}`}</span>
-              <span class="who">{[need.quest.levelMin ? `Lv ${need.quest.levelMin}` : null, need.giver].filter(Boolean).join(" · ")}</span>
+              <span class="who"
+                >{#if need.quest.levelMin}Lv {need.quest.levelMin}{/if}{#if need.giver}{need.quest.levelMin ? " · " : ""}<button
+                    class="ref ref-npc"
+                    onclick={() => showNpcNamed(need.giver!)}>{need.giver}</button
+                  >{/if}</span
+              >
             </li>
           {/each}
         </ul>
@@ -220,7 +229,12 @@
               <button class="link strong tabular" onclick={() => openMonster(version.id)}>
                 Lv {version.level} · {formatCompact(version.hp)} HP · {formatNumber(version.exp)} EXP
               </button>
-              <span class="who">{version.maps.length ? version.maps.slice(0, 2).map((m) => m.name).join(", ") : "Not on any map"}</span>
+              <span class="who"
+                >{#each version.maps.slice(0, 2) as m, k (m.id)}{k ? ", " : ""}{#if m.known}<button
+                      class="ref ref-map"
+                      onclick={() => backend.showPlace("maps", m.id)}>{m.name}</button
+                    >{:else}{m.name}{/if}{:else}Not on any map{/each}</span
+              >
             </li>
           {/each}
         </ul>
@@ -228,7 +242,7 @@
     {/if}
 
     <div class="links">
-      <button class="out" title="Search for it on mapleclassic.wiki" onclick={() => backend.openLink(wikiPage(sheet.name))}>
+      <button class="out" onclick={() => backend.openLink(wikiPage(sheet.name))}>
         mapleclassic.wiki<ExternalLink size={11} />
       </button>
     </div>

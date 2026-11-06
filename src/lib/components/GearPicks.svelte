@@ -43,7 +43,7 @@
         <div class="picks">
           {#each full ? slot.picks : slot.picks.slice(0, 1) as pick (pick.item.id)}
             <div class="pick">
-              <button class="name" class:goal={pick.goal} title="Show it in the Lookup tab" onclick={() => backend.showItem(pick.item.id, null)}>
+              <button class="name ref ref-item" class:goal={pick.goal} onclick={() => backend.showItem(pick.item.id, null)}>
                 {pick.item.name}{#if pick.item.gender}<small>{pick.item.gender[0].toUpperCase()}</small>{/if}
               </button>
               <span class="gives">
@@ -106,20 +106,8 @@
   }
 
   .name {
-    padding: 0;
-    border: 0;
-    background: transparent;
     font-size: var(--text-sm);
     font-weight: 600;
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .name:hover,
-  .name:focus-visible {
-    color: var(--accent-strong);
-    text-decoration: underline;
-    outline: none;
   }
 
   .name.goal {

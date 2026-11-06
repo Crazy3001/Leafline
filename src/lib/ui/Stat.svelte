@@ -6,16 +6,19 @@
     sub,
     size = "md",
     title,
+    faint = false,
   }: {
     label: string;
     value: string;
     sub?: string | null;
     size?: "sm" | "md" | "lg";
     title?: string;
+    /** The value is a rough one: drawn greyed out. */
+    faint?: boolean;
   } = $props();
 </script>
 
-<div class="stat {size}" {title}>
+<div class="stat {size}" class:faint {title}>
   <span class="label">{label}</span>
   <span class="value num">{value}</span>
   {#if sub}<span class="sub tabular">{sub}</span>{/if}
@@ -62,5 +65,9 @@
   .sub {
     font-size: var(--text-xs);
     color: var(--muted);
+  }
+
+  .faint .value {
+    color: var(--faint);
   }
 </style>

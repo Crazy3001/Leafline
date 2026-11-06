@@ -20,19 +20,20 @@ export const questView = $state<{ id: number | null; search: QuestSearch; expand
 /** How many reward items a collapsed quest names before counting the rest. */
 const NAMED_REWARDS = 2;
 
-/** What a quest pays, in a line. */
-export function payout(sheet: QuestSheet): string {
-  const sure = sheet.rewards.filter((r) => r.sure);
-  const named = sure.slice(0, NAMED_REWARDS).map((r) => (r.count > 1 ? `${r.name} ×${r.count}` : r.name));
+/** What a quest pays, in a line: each piece kept apart so it can be coloured or linked. */
+export type PayoutPart =
+  | { kind: "exp" | "mesos" | "more"; text: string }
+  | { kind: "item"; id: number; name: string; count: number };
+
+export function payout(sheet: QuestSheet): PayoutPart[] {
+  const named = sheet.rewards.filter((r) => r.sure).slice(0, NAMED_REWARDS);
   const others = sheet.rewards.length - named.length;
-  return [
-    sheet.row.exp ? `${formatCompact(sheet.row.exp)} EXP` : null,
-    sheet.row.mesos ? `${formatMesos(sheet.row.mesos)} mesos` : null,
-    ...named,
-    others ? `${others} more possible` : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const parts: PayoutPart[] = [];
+  if (sheet.row.exp) parts.push({ kind: "exp", text: `${formatCompact(sheet.row.exp)} EXP` });
+  if (sheet.row.mesos) parts.push({ kind: "mesos", text: `${formatMesos(sheet.row.mesos)} mesos` });
+  for (const r of named) parts.push({ kind: "item", id: r.id, name: r.name, count: r.count });
+  if (others) parts.push({ kind: "more", text: `${others} more possible` });
+  return parts;
 }
 
 export function toggleExpanded(id: number) {

@@ -34,11 +34,13 @@
 
 {#if maps.length}
   <p class="place">
-    <span>{maps.map((m) => m.name).join(", ")}</span>
+    <span>
+      {#each maps as m, k (m.id)}{#if k}{", "}{/if}{#if m.known}<button class="ref ref-map" onclick={() => backend.showPlace("maps", m.id)}>{m.name}</button>{:else}{m.name}{/if}{/each}
+    </span>
     {#if here}
       <span class="here">you're here</span>
     {:else if from}
-      <button aria-expanded={open} onclick={() => (open = !open)}><Route size={11} />{open ? "Hide route" : "Route"}</button>
+      <button class="toggle" aria-expanded={open} onclick={() => (open = !open)}><Route size={11} />{open ? "Hide route" : "Route"}</button>
     {/if}
   </p>
   {#if open && !here}
@@ -66,7 +68,7 @@
     font-size: var(--text-xs);
   }
 
-  button {
+  .toggle {
     display: inline-flex;
     align-items: center;
     gap: 3px;
@@ -78,8 +80,8 @@
     cursor: pointer;
   }
 
-  button:hover,
-  button:focus-visible {
+  .toggle:hover,
+  .toggle:focus-visible {
     color: var(--accent-strong);
     outline: none;
   }

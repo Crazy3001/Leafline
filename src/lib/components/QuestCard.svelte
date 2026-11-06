@@ -8,9 +8,12 @@
   import { backend } from "$lib/api";
   import { formatCompact, formatDuration, objectiveProgress, splitMapLabel } from "$lib/format";
   import { measuredRates, watchHistory } from "$lib/history.svelte";
+  import { showItemNamed } from "$lib/items.svelte";
+  import { showMonsterNamed } from "$lib/monsters.svelte";
+  import { showNpcNamed } from "$lib/places.svelte";
   import { OSMS_URL, WIKI_URL, mapData, watchMapData } from "$lib/mapdata.svelte";
   import { payout, questView, toggleExpanded } from "$lib/quests.svelte";
-  import type { Guide, MapReading, ObjectiveGuide, Objective, QuestReading, QuestWhere, SessionSummary } from "$lib/types";
+  import type { Guide, MapRef, MapReading, ObjectiveGuide, Objective, QuestReading, QuestWhere, SessionSummary } from "$lib/types";
 
   let {
     quest,
@@ -152,6 +155,10 @@
   }
 </script>
 
+{#snippet who(person: string, maps: MapRef[])}
+  <button class="ref ref-npc" onclick={() => showNpcNamed(person)}>{person}</button>{#if maps.length}<span class="faint">{" · "}</span>{#each maps as m, k (m.id)}{#if k}<span class="faint">, </span>{/if}{#if m.known}<button class="ref ref-map" onclick={() => backend.showPlace("maps", m.id)}>{m.name}</button>{:else}<span class="faint">{m.name}</span>{/if}{/each}{/if}
+{/snippet}
+
 <Card title="Quests" {plain}>
   {#snippet aside()}
     {#if quest.page}<span class="tabular">{quest.page[0]} tracked</span>{/if}
@@ -165,7 +172,7 @@
     {@const expanded = id != null && questView.expanded.includes(id)}
     <div class="quest" class:dense={plain}>
       <!-- The map data's spelling, once the title matched a quest there: OCR garbles some letters. -->
-      <h3 class="title" title={info?.quest ? `Read on screen as "${title}"` : undefined}>
+      <h3 class="title">
         {#if id != null}
           <button class="open" aria-expanded={expanded} onclick={() => toggleExpanded(id)}>
             <span class="chevron" class:expanded><ChevronRight size={13} /></span>
@@ -184,16 +191,14 @@
             <UserRound size={11} />
             <span>
               {turnIn ? "Turn in to" : finished ? "Done · from" : "From"}
-              {person}{#if maps.length}<span class="faint">{" · "}{maps.map((m) => m.name).join(", ")}</span>{/if}
+              {@render who(person, maps)}
             </span>
           </p>
         {/if}
         {#if !finished && info.quest.turnIn && info.quest.turnIn !== info.quest.giver}
           <p class="giver">
             <UserRound size={11} />
-            <span>
-              Turn in to {info.quest.turnIn}{#if info.quest.turnInMaps.length}<span class="faint">{" · "}{info.quest.turnInMaps.map((m) => m.name).join(", ")}</span>{/if}
-            </span>
+            <span>Turn in to {@render who(info.quest.turnIn, info.quest.turnInMaps)}</span>
           </p>
         {/if}
       {/if}
@@ -206,7 +211,13 @@
             {@const eta = timeLeft(objective, hint)}
             <li class:done>
               <div class="row">
-                <span>{objective.target}</span>
+                {#if hint?.kind === "monster"}
+                  <button class="ref ref-mob" onclick={() => showMonsterNamed(objective.target)}>{objective.target}</button>
+                {:else if hint?.kind === "item"}
+                  <button class="ref ref-item" onclick={() => showItemNamed(hint.item ?? objective.target)}>{objective.target}</button>
+                {:else}
+                  <span>{objective.target}</span>
+                {/if}
                 <span class="count tabular">{objective.current} / {objective.required}</span>
               </div>
               <div class="track">
@@ -228,8 +239,18 @@
       {:else if !expanded}
         <p class="empty">Counters could not be read.</p>
       {/if}
-      {#if sheet && payout(sheet.sheet)}
-        <p class="payout"><Gift size={11} /><span>{payout(sheet.sheet)}</span></p>
+      {#if sheet && payout(sheet.sheet).length}
+        <p class="payout">
+          <Gift size={11} />
+          <span>
+            <!-- Kept on few lines: the separators carry their own spaces. -->
+            {#each payout(sheet.sheet) as part, k}{#if k}<span class="sep">{" · "}</span>{/if}{#if part.kind === "item"}
+                <span class="nowrap"><button class="ref ref-item" onclick={() => backend.showItem(part.id, null)}>{part.name}</button>{#if part.count > 1}<span class="tabular">{" "}×{part.count}</span>{/if}</span
+              >{:else if part.kind === "more" && id != null}<button class="more" onclick={() => toggleExpanded(id)}
+                  >{expanded ? part.text : `${part.text} ›`}</button
+                >{:else}<span class="{part.kind} nowrap tabular">{part.text}</span>{/if}{/each}
+          </span>
+        </p>
       {/if}
       {#if expanded && sheet}
         <div class="details"><QuestSteps sheet={sheet.sheet} from={sheet.from} tracked={objectives} /></div>
@@ -307,6 +328,40 @@
   .payout :global(svg) {
     flex: none;
     align-self: center;
+    color: var(--faint);
+  }
+
+  .payout .sep {
+    color: var(--faint);
+    white-space: pre;
+  }
+
+  .payout .exp {
+    color: var(--exp);
+  }
+
+  .payout .mesos {
+    color: var(--mesos);
+  }
+
+  .nowrap {
+    white-space: nowrap;
+  }
+
+  .more {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .more:hover,
+  .more:focus-visible {
+    color: var(--text);
+    text-decoration: underline;
+    outline: none;
   }
 
   .details {

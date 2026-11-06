@@ -112,7 +112,7 @@
           title="Live reading follows your Character Stat and Skill windows while they're open. With it off, open them and read them once here{keyHint('ReadCharacter')}"
           onclick={() => backend.readCharacter()}><RefreshCw size={12} />Read stats</button
         >
-        <button class="link" title="Edit this build" onclick={() => backend.showBuild()}><Pencil size={12} />Edit</button>
+        <button class="link" onclick={() => backend.showBuild()}><Pencil size={12} />Edit</button>
       </span>
     {/if}
   </header>
@@ -157,7 +157,7 @@
       </div>
     </div>
 
-    <dl class="stats" title="Base stats the plan has at this level. Compare them with your Character Stat window.">
+    <dl class="stats">
       {#each STATS as stat (stat.id)}
         <div>
           <dt>{stat.label}</dt>
@@ -213,7 +213,7 @@
         <ul class="goals">
           {#each plan.expansion.gear as check (check.item.id)}
             <li>
-              <button title="Show it in the Lookup tab" onclick={() => backend.showItem(check.item.id, null)}
+              <button class="ref ref-item" onclick={() => backend.showItem(check.item.id, null)}
                 >{check.item.name}</button
               >
               <span class="tabular" class:warn={!check.usable || check.level == null}>

@@ -607,7 +607,7 @@
             {#each expansion.gear as check (check.item.id)}
               <li>
                 <span class="goal-name">
-                  <button class="item-link" title="Show it in the Lookup tab" onclick={() => backend.showItem(check.item.id, null)}>{check.item.name}</button>
+                  <button class="ref ref-item" onclick={() => backend.showItem(check.item.id, null)}>{check.item.name}</button>
                   <small>{check.item.slot} · {requires(check.item)}{gives(check.item) ? ` · ${gives(check.item)}` : ""}</small>
                 </span>
                 <span class="max tabular" class:warn={!check.usable || check.level == null}>
@@ -1040,23 +1040,6 @@
 
   .goals li + li {
     border-top: 1px solid var(--border);
-  }
-
-  .item-link {
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: inherit;
-    font: inherit;
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .item-link:hover,
-  .item-link:focus-visible {
-    color: var(--accent-strong);
-    text-decoration: underline;
-    outline: none;
   }
 
   .goal-name {

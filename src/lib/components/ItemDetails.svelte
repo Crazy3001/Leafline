@@ -11,6 +11,7 @@
   import { formatMesos } from "$lib/format";
   import { blankQuery, itemView } from "$lib/items.svelte";
   import { OSMS_CREDIT, OSMS_URL, WIKI_CREDIT, WIKI_URL, mapData } from "$lib/mapdata.svelte";
+  import { showNpcNamed } from "$lib/places.svelte";
   import { live } from "$lib/readings.svelte";
   import type { ItemRecord, ItemTooltip, ItemWhere, MapReading } from "$lib/types";
 
@@ -129,10 +130,17 @@
         <h5>Quest reward</h5>
         <ul class="quests">
           {#each found.origin.quests as quest (quest.quest.id)}
+            {@const giverMap = quest.giverMaps[0]}
             <li>
-              <button class="quest" title="Show it in the Quests tab" onclick={() => backend.showQuest(quest.quest.id)}>{quest.quest.name}</button>
+              <button class="quest" onclick={() => backend.showQuest(quest.quest.id)}>{quest.quest.name}</button>
               <span class="who">
-                {[quest.quest.levelMin ? `Lv ${quest.quest.levelMin}` : null, quest.giver, quest.giverMaps[0]?.name].filter(Boolean).join(" · ")}
+                {#if quest.quest.levelMin}Lv {quest.quest.levelMin}{/if}{#if quest.giver}{quest.quest.levelMin ? " · " : ""}<button
+                    class="ref ref-npc"
+                    onclick={() => showNpcNamed(quest.giver!)}>{quest.giver}</button
+                  >{/if}{#if giverMap}{quest.quest.levelMin || quest.giver ? " · " : ""}{#if giverMap.known}<button
+                      class="ref ref-map"
+                      onclick={() => backend.showPlace("maps", giverMap.id)}>{giverMap.name}</button
+                    >{:else}{giverMap.name}{/if}{/if}
               </span>
             </li>
           {/each}

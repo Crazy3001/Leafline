@@ -188,7 +188,7 @@ fn amber_name(frame: &Frame, area: Rect, ocr: &Ocr) -> Result<Option<String>> {
         let words = ocr.words_in(frame, line, AMBER_SCALE as f32, |crop| {
             // Looser than the check for amber: text over a dark patch of scenery comes out dimmer.
             let keyed = preprocess::keep(crop, |px| {
-                let [r, g, b, _] = px.0;
+                let [r, g, b, _] = px.0.map(i16::from);
                 r >= 150 && g >= 90 && b <= 70 && r >= g + 40
             });
             let (w, h) = (keyed.width() * AMBER_SCALE, keyed.height() * AMBER_SCALE);
@@ -332,7 +332,8 @@ fn frame_top(frame: &Frame, separator: Rect, unit: f32) -> Option<f32> {
     let on_frame = |y: u32| {
         columns.clone().any(|x| {
             let (edge, inside) = (frame.get_pixel(x, y), frame.get_pixel((x + inset).min(frame.width() - 1), y));
-            is_panel_frame(edge) && preprocess::luminance(edge) >= preprocess::luminance(inside) + 30
+            let lighter = u16::from(preprocess::luminance(edge)) >= u16::from(preprocess::luminance(inside)) + 30;
+            is_panel_frame(edge) && lighter
         })
     };
     let max_gap = (4.0 * unit) as u32;

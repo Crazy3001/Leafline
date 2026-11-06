@@ -110,7 +110,7 @@
       {/each}
     </div>
   {/if}
-  {#if changed}<button class="plain" title="Back to your character" onclick={reset}>Reset</button>{/if}
+  {#if changed}<button class="plain" onclick={reset}>Reset</button>{/if}
   <button class="plain everything" title="List all equipment, whoever it's for" onclick={() => (gearView.forMe = false)}>Everything</button>
 </div>
 

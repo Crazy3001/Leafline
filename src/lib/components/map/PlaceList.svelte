@@ -98,7 +98,7 @@
     <p class="note">No route through portals is known from {from.name}.</p>
   {/if}
   {#if ground}
-    <button class="more" title="See everything on this map" onclick={() => backend.showPlace("maps", ground.map.id)}>Open {ground.map.name}</button>
+    <button class="more" onclick={() => backend.showPlace("maps", ground.map.id)}>Open {ground.map.name}</button>
   {/if}
 {/if}
 

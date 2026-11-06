@@ -1,9 +1,11 @@
 <script lang="ts">
   // The Train tab: the session being played (rates, a graph of the whole session, how this map
-  // compares with your best on it, the maps played), then where to train next. Before a session
-  // starts it shows the last one instead.
+  // compares with your best on it, the maps played), then where to train next, with a jump to it
+  // from the top. Before a session starts, where to train comes first and the last session after.
   import SessionControls from "./SessionControls.svelte";
-  import SpotList from "./SpotList.svelte";
+  import { ArrowDown } from "@lucide/svelte";
+
+  import SpotList, { SPOTS_ID } from "./SpotList.svelte";
   import TimersCard from "./TimersCard.svelte";
   import { backend } from "$lib/api";
   import { formatCompact, formatDuration, formatNumber, splitMapLabel } from "$lib/format";
@@ -14,6 +16,8 @@
     eventMarkers,
     mapBands,
     mapStats,
+    mesosCoverage,
+    mesosReminder,
     pointDetail,
     rateFormat,
     shortDay,
@@ -54,13 +58,16 @@
   const headline = $derived.by(() => {
     if (!session) return null;
     if (percentOnly)
-      return { label: "Level per hour", value: session.percentPerHour != null ? `${session.percentPerHour.toFixed(1)}%` : "—", sub: null };
-    return {
-      label: "EXP per hour",
-      value: formatCompact(session.expPerHour),
-      sub: session.percentPerHour != null ? `${session.percentPerHour.toFixed(1)}% / hr` : null,
-    };
+      return { label: "Level % per hour, this session", value: session.percentPerHour != null ? `${session.percentPerHour.toFixed(1)}%` : "—" };
+    return { label: "EXP per hour, this session", value: formatCompact(session.expPerHour) };
   });
+  /** Share of a level an hour, said in words next to the time to level. */
+  const levelPace = $derived(
+    !percentOnly && session?.percentPerHour != null ? `${session.percentPerHour.toFixed(1)}% of a level an hour` : null,
+  );
+
+  /** The graph's points are five-minute rates, so it waits for five minutes of play. */
+  const GRAPH_AFTER = 300;
   const recent = $derived(
     percentOnly
       ? session?.recentPercentPerHour != null
@@ -95,8 +102,30 @@
     return { name: splitMapLabel(session.map).name, now: now?.expPerHour ?? null, saved };
   });
 
-  const MESOS_STALE = 300;
-  const mesosStale = $derived(session != null && !session.paused && (session.mesosAge ?? 0) >= MESOS_STALE);
+  const coverage = $derived(session ? mesosCoverage(session) : null);
+  const reminder = $derived(session ? mesosReminder(session) : null);
+
+  // How Mesos / hr works, said once until the player dismisses it.
+  const MESOS_HINT_KEY = "leafline.train.mesosHintSeen";
+  let mesosHintSeen = $state(storedFlag(MESOS_HINT_KEY));
+
+  function storedFlag(key: string): boolean {
+    try {
+      return localStorage.getItem(key) === "1";
+    } catch {
+      return false;
+    }
+  }
+
+  function dismissMesosHint() {
+    mesosHintSeen = true;
+    try {
+      localStorage.setItem(MESOS_HINT_KEY, "1");
+    } catch {
+      // A convenience only.
+    }
+  }
+
   const dropped = $derived(session ? session.rejected.exp + session.rejected.mesos : 0);
 
   // Before a session: the last few saved ones.
@@ -122,17 +151,28 @@
     }
   }
 
+  function jumpToSpots() {
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    document.getElementById(SPOTS_ID)?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+  }
+
   function mainMap(maps: { map: string }[]) {
     return maps.length ? splitMapLabel(maps[0].map).name : "No map read";
   }
 </script>
 
+{#snippet jump()}
+  <Button variant="ghost" size="sm" onclick={jumpToSpots}>
+    Where to train <ArrowDown size={12} />
+  </Button>
+{/snippet}
+
 <Block title="Session">
   {#snippet aside()}
     {#if session?.held}
-      <span class="state paused" title="Paused by hand">Paused</span>
+      <span class="state paused">Paused</span>
     {:else if tracking && session?.paused}
-      <span class="state paused" title="No EXP for a while, or the map changed: the clock waits for the next gain">Paused</span>
+      <span class="state idle" title="No EXP for a while, or the map changed: the clock waits for your next gain">Idle</span>
     {:else if tracking}
       <span class="state running"><span class="square" aria-hidden="true"></span>Tracking</span>
     {/if}
@@ -141,7 +181,7 @@
     {/if}
   {/snippet}
 
-  <SessionControls />
+  <SessionControls trailing={tracking ? jump : undefined} />
 
   {#if !tracking}
     <div class="empty">
@@ -164,18 +204,15 @@
     <div class="headline">
       <div class="big">
         <span class="label">{headline.label}</span>
-        <span class="figure">
-          <span class="num hero">{headline.value}</span>
-          {#if headline.sub}<span class="tabular sub">{headline.sub}</span>{/if}
-        </span>
+        <span class="num hero">{headline.value}</span>
       </div>
       {#if recent}
-        <div class="recent" title="Over the last five minutes of active time, against the whole session">
+        <div class="recent" title="The rate over the last five minutes of active time, and how it compares with the whole session">
           <span class="label">Last 5 min</span>
           <span class="figure">
             <span class="num">{recent}</span>
             {#if pace != null && pace !== 0}
-              <span class="pace" class:up={pace > 0} class:down={pace < 0}>{pace > 0 ? "▲" : "▼"} {Math.abs(pace)}%</span>
+              <span class="pace" class:up={pace > 0} class:down={pace < 0}>{pace > 0 ? "▲" : "▼"} {Math.abs(pace)}% vs session</span>
             {/if}
           </span>
         </div>
@@ -186,17 +223,38 @@
       <div class="level">
         <div class="level-line"><span class="muted">Lv {lv} to {lv + 1}</span><span class="tabular">{percent.toFixed(2)}%</span></div>
         <Meter value={percent / 100} label="EXP towards the next level" />
-        {#if session.secondsToLevel != null}
-          <span class="muted tabular">{formatDuration(session.secondsToLevel)} to level at this rate</span>
+        {#if session.secondsToLevel != null || levelPace}
+          <span class="muted tabular">
+            {#if session.secondsToLevel != null}{formatDuration(session.secondsToLevel)} to level at this rate{/if}{#if session.secondsToLevel != null && levelPace}{" · "}{/if}{#if levelPace}{levelPace}{/if}
+          </span>
         {/if}
       </div>
     {/if}
 
     <div class="tiles">
-      <Stat label="Mesos / hr" value={formatCompact(session.mesosPerHour)} />
+      <Stat
+        label="Mesos / hr"
+        value={formatCompact(session.mesosPerHour)}
+        sub={coverage?.partial ? coverage.label : null}
+        faint={coverage?.partial && coverage.thin}
+        title="Counted over the active time between your looks at your mesos"
+      />
       <Stat label="EXP gained" value={signed(session.expGained)} />
       <Stat label="Mesos gained" value={signed(session.mesosGained)} />
     </div>
+
+    {#if reminder}
+      <p class="reminder">{reminder}</p>
+    {/if}
+    {#if !mesosHintSeen}
+      <div class="hint">
+        <span>
+          Mesos / hr needs a look at your mesos when you start and again before you spend. Your inventory or a shop window
+          both count, and you don't need to keep either open.
+        </span>
+        <Button size="sm" variant="ghost" onclick={dismissMesosHint}>Got it</Button>
+      </div>
+    {/if}
   </Block>
 
   <Block title="This session">
@@ -212,7 +270,7 @@
         onchange={pickMetric}
       />
     {/snippet}
-    {#if points.filter((p) => p.y != null).length > 1}
+    {#if session.activeSeconds >= GRAPH_AFTER && points.filter((p) => p.y != null).length > 1}
       <LineChart
         {points}
         xMax={Math.max(session.activeSeconds, points[points.length - 1]?.x ?? 0)}
@@ -228,7 +286,7 @@
         {#if session.events?.length}Green dots are level-ups, red ones deaths.{/if}
       </p>
     {:else}
-      <p class="caption">The graph starts after a minute or so of EXP gains.</p>
+      <p class="caption">The graph starts after 5 minutes of play.</p>
     {/if}
   </Block>
 
@@ -283,10 +341,12 @@
           {/each}
         </tbody>
       </table>
-      {#if session.deaths > 0 || session.mapHidden || mesosStale || dropped > 0 || session.mesosExcluded !== 0}
+      {#if sessionMaps.length > 1}
+        <p class="caption">Each map's rate counts only your time on it. The session rate at the top counts all of it, towns too.</p>
+      {/if}
+      {#if session.deaths > 0 || session.mapHidden || dropped > 0 || session.mesosExcluded !== 0}
         <ul class="notes">
           {#if session.mapHidden}<li class="attention">Can't see the minimap's name, so new gains may go to the wrong map.</li>{/if}
-          {#if mesosStale}<li class="attention">Open your inventory now and then so mesos stay up to date.</li>{/if}
           {#if session.deaths > 0}
             <li>
               {session.deaths} death{session.deaths === 1 ? "" : "s"}, {session.percentOnly
@@ -302,7 +362,12 @@
       {/if}
     </Block>
   {/if}
-{:else if lastOne}
+{:else}
+  <!-- No session yet: where to train comes first, the last session after it. -->
+  <SpotList {level} {map} {session} last={!lastOne} />
+{/if}
+
+{#if !(tracking && session && headline) && lastOne}
   <Block title="Last time">
     {#snippet aside()}
       {#if lastOne.character}<span>{lastOne.character}{lastOne.job ? ` · ${lastOne.job}` : ""}</span>{/if}
@@ -325,7 +390,9 @@
   </Block>
 {/if}
 
-<SpotList {level} {map} {session} />
+{#if tracking && session && headline}
+  <SpotList {level} {map} {session} />
+{/if}
 
 <TimersCard />
 
@@ -343,6 +410,11 @@
 
   .paused {
     color: var(--warn);
+  }
+
+  .idle {
+    color: var(--muted);
+    cursor: help;
   }
 
   .square {
@@ -406,11 +478,6 @@
     font-weight: 600;
   }
 
-  .sub {
-    font-size: var(--text-sm);
-    color: var(--muted);
-  }
-
   .pace {
     font-size: var(--text-xs);
     color: var(--muted);
@@ -444,6 +511,28 @@
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 6px;
+  }
+
+  .reminder {
+    margin: 0;
+    padding: 6px var(--space-2);
+    border-left: 2px solid var(--warn);
+    background: var(--surface-2);
+    font-size: var(--text-xs);
+    color: var(--text);
+  }
+
+  .hint {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
+    font-size: var(--text-xs);
+    color: var(--muted);
+  }
+
+  .hint span {
+    flex: 1;
+    min-width: 0;
   }
 
   .caption {

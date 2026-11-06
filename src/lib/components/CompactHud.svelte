@@ -10,6 +10,7 @@
   import { formatCompact, formatDuration, objectiveProgress } from "$lib/format";
   import { live } from "$lib/readings.svelte";
   import { display, keyHint } from "$lib/settings.svelte";
+  import { mesosCoverage } from "$lib/training";
 
   /** Width in screen units at Normal size; the window grows with the text size. */
   const WIDTH = 260;
@@ -24,6 +25,7 @@
     live.analysis?.hud?.exp?.percent ?? live.analysis?.hud?.expPercent ?? session?.percent ?? null,
   );
   const percentOnly = $derived(session?.percentOnly ?? false);
+  const coverage = $derived(session ? mesosCoverage(session) : null);
 
   const rate = $derived.by(() => {
     if (!session) return null;
@@ -108,7 +110,7 @@
   </div>
 
   <div class="tiles" data-tauri-drag-region>
-    <span class="tile" title="Over the last five minutes of active time" data-tauri-drag-region>
+    <span class="tile" data-tauri-drag-region>
       <span class="label" data-tauri-drag-region>Last 5 min</span>
       <span class="tile-value num" data-tauri-drag-region>
         {recent}{#if pace != null && pace !== 0}<span class="pace" class:up={pace > 0} class:down={pace < 0}
@@ -116,9 +118,15 @@
           >{/if}
       </span>
     </span>
-    <span class="tile" data-tauri-drag-region>
+    <span
+      class="tile"
+      title={coverage?.partial ? `Counted ${coverage.label}: open your inventory to bring it up to date` : undefined}
+      data-tauri-drag-region
+    >
       <span class="label" data-tauri-drag-region>Mesos / hr</span>
-      <span class="tile-value num" data-tauri-drag-region>{formatCompact(session?.mesosPerHour)}</span>
+      <span class="tile-value num" class:faint={coverage?.partial && coverage.thin} data-tauri-drag-region
+        >{formatCompact(session?.mesosPerHour)}</span
+      >
     </span>
     <span class="tile" data-tauri-drag-region>
       <span class="label" data-tauri-drag-region>To level</span>
@@ -245,6 +253,10 @@
     font-size: var(--text-sm);
     font-weight: 600;
     white-space: nowrap;
+  }
+
+  .tile-value.faint {
+    color: var(--faint);
   }
 
   .pace {

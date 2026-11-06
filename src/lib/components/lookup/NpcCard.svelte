@@ -55,7 +55,7 @@
         <ul class="quests">
           {#each sheet.quests as quest (quest.id)}
             <li>
-              <button title="Show it in the Quests tab" onclick={() => backend.showQuest(quest.id)}>{quest.name}</button>
+              <button class="ref ref-quest" onclick={() => backend.showQuest(quest.id)}>{quest.name}</button>
               <span class="who">{line(quest)}</span>
             </li>
           {/each}
@@ -68,7 +68,7 @@
         <ul class="quests">
           {#each sheet.takes as quest (quest.id)}
             <li>
-              <button title="Show it in the Quests tab" onclick={() => backend.showQuest(quest.id)}>{quest.name}</button>
+              <button class="ref ref-quest" onclick={() => backend.showQuest(quest.id)}>{quest.name}</button>
               {#if quest.levelMin}<span class="who">Lv {quest.levelMin}</span>{/if}
             </li>
           {/each}
@@ -107,22 +107,10 @@
     border-top: 1px solid var(--border);
   }
 
-  .quests button {
+  .quests .ref {
     display: block;
-    padding: 0;
-    border: 0;
-    background: transparent;
     font-size: var(--text-sm);
     font-weight: 600;
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .quests button:hover,
-  .quests button:focus-visible {
-    color: var(--accent-strong);
-    text-decoration: underline;
-    outline: none;
   }
 
   .who {

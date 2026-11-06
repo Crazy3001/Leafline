@@ -11,8 +11,9 @@ use crate::readers::map::MapReading;
 use crate::readers::mesos::MesoReading;
 use crate::readers::quest::QuestReading;
 use crate::readers::tooltip::ItemTooltip;
+use crate::readers::ui::{self, CANONICAL_SCALE, Canonical};
 use crate::readers::{character, hud, map, mesos, party, quest, shop, tooltip};
-use crate::vision::{Frame, Line, Ocr, group_lines};
+use crate::vision::{Frame, Line, Ocr, Rect, Word, group_lines};
 
 #[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -122,8 +123,9 @@ fn read(frame: &Frame, ocr: &Ocr, items: bool) -> Result<Analysis> {
     }
 
     let started = Instant::now();
-    let quest = kept(&mut failed, "Quest Helper", quest::read(frame, &overview, ocr)).flatten();
-    let (mesos, meso_boxes) = kept(&mut failed, "mesos", mesos::read(frame, ocr)).unwrap_or_default();
+    let scale = redrawn_scale(frame, hud_layout.as_ref());
+    let quest = kept(&mut failed, "Quest Helper", read_quests(frame, scale, &overview, ocr)).flatten();
+    let (mesos, meso_boxes) = kept(&mut failed, "mesos", read_mesos(frame, scale, ocr)).unwrap_or_default();
     timed("Quest & mesos", started);
 
     let started = Instant::now();
@@ -151,6 +153,63 @@ fn read(frame: &Frame, ocr: &Ocr, items: bool) -> Result<Analysis> {
         timings,
         failed,
     })
+}
+
+/// The frame redrawn at the size the readers know, when the HUD shows the game drawing its UI at
+/// another size (UI Size Default Ratio draws it at window height / 768, 1.875x at 1440p). The
+/// Quest Helper's and meso box's pixel fonts only read cleanly at that size.
+fn redrawn_scale(frame: &Frame, hud: Option<&HudLayout>) -> Option<f32> {
+    let scale = ui::hud_scale(frame, hud?);
+    ((scale - CANONICAL_SCALE).abs() > 0.005).then_some(scale)
+}
+
+/// Lines found in the window that lie within `area`, moved onto `view`.
+fn lines_in_view(lines: &[Line], area: Rect, view: &Canonical) -> Vec<Line> {
+    let inside = |rect: &Rect| {
+        rect.x >= area.x && rect.y >= area.y && rect.right() <= area.right() && rect.bottom() <= area.bottom()
+    };
+    lines
+        .iter()
+        .filter(|line| inside(&line.rect))
+        .map(|line| Line {
+            text: line.text.clone(),
+            rect: view.to_view(line.rect),
+            words: line.words.iter().map(|w| Word { text: w.text.clone(), rect: view.to_view(w.rect) }).collect(),
+        })
+        .collect()
+}
+
+fn read_quests(frame: &Frame, scale: Option<f32>, overview: &[Line], ocr: &Ocr) -> Result<Option<QuestReading>> {
+    let (Some(scale), Some((header, panel))) = (scale, quest::panel(overview)) else {
+        return quest::read(frame, overview, ocr);
+    };
+    let smoothed = ui::smoothed(frame, panel).unwrap_or(false);
+    // The header and the panel under it, with room for the panel's edges.
+    let margin = header.rect.h;
+    let area =
+        Rect::from_edges(panel.x - margin, header.rect.y - margin, panel.right() + margin, panel.bottom() + margin);
+    let near_black = if smoothed { ui::NEAR_BLACK_SMOOTHED } else { ui::NEAR_BLACK };
+    let view = Canonical::sharp(frame, scale, area, near_black);
+    Ok(match quest::read(&view.frame, &lines_in_view(overview, area, &view), ocr)? {
+        Some(reading) => Some(QuestReading { panel: view.to_window(reading.panel), ..reading }),
+        None => quest::read(frame, overview, ocr)?,
+    })
+}
+
+/// At UI Size Default Ratio the digits are read as drawn, with the ink thresholds for thin
+/// smoothed strokes. Redrawn on the design grid they smear across two columns wherever the
+/// inventory sits off that grid, so the redraw is only tried when that fails with the box shown.
+fn read_mesos(frame: &Frame, scale: Option<f32>, ocr: &Ocr) -> Result<(Option<MesoReading>, usize)> {
+    let Some(scale) = scale else { return mesos::read(frame, ocr) };
+    let (reading, boxes) = mesos::read_with(frame, ocr, mesos::Ink::SMOOTHED)?;
+    if reading.is_some() || boxes == 0 {
+        return Ok((reading, boxes));
+    }
+    let view = Canonical::new(frame, scale);
+    if let (Some(reading), _) = mesos::read_with(&view.frame, ocr, mesos::Ink::SMOOTHED)? {
+        return Ok((Some(MesoReading { rect: view.to_window(reading.rect), ..reading }), boxes));
+    }
+    mesos::read(frame, ocr)
 }
 
 /// A quick OCR pass over the whole frame at native size. It only needs to find anchors such

@@ -37,6 +37,14 @@
   /* Lighter than the HP red, so it reads as text on the dark surface (5.4:1). */
   --bad: #e06a66;
   --bad-soft: rgba(224, 106, 102, 0.12);
+  /* Mesos match the coin. */
+  --mesos: #e0a030;
+
+  /* Names that open in another tab, coloured by what they name. All read 6:1 or better on the surface. */
+  --ref-item: #86b4e3;
+  --ref-mob: #e5897c;
+  --ref-npc: #6fc2b2;
+  --ref-map: #d9a94e;
 
   --radius-sm: 2px;
   --radius: 2px;
@@ -101,6 +109,54 @@ button {
 
 .num {
   font-family: var(--font-display);
+}
+
+/*
+ * A name that opens its own page: an item, monster, NPC, map or quest. The colour says which,
+ * so the link needs no tooltip. Size and weight come from the text around it.
+ */
+.ref {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ref, var(--text));
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ref:hover,
+.ref:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  outline: none;
+}
+
+.ref:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.ref-item {
+  --ref: var(--ref-item);
+}
+
+.ref-mob {
+  --ref: var(--ref-mob);
+}
+
+.ref-npc {
+  --ref: var(--ref-npc);
+}
+
+.ref-map {
+  --ref: var(--ref-map);
+}
+
+.ref-quest:hover,
+.ref-quest:focus-visible {
+  color: var(--accent-strong);
 }
 
 ::-webkit-scrollbar {

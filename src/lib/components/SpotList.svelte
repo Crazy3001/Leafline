@@ -1,3 +1,8 @@
+<script lang="ts" module>
+  /** The section's element id, for the Train tab's jump link. */
+  export const SPOTS_ID = "where-to-train";
+</script>
+
 <script lang="ts">
   // Where to train: maps near the character's level, ranked for this player. "For you" uses the
   // EXP per hour measured on each map, and for maps not tried yet an estimate: the map's base
@@ -24,11 +29,14 @@
     level: readLevel,
     map = null,
     session = null,
+    last = true,
   }: {
     /** Read from the HUD or the session; the player can set it when it isn't. */
     level: number | null;
     map?: MapReading | null;
     session?: SessionSummary | null;
+    /** The bottom section of the tab, with no rule under it. */
+    last?: boolean;
   } = $props();
 
   type Sort = "you" | "exp" | "near" | "saved";
@@ -197,16 +205,21 @@
     remember(LEVEL_KEY, String(manualLevel));
   }
 
-  function where(spot: TrainingSpot) {
-    const hops = steps(spot);
-    if (hops == null) return "no route known";
-    if (hops === 0) return "here";
-    return `${hops} portal${hops === 1 ? "" : "s"}`;
-  }
+  /** How many of a map's monsters the row names, most common first. */
+  const NAMED = 3;
 
-  function levels(spot: TrainingSpot) {
-    const [low, high] = spot.levelRange;
-    return `Lv ${low}${high !== low ? `–${high}` : ""}`;
+  /**
+   * The row's one line about the map: the levels of its main monsters, then their names. The
+   * full list, bosses and rare spawns included, is in the open row.
+   */
+  function summary(spot: TrainingSpot) {
+    const common = spot.mobs.filter((m) => !m.boss).sort((a, b) => b.count - a.count || a.level - b.level);
+    const main = (common.length ? common : spot.mobs).slice(0, NAMED);
+    const [low, high] = main.length
+      ? [Math.min(...main.map((m) => m.level)), Math.max(...main.map((m) => m.level))]
+      : spot.levelRange;
+    const names = [...main].sort((a, b) => a.level - b.level).map((m) => m.name);
+    return [`Lv ${low}${high !== low ? `–${high}` : ""}`, ...(names.length ? [names.join(", ")] : [])].join(" · ");
   }
 
   function metric(spot: TrainingSpot): { value: string; unit: string; quiet: boolean } {
@@ -218,7 +231,7 @@
     }
     if (spot.measured) return { value: formatCompact(spot.measured.expPerHour), unit: "your EXP / hr", quiet: false };
     const guess = estimate(spot);
-    if (guess != null) return { value: `≈${formatCompact(guess)}`, unit: "estimate", quiet: true };
+    if (guess != null) return { value: `≈${formatCompact(guess)}`, unit: "est. EXP / hr", quiet: true };
     return { value: formatCompact(spot.expPerClear), unit: "EXP / clear", quiet: true };
   }
 
@@ -244,7 +257,7 @@
   </button>
 {/snippet}
 
-<Block title="Where to train" last>
+<Block id={SPOTS_ID} title="Where to train" {last}>
   {#snippet aside()}
     <span
       class="help"
@@ -290,8 +303,8 @@
               <span class="rank tabular">{i + 1}</span>
               <span class="names">
                 <span class="name">{spot.map.name}</span>
-                <span class="meta">
-                  {levels(spot)} · {where(spot)}{#if spot.measured}{" "}· played {formatDuration(spot.measured.activeSeconds)}{/if}
+                <span class="meta" title={summary(spot)}>
+                  {#if steps(spot) === 0}<span class="here">You're here</span>{" · "}{/if}{summary(spot)}
                 </span>
               </span>
               <span class="metric">
@@ -312,7 +325,7 @@
                   {#each spot.mobs as mob (mob.id)}
                     <tr>
                       <td>
-                        <button class="link" title="Show it in the Lookup tab" onclick={() => backend.showMonster(mob.id, null)}>{mob.name}</button
+                        <button class="ref ref-mob" onclick={() => backend.showMonster(mob.id, null)}>{mob.name}</button
                         >{mob.boss ? " (boss)" : ""}
                       </td>
                       <td class="tabular">{mob.level}</td>
@@ -488,8 +501,15 @@
   }
 
   .meta {
+    overflow: hidden;
     font-size: var(--text-xs);
     color: var(--muted);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .meta .here {
+    color: var(--accent-strong);
   }
 
   .metric {
@@ -586,18 +606,6 @@
     text-align: left;
   }
 
-  .link {
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--accent-strong);
-    font: inherit;
-    cursor: pointer;
-  }
-
-  .link:hover {
-    text-decoration: underline;
-  }
 
   .footer {
     display: flex;

@@ -99,7 +99,6 @@
       row.giver,
       row.region,
       row.repeat ? row.repeat[0].toUpperCase() + row.repeat.slice(1) : null,
-      row.exp ? `${formatCompact(row.exp)} EXP` : null,
     ];
     return parts.filter(Boolean).join(" · ");
   }
@@ -111,7 +110,7 @@
       <li>
         <button onclick={() => (questView.id = row.id)}>
           <span class="row-name">{row.name}</span>
-          <span class="row-line">{line(row)}</span>
+          <span class="row-line">{line(row)}{#if row.exp}{line(row) ? " · " : ""}<span class="exp tabular">{formatCompact(row.exp)} EXP</span>{/if}</span>
         </button>
       </li>
     {/each}
@@ -206,6 +205,10 @@
 {/if}
 
 <style>
+  .row-line .exp {
+    color: var(--exp);
+  }
+
   .lead {
     margin: 0 0 10px;
     color: var(--muted);

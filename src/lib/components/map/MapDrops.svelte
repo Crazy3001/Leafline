@@ -102,14 +102,18 @@
       {#each items as item (item.name)}
         <li>
           <div class="item">
-            <button class="name" title="Show it in the Lookup tab" onclick={() => showItemNamed(item.name)}>{item.name}</button>
+            {#if item.category === "meso"}
+              <span class="name mesos">{item.name}</span>
+            {:else}
+              <button class="name ref ref-item" onclick={() => showItemNamed(item.name)}>{item.name}</button>
+            {/if}
             {#if item.quest}<span class="tag">quest</span>{/if}
             {#if item.category}<span class="cat">{item.category}</span>{/if}
           </div>
           <div class="sources">
             {#each item.sources as source (source.monster)}
               <span class="source" class:unmeasured={source.rate == null} title={evidence(source)}>
-                <button class="monster" title="Show it in the Lookup tab" onclick={() => showMonsterNamed(source.monster)}>{source.monster}</button>
+                <button class="monster ref ref-mob" onclick={() => showMonsterNamed(source.monster)}>{source.monster}</button>
                 <span class="rate tabular">{percent(source.rate)}{quantity(source)}</span>
               </span>
             {/each}
@@ -159,18 +163,8 @@
 
   .name {
     min-width: 0;
-    padding: 0;
-    border: 0;
-    background: transparent;
     font-size: var(--text-sm);
     font-weight: 600;
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .name:hover {
-    color: var(--map);
-    text-decoration: underline;
   }
 
   .sources {
@@ -186,19 +180,12 @@
     gap: 4px;
   }
 
-  .monster {
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--muted);
-    font-size: var(--text-xs);
-    text-align: left;
-    cursor: pointer;
+  .mesos {
+    color: var(--mesos);
   }
 
-  .monster:hover {
-    color: var(--map);
-    text-decoration: underline;
+  .monster {
+    font-size: var(--text-xs);
   }
 
   .rate {
