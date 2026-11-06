@@ -83,6 +83,7 @@ pub fn run() {
             // waits for the game window if the game isn't open.
             let settings = app.state::<SettingsState>().get();
             if !settings.setup_done {
+                overlay::fit_first_launch(app.handle())?;
                 settings::open_setup(app.handle())?;
             } else if settings.live.enabled
                 && let Err(err) = live::start(app.handle())

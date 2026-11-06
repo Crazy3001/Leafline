@@ -230,6 +230,33 @@ pub fn create_workbench(_app: &AppHandle) -> Result<()> {
     Ok(())
 }
 
+/// Below this many logical pixels of screen height, the overlay starts smaller.
+const SMALL_SCREEN_HEIGHT: f64 = 900.0;
+/// The overlay's first size on such a screen: narrower, and no taller than this share of it.
+const SMALL_SCREEN_WIDTH: f64 = 300.0;
+const SMALL_SCREEN_SHARE: f64 = 0.5;
+
+/// On a new install, starts the overlay smaller on a short screen, such as a 1366x768 laptop,
+/// where its usual 340x560 would cover most of a game window's height. Only before setup is
+/// done, so a size the player chose stays.
+pub fn fit_first_launch(app: &AppHandle) -> Result<()> {
+    let overlay = window(app, OVERLAY)?;
+    let Some(monitor) = overlay.current_monitor()? else { return Ok(()) };
+    let scale = monitor.scale_factor();
+    let area = monitor.work_area();
+    let height = f64::from(area.size.height) / scale;
+    if height >= SMALL_SCREEN_HEIGHT {
+        return Ok(());
+    }
+    let size: LogicalSize<f64> = overlay.inner_size()?.to_logical(scale);
+    let fitted = LogicalSize::new(
+        size.width.min(SMALL_SCREEN_WIDTH).max(MIN_SIZE.0),
+        size.height.min(height * SMALL_SCREEN_SHARE).max(MIN_SIZE.1),
+    );
+    overlay.set_size(fitted)?;
+    Ok(())
+}
+
 /// Shrinks the workbench to fit its monitor's work area when the default size is too big
 /// (small or high-DPI screens). A size the user chose is restored before this runs.
 #[cfg(debug_assertions)]
