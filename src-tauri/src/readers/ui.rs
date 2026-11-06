@@ -8,7 +8,7 @@
 use image::Rgba;
 
 use super::hud::HudLayout;
-use crate::vision::{Frame, Rect};
+use crate::vision::{Frame, Rect, preprocess};
 
 pub const DESIGN_WIDTH: f32 = 1024.0;
 pub const DESIGN_HEIGHT: f32 = 768.0;
@@ -100,16 +100,20 @@ impl Canonical {
     pub fn inked(frame: &Frame, scale: f32, area: Rect, near_black: u8) -> Self {
         let dark = |px: &Rgba<u8>| px.0[..3].iter().all(|&c| c <= near_black);
         Self::drawn(frame, scale, Some(area), |frame, x, y| {
-            let half = scale / 2.0;
-            // Window pixels whose centres (i + 0.5) fall within [centre - half, centre + half).
-            let span = |centre: f32, limit: u32| {
-                let first = (centre - half - 0.5).ceil().max(0.0) as u32;
-                let end = ((centre + half - 0.5).ceil().max(0.0) as u32).min(limit);
-                first..end
-            };
-            let inked = span(y, frame.height())
-                .any(|py| span(x, frame.width()).any(|px| dark(frame.get_pixel(px, py))));
+            let inked = footprint(frame, scale, x, y).any(|(px, py)| dark(frame.get_pixel(px, py)));
             if inked { Rgba([0, 0, 0, 255]) } else { sample(frame, x, y) }
+        })
+    }
+
+    /// Each design pixel as the brightest window pixel centred inside it, for light text on a
+    /// dark ground such as the level's digits: at 1.41x (1080p, Default Ratio) the left side of a
+    /// 9 is one pixel wide and sampling the middle blends it away, leaving a 3.
+    pub fn brightest(frame: &Frame, scale: f32, area: Rect) -> Self {
+        Self::drawn(frame, scale, Some(area), |frame, x, y| {
+            footprint(frame, scale, x, y)
+                .map(|(px, py)| *frame.get_pixel(px, py))
+                .max_by_key(preprocess::luminance)
+                .unwrap_or_else(|| sample(frame, x, y))
         })
     }
 
@@ -185,6 +189,18 @@ pub fn smoothed(frame: &Frame, rect: Rect) -> Option<bool> {
 }
 
 /// The colour at a point, blended from the four nearest pixels.
+/// The window pixels whose centres (i + 0.5) fall within the design pixel centred at `(x, y)`.
+fn footprint(frame: &Frame, scale: f32, x: f32, y: f32) -> impl Iterator<Item = (u32, u32)> {
+    let half = scale / 2.0;
+    let span = |centre: f32, limit: u32| {
+        let first = (centre - half - 0.5).ceil().max(0.0) as u32;
+        let end = ((centre + half - 0.5).ceil().max(0.0) as u32).min(limit);
+        first..end
+    };
+    let columns = span(x, frame.width());
+    span(y, frame.height()).flat_map(move |py| columns.clone().map(move |px| (px, py)))
+}
+
 fn sample(frame: &Frame, x: f32, y: f32) -> Rgba<u8> {
     let (x, y) = ((x - 0.5).max(0.0), (y - 0.5).max(0.0));
     let (left, top) = (x.floor(), y.floor());

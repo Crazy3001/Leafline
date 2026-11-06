@@ -72,9 +72,17 @@ fn canonical(frame: &Frame, layout: HudLayout) -> Option<(Glyphs, HudLayout)> {
     // Only the bottom of the window, where the HUD is. Full width, since `locate` measures
     // against the width.
     let (width, height) = (frame.width() as f32, frame.height() as f32);
-    let view = Canonical::within(frame, scale, Rect::new(0.0, 0.6 * height, width, 0.4 * height));
+    let area = Rect::new(0.0, 0.6 * height, width, 0.4 * height);
+    let view = Canonical::within(frame, scale, area);
     let found = locate(&view.frame)?;
-    Some((Glyphs::extract(&view.frame, &found), view.layout_to_window(&found)))
+    let mut glyphs = Glyphs::extract(&view.frame, &found);
+    // The level's digits again, keeping strokes one window pixel wide that the plain redraw can
+    // blend away, where they read as a number.
+    let bright = level_glyphs(&Canonical::brightest(frame, scale, area).frame, &found);
+    if digits::number(&bright).is_some_and(|t| !t.is_empty()) {
+        glyphs.level = bright;
+    }
+    Some((glyphs, view.layout_to_window(&found)))
 }
 
 pub fn read(frame: &Frame, ocr: &Ocr) -> Result<Option<(HudLayout, HudReading)>> {
