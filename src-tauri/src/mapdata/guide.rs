@@ -49,6 +49,12 @@ struct Known {
     id: Option<u32>,
     objectives: Vec<Objective>,
     unread: u32,
+    /// Seen in two readings in a row. Until then it isn't shown: one garbled reading can
+    /// match a quest the panel doesn't hold.
+    confirmed: bool,
+    /// A count read lower than shown, by line: kills never go down, so a lower count waits for
+    /// a second reading that agrees.
+    falling: Vec<(String, u32)>,
 }
 
 impl Known {
@@ -95,6 +101,8 @@ impl QuestTitles {
         let is_known = |known: &[Known], title: &str| known.iter().any(|k| k.name == title);
         // A row with no counter that is no quest found is a stray line, such as `o Slime`.
         read.quests.retain(|q| !q.objectives.is_empty() || is_known(&self.known, &q.title));
+        let unconfirmed = |known: &[Known], title: &str| known.iter().any(|k| k.name == title && !k.confirmed);
+        read.quests.retain(|q| !unconfirmed(&self.known, &q.title));
         let mut seen: Vec<String> = Vec::new();
         read.quests.retain(|q| {
             let new = q.title.is_empty() || !seen.contains(&q.title);
@@ -107,7 +115,7 @@ impl QuestTitles {
         self.known.retain(|k| k.unread <= HELD_READINGS);
         let room = read.page.map_or(usize::MAX, |(shown, _)| shown as usize);
         for known in &self.known {
-            if known.unread > 0 && read.quests.len() < room {
+            if known.confirmed && known.unread > 0 && read.quests.len() < room {
                 read.quests.push(Quest { title: known.name.clone(), objectives: known.objectives.clone() });
             }
         }
@@ -139,10 +147,20 @@ impl QuestTitles {
             let lines = id.and_then(|id| atlas.quest_lines(id));
             let position = self.known.iter().position(|k| k.name == quest.title);
             let known = match position {
-                Some(i) => &mut self.known[i],
+                Some(i) => {
+                    self.known[i].confirmed = true;
+                    &mut self.known[i]
+                }
                 None => {
                     let objectives = lines.clone().unwrap_or_default();
-                    self.known.push(Known { name: quest.title.clone(), id, objectives, unread: 0 });
+                    self.known.push(Known {
+                        name: quest.title.clone(),
+                        id,
+                        objectives,
+                        unread: 0,
+                        confirmed: false,
+                        falling: Vec::new(),
+                    });
                     self.known.last_mut().expect("just pushed")
                 }
             };
@@ -150,15 +168,15 @@ impl QuestTitles {
                 if known.id.is_none() || known.objectives.len() != lines.len() {
                     // Matched in the data only now: start from its lines, keeping counts read.
                     let before = std::mem::replace(&mut known.objectives, lines);
-                    fill_counts(&mut known.objectives, &before);
+                    fill_counts(&mut known.objectives, &before, &mut Vec::new());
                 }
                 known.id = id;
-                fill_counts(&mut known.objectives, &quest.objectives);
+                fill_counts(&mut known.objectives, &quest.objectives, &mut known.falling);
             } else {
                 if let Some(found) = id {
                     atlas.fit_counts(found, &mut quest.objectives);
                 }
-                merge_lines(&mut known.objectives, &quest.objectives);
+                merge_lines(&mut known.objectives, &quest.objectives, &mut known.falling);
             }
             quest.objectives.clone_from(&known.objectives);
         }
@@ -220,11 +238,11 @@ fn pair_lines(known: &[Objective], read: &[Objective]) -> Vec<(usize, usize)> {
 /// line not read keeps its count, and a count above its line's target is a misread, since the
 /// game stops counting there. Once a reading shows every line, the lines take its order, the
 /// Quest Helper's.
-fn fill_counts(lines: &mut [Objective], read: &[Objective]) {
+fn fill_counts(lines: &mut [Objective], read: &[Objective], falling: &mut Vec<(String, u32)>) {
     let pairs = pair_lines(lines, read);
     for &(r, k) in &pairs {
         if read[r].current <= lines[k].required {
-            lines[k].current = read[r].current;
+            take_count(&mut lines[k], read[r].current, falling);
         }
     }
     if pairs.len() == lines.len() {
@@ -240,15 +258,30 @@ fn fill_counts(lines: &mut [Objective], read: &[Objective]) {
     }
 }
 
+/// Takes a count read into a line. A higher one shows at once; a lower one (a misread, as kills
+/// never go down, or an item used up) only when the next reading of the line agrees.
+fn take_count(line: &mut Objective, read: u32, falling: &mut Vec<(String, u32)>) {
+    let waiting = falling.iter().position(|(target, _)| *target == line.target);
+    let agreed = waiting.is_some_and(|i| falling[i].1 == read);
+    if let Some(i) = waiting {
+        falling.remove(i);
+    }
+    if read >= line.current || agreed {
+        line.current = read;
+    } else {
+        falling.push((line.target.clone(), read));
+    }
+}
+
 /// Steadies the lines of a quest the data lacks: a line read updates the line it resembles, a
 /// line not read keeps its last count, and a new line is added.
-fn merge_lines(known: &mut Vec<Objective>, read: &[Objective]) {
+fn merge_lines(known: &mut Vec<Objective>, read: &[Objective], falling: &mut Vec<(String, u32)>) {
     let pairs = pair_lines(known, read);
     for (r, line) in read.iter().enumerate() {
         match pairs.iter().find(|(pr, _)| *pr == r) {
             Some(&(_, k)) => {
                 if line.current <= line.required {
-                    known[k].current = line.current;
+                    take_count(&mut known[k], line.current, falling);
                 }
                 if similarity(&fold(&line.target), &fold(&known[k].target)) >= MIN_QUEST_SCORE {
                     known[k].target.clone_from(&line.target);
@@ -921,6 +954,7 @@ mod tests {
         let rough = quest("Sheli Sor 101ng", &[("Pebble Snail", 1, 0), ("Stl.tmr", 1, 3), ("Tillie", 2, 0)]);
         held(&mut titles, &atlas, reading(vec![rough], None));
         let garbled = quest("Shell Sortinq", &[("Snail Shel", 0, 1), ("Pebble Snail", 2, 50), ("Burrow Rot", 1, 2)]);
+        held(&mut titles, &atlas, reading(vec![garbled.clone()], None));
         let read = held(&mut titles, &atlas, reading(vec![garbled], None)).unwrap();
         let lines = [("Snail Shell", 0, 1), ("Pebble Snail", 2, 8), ("Burrow Rat", 1, 2)];
         assert_eq!(read.quests, [quest("Shell Sorting", &lines)], "the data's lines, in the order read");
@@ -938,9 +972,38 @@ mod tests {
     }
 
     #[test]
+    fn a_quest_shows_once_two_readings_in_a_row_find_it() {
+        // Seen live: one reading during a turn-in matched a quest the panel didn't hold.
+        let (atlas, mut titles) = (world(), QuestTitles::default());
+        let samples = quest("Slime Samples", &[("Moss Slime", 2, 5)]);
+        held(&mut titles, &atlas, reading(vec![samples.clone()], None));
+        held(&mut titles, &atlas, reading(vec![samples.clone()], None));
+        let stray = quest("Shell Sortng", &[("Pebble Snail", 0, 8)]);
+        let read = held(&mut titles, &atlas, reading(vec![samples.clone(), stray], None)).unwrap();
+        assert_eq!(read.quests, std::slice::from_ref(&samples), "one reading is not enough");
+        assert_eq!(held(&mut titles, &atlas, reading(vec![samples.clone()], None)).unwrap().quests, [samples]);
+    }
+
+    #[test]
+    fn a_count_going_down_waits_for_a_second_reading() {
+        // Seen live: 10 / 10 read once as 1 / 10.
+        let (atlas, mut titles) = (world(), QuestTitles::default());
+        let at = |n| reading(vec![quest("Slime Samples", &[("Moss Slime", n, 5)])], None);
+        let count = |read: Option<QuestReading>| read.unwrap().quests[0].objectives[0].current;
+        held(&mut titles, &atlas, at(4));
+        assert_eq!(count(held(&mut titles, &atlas, at(5))), 5, "up shows at once");
+        assert_eq!(count(held(&mut titles, &atlas, at(1))), 5, "one low reading is a misread");
+        assert_eq!(count(held(&mut titles, &atlas, at(5))), 5);
+        assert_eq!(count(held(&mut titles, &atlas, at(0))), 5);
+        assert_eq!(count(held(&mut titles, &atlas, at(0))), 0, "two in a row: an item used up");
+    }
+
+    #[test]
     fn the_data_corrects_what_a_quest_counts() {
         let (atlas, mut titles) = (world(), QuestTitles::default());
-        let read = held(&mut titles, &atlas, reading(vec![quest("Slime Samples", &[("Moss Slime", 2, 6)])], None)).unwrap();
+        let samples = || reading(vec![quest("Slime Samples", &[("Moss Slime", 2, 6)])], None);
+        held(&mut titles, &atlas, samples());
+        let read = held(&mut titles, &atlas, samples()).unwrap();
         assert_eq!(read.quests[0].objectives[0].required, 5);
     }
 
@@ -952,6 +1015,7 @@ mod tests {
             quest("Slime Samples", &[("Moss Slime", 2, 5)]),
         ];
         held(&mut titles, &atlas, reading(both.clone(), None));
+        held(&mut titles, &atlas, reading(both.clone(), None));
         let rough = vec![quest("O Slime", &[]), quest("Slime Samples", &[("Moss Slime", 2, 5)])];
         assert_eq!(held(&mut titles, &atlas, reading(rough, None)).unwrap().quests, both);
     }
@@ -959,6 +1023,7 @@ mod tests {
     #[test]
     fn a_quest_unread_for_long_is_gone() {
         let (atlas, mut titles) = (world(), QuestTitles::default());
+        held(&mut titles, &atlas, reading(vec![quest("Slime Samples", &[("Moss Slime", 2, 5)])], None));
         held(&mut titles, &atlas, reading(vec![quest("Slime Samples", &[("Moss Slime", 2, 5)])], None));
         for _ in 0..HELD_READINGS {
             assert_eq!(held(&mut titles, &atlas, reading(vec![], None)).unwrap().quests.len(), 1);
