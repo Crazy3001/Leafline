@@ -288,7 +288,7 @@ fn parse_rows(passes: &[Vec<Line>], top: f32, pitch: f32) -> Vec<Row> {
         if let Some((target, counters)) = objective(&texts) {
             rows.push(Row::Objective { y, target, counters });
         } else {
-            let titles: Vec<String> = texts.iter().map(|t| clean_title(t)).filter(|t| t.len() >= 4).collect();
+            let titles: Vec<String> = texts.iter().map(|t| clean_title(t)).filter(|t| t.len() >= 3).collect();
             if let Some(title) = consensus(&titles) {
                 rows.push(Row::Title { y, title: title.clone() });
             }
@@ -449,18 +449,27 @@ impl CounterGlyphs {
                 _ => words.push(vec![run]),
             }
         }
-        let [current, slash, required, after @ ..] = words.as_slice() else { return None };
         let mask = |cols: &(u32, u32)| Mask::new(frame, *cols, rows, is_ink);
+        // A 1 is narrow in a wider cell, so the digit after it stands further off than letters do.
+        let height = rows.1 - rows.0;
+        let narrow = |run: (u32, u32)| (run.1 - run.0) * 2 <= height;
+        // Before the slash too: `10 / 10` would otherwise cut into `1` and `0`. The slash is
+        // narrow as well, so a word that is the slash joins nothing.
+        if words.len() > 1 && words[0].len() == 1 && narrow(words[0][0]) && !is_slash(&mask(&words[0][0])) {
+            let gap = words[1][0].0 - words[0][0].1;
+            if gap <= ONE_GAP * word_gap && !is_slash(&mask(&words[1][0])) {
+                let next = words.remove(1);
+                words[0].extend(next);
+            }
+        }
+        let [current, slash, required, after @ ..] = words.as_slice() else { return None };
         if slash.len() != 1 || !is_slash(&mask(&slash[0])) {
             return None;
         }
-        // A 1 is narrow in a wider cell, so the digit after it stands further off than letters do.
-        let height = rows.1 - rows.0;
         let mut required = required.clone();
         for word in after {
             let last = required[required.len() - 1];
-            let narrow = (last.1 - last.0) * 2 <= height;
-            if !narrow || word[0].0 - last.1 > ONE_GAP * word_gap {
+            if !narrow(last) || word[0].0 - last.1 > ONE_GAP * word_gap {
                 break;
             }
             required.extend(word);
