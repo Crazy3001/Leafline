@@ -83,6 +83,8 @@ export interface Objective {
   target: string;
   current: number;
   required: number;
+  /** A line the quest data says is there that no reading has counted yet; shown without a count. */
+  unread?: boolean;
 }
 
 export interface Quest {

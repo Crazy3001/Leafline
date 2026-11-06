@@ -57,12 +57,6 @@ struct Known {
     falling: Vec<(String, u32)>,
 }
 
-impl Known {
-    fn targets(&self) -> impl Iterator<Item = &str> {
-        self.objectives.iter().map(|o| o.target.as_str())
-    }
-}
-
 /// The quests matched so far in a live run. OCR can read one title differently from one moment
 /// to the next as the scenery moves behind the panel, so once a quest is known it stays: a
 /// reading too rough to match keeps the quest it most resembles, one with no counter keeps the
@@ -182,16 +176,19 @@ impl QuestTitles {
         }
     }
 
-    /// The known quest counting the same things, or else with the most similar name.
+    /// The known quest counting the same things, or else with the most similar name. Every line
+    /// read resembling one of a known quest's lines counts as the same things: with scenery
+    /// behind the panel a title can read as `Of8Pig` while `Orange Muehroom` under it still
+    /// names Olaf's Second Training. Between two quests whose lines both fit, the closer name wins.
     fn closest(&self, title: &str, objectives: &[Objective]) -> Option<usize> {
         let query = fold(title);
-        let targets: Vec<&str> = objectives.iter().map(|o| o.target.as_str()).collect();
         self.known
             .iter()
             .enumerate()
             .map(|(i, known)| {
-                let same = !targets.is_empty() && known.targets().eq(targets.iter().copied());
-                (if same { 1.0 } else { similarity(&query, &fold(&known.name)) }, i)
+                let name = similarity(&query, &fold(&known.name));
+                let same = !objectives.is_empty() && pair_lines(&known.objectives, objectives).len() == objectives.len();
+                (if same { 1.0 + name / 100.0 } else { name }, i)
             })
             .filter(|(score, _)| *score >= MIN_HELD_SCORE)
             .max_by(|a, b| a.0.total_cmp(&b.0))
@@ -243,6 +240,7 @@ fn fill_counts(lines: &mut [Objective], read: &[Objective], falling: &mut Vec<(S
     for &(r, k) in &pairs {
         if read[r].current <= lines[k].required {
             take_count(&mut lines[k], read[r].current, falling);
+            lines[k].unread = false;
         }
     }
     if pairs.len() == lines.len() {
@@ -655,9 +653,13 @@ impl Atlas {
         }
         let query = fold(title);
         let words: Vec<&str> = query.split_whitespace().filter(|w| w.len() >= MIN_TITLE_WORD).collect();
+        // The words looked up must say most of the title: one word of a longer line, such as
+        // `place` in a speech bubble's `place for you`, names nothing.
+        let letters = |s: &str| s.chars().filter(|c| !c.is_whitespace()).count();
+        let telling = words.iter().map(|w| letters(w)).sum::<usize>() * 10 >= letters(&query) * 6;
         let named = |q: &&QuestRecord| {
             let name = fold(&q.name);
-            !words.is_empty() && words.iter().all(|w| name.contains(w))
+            telling && !words.is_empty() && words.iter().all(|w| name.contains(w))
         };
         let counts = |q: &&QuestRecord| {
             !objectives.is_empty() && objectives.iter().all(|o| self.count_of(q, &o.target) == Some(o.required))
@@ -687,7 +689,7 @@ impl Atlas {
     /// none, or misses a name.
     fn quest_lines(&self, id: u32) -> Option<Vec<Objective>> {
         let quest = self.quests.get(&id)?;
-        let line = |target: &String, required| Objective { target: target.clone(), current: 0, required };
+        let line = |target: &String, required| Objective { target: target.clone(), current: 0, required, unread: true };
         let mobs = quest.requirements.iter().map(|r| Some(line(&self.monsters.get(&r.mob_id)?.name, r.count)));
         let items = quest.items.iter().map(|i| Some(line(self.item_names.get(&i.item_id)?, i.count)));
         let lines: Option<Vec<Objective>> = mobs.chain(items).collect();
@@ -873,7 +875,7 @@ mod tests {
         let atlas = world();
         let mut titles = QuestTitles::default();
         let mut settle = |title: &str, target: &str| {
-            let objectives = vec![Objective { target: target.into(), current: 0, required: 8 }];
+            let objectives = vec![Objective { target: target.into(), current: 0, required: 8, unread: false }];
             let mut quests = [Quest { title: title.into(), objectives }];
             titles.settle(&atlas, &mut quests);
             quests[0].title.clone()
@@ -896,7 +898,12 @@ mod tests {
     fn quest(title: &str, counted: &[(&str, u32, u32)]) -> Quest {
         let objectives = counted
             .iter()
-            .map(|(target, current, required)| Objective { target: (*target).into(), current: *current, required: *required })
+            .map(|(target, current, required)| Objective {
+                target: (*target).into(),
+                current: *current,
+                required: *required,
+                unread: false,
+            })
             .collect();
         Quest { title: title.into(), objectives }
     }
@@ -910,9 +917,10 @@ mod tests {
     fn a_title_that_lost_a_word_finds_its_quest() {
         let atlas = world();
         assert_eq!(atlas.quest_for("Sorting", &[]), Some(70), "only one name holds it");
-        let wanted = [Objective { target: "Moss Slime".into(), current: 0, required: 5 }];
+        let wanted = [Objective { target: "Moss Slime".into(), current: 0, required: 5, unread: false }];
         assert_eq!(atlas.quest_for("Xq", &wanted), Some(71), "only one quest counts that");
         assert_eq!(atlas.quest_for("Xq", &[]), None);
+        assert_eq!(atlas.quest_for("is just the sorting for you", &[]), None, "one word of a longer line");
     }
 
     #[test]
@@ -961,6 +969,25 @@ mod tests {
         let junk = quest("Shell Sorting", &[("Tillie", 9, 9), ("Pebble Snail", 9, 8)]);
         let read = held(&mut titles, &atlas, reading(vec![junk], None)).unwrap();
         assert_eq!(read.quests, [quest("Shell Sorting", &lines)], "no junk line, no count over its target");
+    }
+
+    #[test]
+    fn a_title_lost_behind_scenery_is_found_by_its_lines() {
+        // Seen live: a stone platform behind the panel turned "0 / 8 Pig" into the title Of8Pig.
+        let (atlas, mut titles) = (world(), QuestTitles::default());
+        let both = vec![
+            quest("Shell Sorting", &[("Pebble Snail", 1, 8), ("Burrow Rat", 0, 2)]),
+            quest("Slime Samples", &[("Moss Slime", 2, 5)]),
+        ];
+        held(&mut titles, &atlas, reading(both.clone(), None));
+        held(&mut titles, &atlas, reading(both.clone(), None));
+        let rough = vec![quest("Of1Peb", &[("Burrow Rot", 1, 2)]), quest("Slime Samples", &[("Moss Slime", 2, 5)])];
+        let read = held(&mut titles, &atlas, reading(rough, None)).unwrap();
+        let expected = [
+            quest("Shell Sorting", &[("Pebble Snail", 1, 8), ("Burrow Rat", 1, 2)]),
+            quest("Slime Samples", &[("Moss Slime", 2, 5)]),
+        ];
+        assert_eq!(read.quests, expected);
     }
 
     #[test]

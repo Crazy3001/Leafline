@@ -63,7 +63,7 @@
    */
   function timeLeft(read: Objective, hint: ObjectiveGuide | undefined) {
     const left = read.required - read.current;
-    if (left <= 0) return null;
+    if (left <= 0 || read.unread) return null;
     const timed = (session?.counters ?? [])
       .filter((c) => c.target === read.target && c.required === read.required && (c.perHour ?? 0) >= MIN_PER_HOUR)
       .sort((a, b) => Number(b.map === session?.map) - Number(a.map === session?.map) || b.activeSeconds - a.activeSeconds);
@@ -221,7 +221,7 @@
                 {:else}
                   <span>{objective.target}</span>
                 {/if}
-                <span class="count tabular">{objective.current} / {objective.required}</span>
+                <span class="count tabular">{objective.unread ? "–" : objective.current} / {objective.required}</span>
               </div>
               <div class="track">
                 <div class="fill" style:width="{progress * 100}%"></div>

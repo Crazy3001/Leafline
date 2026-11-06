@@ -42,6 +42,14 @@ pub struct Objective {
     pub target: String,
     pub current: u32,
     pub required: u32,
+    /// A line the quest data says is there that no reading has given a count for yet, shown
+    /// without one rather than as 0.
+    #[serde(skip_serializing_if = "is_false")]
+    pub unread: bool,
+}
+
+fn is_false(value: &bool) -> bool {
+    !value
 }
 
 /// Panel size in header text heights, measured on Classic's Quest Helper.
@@ -103,7 +111,7 @@ pub fn read_with_digits(frame: &Frame, digits: &Frame, overview: &[Line], ocr: &
     let mut rows = parse_rows(&passes, header.rect.bottom(), PITCH * h);
     // Scenery and name tags under the panel can look like text to OCR, but only the panel's
     // own rows are drawn in pure black.
-    rows.retain(|row| has_text(frame, panel, row.y(), h));
+    rows.retain(|row| has_text(frame, panel, row.y(), h) && !on_white(frame, panel, row.y(), h));
     // OCR can lose a counter altogether, leaving `O Snail` looking like a title, but a row that
     // starts `digits / digits` as drawn is an objective, whatever is behind the panel.
     // The digits cut from the view that keeps thin strokes, where they read as a counter: there
@@ -148,6 +156,23 @@ fn is_ink(px: &Rgba<u8>) -> bool {
 fn has_text(frame: &Frame, panel: Rect, y: f32, text_height: f32) -> bool {
     let band = Rect::from_edges(panel.x, y - 0.6 * text_height, panel.right(), y + 0.6 * text_height);
     ink_rows(frame, band, is_text).is_some_and(|(top, bottom)| (bottom - top) as f32 >= 0.5 * text_height)
+}
+
+/// Whether the row centred at `y` stands partly on plain white where its text starts: a speech
+/// bubble or name tag below the panel, as the search area runs past its bottom. The panel is
+/// see-through and tinted, so even over white clouds its ground is never plain white.
+fn on_white(frame: &Frame, panel: Rect, y: f32, text_height: f32) -> bool {
+    let left = Rect::from_edges(panel.x, y - 0.6 * text_height, panel.x + 0.4 * panel.w, y + 0.6 * text_height);
+    let (x0, y0, w, h) = left.to_pixels(frame.width(), frame.height());
+    let white = |px: &Rgba<u8>| {
+        let [r, g, b, _] = px.0;
+        r.min(g).min(b) >= 235 && r.max(g).max(b) - r.min(g).min(b) <= 6
+    };
+    let pixels = (y0..y0 + h).flat_map(|py| (x0..x0 + w).map(move |px| (px, py)));
+    let plain = pixels.clone().filter(|&(px, py)| white(frame.get_pixel(px, py))).count();
+    let all = pixels.count();
+    // Measured: at most 5% on the panel, over a pale grey wall; 20% and up on a speech bubble.
+    all > 0 && plain * 100 > all * 12
 }
 
 /// The panel's text as black on white, with everything else gone.
@@ -284,7 +309,7 @@ fn assemble(rows: &[Row], counters: &[Option<(u32, u32)>]) -> Vec<Quest> {
                 if quests.is_empty() {
                     quests.push(Quest::default());
                 }
-                let objective = Objective { target: target.clone(), current, required };
+                let objective = Objective { target: target.clone(), current, required, unread: false };
                 quests.last_mut().unwrap().objectives.push(objective);
             }
         }
@@ -583,7 +608,7 @@ mod tests {
     }
 
     fn objective(target: &str, current: u32, required: u32) -> Objective {
-        Objective { target: target.into(), current, required }
+        Objective { target: target.into(), current, required, unread: false }
     }
 
     #[test]
