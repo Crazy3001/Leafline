@@ -66,7 +66,13 @@ pub struct QuestTitles {
     known: Vec<Known>,
     last: Option<QuestReading>,
     missed: u32,
+    /// Titles no quest in the data matched, with how many readings in a row have read them.
+    unmatched: Vec<(String, u32)>,
 }
+
+/// Readings in a row a title no quest matches must read the same before it shows. An event
+/// quest the data lacks reads the same each time; a garbled line rarely does.
+const UNMATCHED_READINGS: u32 = 3;
 
 impl QuestTitles {
     /// Steadies one live reading of the panel. `None` when the panel wasn't found this time.
@@ -97,6 +103,21 @@ impl QuestTitles {
         read.quests.retain(|q| !q.objectives.is_empty() || is_known(&self.known, &q.title));
         let unconfirmed = |known: &[Known], title: &str| known.iter().any(|k| k.name == title && !k.confirmed);
         read.quests.retain(|q| !unconfirmed(&self.known, &q.title));
+        // A title no quest matched: a counter line taken for a title (`Of8Pjg`, `15.1`) holds
+        // a digit and is no quest; any other shows once it has read the same a few times.
+        let unmatched: Vec<String> = read
+            .quests
+            .iter()
+            .filter(|q| !q.title.is_empty() && !is_known(&self.known, &q.title))
+            .map(|q| q.title.clone())
+            .collect();
+        let before = |title: &String| self.unmatched.iter().find(|(t, _)| t == title).map_or(0, |(_, n)| *n);
+        let streaks: Vec<(String, u32)> = unmatched.iter().map(|t| (t.clone(), before(t) + 1)).collect();
+        self.unmatched = streaks;
+        let steady = |title: &String| self.unmatched.iter().any(|(t, n)| t == title && *n >= UNMATCHED_READINGS);
+        read.quests.retain(|q| {
+            !unmatched.contains(&q.title) || (!q.title.contains(|c: char| c.is_ascii_digit()) && steady(&q.title))
+        });
         let mut seen: Vec<String> = Vec::new();
         read.quests.retain(|q| {
             let new = q.title.is_empty() || !seen.contains(&q.title);
@@ -988,6 +1009,20 @@ mod tests {
             quest("Slime Samples", &[("Moss Slime", 2, 5)]),
         ];
         assert_eq!(read.quests, expected);
+    }
+
+    #[test]
+    fn a_title_no_quest_matches_shows_only_once_it_reads_the_same_a_few_times() {
+        let (atlas, mut titles) = (world(), QuestTitles::default());
+        let event = || reading(vec![quest("Another Errand", &[("Moss Slime", 0, 3)])], None);
+        let shown = |read: Option<QuestReading>| read.unwrap().quests.len();
+        assert_eq!(shown(held(&mut titles, &atlas, event())), 0);
+        assert_eq!(shown(held(&mut titles, &atlas, event())), 0);
+        assert_eq!(shown(held(&mut titles, &atlas, event())), 1, "an event quest the data lacks");
+        let line = || reading(vec![quest("Of8Pjg", &[("Cit 3rge", 0, 8)])], None);
+        for _ in 0..5 {
+            assert_eq!(shown(held(&mut titles, &atlas, line())), 0, "a counter line taken for a title");
+        }
     }
 
     #[test]
