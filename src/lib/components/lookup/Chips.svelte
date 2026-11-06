@@ -3,14 +3,23 @@
   // the one that's on goes back to all of them.
   let {
     label,
+    caption = null,
     options,
     value,
     onselect,
-  }: { label: string; options: string[]; value: string | null; onselect: (option: string | null) => void } = $props();
+  }: {
+    label: string;
+    /** A word shown before the chips, for a row that would otherwise look like the one above. */
+    caption?: string | null;
+    options: string[];
+    value: string | null;
+    onselect: (option: string | null) => void;
+  } = $props();
 </script>
 
 {#if options.length}
   <div class="chips" role="radiogroup" aria-label={label}>
+    {#if caption}<span class="caption" aria-hidden="true">{caption}</span>{/if}
     <button role="radio" aria-checked={value == null} onclick={() => onselect(null)}>All</button>
     {#each options as option (option)}
       <button role="radio" aria-checked={value === option} onclick={() => onselect(value === option ? null : option)}>{option}</button>
@@ -24,6 +33,13 @@
     flex-wrap: wrap;
     gap: 3px;
     margin-bottom: 8px;
+  }
+
+  .caption {
+    align-self: center;
+    margin-right: 3px;
+    color: var(--faint);
+    font-size: var(--text-xs);
   }
 
   button {

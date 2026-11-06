@@ -40,6 +40,10 @@ pub struct ItemQuery {
     pub sort: Option<String>,
     /// Only equipment the character's build can wear at its level.
     pub mine: bool,
+    /// Only scrolls that raise this, as `scroll_stat` names it.
+    pub stat: Option<String>,
+    /// Only scrolls with this chance, as `scroll_chance` names it.
+    pub chance: Option<String>,
     pub offset: usize,
 }
 
@@ -48,6 +52,8 @@ impl ItemQuery {
         let equipment = item.kind == ItemKind::Equip;
         self.kind.is_none_or(|kind| item.kind == kind)
             && self.slot.as_deref().is_none_or(|slot| fits_slot(item, slot))
+            && self.stat.as_deref().is_none_or(|stat| scroll_stat(item) == Some(stat))
+            && self.chance.as_deref().is_none_or(|chance| scroll_chance(item) == Some(chance))
             && self.class.as_deref().is_none_or(|class| {
                 equipment && (item.classes.is_empty() || item.classes.iter().any(|c| c.eq_ignore_ascii_case(class)))
             })
@@ -62,15 +68,79 @@ pub fn novelty(item: &ItemRecord) -> bool {
     item.kind == ItemKind::Equip && item.price.is_some_and(|price| price <= NOVELTY_PRICE)
 }
 
+/// Items that are the same in everything but their ID, keyed by the first one's ID. Items that
+/// share only a name stay apart: the two Red Relaxers are different chairs, and male and female
+/// versions of gear differ by gender.
+fn copies_in(items: &[ItemRecord]) -> HashMap<u32, Vec<u32>> {
+    let mut by_name: HashMap<(&str, &str), Vec<&ItemRecord>> = HashMap::new();
+    for item in items {
+        by_name.entry((item.name.as_str(), item.kind.name())).or_default().push(item);
+    }
+    let same = |a: &ItemRecord, b: &ItemRecord| ItemRecord { id: 0, ..a.clone() } == ItemRecord { id: 0, ..b.clone() };
+    let mut copies = HashMap::new();
+    for group in by_name.values().filter(|g| g.len() > 1) {
+        let mut sets: Vec<Vec<&ItemRecord>> = Vec::new();
+        for item in group {
+            match sets.iter_mut().find(|set| same(set[0], item)) {
+                Some(set) => set.push(item),
+                None => sets.push(vec![item]),
+            }
+        }
+        for set in sets.into_iter().filter(|s| s.len() > 1) {
+            let mut ids: Vec<u32> = set.iter().map(|i| i.id).collect();
+            ids.sort();
+            copies.insert(ids[0], ids);
+        }
+    }
+    copies
+}
+
 /// Whether an item goes in `slot`, or for a scroll, goes on what does.
 fn fits_slot(item: &ItemRecord, slot: &str) -> bool {
     match &item.scroll {
         Some(scroll) => {
             let weapon = scroll.fits != "Other" && !ARMOUR.contains(&scroll.fits.as_str());
-            scroll.fits == slot || (slot == WEAPON && weapon)
+            scroll.fits == slot || (slot == WEAPON && weapon) || (slot == PET_EQUIP && pet_scroll(item))
         }
         None => item.slot == slot || item.weapon_type.as_deref() == Some(slot) || item_group(item) == Some(slot),
     }
+}
+
+/// Where scrolls for pet equipment are listed. The data files them under `Other`.
+const PET_EQUIP: &str = "Pet equip";
+
+fn pet_scroll(item: &ItemRecord) -> bool {
+    item.scroll.as_ref().is_some_and(|s| s.fits == "Other") && item.name.starts_with("Pet Equip ")
+}
+
+/// What scrolls raise, in the order offered. Names put it just before `Scroll`, after what the
+/// scroll goes on (`Gloves Magic Attack Scroll`), so longer names have to be tried first: the data's
+/// own `stat` lumps several of these together as `Other` and `Attack`.
+const SCROLL_STATS: [&str; 17] = [
+    "Attack", "Magic Attack", "STR", "DEX", "INT", "LUK", "HP", "MP", "Accuracy", "Evasion", "Speed", "Jump", "DEF",
+    "Weapon Def.", "Magic Def.", "Crit. Rate", "Crit. Damage",
+];
+
+/// What a scroll raises, read from its name.
+pub fn scroll_stat(item: &ItemRecord) -> Option<&'static str> {
+    item.scroll.as_ref()?;
+    let stem = item.name.split(" Scroll").next()?;
+    let mut stats = SCROLL_STATS;
+    stats.sort_by_key(|s| std::cmp::Reverse(s.len()));
+    stats.into_iter().find(|stat| stem.ends_with(&format!(" {stat}")))
+}
+
+/// A scroll's chance as the chips name it: its success rate, or `Chaos` for chaos scrolls, which
+/// change stats at random rather than raise one.
+const SCROLL_CHANCES: [&str; 4] = ["100%", "60%", "10%", "Chaos"];
+
+pub fn scroll_chance(item: &ItemRecord) -> Option<&'static str> {
+    let scroll = item.scroll.as_ref()?;
+    if scroll.tier.as_deref() == Some("Chaos") {
+        return Some("Chaos");
+    }
+    let rate = format!("{}%", scroll.success_rate?);
+    SCROLL_CHANCES.into_iter().find(|c| *c == rate)
 }
 
 /// How well `words` match an item, best first, or `None` if they don't. An empty search matches
@@ -125,6 +195,9 @@ pub struct ItemFilters {
     pub weapons: Vec<String>,
     /// What scrolls go on, as slots, with every weapon type under `Weapon`.
     pub scroll_slots: Vec<String>,
+    /// What scrolls for each of `scroll_slots` raise.
+    pub scroll_stats: HashMap<String, Vec<String>>,
+    pub scroll_chances: Vec<String>,
     pub use_groups: Vec<String>,
     pub setup_groups: Vec<String>,
     pub etc_groups: Vec<String>,
@@ -133,9 +206,21 @@ pub struct ItemFilters {
 /// An item that fits none of its kind's groups.
 const OTHER: &str = "Other";
 /// The groups offered under each kind, in the order shown. See `item_group`.
-const USE_GROUPS: [&str; 7] = ["Potions", "Food", "Return scrolls", "Arrows & stars", "Summoning sacks", "Coupons & boxes", OTHER];
+const USE_GROUPS: [&str; 11] = [
+    "Potions",
+    "Buffs",
+    "Food",
+    "Return scrolls",
+    "Bow arrows",
+    "Crossbow arrows",
+    "Throwing stars",
+    "Summoning sacks",
+    "Crafting",
+    "Coupons & boxes",
+    OTHER,
+];
 const SETUP_GROUPS: [&str; 5] = ["Chairs", "Decor", "Crafting", "Event", OTHER];
-const ETC_GROUPS: [&str; 5] = ["Monster loot", "Ores & gems", "Crafting", "Quest items", OTHER];
+const ETC_GROUPS: [&str; 7] = ["Monster loot", "Ores & gems", "Crafting", "Quest items", "Party quest", "Minigames", OTHER];
 
 /// The group a Use, Set-up or Etc item is listed under, or `None` for equipment and scrolls,
 /// which go by slot. The data files every Use item under `Consume` and every Etc item under
@@ -148,10 +233,14 @@ pub fn item_group(item: &ItemRecord) -> Option<&'static str> {
         ItemKind::Equip | ItemKind::Scroll => return None,
         // Crafting kits sit among the buff potions.
         ItemKind::Use => match block {
-            2000..=2002 if !item.name.ends_with(" Kit") => "Potions",
+            2002 if item.name.ends_with(" Kit") => "Crafting",
+            2000 | 2001 => "Potions",
+            2002 | 2023 => "Buffs",
             2010..=2022 => "Food",
             2030 => "Return scrolls",
-            2060..=2079 | 2330..=2339 => "Arrows & stars",
+            2060 => "Bow arrows",
+            2061 => "Crossbow arrows",
+            2070 => "Throwing stars",
             2100 => "Summoning sacks",
             2430..=2459 | 2540..=2549 | 2890..=2899 => "Coupons & boxes",
             _ => OTHER,
@@ -168,6 +257,8 @@ pub fn item_group(item: &ItemRecord) -> Option<&'static str> {
             4000 => "Monster loot",
             4010 | 4020 => "Ores & gems",
             4003 | 4130 => "Crafting",
+            4001 => "Party quest",
+            4080 => "Minigames",
             _ => OTHER,
         },
     })
@@ -211,13 +302,30 @@ pub struct Catalog {
     items: Vec<ItemRecord>,
     skill_index: HashMap<u32, usize>,
     item_index: HashMap<u32, usize>,
+    /// For an item the data holds more than once, every ID it goes by, first one first. See
+    /// `copies_of`.
+    copies: HashMap<u32, Vec<u32>>,
 }
 
 impl Catalog {
     pub fn new(skills: Vec<SkillRecord>, items: Vec<ItemRecord>) -> Self {
         let skill_index = skills.iter().enumerate().map(|(i, s)| (s.id, i)).collect();
         let item_index = items.iter().enumerate().map(|(i, s)| (s.id, i)).collect();
-        Self { skills, items, skill_index, item_index }
+        let copies = copies_in(&items);
+        Self { skills, items, skill_index, item_index, copies }
+    }
+
+    /// Every ID the item goes by: the data repeats some items under new numbers, such as a
+    /// potion that only differs by an expiry flag Leafline doesn't keep, or four of the same
+    /// quest letter. Just `id` for most items.
+    pub fn copies_of(&self, id: u32) -> Vec<u32> {
+        let first = self.copies.iter().find(|(_, ids)| ids.contains(&id)).map(|(first, _)| *first);
+        first.and_then(|f| self.copies.get(&f)).cloned().unwrap_or_else(|| vec![id])
+    }
+
+    /// Whether the item is a later copy of one listed already, which lists leave out.
+    fn repeated(&self, item: &ItemRecord) -> bool {
+        self.copies.values().any(|ids| ids[1..].contains(&item.id))
     }
 
     pub fn skill(&self, id: u32) -> Option<&SkillRecord> {
@@ -294,11 +402,19 @@ impl Catalog {
         let has = |slot: &&str| self.equipment().any(|i| i.slot == *slot);
         let slots = std::iter::once(WEAPON).chain(ARMOUR).filter(has).map(str::to_string).collect();
         let scrolls: Vec<&ItemRecord> = self.items.iter().filter(|i| i.kind == ItemKind::Scroll).collect();
-        let scroll_slots = std::iter::once(WEAPON)
+        let scroll_slots: Vec<String> = std::iter::once(WEAPON)
             .chain(ARMOUR)
+            .chain([PET_EQUIP])
             .filter(|slot| scrolls.iter().any(|i| fits_slot(i, slot)))
             .map(str::to_string)
             .collect();
+        let raised = |slot: &str| -> Vec<String> {
+            let held: Vec<&str> = scrolls.iter().filter(|i| fits_slot(i, slot)).filter_map(|i| scroll_stat(i)).collect();
+            SCROLL_STATS.iter().filter(|s| held.contains(s)).map(|s| s.to_string()).collect()
+        };
+        let scroll_stats = scroll_slots.iter().map(|slot| (slot.clone(), raised(slot))).collect();
+        let chances: Vec<&str> = scrolls.iter().filter_map(|i| scroll_chance(i)).collect();
+        let scroll_chances = SCROLL_CHANCES.iter().filter(|c| chances.contains(c)).map(|c| c.to_string()).collect();
         let groups = |kind: ItemKind, order: &[&str]| -> Vec<String> {
             let held: Vec<&str> = self.items.iter().filter(|i| i.kind == kind).filter_map(item_group).collect();
             order.iter().filter(|g| held.contains(g)).map(|g| g.to_string()).collect()
@@ -307,6 +423,8 @@ impl Catalog {
             slots,
             weapons: self.weapon_types(),
             scroll_slots,
+            scroll_stats,
+            scroll_chances,
             use_groups: groups(ItemKind::Use, &USE_GROUPS),
             setup_groups: groups(ItemKind::Setup, &SETUP_GROUPS),
             etc_groups: groups(ItemKind::Etc, &ETC_GROUPS),
@@ -317,7 +435,7 @@ impl Catalog {
     /// comes up by name, so it doesn't fill the lists.
     pub fn search_items(&self, query: &ItemQuery, allowed: impl Fn(&ItemRecord) -> bool) -> ItemPage {
         let words: Vec<String> = item_key(&query.text).split_whitespace().map(str::to_string).collect();
-        let shown = |i: &&ItemRecord| query.admits(i) && allowed(i) && (!words.is_empty() || !novelty(i));
+        let shown = |i: &&ItemRecord| query.admits(i) && allowed(i) && (!words.is_empty() || !novelty(i)) && !self.repeated(i);
         let candidates: Vec<&ItemRecord> = self.items.iter().filter(shown).collect();
         let mut found: Vec<(u8, &ItemRecord)> =
             candidates.iter().filter_map(|i| Some((text_rank(i, &words)?, *i))).collect();
@@ -583,7 +701,73 @@ pub(crate) mod tests {
         assert_eq!(filters.slots, ["Weapon", "Hat"]);
         assert_eq!(filters.weapons, ["Claw"]);
         assert_eq!(filters.scroll_slots, ["Weapon", "Hat"]);
+        assert_eq!(filters.scroll_chances, ["60%"]);
+        assert!(filters.scroll_stats["Hat"].is_empty(), "`Moss` isn't a stat");
         assert_eq!((filters.use_groups, filters.setup_groups, filters.etc_groups), (vec!["Other".to_string()], vec!["Other".into()], vec!["Other".into()]));
+    }
+
+    #[test]
+    fn scrolls_are_found_by_what_they_raise_and_their_chance() {
+        let rated = |id, name: &str, fits: &str, tier: &str, rate| ItemRecord {
+            scroll: Some(ScrollInfo { fits: fits.into(), tier: Some(tier.into()), success_rate: Some(rate) }),
+            ..scroll(id, name, fits)
+        };
+        let catalog = Catalog::new(
+            Vec::new(),
+            vec![
+                rated(1, "Gloves Attack Scroll: Intermediate", "Glove", "Intermediate", 60),
+                rated(2, "Gloves Magic Attack Scroll: Intermediate", "Glove", "Intermediate", 60),
+                rated(3, "Gloves Attack Scroll: Greater", "Glove", "Greater", 10),
+                rated(4, "Cape Weapon Def. Scroll: Lesser", "Cape", "Lesser", 100),
+                rated(5, "Gloves Attack Scroll: Chaos", "Glove", "Chaos", 10),
+                rated(6, "Pet Equip Speed Scroll: Lesser", "Other", "Lesser", 100),
+                rated(7, "Claw Attack Scroll: Lesser", "Claw", "Lesser", 100),
+            ],
+        );
+        let name = |id| catalog.item(id).unwrap();
+        assert_eq!(scroll_stat(name(2)), Some("Magic Attack"), "the longer name wins");
+        assert_eq!(scroll_stat(name(4)), Some("Weapon Def."));
+        assert_eq!((scroll_chance(name(3)), scroll_chance(name(5))), (Some("10%"), Some("Chaos")));
+
+        let filters = catalog.item_filters();
+        assert_eq!(filters.scroll_slots, ["Weapon", "Glove", "Cape", "Pet equip"]);
+        assert_eq!(filters.scroll_stats["Glove"], ["Attack", "Magic Attack"]);
+        assert_eq!(filters.scroll_stats["Pet equip"], ["Speed"]);
+        assert_eq!(filters.scroll_chances, ["100%", "60%", "10%", "Chaos"]);
+
+        let query = |stat: &str, chance: &str| ItemQuery {
+            kind: Some(ItemKind::Scroll),
+            slot: Some("Glove".into()),
+            stat: Some(stat.into()),
+            chance: Some(chance.into()),
+            ..ItemQuery::default()
+        };
+        assert_eq!(found(&catalog, query("Attack", "60%")), ["Gloves Attack Scroll: Intermediate"]);
+        let pets = ItemQuery { kind: Some(ItemKind::Scroll), slot: Some("Pet equip".into()), ..ItemQuery::default() };
+        assert_eq!(found(&catalog, pets), ["Pet Equip Speed Scroll: Lesser"]);
+    }
+
+    #[test]
+    fn copies_of_an_item_are_listed_once() {
+        let potion = |id| other(id, "Red Potion", ItemKind::Use, "Restores 100 HP.");
+        let catalog = Catalog::new(
+            Vec::new(),
+            vec![
+                potion(2000000),
+                potion(2000007),
+                other(3010002, "The Red Relaxer", ItemKind::Setup, "Restores 30 HP."),
+                other(3015007, "The Red Relaxer", ItemKind::Setup, "Restores 35 MP."),
+                ItemRecord { gender: Some("male".into()), ..item(1040010, "Red Cloth Vest", 10, &[]) },
+                ItemRecord { gender: Some("female".into()), ..item(1041011, "Red Cloth Vest", 10, &[]) },
+            ],
+        );
+        let names = found(&catalog, ItemQuery::default());
+        assert_eq!(names.iter().filter(|n| *n == "Red Potion").count(), 1);
+        assert_eq!(names.iter().filter(|n| *n == "The Red Relaxer").count(), 2, "different chairs");
+        assert_eq!(names.iter().filter(|n| *n == "Red Cloth Vest").count(), 2, "male and female");
+        assert_eq!(catalog.copies_of(2000007), [2000000, 2000007], "either copy finds both");
+        assert_eq!(catalog.copies_of(3010002), [3010002]);
+        assert!(catalog.item(2000007).is_some(), "a copy still opens by its own ID");
     }
 
     #[test]
@@ -608,20 +792,24 @@ pub(crate) mod tests {
         );
         let group = |name: &str| catalog.items.iter().find(|i| i.name == name).and_then(item_group);
         assert_eq!(group("Red Potion"), Some("Potions"));
-        assert_eq!(group("Dexterity Potion"), Some("Potions"));
-        assert_eq!(group("Smithing Kit"), Some("Other"), "a kit isn't a potion");
+        assert_eq!(group("Dexterity Potion"), Some("Buffs"));
+        assert_eq!(group("Smithing Kit"), Some("Crafting"), "a kit isn't a potion");
         assert_eq!(group("Fried Chicken"), Some("Food"));
         assert_eq!(group("Return Scroll to Lith Harbor"), Some("Return scrolls"));
-        assert_eq!(group("Subi Throwing Stars"), Some("Arrows & stars"));
+        assert_eq!(group("Subi Throwing Stars"), Some("Throwing stars"));
         assert_eq!(group("Quest Shell"), Some("Quest items"), "the quest mark comes before the number");
 
         let filters = catalog.item_filters();
-        assert_eq!(filters.use_groups, ["Potions", "Food", "Return scrolls", "Arrows & stars", "Other"], "in the set order");
+        assert_eq!(
+            filters.use_groups,
+            ["Potions", "Buffs", "Food", "Return scrolls", "Throwing stars", "Crafting", "Other"],
+            "in the set order"
+        );
         assert_eq!(filters.setup_groups, ["Chairs", "Event"]);
         assert_eq!(filters.etc_groups, ["Monster loot", "Ores & gems", "Quest items"]);
 
         let in_group = |kind, slot: &str| ItemQuery { kind: Some(kind), slot: Some(slot.into()), ..ItemQuery::default() };
-        assert_eq!(found(&catalog, in_group(ItemKind::Use, "Potions")), ["Dexterity Potion", "Red Potion"]);
+        assert_eq!(found(&catalog, in_group(ItemKind::Use, "Potions")), ["Red Potion"]);
         assert_eq!(found(&catalog, in_group(ItemKind::Etc, "Quest items")), ["Quest Shell", "Sera's Mirror"]);
     }
 

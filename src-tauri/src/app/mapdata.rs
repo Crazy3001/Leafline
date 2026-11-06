@@ -394,7 +394,7 @@ pub async fn item_origin(
         let sources = drops::sources_for(&store, std::slice::from_ref(&item.name))?;
         let from = map_name.and_then(|name| atlas.find_twin(&name, map_street.as_deref(), map_twin)).map(|m| m.card.map);
         let start = from.as_ref().map(|m| m.id);
-        let origin = atlas.item_origin(id, &item.name, sources.first(), start, &travel(&app, &atlas));
+        let origin = atlas.item_origin(&catalog.copies_of(id), &item.name, sources.first(), start, &travel(&app, &atlas));
         Ok(Some(ItemWhere { from, origin }))
     })
     .await

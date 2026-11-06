@@ -399,21 +399,24 @@ impl Atlas {
         }
     }
 
-    /// Where to get an item by its data id: who drops it, as a quest item's objective would show,
-    /// and the quests that can give it. `from` is the map the player is on, for portal counts.
+    /// Where to get an item by its data ids (all of an item's copies): who drops it, as a quest
+    /// item's objective would show, and the quests that can give it. `from` is the map the player
+    /// is on, for portal counts.
     pub fn item_origin(
         &self,
-        item: u32,
+        items: &[u32],
         name: &str,
         sources: Option<&ItemSources>,
         from: Option<u32>,
         travel: &Travel,
     ) -> ItemOrigin {
         let context = self.context(from, &[], travel);
-        let quests = self.quests_rewarding.get(&item).into_iter().flatten();
+        let mut quests: Vec<u32> = items.iter().filter_map(|id| self.quests_rewarding.get(id)).flatten().copied().collect();
+        quests.sort();
+        quests.dedup();
         ItemOrigin {
             drops: self.item_objective(name, sources, &context),
-            quests: quests.filter_map(|id| self.quest_info(*id)).take(QUESTS_PER_ITEM).collect(),
+            quests: quests.iter().filter_map(|id| self.quest_info(*id)).take(QUESTS_PER_ITEM).collect(),
         }
     }
 

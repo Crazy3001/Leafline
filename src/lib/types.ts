@@ -1000,6 +1000,10 @@ export interface ItemQuery {
   sort: string | null;
   /** Only equipment the character's build can wear at its level. */
   mine: boolean;
+  /** Only scrolls that raise this, such as `Attack` or `Weapon Def.`. */
+  stat: string | null;
+  /** Only scrolls with this chance: `100%`, `60%`, `10%` or `Chaos`. */
+  chance: string | null;
   offset: number;
 }
 
@@ -1016,6 +1020,9 @@ export interface ItemFilters {
   weapons: string[];
   /** What scrolls go on, with every weapon type under `Weapon`. */
   scrollSlots: string[];
+  /** What scrolls for each of `scrollSlots` raise. */
+  scrollStats: Record<string, string[]>;
+  scrollChances: string[];
   /** Groups worked out from where an item's number falls, since the data has none for these. */
   useGroups: string[];
   setupGroups: string[];

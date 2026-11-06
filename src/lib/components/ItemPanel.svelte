@@ -69,7 +69,9 @@
   const checks = $derived(checkClosed ? [] : tooltips);
 
   const narrowed = $derived(
-    [query.slot, query.class, query.levelMin, query.levelMax, query.sort, query.mine || null].filter((v) => v != null).length,
+    [query.slot, query.class, query.levelMin, query.levelMax, query.sort, query.mine || null, query.stat, query.chance].filter(
+      (v) => v != null,
+    ).length,
   );
   const browsing = $derived(query.text.trim() !== "" || query.kind != null || narrowed > 0);
   /** Equipment is shown for the character until they search by name or ask for everything. */
@@ -121,6 +123,8 @@
   }
 
   function setQuery(change: Partial<typeof query>) {
+    // What a scroll raises depends on what it goes on, so a new slot starts the stat over.
+    if ("slot" in change && !("stat" in change)) change = { ...change, stat: null };
     itemView.query = { ...itemView.query, ...change, offset: 0 };
     itemView.id = null;
   }
@@ -176,17 +180,30 @@
   />
 
   {#if itemView.id == null}
-    <KindTabs label="Kind of item" options={KINDS} value={query.kind} onselect={(kind) => setQuery({ kind, slot: null })} />
+    <KindTabs label="Kind of item" options={KINDS} value={query.kind} onselect={(kind) => setQuery({ kind, slot: null, chance: null })} />
     {#if query.kind === "equip" && !finding}
       <button class="for-me" onclick={() => (gearView.forMe = true)}>Show only gear for me</button>
       <Chips label="Slot" options={filters?.slots ?? []} value={query.slot} onselect={(slot) => setQuery({ slot })} />
     {:else if query.kind != null && query.kind !== "equip"}
       <Chips
         label={query.kind === "scroll" ? "Goes on" : "Group"}
+        caption={query.kind === "scroll" ? "On" : null}
         options={groupsOf(query.kind)}
         value={query.slot}
         onselect={(slot) => setQuery({ slot })}
       />
+      {#if query.kind === "scroll"}
+        <Chips label="Chance" caption="Chance" options={filters?.scrollChances ?? []} value={query.chance} onselect={(chance) => setQuery({ chance })} />
+        {#if query.slot}
+          <Chips
+            label="Raises"
+            caption="Raises"
+            options={filters?.scrollStats[query.slot] ?? []}
+            value={query.stat}
+            onselect={(stat) => setQuery({ stat })}
+          />
+        {/if}
+      {/if}
     {/if}
   {/if}
 

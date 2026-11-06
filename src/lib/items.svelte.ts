@@ -17,6 +17,8 @@ export const blankQuery = (): ItemQuery => ({
   levelMax: null,
   sort: null,
   mine: false,
+  stat: null,
+  chance: null,
   offset: 0,
 });
 
