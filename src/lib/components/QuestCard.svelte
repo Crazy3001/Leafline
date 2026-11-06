@@ -178,8 +178,11 @@
             <span class="chevron" class:expanded><ChevronRight size={13} /></span>
             <span>{info?.quest?.quest.name}</span>
           </button>
+        {:else if title}
+          {title}
         {:else}
-          {title || "Untitled quest"}
+          <!-- Leafline blanks a title too rough to name until it matches a quest. -->
+          <span class="unread">Can't read this quest yet</span>
         {/if}
       </h3>
       {#if info?.quest}
@@ -381,6 +384,11 @@
     font-family: var(--font-display);
     font-size: var(--text-lg);
     font-weight: 600;
+  }
+
+  .unread {
+    color: var(--muted);
+    font-weight: 400;
   }
 
   .giver {

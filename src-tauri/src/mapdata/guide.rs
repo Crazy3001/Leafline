@@ -25,6 +25,11 @@ pub(super) const MIN_DROPPER_SCORE: f64 = 0.9;
 const MIN_QUEST_SCORE: f64 = 0.8;
 /// Below this a title is another quest, not a bad reading of one already known.
 const MIN_HELD_SCORE: f64 = 0.6;
+/// How closely a line read must match a known line of the same quest to update it. Above
+/// `Blue Snail` against `Red Snail` (0.6), which are two lines, not one misread.
+const MIN_LINE_SCORE: f64 = 0.7;
+/// A title this close to a quest in the data, short of matching it, is a garbled reading.
+const MIN_ROUGH_SCORE: f64 = 0.5;
 /// Words of a title shorter than this say too little to look a quest up by.
 const MIN_TITLE_WORD: usize = 4;
 const MAPS_PER_MONSTER: usize = 4;
@@ -85,12 +90,11 @@ impl QuestTitles {
     /// Takes out rows that are no quest, and puts back known quests that went unread.
     fn keep_known(&mut self, read: &mut QuestReading) {
         let is_known = |known: &[Known], title: &str| known.iter().any(|k| k.name == title);
-        if !self.known.is_empty() {
-            read.quests.retain(|q| !q.objectives.is_empty() || is_known(&self.known, &q.title));
-        }
+        // A row with no counter that is no quest found is a stray line, such as `o Slime`.
+        read.quests.retain(|q| !q.objectives.is_empty() || is_known(&self.known, &q.title));
         let mut seen: Vec<String> = Vec::new();
         read.quests.retain(|q| {
-            let new = !seen.contains(&q.title);
+            let new = q.title.is_empty() || !seen.contains(&q.title);
             seen.push(q.title.clone());
             new
         });
@@ -113,17 +117,37 @@ impl QuestTitles {
     pub fn settle(&mut self, atlas: &Atlas, quests: &mut [Quest]) {
         for quest in quests {
             let matched = atlas.quest_for(&quest.title, &quest.objectives);
+            // How many lines the quest shows, when the data says.
+            let mut lines = None;
+            let mut spelled = Vec::new();
+            quest.objectives.retain(|o| !is_noise(&o.target));
             if let Some(id) = matched {
-                quest.title = atlas.quests[&id].name.clone();
+                let record = &atlas.quests[&id];
+                quest.title = record.name.clone();
+                lines = Some(record.requirements.len() + record.items.len()).filter(|n| *n > 0);
+                spelled = record
+                    .requirements
+                    .iter()
+                    .filter_map(|r| atlas.monsters.get(&r.mob_id))
+                    .map(|m| m.name.clone())
+                    .collect();
                 atlas.fit_counts(id, &mut quest.objectives);
             } else if let Some(name) = self.closest(&quest.title, &quest.objectives) {
                 quest.title = name.to_string();
             } else {
+                // A title near a quest in the data, but not near enough, is a garbled reading of
+                // it: too rough to show until it matches. One like no quest there (an event quest
+                // the data lacks, say) is shown as read.
+                if atlas.quest_resemblance(&quest.title) >= MIN_ROUGH_SCORE {
+                    quest.title.clear();
+                }
                 continue;
             }
             match self.known.iter_mut().find(|k| k.name == quest.title) {
-                Some(known) if quest.objectives.is_empty() => quest.objectives.clone_from(&known.objectives),
-                Some(known) => known.objectives.clone_from(&quest.objectives),
+                Some(known) => {
+                    merge_lines(&mut known.objectives, &quest.objectives, lines, &spelled);
+                    quest.objectives.clone_from(&known.objectives);
+                }
                 None => self.known.push(Known { name: quest.title.clone(), objectives: quest.objectives.clone(), unread: 0 }),
             }
         }
@@ -142,6 +166,58 @@ impl QuestTitles {
             .filter(|(score, _)| *score >= MIN_HELD_SCORE)
             .max_by(|a, b| a.0.total_cmp(&b.0))
             .map(|(_, name)| name)
+    }
+}
+
+/// An objective read through scenery behind the see-through panel, such as `Slime 81413171`
+/// where a counter ran into the line below. No quest target has a run of three digits.
+fn is_noise(target: &str) -> bool {
+    let mut run = 0;
+    for c in target.chars() {
+        run = if c.is_ascii_digit() { run + 1 } else { 0 };
+        if run >= 3 {
+            return true;
+        }
+    }
+    target.chars().filter(|c| c.is_alphabetic()).count() < 3
+}
+
+/// Updates a known quest's lines from a reading, which may have lost some or misread others:
+/// each line read takes the known line it resembles, a line not read this time keeps its last
+/// count, and a new line is added only while the quest has fewer than the data says it shows.
+/// A name the data spells (`spelled`) is kept; another is replaced by a close reading of it. A
+/// count above the line's target is a misread, since the game stops counting there.
+fn merge_lines(known: &mut Vec<Objective>, read: &[Objective], lines: Option<usize>, spelled: &[String]) {
+    let mut taken = vec![false; known.len()];
+    for line in read {
+        let target = fold(&line.target);
+        let best = known
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| !taken[*i])
+            .map(|(i, k)| {
+                let score = similarity(&target, &fold(&k.target));
+                (score + if k.required == line.required { 0.1 } else { 0.0 }, score, i)
+            })
+            .max_by(|a, b| a.0.total_cmp(&b.0));
+        match best {
+            Some((_, score, i)) if score >= MIN_LINE_SCORE => {
+                taken[i] = true;
+                let cap = if spelled.contains(&known[i].target) { known[i].required } else { line.required };
+                if line.current <= cap {
+                    known[i].current = line.current;
+                }
+                if score >= MIN_QUEST_SCORE && !spelled.contains(&known[i].target) {
+                    known[i].target.clone_from(&line.target);
+                    known[i].required = line.required;
+                }
+            }
+            _ if lines.is_none_or(|n| known.len() < n) => {
+                known.push(line.clone());
+                taken.push(true);
+            }
+            _ => {}
+        }
     }
 }
 
@@ -545,6 +621,16 @@ impl Atlas {
         }
     }
 
+    /// How closely the title resembles the most similar quest name in the data, 0 to 1. A
+    /// title of a few letters resembles nothing.
+    fn quest_resemblance(&self, title: &str) -> f64 {
+        let query = fold(title);
+        if query.len() < 4 {
+            return 1.0;
+        }
+        self.quests.values().map(|q| similarity(&query, &fold(&q.name))).fold(0.0, f64::max)
+    }
+
     /// The quest whose name the Quest Helper's title matches. Long titles are cut short with
     /// `...` there, so those are compared with the start of each name.
     fn find_quest(&self, title: &str) -> Option<u32> {
@@ -708,7 +794,7 @@ mod tests {
             quests[0].title.clone()
         };
         const GARBLED: &str = "Sheli Sor 101ng";
-        assert_eq!(settle(GARBLED, "Fern Moth"), GARBLED, "nothing to hold on to yet");
+        assert_eq!(settle(GARBLED, "Fern Moth"), "", "nothing to hold on to yet, and too rough to name");
         assert_eq!(settle(GARBLED, "Pebble Snail"), "Shell Sorting", "only this quest counts these");
         assert_eq!(settle("Shell Sortng", "Pebble Snail"), "Shell Sorting");
         assert_eq!(settle(GARBLED, "Pebble Snail"), "Shell Sorting");
@@ -750,6 +836,35 @@ mod tests {
         held(&mut titles, &atlas, reading(vec![quest("Slime Samples", &[("Moss Slime", 2, 5)])], None));
         let bad = held(&mut titles, &atlas, reading(vec![quest("Slime Samples", &[])], None)).unwrap();
         assert_eq!(bad.quests, [quest("Slime Samples", &[("Moss Slime", 2, 5)])]);
+    }
+
+    #[test]
+    fn scenery_behind_the_panel_cannot_drop_or_garble_a_known_line() {
+        // Seen live on Teo's Weird Hobby with a palm leaf behind the Quest Helper: one reading
+        // lost the second line, the next ran a counter into the line below.
+        let (atlas, mut titles) = (world(), QuestTitles::default());
+        let full = quest("Shell Sorting", &[("Pebble Snail", 1, 8), ("Burrow Rat", 0, 2)]);
+        held(&mut titles, &atlas, reading(vec![full.clone()], None));
+        let lost = held(&mut titles, &atlas, reading(vec![quest("Shell Sorting", &[("Pebble Snail", 1, 8)])], None));
+        assert_eq!(lost.unwrap().quests, std::slice::from_ref(&full), "the line not read keeps its last count");
+        let garbled = quest("Shell Sorting", &[("Pebble Snail 81413171", 0, 1), ("Burrow Rat", 1, 2)]);
+        let read = held(&mut titles, &atlas, reading(vec![garbled], None)).unwrap();
+        assert_eq!(read.quests, [quest("Shell Sorting", &[("Pebble Snail", 1, 8), ("Burrow Rat", 1, 2)])]);
+        let misread = quest("Shell Sorting", &[("Pebb1e Snai1", 2, 8), ("Stray Line", 0, 4)]);
+        let read = held(&mut titles, &atlas, reading(vec![misread], None)).unwrap();
+        assert_eq!(
+            read.quests,
+            [quest("Shell Sorting", &[("Pebble Snail", 2, 8), ("Burrow Rat", 1, 2)])],
+            "a misread line updates its count; the data says there are only two lines"
+        );
+    }
+
+    #[test]
+    fn a_line_missed_on_the_first_reading_is_added_later() {
+        let (atlas, mut titles) = (world(), QuestTitles::default());
+        held(&mut titles, &atlas, reading(vec![quest("Shell Sorting", &[("Pebble Snail", 1, 8)])], None));
+        let full = quest("Shell Sorting", &[("Pebble Snail", 1, 8), ("Burrow Rat", 0, 2)]);
+        assert_eq!(held(&mut titles, &atlas, reading(vec![full.clone()], None)).unwrap().quests, [full]);
     }
 
     #[test]
