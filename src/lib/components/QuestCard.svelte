@@ -185,45 +185,32 @@
           <span class="unread">Can't read this quest yet</span>
         {/if}
       </h3>
-      {#if info?.quest}
-        {@const turnIn = finished ? info.quest.turnIn : null}
-        {@const person = turnIn ?? info.quest.giver}
-        {@const maps = turnIn ? info.quest.turnInMaps : info.quest.giverMaps}
-        {#if person}
-          <p class="giver" class:finished>
-            <UserRound size={11} />
-            <span>
-              {turnIn ? "Turn in to" : finished ? "Done · from" : "From"}
-              {@render who(person, maps)}
-            </span>
-          </p>
-        {/if}
-        {#if !finished && info.quest.turnIn && info.quest.turnIn !== info.quest.giver}
-          <p class="giver">
-            <UserRound size={11} />
-            <span>Turn in to {@render who(info.quest.turnIn, info.quest.turnInMaps)}</span>
-          </p>
-        {/if}
-      {/if}
-      {#if objectives.length}
-        <ul>
+      <!--
+        Steps, not a copy of the Quest Helper beside it: what to hunt or collect and where, then
+        who takes it in. The game shows the counts; a step only gets a check once done.
+      -->
+      {#if objectives.length || info?.quest}
+        <ol class="steps">
           {#each objectives as objective, j}
-            {@const progress = objectiveProgress(objective)}
-            {@const done = progress >= 1 && !objective.unread}
+            {@const done = objectiveProgress(objective) >= 1 && !objective.unread}
             {@const hint = info?.objectives[j]}
-            {@const eta = timeLeft(objective, hint)}
+            {@const eta = done ? null : timeLeft(objective, hint)}
             <li class:done>
               <div class="row">
-                {#if hint?.kind === "monster"}
-                  <button class="ref ref-mob" onclick={() => showMonsterNamed(objective.target)}>{objective.target}</button>
-                {:else if hint?.kind === "item"}
-                  <button class="ref ref-item" onclick={() => showItemNamed(hint.item ?? objective.target)}>{objective.target}</button>
-                {:else}
-                  <span>{objective.target}</span>
-                {/if}
-                <!-- The game's Quest Helper shows the counts; here only that a line is done. -->
+                <span class="step">
+                  {#if hint?.kind === "monster"}
+                    <span class="verb">Hunt</span>
+                    <button class="ref ref-mob" onclick={() => showMonsterNamed(objective.target)}>{objective.target}</button>
+                  {:else if hint?.kind === "item"}
+                    <span class="verb">Collect</span>
+                    <button class="ref ref-item" onclick={() => showItemNamed(hint.item ?? objective.target)}>{objective.target}</button>
+                  {:else}
+                    <span>{objective.target}</span>
+                  {/if}
+                </span>
                 {#if done}<span class="count" aria-label="Done"><Check size={13} /></span>{/if}
               </div>
+              {#if hint && !done && !expanded}<ObjectiveHint guide={hint} from={guide?.from ?? null} />{/if}
               {#if eta}
                 <p class="eta" title={eta.title}>
                   <Hourglass size={10} />
@@ -233,11 +220,25 @@
                   </span>
                 </p>
               {/if}
-              {#if hint && !done && id == null}<ObjectiveHint guide={hint} from={guide?.from ?? null} />{/if}
             </li>
           {/each}
-        </ul>
-      {:else if !expanded}
+          {#if info?.quest}
+            {@const q = info.quest}
+            <li class="hand-in" class:ready={finished}>
+              <p class="giver">
+                <UserRound size={11} />
+                {#if q.turnIn}
+                  <span>{objectives.length ? "Then turn in to" : "Turn in to"} {@render who(q.turnIn, q.turnInMaps)}</span>
+                {:else if q.giver}
+                  <!-- The data doesn't say who takes most quests in, so no one is guessed. -->
+                  <span>{objectives.length ? "Then hand it in" : "Hand it in"} <span class="faint">· given by</span> {@render who(q.giver, q.giverMaps)}</span>
+                {/if}
+              </p>
+            </li>
+          {/if}
+        </ol>
+      {/if}
+      {#if !objectives.length && !expanded}
         <p class="empty">Its lines could not be read.</p>
       {/if}
       {#if sheet && payout(sheet.sheet).length}
@@ -402,20 +403,42 @@
     font-size: var(--text-sm);
   }
 
-  .giver.finished {
+  /* The last step: who takes the quest in, plain until every step before it is done. */
+  .hand-in .giver {
+    margin: 0;
+  }
+
+  .hand-in.ready .giver {
     color: var(--good);
+    font-weight: 600;
   }
 
   .faint {
     color: var(--faint);
   }
 
-  ul {
+  .steps {
     display: grid;
     gap: 8px;
     margin: 0;
     padding: 0;
     list-style: none;
+  }
+
+  .step {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 5px;
+  }
+
+  .verb {
+    color: var(--muted);
+  }
+
+  /* A step done steps back, so what is left stands out. */
+  .done .step {
+    opacity: 0.6;
   }
 
   .row {
@@ -464,7 +487,7 @@
     margin: -2px 0 5px;
   }
 
-  .dense ul {
+  .dense .steps {
     gap: 5px;
   }
 
