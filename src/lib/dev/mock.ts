@@ -750,7 +750,14 @@ export const mockBackend: Backend = {
     );
     return { items: items.slice(query.offset, query.offset + 40), total: items.length, closest: false };
   },
-  itemFilters: async () => ({ slots: ["Weapon", "Hat", "Top"], weapons: ["Claw", "Dagger"] }),
+  itemFilters: async () => ({
+    slots: ["Weapon", "Hat", "Top"],
+    weapons: ["Claw", "Dagger"],
+    scrollSlots: ["Weapon", "Hat"],
+    useGroups: ["Potions", "Food", "Return scrolls", "Arrows & stars", "Other"],
+    setupGroups: ["Chairs", "Decor"],
+    etcGroups: ["Monster loot", "Ores & gems", "Quest items"],
+  }),
   itemRecord: async (id) => mockItems.find((item) => item.id === id) ?? null,
   findItem: async (name) => mockItems.find((item) => item.name.toLowerCase() === name.toLowerCase()) ?? null,
   async itemOrigin(id) {

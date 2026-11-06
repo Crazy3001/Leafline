@@ -143,6 +143,13 @@
     return lastLine(item) || itemSlot(item);
   }
 
+  /** The chips under a kind other than equipment: what scrolls go on, or the other kinds' groups. */
+  function groupsOf(kind: Exclude<ItemKind, "equip">): string[] {
+    if (!filters) return [];
+    const groups = { scroll: filters.scrollSlots, use: filters.useGroups, setup: filters.setupGroups, etc: filters.etcGroups };
+    return groups[kind];
+  }
+
   const gender = (item: ItemRecord) => (item.gender ? item.gender[0].toUpperCase() : null);
 </script>
 
@@ -173,6 +180,13 @@
     {#if query.kind === "equip" && !finding}
       <button class="for-me" onclick={() => (gearView.forMe = true)}>Show only gear for me</button>
       <Chips label="Slot" options={filters?.slots ?? []} value={query.slot} onselect={(slot) => setQuery({ slot })} />
+    {:else if query.kind != null && query.kind !== "equip"}
+      <Chips
+        label={query.kind === "scroll" ? "Goes on" : "Group"}
+        options={groupsOf(query.kind)}
+        value={query.slot}
+        onselect={(slot) => setQuery({ slot })}
+      />
     {/if}
   {/if}
 

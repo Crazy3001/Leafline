@@ -1014,6 +1014,12 @@ export interface ItemPage {
 export interface ItemFilters {
   slots: string[];
   weapons: string[];
+  /** What scrolls go on, with every weapon type under `Weapon`. */
+  scrollSlots: string[];
+  /** Groups worked out from where an item's number falls, since the data has none for these. */
+  useGroups: string[];
+  setupGroups: string[];
+  etcGroups: string[];
 }
 
 /** Where to get an item. */

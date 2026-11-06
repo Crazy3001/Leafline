@@ -69,7 +69,7 @@ fn fits_slot(item: &ItemRecord, slot: &str) -> bool {
             let weapon = scroll.fits != "Other" && !ARMOUR.contains(&scroll.fits.as_str());
             scroll.fits == slot || (slot == WEAPON && weapon)
         }
-        None => item.slot == slot || item.weapon_type.as_deref() == Some(slot),
+        None => item.slot == slot || item.weapon_type.as_deref() == Some(slot) || item_group(item) == Some(slot),
     }
 }
 
@@ -123,6 +123,54 @@ pub struct ItemPage {
 pub struct ItemFilters {
     pub slots: Vec<String>,
     pub weapons: Vec<String>,
+    /// What scrolls go on, as slots, with every weapon type under `Weapon`.
+    pub scroll_slots: Vec<String>,
+    pub use_groups: Vec<String>,
+    pub setup_groups: Vec<String>,
+    pub etc_groups: Vec<String>,
+}
+
+/// An item that fits none of its kind's groups.
+const OTHER: &str = "Other";
+/// The groups offered under each kind, in the order shown. See `item_group`.
+const USE_GROUPS: [&str; 7] = ["Potions", "Food", "Return scrolls", "Arrows & stars", "Summoning sacks", "Coupons & boxes", OTHER];
+const SETUP_GROUPS: [&str; 5] = ["Chairs", "Decor", "Crafting", "Event", OTHER];
+const ETC_GROUPS: [&str; 5] = ["Monster loot", "Ores & gems", "Crafting", "Quest items", OTHER];
+
+/// The group a Use, Set-up or Etc item is listed under, or `None` for equipment and scrolls,
+/// which go by slot. The data files every Use item under `Consume` and every Etc item under
+/// `Etc`, but the client numbers items in blocks by what they are (2000xxx potions, 2030xxx
+/// return scrolls, 4010xxx ores and so on), so the groups come from where an item's number falls.
+/// The blocks were read off the downloaded data on 2026-11-06; an item outside them is `Other`.
+pub fn item_group(item: &ItemRecord) -> Option<&'static str> {
+    let block = item.id / 1000;
+    Some(match item.kind {
+        ItemKind::Equip | ItemKind::Scroll => return None,
+        // Crafting kits sit among the buff potions.
+        ItemKind::Use => match block {
+            2000..=2002 if !item.name.ends_with(" Kit") => "Potions",
+            2010..=2022 => "Food",
+            2030 => "Return scrolls",
+            2060..=2079 | 2330..=2339 => "Arrows & stars",
+            2100 => "Summoning sacks",
+            2430..=2459 | 2540..=2549 | 2890..=2899 => "Coupons & boxes",
+            _ => OTHER,
+        },
+        ItemKind::Setup => match block {
+            3010..=3019 => "Chairs",
+            3000..=3009 | 3020..=3029 | 3040..=3049 => "Decor",
+            3030..=3039 => "Crafting",
+            3990..=3999 => "Event",
+            _ => OTHER,
+        },
+        ItemKind::Etc if item.quest_item => "Quest items",
+        ItemKind::Etc => match block {
+            4000 => "Monster loot",
+            4010 | 4020 => "Ores & gems",
+            4003 | 4130 => "Crafting",
+            _ => OTHER,
+        },
+    })
 }
 
 /// A job a player can choose.
@@ -245,7 +293,24 @@ impl Catalog {
     pub fn item_filters(&self) -> ItemFilters {
         let has = |slot: &&str| self.equipment().any(|i| i.slot == *slot);
         let slots = std::iter::once(WEAPON).chain(ARMOUR).filter(has).map(str::to_string).collect();
-        ItemFilters { slots, weapons: self.weapon_types() }
+        let scrolls: Vec<&ItemRecord> = self.items.iter().filter(|i| i.kind == ItemKind::Scroll).collect();
+        let scroll_slots = std::iter::once(WEAPON)
+            .chain(ARMOUR)
+            .filter(|slot| scrolls.iter().any(|i| fits_slot(i, slot)))
+            .map(str::to_string)
+            .collect();
+        let groups = |kind: ItemKind, order: &[&str]| -> Vec<String> {
+            let held: Vec<&str> = self.items.iter().filter(|i| i.kind == kind).filter_map(item_group).collect();
+            order.iter().filter(|g| held.contains(g)).map(|g| g.to_string()).collect()
+        };
+        ItemFilters {
+            slots,
+            weapons: self.weapon_types(),
+            scroll_slots,
+            use_groups: groups(ItemKind::Use, &USE_GROUPS),
+            setup_groups: groups(ItemKind::Setup, &SETUP_GROUPS),
+            etc_groups: groups(ItemKind::Etc, &ETC_GROUPS),
+        }
     }
 
     /// One page of the items that `query` finds and `allowed` lets through. Novelty gear only
@@ -517,5 +582,57 @@ pub(crate) mod tests {
         let filters = stocked().item_filters();
         assert_eq!(filters.slots, ["Weapon", "Hat"]);
         assert_eq!(filters.weapons, ["Claw"]);
+        assert_eq!(filters.scroll_slots, ["Weapon", "Hat"]);
+        assert_eq!((filters.use_groups, filters.setup_groups, filters.etc_groups), (vec!["Other".to_string()], vec!["Other".into()], vec!["Other".into()]));
+    }
+
+    #[test]
+    fn use_setup_and_etc_items_are_grouped_by_their_number() {
+        let catalog = Catalog::new(
+            Vec::new(),
+            vec![
+                other(2000000, "Red Potion", ItemKind::Use, ""),
+                other(2002000, "Dexterity Potion", ItemKind::Use, ""),
+                other(2002007, "Smithing Kit", ItemKind::Use, ""),
+                other(2020001, "Fried Chicken", ItemKind::Use, ""),
+                other(2030001, "Return Scroll to Lith Harbor", ItemKind::Use, ""),
+                other(2070000, "Subi Throwing Stars", ItemKind::Use, ""),
+                other(2190000, "Lie Detector Test", ItemKind::Use, ""),
+                other(3010000, "The Green Relaxer", ItemKind::Setup, ""),
+                other(3992000, "Santa Ornament", ItemKind::Setup, ""),
+                other(4000000, "Snail Shell", ItemKind::Etc, ""),
+                other(4010000, "Bronze Ore", ItemKind::Etc, ""),
+                ItemRecord { quest_item: true, ..other(4031013, "Sera's Mirror", ItemKind::Etc, "") },
+                ItemRecord { quest_item: true, ..other(4000999, "Quest Shell", ItemKind::Etc, "") },
+            ],
+        );
+        let group = |name: &str| catalog.items.iter().find(|i| i.name == name).and_then(item_group);
+        assert_eq!(group("Red Potion"), Some("Potions"));
+        assert_eq!(group("Dexterity Potion"), Some("Potions"));
+        assert_eq!(group("Smithing Kit"), Some("Other"), "a kit isn't a potion");
+        assert_eq!(group("Fried Chicken"), Some("Food"));
+        assert_eq!(group("Return Scroll to Lith Harbor"), Some("Return scrolls"));
+        assert_eq!(group("Subi Throwing Stars"), Some("Arrows & stars"));
+        assert_eq!(group("Quest Shell"), Some("Quest items"), "the quest mark comes before the number");
+
+        let filters = catalog.item_filters();
+        assert_eq!(filters.use_groups, ["Potions", "Food", "Return scrolls", "Arrows & stars", "Other"], "in the set order");
+        assert_eq!(filters.setup_groups, ["Chairs", "Event"]);
+        assert_eq!(filters.etc_groups, ["Monster loot", "Ores & gems", "Quest items"]);
+
+        let in_group = |kind, slot: &str| ItemQuery { kind: Some(kind), slot: Some(slot.into()), ..ItemQuery::default() };
+        assert_eq!(found(&catalog, in_group(ItemKind::Use, "Potions")), ["Dexterity Potion", "Red Potion"]);
+        assert_eq!(found(&catalog, in_group(ItemKind::Etc, "Quest items")), ["Quest Shell", "Sera's Mirror"]);
+    }
+
+    #[test]
+    fn every_group_an_item_gets_is_offered() {
+        let kinds = [(ItemKind::Use, &USE_GROUPS[..], 2000), (ItemKind::Setup, &SETUP_GROUPS[..], 3000), (ItemKind::Etc, &ETC_GROUPS[..], 4000)];
+        for (kind, offered, first) in kinds {
+            for block in first..first + 1000 {
+                let group = item_group(&other(block * 1000, "X", kind, "")).unwrap();
+                assert!(offered.contains(&group), "{group} for block {block}");
+            }
+        }
     }
 }
