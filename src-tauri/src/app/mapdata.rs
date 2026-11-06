@@ -51,8 +51,10 @@ const LINK_HOSTS: [&str; 9] = [
 
 /// The map data, and the skills and equipment that came with it.
 fn split(mut data: Dataset) -> (Arc<Atlas>, Arc<Catalog>) {
+    // The Atlas keeps the item names too, for the items quests ask to bring.
+    let item_names = data.items.iter().map(|i| (i.id, i.name.clone())).collect();
     let catalog = Catalog::new(std::mem::take(&mut data.skills), std::mem::take(&mut data.items));
-    (Arc::new(Atlas::new(data)), Arc::new(catalog))
+    (Arc::new(Atlas::new(data).with_item_names(item_names)), Arc::new(catalog))
 }
 
 pub struct MapDataState {

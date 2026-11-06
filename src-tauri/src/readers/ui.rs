@@ -92,6 +92,27 @@ impl Canonical {
         })
     }
 
+    /// Like [`Self::sharp`], but a design pixel is black when any window pixel centred inside
+    /// it is near-black, not only its middle: at 1.875x a one-pixel stroke, such as the bar
+    /// across an 8, can sit off the middle of its design pixel, and sampling the middle alone
+    /// loses it (8/8 read as 0/0). For cutting out digits only: it thickens letters, which
+    /// OCR then reads worse.
+    pub fn inked(frame: &Frame, scale: f32, area: Rect, near_black: u8) -> Self {
+        let dark = |px: &Rgba<u8>| px.0[..3].iter().all(|&c| c <= near_black);
+        Self::drawn(frame, scale, Some(area), |frame, x, y| {
+            let half = scale / 2.0;
+            // Window pixels whose centres (i + 0.5) fall within [centre - half, centre + half).
+            let span = |centre: f32, limit: u32| {
+                let first = (centre - half - 0.5).ceil().max(0.0) as u32;
+                let end = ((centre + half - 0.5).ceil().max(0.0) as u32).min(limit);
+                first..end
+            };
+            let inked = span(y, frame.height())
+                .any(|py| span(x, frame.width()).any(|px| dark(frame.get_pixel(px, py))));
+            if inked { Rgba([0, 0, 0, 255]) } else { sample(frame, x, y) }
+        })
+    }
+
     fn drawn(frame: &Frame, scale: f32, area: Option<Rect>, sample: impl Fn(&Frame, f32, f32) -> Rgba<u8>) -> Self {
         let (width, height) = (frame.width() as f32, frame.height() as f32);
         // Everything within the window, on the same grid as the design area, which is centred

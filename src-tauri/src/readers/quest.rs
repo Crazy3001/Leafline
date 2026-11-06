@@ -74,6 +74,12 @@ pub fn panel(overview: &[Line]) -> Option<(&Line, Rect)> {
 }
 
 pub fn read(frame: &Frame, overview: &[Line], ocr: &Ocr) -> Result<Option<QuestReading>> {
+    read_with_digits(frame, frame, overview, ocr)
+}
+
+/// [`read`], cutting the counters' digits out of `digits`, the same view drawn to keep thin
+/// strokes (see `Canonical::inked`).
+pub fn read_with_digits(frame: &Frame, digits: &Frame, overview: &[Line], ocr: &Ocr) -> Result<Option<QuestReading>> {
     let Some((header, panel)) = panel(overview) else { return Ok(None) };
     let h = header.rect.h;
     const SCALE: f32 = 2.0;
@@ -100,8 +106,17 @@ pub fn read(frame: &Frame, overview: &[Line], ocr: &Ocr) -> Result<Option<QuestR
     rows.retain(|row| has_text(frame, panel, row.y(), h));
     // OCR can lose a counter altogether, leaving `O Snail` looking like a title, but a row that
     // starts `digits / digits` as drawn is an objective, whatever is behind the panel.
-    let glyphs: Vec<Option<CounterGlyphs>> =
-        rows.iter().map(|row| CounterGlyphs::read(frame, panel, row.y(), h)).collect();
+    // The digits cut from the view that keeps thin strokes, where they read as a counter with
+    // as many digits as the plain cut-out: there an 8 keeps the bar the plain view can lose.
+    let glyphs: Vec<Option<CounterGlyphs>> = rows
+        .iter()
+        .map(|row| {
+            let plain = CounterGlyphs::read(frame, panel, row.y(), h)?;
+            let inked = CounterGlyphs::read(digits, panel, row.y(), h)
+                .filter(|inked| inked.shaped().is_some_and(|counter| plain.fits(counter)));
+            Some(inked.unwrap_or(plain))
+        })
+        .collect();
     for (row, glyphs) in rows.iter_mut().zip(&glyphs) {
         if let (Row::Title { y, title }, Some(_)) = (&*row, glyphs) {
             *row = Row::Objective { y: *y, target: after_counter(title), counters: Vec::new() };

@@ -190,7 +190,10 @@ fn read_quests(frame: &Frame, scale: Option<f32>, overview: &[Line], ocr: &Ocr) 
         Rect::from_edges(panel.x - margin, header.rect.y - margin, panel.right() + margin, panel.bottom() + margin);
     let near_black = if smoothed { ui::NEAR_BLACK_SMOOTHED } else { ui::NEAR_BLACK };
     let view = Canonical::sharp(frame, scale, area, near_black);
-    Ok(match quest::read(&view.frame, &lines_in_view(overview, area, &view), ocr)? {
+    // The counters' digits again, keeping one-pixel strokes that the middle of a design pixel
+    // can miss (the bar across an 8). Used only where it agrees on how many digits there are.
+    let digits = Canonical::inked(frame, scale, area, near_black);
+    Ok(match quest::read_with_digits(&view.frame, &digits.frame, &lines_in_view(overview, area, &view), ocr)? {
         Some(reading) => Some(QuestReading { panel: view.to_window(reading.panel), ..reading }),
         None => quest::read(frame, overview, ocr)?,
     })

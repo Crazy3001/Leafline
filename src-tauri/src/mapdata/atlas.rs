@@ -253,6 +253,12 @@ pub struct Atlas {
 }
 
 impl Atlas {
+    /// Adds item names, when the items went elsewhere before the Atlas was made.
+    pub fn with_item_names(mut self, names: HashMap<u32, String>) -> Self {
+        self.item_names.extend(names);
+        self
+    }
+
     pub fn new(data: Dataset) -> Self {
         // A few names in the data carry stray spaces.
         let maps: BTreeMap<u32, MapRecord> =
