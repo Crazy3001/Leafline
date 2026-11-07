@@ -73,10 +73,7 @@ pub fn restore(app: &AppHandle) -> Result<()> {
 
 fn open(app: &AppHandle) -> Result<()> {
     if let Some(window) = app.get_webview_window(DESK) {
-        window.show()?;
-        window.unminimize()?;
-        window.set_focus()?;
-        return Ok(());
+        return super::settings::bring_forward(app, &window);
     }
     let settings = app.state::<SettingsState>().get();
     WebviewWindowBuilder::new(app, DESK, WebviewUrl::App("desk".into()))

@@ -27,6 +27,7 @@
   import { OSMS_URL, WIKI_URL } from "$lib/mapdata.svelte";
   import { live, watchLive } from "$lib/readings.svelte";
   import { changeSettings, display, hotkey, keyHint, keyName, usesNumpad, watchSettings } from "$lib/settings.svelte";
+  import { watchTyping } from "$lib/typing";
   import Segmented from "$lib/ui/Segmented.svelte";
   import type {
     GameWindow,
@@ -162,6 +163,9 @@
   /** When each hotkey last arrived, so the list can show it was received. */
   let received = $state<Record<string, number>>({});
   let now = $state(Date.now());
+
+  // Clicks leave the game focused; typing in a box takes focus while it lasts.
+  onMount(() => watchTyping());
 
   onMount(() => {
     const stopHotkeys = backend.onHotkey((action) => {
@@ -534,7 +538,10 @@
       <div class="row">
         <label for="keep-focus">
           <span class="name">Keep the game focused</span>
-          <span class="help">Clicking the overlay doesn't take you out of the game. Typing in a box still works.</span>
+          <span class="help"
+            >Opening or clicking Leafline's windows doesn't take you out of the game: the overlay, pins, desk view,
+            Settings, setup and the build planner. Typing in a box and picking a hotkey still work.</span
+          >
         </label>
         <div class="control">
           <input

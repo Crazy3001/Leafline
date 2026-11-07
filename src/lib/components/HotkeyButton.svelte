@@ -15,6 +15,18 @@
   }: { keys: string; disabled?: boolean; taken?: boolean; label: string; onchange: (keys: string) => void } = $props();
 
   let listening = $state(false);
+  let button = $state<HTMLButtonElement>();
+
+  // The window may leave the game focused when clicked, and then the keys pressed would go to the
+  // game. While this waits for keys it takes focus like a text box, and gives it back after.
+  $effect(() => {
+    if (!listening) return;
+    backend
+      .setTyping(true)
+      .then(() => button?.focus())
+      .catch(() => {});
+    return () => void backend.setTyping(false).catch(() => {});
+  });
 
   $effect(() => {
     if (!listening) return;
@@ -64,6 +76,7 @@
 </script>
 
 <button
+  bind:this={button}
   class="hotkey"
   class:listening
   class:taken={taken && !listening}

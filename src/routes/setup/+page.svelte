@@ -25,6 +25,7 @@
   import { WIKI_URL, mapData } from "$lib/mapdata.svelte";
   import { changeSettings, display, keyName, quietHotkeys, usesNumpad, watchSettings } from "$lib/settings.svelte";
   import type { ShortcutInfo } from "$lib/types";
+  import { watchTyping } from "$lib/typing";
 
   const STEPS = ["Welcome", "Hotkeys", "Game settings", "Views", "Map data"];
   const SCREENS_STEP = 3;
@@ -49,6 +50,9 @@
   let deskOpened = $state(false);
   let finishing = $state(false);
   let finishError = $state<string | null>(null);
+
+  // Clicks leave the game focused; typing in a box takes focus while it lasts.
+  onMount(() => watchTyping());
 
   onMount(() => {
     watchSettings();

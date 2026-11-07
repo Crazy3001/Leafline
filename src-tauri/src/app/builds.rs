@@ -7,7 +7,7 @@ use tauri_plugin_opener::OpenerExt;
 
 use super::mapdata::MapDataState;
 use super::records::{UserDataState, now};
-use super::settings::SettingsState;
+use super::settings::{self, SettingsState};
 use super::{overlay, pins};
 use crate::build::plan::{MAX_LEVEL, Piece};
 use crate::build::progress::{self, CatchUp};
@@ -425,16 +425,16 @@ pub fn open_guide(app: AppHandle, url: String) -> Result<()> {
 #[tauri::command]
 pub async fn show_build(app: AppHandle) -> Result<()> {
     if let Some(window) = app.get_webview_window(BUILD) {
-        window.show()?;
-        window.unminimize()?;
-        window.set_focus()?;
-        return Ok(());
+        return settings::bring_forward(&app, &window);
     }
+    let keep = settings::keeps_game_focus(&app);
     WebviewWindowBuilder::new(&app, BUILD, WebviewUrl::App("build".into()))
         .title("Leafline — Build planner")
         .inner_size(960.0, 760.0)
         .min_inner_size(760.0, 520.0)
         .center()
+        .focusable(!keep)
+        .focused(!keep)
         .background_color(tauri::window::Color(20, 20, 18, 255))
         .additional_browser_args(super::BROWSER_ARGS)
         .build()?;

@@ -171,13 +171,34 @@ pub fn apply(app: &AppHandle) -> Result<()> {
     Ok(())
 }
 
-/// The windows that go with the game: the overlay, the pinned panels and the desk view.
+/// The windows that leave the game focused when clicked, while the setting is on: the overlay,
+/// the pinned panels, the desk view, Settings, setup and the build planner.
 fn game_side_windows(app: &AppHandle) -> Vec<tauri::WebviewWindow> {
     app.get_webview_window(OVERLAY)
         .into_iter()
         .chain(pins::windows(app))
-        .chain(app.get_webview_window(super::desk::DESK))
+        .chain(
+            [super::desk::DESK, SETTINGS, SETUP, super::builds::BUILD]
+                .into_iter()
+                .filter_map(|label| app.get_webview_window(label)),
+        )
         .collect()
+}
+
+/// Whether Leafline's windows leave the game focused when opened or clicked.
+pub fn keeps_game_focus(app: &AppHandle) -> bool {
+    app.state::<SettingsState>().get().keep_game_focus
+}
+
+/// Brings an open window forward: shown and unminimized, and focused too unless the game keeps
+/// the focus.
+pub fn bring_forward(app: &AppHandle, window: &tauri::WebviewWindow) -> Result<()> {
+    window.show()?;
+    window.unminimize()?;
+    if !keeps_game_focus(app) {
+        window.set_focus()?;
+    }
+    Ok(())
 }
 
 /// While the player types in a box on the overlay or a pinned panel, that window takes focus so
@@ -307,16 +328,16 @@ pub async fn show_settings(app: AppHandle) -> Result<()> {
 /// Opens the first-launch setup, or brings it forward.
 pub fn open_setup(app: &AppHandle) -> Result<()> {
     if let Some(window) = app.get_webview_window(SETUP) {
-        window.show()?;
-        window.unminimize()?;
-        window.set_focus()?;
-        return Ok(());
+        return bring_forward(app, &window);
     }
+    let keep = keeps_game_focus(app);
     WebviewWindowBuilder::new(app, SETUP, WebviewUrl::App("setup".into()))
         .title("Leafline — Setup")
         .inner_size(600.0, 640.0)
         .min_inner_size(520.0, 520.0)
         .center()
+        .focusable(!keep)
+        .focused(!keep)
         .background_color(tauri::window::Color(20, 20, 18, 255))
         .additional_browser_args(super::BROWSER_ARGS)
         .build()?;
@@ -343,16 +364,16 @@ pub fn finish_setup(app: AppHandle) -> Result<()> {
 
 pub fn open(app: &AppHandle) -> Result<()> {
     if let Some(window) = app.get_webview_window(SETTINGS) {
-        window.show()?;
-        window.unminimize()?;
-        window.set_focus()?;
-        return Ok(());
+        return bring_forward(app, &window);
     }
+    let keep = keeps_game_focus(app);
     WebviewWindowBuilder::new(app, SETTINGS, WebviewUrl::App("settings".into()))
         .title("Leafline — Settings")
         .inner_size(640.0, 720.0)
         .min_inner_size(520.0, 480.0)
         .center()
+        .focusable(!keep)
+        .focused(!keep)
         .background_color(tauri::window::Color(13, 16, 23, 255))
         .additional_browser_args(super::BROWSER_ARGS)
         .build()?;

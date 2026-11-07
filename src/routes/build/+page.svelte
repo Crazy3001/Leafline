@@ -24,6 +24,7 @@
   import { OSMS_CREDIT, OSMS_URL, mapData, watchMapData } from "$lib/mapdata.svelte";
   import { live, watchLive } from "$lib/readings.svelte";
   import { DEFAULT_RULES, changeSettings, display, keyHint, watchSettings } from "$lib/settings.svelte";
+  import { watchTyping } from "$lib/typing";
   import type {
     BaseStat,
     Build,
@@ -68,6 +69,9 @@
   const ready = $derived(mapData.status?.ready ?? false);
   const character = $derived(live.analysis?.hud?.name ?? null);
   const level = $derived(live.analysis?.hud?.level ?? live.session?.level ?? null);
+
+  // Clicks leave the game focused; typing in a box takes focus while it lasts.
+  onMount(() => watchTyping());
 
   onMount(() => {
     watchLive();
