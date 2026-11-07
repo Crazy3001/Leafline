@@ -590,7 +590,7 @@ fn bonus_of(item: &ItemRecord) -> Stats {
 }
 
 /// What stats, as the item data names them, add to the four base stats.
-fn piece_bonus(stats: &[(String, i64)]) -> Stats {
+pub(super) fn piece_bonus(stats: &[(String, i64)]) -> Stats {
     let mut bonus = Stats::default();
     for (label, value) in stats {
         let target = match label.as_str() {

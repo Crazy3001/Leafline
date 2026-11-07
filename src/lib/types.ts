@@ -1435,6 +1435,17 @@ export interface SlotGear {
   planned: boolean;
   /** More goals for the slot after a planned `next`. */
   later: number;
+  /** Whether the character, as they are now, meets each piece's level and stat requirements. */
+  wearingFit: Fit | null;
+  suggestedFit: Fit | null;
+  nextFit: Fit | null;
+}
+
+/** Whether the character meets an item's requirements now, and what falls short. */
+export interface Fit {
+  ok: boolean;
+  /** Each requirement not met, such as "DEX 35 (you have 28)". */
+  short: string[];
 }
 
 export interface Outfit {

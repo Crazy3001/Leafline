@@ -992,7 +992,19 @@ export const mockBackend: Backend = {
       const optional = slot === "Overall" || slot === "Shield";
       if (optional && !wearing && !planned && !suggestedPlanned) continue;
       const item = next && (mockItems.find((i) => i.id === next.item.id) ?? next.item);
-      outfit.slots.push({ slot, wearing, suggested, suggestedPlanned, next: next && item && { ...next, item }, planned, later });
+      const fit = (reqLevel: number) => ({ ok: reqLevel <= level, short: reqLevel <= level ? [] : [`Lv ${reqLevel} (you're ${level})`] });
+      outfit.slots.push({
+        slot,
+        wearing,
+        suggested,
+        suggestedPlanned,
+        next: next && item && { ...next, item },
+        planned,
+        later,
+        wearingFit: wearing ? fit(wearing.level ?? 0) : null,
+        suggestedFit: suggested ? fit(suggested.reqLevel) : null,
+        nextFit: next ? fit(next.level ?? next.item.reqLevel) : null,
+      });
     }
     return outfit;
   },

@@ -7,7 +7,7 @@ use serde::Serialize;
 
 use super::catalog::{Catalog, novelty};
 use super::fit::ARMOUR;
-use super::plan::{Build, Expansion, GearCheck, MAX_LEVEL, Piece};
+use super::plan::{Build, Expansion, GearCheck, MAX_LEVEL, Piece, Stats, piece_bonus};
 use super::rules::Rules;
 use super::suggest::{Scorer, Wearer, suggest};
 use crate::mapdata::osms::ItemRecord;
@@ -30,6 +30,37 @@ pub struct SlotGear {
     pub planned: bool,
     /// More goals for this slot after a planned `next`.
     pub later: usize,
+    /// Whether the character, as they are now, meets each piece's level and stat requirements.
+    pub wearing_fit: Option<Fit>,
+    pub suggested_fit: Option<Fit>,
+    pub next_fit: Option<Fit>,
+}
+
+/// Whether the character meets an item's requirements now, and what falls short.
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Fit {
+    pub ok: bool,
+    /// Each requirement not met, such as `DEX 35 (you have 28)`.
+    pub short: Vec<String>,
+}
+
+/// `item`'s level and stat requirements against `level` and, when known, `stats`.
+fn fit(item: &ItemRecord, level: u32, stats: Option<Stats>) -> Fit {
+    let mut short = Vec::new();
+    if level < item.req_level {
+        short.push(format!("Lv {} (you're {level})", item.req_level));
+    }
+    if let Some(have) = stats {
+        for (name, need, got) in
+            [("STR", item.req_str, have.str), ("DEX", item.req_dex, have.dex), ("INT", item.req_int, have.int), ("LUK", item.req_luk, have.luk)]
+        {
+            if got < need {
+                short.push(format!("{name} {need} (you have {got})"));
+            }
+        }
+    }
+    Fit { ok: short.is_empty(), short }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
@@ -51,6 +82,17 @@ pub fn outfit(build: &Build, expansion: &Expansion, rules: &Rules, catalog: &Cat
     let picks = suggest(build, expansion, rules, catalog, level);
     let scorer = Scorer::new(build);
     let wearing = |slot: &str| build.start.pieces.iter().rev().find(|p| p.slot(catalog) == slot);
+    // The character's stats now: as last read, or the plan's for a level reached since. Gear worn
+    // in other slots counts toward a piece's requirements, as in the game.
+    let base = if level <= build.start.level { build.start.stats } else { expansion.step(level).map(|s| s.stats).or(build.start.stats) };
+    let known = build.start.stats.is_some();
+    let worn_bonus: Vec<(String, Stats)> = build.start.pieces.iter().map(|p| (p.slot(catalog), piece_bonus(&p.data_stats(catalog)))).collect();
+    let fits = |item: &ItemRecord| {
+        let stats = known.then(|| {
+            worn_bonus.iter().filter(|(s, _)| !Piece::clashes(s, &item.slot)).fold(base.unwrap_or_default(), |total, (_, b)| total.plus(*b))
+        });
+        fit(item, level, stats)
+    };
     let overall = wearing("Overall").is_some();
     let end = expansion.steps.last().map_or(level, |s| s.level);
     let later_wearers: Vec<(u32, Wearer)> =
@@ -125,7 +167,28 @@ pub fn outfit(build: &Build, expansion: &Expansion, rules: &Rules, catalog: &Cat
         if optional && worn.is_none() && !planned && !suggested_planned {
             continue;
         }
-        outfit.slots.push(SlotGear { slot: slot.to_string(), wearing: worn, suggested, suggested_planned, next, planned, later });
+        let wearing_fit = worn.as_ref().map(|p| match p.item.and_then(|id| catalog.item(id)) {
+            Some(item) => fits(item),
+            None => {
+                let need = p.level.unwrap_or(0);
+                let short: Vec<String> = (level < need).then(|| format!("Lv {need} (you're {level})")).into_iter().collect();
+                Fit { ok: short.is_empty(), short }
+            }
+        });
+        let suggested_fit = suggested.as_ref().map(fits);
+        let next_fit = next.as_ref().map(|n| fits(&n.item));
+        outfit.slots.push(SlotGear {
+            slot: slot.to_string(),
+            wearing: worn,
+            suggested,
+            suggested_planned,
+            next,
+            planned,
+            later,
+            wearing_fit,
+            suggested_fit,
+            next_fit,
+        });
     }
     outfit
 }
@@ -288,6 +351,22 @@ mod tests {
         assert_eq!(weapon.next.map(|n| (n.item.name, n.level)), Some(("Iron Dagger".into(), Some(25))));
         assert!(weapon.planned);
         assert_eq!(weapon.later, 0);
+    }
+
+    #[test]
+    fn each_piece_says_whether_the_character_meets_it_now() {
+        let mut field = dagger(2, "Field Dagger", 15, 25);
+        field.req_dex = 30;
+        let catalog = Catalog::new(vec![skill(1, "Double Stab", 400, 20, &[])], vec![field, dagger(4, "Iron Dagger", 25, 35)]);
+        // Wearing the Field Dagger at Lv 16 with 25 DEX: old enough, but 5 DEX short.
+        let build = bandit(16, vec![], vec![worn(2, &catalog)]);
+        let weapon = slot(&at(&build, &catalog, 16), "Weapon").clone();
+        let wearing = weapon.wearing_fit.expect("a fit for what is worn");
+        assert!(!wearing.ok);
+        assert_eq!(wearing.short, ["DEX 30 (you have 25)"]);
+        // The Iron Dagger comes at Lv 25.
+        let next = weapon.next_fit.expect("a fit for what is next");
+        assert_eq!(next.short, ["Lv 25 (you're 16)"]);
     }
 
     #[test]

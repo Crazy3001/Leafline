@@ -13,7 +13,7 @@
   import { gives } from "$lib/items.svelte";
   import { openPlanner } from "$lib/nav.svelte";
   import { display, keyHint } from "$lib/settings.svelte";
-  import type { BuildPlan, GearItem, GearPiece, ItemRecord, LevelStep, Outfit } from "$lib/types";
+  import type { BuildPlan, Fit, GearItem, GearPiece, ItemRecord, LevelStep, Outfit } from "$lib/types";
   import Segmented from "$lib/ui/Segmented.svelte";
 
   let {
@@ -231,6 +231,12 @@
     }
   }
 
+  /** What a gear line's level says on hover: what falls short, or that it can be worn. */
+  function fitTitle(fit: Fit | null | undefined): string | undefined {
+    if (!fit) return undefined;
+    return fit.ok ? "You meet its requirements" : `Needs ${fit.short.join(", ")}`;
+  }
+
   function pickView(next: View) {
     view = next;
     try {
@@ -421,7 +427,9 @@
                   >{piece.name}{#if piece.upgrades}{` (+${piece.upgrades})`}{/if}</button
                 >
                 <span class="end">
-                  {#if piece.level != null}<span class="lv tabular">{piece.level ? `Lv ${piece.level}` : "Any level"}</span>{/if}
+                  {#if piece.level != null}<span class="lv tabular" class:good={row.wearingFit?.ok} class:bad={row.wearingFit && !row.wearingFit.ok} title={fitTitle(row.wearingFit)}
+                      >{piece.level ? `Lv ${piece.level}` : "Any level"}</span
+                    >{/if}
                   <button class="remove" title="Put right what the item check read" aria-label="Edit {piece.name}" onclick={() => startEdit(piece)}
                     ><Pencil size={11} /></button
                   >
@@ -485,7 +493,9 @@
                 <span class="label">Suggested</span>
                 <button class="ref ref-item" onclick={() => backend.showItem(pick.id, null)}>{pick.name}</button>
                 <span class="end">
-                  <span class="lv tabular good">{pick.reqLevel ? `Lv ${pick.reqLevel}` : "Any level"}</span>
+                  <span class="lv tabular" class:good={row.suggestedFit?.ok} class:bad={row.suggestedFit && !row.suggestedFit.ok} title={fitTitle(row.suggestedFit)}
+                    >{pick.reqLevel ? `Lv ${pick.reqLevel}` : "Any level"}</span
+                  >
                   {#if row.suggestedPlanned}
                     <button
                       class="remove"
@@ -509,7 +519,13 @@
                 {@const next = row.next}
                 <button class="ref ref-item" onclick={() => backend.showItem(next.item.id, null)}>{next.item.name}</button>
                 <span class="end">
-                  <span class="lv tabular" class:warn={next.level == null}>
+                  <span
+                    class="lv tabular"
+                    class:warn={next.level == null}
+                    class:good={next.level != null && row.nextFit?.ok}
+                    class:bad={next.level != null && row.nextFit && !row.nextFit.ok}
+                    title={fitTitle(row.nextFit)}
+                  >
                     {#if next.level == null}Out of reach{:else}Lv {next.level}{/if}
                   </span>
                   {#if row.planned}
@@ -911,6 +927,10 @@
 
   .line .lv.warn {
     color: var(--warn);
+  }
+
+  .line .lv.bad {
+    color: var(--bad);
   }
 
   /* Lines under an item line up with its name. */
