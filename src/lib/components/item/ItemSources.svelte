@@ -20,13 +20,12 @@
 
   let dropsOpen = $state(true);
   let questsOpen = $state(true);
-  /** Monsters opened to their maps; a lone monster starts open. */
+  /** Monsters opened to their maps. */
   let opened = $state<string[]>([]);
-  const isOpen = (hunt: Hunt) => opened.includes(hunt.monster.name) || known.length === 1;
+  const isOpen = (hunt: Hunt) => opened.includes(hunt.monster.name);
 
   function toggle(hunt: Hunt) {
     const name = hunt.monster.name;
-    if (known.length === 1) return;
     opened = opened.includes(name) ? opened.filter((m) => m !== name) : [...opened, name];
   }
 
@@ -65,10 +64,11 @@
         {#each known as hunt (hunt.monster.name)}
           {@const open = isOpen(hunt)}
           <li>
-            <button class="mob-head" class:fixed={known.length === 1} aria-expanded={open} onclick={() => toggle(hunt)}>
+            <button class="mob-head" aria-expanded={open} onclick={() => toggle(hunt)}>
               <span class="chevron" class:open><ChevronRight size={11} /></span>
               <span class="mob-name">{hunt.monster.name}</span>
               <span class="muted tabular">Lv {hunt.monster.level}{hunt.monster.boss ? " · boss" : ""}</span>
+              <span class="maps-count faint tabular">{hunt.maps.length} map{hunt.maps.length === 1 ? "" : "s"}</span>
               {#if rate(hunt)}<span class="rate tabular" title={evidence(hunt)}>{rate(hunt)}</span>{/if}
             </button>
             {#if open}
@@ -192,13 +192,16 @@
     border-top: 1px solid var(--border);
   }
 
-  .mob-head.fixed,
   .mob-head.missing {
     cursor: default;
   }
 
-  .mob-head.fixed .chevron {
-    visibility: hidden;
+  .maps-count {
+    margin-left: auto;
+  }
+
+  .maps-count + .rate {
+    margin-left: 8px;
   }
 
   .mob-name {

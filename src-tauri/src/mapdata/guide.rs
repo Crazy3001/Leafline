@@ -32,10 +32,9 @@ const MIN_LINE_SCORE: f64 = 0.7;
 const MIN_ROUGH_SCORE: f64 = 0.5;
 /// Words of a title shorter than this say too little to look a quest up by.
 const MIN_TITLE_WORD: usize = 4;
+/// A quest's one-line hint names the best few; an item's own page lists every one.
 const MAPS_PER_MONSTER: usize = 4;
 const DROPPERS_PER_ITEM: usize = 4;
-/// Some scrolls are given by dozens of quests. The first few, by level, say enough.
-const QUESTS_PER_ITEM: usize = 6;
 
 /// How many readings in a row a known quest can go unread before it counts as gone, or the
 /// panel as closed. A few, so a bad moment shows nothing, but closing it soon shows.
@@ -517,20 +516,21 @@ impl Atlas {
                 kind: TargetKind::Monster,
                 item: None,
                 looked_up: false,
-                hunts: vec![self.hunt(&ids, None, context)],
+                hunts: vec![self.hunt(&ids, None, context, false)],
             };
         }
 
         let key = item_key(target);
-        self.item_objective(target, items.iter().find(|s| s.key == key), context)
+        self.item_objective(target, items.iter().find(|s| s.key == key), context, false)
     }
 
     /// An item and the monsters players saw drop it. `sources` is `None` until it is looked up.
-    fn item_objective(&self, target: &str, sources: Option<&ItemSources>, context: &Context) -> ObjectiveGuide {
+    /// `every` lists all of them and all their maps, for the item's own page.
+    fn item_objective(&self, target: &str, sources: Option<&ItemSources>, context: &Context, every: bool) -> ObjectiveGuide {
         let hunts = sources
             .into_iter()
             .flat_map(|s| &s.droppers)
-            .take(DROPPERS_PER_ITEM)
+            .take(if every { usize::MAX } else { DROPPERS_PER_ITEM })
             .map(|dropper| {
                 let drop = DropRate {
                     rate: dropper.rate,
@@ -541,7 +541,7 @@ impl Atlas {
                     quest: dropper.quest,
                 };
                 match self.monsters_named(&dropper.monster, None).filter(|(score, _)| *score >= MIN_DROPPER_SCORE) {
-                    Some((_, ids)) => self.hunt(&ids, Some(drop), context),
+                    Some((_, ids)) => self.hunt(&ids, Some(drop), context, every),
                     None => Hunt {
                         monster: MonsterRef {
                             name: dropper.monster.clone(),
@@ -582,8 +582,8 @@ impl Atlas {
         quests.sort();
         quests.dedup();
         ItemOrigin {
-            drops: self.item_objective(name, sources, &context),
-            quests: quests.iter().filter_map(|id| self.quest_info(*id)).take(QUESTS_PER_ITEM).collect(),
+            drops: self.item_objective(name, sources, &context, true),
+            quests: quests.iter().filter_map(|id| self.quest_info(*id)).collect(),
         }
     }
 
@@ -610,13 +610,15 @@ impl Atlas {
         Some((score, ids))
     }
 
-    /// Where to hunt the monster with these IDs.
-    fn hunt(&self, ids: &[u32], drop: Option<DropRate>, context: &Context) -> Hunt {
+    /// Where to hunt the monster with these IDs: the best few maps, or `every` one.
+    fn hunt(&self, ids: &[u32], drop: Option<DropRate>, context: &Context, every: bool) -> Hunt {
         let records: Vec<&MonsterRecord> = ids.iter().filter_map(|id| self.monsters.get(id)).collect();
         // Of IDs sharing a name, the one that spawns most is the one players meet.
         let main = records.iter().copied().min_by_key(|m| main_first(m)).expect("hunt needs a known monster");
         let mut maps = self.hunting_grounds(&records, context);
-        maps.truncate(MAPS_PER_MONSTER);
+        if !every {
+            maps.truncate(MAPS_PER_MONSTER);
+        }
         Hunt {
             monster: MonsterRef {
                 name: main.name.clone(),
