@@ -540,7 +540,7 @@
           <span class="name">Keep the game focused</span>
           <span class="help"
             >Opening or clicking Leafline's windows doesn't take you out of the game: the overlay, pins, desk view,
-            Settings, setup and the build planner. Typing in a box and picking a hotkey still work.</span
+            Settings, setup, the build planner and the training log. Typing in a box and picking a hotkey still work.</span
           >
         </label>
         <div class="control">

@@ -173,13 +173,13 @@ pub fn apply(app: &AppHandle) -> Result<()> {
 }
 
 /// The windows that leave the game focused when clicked, while the setting is on: the overlay,
-/// the pinned panels, the desk view, Settings, setup and the build planner.
+/// the pinned panels, the desk view, Settings, setup, the build planner and the training log.
 fn game_side_windows(app: &AppHandle) -> Vec<tauri::WebviewWindow> {
     app.get_webview_window(OVERLAY)
         .into_iter()
         .chain(pins::windows(app))
         .chain(
-            [super::desk::DESK, SETTINGS, SETUP, super::builds::BUILD]
+            [super::desk::DESK, SETTINGS, SETUP, super::builds::BUILD, super::records::TRAINING]
                 .into_iter()
                 .filter_map(|label| app.get_webview_window(label)),
         )
@@ -217,7 +217,7 @@ static TYPING: AtomicBool = AtomicBool::new(false);
 
 /// Leafline's windows that leave the game focused, by label.
 fn game_side(label: &str) -> bool {
-    matches!(label, OVERLAY | SETTINGS | SETUP | super::desk::DESK | super::builds::BUILD)
+    matches!(label, OVERLAY | SETTINGS | SETUP | super::desk::DESK | super::builds::BUILD | super::records::TRAINING)
         || label.starts_with(pins::PREFIX)
 }
 

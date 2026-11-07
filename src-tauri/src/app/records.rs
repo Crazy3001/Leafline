@@ -203,19 +203,23 @@ pub const TRAINING: &str = "training";
 #[tauri::command]
 pub async fn show_training(app: AppHandle) -> Result<()> {
     if let Some(window) = app.get_webview_window(TRAINING) {
-        window.show()?;
-        window.unminimize()?;
-        window.set_focus()?;
-        return Ok(());
+        return super::settings::bring_forward(&app, &window);
     }
-    WebviewWindowBuilder::new(&app, TRAINING, WebviewUrl::App("training".into()))
+    // Like the overlay, it leaves the game focused when the setting is on.
+    let keep = super::settings::keeps_game_focus(&app);
+    let window = WebviewWindowBuilder::new(&app, TRAINING, WebviewUrl::App("training".into()))
         .title("Leafline — Training log")
         .inner_size(1180.0, 800.0)
         .min_inner_size(760.0, 520.0)
         .center()
+        .focusable(!keep)
+        .focused(!keep)
         .background_color(tauri::window::Color(20, 20, 18, 255))
         .additional_browser_args(super::BROWSER_ARGS)
         .build()?;
+    if keep {
+        super::settings::raise(&window);
+    }
     Ok(())
 }
 
