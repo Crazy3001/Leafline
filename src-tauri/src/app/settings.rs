@@ -205,10 +205,19 @@ pub fn bring_forward(app: &AppHandle, window: &tauri::WebviewWindow) -> Result<(
 }
 
 /// Puts a window above the others, the game included, without taking focus. A window opened
-/// without focus otherwise lands under the game, which keeps the front.
+/// without focus otherwise lands under the game, which keeps the front. Done on the main thread,
+/// which owns the window.
 pub fn raise(window: &tauri::WebviewWindow) {
-    if let Ok(hwnd) = window.hwnd() {
-        foreground::raise(hwnd.0 as isize);
+    let Ok(hwnd) = window.hwnd() else { return };
+    let hwnd = hwnd.0 as isize;
+    let _ = window.run_on_main_thread(move || foreground::raise(hwnd));
+}
+
+/// For a new window's `on_page_load`: once its page has loaded, it goes above the game. Moving it
+/// in the stack any sooner, while WebView2 was still starting in it, left the window black.
+pub fn raise_when_loaded(window: tauri::WebviewWindow, payload: tauri::webview::PageLoadPayload<'_>) {
+    if payload.event() == tauri::webview::PageLoadEvent::Finished && keeps_game_focus(window.app_handle()) {
+        raise(&window);
     }
 }
 
@@ -396,7 +405,7 @@ pub fn open_setup(app: &AppHandle) -> Result<()> {
         return bring_forward(app, &window);
     }
     let keep = keeps_game_focus(app);
-    let window = WebviewWindowBuilder::new(app, SETUP, WebviewUrl::App("setup".into()))
+    WebviewWindowBuilder::new(app, SETUP, WebviewUrl::App("setup".into()))
         .title("Leafline — Setup")
         .inner_size(600.0, 640.0)
         .min_inner_size(520.0, 520.0)
@@ -405,10 +414,8 @@ pub fn open_setup(app: &AppHandle) -> Result<()> {
         .focused(!keep)
         .background_color(tauri::window::Color(20, 20, 18, 255))
         .additional_browser_args(super::BROWSER_ARGS)
+        .on_page_load(raise_when_loaded)
         .build()?;
-    if keep {
-        raise(&window);
-    }
     Ok(())
 }
 
@@ -435,7 +442,7 @@ pub fn open(app: &AppHandle) -> Result<()> {
         return bring_forward(app, &window);
     }
     let keep = keeps_game_focus(app);
-    let window = WebviewWindowBuilder::new(app, SETTINGS, WebviewUrl::App("settings".into()))
+    WebviewWindowBuilder::new(app, SETTINGS, WebviewUrl::App("settings".into()))
         .title("Leafline — Settings")
         .inner_size(640.0, 720.0)
         .min_inner_size(520.0, 480.0)
@@ -444,9 +451,7 @@ pub fn open(app: &AppHandle) -> Result<()> {
         .focused(!keep)
         .background_color(tauri::window::Color(13, 16, 23, 255))
         .additional_browser_args(super::BROWSER_ARGS)
+        .on_page_load(raise_when_loaded)
         .build()?;
-    if keep {
-        raise(&window);
-    }
     Ok(())
 }

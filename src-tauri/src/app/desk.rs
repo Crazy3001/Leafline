@@ -76,7 +76,7 @@ fn open(app: &AppHandle) -> Result<()> {
         return super::settings::bring_forward(app, &window);
     }
     let settings = app.state::<SettingsState>().get();
-    let window = WebviewWindowBuilder::new(app, DESK, WebviewUrl::App("desk".into()))
+    WebviewWindowBuilder::new(app, DESK, WebviewUrl::App("desk".into()))
         .title("Leafline — Desk view")
         .inner_size(1600.0, 900.0)
         .min_inner_size(640.0, 420.0)
@@ -88,10 +88,8 @@ fn open(app: &AppHandle) -> Result<()> {
         .focusable(!settings.keep_game_focus)
         .focused(!settings.keep_game_focus)
         .additional_browser_args(super::BROWSER_ARGS)
+        .on_page_load(super::settings::raise_when_loaded)
         .build()?;
-    if settings.keep_game_focus {
-        super::settings::raise(&window);
-    }
     Ok(())
 }
 
