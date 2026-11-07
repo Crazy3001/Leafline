@@ -24,6 +24,9 @@ pub const PINS_EVENT: &str = "pins";
 /// Emitted to a pinned panel when the player resizes it, with its logical width and height.
 const RESIZED_EVENT: &str = "pin-resized";
 
+/// Emitted to the overlay to open one of its tabs, asked for from a pinned panel.
+const SHOW_PANEL_EVENT: &str = "show-panel";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Panel {
@@ -284,6 +287,13 @@ pub fn toggle_visibility(app: &AppHandle) -> Result<()> {
 #[tauri::command]
 pub fn toggle_pins(app: AppHandle) -> Result<()> {
     toggle_visibility(&app)
+}
+
+/// Brings the overlay up at a panel's tab, for the whole of what a pinned panel shows in short.
+#[tauri::command]
+pub fn show_panel(app: AppHandle, panel: Panel) -> Result<()> {
+    overlay::show_full(&app)?;
+    Ok(app.emit_to(OVERLAY, SHOW_PANEL_EVENT, panel)?)
 }
 
 #[cfg(test)]

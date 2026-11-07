@@ -36,7 +36,15 @@
     level,
     map = null,
     session = null,
-  }: { level: number | null; map?: MapReading | null; session?: SessionSummary | null } = $props();
+    glance = false,
+  }: {
+    level: number | null;
+    map?: MapReading | null;
+    session?: SessionSummary | null;
+    /** A pinned window's short form: the session's rates and controls, and timers. The graph,
+     *  the maps, where to train and past sessions stay in the tab. */
+    glance?: boolean;
+  } = $props();
 
   watchHistory();
 
@@ -181,9 +189,11 @@
     {/if}
   {/snippet}
 
-  <SessionControls trailing={tracking ? jump : undefined} />
+  <SessionControls trailing={tracking && !glance ? jump : undefined} />
 
-  {#if !tracking}
+  {#if !tracking && glance}
+    <p class="caption">Starts with your first EXP.</p>
+  {:else if !tracking}
     <div class="empty">
       <strong>Starts with your first EXP</strong>
       <span>
@@ -246,7 +256,10 @@
     {#if reminder}
       <p class="reminder">{reminder}</p>
     {/if}
-    {#if !mesosHintSeen}
+    {#if glance && session.mapHidden}
+      <p class="attention">Can't see the minimap's name, so new gains may go to the wrong map.</p>
+    {/if}
+    {#if !mesosHintSeen && !glance}
       <div class="hint">
         <span>
           Mesos / hr needs a look at your mesos when you start and again before you spend. Your inventory or a shop window
@@ -257,6 +270,7 @@
     {/if}
   </Block>
 
+  {#if !glance}
   <Block title="This session">
     {#snippet aside()}
       <Segmented
@@ -362,12 +376,13 @@
       {/if}
     </Block>
   {/if}
-{:else}
+  {/if}
+{:else if !glance}
   <!-- No session yet: where to train comes first, the last session after it. -->
   <SpotList {level} {map} {session} last={!lastOne} />
 {/if}
 
-{#if !(tracking && session && headline) && lastOne}
+{#if !(tracking && session && headline) && lastOne && !glance}
   <Block title="Last time">
     {#snippet aside()}
       {#if lastOne.character}<span>{lastOne.character}{lastOne.job ? ` · ${lastOne.job}` : ""}</span>{/if}
@@ -390,7 +405,7 @@
   </Block>
 {/if}
 
-{#if tracking && session && headline}
+{#if tracking && session && headline && !glance}
   <SpotList {level} {map} {session} />
 {/if}
 

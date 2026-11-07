@@ -1,6 +1,8 @@
 <script lang="ts">
-  // What one panel shows, the same as a tab of the overlay or pinned into its own window. A
-  // pinned window names the panel itself, so single cards drop their frame there.
+  // What one panel shows, as a tab of the overlay or pinned into its own window. A pinned window
+  // sits over the game and is glanced at mid-fight, so it shows the part that follows the game by
+  // itself and leaves searching and browsing to the tab (Lookup, a tool more than a readout, stays
+  // whole). It names the panel itself, so single cards drop their frame there.
   import BuildSection from "./BuildSection.svelte";
   import CharacterCard from "./CharacterCard.svelte";
   import LookupPanel from "./LookupPanel.svelte";
@@ -24,16 +26,16 @@
 {#if panel === "character"}
   <!-- One card for who the character is and where the build plan has them, so the level shows once. -->
   <CharacterCard hud={analysis?.hud ?? null} mesos={analysis?.mesos ?? null} {session} remember plain={pinned} linkTrain={!pinned}>
-    <BuildSection level={analysis?.hud?.level ?? session?.level ?? null} character={analysis?.hud?.name ?? null} />
+    <BuildSection level={analysis?.hud?.level ?? session?.level ?? null} character={analysis?.hud?.name ?? null} glance={pinned} />
   </CharacterCard>
 {:else if panel === "map"}
   {#if analysis?.map}
-    <MapCard map={analysis.map} {session} variant="compact" plain={pinned} />
+    <MapCard map={analysis.map} {session} variant={pinned ? "glance" : "compact"} plain={pinned} />
   {:else}
     {@render empty("The minimap isn't in view. Its map's details show here when it is.")}
   {/if}
 {:else if panel === "train"}
-  <TrainPanel level={analysis?.hud?.level ?? session?.level ?? null} map={analysis?.map ?? null} {session} />
+  <TrainPanel level={analysis?.hud?.level ?? session?.level ?? null} map={analysis?.map ?? null} {session} glance={pinned} />
 {:else if panel === "quests"}
   <QuestPanel
     quest={analysis?.quest ?? null}

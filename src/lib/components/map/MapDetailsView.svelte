@@ -22,11 +22,13 @@
     details: MapDetails;
     /** The map the player is on, when known. */
     current?: MapRef | null;
-    variant?: "full" | "compact";
+    /** `glance` keeps the facts and the monsters, for a pinned window. */
+    variant?: "full" | "compact" | "glance";
     onnavigate: (id: number) => void;
   } = $props();
 
   const compact = $derived(variant !== "full");
+  const glance = $derived(variant === "glance");
   /** The player's map, while they look at another. */
   const away = $derived(current && current.id !== details.map.id ? current : null);
   const placed = $derived(details.exits.some((e) => e.side));
@@ -63,12 +65,14 @@
   </Section>
 {/if}
 
-<Section title="Exits" count={details.exits.length}>
-  {#snippet aside()}
-    {#if placed}<span title="Roughly which part of the map each portal is in, from the map data">rough positions</span>{/if}
-  {/snippet}
-  <ConnectionCompass exits={details.exits} map={details.map} {current} {onnavigate} />
-</Section>
+{#if !glance}
+  <Section title="Exits" count={details.exits.length}>
+    {#snippet aside()}
+      {#if placed}<span title="Roughly which part of the map each portal is in, from the map data">rough positions</span>{/if}
+    {/snippet}
+    <ConnectionCompass exits={details.exits} map={details.map} {current} {onnavigate} />
+  </Section>
+{/if}
 
 {#if details.mobs.length}
   <Section title="Monsters" count={details.mobTotal}>
@@ -98,6 +102,8 @@
   </Section>
 {/if}
 
+<!-- A pinned window stops at the monsters; exits, drops, quests, NPCs and routes are in the tab. -->
+{#if !glance}
 {#if monsterNames.length}
   <Section title="Drops">
     <MapDrops monsters={monsterNames} />
@@ -153,6 +159,7 @@
     </button>
   {/each}
 </div>
+{/if}
 <button class="credit" onclick={() => backend.openLink(OSMS_URL)}>{OSMS_CREDIT}</button>
 
 <style>

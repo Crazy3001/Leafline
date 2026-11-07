@@ -314,6 +314,9 @@ export interface Backend {
   onPins(handler: (status: PinStatus) => void): Promise<UnlistenFn>;
   /** The player resized the calling pinned panel, with its new width and height in screen units. */
   onPinResized(handler: (size: [number, number]) => void): Promise<UnlistenFn>;
+  /** Brings the overlay up at a panel's tab, from a pinned panel. */
+  showPanel(panel: Panel): Promise<void>;
+  onShowPanel(handler: (panel: Panel) => void): Promise<UnlistenFn>;
   settings(): Promise<DisplaySettings>;
   updateSettings(settings: DisplaySettings): Promise<DisplaySettings>;
   onSettings(handler: (settings: DisplaySettings) => void): Promise<UnlistenFn>;
@@ -496,6 +499,8 @@ const tauriBackend: Backend = {
   unpinPanel: (panel) => invoke("unpin_panel", { panel }),
   onPins: (handler) => listen<PinStatus>("pins", (e) => handler(e.payload)),
   onPinResized: (handler) => getCurrentWindow().listen<[number, number]>("pin-resized", (e) => handler(e.payload)),
+  showPanel: (panel) => invoke("show_panel", { panel }),
+  onShowPanel: (handler) => listen<Panel>("show-panel", (e) => handler(e.payload)),
   settings: () => invoke("get_settings"),
   updateSettings: (settings) => invoke("update_settings", { settings }),
   onSettings: (handler) => listen<DisplaySettings>("settings", (e) => handler(e.payload)),

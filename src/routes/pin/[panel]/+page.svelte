@@ -1,22 +1,21 @@
 <script lang="ts">
   // One panel pinned into a small window of its own. It stays on screen while the overlay is
   // hidden and sizes itself to what it shows, until the player resizes it by hand.
-  import { Minimize2, PinOff } from "@lucide/svelte";
+  import { AppWindow, Minimize2, PinOff } from "@lucide/svelte";
   import { onMount, tick, untrack } from "svelte";
 
   import { page } from "$app/state";
   import { backend } from "$lib/api";
   import PanelView from "$lib/components/PanelView.svelte";
-  import { PIN_WIDTH, panelId, panelInfo } from "$lib/panels";
+  import { PIN_MAX_HEIGHT, PIN_WIDTH, panelId, panelInfo } from "$lib/panels";
   import { live, watchLive } from "$lib/readings.svelte";
   import { watchTyping } from "$lib/typing";
   import { display, watchSettings } from "$lib/settings.svelte";
   import type { Panel } from "$lib/types";
 
-  /** Taller than this, the panel scrolls instead of growing. */
-  const MAX_HEIGHT = 560;
-
   const panel = $derived<Panel>(panelId(page.params.panel) ?? "character");
+  /** Taller than this, the panel scrolls instead of growing. */
+  const maxHeight = $derived(PIN_MAX_HEIGHT[panel]);
   const info = $derived(panelInfo(panel));
   const Icon = $derived(info.icon);
 
@@ -26,7 +25,7 @@
 
   /** A size set by hand, in the page's own units so it follows the size setting. */
   let sized = $state<{ width: number; height: number } | null>(storedSize());
-  /** Content taller than MAX_HEIGHT: the body scrolls. Otherwise it never shows a scrollbar,
+  /** Content taller than the panel's cap: the body scrolls. Otherwise it never shows a scrollbar,
    *  because the window can come out a fraction of a pixel short of the content (display scaling
    *  rounds it), and a scrollbar narrows the content, which refits the window, which can drop the
    *  scrollbar again: the content then shakes sideways while the window keeps its size. */
@@ -80,8 +79,8 @@
     }
     if (!frame || !body) return;
     const natural = Math.ceil(frame.offsetHeight - body.clientHeight + body.scrollHeight);
-    capped = natural > MAX_HEIGHT;
-    setWindow(PIN_WIDTH * display.scale, Math.min(MAX_HEIGHT, natural) * display.scale);
+    capped = natural > maxHeight;
+    setWindow(PIN_WIDTH * display.scale, Math.min(maxHeight, natural) * display.scale);
   }
 
   // Clicks leave the game focused; typing in a box takes focus while it lasts.
@@ -127,6 +126,9 @@
       {#if sized}
         <button class="action" title="Fit to contents" onclick={fitToContent}><Minimize2 size={12} /></button>
       {/if}
+      <button class="action" title="Open the whole {info.title} tab in the overlay" onclick={() => backend.showPanel(panel)}
+        ><AppWindow size={12} /></button
+      >
       <button class="action" title="Unpin" onclick={() => backend.unpinPanel(panel)}><PinOff size={12} /></button>
     </span>
   </header>

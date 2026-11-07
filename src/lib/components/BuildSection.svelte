@@ -18,10 +18,13 @@
   let {
     level,
     character = null,
+    glance = false,
   }: {
     /** Read from the HUD or the session. */
     level: number | null;
     character?: string | null;
+    /** A pinned window's short form: this level's to-do and the next advancement, nothing to browse. */
+    glance?: boolean;
   } = $props();
 
   /** How many later levels with something to do are shown. */
@@ -101,6 +104,59 @@
   }
 </script>
 
+{#snippet todo(step: LevelStep)}
+  <div class="now">
+    <span class="at tabular">Lv {level ?? step.level}</span>
+    <div class="todo">
+      {#if past}
+        <p class="quiet">Past the end of this plan (Lv {step.level}).</p>
+      {:else if !hasWork(step)}
+        <p class="quiet">Nothing to spend at this level.</p>
+      {/if}
+      {#if !past}
+        {#if step.advance}<p class="advance">{step.advance}</p>{/if}
+        {#each step.sp as gain (gain.skillId)}
+          <p>
+            <span class="tag">{gain.to - gain.from} SP</span>{gain.name}
+            <span class="tabular dim">{gain.from} → {gain.to}</span>
+          </p>
+        {/each}
+        {#each step.ap as gain (gain.stat)}
+          <p><span class="tag">{gain.amount} AP</span>{statLabel(gain.stat)} <span class="tabular dim">to {gain.total}</span></p>
+        {/each}
+        {#each step.gear as name (name)}
+          <p><span class="tag">Gear</span><button class="ref ref-item" onclick={() => backend.showItem(null, name)}>{name}</button></p>
+        {/each}
+      {/if}
+    </div>
+  </div>
+{/snippet}
+
+{#if glance}
+  <!-- Nothing to set up or browse in a pinned window: without a plan, it stays out of the way. -->
+  {#if ready && plan && step}
+    <section class="build" aria-label="Build plan">
+      <header class="head">
+        <span class="title">Build</span>
+        <span class="plan" title={plan.build.name}>{plan.build.name}</span>
+      </header>
+      {@render todo(step)}
+      {#if advance}
+        <p class="next">
+          Next job advancement: <strong>{advance.advance}</strong> at Lv {advance.level}
+        </p>
+      {/if}
+      {#if warnings.length}
+        <button class="link warn-line" onclick={() => backend.showBuild()}>
+          {warnings.length === 1 ? "1 thing to fix" : `${warnings.length} things to fix`} in this plan
+        </button>
+      {/if}
+      <footer>
+        <button class="credit" onclick={() => backend.openLink(OSMS_URL)}>{OSMS_CREDIT}</button>
+      </footer>
+    </section>
+  {/if}
+{:else}
 <section class="build" aria-label="Build plan">
   <header class="head">
     <span class="title">Build</span>
@@ -131,31 +187,7 @@
   {:else if plan && step}
     <div class="views"><Segmented label="Build view" options={views} value={shown} stretch size="sm" onchange={pickView} /></div>
     {#if shown === "plan"}
-    <div class="now">
-      <span class="at tabular">Lv {level ?? step.level}</span>
-      <div class="todo">
-        {#if past}
-          <p class="quiet">Past the end of this plan (Lv {step.level}).</p>
-        {:else if !hasWork(step)}
-          <p class="quiet">Nothing to spend at this level.</p>
-        {/if}
-        {#if !past}
-          {#if step.advance}<p class="advance">{step.advance}</p>{/if}
-          {#each step.sp as gain (gain.skillId)}
-            <p>
-              <span class="tag">{gain.to - gain.from} SP</span>{gain.name}
-              <span class="tabular dim">{gain.from} → {gain.to}</span>
-            </p>
-          {/each}
-          {#each step.ap as gain (gain.stat)}
-            <p><span class="tag">{gain.amount} AP</span>{statLabel(gain.stat)} <span class="tabular dim">to {gain.total}</span></p>
-          {/each}
-          {#each step.gear as name (name)}
-            <p><span class="tag">Gear</span><button class="ref ref-item" onclick={() => backend.showItem(null, name)}>{name}</button></p>
-          {/each}
-        {/if}
-      </div>
-    </div>
+    {@render todo(step)}
 
     <dl class="stats">
       {#each STATS as stat (stat.id)}
@@ -236,8 +268,14 @@
     </footer>
   {/if}
 </section>
+{/if}
 
 <style>
+  .link.warn-line {
+    margin-top: 8px;
+    color: var(--warn);
+  }
+
   .views {
     display: flex;
     margin: 8px 0 10px;

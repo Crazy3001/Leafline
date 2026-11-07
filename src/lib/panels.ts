@@ -14,6 +14,19 @@ export interface PanelInfo {
 /** Width of a pinned window, matching `WIDTH` in src-tauri/src/app/pins.rs. */
 export const PIN_WIDTH = 340;
 
+/**
+ * How tall a pinned window grows before it scrolls. A pinned window shows its panel in short
+ * (see PanelView), so most stay well under these; the caps keep a long quest list or map from
+ * covering the game.
+ */
+export const PIN_MAX_HEIGHT: Record<Panel, number> = {
+  character: 440,
+  map: 480,
+  train: 400,
+  quests: 520,
+  item: 560,
+};
+
 export const PANELS: PanelInfo[] = [
   { id: "character", title: "Character", icon: UserRound },
   { id: "map", title: "Map", icon: MapIcon },

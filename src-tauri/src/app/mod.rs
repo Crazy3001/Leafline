@@ -135,6 +135,7 @@ pub fn run() {
             pins::pin_panel,
             pins::unpin_panel,
             pins::toggle_pins,
+            pins::show_panel,
             launch::take_launch_image,
             mapdata::map_data_status,
             mapdata::download_map_data,

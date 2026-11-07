@@ -19,8 +19,9 @@
   }: {
     map: MapReading | null;
     session?: SessionSummary | null;
-    /** `full` in the workbench, `compact` in the overlay and pinned windows. */
-    variant?: "full" | "compact";
+    /** `full` in the workbench, `compact` in the overlay, `glance` in a pinned window: the
+     *  map, your rates on it and its monsters. */
+    variant?: "full" | "compact" | "glance";
     plain?: boolean;
   } = $props();
 

@@ -36,6 +36,7 @@ import type {
   MapDataStatus,
   MapMatch,
   OverlayStatus,
+  Panel,
   PinStatus,
   QuestRow,
   ReplayProgress,
@@ -301,6 +302,7 @@ const mockItems: ItemRecord[] = [
 ];
 const showItemHandlers: ((link: ItemLink) => void)[] = [];
 const showQuestHandlers: ((id: number) => void)[] = [];
+const showPanelHandlers: ((panel: Panel) => void)[] = [];
 const showMonsterHandlers: ((link: MonsterLink) => void)[] = [];
 const showPlaceHandlers: ((link: PlaceLink) => void)[] = [];
 const mockQuests: QuestRow[] = [
@@ -945,6 +947,13 @@ export const mockBackend: Backend = {
     return () => {};
   },
   onPinResized: async () => () => {},
+  async showPanel(panel) {
+    showPanelHandlers.forEach((h) => h(panel));
+  },
+  async onShowPanel(handler) {
+    showPanelHandlers.push(handler);
+    return () => {};
+  },
   settings: async () => displaySettings,
   async updateSettings(settings) {
     const checkChanged = settings.updateCheck !== displaySettings.updateCheck;

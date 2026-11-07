@@ -117,7 +117,8 @@
   </ul>
 {/snippet}
 
-{#if ready}
+<!-- A pinned window shows what is tracked, and a quest opened from a link; the book is in the tab. -->
+{#if ready && !pinned}
   <div class="controls" class:pinned>
     <div class="search">
       <label class="field">
@@ -196,7 +197,7 @@
   {:else}
     <p class="empty">Open the Quest Helper in game to track quest counters here.</p>
   {/if}
-  {#if !ready}
+  {#if !ready && !pinned}
     <Card title="Quest search" plain={pinned}>
       <p class="lead">Search every quest once the map data is downloaded.</p>
       <MapDataPanel compact />

@@ -33,6 +33,9 @@
     watchMonsters();
     watchPlaces();
     watchQuests();
+    // A pinned panel's way to the whole of its tab.
+    const stop = backend.onShowPanel((panel) => select(panel));
+    return () => void stop.then((unlisten) => unlisten());
   });
 
   const signatures = $derived(
