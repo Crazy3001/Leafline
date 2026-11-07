@@ -44,6 +44,12 @@ const BULLET_AREA: f32 = 13.0;
 /// Tags as printed in game; a reading close to one takes its spelling.
 const TAGS: [&str; 3] = ["Quest Item", "Untradable", "One-of-a-kind"];
 
+/// Whether a line under a name is a tag, such as `Untradable`. Equipment prints these in the
+/// same amber as an upgraded name.
+pub(super) fn is_tag(text: &str) -> bool {
+    best_match(trim_noise(text), &TAGS, 0.6).is_some()
+}
+
 /// The icon box's shade, lighter or darker with what is behind it.
 fn is_icon_box(px: &Rgba<u8>) -> bool {
     let [r, g, b, _] = px.0.map(i16::from);
@@ -212,6 +218,16 @@ mod tests {
         for tag in ["auest Item", "Clijest Item", "CllJest Item"] {
             let lines = [line("• Sera's Mirror", 1050.0), line(tag, 1092.0)];
             assert_eq!(name_and_tags(&lines, 2.0), ("Sera's Mirror".to_string(), vec!["Quest Item".to_string()]));
+        }
+    }
+
+    #[test]
+    fn tags_under_an_equipment_name_are_known() {
+        for tag in ["Untradable", "I-Jntradable", "Quest Item", "One-of-a-kind"] {
+            assert!(is_tag(tag), "{tag}");
+        }
+        for name in ["Beginner's Triangular Zamadar", "White Undershirt (M)", "Black Bandana (+2)"] {
+            assert!(!is_tag(name), "{name}");
         }
     }
 

@@ -136,8 +136,10 @@ pub fn read(frame: &Frame, panel: Panel, ocr: &Ocr) -> Result<ItemTooltip> {
     // keying that colour alone leaves the scenery behind the name out.
     let top = req_row_top(panel, 0) - NAME_LINES * LINE_PITCH * panel.unit;
     let above = Rect::from_edges(panel.rect.x, top.max(panel.rect.y), panel.rect.right(), req_row_top(panel, 0));
-    let upgraded = amber_pixels(frame, above) >= MIN_AMBER_AREA * panel.unit * panel.unit;
-    let amber = if upgraded { amber_name(frame, above, ocr)? } else { None };
+    let min_amber = MIN_AMBER_AREA * panel.unit * panel.unit;
+    // A tag such as `Untradable` is amber too, so only amber that isn't a tag says upgraded.
+    let (upgraded, amber) =
+        if amber_pixels(frame, above) >= min_amber { amber_name(frame, above, ocr, min_amber)? } else { (false, None) };
     // Prefer whichever pass read the name cleanly; keying helps over busy scenery but can
     // garble the `(+1)` suffix.
     let names = [amber, name_text(&plain, panel), name_text(&keyed, panel)].map(|name| name.map(|n| tidy_name(&n)));
@@ -166,9 +168,9 @@ fn tidy_name(name: &str) -> String {
     name.replace(['{', '['], "(").replace(['}', ']'], ")")
 }
 
-/// An amber name, each line read alone: OCR loses or reorders the lines of a wrapped name read
-/// together.
-fn amber_name(frame: &Frame, area: Rect, ocr: &Ocr) -> Result<Option<String>> {
+/// Whether the name is amber, and the amber name, each line read alone: OCR loses or reorders
+/// the lines of a wrapped name read together. Tag lines, amber as well, are left out of both.
+fn amber_name(frame: &Frame, area: Rect, ocr: &Ocr, min_amber: f32) -> Result<(bool, Option<String>)> {
     let (x, y, w, h) = area.to_pixels(frame.width(), frame.height());
     let ink = |row: u32| (x..x + w).filter(|&col| is_amber(frame.get_pixel(col, row))).count();
     let mut lines: Vec<(u32, u32)> = Vec::new();
@@ -179,6 +181,7 @@ fn amber_name(frame: &Frame, area: Rect, ocr: &Ocr) -> Result<Option<String>> {
         }
     }
     let mut name = Vec::new();
+    let mut name_ink = 0;
     for (top, bottom) in lines {
         // Cropped close: OCR finds nothing in a short line left in a wide, empty picture.
         let inked: Vec<u32> =
@@ -195,10 +198,16 @@ fn amber_name(frame: &Frame, area: Rect, ocr: &Ocr) -> Result<Option<String>> {
             preprocess::pad(&imageops::resize(&keyed, w, h, imageops::FilterType::Nearest), 24)
         })?;
         let text: Vec<&str> = words.iter().map(|word| word.text.as_str()).collect();
-        name.push(text.join(" "));
+        let text = text.join(" ");
+        if plain::is_tag(&text) {
+            continue;
+        }
+        name_ink += (top..bottom).map(|row| inked.iter().filter(|&&col| is_amber(frame.get_pixel(col, row))).count()).sum::<usize>();
+        name.push(text);
     }
     let name = name.join(" ");
-    Ok((!name.trim().is_empty()).then(|| trim_noise(&name).to_string()))
+    let upgraded = name_ink as f32 >= min_amber;
+    Ok((upgraded, (upgraded && !name.trim().is_empty()).then(|| trim_noise(&name).to_string())))
 }
 
 fn amber_pixels(frame: &Frame, area: Rect) -> f32 {
@@ -210,7 +219,10 @@ fn amber_pixels(frame: &Frame, area: Rect) -> f32 {
 /// run of lines that follow each other closely upwards from there.
 fn name_text(words: &[Word], panel: Panel) -> Option<String> {
     let mut lines = group_lines(words);
-    lines.retain(|l| l.rect.center_y() < req_row_top(panel, 0) && !trim_noise(&l.text).is_empty());
+    // A tag under the name, such as `Untradable`, is not part of it.
+    lines.retain(|l| {
+        l.rect.center_y() < req_row_top(panel, 0) && !trim_noise(&l.text).is_empty() && !plain::is_tag(&l.text)
+    });
     lines.sort_by(|a, b| b.rect.y.total_cmp(&a.rect.y));
     let mut edge = req_row_top(panel, 0) + panel.unit;
     let mut name: Vec<&str> = Vec::new();
