@@ -538,6 +538,7 @@
   <span class="reached tabular {r.tone}">{r.text}</span>
 {/snippet}
 
+<div class="host" class:embedded>
 <div class="page" class:setup={creating || !draft} class:embedded>
   {#if !embedded}
   <nav aria-label="Builds">
@@ -993,6 +994,7 @@
     <Timeline {expansion} goals={draft.plan.skills} {level} />
   {/if}
 </div>
+</div>
 
 <style>
   .page {
@@ -1004,6 +1006,11 @@
 
   .page.setup {
     grid-template-columns: 176px minmax(0, 1fr);
+  }
+
+  .host.embedded {
+    height: 100%;
+    container: planner / inline-size;
   }
 
   /* A desk view column: its own height, no list of builds, a narrower timeline. */
@@ -1019,6 +1026,24 @@
   .page.embedded :global(.setup),
   .page.embedded main.center {
     grid-column: 1 / -1;
+  }
+
+  /* A narrow desk column: the timeline goes under the tabs, and the whole column scrolls. */
+  @container planner (max-width: 640px) {
+    .page.embedded {
+      display: block;
+      overflow-y: auto;
+    }
+
+    .page.embedded .content {
+      overflow: visible;
+    }
+
+    .page.embedded :global(aside) {
+      border-top: 1px solid var(--border);
+      border-left: 0;
+      overflow: visible;
+    }
   }
 
   select.switch {

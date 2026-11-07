@@ -31,7 +31,7 @@
   } from "$lib/desk";
   import { itemView, watchItems } from "$lib/items.svelte";
   import { monsterView, watchMonsters } from "$lib/monsters.svelte";
-  import { deskWindow, logRequest, tabRequest } from "$lib/nav.svelte";
+  import { deskWindow, logRequest, plannerRequest, tabRequest } from "$lib/nav.svelte";
   import { panelInfo } from "$lib/panels";
   import { placeLinks, watchPlaces } from "$lib/places.svelte";
   import { questView, watchQuests } from "$lib/quests.svelte";
@@ -130,6 +130,10 @@
 
   $effect(() => {
     if (logRequest.seq) bringUp("log");
+  });
+
+  $effect(() => {
+    if (plannerRequest.seq) bringUp("planner");
   });
 
   // Reading the character's windows by hotkey shows its result in the Character panel.

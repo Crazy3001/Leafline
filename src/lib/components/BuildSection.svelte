@@ -11,6 +11,7 @@
   import { STATS, buildState, statLabel, watchBuilds } from "$lib/builds.svelte";
   import { OSMS_CREDIT, OSMS_URL, mapData, watchMapData } from "$lib/mapdata.svelte";
   import { gives } from "$lib/items.svelte";
+  import { openPlanner } from "$lib/nav.svelte";
   import { display, keyHint } from "$lib/settings.svelte";
   import type { BuildPlan, GearItem, GearPiece, ItemRecord, LevelStep, Outfit } from "$lib/types";
   import Segmented from "$lib/ui/Segmented.svelte";
@@ -283,7 +284,7 @@
         </p>
       {/if}
       {#if warnings.length}
-        <button class="link warn-line" onclick={() => backend.showBuild()}>
+        <button class="link warn-line" onclick={() => openPlanner()}>
           {warnings.length === 1 ? "1 thing to fix" : `${warnings.length} things to fix`} in this plan
         </button>
       {/if}
@@ -304,7 +305,7 @@
           title="Live reading follows your Character Stat and Skill windows while they're open. With it off, open them and read them once here{keyHint('ReadCharacter')}"
           onclick={() => backend.readCharacter()}><RefreshCw size={12} />Read stats</button
         >
-        <button class="link" onclick={() => backend.showBuild()}><Pencil size={12} />Edit</button>
+        <button class="link" onclick={() => openPlanner()}><Pencil size={12} />Edit</button>
       </span>
     {/if}
   </header>
@@ -319,7 +320,7 @@
       No build yet. Choose a job and write your goals in order, from a guide or your own idea, and Leafline lays them out
       level by level.
     </p>
-    <button class="action" onclick={() => backend.showBuild()}><Pencil size={13} />Plan a build</button>
+    <button class="action" onclick={() => openPlanner()}><Pencil size={13} />Plan a build</button>
   {:else if plan && step}
     <div class="views"><Segmented label="Build view" options={views} value={shown} stretch size="sm" onchange={pickView} /></div>
     {#if shown === "plan"}
@@ -380,7 +381,7 @@
       <ul class="warnings">
         {#each warnings.slice(0, 3) as problem (problem.message)}<li>{problem.message}</li>{/each}
       </ul>
-      {#if warnings.length > 3}<button class="link" onclick={() => backend.showBuild()}>See all in the editor</button>{/if}
+      {#if warnings.length > 3}<button class="link" onclick={() => openPlanner()}>See all in the editor</button>{/if}
     {/if}
     {:else if shown === "advance" && nextAdvance?.advance && plan.build.plan.job}
       <p class="next">
@@ -521,7 +522,7 @@
             </div>
             {#if row.next}
               <p class="piece-line">
-                {gives(row.next.item as ItemRecord, 3)}{#if row.later}<span class="sep">{" · "}</span><button class="link later" onclick={() => backend.showBuild()}
+                {gives(row.next.item as ItemRecord, 3)}{#if row.later}<span class="sep">{" · "}</span><button class="link later" onclick={() => openPlanner()}
                     >{row.later} more planned after it</button
                   >{/if}
               </p>

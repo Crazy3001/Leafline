@@ -20,3 +20,11 @@ export function openTrainingLog() {
   if (deskWindow.active) logRequest.seq += 1;
   else void backend.showTraining();
 }
+
+export const plannerRequest = $state({ seq: 0 });
+
+/** Shows the build planner: in the desk view when the link is in it, else in its own window. */
+export function openPlanner() {
+  if (deskWindow.active) plannerRequest.seq += 1;
+  else void backend.showBuild();
+}
