@@ -7,12 +7,18 @@ use super::{Frame, Rect};
 /// Bounding boxes of horizontal runs of `matches` pixels at least `min_run` long, merged
 /// across consecutive rows. Only rows inside `region` are scanned.
 pub fn find_blocks(frame: &Frame, region: Rect, min_run: u32, matches: impl Fn(&Rgba<u8>) -> bool) -> Vec<Rect> {
+    find_blocks_at(frame, region, min_run, |x, y| matches(frame.get_pixel(x, y)))
+}
+
+/// [`find_blocks`] with a test that is given each pixel's position, so it can look at the
+/// pixels around it.
+pub fn find_blocks_at(frame: &Frame, region: Rect, min_run: u32, matches: impl Fn(u32, u32) -> bool) -> Vec<Rect> {
     let (rx, ry, rw, rh) = region.to_pixels(frame.width(), frame.height());
     let mut open: Vec<Block> = Vec::new();
     let mut done: Vec<Block> = Vec::new();
 
     for y in ry..ry + rh {
-        let runs = row_runs(frame, y, rx, rx + rw, min_run, &matches);
+        let runs = row_runs(y, rx, rx + rw, min_run, &matches);
         let (continuing, ended): (Vec<Block>, Vec<Block>) =
             open.drain(..).partition(|block| runs.iter().any(|&(left, right)| block.overlaps(left, right)));
         done.extend(ended);
@@ -29,18 +35,11 @@ pub fn find_blocks(frame: &Frame, region: Rect, min_run: u32, matches: impl Fn(&
     done.into_iter().map(Block::rect).collect()
 }
 
-fn row_runs(
-    frame: &Frame,
-    y: u32,
-    from: u32,
-    to: u32,
-    min_run: u32,
-    matches: &impl Fn(&Rgba<u8>) -> bool,
-) -> Vec<(u32, u32)> {
+fn row_runs(y: u32, from: u32, to: u32, min_run: u32, matches: &impl Fn(u32, u32) -> bool) -> Vec<(u32, u32)> {
     let mut runs = Vec::new();
     let mut start = None;
     for x in from..=to {
-        let hit = x < to && matches(frame.get_pixel(x, y));
+        let hit = x < to && matches(x, y);
         match (hit, start) {
             (true, None) => start = Some(x),
             (false, Some(s)) => {

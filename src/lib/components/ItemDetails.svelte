@@ -8,7 +8,7 @@
   import Section from "./map/Section.svelte";
   import { backend } from "$lib/api";
   import { buildState, watchBuilds } from "$lib/builds.svelte";
-  import { formatMesos } from "$lib/format";
+  import { attackSpeedName, formatMesos } from "$lib/format";
   import { blankQuery, itemView } from "$lib/items.svelte";
   import { OSMS_CREDIT, OSMS_URL, WIKI_CREDIT, WIKI_URL, mapData } from "$lib/mapdata.svelte";
   import { showNpcNamed } from "$lib/places.svelte";
@@ -132,7 +132,9 @@
         <div><dt>Upgrade slots</dt><dd class="tabular">{shown.upgradeSlots}</dd></div>
       {/if}
       {#if speed != null}
-        <div title="The data's number for it. Lower is faster."><dt>Attack speed</dt><dd class="tabular">{speed}</dd></div>
+        <div title={`The data's number for it is ${speed}. Lower is faster.`}>
+          <dt>Attack speed</dt><dd class="tabular">{attackSpeedName(speed) ?? speed}</dd>
+        </div>
       {/if}
       {#if rate != null}
         <div><dt>Success rate</dt><dd class="tabular">{rate}%</dd></div>

@@ -58,6 +58,9 @@ const MIN_AMBER_AREA: f32 = 25.0;
 const AMBER_SCALE: u32 = 3;
 /// How many lines above the `REQ` block a name can reach, wrapped.
 const NAME_LINES: f32 = 3.25;
+/// Screen pixels above and below the separator that must not be light, so a white window
+/// seen through the panel isn't taken for the rule. The rule is at most 3 pixels thick.
+const RULE_CLEARANCE: u32 = 3;
 
 static DIGITS: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(\d{1,3})\s*$").unwrap());
 /// Words, an optional `(M)`-style tag and an optional `(+N)`, with nothing OCR made up.
@@ -94,8 +97,17 @@ pub fn read_all(frame: &Frame, overview: &[Line], ocr: &Ocr) -> Result<Vec<ItemT
 pub fn locate(frame: &Frame, overview: &[Line]) -> Vec<Panel> {
     let width = frame.width() as f32;
     let whole = Rect::new(0.0, 0.0, width, frame.height() as f32);
+    // The rule is a thin line: where it runs on past the panel into a white window behind, the
+    // pixels above and below it are light too, and that part is left out.
+    let height = frame.height();
+    let light = |x: u32, y: u32| is_rule(frame.get_pixel(x, y));
+    let thin = |x: u32, y: u32| {
+        light(x, y)
+            && !(y >= RULE_CLEARANCE && light(x, y - RULE_CLEARANCE))
+            && !(y + RULE_CLEARANCE < height && light(x, y + RULE_CLEARANCE))
+    };
     let pieces =
-        color::find_blocks(frame, whole, (width * 0.03) as u32, is_rule).into_iter().filter(|r| r.h <= 3.0).collect();
+        color::find_blocks_at(frame, whole, (width * 0.03) as u32, thin).into_iter().filter(|r| r.h <= 3.0).collect();
 
     let mut panels: Vec<Panel> = Vec::new();
     for separator in join_collinear(pieces, width * 0.003).into_iter().filter(|r| r.w >= width * 0.08) {
@@ -137,12 +149,20 @@ pub fn read(frame: &Frame, panel: Panel, ocr: &Ocr) -> Result<ItemTooltip> {
     let top = req_row_top(panel, 0) - NAME_LINES * LINE_PITCH * panel.unit;
     let above = Rect::from_edges(panel.rect.x, top.max(panel.rect.y), panel.rect.right(), req_row_top(panel, 0));
     let min_amber = MIN_AMBER_AREA * panel.unit * panel.unit;
+    let (plain_name, keyed_name) = (name_text(&plain, panel), name_text(&keyed, panel));
+    // An owner's tag (`Zeni's`, the name amber) sits a gap above the item's name. Amber that far
+    // above the name the white passes read is a tag, not an upgraded name.
+    let name_top = [&plain_name, &keyed_name].into_iter().flatten().map(|(_, top)| *top).reduce(f32::min);
+    let tag_below = name_top.map(|top| top - 0.5 * LINE_PITCH * panel.unit);
     // A tag such as `Untradable` is amber too, so only amber that isn't a tag says upgraded.
-    let (upgraded, amber) =
-        if amber_pixels(frame, above) >= min_amber { amber_name(frame, above, ocr, min_amber)? } else { (false, None) };
+    let (upgraded, amber) = if amber_pixels(frame, above) >= min_amber {
+        amber_name(frame, above, tag_below, ocr, min_amber)?
+    } else {
+        (false, None)
+    };
     // Prefer whichever pass read the name cleanly; keying helps over busy scenery but can
     // garble the `(+1)` suffix.
-    let names = [amber, name_text(&plain, panel), name_text(&keyed, panel)].map(|name| name.map(|n| tidy_name(&n)));
+    let names = [amber, plain_name.map(|(n, _)| n), keyed_name.map(|(n, _)| n)].map(|name| name.map(|n| tidy_name(&n)));
     if let Some(name) = names
         .iter()
         .flatten()
@@ -169,8 +189,15 @@ fn tidy_name(name: &str) -> String {
 }
 
 /// Whether the name is amber, and the amber name, each line read alone: OCR loses or reorders
-/// the lines of a wrapped name read together. Tag lines, amber as well, are left out of both.
-fn amber_name(frame: &Frame, area: Rect, ocr: &Ocr, min_amber: f32) -> Result<(bool, Option<String>)> {
+/// the lines of a wrapped name read together. Tag lines, amber as well, are left out of both,
+/// and so are lines ending above `tag_below`, when it is known.
+fn amber_name(
+    frame: &Frame,
+    area: Rect,
+    tag_below: Option<f32>,
+    ocr: &Ocr,
+    min_amber: f32,
+) -> Result<(bool, Option<String>)> {
     let (x, y, w, h) = area.to_pixels(frame.width(), frame.height());
     let ink = |row: u32| (x..x + w).filter(|&col| is_amber(frame.get_pixel(col, row))).count();
     let mut lines: Vec<(u32, u32)> = Vec::new();
@@ -183,6 +210,9 @@ fn amber_name(frame: &Frame, area: Rect, ocr: &Ocr, min_amber: f32) -> Result<(b
     let mut name = Vec::new();
     let mut name_ink = 0;
     for (top, bottom) in lines {
+        if tag_below.is_some_and(|limit| (bottom as f32) < limit) {
+            continue;
+        }
         // Cropped close: OCR finds nothing in a short line left in a wide, empty picture.
         let inked: Vec<u32> =
             (x..x + w).filter(|&col| (top..bottom).any(|row| is_amber(frame.get_pixel(col, row)))).collect();
@@ -215,9 +245,9 @@ fn amber_pixels(frame: &Frame, area: Rect) -> f32 {
     (y..y + h).map(|row| (x..x + w).filter(|&col| is_amber(frame.get_pixel(col, row))).count()).sum::<usize>() as f32
 }
 
-/// The item name: it sits just above the REQ block and may wrap onto two lines, so it is the
-/// run of lines that follow each other closely upwards from there.
-fn name_text(words: &[Word], panel: Panel) -> Option<String> {
+/// The item name and its top: it sits just above the REQ block and may wrap onto two lines, so
+/// it is the run of lines that follow each other closely upwards from there.
+fn name_text(words: &[Word], panel: Panel) -> Option<(String, f32)> {
     let mut lines = group_lines(words);
     // A tag under the name, such as `Untradable`, is not part of it.
     lines.retain(|l| {
@@ -234,7 +264,7 @@ fn name_text(words: &[Word], panel: Panel) -> Option<String> {
         name.insert(0, trim_noise(&line.text));
         edge = line.rect.y;
     }
-    (!name.is_empty()).then(|| name.join(" "))
+    (!name.is_empty()).then(|| (name.join(" "), edge))
 }
 
 /// Top of `REQ` row `index` (0 = LEV ... 5 = FAM).
@@ -335,15 +365,28 @@ impl RequirementRows {
     }
 }
 
-/// The top of the light blue frame on the panel's left side, a few game pixels out from the
-/// separator. The frame is translucent, so it is told apart by being lighter than the panel
-/// just inside it, and short breaks (something drawn over it) are bridged.
+/// The top of the panel's light blue frame, a few game pixels out from the separator. The left
+/// side is tried first, then the right: a window seen through the panel, such as a shop's list,
+/// can hide one side's frame. A top no higher than the `REQ` block is no top at all.
 fn frame_top(frame: &Frame, separator: Rect, unit: f32) -> Option<f32> {
-    let columns = (separator.x - 7.0 * unit).max(0.0) as u32..=(separator.x - 3.0 * unit) as u32;
+    let highest = separator.y - (REQ_TOP + LINE_PITCH) * unit;
+    [true, false].into_iter().find_map(|left| frame_side_top(frame, separator, unit, left).filter(|&top| top <= highest))
+}
+
+/// The top of the frame on one side. The frame is translucent, so it is told apart by being
+/// lighter than the panel just inside it, and short breaks (something drawn over it) are bridged.
+fn frame_side_top(frame: &Frame, separator: Rect, unit: f32, left: bool) -> Option<f32> {
+    let last = frame.width() - 1;
+    let columns = if left {
+        (separator.x - 7.0 * unit).max(0.0) as u32..=(separator.x - 3.0 * unit) as u32
+    } else {
+        ((separator.right() + 3.0 * unit) as u32).min(last)..=((separator.right() + 7.0 * unit) as u32).min(last)
+    };
     let inset = (3.0 * unit) as u32;
+    let inside_of = |x: u32| if left { (x + inset).min(last) } else { x.saturating_sub(inset) };
     let on_frame = |y: u32| {
         columns.clone().any(|x| {
-            let (edge, inside) = (frame.get_pixel(x, y), frame.get_pixel((x + inset).min(frame.width() - 1), y));
+            let (edge, inside) = (frame.get_pixel(x, y), frame.get_pixel(inside_of(x), y));
             let lighter = u16::from(preprocess::luminance(edge)) >= u16::from(preprocess::luminance(inside)) + 30;
             is_panel_frame(edge) && lighter
         })
@@ -469,9 +512,10 @@ fn is_flag_grey(px: &Rgba<u8>) -> bool {
     (85..=200).contains(&preprocess::luminance(px)) && preprocess::saturation(px) <= 50 && r >= b && g + 5 >= b
 }
 
-/// `REQ` text: white when required, grey when not.
+/// `REQ` text: white when required, grey when not, and pure red when the character falls short.
 fn is_req_text(px: &Rgba<u8>) -> bool {
-    preprocess::luminance(px) >= 100 && preprocess::saturation(px) <= 30
+    let [r, g, b, _] = px.0;
+    (preprocess::luminance(px) >= 100 && preprocess::saturation(px) <= 30) || (r >= 200 && g <= 60 && b <= 60)
 }
 
 /// The panel's light blue frame, paler where it crosses bright scenery.

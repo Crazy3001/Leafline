@@ -101,6 +101,7 @@ const STAT_LABELS: &[&str] = &[
     "Speed",
     "Jump",
     "Hands",
+    "Critical Rate",
 ];
 
 const REQ_KEYS: [&str; 6] = ["LEV", "STR", "DEX", "INT", "LUK", "FAM"];

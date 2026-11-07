@@ -30,7 +30,6 @@
     plain?: boolean;
   } = $props();
 
-  const item = $derived(read ?? tooltipOf(record!));
   const wearable = $derived(read ? !read.plain : record?.kind === "equip");
 
   const requirementKeys: [keyof Requirements, string][] = [
@@ -41,8 +40,6 @@
     ["luk", "LUK"],
     ["fam", "FAM"],
   ];
-
-  const upgraded = $derived(item.upgraded);
 
   /** The data's record for a copy read from the game, to count the slots it started with. */
   let matched = $state<ItemRecord | null>(null);
@@ -58,6 +55,29 @@
       if (key === nameKey) matched = result;
     });
   });
+
+  /**
+   * The copy as read, with what the reader missed taken from the data. Requirements, type and
+   * jobs are the same on every copy; stats and slots left are not (stats roll on a drop, failed
+   * scrolls use slots), so those only ever come from the tooltip.
+   */
+  const fromData = $derived(read && !read.plain && matched ? tooltipOf(matched) : null);
+  const filled = $derived(
+    new Set(fromData ? requirementKeys.map(([key]) => key).filter((key) => read!.requirements[key] == null) : []),
+  );
+  const item = $derived.by((): ItemTooltip => {
+    if (!read) return tooltipOf(record!);
+    if (!fromData) return read;
+    const requirements = { ...read.requirements };
+    for (const key of filled) requirements[key] = fromData.requirements[key];
+    return {
+      ...read,
+      itemType: read.itemType ?? fromData.itemType,
+      requirements,
+      jobs: read.jobs.length ? read.jobs : fromData.jobs,
+    };
+  });
+  const upgraded = $derived(item.upgraded);
 
   /**
    * Clean or scrolled. Successful scrolls show as the name's (+N) and its amber colour; failed
@@ -149,7 +169,12 @@
     <div class="chips">
       {#each requirementKeys as [key, label] (key)}
         {@const value = item.requirements[key]}
-        <span class="chip req" class:zero={!value} class:unread={value == null}>
+        <span
+          class="chip req"
+          class:zero={!value}
+          class:unread={value == null}
+          title={filled.has(key) && value != null ? "Not read from the tooltip: this is the data's value" : undefined}
+        >
           {label}<b class="tabular">{value ?? "?"}</b>
         </span>
       {/each}

@@ -102,3 +102,11 @@ export function formatDay(unixSeconds: number): string {
 export function formatMesos(value: number | null | undefined): string {
   return formatCompact(value).replace(/\.0(?=[kM])/, "");
 }
+
+/**
+ * Attack speed as the game's tooltips word it, from the data's number. Only the numbers seen
+ * beside a tooltip in Classic are named; others stay numbers rather than guess.
+ */
+export function attackSpeedName(speed: number): string | null {
+  return ({ 3: "Very Fast", 4: "Fast" } as Record<number, string>)[speed] ?? null;
+}
