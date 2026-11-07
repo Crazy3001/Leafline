@@ -2,7 +2,7 @@
 
 **A free, read-only overlay for MapleStory Classic World.** It sits beside the game and shows your EXP and meso rates, where to train and how to get there, your quests, item checks and your build plan, all from what the game already shows on screen.
 
-[**Download the latest release**](https://github.com/Crazy3001/Leafline/releases/latest) · Windows 10 and 11 · [FAQ](#faq) · [Known limitations](#known-limitations)
+[**Download the latest release**](https://github.com/Crazy3001/Leafline/releases/latest) · Windows 10 and 11 · [FAQ](#faq) · [Known limitations](#known-limitations) · [Code signing policy](#code-signing-policy)
 
 > [!WARNING]
 > **Leafline is unofficial, and you use it at your own risk.** Nexon has not said whether read-only overlays are allowed. [More on the risk](#is-it-allowed-can-i-get-banned)
@@ -63,7 +63,7 @@ Leafline only looks at the game window, the way OBS or Discord capture it, and r
 Nothing read from the game leaves your PC. Leafline only goes online to:
 
 - download the community map, monster, quest and drop data (when you ask, then weekly), and
-- ask GitHub for the latest version number at startup, if you leave the update check on. That request carries Leafline's name and version and nothing else. Nothing is downloaded or installed for you.
+- ask GitHub for the latest version number at startup, if you turn the update check on (it starts off). That request carries Leafline's name and version and nothing else. Nothing is downloaded or installed for you.
 
 Your sessions, notes, drop log, builds and settings stay in `%APPDATA%\app.leafline.overlay`, with a daily backup of the last 7 days. **Settings → Data** opens the folder.
 
@@ -155,6 +155,17 @@ Leafline ships no game data. It downloads community data on your PC when you ask
 - Player-observed drops, quest turn-ins, taxi routes and return scrolls: [mapleclassic.wiki](https://mapleclassic.wiki) contributors, CC BY-NC-SA 4.0.
 
 Game content belongs to Nexon. Leafline is unofficial and not affiliated with or endorsed by Nexon.
+
+## Code signing policy
+
+Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org). Until signing is in place, releases are unsigned.
+
+- Committers and reviewers: [Crazy3001](https://github.com/Crazy3001)
+- Approvers: [Crazy3001](https://github.com/Crazy3001)
+
+Every release is built from this repository's source by its [release workflow](.github/workflows/release.yml) on GitHub Actions, and each signing request is approved by hand.
+
+**Privacy policy:** this program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it. In detail: it downloads the community data from [OSMS Data Explorer](https://osmsdataexplorer.com) and [mapleclassic.wiki](https://mapleclassic.wiki) when you ask (then refreshes it weekly), and asks GitHub for the latest version number only if you turn the update check on. Nothing read from the game, and none of your records, is ever sent anywhere. See [Privacy](#privacy).
 
 ## Building from source
 

@@ -56,3 +56,5 @@ jobs:
             Download the `-setup.exe` (or the `.msi`) below and run it. The installer isn't code-signed yet, so Windows SmartScreen may warn: choose **More info → Run anyway**.
 
             **Use it at your own risk.** Nexon has not said whether read-only overlays are allowed; the README explains what Leafline reads, what it never does, and the one reported ban. Leafline is not affiliated with or endorsed by Nexon.
+
+            [Code signing policy](https://github.com/Crazy3001/Leafline#code-signing-policy)
