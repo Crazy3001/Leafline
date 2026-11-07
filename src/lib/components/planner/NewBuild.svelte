@@ -76,7 +76,9 @@
         start: { level: level ?? 1, stats: null, ap: 0, sp: 0, skills: [] },
         plan,
       });
-      onCreated(made);
+      // Slots the plan leaves empty get an upgrade path from the data, as Fill empty slots does.
+      const added = await backend.fillGear(made.build.id, level ?? 1).catch(() => 0);
+      onCreated((added && (await backend.buildPlan(made.build.id))) || made);
     } catch (e) {
       error = String(e);
     } finally {
@@ -156,7 +158,8 @@
     </div>
     <p class="help">
       {#if character}Character and level are read from the game.{:else}No character read yet: the build follows whoever you name.{/if}
-      Stats and skills fill in the next time Leafline reads your Character Stat and Skill windows.
+      Stats and skills fill in the next time Leafline reads your Character Stat and Skill windows. Gear slots the plan leaves
+      empty get an upgrade every 10 levels from the item data, to change in the Gear tab.
     </p>
   </section>
 
