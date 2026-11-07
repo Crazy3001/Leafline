@@ -6,7 +6,10 @@
 //! and the icon box below it. The box is see-through too and often shows only in pieces, and
 //! other see-through panels can share its shade, so it takes both to make a tooltip.
 
+use std::sync::LazyLock;
+
 use image::Rgba;
+use regex::Regex;
 
 use super::parse::ItemTooltip;
 use super::{LINE_PITCH, Panel, TARGET_TEXT_HEIGHT, parse};
@@ -40,6 +43,11 @@ const NAME_WRAP: f32 = 16.0;
 /// The bullet is a diamond this many game pixels across, 13 square game pixels in all.
 const BULLET_SIDE: f32 = 5.0;
 const BULLET_AREA: f32 = 13.0;
+
+/// A `REQ LEV : 10` line, as on throwing stars: the name ends above it and a description
+/// follows. OCR drops or garbles the `REQ` (`LEW : 10`), so a short "word : number" line counts.
+static REQ_LINE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)^(?:R[EF][QO0]\b.*|\S{2,4}\s*[:;.]\s*\d{1,3})\s*$|\bL[EF][VWY]\s*[:;.]\s*\d").unwrap());
 
 /// Tags as printed in game; a reading close to one takes its spelling.
 const TAGS: [&str; 3] = ["Quest Item", "Untradable", "One-of-a-kind"];
@@ -187,9 +195,15 @@ fn name_and_tags(lines: &[Line], unit: f32) -> (String, Vec<String>) {
     lines.sort_by(|a, b| a.rect.y.total_cmp(&b.rect.y));
     let (mut name, mut tags): (Vec<&str>, Vec<String>) = (Vec::new(), Vec::new());
     let mut previous: Option<f32> = None;
+    let mut ended = false;
     for line in lines {
         let text = trim_noise(&line.text);
-        let wraps = name.is_empty() || previous.is_some_and(|y| line.rect.y - y < NAME_WRAP * unit);
+        if !name.is_empty() && REQ_LINE.is_match(text) {
+            ended = true;
+            previous = None;
+            continue;
+        }
+        let wraps = !ended && (name.is_empty() || previous.is_some_and(|y| line.rect.y - y < NAME_WRAP * unit));
         if wraps {
             name.push(text);
             previous = Some(line.rect.y);
@@ -239,6 +253,18 @@ mod tests {
             line("Success rate: 60%, LUK +2", 888.0),
         ];
         assert_eq!(name_and_tags(&lines, 2.0), ("Earring LUK Scroll: Intermediate".to_string(), vec![]));
+    }
+
+    #[test]
+    fn a_level_line_ends_the_name() {
+        for req in ["REQ LEV : 10", "LEW : 10", "REO LEV: 10"] {
+            let lines = [
+                line("• Wolbi Throwing Stars", 1060.0),
+                line(req, 1080.0),
+                line("Throwing stars made out of", 1104.0),
+            ];
+            assert_eq!(name_and_tags(&lines, 2.0), ("Wolbi Throwing Stars".to_string(), vec![]), "{req}");
+        }
     }
 
     #[test]
