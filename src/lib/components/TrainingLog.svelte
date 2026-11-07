@@ -429,6 +429,7 @@
                     <span class="key"><span class="dot good"></span>Level up</span>
                     <span class="key"><span class="dot bad"></span>Death</span>
                     Shaded stretches are maps. Each point is the rate over the 5 minutes before it.
+                    {#if metric === "mesos"}Mesos are spread evenly between your looks at them.{/if}
                   </p>
                 {:else if timeline}
                   <p class="quiet">No graph for this session: it was saved before Leafline kept timelines, or was too short.</p>

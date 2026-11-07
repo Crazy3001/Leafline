@@ -397,7 +397,6 @@ struct Mark {
     clock: f64,
     exp: i64,
     percent: f64,
-    mesos: i64,
 }
 
 #[derive(Debug, Clone)]
@@ -509,6 +508,9 @@ pub struct SessionTracker {
     mesos_gained: i64,
     meso_seconds: f64,
     mesos_excluded: i64,
+    /// Each look at the mesos as (active clock, mesos gained by then), oldest first. Between two
+    /// looks the gain is spread evenly, since the loot came in all along, not at the second look.
+    meso_looks: VecDeque<(f64, i64)>,
 
     maps: Vec<MapTotals>,
     lines: Vec<SessionLine>,
@@ -911,7 +913,7 @@ impl SessionTracker {
     /// Notes the running totals, for the recent rates and the trend line.
     fn mark(&mut self) {
         let mark =
-            Mark { clock: self.clock, exp: self.exp_gained, percent: self.percent_gained, mesos: self.mesos_gained };
+            Mark { clock: self.clock, exp: self.exp_gained, percent: self.percent_gained };
         self.marks.push_back(mark);
         while self.marks.front().is_some_and(|m| m.clock < self.clock - RECENT_SECONDS - TREND_STEP) {
             self.marks.pop_front();
@@ -952,7 +954,7 @@ impl SessionTracker {
             at: self.clock,
             exp_per_hour: exp,
             percent_per_hour: percent,
-            mesos_per_hour: self.recent_rate(|m| m.mesos as f64),
+            mesos_per_hour: self.meso_rate_at(self.clock),
             level,
             map: self.map.clone().filter(|_| !self.town),
         });
@@ -976,6 +978,70 @@ impl SessionTracker {
         let first = self.marks.iter().find(|m| m.clock >= last.clock - RECENT_SECONDS)?;
         let seconds = last.clock - first.clock;
         (seconds >= self.config.min_rate_seconds).then(|| (total(last) - total(first)) * 3600.0 / seconds)
+    }
+
+    /// Notes a look at the mesos, then redraws the graph's points since the look before, which
+    /// could not know what was looted until now.
+    fn meso_look(&mut self, clock: f64) {
+        let total = self.mesos_gained;
+        let previous = self.meso_looks.back().copied();
+        let clock = previous.map_or(clock, |(last, _)| clock.max(last));
+        // A flat stretch needs only its two ends.
+        let len = self.meso_looks.len();
+        if len >= 2 && self.meso_looks[len - 2].1 == total && self.meso_looks[len - 1].1 == total {
+            self.meso_looks[len - 1].0 = clock;
+        } else if previous == Some((clock, total)) {
+            return;
+        } else if previous.is_some_and(|(last, _)| last == clock) {
+            self.meso_looks[len - 1].1 = total;
+        } else {
+            self.meso_looks.push_back((clock, total));
+        }
+        // Points after the look before this one may still need it, and their windows reach back
+        // one recent window further.
+        let len = self.meso_looks.len();
+        if len >= 2 {
+            let keep_from = self.meso_looks[len - 2].0 - RECENT_SECONDS;
+            while self.meso_looks.len() > 2 && self.meso_looks[1].0 <= keep_from {
+                self.meso_looks.pop_front();
+            }
+        }
+        let since = previous.map_or(f64::NEG_INFINITY, |(last, _)| last);
+        for i in (0..self.timeline.len()).rev() {
+            let at = self.timeline[i].at;
+            if at <= since {
+                break;
+            }
+            self.timeline[i].mesos_per_hour = self.meso_rate_at(at);
+        }
+    }
+
+    /// Mesos gained by this moment, spread evenly between looks. `None` outside the looks.
+    fn mesos_at(&self, clock: f64) -> Option<f64> {
+        let first = *self.meso_looks.front()?;
+        let last = *self.meso_looks.back()?;
+        if clock < first.0 || clock > last.0 {
+            return None;
+        }
+        let after = self.meso_looks.iter().position(|&(c, _)| c >= clock)?;
+        let (c1, t1) = self.meso_looks[after];
+        if after == 0 || c1 == clock {
+            return Some(t1 as f64);
+        }
+        let (c0, t0) = self.meso_looks[after - 1];
+        Some(t0 as f64 + (t1 - t0) as f64 * (clock - c0) / (c1 - c0))
+    }
+
+    /// Mesos per hour over the recent window ending at this moment. Unknown before the first
+    /// look and after the latest one, since the loot since then hasn't been seen.
+    fn meso_rate_at(&self, clock: f64) -> Option<f64> {
+        let first = self.meso_looks.front()?.0;
+        let from = (clock - RECENT_SECONDS).max(first);
+        let seconds = clock - from;
+        if seconds < self.config.min_rate_seconds {
+            return None;
+        }
+        Some((self.mesos_at(clock)? - self.mesos_at(from)?) * 3600.0 / seconds)
     }
 
     /// How many readings in a row a new amount needs. A big change is usually a digit misread,
@@ -1024,6 +1090,7 @@ impl SessionTracker {
             self.mesos_seen_at = Some(sample.at);
             self.mesos_seen_clock = Some(self.clock);
             self.exchange_seen = sample.exchange;
+            self.meso_look(self.clock);
             return;
         }
         if count < needed {
@@ -1050,8 +1117,13 @@ impl SessionTracker {
                 let line = self.line(map, level);
                 line.mesos_gained += delta;
                 line.mesos_seconds += seconds;
+                self.meso_look(run.clock);
                 self.mark();
             }
+        }
+        // The first amount, a change left out, or no change: still a look that ends a stretch.
+        if self.meso_looks.back().is_none_or(|&(clock, _)| clock < run.clock) {
+            self.meso_look(run.clock);
         }
         // A window still open now also covers the next change.
         self.exchange_seen = sample.exchange;
@@ -1208,7 +1280,7 @@ impl SessionTracker {
             seconds_to_level,
             recent_exp_per_hour: self.recent_rate(|m| m.exp as f64).filter(|_| !percent_only),
             recent_percent_per_hour: self.recent_rate(|m| m.percent),
-            recent_mesos_per_hour: self.recent_rate(|m| m.mesos as f64),
+            recent_mesos_per_hour: self.meso_looks.back().and_then(|&(clock, _)| self.meso_rate_at(clock)),
             trend: self.trend.iter().copied().collect(),
             timeline: self.timeline.clone(),
             events: self.events.clone(),
@@ -1841,6 +1913,45 @@ mod tests {
         let rate = &summary.counters[0];
         assert_eq!((rate.gained, rate.active_seconds), (2, 61.0));
         assert!(close(rate.per_hour, 118.0, 0.1), "{:?}", rate.per_hour);
+    }
+
+    /// A look at the mesos at the start, six minutes with the inventory shut, then another look.
+    fn two_looks(until: u32) -> SessionSummary {
+        let mut samples = vec![with_mesos(sample(0.0, 30, 24_000, 25.0), 1_000)];
+        samples.push(with_mesos(sample(1.0, 30, 24_000, 25.0), 1_000));
+        for step in 1..=until / 10 {
+            let at = f64::from(step * 10);
+            let s = sample(at, 30, 24_000 + u64::from(step) * 10, 25.0 + step as f32 * 10.0 / 960.0);
+            if step * 10 == 360 {
+                // A new amount needs two agreeing readings.
+                samples.push(with_mesos(s.clone(), 1_420));
+                samples.push(with_mesos(Sample { at: at + 1.0, ..s }, 1_420));
+            } else {
+                samples.push(s);
+            }
+        }
+        track(&samples)
+    }
+
+    #[test]
+    fn the_meso_graph_spreads_a_gain_over_the_time_between_looks() {
+        // Before the second look the loot is unseen, so the graph has no meso rate yet rather
+        // than a falling one.
+        let before = two_looks(350);
+        assert!(before.timeline.len() >= 5);
+        assert!(before.timeline.iter().all(|p| p.mesos_per_hour.is_none()), "{:?}", before.timeline);
+
+        // 420 mesos over 6 minutes is 4,200 an hour, all along, not a jump at the end.
+        let after = two_looks(360);
+        assert_eq!(after.mesos_gained, 420);
+        let rates: Vec<f64> = after.timeline.iter().filter_map(|p| p.mesos_per_hour).collect();
+        assert!(rates.len() >= 10, "{:?}", after.timeline);
+        assert!(rates.iter().all(|&r| (r - 4_200.0).abs() < 50.0), "{rates:?}");
+        assert!(close(after.recent_mesos_per_hour, 4_200.0, 50.0), "{:?}", after.recent_mesos_per_hour);
+
+        // Play on with the inventory shut: the new stretch waits for the next look.
+        let later = two_looks(420);
+        assert!(later.timeline.last().is_some_and(|p| p.at > 370.0 && p.mesos_per_hour.is_none()));
     }
 
     #[test]

@@ -297,6 +297,7 @@
       />
       <p class="caption">
         Each point is the rate over the 5 minutes before it.
+        {#if metric === "mesos"}Mesos are spread evenly between your looks at them, so the line reaches only your last look.{/if}
         {#if session.events?.length}Green dots are level-ups, red ones deaths.{/if}
       </p>
     {:else}
