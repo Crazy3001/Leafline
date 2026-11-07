@@ -7,6 +7,7 @@
 
   import { backend } from "$lib/api";
   import Logo from "$lib/components/Logo.svelte";
+  import NextStep from "$lib/components/NextStep.svelte";
   import { formatCompact, formatDuration, objectiveProgress } from "$lib/format";
   import { live } from "$lib/readings.svelte";
   import { display, keyHint } from "$lib/settings.svelte";
@@ -133,6 +134,8 @@
       <span class="tile-value num" data-tauri-drag-region>{formatDuration(session?.secondsToLevel)}</span>
     </span>
   </div>
+
+  <NextStep variant="hud" />
 
   {#if objectives.length}
     <ul class="counters">

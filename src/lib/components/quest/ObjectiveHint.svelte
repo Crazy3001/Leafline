@@ -8,6 +8,8 @@
   import { showMonsterNamed } from "$lib/monsters.svelte";
   import { travelKey } from "$lib/settings.svelte";
   import RouteSteps from "$lib/components/map/RouteSteps.svelte";
+  import GoButton from "$lib/components/GoButton.svelte";
+  import { mapPlace } from "$lib/destination.svelte";
   import type { HuntingGround, MapRef, MapRoute, ObjectiveGuide } from "$lib/types";
 
   let { guide, from }: { guide: ObjectiveGuide; from: MapRef | null } = $props();
@@ -57,23 +59,26 @@
 </script>
 
 {#if top && best}
-  <button class="hint" aria-expanded={open} onclick={() => (open = !open)}>
-    <span class="icon"><Crosshair size={11} /></span>
-    <span class="line">
-      {#if guide.kind === "item"}
-        <span class="who">{top.monster.name}</span>
-        {#if top.drop}<span class="muted" title={rateTitle(top.drop)}>{rate(top.drop.rate)}</span>{/if}
-        <span class="sep">·</span>
+  <div class="hint-row">
+    <button class="hint" aria-expanded={open} onclick={() => (open = !open)}>
+      <span class="icon"><Crosshair size={11} /></span>
+      <span class="line">
+        {#if guide.kind === "item"}
+          <span class="who">{top.monster.name}</span>
+          {#if top.drop}<span class="muted" title={rateTitle(top.drop)}>{rate(top.drop.rate)}</span>{/if}
+          <span class="sep">·</span>
+        {/if}
+        <span class="where">{best.map.name}</span>
+      </span>
+      {#if best.travel}
+        <span class="far tabular shortcut" title="{distance(best)}, via {best.travel.via.name}">{best.travel.hops} with travel</span>
+      {:else if best.hops != null}
+        <span class="far tabular">{distance(best)}</span>
       {/if}
-      <span class="where">{best.map.name}</span>
-    </span>
-    {#if best.travel}
-      <span class="far tabular shortcut" title="{distance(best)}, via {best.travel.via.name}">{best.travel.hops} with travel</span>
-    {:else if best.hops != null}
-      <span class="far tabular">{distance(best)}</span>
-    {/if}
-    <span class="chevron" class:open><ChevronRight size={11} /></span>
-  </button>
+      <span class="chevron" class:open><ChevronRight size={11} /></span>
+    </button>
+    {#if best.hops !== 0}<GoButton place={mapPlace(best.map)} />{/if}
+  </div>
 
   {#if open}
     <div class="detail">
@@ -88,7 +93,7 @@
           </div>
           <ul class="maps">
             {#each hunt.maps as ground (ground.map.id)}
-              <li>
+              <li class="ground-row">
                 <button
                   class="ground"
                   class:selected={ground.map.id === target}
@@ -104,6 +109,7 @@
                     >{distance(ground)}</span
                   >
                 </button>
+                {#if ground.hops !== 0}<GoButton place={mapPlace(ground.map)} />{/if}
               </li>
             {/each}
           </ul>
@@ -150,6 +156,30 @@
     font-size: var(--text-sm);
     text-align: left;
     cursor: pointer;
+  }
+
+  .hint-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin: 5px 0 0;
+  }
+
+  .hint-row .hint {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+  }
+
+  .ground-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .ground-row .ground {
+    flex: 1;
+    min-width: 0;
   }
 
   button.hint:hover {

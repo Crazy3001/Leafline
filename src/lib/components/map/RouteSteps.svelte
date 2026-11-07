@@ -4,7 +4,8 @@
   import { CarTaxiFront, EyeOff, ScrollText } from "@lucide/svelte";
 
   import { formatNumber } from "$lib/format";
-  import type { Direction, MapRoute, RouteStep, Side } from "$lib/types";
+  import type { MapRoute } from "$lib/types";
+  import { stepVerb as verb } from "$lib/wayfinding";
 
   let {
     route,
@@ -14,16 +15,6 @@
     /** Opens a map named in a step; without it the names are plain text. */
     onnavigate?: (id: number) => void;
   } = $props();
-
-  const verbs: Record<Direction, string> = {
-    west: "West portal",
-    east: "East portal",
-    in: "Go in",
-    out: "Go out",
-    other: "Portal",
-  };
-  const sides: Record<Side, string> = { left: "Left portal", centre: "Middle portal", right: "Right portal" };
-  const verb = (step: RouteStep) => (step.side ? sides[step.side] : verbs[step.direction]);
 
   const rides =$derived(route.steps.filter((s) => s.travel).length);
   const portals = $derived(route.steps.length - rides);

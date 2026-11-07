@@ -6,6 +6,7 @@ mod launch;
 mod layout;
 mod live;
 mod mapdata;
+mod nav;
 mod overlay;
 mod pins;
 mod readings;
@@ -31,6 +32,7 @@ pub const BROWSER_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartSc
 use launch::LaunchImage;
 use live::LiveState;
 use mapdata::MapDataState;
+use nav::NavState;
 use overlay::{OVERLAY, OverlayState, WORKBENCH};
 use pins::PinState;
 use readings::Readings;
@@ -74,6 +76,7 @@ pub fn run() {
             if let Some(overlay) = app.get_webview_window(OVERLAY) {
                 snap::attach(&overlay)?;
             }
+            app.manage(NavState::load(app.handle())?);
             app.manage(PinState::load(app.handle())?);
             pins::restore(app.handle())?;
             tray::create(app)?;
@@ -222,6 +225,10 @@ pub fn run() {
             mapdata::find_npc,
             mapdata::npc_sheet,
             mapdata::show_place,
+            nav::destination,
+            nav::set_destination,
+            nav::arrive_at,
+            nav::forget_destination,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Leafline");

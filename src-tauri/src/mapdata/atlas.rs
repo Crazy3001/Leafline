@@ -4,7 +4,7 @@
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, HashMap, VecDeque};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use strsim::normalized_levenshtein;
 
 use super::osms::{Dataset, Height, MapRecord, MonsterRecord, NO_MAP, QuestRecord, Side};
@@ -53,8 +53,8 @@ impl Direction {
     }
 }
 
-/// A map named in a card or route.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+/// A map named in a card or route. Read back too, as part of a place to head for.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MapRef {
     pub id: u32,

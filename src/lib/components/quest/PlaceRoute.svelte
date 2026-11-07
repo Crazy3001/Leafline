@@ -1,5 +1,7 @@
 <script lang="ts">
   // The map a quest step happens on, with the way there from where the character is.
+  import GoButton from "$lib/components/GoButton.svelte";
+  import { mapPlace, npcPlace } from "$lib/destination.svelte";
   import { Route } from "@lucide/svelte";
 
   import RouteSteps from "$lib/components/map/RouteSteps.svelte";
@@ -7,7 +9,18 @@
   import { travelKey } from "$lib/settings.svelte";
   import type { MapRef, MapRoute } from "$lib/types";
 
-  let { maps, from }: { maps: MapRef[]; from: MapRef | null } = $props();
+  let {
+    maps,
+    from,
+    npc = null,
+  }: {
+    maps: MapRef[];
+    from: MapRef | null;
+    /** Who stands there, so "Go" heads for them on whichever of the maps is nearest. */
+    npc?: string | null;
+  } = $props();
+
+  const place = $derived(npc ? npcPlace(npc, maps) : maps[0]?.known ? mapPlace(maps[0]) : null);
 
   let open = $state(false);
   let route = $state<MapRoute | null>(null);
@@ -37,6 +50,7 @@
     <span>
       {#each maps as m, k (m.id)}{#if k}{", "}{/if}{#if m.known}<button class="ref ref-map" onclick={() => backend.showPlace("maps", m.id)}>{m.name}</button>{:else}{m.name}{/if}{/each}
     </span>
+    {#if !here}<GoButton {place} />{/if}
     {#if here}
       <span class="here">you're here</span>
     {:else if from}

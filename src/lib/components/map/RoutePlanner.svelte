@@ -2,6 +2,8 @@
   // "Route to…": the fewest portals from this map to another, as steps the player walks.
   import { Flag, X } from "@lucide/svelte";
 
+  import GoButton from "$lib/components/GoButton.svelte";
+  import { mapPlace } from "$lib/destination.svelte";
   import { backend } from "$lib/api";
   import { display, travelKey } from "$lib/settings.svelte";
   import type { MapRef, MapRoute } from "$lib/types";
@@ -39,6 +41,7 @@
   <div class="target">
     <Flag size={12} />
     <span class="to">To <strong>{target.name}</strong></span>
+    <GoButton place={mapPlace(target)} />
     <button class="clear" title="Clear the route" onclick={() => (target = null)}><X size={12} /></button>
   </div>
   {#if route}

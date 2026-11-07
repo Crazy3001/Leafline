@@ -6,6 +6,9 @@
   import MapDataPanel from "./map/MapDataPanel.svelte";
   import MapDetailsView from "./map/MapDetailsView.svelte";
   import MapPicker from "./map/MapPicker.svelte";
+  import GoTo from "./map/GoTo.svelte";
+  import GoButton from "./GoButton.svelte";
+  import { mapPlace } from "$lib/destination.svelte";
   import { backend } from "$lib/api";
   import { formatCompact, formatDuration, mapLabel } from "$lib/format";
   import { mapData, watchMapData } from "$lib/mapdata.svelte";
@@ -97,7 +100,7 @@
       <div class="names">
         {#if browsing}
           {#if browsing.map.street}<div class="street">{browsing.map.street}</div>{/if}
-          <div class="name">{browsing.map.name}</div>
+          <div class="name">{browsing.map.name} <GoButton place={mapPlace(browsing.map)} /></div>
         {:else if found}
           {#if found.card.map.street}<div class="street">{found.card.map.street}</div>{/if}
           <div class="name">{found.card.map.name}</div>
@@ -130,6 +133,11 @@
     </div>
   {/if}
 
+  <!-- Setting a place is done in the tab; a pinned window follows it in the Route pin. -->
+  {#if ready && variant !== "glance"}
+    <div class="goto"><GoTo /></div>
+  {/if}
+
   {#if shown}
     <MapNote mapId={shown.map.id} name={shown.map.name} />
     {#key shown.map.id}
@@ -151,6 +159,10 @@
 </Card>
 
 <style>
+  .goto {
+    margin: var(--space-2) 0;
+  }
+
   .where {
     display: flex;
     align-items: center;
