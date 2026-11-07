@@ -2,7 +2,7 @@
   // The build plan's part of the Character tab: what the plan says at the character's level. It
   // moves on with the level, and catches up with what was really spent whenever the stat and
   // skill windows are read. The level itself is shown once, in the character's header above.
-  import { ExternalLink, Pencil, RefreshCw } from "@lucide/svelte";
+  import { Check, ExternalLink, Pencil, Plus, RefreshCw, Search, X } from "@lucide/svelte";
   import { untrack } from "svelte";
 
   import AdvancementChecklist from "./AdvancementChecklist.svelte";
@@ -12,7 +12,7 @@
   import { STATS, buildState, statLabel, watchBuilds } from "$lib/builds.svelte";
   import { OSMS_CREDIT, OSMS_URL, mapData, watchMapData } from "$lib/mapdata.svelte";
   import { display, keyHint } from "$lib/settings.svelte";
-  import type { BuildPlan, LevelStep } from "$lib/types";
+  import type { BuildPlan, GearItem, LevelStep } from "$lib/types";
   import Segmented from "$lib/ui/Segmented.svelte";
 
   let {
@@ -81,8 +81,47 @@
   const views = $derived([
     { id: "plan" as View, label: "Plan" },
     ...(canAdvance ? [{ id: "advance" as View, label: "Advancement" }] : []),
-    { id: "gear" as View, label: "Gear" },
+    { id: "gear" as View, label: "My build" },
   ]);
+
+  // My build's equipment: added from the search here, the suggestions, or Lookup, and taken out here.
+  const SEARCH_DELAY = 120;
+  const FOUND_SHOWN = 6;
+  let gearText = $state("");
+  let gearFound = $state<GearItem[]>([]);
+  /** The text the shown results answer, so "nothing found" waits for the answer. */
+  let searched = $state("");
+  let goalError = $state<string | null>(null);
+
+  $effect(() => {
+    const text = gearText;
+    const job = plan?.build.plan.job ?? 0;
+    if (text.trim().length < 2) {
+      gearFound = [];
+      searched = "";
+      return;
+    }
+    const timer = setTimeout(() => {
+      backend
+        .searchGear(text, job)
+        .then((found) => {
+          if (text !== gearText) return;
+          gearFound = found.slice(0, FOUND_SHOWN);
+          searched = text;
+        })
+        .catch(() => {});
+    }, SEARCH_DELAY);
+    return () => clearTimeout(timer);
+  });
+
+  async function setGoal(id: number, wanted: boolean) {
+    try {
+      await backend.setGearGoal(id, wanted, character);
+      goalError = null;
+    } catch (e) {
+      goalError = String(e);
+    }
+  }
   const shown = $derived(view === "advance" && !canAdvance ? "plan" : view);
 
   function storedView(): View {
@@ -241,23 +280,55 @@
         {character}
       />
     {:else}
+    <!-- My build: the equipment the plan aims for, the same list "Add to my build" in Lookup adds to. -->
     {#if plan.expansion.gear.length}
-      <h4 class="sub">Gear goals</h4>
-        <ul class="goals">
-          {#each plan.expansion.gear as check (check.item.id)}
-            <li>
-              <button class="ref ref-item" onclick={() => backend.showItem(check.item.id, null)}
-                >{check.item.name}</button
-              >
-              <span class="tabular" class:warn={!check.usable || check.level == null}>
-                {#if !check.usable}Wrong job{:else if check.level != null}Lv {check.level}{:else}Out of reach{/if}
-              </span>
-            </li>
-          {/each}
-        </ul>
+      <ul class="goals">
+        {#each plan.expansion.gear as check (check.item.id)}
+          <li>
+            <span class="goal-name">
+              <button class="ref ref-item" onclick={() => backend.showItem(check.item.id, null)}>{check.item.name}</button>
+              <span class="slot">{check.item.slot}</span>
+            </span>
+            <span class="tabular when" class:warn={!check.usable || check.level == null}>
+              {#if !check.usable}Wrong job{:else if check.level != null}Lv {check.level}{:else}Out of reach{/if}
+            </span>
+            <button
+              class="remove"
+              title="Take it out of my build"
+              aria-label="Take {check.item.name} out of my build"
+              onclick={() => setGoal(check.item.id, false)}><X size={12} /></button
+            >
+          </li>
+        {/each}
+      </ul>
+    {:else}
+      <p class="quiet-line">No equipment yet. Add some below, or with <strong>Add to my build</strong> on an item in Lookup.</p>
     {/if}
+    {#if goalError}<p class="goal-error">{goalError}</p>{/if}
+
+    <label class="find">
+      <Search size={13} />
+      <input type="search" placeholder="Add equipment: type a name" aria-label="Find equipment to add" bind:value={gearText} />
+    </label>
+    {#if gearFound.length}
+      <ul class="found">
+        {#each gearFound as item (item.id)}
+          {@const added = plan.build.plan.gear.includes(item.id)}
+          <li>
+            <button disabled={added} onclick={() => setGoal(item.id, true)} title={added ? "Already in my build" : "Add to my build"}>
+              <span class="found-name">{item.name}</span>
+              <small>{item.slot}{item.reqLevel ? ` · Lv ${item.reqLevel}` : ""}</small>
+              {#if added}<Check size={12} />{:else}<Plus size={12} />{/if}
+            </button>
+          </li>
+        {/each}
+      </ul>
+    {:else if gearText.trim().length >= 2 && searched === gearText}
+      <p class="quiet-line">No equipment by that name for this job.</p>
+    {/if}
+
     <h4 class="sub">Gear to look for</h4>
-    <GearPicks build={plan.build.id} level={at} />
+    <GearPicks build={plan.build.id} level={at} onAdd={(item) => setGoal(item.id, true)} />
     {/if}
 
     <footer>
@@ -502,9 +573,142 @@
 
   .goals li {
     display: flex;
-    justify-content: space-between;
+    align-items: center;
     gap: 8px;
-    padding: 2px 0;
+    padding: 3px 0;
+  }
+
+  .goals li + li {
+    border-top: 1px solid var(--border);
+  }
+
+  .goals .goal-name {
+    display: flex;
+    flex: 1;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 6px;
+    min-width: 0;
+  }
+
+  .goals .slot {
+    color: var(--faint);
+    font-size: var(--text-xs);
+  }
+
+  .goals .when {
+    margin-left: auto;
+  }
+
+  .goals .remove {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border-radius: var(--radius-sm);
+    color: var(--faint);
+  }
+
+  .goals .remove:hover,
+  .goals .remove:focus-visible {
+    background: rgba(255, 255, 255, 0.07);
+    color: var(--text);
+    text-decoration: none;
+  }
+
+  .quiet-line {
+    margin: 0 0 4px;
+    color: var(--faint);
+    font-size: var(--text-sm);
+  }
+
+  .quiet-line strong {
+    color: var(--muted);
+    font-weight: 600;
+  }
+
+  .goal-error {
+    margin: 4px 0 0;
+    color: var(--bad);
+    font-size: var(--text-sm);
+  }
+
+  .find {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 28px;
+    margin-top: 10px;
+    padding: 0 8px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--faint);
+  }
+
+  .find:focus-within {
+    border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  }
+
+  .find input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--text);
+    font-size: var(--text-sm);
+  }
+
+  .found {
+    margin-top: 4px;
+    border: 1px solid var(--border);
+  }
+
+  .found li + li {
+    border-top: 1px solid var(--border);
+  }
+
+  .found button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 5px 8px;
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    font-size: var(--text-sm);
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .found button:hover:not(:disabled) {
+    background: var(--surface-2);
+  }
+
+  .found button:disabled {
+    color: var(--muted);
+    cursor: default;
+  }
+
+  .found .found-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .found small {
+    flex: none;
+    color: var(--faint);
+  }
+
+  .found :global(svg) {
+    flex: none;
+    color: var(--accent);
   }
 
   .goals button {
