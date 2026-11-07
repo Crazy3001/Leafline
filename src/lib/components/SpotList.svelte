@@ -252,7 +252,7 @@
     class="save"
     class:on={isSaved}
     aria-pressed={isSaved}
-    title={isSaved ? "Remove from your spots" : "Save to your spots: kept in this list whatever your level"}
+    title={isSaved ? "Remove from your spots" : "Save to your spots"}
     aria-label={isSaved ? `Remove ${name} from your spots` : `Save ${name} to your spots`}
     onclick={() => toggleSaved(mapId, name)}
   >
@@ -264,14 +264,14 @@
   {#snippet aside()}
     <span
       class="help"
-      title="Your rate is what Leafline measured in your own sessions. Estimates scale a map's base EXP by how your measured maps compare with theirs. Base numbers come from OSMS map data and leave out EXP events, party bonus and respawn speed. Maps reached only through an NPC, such as party quests, are left out."
+      title="Your rate is measured in your own sessions. Other maps are estimated from the map data, without EXP events, party bonus or respawn speed."
     >
       <CircleHelp size={13} />
     </span>
     {#if readLevel != null}
       <span class="tabular">For Lv {readLevel}</span>
     {:else}
-      <span class="stepper" title="The HUD isn't in view, so set your level">
+      <span class="stepper">
         Lv
         <button aria-label="Lower level" onclick={() => setLevel((manualLevel ?? 2) - 1)}><Minus size={10} /></button>
         <input

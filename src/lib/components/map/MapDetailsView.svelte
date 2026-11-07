@@ -68,7 +68,7 @@
 {#if !glance}
   <Section title="Exits" count={details.exits.length}>
     {#snippet aside()}
-      {#if placed}<span title="Roughly which part of the map each portal is in, from the map data">rough positions</span>{/if}
+      {#if placed}<span>rough positions</span>{/if}
     {/snippet}
     <ConnectionCompass exits={details.exits} map={details.map} {current} {onnavigate} />
   </Section>

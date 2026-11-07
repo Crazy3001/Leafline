@@ -60,7 +60,7 @@
     <span>Map</span>
     {#if counted}<span title="How many of it spawn, out of every monster on the map">It / all</span>{/if}
     {#if from && places.length > 1}
-      <button class:on={nearest} title={nearest ? "Show the best maps first" : "Show the closest maps first"} aria-pressed={nearest} onclick={() => (nearest = !nearest)}>Nearest</button>
+      <button class:on={nearest} aria-pressed={nearest} onclick={() => (nearest = !nearest)}>Nearest</button>
     {/if}
   </div>
   <ul class="maps">
@@ -69,7 +69,7 @@
         <button class="ground" class:selected={map.map.id === target} aria-pressed={map.map.id === target} onclick={() => (picked = map.map.id)}>
           <span class="name">{map.map.name}</span>
           {#if map.count != null}
-            <span class="count tabular" title="{map.count} spawn, {share(map)}">{map.count}<small>/{map.mapTotal}</small></span>
+            <span class="count tabular">{map.count}<small>/{map.mapTotal}</small></span>
           {/if}
           <span
             class="dist tabular"
@@ -85,7 +85,7 @@
   {/if}
 
   {#if ground?.pace}
-    <p class="note" title="From the EXP you measured here, assuming you defeat its monsters in proportion to how many spawn, at the map data's base EXP.">
+    <p class="note">
       About {formatCompact(ground.pace.killsPerHour)} an hour at your measured pace here
     </p>
   {/if}

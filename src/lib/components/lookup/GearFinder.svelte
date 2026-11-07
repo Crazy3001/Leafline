@@ -104,14 +104,14 @@
 
 <div class="ahead">
   {#if baseLevel != null}
-    <div role="radiogroup" aria-label="Levels to look ahead" title="See what you could wear this many levels from now">
+    <div role="radiogroup" aria-label="Levels to look ahead">
       {#each AHEAD as levels (levels)}
         <button role="radio" aria-checked={gearView.ahead === levels} onclick={() => (gearView.ahead = levels)}>{levels ? `+${levels}` : "Now"}</button>
       {/each}
     </div>
   {/if}
   {#if changed}<button class="plain" onclick={reset}>Reset</button>{/if}
-  <button class="plain everything" title="List all equipment, whoever it's for" onclick={() => (gearView.forMe = false)}>Everything</button>
+  <button class="plain everything" onclick={() => (gearView.forMe = false)}>Everything</button>
 </div>
 
 <Chips label="Slot" options={offered} value={slot} onselect={onslot} />

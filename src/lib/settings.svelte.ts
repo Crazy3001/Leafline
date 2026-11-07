@@ -11,8 +11,6 @@ export const DEFAULT_RULES: BuildRules = {
   advancementSp: 1,
   firstJobLevel: 10,
   secondJobLevel: 30,
-  secondSpBuysFirst: false,
-  gearCounts: true,
 };
 
 export const display = $state<DisplaySettings>({

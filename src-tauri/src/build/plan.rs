@@ -334,21 +334,19 @@ struct SkillGoal {
     tier: u32,
 }
 
-/// SP waiting to be spent. Each kind buys only its own tier's skills, unless the rules let
-/// 2nd-job SP buy 1st-job skills too.
+/// SP waiting to be spent. Each kind buys only its own tier's skills.
 #[derive(Default)]
 struct SkillPoints {
     beginner: u32,
     first: u32,
     second: u32,
-    second_buys_first: bool,
 }
 
 impl SkillPoints {
     fn can_buy(&self, tier: u32) -> bool {
         match tier {
             0 => self.beginner > 0,
-            1 => self.first > 0 || (self.second_buys_first && self.second > 0),
+            1 => self.first > 0,
             _ => self.second > 0,
         }
     }
@@ -383,7 +381,7 @@ pub fn expand(build: &Build, rules: &Rules, catalog: &Catalog) -> Expansion {
 
     let mut stats = build.start.stats.unwrap_or_default();
     let mut ap = build.start.ap;
-    let mut sp = SkillPoints { second_buys_first: rules.second_sp_buys_first, ..SkillPoints::default() };
+    let mut sp = SkillPoints::default();
     if start >= second_job {
         sp.second = build.start.sp;
     } else if start >= first_job {
@@ -443,7 +441,7 @@ pub fn expand(build: &Build, rules: &Rules, catalog: &Catalog) -> Expansion {
         });
     }
 
-    let gear = check_gear(build, catalog, rules, branch, &mut steps, &mut problems);
+    let gear = check_gear(build, catalog, branch, &mut steps, &mut problems);
     problems.extend(end_notes(build, &goals, &skills, &stats, catalog, end, ap, sp.left()));
     let mut skills: Vec<SkillLevel> = skills.into_iter().map(|(skill_id, level)| SkillLevel { skill_id, level }).collect();
     skills.sort_by_key(|s| s.skill_id);
@@ -611,7 +609,6 @@ pub(super) fn piece_bonus(stats: &[(String, i64)]) -> Stats {
 fn check_gear(
     build: &Build,
     catalog: &Catalog,
-    rules: &Rules,
     branch: Option<Branch>,
     steps: &mut [LevelStep],
     problems: &mut Vec<Problem>,
@@ -632,14 +629,14 @@ fn check_gear(
     }
 
     let known = build.start.stats.is_some();
-    // What the character wears now counts from the start, with its own stats.
-    let mut worn: Vec<Worn> = Vec::new();
-    if rules.gear_counts {
-        for piece in &build.start.pieces {
-            let bonus = piece_bonus(&piece.data_stats(catalog));
-            worn.push(Worn { slot: piece.slot(catalog), bonus });
-        }
-    }
+    // What the character wears now counts from the start, with its own stats. Worn gear's
+    // stats count toward other gear's requirements, never an item's own.
+    let mut worn: Vec<Worn> = build
+        .start
+        .pieces
+        .iter()
+        .map(|piece| Worn { slot: piece.slot(catalog), bonus: piece_bonus(&piece.data_stats(catalog)) })
+        .collect();
     for step in steps.iter_mut() {
         loop {
             let wearable = gear.iter().position(|check: &GearCheck| {
@@ -651,10 +648,8 @@ fn check_gear(
             let check = &mut gear[i];
             check.level = Some(step.level);
             step.gear.push(check.item.name.clone());
-            if rules.gear_counts {
-                worn.retain(|w| !Piece::clashes(&w.slot, &check.item.slot));
-                worn.push(Worn { slot: check.item.slot.clone(), bonus: bonus_of(&check.item) });
-            }
+            worn.retain(|w| !Piece::clashes(&w.slot, &check.item.slot));
+            worn.push(Worn { slot: check.item.slot.clone(), bonus: bonus_of(&check.item) });
         }
         step.worn = worn.clone();
     }
@@ -815,17 +810,13 @@ mod tests {
     }
 
     #[test]
-    fn second_job_sp_buys_first_job_skills_only_if_the_rules_say_so() {
+    fn second_job_sp_doesnt_buy_first_job_skills() {
         let mut plan = build(vec![goal(THROW, 20)], vec![stat(Stat::Luk, None)], 31);
         plan.start.level = 29;
         plan.start.skills = vec![goal(TOSS, 3)];
         let e = run(&plan);
         assert_eq!(step(&e, 30).sp.iter().map(|s| (s.skill_id, s.to)).collect::<Vec<_>>(), [(THROW, 3)], "Lv 30's own SP is 1st-job");
         assert!(step(&e, 31).sp.is_empty());
-
-        let rules = Rules { second_sp_buys_first: true, ..Rules::default() };
-        let e = expand(&plan, &rules, &catalog());
-        assert_eq!(step(&e, 31).sp[0].to, 7, "the advancement's point and Lv 31's three");
     }
 
     #[test]
@@ -998,15 +989,6 @@ mod tests {
         let e = expand(&plan, &Rules::default(), &catalog);
         assert_eq!(e.gear[1].level, None);
         assert_eq!(e.gear[0].level, None);
-    }
-
-    #[test]
-    fn gear_can_be_left_out_of_requirements_by_the_rules() {
-        let (plan, catalog) = hat_and_dagger(0);
-        let rules = Rules { gear_counts: false, ..Rules::default() };
-        let e = expand(&plan, &rules, &catalog);
-        assert_eq!((e.gear[0].level, e.gear[1].level), (None, Some(10)));
-        assert!(step(&e, 12).worn.is_empty());
     }
 
     #[test]

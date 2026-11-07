@@ -206,7 +206,7 @@
       <span class="actions">
         {#if live.liveStatus.state === "reading"}
           <button
-            title="Save this game picture on this PC, to report a misread{keyHint('SaveFrame')}"
+            title="Save frame{keyHint('SaveFrame')}"
             aria-label="Save game picture"
             onclick={saveFrame}
           >
@@ -219,7 +219,7 @@
           </button>
         {/if}
         <button
-          title="Desk view: every panel side by side in one window you can put anywhere"
+          title="Desk view"
           aria-label="Desk view"
           onclick={() => backend.showDesk()}
         >
@@ -240,7 +240,7 @@
             ? hotkey("ToggleClickThrough")
               ? `Unlock with ${hotkey("ToggleClickThrough")}`
               : "Unlock: set a Lock hotkey in Settings, or use the tray menu"
-            : `Lock: clicks pass through to the game${keyHint("ToggleClickThrough")}`}
+            : `Lock, so clicks pass through to the game${keyHint("ToggleClickThrough")}`}
           class:active={live.status.clickThrough}
           onclick={toggleLock}
         >
@@ -289,9 +289,7 @@
       <button
         class="pin"
         class:active={pinned}
-        title={pinned
-          ? `Unpin ${panelInfo(tab).title}`
-          : `Pin ${panelInfo(tab).title}: keep it on screen in its own window, even when the overlay is hidden`}
+        title={pinned ? `Unpin ${panelInfo(tab).title}` : `Pin ${panelInfo(tab).title} in its own window`}
         onclick={togglePin}
       >
         {#if pinned}<PinOff size={14} />{:else}<Pin size={14} />{/if}

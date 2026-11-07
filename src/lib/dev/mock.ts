@@ -33,8 +33,6 @@ import type {
   LiveStatus,
   TravelFile,
   TravelInfo,
-  PriceEntry,
-  PriceLog,
   Guide,
   TrainingSpots,
   MapDataStatus,
@@ -119,37 +117,6 @@ const notes = new Map<string, ItemNote>([
   ["green robin hat", { item: "Green Robin Hat", note: "Keep for a 60% DEX scroll.", updatedAt: Date.now() / 1000 - 86_400 }],
 ]);
 
-/** Prices logged in this browser tab; made-up starting records for one item. */
-const now = Date.now() / 1000;
-let prices: PriceEntry[] = [
-  { id: 1, item: "Green Robin Hat", upgrades: 1, slots: 6, stats: "DEX +2, Weapon Def. +21", price: 85_000, kind: "traded", note: null, recordedAt: now - 86400 * 6 },
-  { id: 2, item: "Green Robin Hat", upgrades: null, slots: 7, stats: "", price: 30_000, kind: "asking", note: "FM shop", recordedAt: now - 86400 * 3 },
-  { id: 3, item: "Green Robin Hat", upgrades: 1, slots: 6, stats: "DEX +2, Weapon Def. +21", price: 95_000, kind: "asking", note: null, recordedAt: now - 86400 },
-];
-
-function mockLog(item: string, upgrades: number | null, slots: number | null): PriceLog {
-  const entries = prices.filter((p) => p.item.toLowerCase() === item.toLowerCase()).sort((a, b) => b.recordedAt - a.recordedAt);
-  const summary = (list: PriceEntry[]) => {
-    if (!list.length) return null;
-    const sorted = list.map((p) => p.price).sort((a, b) => a - b);
-    const n = sorted.length;
-    return {
-      count: n,
-      traded: list.filter((p) => p.kind === "traded").length,
-      median: n % 2 ? sorted[(n - 1) / 2] : Math.ceil((sorted[n / 2 - 1] + sorted[n / 2]) / 2),
-      low: sorted[0],
-      high: sorted[n - 1],
-      firstAt: Math.min(...list.map((p) => p.recordedAt)),
-      lastAt: Math.max(...list.map((p) => p.recordedAt)),
-    };
-  };
-  return {
-    item: entries.at(-1)?.item ?? null,
-    entries,
-    all: summary(entries),
-    likeThis: summary(entries.filter((p) => (p.upgrades ?? 0) === (upgrades ?? 0) && p.slots === slots)),
-  };
-}
 
 /** Saved sessions: a made-up week on the sample world's maps. */
 let savedSessions: SavedSession[] = [...sampleSavedSessions];
@@ -245,7 +212,7 @@ let displaySettings: DisplaySettings = {
   framesFolder: null,
   setupDone: true,
   updateCheck: false,
-  buildRules: { apPerLevel: 5, spPerLevel: 3, beginnerSpPerLevel: 1, advancementSp: 1, firstJobLevel: 10, secondJobLevel: 30, secondSpBuysFirst: false, gearCounts: true },
+  buildRules: { apPerLevel: 5, spPerLevel: 3, beginnerSpPerLevel: 1, advancementSp: 1, firstJobLevel: 10, secondJobLevel: 30 },
 };
 
 /** A made-up job tree and equipment, in the shapes the real data has. None of it is game data. */
@@ -688,14 +655,6 @@ export const mockBackend: Backend = {
     mapDataHandlers.push(handler);
     return () => {};
   },
-  priceLog: async (item, upgrades, slots) => mockLog(item, upgrades, slots),
-  async recordPrice(price) {
-    prices.push({ ...price, id: Math.max(0, ...prices.map((p) => p.id)) + 1, recordedAt: Date.now() / 1000 });
-    return mockLog(price.item, price.upgrades, price.slots);
-  },
-  async deletePrice(id) {
-    prices = prices.filter((p) => p.id !== id);
-  },
   savedSpots: async () => [...savedSpots],
   async setSpotSaved(mapId, name, saved) {
     savedSpots = savedSpots.filter((s) => s.mapId !== mapId);
@@ -829,7 +788,7 @@ export const mockBackend: Backend = {
     return () => {};
   },
   async exportCsv(what) {
-    return what === "prices" ? prices.length : what === "drops" ? drops.length : savedSessions.length;
+    return what === "drops" ? drops.length : savedSessions.length;
   },
   buildCatalog: async () => (mapStatus.ready ? mockCatalog : null),
   starterPlans: async () =>
@@ -1106,7 +1065,7 @@ export const mockBackend: Backend = {
     return { level, rankedBy: ["Attack", "LUK", "DEX", "Weapon Def."], slots };
   },
   listBuilds: async () =>
-    [...mockBuilds].sort((a, b) => b.usedAt - a.usedAt).map(({ id, name, character }) => ({ id, name, character, updatedAt: now })),
+    [...mockBuilds].sort((a, b) => b.usedAt - a.usedAt).map(({ id, name, character }) => ({ id, name, character, updatedAt: Date.now() / 1000 })),
   async buildPlan(id) {
     const build = mockBuilds.find((b) => b.id === id);
     return build ? mockPlan(build) : null;

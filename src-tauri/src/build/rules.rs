@@ -58,10 +58,6 @@ pub struct Rules {
     pub advancement_sp: u32,
     pub first_job_level: u32,
     pub second_job_level: u32,
-    /// Whether 2nd-job SP can buy 1st-job skills.
-    pub second_sp_buys_first: bool,
-    /// Whether stats from other worn gear count toward a requirement. An item's own never do.
-    pub gear_counts: bool,
 }
 
 impl Default for Rules {
@@ -73,8 +69,6 @@ impl Default for Rules {
             advancement_sp: 1,
             first_job_level: 10,
             second_job_level: 30,
-            second_sp_buys_first: false,
-            gear_counts: true,
         }
     }
 }
@@ -105,7 +99,6 @@ impl Rules {
             advancement_sp: self.advancement_sp.min(50),
             first_job_level: level(self.first_job_level),
             second_job_level: level(self.second_job_level),
-            ..self
         }
     }
 }
@@ -126,11 +119,13 @@ mod tests {
 
     #[test]
     fn a_saved_file_missing_new_rules_keeps_the_defaults() {
-        let rules: Rules = serde_json::from_str(r#"{"apPerLevel": 4, "manualApLevel": 11}"#).unwrap();
+        // `gearCounts` and `secondSpBuysFirst` were switches once; old files still carry them.
+        let rules: Rules =
+            serde_json::from_str(r#"{"apPerLevel": 4, "manualApLevel": 11, "gearCounts": false, "secondSpBuysFirst": true}"#)
+                .unwrap();
         assert_eq!(rules.ap_per_level, 4);
         assert_eq!(rules.sp_per_level, 3);
         assert_eq!(rules.first_job_level, 10);
-        assert!(rules.gear_counts && !rules.second_sp_buys_first);
     }
 
     #[test]

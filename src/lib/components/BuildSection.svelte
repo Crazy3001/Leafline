@@ -308,7 +308,7 @@
       <span class="tools">
         <button
           class="link"
-          title="Live reading follows your Character Stat and Skill windows while they're open. With it off, open them and read them once here{keyHint('ReadCharacter')}"
+          title="Read your Character Stat and Skill windows{keyHint('ReadCharacter')}"
           onclick={() => backend.readCharacter()}><RefreshCw size={12} />Read stats</button
         >
         <button class="link" onclick={() => openPlanner()}><Pencil size={12} />Edit</button>
@@ -430,7 +430,7 @@
                   {#if piece.level != null}<span class="lv tabular" class:good={row.wearingFit?.ok} class:bad={row.wearingFit && !row.wearingFit.ok} title={fitTitle(row.wearingFit)}
                       >{piece.level ? `Lv ${piece.level}` : "Any level"}</span
                     >{/if}
-                  <button class="remove" title="Put right what the item check read" aria-label="Edit {piece.name}" onclick={() => startEdit(piece)}
+                  <button class="remove" title="Edit" aria-label="Edit {piece.name}" onclick={() => startEdit(piece)}
                     ><Pencil size={11} /></button
                   >
                   <button class="remove" title="Take it off" aria-label="Take off {piece.name}" onclick={() => removePiece(piece.id)}
@@ -499,12 +499,12 @@
                   {#if row.suggestedPlanned}
                     <button
                       class="remove"
-                      title="Take it off the plan's gear goals"
+                      title="Remove goal"
                       aria-label="Stop aiming for {pick.name}"
                       onclick={() => setGoal(pick.id, false)}><X size={12} /></button
                     >
                   {:else}
-                    <button class="remove" title="Add it to the plan's gear goals" aria-label="Aim for {pick.name}" onclick={() => setGoal(pick.id, true)}
+                    <button class="remove" title="Aim for this" aria-label="Aim for {pick.name}" onclick={() => setGoal(pick.id, true)}
                       ><Plus size={12} /></button
                     >
                   {/if}
@@ -531,12 +531,12 @@
                   {#if row.planned}
                     <button
                       class="remove"
-                      title="Take it off the plan's gear goals"
+                      title="Remove goal"
                       aria-label="Stop aiming for {next.item.name}"
                       onclick={() => setGoal(next.item.id, false)}><X size={12} /></button
                     >
                   {:else}
-                    <button class="remove" title="Add it to the plan's gear goals" aria-label="Aim for {next.item.name}" onclick={() => setGoal(next.item.id, true)}
+                    <button class="remove" title="Aim for this" aria-label="Aim for {next.item.name}" onclick={() => setGoal(next.item.id, true)}
                       ><Plus size={12} /></button
                     >
                   {/if}
@@ -567,7 +567,7 @@
         {#each gearFound as item (item.id)}
           {@const on = worn.has(item.id)}
           <li>
-            <button disabled={on} onclick={() => wear(item.id)} title={on ? "Wearing it" : "Wear it, in place of what is in its slot"}>
+            <button disabled={on} onclick={() => wear(item.id)}>
               <span class="found-name">{item.name}</span>
               <small>{slotName(item.slot)}{item.reqLevel ? ` · Lv ${item.reqLevel}` : ""}</small>
               {#if on}<Check size={12} />{:else}<Plus size={12} />{/if}

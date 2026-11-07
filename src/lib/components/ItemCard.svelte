@@ -139,7 +139,7 @@
     <p class="summary">{summary.join(" · ")}</p>
   {/if}
   {#if scrolling?.line}
-    <p class="slots tabular" title={scrolling.counted}>{scrolling.line}</p>
+    <p class="slots tabular">{scrolling.line}</p>
   {/if}
 
   {#if item.stats.length}
@@ -196,8 +196,8 @@
   <!-- Only for a copy read from the game: that's the one the player just got. -->
   {#if read}<DropLogger item={item.name} itemId={matched?.id ?? null} {map} />{/if}
 
-  <!-- The price log (PriceLog.svelte) is hidden for v1: with no price source it was all typing.
-       Its records stay in the file, ready for when a price source gives permission. -->
+  <!-- No prices until a price source gives permission. Prices logged by earlier builds stay in
+       the records file (src-tauri/src/userdata/prices.rs). -->
   <ItemNotes name={item.name} />
 </Card>
 

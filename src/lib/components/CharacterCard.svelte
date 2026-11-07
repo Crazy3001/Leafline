@@ -94,7 +94,7 @@
     <div class="who">
       <div class="name">
         {displayName ?? "Unknown character"}
-        {#if lastPlayed}<span class="seen" title="No character read yet: the one Leafline saw last">last played</span>{/if}
+        {#if lastPlayed}<span class="seen">last played</span>{/if}
       </div>
       <div class="mesos tabular">
         <span class="coin" aria-hidden="true"></span>
@@ -104,7 +104,7 @@
           {formatNumber(session.mesos)} mesos
           <span class="seen">(last seen {formatDuration(session.mesosAge)} ago)</span>
         {:else if known}
-          <span title="Remembered from when your inventory last showed them">{formatNumber(known.mesos)} mesos</span>
+          <span>{formatNumber(known.mesos)} mesos</span>
           <span class="seen">(last seen {formatAgo(now - known.seenAt)})</span>
         {:else}
           Mesos not visible

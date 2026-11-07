@@ -107,7 +107,7 @@
     {#if logged}
       <p class="done"><Check size={13} /> Logged from <b>{logged.monster}</b>{card ? ` on ${card.map.name}` : ""}.</p>
       <div class="row">
-        <button class="act" onclick={report} title="Opens the monster's MeowDB page in your browser and copies the item's name for “+ Add another item”"
+        <button class="act" onclick={report} title="Opens MeowDB and copies the item's name"
           ><ExternalLink size={12} />Report on MeowDB</button
         >
         <button class="act ghost" onclick={undo}><Undo2 size={12} />Undo</button>

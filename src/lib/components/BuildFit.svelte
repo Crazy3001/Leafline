@@ -39,7 +39,6 @@
     class="fit"
     class:good={fit.wearableNow && fit.jobOk !== false}
     class:bad={fit.jobOk === false}
-    title="Compares the item's requirements with your build's base stats plus any gear goals worn by then, not what you really have on."
   >
     {#if fit.jobOk === false}
       Not for this build's job

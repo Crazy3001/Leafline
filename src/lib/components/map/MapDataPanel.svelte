@@ -28,12 +28,7 @@
         />Check for updates{/if}
     </button>
   {:else}
-    <p
-      class="explain"
-      title="Monsters, NPCs, quests, exits, skills and equipment come from OSMS Data Explorer, a community dataset taken from the Classic client. About 2 MB is downloaded once, kept on this PC, and checked for changes at most daily."
-    >
-      Maps, monsters, quests and items need the community map data: about 2 MB, downloaded once.
-    </p>
+    <p class="explain">Maps, monsters, quests and items need the community map data: about 2 MB, downloaded once.</p>
     <button class="action primary" onclick={() => downloadMapData(false)} disabled={mapData.downloading}>
       {#if mapData.downloading}<span class="spin"><LoaderCircle size={13} /></span>Downloading…{:else}<Database
           size={13}

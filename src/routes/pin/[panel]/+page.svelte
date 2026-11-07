@@ -131,7 +131,7 @@
       {/if}
       <button
         class="action"
-        title={panel === "route" ? "Open the Map tab, where places are set, in the overlay" : `Open the whole ${info.title} tab in the overlay`}
+        title={panel === "route" ? "Open the Map tab" : `Open the ${info.title} tab`}
         onclick={() => backend.showPanel(panel)}
         ><AppWindow size={12} /></button
       >

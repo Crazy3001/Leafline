@@ -50,7 +50,6 @@ import type {
   NavState,
   Destination,
   MeasuredRate,
-  NewPrice,
   SavedSpot,
   UpdateStatus,
   ItemNote,
@@ -72,7 +71,6 @@ import type {
   Trip,
   TripMessage,
   PlaceLink,
-  PriceLog,
   QuestPage,
   QuestQuery,
   QuestSearch,
@@ -219,10 +217,6 @@ export interface Backend {
   openLink(url: string): Promise<void>;
   onMapData(handler: (status: MapDataStatus) => void): Promise<UnlistenFn>;
 
-  /** The prices logged for an item, summarised for a copy with these upgrades and slots. */
-  priceLog(item: string, upgrades: number | null, slots: number | null): Promise<PriceLog>;
-  recordPrice(price: NewPrice): Promise<PriceLog>;
-  deletePrice(id: number): Promise<void>;
   /** The training spots the player saved, the newest first. */
   savedSpots(): Promise<SavedSpot[]>;
   /** Saves a map as a training spot, or takes it off the list. Every window hears of it. */
@@ -281,7 +275,7 @@ export interface Backend {
   diagnostics(): Promise<string>;
   onHistory(handler: () => void): Promise<UnlistenFn>;
   /** Asks where to save, then writes the price log or session history as CSV. Null if cancelled. */
-  exportCsv(what: "prices" | "sessions" | "drops"): Promise<number | null>;
+  exportCsv(what: "sessions" | "drops"): Promise<number | null>;
 
   /** The jobs and skills to plan with. Null until map data is downloaded. */
   buildCatalog(): Promise<BuildCatalog | null>;
@@ -468,9 +462,6 @@ const tauriBackend: Backend = {
   onShowPlace: (handler) => listen<PlaceLink>("show-place", (e) => handler(e.payload)),
   openLink: (url) => invoke("open_link", { url }),
   onMapData: (handler) => listen<MapDataStatus>("map-data", (e) => handler(e.payload)),
-  priceLog: (item, upgrades, slots) => invoke("price_log", { item, upgrades, slots }),
-  recordPrice: (price) => invoke("record_price", { price }),
-  deletePrice: (id) => invoke("delete_price", { id }),
   savedSpots: () => invoke("saved_spots"),
   setSpotSaved: (mapId, name, saved) => invoke("set_spot_saved", { mapId, name, saved }),
   onSavedSpots: (handler) => listen<SavedSpot[]>("saved-spots", (e) => handler(e.payload)),
@@ -512,7 +503,7 @@ const tauriBackend: Backend = {
   async exportCsv(what) {
     const stamp = new Date().toISOString().slice(0, 10);
     const path = await save({
-      defaultPath: `leafline-${what === "prices" ? "price-log" : what === "drops" ? "drop-log" : "sessions"}-${stamp}.csv`,
+      defaultPath: `leafline-${what === "drops" ? "drop-log" : "sessions"}-${stamp}.csv`,
       filters: [{ name: "CSV", extensions: ["csv"] }],
     });
     return path ? invoke<number>("export_csv", { what, path }) : null;

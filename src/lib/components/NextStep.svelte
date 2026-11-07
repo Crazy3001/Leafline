@@ -152,7 +152,7 @@
       {/if}
     </div>
     {#if canPin}
-      <button class="close" title="Pin the route: keep the next step in a window of its own" aria-label="Pin the route" onclick={pinRoute}
+      <button class="close" title="Pin the route" aria-label="Pin the route" onclick={pinRoute}
         ><Pin size={11} /></button
       >
     {/if}

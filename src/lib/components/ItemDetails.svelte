@@ -132,7 +132,7 @@
         <div><dt>Upgrade slots</dt><dd class="tabular">{shown.upgradeSlots}</dd></div>
       {/if}
       {#if speed != null}
-        <div title={`The data's number for it is ${speed}. Lower is faster.`}>
+        <div>
           <dt>Attack speed</dt><dd class="tabular">{attackSpeedName(speed) ?? speed}</dd>
         </div>
       {/if}
@@ -140,7 +140,7 @@
         <div><dt>Success rate</dt><dd class="tabular">{rate}%</dd></div>
       {/if}
       {#if shown.price != null}
-        <div title="The price the data lists. What it means in Classic isn't confirmed."><dt>Listed price</dt><dd class="tabular">{formatMesos(shown.price)}</dd></div>
+        <div><dt>Listed price</dt><dd class="tabular">{formatMesos(shown.price)}</dd></div>
       {/if}
     </dl>
     {#if tags.length}<p class="tags">{tags.join(" · ")}</p>{/if}
@@ -152,14 +152,13 @@
         <!-- A copy read from the game may be the player's own: put it in its slot as it is, scrolls and all. -->
         <button
           class:on={!!kept}
-          title={kept ? "Take it off in Character → Gear" : "Put this copy in its slot in Character → Gear, with the stats it has"}
           onclick={togglePiece}
         >
           {#if kept}<Check size={12} />Wearing this one{:else}<Plus size={12} />I'm wearing this{/if}
         </button>
       {/if}
       {#if goal != null}
-        <button class:on={goal} title={goal ? "Take it off the plan's gear goals" : "Show it as Next for its slot in Character → Gear"} onclick={() => toggleGoal(shown)}>
+        <button class:on={goal} onclick={() => toggleGoal(shown)}>
           {#if goal}<Check size={12} />In my plan{:else}<Plus size={12} />Aim for this{/if}
         </button>
       {/if}

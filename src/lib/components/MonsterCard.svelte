@@ -149,7 +149,7 @@
     </dl>
 
     {#if yours?.kills}
-      <p class="kills tabular" title="EXP left to the next level, from the session tracker, over this monster's base EXP. EXP events, parties and level gaps change it.">
+      <p class="kills tabular">
         About {formatNumber(yours.kills)} kills to your next level, at base EXP
       </p>
     {/if}
@@ -184,7 +184,7 @@
     {/if}
 
     {#if sheet.respawn}
-      <p class="traits" title="A raw value in the client data. The game's servers decide the real timing, so take it as a rough guide.">
+      <p class="traits">
         Listed respawn <span class="tabular">{formatDuration(sheet.respawn)}</span>
       </p>
     {/if}

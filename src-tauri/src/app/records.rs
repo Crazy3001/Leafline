@@ -12,7 +12,6 @@ use crate::userdata::UserData;
 use crate::userdata::characters::KnownMesos;
 use crate::userdata::drops::{LoggedDrop, NewDrop};
 use crate::userdata::notes::{ItemNote, MapNote};
-use crate::userdata::prices::{NewPrice, PriceLog};
 use crate::userdata::sessions::{MapRate, SavedSession, SessionTimeline};
 use crate::userdata::spots::SavedSpot;
 
@@ -59,31 +58,6 @@ impl UserDataState {
 #[tauri::command]
 pub fn known_mesos(state: State<UserDataState>, name: Option<String>) -> Result<Option<KnownMesos>> {
     state.with(|db| db.known_mesos(name.as_deref()))
-}
-
-/// What has been logged for an item, summarised for a copy with these upgrades and slots.
-#[tauri::command]
-pub fn price_log(
-    state: State<UserDataState>,
-    item: String,
-    upgrades: Option<u32>,
-    slots: Option<u32>,
-) -> Result<PriceLog> {
-    state.with(|db| db.price_log(&item, upgrades, slots))
-}
-
-/// Records a price and returns the item's updated log.
-#[tauri::command]
-pub fn record_price(state: State<UserDataState>, price: NewPrice) -> Result<PriceLog> {
-    state.with(|db| {
-        db.record_price(&price, now())?;
-        db.price_log(&price.item, price.upgrades, price.slots)
-    })
-}
-
-#[tauri::command]
-pub fn delete_price(state: State<UserDataState>, id: i64) -> Result<()> {
-    state.with(|db| db.delete_price(id))
 }
 
 /// Emitted to every window when the saved training spots change, with the new list.

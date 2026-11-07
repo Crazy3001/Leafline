@@ -220,7 +220,7 @@
       <button
         class="ontop"
         aria-pressed={onTop}
-        title={onTop ? "Stop keeping the desk view above other windows" : "Keep the desk view above other windows, so it stays in view beside or over the game"}
+        title={onTop ? "Stop keeping on top" : "Keep on top"}
         onclick={toggleOnTop}
         >{#if onTop}<PinOff size={13} />{:else}<Pin size={13} />{/if}Keep on top</button
       >

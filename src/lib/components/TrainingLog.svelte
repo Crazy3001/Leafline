@@ -465,7 +465,7 @@
                               {l.map ? splitMapLabel(l.map).name : "Not placed on a map"}
                               {#if l.map}
                                 {@const map = l.map}
-                                <button class="pen" title="Fix a misread name; the same misread is fixed from now on" aria-label="Rename map" onclick={() => startRename(map)}
+                                <button class="pen" title="Rename" aria-label="Rename map" onclick={() => startRename(map)}
                                   ><PenLine size={11} /></button
                                 >
                               {/if}

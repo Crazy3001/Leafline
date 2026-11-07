@@ -94,7 +94,7 @@
     class:yours
     class:unknown={!exit.to.known}
     disabled={!exit.to.known}
-    title={title(exit)}
+    title={exit.to.known ? undefined : "Not in the map data"}
     onclick={() => onnavigate(exit.to.id)}
   >
     <span class="dir"><Icon size={10} />{word(exit)}</span>
@@ -112,7 +112,7 @@
 
     <div class="slot west">{@render group("left", left)}</div>
     {#if left.length}<span class="wire h left"></span>{/if}
-    <div class="here" class:away={!here} title={here ? `You are on ${map.name}` : `Looking at ${map.name}`}>
+    <div class="here" class:away={!here}>
       {#if here}<MapPin size={13} />{/if}
       <span>{map.name}</span>
     </div>

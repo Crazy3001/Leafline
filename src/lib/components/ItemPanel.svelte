@@ -292,7 +292,7 @@
     </div>
   {:else}
     {#if checks.length}
-      <button class="back" class:pinned title="Put the item check away; the next read brings it back" onclick={() => (checkClosed = true)}
+      <button class="back" class:pinned onclick={() => (checkClosed = true)}
         ><ArrowLeft size={12} />Back to search</button
       >
     {/if}

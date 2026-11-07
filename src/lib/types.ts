@@ -773,43 +773,6 @@ export interface LoggedDrop extends NewDrop {
 
 // Price log (see src-tauri/src/userdata/prices.rs): only prices the player logged.
 
-export type PriceKind = "traded" | "asking";
-
-export interface NewPrice {
-  item: string;
-  upgrades: number | null;
-  slots: number | null;
-  stats: string;
-  price: number;
-  kind: PriceKind;
-  note: string | null;
-}
-
-export interface PriceEntry extends NewPrice {
-  id: number;
-  /** Unix seconds. */
-  recordedAt: number;
-}
-
-export interface PriceStats {
-  count: number;
-  traded: number;
-  median: number;
-  low: number;
-  high: number;
-  firstAt: number;
-  lastAt: number;
-}
-
-export interface PriceLog {
-  item: string | null;
-  /** Newest first. */
-  entries: PriceEntry[];
-  all: PriceStats | null;
-  /** Records with the same upgrades and slots as the item asked about. */
-  likeThis: PriceStats | null;
-}
-
 export type CompactShape = "card" | "wide" | "bar";
 
 export interface HotkeyChoice {
@@ -1506,10 +1469,6 @@ export interface BuildRules {
   advancementSp: number;
   firstJobLevel: number;
   secondJobLevel: number;
-  /** Whether 2nd-job SP can buy 1st-job skills. */
-  secondSpBuysFirst: boolean;
-  /** Whether stats from other worn gear count toward a requirement. */
-  gearCounts: boolean;
 }
 
 /** How a hovered item suits the build. */

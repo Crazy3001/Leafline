@@ -121,7 +121,6 @@
     </span>
     <span
       class="tile"
-      title={coverage?.partial ? `Counted ${coverage.label}: open your inventory to bring it up to date` : undefined}
       data-tauri-drag-region
     >
       <span class="label" data-tauri-drag-region>Mesos / hr</span>

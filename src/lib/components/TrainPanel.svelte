@@ -180,7 +180,7 @@
     {#if session?.held}
       <span class="state paused">Paused</span>
     {:else if tracking && session?.paused}
-      <span class="state idle" title="No EXP for a while, or the map changed: the clock waits for your next gain">Idle</span>
+      <span class="state idle">Idle</span>
     {:else if tracking}
       <span class="state running"><span class="square" aria-hidden="true"></span>Tracking</span>
     {/if}
@@ -217,7 +217,7 @@
         <span class="num hero">{headline.value}</span>
       </div>
       {#if recent}
-        <div class="recent" title="The rate over the last five minutes of active time, and how it compares with the whole session">
+        <div class="recent">
           <span class="label">Last 5 min</span>
           <span class="figure">
             <span class="num">{recent}</span>
@@ -247,7 +247,6 @@
         value={formatCompact(session.mesosPerHour)}
         sub={coverage?.partial ? coverage.label : null}
         faint={coverage?.partial && coverage.thin}
-        title="Counted over the active time between your looks at your mesos"
       />
       <Stat label="EXP gained" value={signed(session.expGained)} />
       <Stat label="Mesos gained" value={signed(session.mesosGained)} />
@@ -345,7 +344,6 @@
                 {#if row.map === session.map}<span class="here" title="You are here"></span>{/if}
                 {#if row.map}{splitMapLabel(row.map).name}{:else}<span
                     class="unplaced"
-                    title="Gains between two readings on different maps, or before the minimap was read. They count in the totals."
                     >Not placed on a map</span
                   >{/if}
               </td>

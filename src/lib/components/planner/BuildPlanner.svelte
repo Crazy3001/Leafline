@@ -606,7 +606,7 @@
           <input class="name" maxlength="80" aria-label="Build name" bind:value={draft.name} />
           <p class="path">{pathSummary}</p>
         </div>
-        <button class="plain" onclick={copyCode} title="Copy this plan as a line of text: your goals only, not your character or stats.">
+        <button class="plain" onclick={copyCode}>
           <ClipboardCopy size={13} />{copied ? "Copied" : "Copy plan code"}
         </button>
       </header>
@@ -945,14 +945,6 @@
               <label><span>1st job at Lv</span><input class="number" type="number" min="2" value={rules.firstJobLevel} oninput={(e) => setRules({ firstJobLevel: whole(e.currentTarget.value) })} /></label>
               <label><span>2nd job at Lv</span><input class="number" type="number" min="2" value={rules.secondJobLevel} oninput={(e) => setRules({ secondJobLevel: whole(e.currentTarget.value) })} /></label>
             </div>
-            <label class="check">
-              <input type="checkbox" checked={rules.gearCounts} onchange={(e) => setRules({ gearCounts: e.currentTarget.checked })} />
-              <span>Stats from other worn gear count toward requirements</span>
-            </label>
-            <label class="check">
-              <input type="checkbox" checked={rules.secondSpBuysFirst} onchange={(e) => setRules({ secondSpBuysFirst: e.currentTarget.checked })} />
-              <span>2nd-job SP can buy 1st-job skills</span>
-            </label>
             {#if rulesChanged}
               <button class="plain" onclick={() => setRules(DEFAULT_RULES)}><RotateCcw size={13} />Back to the defaults</button>
             {/if}
@@ -1299,17 +1291,6 @@
     gap: 3px;
     color: var(--muted);
     font-size: var(--text-sm);
-  }
-
-  label.check {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    margin-top: 8px;
-  }
-
-  label.check input {
-    accent-color: var(--accent);
   }
 
   label.inline {

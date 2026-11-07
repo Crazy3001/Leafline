@@ -94,7 +94,7 @@
               <td>{d.monster}</td>
               <td class="muted">{d.map ?? "—"}</td>
               <td class="nowrap r">
-                <button class="report" title="Opens {d.monster} on MeowDB in your browser and copies the item's name" onclick={() => report(d)}>
+                <button class="report" title="Opens MeowDB and copies the item's name" onclick={() => report(d)}>
                   {#if copiedId === d.id}<Check size={12} />Name copied{:else}<ExternalLink size={12} />Report on MeowDB{/if}
                 </button>
                 <button class="icon" title="Delete this drop" aria-label="Delete this drop" onclick={() => remove(d.id)}><Trash2 size={12} /></button>

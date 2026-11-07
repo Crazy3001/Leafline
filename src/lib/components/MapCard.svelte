@@ -82,7 +82,7 @@
 
 <Card title="Map" {plain}>
   {#snippet aside()}
-    {#if map?.collapsed && !browsing}<span title="Read from the collapsed minimap's title bar">Minimap title</span>{/if}
+    {#if map?.collapsed && !browsing}<span>Minimap title</span>{/if}
   {/snippet}
 
   {#if browsing}
@@ -127,7 +127,7 @@
       {#if found.alternatives.length}
         Not it?
         {#each found.alternatives as alt (alt.id)}
-          <button class="alt" onclick={() => navigate(alt.id)} title={alt.street ?? ""}>{alt.name}</button>
+          <button class="alt" onclick={() => navigate(alt.id)} title={alt.street ?? undefined}>{alt.name}</button>
         {/each}
       {/if}
     </div>

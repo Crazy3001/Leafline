@@ -151,7 +151,7 @@
     return [...groups].map(([from, to]) => ({ from, to: to.join(", ") }));
   }
 
-  async function exportCsv(what: "prices" | "sessions") {
+  async function exportCsv(what: "sessions") {
     try {
       const rows = await backend.exportCsv(what);
       if (rows != null) exported = `Saved ${rows} row${rows === 1 ? "" : "s"}.`;
@@ -538,10 +538,7 @@
       <div class="row">
         <label for="keep-focus">
           <span class="name">Keep the game focused</span>
-          <span class="help"
-            >Opening or clicking Leafline's windows doesn't take you out of the game: the overlay, pins, desk view,
-            Settings, setup, the build planner and the training log. Typing in a box and picking a hotkey still work.</span
-          >
+          <span class="help">Clicking Leafline's windows doesn't take your keys away from the game. Typing in a box still works.</span>
         </label>
         <div class="control">
           <input
@@ -571,7 +568,7 @@
       <div class="row">
         <label for="travel">
           <span class="name">Taxis and return scrolls</span>
-          <span class="help">Used in the Map tab's routes, training spots and quest hints. Off by default.</span>
+          <span class="help">Used in routes, training spots and quest hints.</span>
         </label>
         <div class="control">
           <input
