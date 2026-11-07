@@ -1,6 +1,5 @@
-//! Live reading: the game window captured every few seconds and run through the same pipeline
-//! and session tracker as the workbench's replays. It stays off until the player turns it on in
-//! Settings, and only ever looks at the window; see [`crate::capture`]. Each session saves itself
+//! Live reading: the game window captured every few seconds and run through the pipeline and
+//! the session tracker. It stays off until the player turns it on in Settings, and only ever looks at the window; see [`crate::capture`]. Each session saves itself
 //! as it goes, so a crash or a closed window costs half a minute of it at most.
 //!
 //! Item tooltips are not part of this. An item check is one picture on the player's hotkey. The
@@ -18,7 +17,6 @@ use tauri::{AppHandle, Emitter, Manager};
 use super::mapdata::MapDataState;
 use super::records::{self, HISTORY_EVENT, MESOS_EVENT, UserDataState};
 use super::builds;
-use super::replay;
 use super::report;
 use super::settings::{self, SettingsState};
 use super::{overlay, pins, readings};
@@ -126,9 +124,6 @@ pub fn running(app: &AppHandle) -> bool {
 pub fn start(app: &AppHandle) -> Result<()> {
     if !app.state::<SettingsState>().get().live.enabled {
         return Err(Error::Invalid("Turn on live reading in Settings first.".into()));
-    }
-    if replay::running(app) {
-        return Err(Error::Invalid("A replay is running in the workbench. Stop it first.".into()));
     }
     let state = app.state::<LiveState>();
     if state.running.swap(true, Ordering::SeqCst) {
@@ -432,8 +427,8 @@ pub fn frames_folder(app: &AppHandle) -> Result<PathBuf> {
     }
 }
 
-/// Saves the last picture read as a PNG in the saved pictures folder, for the workbench or a bug
-/// report: an item check's for a moment after it, or else the last live one.
+/// Saves the last picture read as a PNG in the saved pictures folder, for a bug report: an item
+/// check's for a moment after it, or else the last live one.
 pub fn save_frame(app: &AppHandle) -> Result<PathBuf> {
     let state = app.state::<LiveState>();
     let item = state.item_picture.lock().expect("live lock").clone();

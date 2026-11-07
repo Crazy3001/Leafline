@@ -382,17 +382,6 @@ export interface CounterRate {
   perHour: number | null;
 }
 
-/** How a replay orders frames: by file time, or by name a fixed interval apart. */
-export type ReplayOrder = { by: "modified" } | { by: "name"; intervalSeconds: number };
-
-export interface ReplayProgress {
-  done: number;
-  total: number;
-  path: string;
-  at: number;
-  analysis: Analysis;
-  session: SessionSummary;
-}
 
 // Map data (see src-tauri/src/mapdata/). Facts from OSMS Data Explorer, fetched on request.
 

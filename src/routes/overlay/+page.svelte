@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Camera, Lock, LockOpen, Minimize2, MonitorUp, PanelsTopLeft, Pin, PinOff, Settings, X } from "@lucide/svelte";
+  import { Camera, Lock, LockOpen, Minimize2, MonitorUp, Pin, PinOff, Settings, X } from "@lucide/svelte";
   import { onMount } from "svelte";
 
   import { backend, fileName } from "$lib/api";
@@ -211,11 +211,6 @@
             onclick={saveFrame}
           >
             <Camera size={14} />
-          </button>
-        {/if}
-        {#if import.meta.env.DEV}
-          <button title="Open workbench{keyHint('ShowWorkbench')}" aria-label="Open workbench" onclick={() => backend.showWorkbench()}>
-            <PanelsTopLeft size={14} />
           </button>
         {/if}
         <button

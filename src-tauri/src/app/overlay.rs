@@ -1,22 +1,16 @@
-//! Overlay window behaviour: visibility, click-through, the compact HUD, and the workbench
-//! window.
+//! Overlay window behaviour: visibility, click-through and the compact HUD.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock};
 
 use serde::{Deserialize, Serialize};
 use tauri::menu::CheckMenuItem;
-#[cfg(debug_assertions)]
-use tauri::webview::Color;
 use tauri::{AppHandle, Emitter, LogicalSize, Manager, WebviewWindow, Wry};
-#[cfg(debug_assertions)]
-use tauri::{PhysicalSize, WebviewUrl, WebviewWindowBuilder};
 
 use super::pins;
 use crate::error::{Error, Result};
 
 pub const OVERLAY: &str = "overlay";
-pub const WORKBENCH: &str = "workbench";
 
 /// Emitted to all windows whenever the overlay's status changes.
 pub const STATUS_EVENT: &str = "overlay-status";
@@ -198,36 +192,10 @@ pub fn toggle_click_through(app: &AppHandle) -> Result<()> {
     set_click_through(app, !enabled)
 }
 
-/// Shows the workbench, or in a release build, which has none, the overlay.
-pub fn show_workbench(app: &AppHandle) -> Result<()> {
-    let Some(workbench) = app.get_webview_window(WORKBENCH) else {
-        window(app, OVERLAY)?.show()?;
-        return broadcast(app);
-    };
-    workbench.show()?;
-    workbench.unminimize()?;
-    workbench.set_focus()?;
-    Ok(())
-}
-
-/// Opens the workbench, a tool for working on Leafline that players never see. It is made here
-/// and not in `tauri.conf.json` so that a release build has no such window at all.
-#[cfg(debug_assertions)]
-pub fn create_workbench(app: &AppHandle) -> Result<()> {
-    let workbench = WebviewWindowBuilder::new(app, WORKBENCH, WebviewUrl::App("workbench".into()))
-        .title("Leafline — Workbench")
-        .inner_size(1360.0, 860.0)
-        .min_inner_size(960.0, 600.0)
-        .center()
-        .background_color(Color(13, 16, 23, 255))
-        .additional_browser_args(super::BROWSER_ARGS)
-        .build()?;
-    fit_workbench(&workbench)
-}
-
-#[cfg(not(debug_assertions))]
-pub fn create_workbench(_app: &AppHandle) -> Result<()> {
-    Ok(())
+/// Shows the overlay, as when Leafline is started again while it runs.
+pub fn show(app: &AppHandle) -> Result<()> {
+    window(app, OVERLAY)?.show()?;
+    broadcast(app)
 }
 
 /// Below this many logical pixels of screen height, the overlay starts smaller.
@@ -254,21 +222,6 @@ pub fn fit_first_launch(app: &AppHandle) -> Result<()> {
         size.height.min(height * SMALL_SCREEN_SHARE).max(MIN_SIZE.1),
     );
     overlay.set_size(fitted)?;
-    Ok(())
-}
-
-/// Shrinks the workbench to fit its monitor's work area when the default size is too big
-/// (small or high-DPI screens). A size the user chose is restored before this runs.
-#[cfg(debug_assertions)]
-fn fit_workbench(workbench: &WebviewWindow) -> Result<()> {
-    let Some(monitor) = workbench.current_monitor()? else { return Ok(()) };
-    let area = monitor.work_area().size;
-    let size = workbench.outer_size()?;
-    if size.width > area.width || size.height > area.height {
-        let fitted = PhysicalSize::new(size.width.min(area.width * 9 / 10), size.height.min(area.height * 9 / 10));
-        workbench.set_size(fitted)?;
-        workbench.center()?;
-    }
     Ok(())
 }
 

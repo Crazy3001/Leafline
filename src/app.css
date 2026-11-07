@@ -1,4 +1,4 @@
-/* Design tokens and base styles shared by the overlay and the workbench. */
+/* Design tokens and base styles shared by every window. */
 
 :root {
   color-scheme: dark;

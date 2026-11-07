@@ -1,4 +1,4 @@
-// The map data cache's state, shared by the map card and the workbench's Map data panel.
+// The map data cache's state, shared by the map card and Settings.
 // Data is only ever downloaded when the user presses the button.
 
 import { backend } from "./api";

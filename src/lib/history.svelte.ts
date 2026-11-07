@@ -1,4 +1,4 @@
-// Saved sessions, shared by the Character and Train tabs and the workbench. Follows saves and
+// Saved sessions, shared by the Character and Train tabs. Follows saves and
 // deletes made in any window.
 
 import { backend } from "./api";

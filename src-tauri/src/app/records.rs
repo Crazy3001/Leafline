@@ -145,18 +145,6 @@ pub fn delete_drop(app: AppHandle, state: State<UserDataState>, id: i64) -> Resu
     Ok(())
 }
 
-/// Saves the session the overlay is showing to the history. Live sessions save themselves; this
-/// is for the last replay.
-#[tauri::command]
-pub fn save_session(app: AppHandle, state: State<UserDataState>, label: String) -> Result<i64> {
-    let session = super::readings::current_session(&app).ok_or_else(|| {
-        Error::Invalid("There is no session to save. Start live reading, or replay a folder in the workbench.".into())
-    })?;
-    let id = state.with(|db| db.save_session(&session, &label, now()))?;
-    app.emit(HISTORY_EVENT, ())?;
-    Ok(id)
-}
-
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct History {

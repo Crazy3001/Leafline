@@ -1,52 +1,12 @@
 //! Commands the frontend can call.
 
-use std::path::PathBuf;
-
-use tauri::ipc::Response;
 use tauri::{AppHandle, Manager};
 use tauri_plugin_opener::OpenerExt;
 
 use super::overlay::{self, OverlayStatus};
-use super::readings;
 use super::settings::SettingsState;
 use super::shortcuts::{self, ShortcutInfo};
 use crate::error::{Error, Result};
-use crate::pipeline::{self, Analysis};
-use crate::vision::{self, Ocr};
-
-/// Runs the pipeline on a saved screenshot (offline test mode) and shows the result on the
-/// overlay and pinned panels as it would appear live.
-#[tauri::command]
-pub async fn analyze_image(app: AppHandle, path: PathBuf) -> Result<Analysis> {
-    let analysis = tauri::async_runtime::spawn_blocking(move || -> Result<Analysis> {
-        let frame = vision::load(&path)?;
-        pipeline::analyze(&frame, &Ocr::new()?)
-    })
-    .await
-    .map_err(|err| Error::Invalid(err.to_string()))??;
-    readings::publish_analysis(&app, &analysis);
-    Ok(analysis)
-}
-
-/// Supported images in `folder`, sorted by name.
-#[tauri::command]
-pub fn list_images(folder: PathBuf) -> Result<Vec<PathBuf>> {
-    let mut images: Vec<PathBuf> = std::fs::read_dir(folder)?
-        .filter_map(|entry| Some(entry.ok()?.path()))
-        .filter(|path| vision::is_supported(path))
-        .collect();
-    images.sort();
-    Ok(images)
-}
-
-/// The raw bytes of a screenshot, for display in the workbench.
-#[tauri::command]
-pub fn read_image(path: PathBuf) -> Result<Response> {
-    if !vision::is_supported(&path) {
-        return Err(Error::Invalid(format!("{} is not a supported image", path.display())));
-    }
-    Ok(Response::new(std::fs::read(path)?))
-}
 
 #[tauri::command]
 pub fn overlay_status(app: AppHandle) -> Result<OverlayStatus> {
@@ -71,11 +31,6 @@ pub fn hide_overlay(app: AppHandle) -> Result<()> {
 #[tauri::command]
 pub fn toggle_overlay(app: AppHandle) -> Result<()> {
     overlay::toggle_visibility(&app)
-}
-
-#[tauri::command]
-pub fn show_workbench(app: AppHandle) -> Result<()> {
-    overlay::show_workbench(&app)
 }
 
 #[tauri::command]

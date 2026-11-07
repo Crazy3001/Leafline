@@ -3,7 +3,6 @@
 mod builds;
 mod commands;
 mod desk;
-mod launch;
 mod layout;
 mod live;
 mod mapdata;
@@ -12,7 +11,6 @@ mod overlay;
 mod pins;
 mod readings;
 mod records;
-mod replay;
 mod report;
 mod settings;
 mod shortcuts;
@@ -31,29 +29,22 @@ pub const BROWSER_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartSc
      --disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows";
 
 use desk::DeskState;
-use launch::LaunchImage;
 use live::LiveState;
 use mapdata::MapDataState;
 use nav::NavState;
-use overlay::{OVERLAY, OverlayState, WORKBENCH};
+use overlay::{OVERLAY, OverlayState};
 use pins::PinState;
 use readings::Readings;
 use records::UserDataState;
-use replay::ReplayState;
 use settings::SettingsState;
 use shortcuts::Bindings;
 use update::UpdateState;
 
 pub fn run() {
-    let args: Vec<String> = std::env::args().collect();
-
     tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
-            let result = match launch::image_arg(&args) {
-                Some(path) => launch::open(app, path),
-                None => overlay::show_workbench(app),
-            };
-            if let Err(err) = result {
+        // Starting Leafline again while it runs brings the overlay up.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Err(err) = overlay::show(app) {
                 shortcuts::log_error(&err);
             }
         }))
@@ -62,11 +53,9 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(shortcuts::plugin())
         .manage(OverlayState::default())
-        .manage(ReplayState::default())
         .manage(LiveState::default())
         .manage(Readings::default())
         .manage(Bindings::default())
-        .manage(LaunchImage::new(&args))
         .manage(UpdateState::default())
         .setup(|app| {
             app.manage(MapDataState::load(app.handle())?);
@@ -84,7 +73,6 @@ pub fn run() {
             app.manage(DeskState::load(app.handle())?);
             desk::restore(app.handle())?;
             tray::create(app)?;
-            overlay::create_workbench(app.handle())?;
             update::check_at_startup(app.handle());
             // Setup comes first on a new install. After it, live reading starts with Leafline and
             // waits for the game window if the game isn't open.
@@ -101,7 +89,7 @@ pub fn run() {
         })
         .on_window_event(|window, event| match event {
             // Closing a window hides it; the app keeps running in the tray until Quit.
-            WindowEvent::CloseRequested { api, .. } if matches!(window.label(), OVERLAY | WORKBENCH) => {
+            WindowEvent::CloseRequested { api, .. } if window.label() == OVERLAY => {
                 api.prevent_close();
                 let _ = window.hide();
             }
@@ -115,11 +103,6 @@ pub fn run() {
             _ => {}
         })
         .invoke_handler(tauri::generate_handler![
-            commands::analyze_image,
-            commands::list_images,
-            commands::read_image,
-            replay::replay_session,
-            replay::cancel_replay,
             live::live_status,
             live::start_live,
             live::stop_live,
@@ -132,7 +115,6 @@ pub fn run() {
             commands::set_compact,
             commands::hide_overlay,
             commands::toggle_overlay,
-            commands::show_workbench,
             commands::shortcut_list,
             commands::open_data_folder,
             commands::frames_folder,
@@ -148,7 +130,6 @@ pub fn run() {
             desk::desk_status,
             desk::show_desk,
             desk::set_desk_on_top,
-            launch::take_launch_image,
             mapdata::map_data_status,
             mapdata::download_map_data,
             mapdata::find_map,
@@ -176,7 +157,6 @@ pub fn run() {
             records::log_drop,
             records::delete_drop,
             records::save_image,
-            records::save_session,
             records::session_history,
             records::session_timeline,
             records::show_training,

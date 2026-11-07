@@ -1,5 +1,5 @@
-// Stand-in backend for designing the UI in a plain browser (`npm run dev`). Images come from
-// the git-ignored test-screenshots folder; every analysis returns a saved real result.
+// Stand-in backend for designing the UI in a plain browser (`npm run dev`). Every analysis
+// returns a saved real result.
 
 import type { Backend } from "../api";
 import type {
@@ -44,7 +44,6 @@ import type {
   Trip,
   TripMessage,
   QuestRow,
-  ReplayProgress,
   SessionSummary,
 } from "../types";
 import sample from "./sample-analysis.json";
@@ -63,12 +62,6 @@ import {
 } from "./sample-map";
 import sampleSession from "./sample-session.json";
 import { sampleSavedSessions, sampleTimelines, withTimeline } from "./sample-training";
-
-const screenshots = import.meta.glob("/test-screenshots/*.{png,jpg,jpeg,webp}", {
-  query: "?url",
-  import: "default",
-  eager: true,
-}) as Record<string, string>;
 
 /**
  * Readings a screenshot script can put on `window.__LEAFLINE_PREVIEW__` before the page loads,
@@ -98,9 +91,7 @@ const status: OverlayStatus = {
 };
 const statusHandlers: ((status: OverlayStatus) => void)[] = [];
 const analysisHandlers: ((analysis: Analysis) => void)[] = [];
-const progressHandlers: ((progress: ReplayProgress) => void)[] = [];
 const sessionHandlers: ((session: SessionSummary) => void)[] = [];
-let replayCancelled = false;
 
 // Starts without map data, so the download prompt can be designed too.
 let mapStatus: MapDataStatus = preview?.map
@@ -411,21 +402,6 @@ const pins: PinStatus = preview?.pins ?? { pinned: [], hidden: false };
 const pinHandlers: ((status: PinStatus) => void)[] = [];
 const pinsChanged = () => pinHandlers.forEach((h) => h({ ...pins, pinned: [...pins.pinned] }));
 
-/** The saved real session, as if `fraction` of it had been replayed so far. */
-function partialSession(fraction: number, frames: number): SessionSummary {
-  const full = sampleSessionSummary;
-  const part = (value: number) => Math.round(value * fraction);
-  return {
-    ...full,
-    frames,
-    elapsedSeconds: full.elapsedSeconds * fraction,
-    activeSeconds: full.activeSeconds * fraction,
-    expGained: part(full.expGained),
-    mesosGained: part(full.mesosGained),
-    mesosSeconds: full.mesosSeconds * fraction,
-    maps: full.maps.map((m) => ({ ...m, activeSeconds: m.activeSeconds * fraction, expGained: part(m.expGained), mesosGained: part(m.mesosGained) })),
-  };
-}
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** "Go here" in this browser tab, as src-tauri/src/app/nav.rs keeps it. */
@@ -469,33 +445,6 @@ if (typeof window !== "undefined") {
 }
 
 export const mockBackend: Backend = {
-  async analyzeImage() {
-    await delay(350);
-    const analysis = sampleAnalysis;
-    analysisHandlers.forEach((handler) => handler(analysis));
-    return analysis;
-  },
-  listImages: async () => Object.keys(screenshots),
-  async replaySession() {
-    replayCancelled = false;
-    const paths = Object.keys(screenshots);
-    let session = partialSession(0, 0);
-    for (const [i, path] of paths.entries()) {
-      if (replayCancelled) break;
-      await delay(450);
-      const analysis = sampleAnalysis;
-      session = partialSession((i + 1) / paths.length, i + 1);
-      progressHandlers.forEach((h) => h({ done: i + 1, total: paths.length, path, at: i, analysis, session }));
-      analysisHandlers.forEach((h) => h(analysis));
-      sessionHandlers.forEach((h) => h(session));
-    }
-    return session;
-  },
-  async cancelReplay() {
-    replayCancelled = true;
-  },
-  imageUrl: async (path) => screenshots[path] ?? "",
-  pickImage: async () => Object.keys(screenshots)[0] ?? null,
   pickFolder: async () => "/test-screenshots",
   overlayStatus: async () => status,
   async setClickThrough(enabled) {
@@ -503,7 +452,6 @@ export const mockBackend: Backend = {
   },
   async hideOverlay() {},
   async toggleOverlay() {},
-  async showWorkbench() {},
   async setHotkeysQuiet() {},
   async onHotkey(handler) {
     // In the browser, `__pressHotkey("ReadItem")` in the console stands in for pressing one.
@@ -526,7 +474,6 @@ export const mockBackend: Backend = {
     { action: "PauseTracking", keys: "", suggestedKeys: "", label: "Pause or resume tracking", inSetup: false, taken: false },
     { action: "NewSession", keys: "", suggestedKeys: "", label: "Start a new session", inSetup: false, taken: false },
     { action: "SaveFrame", keys: "", suggestedKeys: "", label: "Save the picture last read", inSetup: true, taken: false },
-    { action: "ShowWorkbench", keys: "", suggestedKeys: "", label: "Open the workbench", inSetup: false, taken: false },
     ].map((s) => {
       const keys = displaySettings.hotkeys.keys[s.action] ?? s.keys;
       return { ...s, keys, taken: keys === "F10" };
@@ -559,15 +506,9 @@ export const mockBackend: Backend = {
   },
   onFrameSaved: async () => () => {},
   onItemRead: async () => () => {},
-  takeLaunchImage: async () => null,
-  onOpenImage: async () => () => {},
   async onAnalysis(handler) {
     analysisHandlers.push(handler);
     if (!preview?.empty) setTimeout(() => handler(liveAnalysis), 200);
-    return () => {};
-  },
-  async onReplayProgress(handler) {
-    progressHandlers.push(handler);
     return () => {};
   },
   async onSession(handler) {
@@ -676,36 +617,6 @@ export const mockBackend: Backend = {
     const saved = { item, note: text, updatedAt: Date.now() / 1000 };
     notes.set(item.toLowerCase(), saved);
     return saved;
-  },
-  async saveSession(label) {
-    const s = sampleSessionSummary;
-    const id = Math.max(0, ...savedSessions.map((x) => x.id)) + 1;
-    savedSessions.push({
-      id,
-      label,
-      savedAt: Date.now() / 1000,
-      startedAt: s.startedAt,
-      level: s.level,
-      levelUps: s.levelUps,
-      activeSeconds: s.activeSeconds,
-      elapsedSeconds: s.elapsedSeconds,
-      expGained: s.expGained,
-      expPerHour: s.expPerHour,
-      mesosGained: s.mesosGained,
-      mesosPerHour: s.mesosPerHour,
-      percentPerHour: s.percentPerHour,
-      job: s.job,
-      character: s.name,
-      deaths: s.deaths,
-      note: "",
-      lines: s.lines,
-      maps: s.maps
-        .filter((m) => m.map && m.activeSeconds > 0)
-        .map((m) => ({ map: m.map!, activeSeconds: m.activeSeconds, expGained: m.expGained, mesosGained: m.mesosGained })),
-    });
-    sampleTimelines.set(id, { points: s.timeline, events: s.events });
-    historyHandlers.forEach((h) => h());
-    return id;
   },
   sessionHistory: async () => mockHistory(),
   sessionTimeline: async (id) => sampleTimelines.get(id) ?? { points: [], events: [] },

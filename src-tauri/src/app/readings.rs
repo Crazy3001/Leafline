@@ -27,13 +27,8 @@ pub struct Current {
     session: Option<SessionSummary>,
 }
 
-/// Shares a new analysis with every window. A window that is closed just misses it.
-pub fn publish_analysis(app: &AppHandle, analysis: &Analysis) {
-    *app.state::<Readings>().analysis.lock().expect("readings lock") = Some(analysis.clone());
-    let _ = app.emit(ANALYSIS_EVENT, analysis);
-}
-
-/// Shares a live analysis. Those read no items, so the last item read stays on show.
+/// Shares a live analysis with every window; a window that is closed just misses it. Those read
+/// no items, so the last item read stays on show.
 pub fn publish_live_analysis(app: &AppHandle, mut analysis: Analysis) {
     let state = app.state::<Readings>();
     let mut current = state.analysis.lock().expect("readings lock");

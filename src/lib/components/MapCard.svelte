@@ -22,7 +22,7 @@
   }: {
     map: MapReading | null;
     session?: SessionSummary | null;
-    /** `full` in the workbench, `compact` in the overlay, `glance` in a pinned window: the
+    /** `compact` in the overlay, `glance` in a pinned window, `full` everything: the
      *  map, your rates on it and its monsters. */
     variant?: "full" | "compact" | "glance";
     plain?: boolean;

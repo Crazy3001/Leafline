@@ -38,11 +38,10 @@ pub enum Action {
     PauseTracking,
     NewSession,
     SaveFrame,
-    ShowWorkbench,
 }
 
 impl Action {
-    pub const ALL: [Action; 11] = [
+    pub const ALL: [Action; 10] = [
         Action::ToggleOverlay,
         Action::ToggleClickThrough,
         Action::TogglePins,
@@ -53,7 +52,6 @@ impl Action {
         Action::PauseTracking,
         Action::NewSession,
         Action::SaveFrame,
-        Action::ShowWorkbench,
     ];
 
     /// The key offered at setup, or "" for none. Few keys are free in game by default.
@@ -84,13 +82,7 @@ impl Action {
             Action::PauseTracking => "Pause or resume tracking",
             Action::NewSession => "Start a new session",
             Action::SaveFrame => "Save the picture last read",
-            Action::ShowWorkbench => "Open the workbench",
         }
-    }
-
-    /// Whether this build has this action. Only development builds have a workbench.
-    pub fn available(self) -> bool {
-        self != Action::ShowWorkbench || cfg!(debug_assertions)
     }
 
     /// The name settings know this action by.
@@ -121,7 +113,6 @@ impl Action {
                 Ok(())
             }
             Action::SaveFrame => live::save_frame(app).map(|_| ()),
-            Action::ShowWorkbench => overlay::show_workbench(app),
         }
     }
 }
@@ -144,7 +135,6 @@ pub fn list(app: &AppHandle, choice: &HotkeyChoice) -> Vec<ShortcutInfo> {
     let taken = app.state::<Bindings>().taken.lock().expect("hotkey lock").clone();
     Action::ALL
         .iter()
-        .filter(|action| action.available())
         .map(|&action| ShortcutInfo {
             action: action.name(),
             keys: action.keys(choice),
@@ -213,7 +203,7 @@ fn types_nothing(key: &str) -> bool {
 /// working in the game's chat (see `types_nothing`). Two actions can't share one.
 fn parsed(choice: &HotkeyChoice) -> Result<Vec<(Shortcut, Action)>> {
     let mut bindings: Vec<(Shortcut, Action)> = Vec::new();
-    for action in Action::ALL.into_iter().filter(|action| action.available()) {
+    for action in Action::ALL {
         let keys = action.keys(choice);
         if keys.is_empty() {
             continue;

@@ -75,8 +75,6 @@ import type {
   QuestQuery,
   QuestSearch,
   QuestWhere,
-  ReplayOrder,
-  ReplayProgress,
   SessionSummary,
   SessionTimeline,
   MapNote,
@@ -86,15 +84,6 @@ import type {
 } from "./types";
 
 export interface Backend {
-  analyzeImage(path: string): Promise<Analysis>;
-  listImages(folder: string): Promise<string[]>;
-  /** Runs every screenshot in the folder through the pipeline as one session. */
-  replaySession(folder: string, order: ReplayOrder): Promise<SessionSummary>;
-  /** Stops a running replay after its current frame. */
-  cancelReplay(): Promise<void>;
-  /** An object URL for displaying the image; revoke it when done. */
-  imageUrl(path: string): Promise<string>;
-  pickImage(): Promise<string | null>;
   pickFolder(): Promise<string | null>;
   overlayStatus(): Promise<OverlayStatus>;
   setClickThrough(enabled: boolean): Promise<void>;
@@ -102,7 +91,6 @@ export interface Backend {
   /** Switches the overlay between the full panels and the compact HUD. */
   setCompact(enabled: boolean): Promise<void>;
   toggleOverlay(): Promise<void>;
-  showWorkbench(): Promise<void>;
   shortcuts(): Promise<ShortcutInfo[]>;
   /** While true, a hotkey press only reports itself and runs nothing; it lapses after 30 s unless renewed. */
   setHotkeysQuiet(quiet: boolean): Promise<void>;
@@ -126,12 +114,7 @@ export interface Backend {
   onFrameSaved(handler: (path: string) => void): Promise<UnlistenFn>;
   /** An item check from the hotkey has ended. */
   onItemRead(handler: (read: ItemRead) => void): Promise<UnlistenFn>;
-  /** An image passed on the command line at startup, once. */
-  takeLaunchImage(): Promise<string | null>;
-  /** Images passed to later launches while the app is already running. */
-  onOpenImage(handler: (path: string) => void): Promise<UnlistenFn>;
   onAnalysis(handler: (analysis: Analysis) => void): Promise<UnlistenFn>;
-  onReplayProgress(handler: (progress: ReplayProgress) => void): Promise<UnlistenFn>;
   onSession(handler: (session: SessionSummary) => void): Promise<UnlistenFn>;
   onOverlayStatus(handler: (status: OverlayStatus) => void): Promise<UnlistenFn>;
 
@@ -245,8 +228,6 @@ export interface Backend {
   knownMesos(name: string | null): Promise<KnownMesos | null>;
   onKnownMesos(handler: () => void): Promise<UnlistenFn>;
 
-  /** Saves the session the overlay shows (the last replay) to the history. */
-  saveSession(label: string): Promise<number>;
   sessionHistory(): Promise<History>;
   /** How a saved session's rates moved over time. */
   sessionTimeline(id: number): Promise<SessionTimeline>;
@@ -378,21 +359,7 @@ export interface Backend {
   fitWindow(width: number, height: number): Promise<void>;
 }
 
-const IMAGE_FILTER = { name: "Screenshots", extensions: ["png", "jpg", "jpeg", "webp"] };
-
 const tauriBackend: Backend = {
-  analyzeImage: (path) => invoke("analyze_image", { path }),
-  listImages: (folder) => invoke("list_images", { folder }),
-  replaySession: (folder, order) => invoke("replay_session", { folder, order }),
-  cancelReplay: () => invoke("cancel_replay"),
-  async imageUrl(path) {
-    const bytes = await invoke<ArrayBuffer>("read_image", { path });
-    return URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: imageType(path) }));
-  },
-  async pickImage() {
-    const picked = await open({ multiple: false, directory: false, filters: [IMAGE_FILTER] });
-    return typeof picked === "string" ? picked : null;
-  },
   async pickFolder() {
     const picked = await open({ multiple: false, directory: true });
     return typeof picked === "string" ? picked : null;
@@ -402,7 +369,6 @@ const tauriBackend: Backend = {
   hideOverlay: () => invoke("hide_overlay"),
   setCompact: (enabled) => invoke("set_compact", { enabled }),
   toggleOverlay: () => invoke("toggle_overlay"),
-  showWorkbench: () => invoke("show_workbench"),
   shortcuts: () => invoke("shortcut_list"),
   setHotkeysQuiet: (quiet) => invoke("set_hotkeys_quiet", { quiet }),
   onHotkey: (handler) => listen<string>("hotkey", (e) => handler(e.payload)),
@@ -416,10 +382,7 @@ const tauriBackend: Backend = {
   onLive: (handler) => listen<LiveStatus>("live", (e) => handler(e.payload)),
   onFrameSaved: (handler) => listen<string>("frame-saved", (e) => handler(e.payload)),
   onItemRead: (handler) => listen<ItemRead>("item-read", (e) => handler(e.payload)),
-  takeLaunchImage: () => invoke("take_launch_image"),
-  onOpenImage: (handler) => listen<string>("open-image", (e) => handler(e.payload)),
   onAnalysis: (handler) => listen<Analysis>("analysis", (e) => handler(e.payload)),
-  onReplayProgress: (handler) => listen<ReplayProgress>("replay-progress", (e) => handler(e.payload)),
   onSession: (handler) => listen<SessionSummary>("session", (e) => handler(e.payload)),
   onOverlayStatus: (handler) => listen<OverlayStatus>("overlay-status", (e) => handler(e.payload)),
   mapDataStatus: () => invoke("map_data_status"),
@@ -482,7 +445,6 @@ const tauriBackend: Backend = {
   },
   knownMesos: (name) => invoke("known_mesos", { name }),
   onKnownMesos: (handler) => listen("known-mesos", () => handler()),
-  saveSession: (label) => invoke("save_session", { label }),
   setSessionNote: (id, note) => invoke("set_session_note", { id, note }),
   renameMap: (from, to) => invoke("rename_map", { from, to }),
   openDataFolder: () => invoke("open_data_folder"),
@@ -578,11 +540,6 @@ async function devBackend(): Promise<Backend | null> {
 }
 
 export const backend: Backend = (await devBackend()) ?? tauriBackend;
-
-function imageType(path: string): string {
-  const extension = path.split(".").pop()?.toLowerCase();
-  return extension === "jpg" ? "image/jpeg" : `image/${extension}`;
-}
 
 /** File name without its folder, for display. */
 export function fileName(path: string): string {

@@ -25,8 +25,6 @@ npm run tauri dev
 
 The first launch opens **setup**: a line on what Leafline is, the hotkeys, game settings that help it read, and the map data download. Run it again from Settings → About. Then the **overlay** is there: the compact, transparent, always-on-top panel. Drag it by its title bar.
 
-Development builds also open the **workbench**, a tool for working on Leafline that release builds don't have. Open a screenshot or a folder of them; the pipeline runs on each, outlines what it found and shows the readings. The overlay updates too, as it would during play. With a folder open, **Replay as session** reads every frame in order as one play session and shows EXP/hour, mesos/hour and time to level, overall and per map (see below). You can also pass it an image on the command line (`leafline.exe shot.png`), or use *Open with*.
-
 No hotkey is set until you pick it in setup or Settings, and a hotkey takes its key from the game. Setup suggests:
 
 | Suggested | Action |
@@ -37,7 +35,7 @@ No hotkey is set until you pick it in setup or Settings, and a hotkey takes its 
 
 The game can't bind Win, and adding it also keeps a key away from programs that grab plain F-keys. Setup then asks you to click into the game and press each key there, and ticks the ones that arrive: the game can keep some keys to itself while it's in front, even ones it doesn't bind, so a key has to be tested with the game in front. F12 can't be a hotkey: Windows keeps it for itself.
 
-Setup also asks about the compact HUD, reading your Character Stat and Skill windows, and saving the picture last read. Settings has the rest: pinned panels, starting or stopping live reading, pausing tracking, a new session, keeping a run out of the history, and the workbench (development builds).
+Setup also asks about the compact HUD, reading your Character Stat and Skill windows, and saving the picture last read. Settings has the rest: pinned panels, starting or stopping live reading, pausing tracking, a new session and keeping a run out of the history.
 
 Use Win with each hotkey. While the game is in front it keeps keys pressed on their own to itself, even ones it doesn't bind such as Pause and the numpad, so those never reach Leafline; Win+F-keys and Ctrl+Alt combinations do. Avoid Ctrl and Alt: the game sees them while you hold them, so a hotkey with Ctrl can make your character attack. Leafline still accepts F-keys, Pause and numpad keys on their own, in case they get through on your PC. If another program on your PC already uses a key, setup and Settings say so.
 
@@ -47,7 +45,7 @@ On Windows, the overlay and pinned panels snap to the edges of the screen and to
 
 ### Live reading
 
-It starts with Leafline and waits for the game window if the game isn't open. Turn it off under **Settings → Live reading**, or stop it with the **Live** badge on the overlay. Every few seconds Leafline takes a picture of the game window with Windows Graphics Capture, the API OBS and Discord use, and runs it through the same pipeline and session tracker as the workbench. The picture comes from the window itself, so the overlay and anything else in front of it are never in it, and a covered game is still read.
+It starts with Leafline and waits for the game window if the game isn't open. Turn it off under **Settings → Live reading**, or stop it with the **Live** badge on the overlay. Every few seconds Leafline takes a picture of the game window with Windows Graphics Capture, the API OBS and Discord use, and runs it through the pipeline and the session tracker. The picture comes from the window itself, so the overlay and anything else in front of it are never in it, and a covered game is still read.
 
 It only looks at the window. It asks Windows for the window's title, class, position and size, and never sends the game a message or opens its process. Pictures stay in memory unless you press **Save frame**, which saves one to a local folder that doesn't sync (Settings → Data shows it and lets you choose another). A picture that hasn't changed isn't read again, and pictures are always at least a second apart.
 
@@ -174,16 +172,14 @@ Every reader locates its UI element by appearance (colour, shape, nearby text) r
 
 ```
 src/                     Svelte frontend
-  lib/components/          cards shared by the overlay and the workbench
-  lib/workbench/           image viewer and results panel
+  lib/components/          cards shared by the windows
   routes/overlay/          overlay window
-  routes/workbench/        workbench window
 src-tauri/src/
   app/                     Tauri wiring: windows, tray, hotkeys, commands
   capture/                 live pictures of the game window (Windows Graphics Capture)
   vision/                  image handling, colour blocks, OCR (Windows.Media.Ocr)
   readers/                 one module per game UI element: locate, read, parse
-  pipeline.rs              frame → readings, shared by live capture and offline mode
+  pipeline.rs              frame → readings, shared by live capture and the examples
   session.rs               readings over time → EXP and meso rates
   replay.rs                a folder of screenshots fed through both, in order
 ```

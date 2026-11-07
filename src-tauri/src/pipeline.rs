@@ -33,7 +33,7 @@ pub struct Analysis {
     /// How many are in the party, the player included; 1 with no party list in view.
     pub party_size: u32,
     pub map: Option<MapReading>,
-    /// Every line from the whole-frame OCR pass, for the workbench's debug view.
+    /// Every line from the whole-frame OCR pass, for the analyze example's debug output.
     pub overview: Vec<Line>,
     pub timings: Vec<Timing>,
     /// Parts that hit an error this time. The rest were still read.

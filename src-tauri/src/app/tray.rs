@@ -35,9 +35,6 @@ pub fn create(app: &App) -> tauri::Result<()> {
             &MenuItem::with_id(app, QUIT, "Quit Leafline", true, None::<&str>)?,
         ],
     )?;
-    if Action::ShowWorkbench.available() {
-        menu.insert(&item(Action::ShowWorkbench, "Open workbench")?, 5)?;
-    }
     let _ = app.state::<OverlayState>().click_through_item.set(click_through);
 
     TrayIconBuilder::with_id("main")
