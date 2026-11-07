@@ -5,12 +5,12 @@
 import { PANELS } from "./panels";
 import type { Panel } from "./types";
 
-/** What a desk view column can show: the overlay's panels, and the training log, which is a
- *  window of its own elsewhere. */
-export type DeskPanel = Panel | "log";
+/** What a desk view column can show: the overlay's panels, and the training log and the build
+ *  planner, which are windows of their own elsewhere. */
+export type DeskPanel = Panel | "log" | "planner";
 
 /** Every desk panel, in the order the Change menu lists them. */
-export const DESK_PANELS: DeskPanel[] = [...PANELS.map((p) => p.id), "log"];
+export const DESK_PANELS: DeskPanel[] = [...PANELS.map((p) => p.id), "log", "planner"];
 
 /** One column, top to bottom: one panel, or two sharing its height. */
 export type DeskColumn = DeskPanel[];
@@ -31,9 +31,10 @@ export const PRESETS: Record<Exclude<PresetId, "mine">, DeskColumn[]> = {
   log: [["train"], ["log"]],
 };
 
-/** How wide a column is against the others: the training log's tables and graphs want room. */
+/** How wide a column is against the others: the training log's tables and graphs, and the
+ *  planner's tabs beside its timeline, want room. */
 export function weight(column: DeskColumn): number {
-  return column.includes("log") ? 2 : 1;
+  return column.includes("log") || column.includes("planner") ? 2 : 1;
 }
 
 export const ZOOMS = [1, 1.25, 1.5];

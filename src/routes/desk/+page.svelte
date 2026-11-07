@@ -3,13 +3,14 @@
   // screen but just as well beside a windowed game.
   // It reads what the overlay reads, follows the overlay's "Go here" trip, and opens links in a
   // column of its own so the overlay needn't come up over the game.
-  import { ArrowLeft, ChartLine, ChevronDown, Pin, PinOff, Plus, X } from "@lucide/svelte";
+  import { ArrowLeft, ChartLine, ChevronDown, Milestone, Pin, PinOff, Plus, X } from "@lucide/svelte";
   import { onMount, untrack } from "svelte";
 
   import { backend } from "$lib/api";
   import NextStep from "$lib/components/NextStep.svelte";
   import PanelView from "$lib/components/PanelView.svelte";
   import TrainingLog from "$lib/components/TrainingLog.svelte";
+  import BuildPlanner from "$lib/components/planner/BuildPlanner.svelte";
   import {
     DESK_PANELS,
     MAX_COLUMNS,
@@ -158,9 +159,11 @@
     return at[0] === column ? (at[1] === 0 ? "Above" : "Below") : `Column ${at[0] + 1}`;
   }
 
-  /** A panel's name and icon. The training log isn't one of the overlay's tabs. */
+  /** A panel's name and icon. The training log and the planner aren't overlay tabs. */
   function deskInfo(panel: DeskPanel) {
-    return panel === "log" ? { title: "Training log", icon: ChartLine } : panelInfo(panel);
+    if (panel === "log") return { title: "Training log", icon: ChartLine };
+    if (panel === "planner") return { title: "Build planner", icon: Milestone };
+    return panelInfo(panel);
   }
 
   const template = $derived(columns.map((c) => `minmax(0, ${weight(c)}fr)`).join(" "));
@@ -280,6 +283,8 @@
               {#key panel}
                 {#if panel === "log"}
                   <TrainingLog embedded />
+                {:else if panel === "planner"}
+                  <BuildPlanner embedded />
                 {:else}
                   <PanelView {panel} analysis={live.analysis} session={live.session} />
                 {/if}
