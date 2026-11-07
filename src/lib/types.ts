@@ -171,8 +171,11 @@ export interface ItemRead {
 /** The overlay's tabs, each of which can be pinned into a window of its own. */
 export type Panel = "character" | "map" | "train" | "quests" | "item";
 
+/** What can be pinned: any tab, and the "Go here" route, which is not a tab. */
+export type PinId = Panel | "route";
+
 export interface PinStatus {
-  pinned: Panel[];
+  pinned: PinId[];
   /** Pinned panels are hidden for now, without being unpinned. */
   hidden: boolean;
 }
@@ -506,6 +509,30 @@ export interface NavState {
   /** The newest first. */
   recent: Destination[];
 }
+
+/** How the way to the destination stands, worked out in the overlay and sent to the Route pin. */
+export interface Trip {
+  /** The map the player was last read on, held through a missed or rough reading. */
+  here: MapRef | null;
+  /** The last reading was too rough to trust, so `here` may be out of date. */
+  unsure: boolean;
+  /** The way from where the route was worked out; `next` is the step to take now. */
+  route: MapRoute | null;
+  next: number;
+  /** Working a route out. */
+  routing: boolean;
+  /** No way there is known from `here`. */
+  lost: boolean;
+  /** The route was just worked out again after a turn off it. */
+  rerouted: boolean;
+  /** Said for a moment after arriving, once the destination has cleared. */
+  arrived: string | null;
+  /** A quest whose counters just filled, and where to hand it in: offered, never set unasked. */
+  offer: { title: string; quest: string; destination: Destination; giver: boolean } | null;
+}
+
+/** A Route pin's word to the overlay: send the trip as it stands, or drop the turn-in offer. */
+export type TripMessage = "ask" | "dismiss-offer";
 
 /** Taxis and return scrolls (see src-tauri/src/mapdata/travel.rs). */
 export type TravelKind = "cab" | "vipCab" | "scroll";

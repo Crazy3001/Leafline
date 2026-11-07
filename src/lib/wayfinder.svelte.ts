@@ -10,7 +10,7 @@ import { objectiveProgress } from "./format";
 import { mapData, watchMapData } from "./mapdata.svelte";
 import { live } from "./readings.svelte";
 import { travelKey } from "./settings.svelte";
-import type { Destination, MapMatch, MapReading, MapRef, MapRoute, Quest } from "./types";
+import type { Destination, MapMatch, MapReading, MapRef, MapRoute, Quest, Trip } from "./types";
 import { TRUSTED_SCORE, arrivedLine, locate, shortest } from "./wayfinding";
 
 /** How long the bar says "you're there" or "new route" before going back to normal. */
@@ -19,25 +19,7 @@ const REROUTED_MS = 6000;
 /** Readings in a row a map off the route must be seen in before the route starts again from it. */
 const OFF_ROUTE_READINGS = 2;
 
-export const trip = $state<{
-  /** The map the player was last read on, held through a missed or rough reading. */
-  here: MapRef | null;
-  /** The last reading was too rough to trust, so `here` may be out of date. */
-  unsure: boolean;
-  /** The way from where the route was worked out; `next` is the step to take now. */
-  route: MapRoute | null;
-  next: number;
-  /** Working a route out. */
-  routing: boolean;
-  /** No way there is known from `here`. */
-  lost: boolean;
-  /** The route was just worked out again after a turn off it. */
-  rerouted: boolean;
-  /** Said for a moment after arriving, once the destination has cleared. */
-  arrived: string | null;
-  /** A quest whose counters just filled, and where to hand it in: offered, never set unasked. */
-  offer: { title: string; quest: string; destination: Destination; giver: boolean } | null;
-}>({
+export const trip = $state<Trip>({
   here: null,
   unsure: false,
   route: null,
@@ -69,6 +51,10 @@ let routedFor = "";
 export function startWayfinder() {
   if (started) return;
   started = true;
+  backend.onTripMessage((message) => {
+    if (message === "dismiss-offer") trip.offer = null;
+    else void backend.sendTrip($state.snapshot(trip));
+  });
   watchDestination();
   watchMapData();
   $effect.root(() => {
@@ -85,6 +71,11 @@ export function startWayfinder() {
       if (key === routedFor) return;
       routedFor = key;
       untrack(startTrip);
+    });
+    // The Route pin shows the trip as worked out here.
+    $effect(() => {
+      const now = $state.snapshot(trip);
+      untrack(() => void backend.sendTrip(now));
     });
     $effect(() => {
       const quests = live.analysis?.quest?.quests ?? null;
@@ -211,6 +202,21 @@ export function endTrip() {
 
 export function dismissOffer() {
   trip.offer = null;
+  if (!started) void backend.tripMessage("dismiss-offer");
+}
+
+let following = false;
+
+/**
+ * For the Route pin: shows the trip the overlay follows, rather than following it a second
+ * time, so one window reports the arrival and offers each turn-in once.
+ */
+export function followTrip() {
+  if (following || started) return;
+  following = true;
+  watchDestination();
+  backend.onTrip((now) => Object.assign(trip, now));
+  void backend.tripMessage("ask");
 }
 
 // Quest titles seen with counters still to fill, and ones already offered, this run. Only a

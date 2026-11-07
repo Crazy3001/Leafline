@@ -1,23 +1,32 @@
 <script lang="ts">
-  // The slim "next step" bar for "Go here", under the overlay's header and in the compact HUD:
+  // The slim "next step" bar for "Go here", under the overlay's header, in the compact HUD and
+  // in the Route pin (which shows the trip the overlay follows, see followTrip):
   // the step to take from the map the player is on, how many follow, and a way to cancel. It
   // moves on by itself as the minimap reading changes (see wayfinder.svelte.ts). Also offers
   // the turn-in place of a quest whose counters just filled.
-  import { CarTaxiFront, Check, Navigation, ScrollText, X } from "@lucide/svelte";
+  import { CarTaxiFront, Check, Navigation, Pin, ScrollText, X } from "@lucide/svelte";
 
   import GoButton from "./GoButton.svelte";
   import { backend } from "$lib/api";
   import { nav } from "$lib/destination.svelte";
   import { formatNumber } from "$lib/format";
   import { showNpcNamed } from "$lib/places.svelte";
+  import { live } from "$lib/readings.svelte";
   import { display } from "$lib/settings.svelte";
   import type { Destination } from "$lib/types";
   import { dismissOffer, endTrip, trip } from "$lib/wayfinder.svelte";
   import { stepVerb } from "$lib/wayfinding";
 
-  let { variant = "overlay" }: { variant?: "overlay" | "hud" } = $props();
+  let { variant = "overlay" }: { variant?: "overlay" | "hud" | "pin" } = $props();
 
   const hud = $derived(variant === "hud");
+  const pin = $derived(variant === "pin");
+  /** The overlay's bar offers the Route pin, a window of its own to keep in view. */
+  const canPin = $derived(variant === "overlay" && !live.pins.pinned.includes("route"));
+
+  async function pinRoute() {
+    live.pins = await backend.pinPanel("route");
+  }
   const destination = $derived(nav.destination);
   const step = $derived(trip.route?.steps[trip.next] ?? null);
   const after = $derived(trip.route ? trip.route.steps.length - trip.next - 1 : 0);
@@ -40,7 +49,7 @@
 
 {#if trip.offer}
   {@const offer = trip.offer}
-  <div class="bar offer" class:hud role="status">
+  <div class="bar offer" class:hud class:pin role="status">
     <span class="icon good"><Check size={11} /></span>
     <span class="line">
       <span class="quest">{offer.quest}</span> is done.
@@ -53,12 +62,12 @@
 {/if}
 
 {#if trip.arrived}
-  <div class="bar arrived" class:hud role="status">
+  <div class="bar arrived" class:hud class:pin role="status">
     <span class="icon good"><Check size={11} /></span>
     <span class="line">{trip.arrived}</span>
   </div>
 {:else if destination}
-  <div class="bar trip" class:hud>
+  <div class="bar trip" class:hud class:pin>
     <span class="icon"><Navigation size={11} /></span>
     <div class="body">
       <p class="next">
@@ -105,8 +114,15 @@
         {#if trip.unsure && !trip.rerouted}<span class="faint">{" · minimap unclear"}</span>{/if}
       </p>
     </div>
+    {#if canPin}
+      <button class="close" title="Pin the route: keep the next step in a window of its own" aria-label="Pin the route" onclick={pinRoute}
+        ><Pin size={11} /></button
+      >
+    {/if}
     <button class="close" aria-label="Cancel the trip" onclick={() => endTrip()}><X size={11} /></button>
   </div>
+{:else if pin && !trip.offer}
+  <p class="idle">Not heading anywhere. Pick <strong>Go</strong> beside a map or NPC, or <strong>Go to…</strong> in the Map tab.</p>
 {/if}
 
 <style>
@@ -131,6 +147,32 @@
   .trip {
     border-left: 2px solid var(--accent);
     padding-left: 8px;
+  }
+
+  /* The pin's window frames it, and the next step is all it shows, so it reads larger. */
+  .bar.pin {
+    padding: 6px 2px 6px 8px;
+    border-bottom: 0;
+  }
+
+  .bar.pin + .bar.pin {
+    margin-top: 6px;
+  }
+
+  .pin .next {
+    font-size: var(--text-md);
+  }
+
+  .idle {
+    margin: 0;
+    padding: 4px 0;
+    color: var(--faint);
+    font-size: var(--text-sm);
+  }
+
+  .idle strong {
+    color: var(--muted);
+    font-weight: 600;
   }
 
   .icon {

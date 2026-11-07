@@ -38,10 +38,13 @@ pub enum Panel {
     Train,
     Quests,
     Item,
+    /// The "Go here" next step, in a slim window of its own. Not a tab: it is pinned from the
+    /// next-step bar, and its whole is the Map tab.
+    Route,
 }
 
 impl Panel {
-    const ALL: [Panel; 5] = [Panel::Character, Panel::Map, Panel::Train, Panel::Quests, Panel::Item];
+    const ALL: [Panel; 6] = [Panel::Character, Panel::Map, Panel::Train, Panel::Quests, Panel::Item, Panel::Route];
 
     fn id(self) -> &'static str {
         match self {
@@ -50,6 +53,7 @@ impl Panel {
             Panel::Train => "train",
             Panel::Quests => "quests",
             Panel::Item => "item",
+            Panel::Route => "route",
         }
     }
 
@@ -60,6 +64,7 @@ impl Panel {
             Panel::Train => "Train",
             Panel::Quests => "Quests",
             Panel::Item => "Lookup",
+            Panel::Route => "Route",
         }
     }
 
@@ -292,6 +297,8 @@ pub fn toggle_pins(app: AppHandle) -> Result<()> {
 /// Brings the overlay up at a panel's tab, for the whole of what a pinned panel shows in short.
 #[tauri::command]
 pub fn show_panel(app: AppHandle, panel: Panel) -> Result<()> {
+    // The route is set and browsed in the Map tab.
+    let panel = if panel == Panel::Route { Panel::Map } else { panel };
     overlay::show_full(&app)?;
     Ok(app.emit_to(OVERLAY, SHOW_PANEL_EVENT, panel)?)
 }
@@ -306,6 +313,7 @@ mod tests {
         assert_eq!(parse(r#"["build"]"#), vec![Panel::Character]);
         assert_eq!(parse(r#"["character","item"]"#), vec![Panel::Character, Panel::Item]);
         assert_eq!(parse("not json"), Vec::<Panel>::new());
+        assert_eq!(parse(r#"["map","route"]"#), vec![Panel::Map, Panel::Route]);
     }
 
     #[test]

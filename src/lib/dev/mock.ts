@@ -40,6 +40,8 @@ import type {
   OverlayStatus,
   Panel,
   PinStatus,
+  Trip,
+  TripMessage,
   QuestRow,
   ReplayProgress,
   SessionSummary,
@@ -305,6 +307,26 @@ const mockItems: ItemRecord[] = [
 const showItemHandlers: ((link: ItemLink) => void)[] = [];
 const showQuestHandlers: ((id: number) => void)[] = [];
 const showPanelHandlers: ((panel: Panel) => void)[] = [];
+// Each window of the dev preview is a browser tab with its own mock, so trips, Route pin
+// messages and the destination go between tabs on a channel, as Tauri events go between windows.
+const tripHandlers: ((trip: Trip) => void)[] = [];
+const tripMessageHandlers: ((message: TripMessage) => void)[] = [];
+type Relayed = { kind: "trip"; trip: Trip } | { kind: "message"; message: TripMessage } | { kind: "nav"; nav: NavState };
+const relay = typeof BroadcastChannel === "undefined" ? null : new BroadcastChannel("leafline-dev");
+function relayed(event: MessageEvent<Relayed>) {
+  const data = event.data;
+  if (data.kind === "trip") tripHandlers.forEach((h) => h(data.trip));
+  else if (data.kind === "message") {
+    // A tab opened later starts with no destination, where the app keeps one for every window.
+    if (data.message === "ask" && nav.destination) relay?.postMessage({ kind: "nav", nav });
+    tripMessageHandlers.forEach((h) => h(data.message));
+  }
+  else {
+    nav = data.nav;
+    navHandlers.forEach((h) => h(nav));
+  }
+}
+relay?.addEventListener("message", relayed);
 const showMonsterHandlers: ((link: MonsterLink) => void)[] = [];
 const showPlaceHandlers: ((link: PlaceLink) => void)[] = [];
 const mockQuests: QuestRow[] = [
@@ -435,6 +457,7 @@ const samePlace = (a: Destination, b: Destination) =>
 function changeNav(next: NavState): NavState {
   nav = next;
   navHandlers.forEach((h) => h(nav));
+  relay?.postMessage({ kind: "nav", nav });
   return nav;
 }
 
@@ -1010,7 +1033,22 @@ export const mockBackend: Backend = {
   },
   onPinResized: async () => () => {},
   async showPanel(panel) {
-    showPanelHandlers.forEach((h) => h(panel));
+    const tab = panel === "route" ? "map" : panel;
+    showPanelHandlers.forEach((h) => h(tab));
+  },
+  async sendTrip(trip) {
+    relay?.postMessage({ kind: "trip", trip });
+  },
+  async onTrip(handler) {
+    tripHandlers.push(handler);
+    return () => {};
+  },
+  async tripMessage(message) {
+    relay?.postMessage({ kind: "message", message });
+  },
+  async onTripMessage(handler) {
+    tripMessageHandlers.push(handler);
+    return () => {};
   },
   async onShowPanel(handler) {
     showPanelHandlers.push(handler);

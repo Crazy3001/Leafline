@@ -6,17 +6,19 @@
 
   import { page } from "$app/state";
   import { backend } from "$lib/api";
+  import NextStep from "$lib/components/NextStep.svelte";
   import PanelView from "$lib/components/PanelView.svelte";
-  import { PIN_MAX_HEIGHT, PIN_WIDTH, panelId, panelInfo } from "$lib/panels";
+  import { PIN_MAX_HEIGHT, PIN_WIDTH, pinId, pinInfo } from "$lib/panels";
   import { live, watchLive } from "$lib/readings.svelte";
   import { watchTyping } from "$lib/typing";
   import { display, watchSettings } from "$lib/settings.svelte";
-  import type { Panel } from "$lib/types";
+  import type { PinId } from "$lib/types";
+  import { followTrip } from "$lib/wayfinder.svelte";
 
-  const panel = $derived<Panel>(panelId(page.params.panel) ?? "character");
+  const panel = $derived<PinId>(pinId(page.params.panel) ?? "character");
   /** Taller than this, the panel scrolls instead of growing. */
   const maxHeight = $derived(PIN_MAX_HEIGHT[panel]);
-  const info = $derived(panelInfo(panel));
+  const info = $derived(pinInfo(panel));
   const Icon = $derived(info.icon);
 
   let frame = $state<HTMLElement>();
@@ -89,6 +91,7 @@
   onMount(() => {
     watchLive();
     watchSettings();
+    if (panel === "route") followTrip();
     const resized = backend.onPinResized(([width, height]) =>
       keepSize({ width: width / display.scale, height: height / display.scale }),
     );
@@ -126,7 +129,10 @@
       {#if sized}
         <button class="action" title="Fit to contents" onclick={fitToContent}><Minimize2 size={12} /></button>
       {/if}
-      <button class="action" title="Open the whole {info.title} tab in the overlay" onclick={() => backend.showPanel(panel)}
+      <button
+        class="action"
+        title={panel === "route" ? "Open the Map tab, where places are set, in the overlay" : `Open the whole ${info.title} tab in the overlay`}
+        onclick={() => backend.showPanel(panel)}
         ><AppWindow size={12} /></button
       >
       <button class="action" title="Unpin" onclick={() => backend.unpinPanel(panel)}><PinOff size={12} /></button>
@@ -134,7 +140,11 @@
   </header>
   <div class="body" class:scrolls={capped} bind:this={body}>
     <div bind:this={content}>
-      <PanelView {panel} analysis={live.analysis} session={live.session} pinned />
+      {#if panel === "route"}
+        <NextStep variant="pin" />
+      {:else}
+        <PanelView {panel} analysis={live.analysis} session={live.session} pinned />
+      {/if}
     </div>
   </div>
 </div>

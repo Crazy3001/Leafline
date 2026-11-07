@@ -4,7 +4,7 @@
 import { getVersion } from "@tauri-apps/api/app";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { LogicalSize } from "@tauri-apps/api/dpi";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open, save } from "@tauri-apps/plugin-dialog";
 
@@ -63,7 +63,10 @@ import type {
   NpcWhere,
   OverlayStatus,
   Panel,
+  PinId,
   PinStatus,
+  Trip,
+  TripMessage,
   PlaceLink,
   PriceLog,
   QuestPage,
@@ -320,14 +323,20 @@ export interface Backend {
   currentReadings(): Promise<{ analysis: Analysis | null; session: SessionSummary | null }>;
   pinStatus(): Promise<PinStatus>;
   /** Opens a panel in its own window that stays up while the overlay is hidden. */
-  pinPanel(panel: Panel): Promise<PinStatus>;
-  unpinPanel(panel: Panel): Promise<PinStatus>;
+  pinPanel(panel: PinId): Promise<PinStatus>;
+  unpinPanel(panel: PinId): Promise<PinStatus>;
   onPins(handler: (status: PinStatus) => void): Promise<UnlistenFn>;
   /** The player resized the calling pinned panel, with its new width and height in screen units. */
   onPinResized(handler: (size: [number, number]) => void): Promise<UnlistenFn>;
-  /** Brings the overlay up at a panel's tab, from a pinned panel. */
-  showPanel(panel: Panel): Promise<void>;
+  /** Brings the overlay up at a panel's tab, from a pinned panel. The route's is the Map tab. */
+  showPanel(panel: PinId): Promise<void>;
   onShowPanel(handler: (panel: Panel) => void): Promise<UnlistenFn>;
+  /** The overlay, which follows the route, tells the Route pin how it stands. */
+  sendTrip(trip: Trip): Promise<void>;
+  onTrip(handler: (trip: Trip) => void): Promise<UnlistenFn>;
+  /** The Route pin asks the overlay for the trip, or drops its turn-in offer. */
+  tripMessage(message: TripMessage): Promise<void>;
+  onTripMessage(handler: (message: TripMessage) => void): Promise<UnlistenFn>;
   settings(): Promise<DisplaySettings>;
   updateSettings(settings: DisplaySettings): Promise<DisplaySettings>;
   onSettings(handler: (settings: DisplaySettings) => void): Promise<UnlistenFn>;
@@ -517,6 +526,11 @@ const tauriBackend: Backend = {
   onPinResized: (handler) => getCurrentWindow().listen<[number, number]>("pin-resized", (e) => handler(e.payload)),
   showPanel: (panel) => invoke("show_panel", { panel }),
   onShowPanel: (handler) => listen<Panel>("show-panel", (e) => handler(e.payload)),
+  // Window to window, without the backend: only the overlay sends trips, only pins send messages.
+  sendTrip: (trip) => emit("trip", trip),
+  onTrip: (handler) => listen<Trip>("trip", (e) => handler(e.payload)),
+  tripMessage: (message) => emit("trip-message", message),
+  onTripMessage: (handler) => listen<TripMessage>("trip-message", (e) => handler(e.payload)),
   settings: () => invoke("get_settings"),
   updateSettings: (settings) => invoke("update_settings", { settings }),
   onSettings: (handler) => listen<DisplaySettings>("settings", (e) => handler(e.payload)),

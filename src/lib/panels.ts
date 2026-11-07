@@ -1,12 +1,12 @@
 // The overlay's panels: one tab each, and each can be pinned into a window of its own.
 
-import { Map as MapIcon, ScrollText, Search, Swords, UserRound } from "@lucide/svelte";
+import { Map as MapIcon, Navigation, ScrollText, Search, Swords, UserRound } from "@lucide/svelte";
 
 import { mapLabel } from "./format";
-import type { Analysis, Panel, SessionSummary } from "./types";
+import type { Analysis, Panel, PinId, SessionSummary } from "./types";
 
-export interface PanelInfo {
-  id: Panel;
+export interface PanelInfo<Id extends PinId = Panel> {
+  id: Id;
   title: string;
   icon: typeof UserRound;
 }
@@ -19,13 +19,26 @@ export const PIN_WIDTH = 340;
  * (see PanelView), so most stay well under these; the caps keep a long quest list or map from
  * covering the game.
  */
-export const PIN_MAX_HEIGHT: Record<Panel, number> = {
-  character: 440,
+export const PIN_MAX_HEIGHT: Record<PinId, number> = {
+  character: 520,
   map: 480,
   train: 400,
   quests: 520,
   item: 560,
+  route: 200,
 };
+
+/** The "Go here" next step in a window of its own: pinned from the next-step bar, not a tab. */
+export const ROUTE_PIN: PanelInfo<"route"> = { id: "route", title: "Route", icon: Navigation };
+
+/** What a pinned window shows, from its address. */
+export function pinId(id: string | null | undefined): PinId | null {
+  return id === "route" ? "route" : panelId(id);
+}
+
+export function pinInfo(id: PinId): PanelInfo<PinId> {
+  return id === "route" ? ROUTE_PIN : panelInfo(id);
+}
 
 export const PANELS: PanelInfo[] = [
   { id: "character", title: "Character", icon: UserRound },
