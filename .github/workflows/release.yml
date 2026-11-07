@@ -1,0 +1,58 @@
+# Builds the Windows installers and puts them on a draft GitHub release.
+#
+# Push a tag such as v0.1.0 (it must match the version in tauri.conf.json), or run it by hand
+# from the Actions tab. The release stays a draft until someone publishes it on GitHub, so
+# nothing reaches players by accident. Leafline's update check reads the latest published
+# release of this repository.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build installers (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install npm packages
+        run: npm ci
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          shared-key: release
+
+      - name: Build and upload to a draft release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: v__VERSION__
+          releaseName: Leafline v__VERSION__
+          releaseDraft: true
+          prerelease: false
+          releaseBody: |
+            An unofficial, read-only overlay for MapleStory Classic World. Windows 10 and 11.
+
+            Download the `-setup.exe` (or the `.msi`) below and run it. The installer isn't code-signed yet, so Windows SmartScreen may warn: choose **More info → Run anyway**.
+
+            **Use it at your own risk.** Nexon has not said whether read-only overlays are allowed; the README explains what Leafline reads, what it never does, and the one reported ban. Leafline is not affiliated with or endorsed by Nexon.
