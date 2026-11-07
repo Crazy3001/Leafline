@@ -104,12 +104,42 @@ pub struct Start {
     pub skills: Vec<SkillLevel>,
     /// `male` or `female`, for gear that is made for one. `None` until the player says.
     pub gender: Option<String>,
+    /// Equipment the character has, each piece as an item check read it, scrolls and all. Only
+    /// shown for now: the plan's requirement checks still count the data's stats.
+    pub pieces: Vec<Piece>,
 }
 
 impl Default for Start {
     fn default() -> Self {
-        Self { level: 1, stats: None, ap: 0, sp: 0, skills: Vec::new(), gender: None }
+        Self { level: 1, stats: None, ap: 0, sp: 0, skills: Vec::new(), gender: None, pieces: Vec::new() }
     }
+}
+
+/// One copy of an item, as its tooltip showed it: its own stats rather than the data's.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Piece {
+    /// Tells two copies of an item apart. Given when it is added.
+    #[serde(default)]
+    pub id: i64,
+    /// The data's item, when the name matched one.
+    pub item: Option<u32>,
+    pub name: String,
+    /// What the tooltip calls it, such as `Hat` or `One-handed Sword`.
+    pub item_type: Option<String>,
+    pub level: Option<u32>,
+    pub stats: Vec<PieceStat>,
+    /// Successful scrolls, from the name's (+N).
+    pub upgrades: Option<u32>,
+    pub slots_left: Option<u32>,
+    /// The data's upgrade slots for the item, to say how many were used.
+    pub slots: Option<u32>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PieceStat {
+    pub label: String,
+    pub value: i32,
 }
 
 /// The part of a build that can be shared: nothing in it is about one character.
@@ -627,6 +657,15 @@ mod tests {
     use super::super::catalog::tests::{item, skill};
     use super::*;
     use crate::mapdata::osms::ItemStat;
+
+    #[test]
+    fn builds_saved_before_pieces_load_with_none() {
+        let start: Start = serde_json::from_str(r#"{"level":12,"ap":0,"sp":0,"skills":[]}"#).unwrap();
+        assert_eq!(start.level, 12);
+        assert!(start.pieces.is_empty());
+        let piece: Piece = serde_json::from_str(r#"{"name":"Black Bandana","stats":[{"label":"LUK","value":3}]}"#).unwrap();
+        assert_eq!((piece.id, piece.upgrades, piece.stats.len()), (0, None, 1));
+    }
 
     const FIRST: u32 = 400;
     const SECOND: u32 = 420;

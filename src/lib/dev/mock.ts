@@ -18,6 +18,7 @@ import type {
   CharacterRead,
   Expansion,
   GearItem,
+  GearPiece,
   ItemLink,
   MonsterLink,
   PlaceLink,
@@ -862,6 +863,21 @@ export const mockBackend: Backend = {
   async onShowItem(handler) {
     showItemHandlers.push(handler);
     return () => {};
+  },
+  async addPiece(piece) {
+    const build = newestBuild();
+    if (!build) throw new Error("Plan a build first, in the Character tab.");
+    const pieces = (build.start.pieces ??= []);
+    const same = (p: GearPiece) => JSON.stringify({ ...p, id: 0 }) === JSON.stringify({ ...piece, id: 0 });
+    if (pieces.some(same)) return;
+    pieces.push({ ...piece, id: Math.max(0, ...pieces.map((p) => p.id)) + 1 });
+    buildsChanged();
+  },
+  async removePiece(id) {
+    const build = newestBuild();
+    if (!build) return;
+    build.start.pieces = (build.start.pieces ?? []).filter((p) => p.id !== id);
+    buildsChanged();
   },
   async setGearGoal(item, wanted) {
     const build = newestBuild();

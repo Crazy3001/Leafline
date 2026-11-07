@@ -919,6 +919,25 @@ export interface BuildStart {
   skills: SkillLevel[];
   /** `male` or `female`, for gear that is made for one. */
   gender?: string | null;
+  /** Equipment the character has, each as an item check read it. Changed only by add/removePiece. */
+  pieces?: GearPiece[];
+}
+
+/** One copy of an item, as its tooltip showed it, scrolls and all. */
+export interface GearPiece {
+  /** Tells two copies apart; given when it is added (0 before). */
+  id: number;
+  /** The data's item, when the name matched one. */
+  item: number | null;
+  name: string;
+  itemType: string | null;
+  level: number | null;
+  stats: { label: string; value: number }[];
+  /** Successful scrolls, from the name's (+N). */
+  upgrades: number | null;
+  slotsLeft: number | null;
+  /** The data's upgrade slots for the item. */
+  slots: number | null;
 }
 
 /** The part of a build that can be shared. */

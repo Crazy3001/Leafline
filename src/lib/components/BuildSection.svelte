@@ -114,6 +114,15 @@
     return () => clearTimeout(timer);
   });
 
+  async function removePiece(id: number) {
+    try {
+      await backend.removePiece(id, character);
+      goalError = null;
+    } catch (e) {
+      goalError = String(e);
+    }
+  }
+
   async function setGoal(id: number, wanted: boolean) {
     try {
       await backend.setGearGoal(id, wanted, character);
@@ -280,7 +289,39 @@
         {character}
       />
     {:else}
-    <!-- My build: the equipment the plan aims for, the same list "Add to my build" in Lookup adds to. -->
+    <!-- My build: the pieces the character has, as item checks read them, then what the plan aims for. -->
+    {@const pieces = plan.build.start.pieces ?? []}
+    <h4 class="sub first">I have</h4>
+    {#if pieces.length}
+      <ul class="pieces">
+        {#each pieces as p (p.id)}
+          <li>
+            <div class="piece-head">
+              <button class="ref ref-item" class:upgraded={!!p.upgrades} onclick={() => backend.showItem(p.item, p.item == null ? p.name : null)}
+                >{p.name}{#if p.upgrades}{` (+${p.upgrades})`}{/if}</button
+              >
+              {#if p.itemType}<span class="slot">{p.itemType}</span>{/if}
+              <button
+                class="remove"
+                title="Take it out of my build"
+                aria-label="Take {p.name} out of my build"
+                onclick={() => removePiece(p.id)}><X size={12} /></button
+              >
+            </div>
+            <p class="piece-line tabular">
+              {#each p.stats as s, k}{#if k}<span class="sep">{" · "}</span>{/if}<span class="nowrap">{s.label} {s.value > 0 ? "+" : ""}{s.value}</span>{/each}{#if p.slotsLeft != null}<span class="sep">{" · "}</span><span class="nowrap faint">{p.slotsLeft}{p.slots != null ? ` of ${p.slots}` : ""} slots left</span>{/if}
+            </p>
+          </li>
+        {/each}
+      </ul>
+    {:else}
+      <p class="quiet-line">
+        Check an item in game{keyHint("ReadItem")}, then press <strong>Add this one to my build</strong> to keep it here with its
+        own stats, scrolls and all.
+      </p>
+    {/if}
+
+    <h4 class="sub">Aiming for</h4>
     {#if plan.expansion.gear.length}
       <ul class="goals">
         {#each plan.expansion.gear as check (check.item.id)}
@@ -302,7 +343,7 @@
         {/each}
       </ul>
     {:else}
-      <p class="quiet-line">No equipment yet. Add some below, or with <strong>Add to my build</strong> on an item in Lookup.</p>
+      <p class="quiet-line">Nothing yet. Add equipment below, or with <strong>Add to my build</strong> on an item in Lookup.</p>
     {/if}
     {#if goalError}<p class="goal-error">{goalError}</p>{/if}
 
@@ -600,21 +641,82 @@
     margin-left: auto;
   }
 
-  .goals .remove {
+  .goals .remove,
+  .remove {
     display: grid;
     flex: none;
     place-items: center;
     width: 20px;
     height: 20px;
+    padding: 0;
+    border: 0;
     border-radius: var(--radius-sm);
+    background: transparent;
     color: var(--faint);
+    cursor: pointer;
   }
 
   .goals .remove:hover,
-  .goals .remove:focus-visible {
+  .goals .remove:focus-visible,
+  .remove:hover,
+  .remove:focus-visible {
     background: rgba(255, 255, 255, 0.07);
     color: var(--text);
     text-decoration: none;
+    outline: none;
+  }
+
+  .sub.first {
+    margin-top: 2px;
+  }
+
+  .pieces li {
+    padding: 4px 0;
+  }
+
+  .pieces li + li {
+    border-top: 1px solid var(--border);
+  }
+
+  .piece-head {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+
+  .piece-head .ref {
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+
+  /* Scrolled, in the game's amber, as the item check shows it. */
+  .piece-head .ref.upgraded {
+    color: var(--accent-strong);
+  }
+
+  .piece-head .slot {
+    color: var(--faint);
+    font-size: var(--text-xs);
+  }
+
+  .piece-head .remove {
+    align-self: center;
+    margin-left: auto;
+  }
+
+  .piece-line {
+    margin: 1px 0 0;
+    color: var(--muted);
+    font-size: var(--text-xs);
+  }
+
+  .piece-line .sep,
+  .piece-line .faint {
+    color: var(--faint);
+  }
+
+  .nowrap {
+    white-space: nowrap;
   }
 
   .quiet-line {

@@ -99,15 +99,20 @@
     saveTimer = setTimeout(() => save(snapshot), SAVE_DELAY);
   });
 
-  // A gear goal can be set from the Lookup tab. Unsaved typing here comes first.
+  // A gear goal can be set from the Lookup tab, and a piece added from an item check. Unsaved
+  // typing here comes first for goals; pieces are kept by the backend whatever this window saves.
   $effect(() => {
     void buildState.version;
     const id = untrack(() => draft?.id);
     if (!id) return;
     backend.buildPlan(id).then((plan) => {
       if (!plan || !draft || draft.id !== id || JSON.stringify(draft) !== saved) return;
-      if (JSON.stringify(plan.build.plan.gear) === JSON.stringify(draft.plan.gear)) return;
+      const same =
+        JSON.stringify(plan.build.plan.gear) === JSON.stringify(draft.plan.gear) &&
+        JSON.stringify(plan.build.start.pieces ?? []) === JSON.stringify(draft.start.pieces ?? []);
+      if (same) return;
       draft.plan.gear = plan.build.plan.gear;
+      draft.start.pieces = plan.build.start.pieces ?? [];
       saved = JSON.stringify(draft);
       expansion = plan.expansion;
     });

@@ -9,7 +9,7 @@ use super::mapdata::MapDataState;
 use super::records::{UserDataState, now};
 use super::settings::SettingsState;
 use super::{overlay, pins};
-use crate::build::plan::MAX_LEVEL;
+use crate::build::plan::{MAX_LEVEL, Piece};
 use crate::build::progress::{self, CatchUp};
 use crate::build::{
     Branch, Build, Catalog, Expansion, GearFor, GearFound, GearSuggestions, ItemFilters, ItemFit, ItemJob, ItemPage,
@@ -151,6 +151,37 @@ pub fn show_item(app: AppHandle, id: Option<u32>, text: Option<String>) -> Resul
     Ok(app.emit(SHOW_ITEM_EVENT, ItemLink { id, text })?)
 }
 
+/// Adds a piece of equipment, as an item check read it, to the build for `character`.
+#[tauri::command]
+pub fn add_piece(app: AppHandle, state: State<UserDataState>, piece: Piece, character: Option<String>) -> Result<()> {
+    let Some(mut build) = state.with(|db| db.active_build(character.as_deref()))? else {
+        return Err(Error::Invalid("Plan a build first, in the Character tab.".into()));
+    };
+    let pieces = &mut build.start.pieces;
+    // A tooltip read twice is the same piece, not a second copy.
+    if pieces.iter().any(|p| same_piece(p, &piece)) {
+        return Ok(());
+    }
+    let id = pieces.iter().map(|p| p.id).max().unwrap_or(0) + 1;
+    pieces.push(Piece { id, ..piece });
+    state.with(|db| db.save_build(&build, now()))?;
+    changed(&app)
+}
+
+/// Takes a piece of equipment out of the build for `character`.
+#[tauri::command]
+pub fn remove_piece(app: AppHandle, state: State<UserDataState>, id: i64, character: Option<String>) -> Result<()> {
+    let Some(mut build) = state.with(|db| db.active_build(character.as_deref()))? else { return Ok(()) };
+    build.start.pieces.retain(|p| p.id != id);
+    state.with(|db| db.save_build(&build, now()))?;
+    changed(&app)
+}
+
+/// Everything read off the tooltip matches; only the id differs.
+fn same_piece(a: &Piece, b: &Piece) -> bool {
+    Piece { id: 0, ..a.clone() } == Piece { id: 0, ..b.clone() }
+}
+
 /// Adds an item to the gear goals of the build for `character`, or takes it off.
 #[tauri::command]
 pub fn set_gear_goal(
@@ -277,7 +308,13 @@ pub fn active_build(app: AppHandle, state: State<UserDataState>, character: Opti
 /// Saves a build, new or changed, and returns how it plays out.
 #[tauri::command]
 pub fn save_build(app: AppHandle, state: State<UserDataState>, build: Build) -> Result<BuildPlan> {
-    let build = tidied(build);
+    let mut build = tidied(build);
+    // Pieces change only by adding or removing one, so an editor's older copy can't undo either.
+    if build.id != 0
+        && let Some(stored) = state.with(|db| db.build(build.id))?
+    {
+        build.start.pieces = stored.start.pieces;
+    }
     let id = state.with(|db| db.save_build(&build, now()))?;
     changed(&app)?;
     planned(&app, Build { id, ..build })
