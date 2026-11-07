@@ -1427,7 +1427,9 @@ export interface SlotGear {
   wearing: GearPiece | null;
   /** The best the character can wear now, when it beats what they wear. */
   suggested: ItemRecord | null;
-  /** The plan's next goal for the slot, or else the first better piece a later level can wear. */
+  /** `suggested` is one of the plan's goals. */
+  suggestedPlanned: boolean;
+  /** The next step up, which only a later level can wear: the plan's next goal for the slot, or else the first better piece in the data. */
   next: GearCheck | null;
   /** `next` is one of the plan's goals. */
   planned: boolean;

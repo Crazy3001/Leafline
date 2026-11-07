@@ -486,9 +486,18 @@
                 <button class="ref ref-item" onclick={() => backend.showItem(pick.id, null)}>{pick.name}</button>
                 <span class="end">
                   <span class="lv tabular good">{pick.reqLevel ? `Lv ${pick.reqLevel}` : "Any level"}</span>
-                  <button class="remove" title="Add it to the plan's gear goals" aria-label="Aim for {pick.name}" onclick={() => setGoal(pick.id, true)}
-                    ><Plus size={12} /></button
-                  >
+                  {#if row.suggestedPlanned}
+                    <button
+                      class="remove"
+                      title="Take it off the plan's gear goals"
+                      aria-label="Stop aiming for {pick.name}"
+                      onclick={() => setGoal(pick.id, false)}><X size={12} /></button
+                    >
+                  {:else}
+                    <button class="remove" title="Add it to the plan's gear goals" aria-label="Aim for {pick.name}" onclick={() => setGoal(pick.id, true)}
+                      ><Plus size={12} /></button
+                    >
+                  {/if}
                 </span>
               </div>
               <p class="piece-line">{gives(pick, 3)}</p>
@@ -500,8 +509,8 @@
                 {@const next = row.next}
                 <button class="ref ref-item" onclick={() => backend.showItem(next.item.id, null)}>{next.item.name}</button>
                 <span class="end">
-                  <span class="lv tabular" class:good={next.level != null && next.level <= at} class:warn={next.level == null}>
-                    {#if next.level == null}Out of reach{:else if next.level <= at}Wear it now{:else}Lv {next.level}{/if}
+                  <span class="lv tabular" class:warn={next.level == null}>
+                    {#if next.level == null}Out of reach{:else}Lv {next.level}{/if}
                   </span>
                   {#if row.planned}
                     <button
