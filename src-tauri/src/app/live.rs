@@ -240,7 +240,10 @@ pub fn read_character(app: &AppHandle) -> Result<()> {
             report::note(format!("Couldn't read the character's windows: {err}"));
             builds::CharacterRead::failed(err.to_string())
         });
-        if let Err(err) = overlay::show_full(&handle) {
+        // The desk view shows the result in its Character column.
+        if !super::desk::showing(&handle)
+            && let Err(err) = overlay::show_full(&handle)
+        {
             report::note(err.to_string());
         }
         let _ = handle.emit(CHARACTER_READ_EVENT, &outcome);

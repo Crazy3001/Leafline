@@ -171,9 +171,13 @@ pub fn apply(app: &AppHandle) -> Result<()> {
     Ok(())
 }
 
-/// The windows that sit over the game: the overlay and the pinned panels.
+/// The windows that go with the game: the overlay, the pinned panels and the desk view.
 fn game_side_windows(app: &AppHandle) -> Vec<tauri::WebviewWindow> {
-    app.get_webview_window(OVERLAY).into_iter().chain(pins::windows(app)).collect()
+    app.get_webview_window(OVERLAY)
+        .into_iter()
+        .chain(pins::windows(app))
+        .chain(app.get_webview_window(super::desk::DESK))
+        .collect()
 }
 
 /// While the player types in a box on the overlay or a pinned panel, that window takes focus so

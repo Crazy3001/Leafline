@@ -180,6 +180,13 @@ export interface PinStatus {
   hidden: boolean;
 }
 
+/** The desk view, the panels side by side in a window for a second screen. */
+export interface DeskStatus {
+  /** Open when Leafline last quit, so it opens again at launch. */
+  open: boolean;
+  onTop: boolean;
+}
+
 export interface OverlayStatus {
   visible: boolean;
   clickThrough: boolean;

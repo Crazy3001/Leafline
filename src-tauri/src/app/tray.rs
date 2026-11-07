@@ -10,6 +10,7 @@ use super::shortcuts::{Action, log_error};
 
 const QUIT: &str = "quit";
 const SETTINGS: &str = "settings";
+const DESK: &str = "desk";
 
 pub fn create(app: &App) -> tauri::Result<()> {
     let item = |action: Action, text: &str| MenuItem::with_id(app, action_id(action), text, true, None::<&str>);
@@ -27,6 +28,7 @@ pub fn create(app: &App) -> tauri::Result<()> {
             &item(Action::ToggleOverlay, "Show / hide overlay")?,
             &click_through,
             &item(Action::TogglePins, "Show / hide pinned panels")?,
+            &MenuItem::with_id(app, DESK, "Desk view", true, None::<&str>)?,
             &item(Action::ToggleLive, "Start / stop live reading")?,
             &MenuItem::with_id(app, SETTINGS, "Settings…", true, None::<&str>)?,
             &PredefinedMenuItem::separator(app)?,
@@ -34,7 +36,7 @@ pub fn create(app: &App) -> tauri::Result<()> {
         ],
     )?;
     if Action::ShowWorkbench.available() {
-        menu.insert(&item(Action::ShowWorkbench, "Open workbench")?, 4)?;
+        menu.insert(&item(Action::ShowWorkbench, "Open workbench")?, 5)?;
     }
     let _ = app.state::<OverlayState>().click_through_item.set(click_through);
 
@@ -45,6 +47,13 @@ pub fn create(app: &App) -> tauri::Result<()> {
         .on_menu_event(|app, event| {
             if event.id() == QUIT {
                 app.exit(0);
+            } else if event.id() == DESK {
+                let app = app.clone();
+                tauri::async_runtime::spawn(async move {
+                    if let Err(err) = super::desk::show_desk(app).await {
+                        log_error(&err);
+                    }
+                });
             } else if event.id() == SETTINGS {
                 if let Err(err) = super::settings::open(app) {
                     log_error(&err);

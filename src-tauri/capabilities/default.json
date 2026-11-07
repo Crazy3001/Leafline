@@ -1,13 +1,14 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Permissions for the overlay, workbench, settings, setup, build planner, training log and pinned panel windows",
-  "windows": ["overlay", "workbench", "settings", "setup", "build", "training", "pin-*"],
+  "description": "Permissions for the overlay, workbench, settings, setup, build planner, training log, desk view and pinned panel windows",
+  "windows": ["overlay", "workbench", "settings", "setup", "build", "training", "desk", "pin-*"],
   "permissions": [
     "core:default",
     "core:window:allow-start-dragging",
     "core:window:allow-hide",
     "core:window:allow-set-size",
+    "core:webview:allow-set-webview-zoom",
     "dialog:allow-open",
     "dialog:allow-save"
   ]
