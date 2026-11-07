@@ -62,7 +62,13 @@ pub fn outfit(build: &Build, expansion: &Expansion, rules: &Rules, catalog: &Cat
         if overall && (slot == "Top" || slot == "Bottom") {
             continue;
         }
-        let worn = wearing(slot).cloned();
+        // With the level it needs, from the data when the item check didn't read one.
+        let worn = wearing(slot).cloned().map(|mut p| {
+            if p.level.is_none() && p.item.is_some_and(|id| catalog.item(id).is_some()) {
+                p.level = Some(p.req_level(catalog));
+            }
+            p
+        });
         let worn_item = worn.as_ref().and_then(|p| p.item);
         let worn_level = worn.as_ref().map_or(0, |p| p.req_level(catalog));
         let worn_score = worn.as_ref().map(|p| scorer.score(&p.data_stats(catalog)));
@@ -262,10 +268,11 @@ mod tests {
     #[test]
     fn the_next_goal_is_the_first_after_what_is_worn() {
         let catalog = catalog();
-        let build = bandit(10, vec![2, 3, 4], vec![worn(1, &catalog)]);
+        // Added without a level read: the data's is shown.
+        let build = bandit(10, vec![2, 3, 4], vec![Piece { level: None, ..worn(1, &catalog) }]);
         let outfit = at(&build, &catalog, 10);
         let weapon = slot(&outfit, "Weapon");
-        assert_eq!(weapon.wearing.as_ref().map(|p| p.name.as_str()), Some("Old Dagger"));
+        assert_eq!(weapon.wearing.as_ref().map(|p| (p.name.as_str(), p.level)), Some(("Old Dagger", Some(10))));
         assert_eq!(weapon.next.as_ref().map(|n| n.item.name.as_str()), Some("Field Dagger"));
         assert!(weapon.planned);
         assert_eq!(weapon.later, 2);

@@ -421,7 +421,7 @@
                   >{piece.name}{#if piece.upgrades}{` (+${piece.upgrades})`}{/if}</button
                 >
                 <span class="end">
-                  {#if piece.level}<span class="lv tabular">Lv {piece.level}</span>{/if}
+                  {#if piece.level != null}<span class="lv tabular">{piece.level ? `Lv ${piece.level}` : "Any level"}</span>{/if}
                   <button class="remove" title="Put right what the item check read" aria-label="Edit {piece.name}" onclick={() => startEdit(piece)}
                     ><Pencil size={11} /></button
                   >
