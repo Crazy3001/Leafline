@@ -6,13 +6,13 @@
   import { untrack } from "svelte";
 
   import AdvancementChecklist from "./AdvancementChecklist.svelte";
-  import GearPicks from "./GearPicks.svelte";
   import MapDataPanel from "./map/MapDataPanel.svelte";
   import { backend } from "$lib/api";
   import { STATS, buildState, statLabel, watchBuilds } from "$lib/builds.svelte";
   import { OSMS_CREDIT, OSMS_URL, mapData, watchMapData } from "$lib/mapdata.svelte";
+  import { gives } from "$lib/items.svelte";
   import { display, keyHint } from "$lib/settings.svelte";
-  import type { BuildPlan, GearCheck, GearItem, GearPiece, LevelStep } from "$lib/types";
+  import type { BuildPlan, GearItem, GearPiece, LevelStep, Outfit } from "$lib/types";
   import Segmented from "$lib/ui/Segmented.svelte";
 
   let {
@@ -67,24 +67,27 @@
   const hasWork = (s: LevelStep) => s.ap.length > 0 || s.sp.length > 0 || s.advance != null || s.gear.length > 0;
   const coming = $derived(steps.filter((s) => s.level > at && hasWork(s)).slice(0, COMING));
   const advance = $derived(steps.find((s) => s.level > at && s.advance));
+  /** The next level that brings a gear goal within reach. */
+  const nextGear = $derived(steps.find((s) => s.level > at && s.gear.length));
   /** The advancement the checklist is for: the next one, or this level's until the next level. */
   const nextAdvance = $derived(steps.find((s) => s.level >= at && s.advance));
   const warnings = $derived(plan?.expansion.problems.filter((p) => p.severity === "warning") ?? []);
   const past = $derived(level != null && steps.length > 0 && level > steps[steps.length - 1].level);
 
-  // The plan, the next job advancement and gear each get a view of their own, so the tab stays
-  // short. The one last picked is remembered.
+  // What to spend, the next job advancement and gear each get a view of their own, so the tab
+  // stays short. The one last picked is remembered.
   type View = "plan" | "advance" | "gear";
   const VIEW_KEY = "leafline.build.view";
   let view = $state<View>(storedView());
   const canAdvance = $derived(!!nextAdvance?.advance && !!plan?.build.plan.job);
   const views = $derived([
-    { id: "plan" as View, label: "Plan" },
-    ...(canAdvance ? [{ id: "advance" as View, label: "Advancement" }] : []),
-    { id: "gear" as View, label: "My build" },
+    { id: "plan" as View, label: "Level up" },
+    ...(canAdvance ? [{ id: "advance" as View, label: "Job advance" }] : []),
+    { id: "gear" as View, label: "Gear" },
   ]);
 
-  // My build's equipment: added from the search here, the suggestions, or Lookup, and taken out here.
+  // Gear, slot by slot: what is worn, the plan's next goal and a better pick. What is worn comes
+  // from an item check, or from the search here for gear named rather than checked.
   const SEARCH_DELAY = 120;
   const FOUND_SHOWN = 6;
   let gearText = $state("");
@@ -114,24 +117,40 @@
     return () => clearTimeout(timer);
   });
 
-  /** One row of My build: an item the plan aims for, a copy of it you have, or both. */
-  type MineRow = { key: string; check: GearCheck | null; piece: GearPiece | null };
-  const myRows = $derived.by((): MineRow[] => {
-    if (!plan) return [];
-    const pieces = plan.build.start.pieces ?? [];
-    const rows: MineRow[] = [];
-    const placed = new Set<number>();
-    for (const check of plan.expansion.gear) {
-      const copies = pieces.filter((p) => p.item === check.item.id);
-      for (const p of copies) {
-        rows.push({ key: `p${p.id}`, check, piece: p });
-        placed.add(p.id);
-      }
-      if (!copies.length) rows.push({ key: `g${check.item.id}`, check, piece: null });
+  let outfit = $state<Outfit | null>(null);
+  const outfitKey = $derived(plan ? JSON.stringify([plan.build.id, at, buildState.version, display.buildRules]) : null);
+
+  // Follows the key alone, as the plan does.
+  $effect(() => {
+    const asked = outfitKey;
+    const id = untrack(() => plan?.build.id);
+    if (asked == null || id == null) {
+      outfit = null;
+      return;
     }
-    for (const p of pieces) if (!placed.has(p.id)) rows.push({ key: `p${p.id}`, check: null, piece: p });
-    return rows;
+    untrack(() => backend.buildOutfit(id, at))
+      .then((result) => {
+        if (asked === outfitKey) outfit = result;
+      })
+      .catch(() => {});
   });
+
+  const worn = $derived(new Set((plan?.build.start.pieces ?? []).map((p) => p.item)));
+
+  /** Slot names as the game's equip window shows them. */
+  const SLOT_NAMES: Record<string, string> = { Glove: "Gloves", Earring: "Earrings" };
+  const slotName = (slot: string) => SLOT_NAMES[slot] ?? slot;
+  const listed = (names: string[]) => (names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : (names[0] ?? ""));
+
+  async function wear(id: number) {
+    try {
+      await backend.wearItem(id, character);
+      gearText = "";
+      goalError = null;
+    } catch (e) {
+      goalError = String(e);
+    }
+  }
 
   /** Stats an equip's tooltip can show, as it spells them. */
   const STAT_LABELS = [
@@ -243,7 +262,7 @@
           <p><span class="tag">{gain.amount} AP</span>{statLabel(gain.stat)} <span class="tabular dim">to {gain.total}</span></p>
         {/each}
         {#each step.gear as name (name)}
-          <p><span class="tag">Gear</span><button class="ref ref-item" onclick={() => backend.showItem(null, name)}>{name}</button></p>
+          <p><span class="tag">Get</span><button class="ref ref-item" onclick={() => backend.showItem(null, name)}>{name}</button></p>
         {/each}
       {/if}
     </div>
@@ -307,6 +326,7 @@
     {#if shown === "plan"}
     {@render todo(step)}
 
+    <h4 class="sub">Your stats by the plan</h4>
     <dl class="stats">
       {#each STATS as stat (stat.id)}
         <div>
@@ -315,12 +335,6 @@
         </div>
       {/each}
     </dl>
-
-    {#if advance}
-      <p class="next">
-        Next job advancement: <strong>{advance.advance}</strong> at Lv {advance.level}
-      </p>
-    {/if}
 
     {#if coming.length}
       <h4 class="sub">Coming up</h4>
@@ -338,6 +352,28 @@
             </li>
           {/each}
         </ul>
+    {/if}
+
+    {#if nextGear || advance}
+      <h4 class="sub">Next</h4>
+      <ul class="coming">
+        {#if nextGear}
+          <li>
+            <span class="when tabular">Lv {nextGear.level}</span>
+            <span class="what"
+              ><span>New gear:</span>{#each nextGear.gear as name (name)}<button class="ref ref-item" onclick={() => backend.showItem(null, name)}
+                  >{name}</button
+                >{/each}</span
+            >
+          </li>
+        {/if}
+        {#if advance}
+          <li>
+            <span class="when tabular">Lv {advance.level}</span>
+            <span class="what"><span class="advance">{advance.advance}</span></span>
+          </li>
+        {/if}
+      </ul>
     {/if}
 
     {#if warnings.length}
@@ -360,46 +396,42 @@
       />
     {:else}
     <!--
-      My build, one list: each item the plan aims for, shown as the very copy you have when an item
-      check added one (its own stats, scrolls and all, which can be put right here), and copies
-      whose name matched no item.
+      Gear slot by slot, as the equip window has it: what you wear (its own stats, scrolls and all,
+      which can be put right here), the plan's next goal for the slot, and the best you can wear
+      now when it beats what you wear.
     -->
-    {#if myRows.length}
-      <ul class="mine">
-        {#each myRows as row (row.key)}
-          {@const piece = row.piece}
-          {@const check = row.check}
-          {@const name = piece?.name ?? check?.item.name ?? ""}
+    {#if outfit}
+      {#if !plan.build.start.pieces?.length}
+        <p class="quiet-line">
+          Check what you wear in game{keyHint("ReadItem")} and press <strong>I'm wearing this</strong>, or put it on by name below.
+        </p>
+      {/if}
+      <ul class="outfit">
+        {#each outfit.slots as row (row.slot)}
+          {@const piece = row.wearing}
           <li>
-            <div class="row-head">
-              <button
-                class="ref ref-item"
-                class:upgraded={!!piece?.upgrades}
-                onclick={() => backend.showItem(piece?.item ?? check?.item.id ?? null, piece && piece.item == null ? piece.name : null)}
-                >{name}{#if piece?.upgrades}{` (+${piece.upgrades})`}{/if}</button
-              >
-              <span class="slot">{piece?.itemType ?? check?.item.slot ?? ""}</span>
-              {#if check}
-                <span class="when tabular" class:warn={!check.usable || check.level == null}>
-                  {#if !check.usable}Wrong job{:else if check.level != null}Lv {check.level}{:else}Out of reach{/if}
-                </span>
-              {/if}
+            <h5 class="slot-name">{slotName(row.slot)}</h5>
+            <div class="line">
+              <span class="label">Wearing</span>
               {#if piece}
                 <button
-                  class="remove"
-                  class:push={!check}
-                  title="Put right what the item check read"
-                  aria-label="Edit {name}"
-                  onclick={() => startEdit(piece)}><Pencil size={11} /></button
+                  class="ref ref-item"
+                  class:upgraded={!!piece.upgrades}
+                  onclick={() => backend.showItem(piece.item, piece.item == null ? piece.name : null)}
+                  >{piece.name}{#if piece.upgrades}{` (+${piece.upgrades})`}{/if}</button
                 >
+                <span class="end">
+                  {#if piece.level}<span class="lv tabular">Lv {piece.level}</span>{/if}
+                  <button class="remove" title="Put right what the item check read" aria-label="Edit {piece.name}" onclick={() => startEdit(piece)}
+                    ><Pencil size={11} /></button
+                  >
+                  <button class="remove" title="Take it off" aria-label="Take off {piece.name}" onclick={() => removePiece(piece.id)}
+                    ><X size={12} /></button
+                  >
+                </span>
+              {:else}
+                <span class="none">Nothing added</span>
               {/if}
-              <button
-                class="remove"
-                class:push={!check && !piece}
-                title="Take it out of my build"
-                aria-label="Take {name} out of my build"
-                onclick={() => (piece ? removePiece(piece.id) : check && setGoal(check.item.id, false))}><X size={12} /></button
-              >
             </div>
             {#if piece && editing?.id === piece.id}
               <div class="edit">
@@ -437,7 +469,7 @@
                   <button class="link" onclick={() => (editing = null)}>Cancel</button>
                 </div>
               </div>
-            {:else if piece}
+            {:else if piece && (piece.stats.length || piece.slotsLeft != null)}
               <p class="piece-line tabular">
                 {#each piece.stats as s, k}{#if k}<span class="sep">{" · "}</span>{/if}<span class="nowrap"
                     >{s.label} {s.value > 0 ? "+" : ""}{s.value}</span
@@ -446,30 +478,67 @@
                   >{/if}
               </p>
             {/if}
+
+            {#if row.next}
+              {@const next = row.next}
+              <div class="line">
+                <span class="label">Next</span>
+                <button class="ref ref-item" onclick={() => backend.showItem(next.item.id, null)}>{next.item.name}</button>
+                <span class="end">
+                  <span class="lv tabular" class:good={next.level != null && next.level <= at} class:warn={next.level == null}>
+                    {#if next.level == null}Out of reach{:else if next.level <= at}Wear it now{:else}Lv {next.level}{/if}
+                  </span>
+                  <button
+                    class="remove"
+                    title="Take it off the plan's gear goals"
+                    aria-label="Stop aiming for {next.item.name}"
+                    onclick={() => setGoal(next.item.id, false)}><X size={12} /></button
+                  >
+                </span>
+              </div>
+              {#if row.later}
+                <button class="link later" onclick={() => backend.showBuild()}>
+                  {row.later} more planned after it
+                </button>
+              {/if}
+            {/if}
+
+            {#if row.suggested}
+              {@const pick = row.suggested}
+              <div class="line">
+                <span class="label">Suggested</span>
+                <button class="ref ref-item" onclick={() => backend.showItem(pick.id, null)}>{pick.name}</button>
+                <span class="end">
+                  {#if pick.reqLevel}<span class="lv tabular">Lv {pick.reqLevel}</span>{/if}
+                  <button class="remove" title="Aim for it: it shows as Next" aria-label="Aim for {pick.name}" onclick={() => setGoal(pick.id, true)}
+                    ><Plus size={12} /></button
+                  >
+                </span>
+              </div>
+              <p class="piece-line">{gives(pick, 3)}</p>
+            {/if}
           </li>
         {/each}
       </ul>
-    {:else}
-      <p class="quiet-line">
-        Nothing yet. Check an item in game{keyHint("ReadItem")} and press <strong>Add this one to my build</strong> to keep that
-        copy, scrolls and all, or add equipment by name below.
-      </p>
+      {#if outfit.empty.length}
+        <p class="quiet-line">Nothing worn, planned or suggested for {listed(outfit.empty.map(slotName))}.</p>
+      {/if}
     {/if}
     {#if goalError}<p class="goal-error">{goalError}</p>{/if}
 
     <label class="find">
       <Search size={13} />
-      <input type="search" placeholder="Add equipment: type a name" aria-label="Find equipment to add" bind:value={gearText} />
+      <input type="search" placeholder="Put on gear by name" aria-label="Find equipment you wear" bind:value={gearText} />
     </label>
     {#if gearFound.length}
       <ul class="found">
         {#each gearFound as item (item.id)}
-          {@const added = plan.build.plan.gear.includes(item.id)}
+          {@const on = worn.has(item.id)}
           <li>
-            <button disabled={added} onclick={() => setGoal(item.id, true)} title={added ? "Already in my build" : "Add to my build"}>
+            <button disabled={on} onclick={() => wear(item.id)} title={on ? "Wearing it" : "Wear it, in place of what is in its slot"}>
               <span class="found-name">{item.name}</span>
-              <small>{item.slot}{item.reqLevel ? ` · Lv ${item.reqLevel}` : ""}</small>
-              {#if added}<Check size={12} />{:else}<Plus size={12} />{/if}
+              <small>{slotName(item.slot)}{item.reqLevel ? ` · Lv ${item.reqLevel}` : ""}</small>
+              {#if on}<Check size={12} />{:else}<Plus size={12} />{/if}
             </button>
           </li>
         {/each}
@@ -477,9 +546,6 @@
     {:else if gearText.trim().length >= 2 && searched === gearText}
       <p class="quiet-line">No equipment by that name for this job.</p>
     {/if}
-
-    <h4 class="sub">Gear to look for</h4>
-    <GearPicks build={plan.build.id} level={at} onAdd={(item) => setGoal(item.id, true)} />
     {/if}
 
     <footer>
@@ -744,25 +810,37 @@
     outline: none;
   }
 
-  .mine {
-    margin-top: 2px;
+  .outfit li {
+    padding: 6px 0 8px;
   }
 
-  .mine li {
-    padding: 4px 0;
-  }
-
-  .mine li + li {
+  .outfit li + li {
     border-top: 1px solid var(--border);
   }
 
-  .row-head {
-    display: flex;
-    align-items: baseline;
-    gap: 6px;
+  .slot-name {
+    margin: 0 0 3px;
+    font-family: var(--font-display);
+    font-size: var(--text-sm);
+    font-weight: 400;
+    color: var(--muted);
   }
 
-  .row-head .ref {
+  /* Wearing, Next and Suggested: a label, the item, then its level and buttons. */
+  .line {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr) auto;
+    align-items: baseline;
+    gap: 6px;
+    padding: 1px 0;
+  }
+
+  .line .label {
+    color: var(--faint);
+    font-size: var(--text-xs);
+  }
+
+  .line .ref {
     min-width: 0;
     padding: 0;
     border: 0;
@@ -774,33 +852,43 @@
   }
 
   /* Scrolled, in the game's amber, as the item check shows it. */
-  .row-head .ref.upgraded {
+  .line .ref.upgraded {
     color: var(--accent-strong);
   }
 
-  .row-head .slot {
-    flex: none;
+  .line .none {
     color: var(--faint);
-    font-size: var(--text-xs);
+    font-size: var(--text-sm);
   }
 
-  .row-head .when {
-    flex: none;
-    margin-left: auto;
+  .line .end {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .line .lv {
     color: var(--muted);
     font-size: var(--text-sm);
   }
 
-  .row-head .when.warn {
+  .line .lv.good {
+    color: var(--good);
+  }
+
+  .line .lv.warn {
     color: var(--warn);
   }
 
-  .row-head .remove {
-    align-self: center;
+  /* Lines under an item line up with its name. */
+  .outfit .piece-line,
+  .outfit .edit,
+  .link.later {
+    margin-left: 70px;
   }
 
-  .row-head .remove.push {
-    margin-left: auto;
+  .link.later {
+    font-size: var(--text-xs);
   }
 
   .edit {

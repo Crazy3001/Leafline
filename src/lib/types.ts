@@ -1420,6 +1420,25 @@ export interface GearCheck {
   usable: boolean;
 }
 
+/** One equipment slot: what is worn, the plan's next goal for it, and a better pick if there is one. */
+export interface SlotGear {
+  /** As the item data names it: Weapon, Hat, Glove... */
+  slot: string;
+  wearing: GearPiece | null;
+  next: GearCheck | null;
+  /** More goals for the slot after `next`. */
+  later: number;
+  /** The best the character can wear now, when it beats what they wear. */
+  suggested: ItemRecord | null;
+}
+
+export interface Outfit {
+  level: number;
+  slots: SlotGear[];
+  /** Slots with nothing worn, planned or suggested. */
+  empty: string[];
+}
+
 export interface Expansion {
   steps: LevelStep[];
   problems: BuildProblem[];

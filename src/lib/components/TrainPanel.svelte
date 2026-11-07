@@ -7,7 +7,7 @@
 
   import SpotList, { SPOTS_ID } from "./SpotList.svelte";
   import TimersCard from "./TimersCard.svelte";
-  import { backend } from "$lib/api";
+  import { openTrainingLog } from "$lib/nav.svelte";
   import { formatCompact, formatDuration, formatNumber, splitMapLabel } from "$lib/format";
   import { history, watchHistory } from "$lib/history.svelte";
   import { live } from "$lib/readings.svelte";
@@ -401,7 +401,7 @@
         </li>
       {/each}
     </ul>
-    <div><Button onclick={() => backend.showTraining()}>All sessions</Button></div>
+    <div><Button onclick={openTrainingLog}>All sessions</Button></div>
   </Block>
 {/if}
 

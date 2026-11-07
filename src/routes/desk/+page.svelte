@@ -2,13 +2,15 @@
   // The desk view: the overlay's panels, whole, side by side in one window for a second screen.
   // It reads what the overlay reads, follows the overlay's "Go here" trip, and opens links in a
   // column of its own so the overlay needn't come up over the game.
-  import { ArrowLeft, ChevronDown, Pin, PinOff, Plus, X } from "@lucide/svelte";
+  import { ArrowLeft, ChartLine, ChevronDown, Pin, PinOff, Plus, X } from "@lucide/svelte";
   import { onMount, untrack } from "svelte";
 
   import { backend } from "$lib/api";
   import NextStep from "$lib/components/NextStep.svelte";
   import PanelView from "$lib/components/PanelView.svelte";
+  import TrainingLog from "$lib/components/TrainingLog.svelte";
   import {
+    DESK_PANELS,
     MAX_COLUMNS,
     ZOOMS,
     find,
@@ -19,29 +21,33 @@
     savePrefs,
     split,
     unused,
+    weight,
     withColumns,
     type DeskColumn,
+    type DeskPanel,
     type PresetId,
   } from "$lib/desk";
   import { itemView, watchItems } from "$lib/items.svelte";
   import { monsterView, watchMonsters } from "$lib/monsters.svelte";
-  import { tabRequest } from "$lib/nav.svelte";
-  import { panelInfo, PANELS } from "$lib/panels";
+  import { deskWindow, logRequest, tabRequest } from "$lib/nav.svelte";
+  import { panelInfo } from "$lib/panels";
   import { placeLinks, watchPlaces } from "$lib/places.svelte";
   import { questView, watchQuests } from "$lib/quests.svelte";
   import { live, watchLive } from "$lib/readings.svelte";
   import { watchSettings } from "$lib/settings.svelte";
   import { watchTyping } from "$lib/typing";
-  import type { Panel } from "$lib/types";
   import Segmented from "$lib/ui/Segmented.svelte";
   import { followTrip } from "$lib/wayfinder.svelte";
+
+  // Links to the training log open it in a column here, not in its own window.
+  deskWindow.active = true;
 
   let prefs = $state(loadPrefs());
   const columns = $derived(layoutOf(prefs));
   let onTop = $state(false);
 
   /** A panel a link brought up where no column showed it, over another until put back. */
-  let visit = $state<{ column: number; slot: number; panel: Panel } | null>(null);
+  let visit = $state<{ column: number; slot: number; panel: DeskPanel } | null>(null);
   /** The column and place whose Change menu is open. */
   let menu = $state<{ column: number; slot: number } | null>(null);
 
@@ -93,12 +99,12 @@
   }
 
   /** What a place shows now: the panel a link brought up there, or the layout's own. */
-  function shown(column: number, slot: number): Panel {
+  function shown(column: number, slot: number): DeskPanel {
     return visit && visit.column === column && visit.slot === slot ? visit.panel : columns[column][slot];
   }
 
   /** Makes sure a panel is in view after a link, taking over the last column's top for a while. */
-  function bringUp(panel: Panel) {
+  function bringUp(panel: DeskPanel) {
     // Only the link itself counts: a later change of layout mustn't bring it up again.
     untrack(() => {
       if (find(columns, panel)) visit = null;
@@ -120,6 +126,10 @@
     if (tabRequest.seq && tabRequest.panel) bringUp(tabRequest.panel);
   });
 
+  $effect(() => {
+    if (logRequest.seq) bringUp("log");
+  });
+
   // Reading the character's windows by hotkey shows its result in the Character panel.
   $effect(() => {
     const read = live.characterRead;
@@ -133,6 +143,7 @@
   const presetOptions = $derived([
     { id: "training" as const, label: "Training" },
     { id: "questing" as const, label: "Questing" },
+    { id: "log" as const, label: "Log" },
     ...(prefs.mine ? [{ id: "mine" as const, label: "My layout" }] : []),
   ]);
 
@@ -140,11 +151,18 @@
   const zoomOptions = ZOOMS.map((z) => ({ id: z, label: `${Math.round(z * 100)}%` }));
 
   /** Where else a panel is, for the Change menu. */
-  function whereElse(panel: Panel, column: number, slot: number): string | null {
+  function whereElse(panel: DeskPanel, column: number, slot: number): string | null {
     const at = find(columns, panel);
     if (!at || (at[0] === column && at[1] === slot)) return null;
     return at[0] === column ? (at[1] === 0 ? "Above" : "Below") : `Column ${at[0] + 1}`;
   }
+
+  /** A panel's name and icon. The training log isn't one of the overlay's tabs. */
+  function deskInfo(panel: DeskPanel) {
+    return panel === "log" ? { title: "Training log", icon: ChartLine } : panelInfo(panel);
+  }
+
+  const template = $derived(columns.map((c) => `minmax(0, ${weight(c)}fr)`).join(" "));
 
   const hud = $derived(live.analysis?.hud ?? null);
   const liveText = $derived.by(() => {
@@ -202,12 +220,12 @@
 
   <NextStep />
 
-  <main style:grid-template-columns="repeat({columns.length}, minmax(0, 1fr))">
+  <main style:grid-template-columns={template}>
     {#each columns as column, c (c)}
       <div class="column">
         {#each column as _, s (s)}
           {@const panel = shown(c, s)}
-          {@const info = panelInfo(panel)}
+          {@const info = deskInfo(panel)}
           {@const Icon = info.icon}
           {@const visiting = visit?.column === c && visit?.slot === s}
           <section class="panel" aria-label={info.title}>
@@ -216,7 +234,7 @@
               <span class="actions">
                 {#if visiting}
                   <button class="small" onclick={() => (visit = null)}
-                    ><ArrowLeft size={12} />Back to {panelInfo(columns[c][s]).title}</button
+                    ><ArrowLeft size={12} />Back to {deskInfo(columns[c][s]).title}</button
                   >
                 {/if}
                 <button
@@ -229,24 +247,24 @@
               {#if menu?.column === c && menu?.slot === s}
                 <div class="menu" role="menu">
                   <p class="menu-label">Show here</p>
-                  {#each PANELS as option (option.id)}
-                    {@const elsewhere = whereElse(option.id, c, s)}
+                  {#each DESK_PANELS as option (option)}
+                    {@const elsewhere = whereElse(option, c, s)}
                     <button
                       role="menuitemradio"
-                      aria-checked={option.id === columns[c][s]}
+                      aria-checked={option === columns[c][s]}
                       class="item"
-                      class:current={option.id === columns[c][s]}
-                      onclick={() => change(place(columns, c, s, option.id))}
+                      class:current={option === columns[c][s]}
+                      onclick={() => change(place(columns, c, s, option))}
                     >
-                      <span>{option.title}</span>
-                      {#if option.id === columns[c][s]}<span class="note">Here now</span>
+                      <span>{deskInfo(option).title}</span>
+                      {#if option === columns[c][s]}<span class="note">Here now</span>
                       {:else if elsewhere}<span class="note">{elsewhere}, swaps</span>{/if}
                     </button>
                   {/each}
                   <div class="menu-rule"></div>
                   {#if column.length < 2 && unused(columns).length}
                     <button role="menuitem" class="item" onclick={() => change(split(columns, c))}
-                      ><span><Plus size={12} /> Add {panelInfo(unused(columns)[0]).title} below</span></button
+                      ><span><Plus size={12} /> Add {deskInfo(unused(columns)[0]).title} below</span></button
                     >
                   {/if}
                   {#if columns.length > 1 || column.length > 1}
@@ -259,7 +277,11 @@
             </div>
             <div class="panel-body">
               {#key panel}
-                <PanelView {panel} analysis={live.analysis} session={live.session} />
+                {#if panel === "log"}
+                  <TrainingLog embedded />
+                {:else}
+                  <PanelView {panel} analysis={live.analysis} session={live.session} />
+                {/if}
               {/key}
             </div>
           </section>

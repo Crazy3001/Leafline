@@ -147,17 +147,18 @@
   {#if shown.kind === "equip"}
     <div class="actions">
       {#if piece && pieces != null}
-        <!-- A copy read from the game is one the player has: keep it as it is, scrolls and all. -->
+        <!-- A copy read from the game may be the player's own: put it in its slot as it is, scrolls and all. -->
         <button
           class:on={!!kept}
-          title={kept ? "Take this copy out of My build" : "Keep this copy in My build, with the stats it has"}
+          title={kept ? "Take it off in Character → Gear" : "Put this copy in its slot in Character → Gear, with the stats it has"}
           onclick={togglePiece}
         >
-          {#if kept}<Check size={12} />This one is in my build{:else}<Plus size={12} />Add this one to my build{/if}
+          {#if kept}<Check size={12} />Wearing this one{:else}<Plus size={12} />I'm wearing this{/if}
         </button>
-      {:else if goal != null}
-        <button class:on={goal} title={goal ? "Take it off the build's gear goals" : "Add it to the build's gear goals"} onclick={() => toggleGoal(shown)}>
-          {#if goal}<Check size={12} />In my build{:else}<Plus size={12} />Add to my build{/if}
+      {/if}
+      {#if goal != null}
+        <button class:on={goal} title={goal ? "Take it off the plan's gear goals" : "Show it as Next for its slot in Character → Gear"} onclick={() => toggleGoal(shown)}>
+          {#if goal}<Check size={12} />In my plan{:else}<Plus size={12} />Aim for this{/if}
         </button>
       {/if}
       <button onclick={() => scrollsFor(shown)}><ScrollText size={12} />Scrolls for it</button>

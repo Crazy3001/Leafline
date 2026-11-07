@@ -104,8 +104,8 @@ pub struct Start {
     pub skills: Vec<SkillLevel>,
     /// `male` or `female`, for gear that is made for one. `None` until the player says.
     pub gender: Option<String>,
-    /// Equipment the character has, each piece as an item check read it, scrolls and all. Only
-    /// shown for now: the plan's requirement checks still count the data's stats.
+    /// Equipment the character wears, each piece as an item check read it, scrolls and all, one
+    /// to a slot. Its own stats count toward other gear's requirements, as the game counts them.
     pub pieces: Vec<Piece>,
 }
 
@@ -140,6 +140,60 @@ pub struct Piece {
 pub struct PieceStat {
     pub label: String,
     pub value: i32,
+}
+
+/// Tooltip stat names that the item data spells another way.
+const DATA_LABELS: [(&str, &str); 2] = [("Weapon Attack", "Attack"), ("Magic Attack", "Magic")];
+
+impl Piece {
+    /// A clean copy of an item from the data, for gear the player names rather than checks.
+    pub fn of_item(item: &ItemRecord) -> Self {
+        let tooltip = |label: &str| DATA_LABELS.iter().find(|(_, data)| *data == label).map_or(label, |(t, _)| t).to_string();
+        Self {
+            id: 0,
+            item: Some(item.id),
+            name: item.name.clone(),
+            item_type: Some(item.weapon_type.clone().unwrap_or_else(|| item.slot.clone())),
+            level: Some(item.req_level),
+            stats: item
+                .stats
+                .iter()
+                .map(|s| PieceStat { label: tooltip(&s.label), value: s.value.clamp(i32::MIN.into(), i32::MAX.into()) as i32 })
+                .collect(),
+            upgrades: None,
+            slots_left: item.upgrade_slots,
+            slots: item.upgrade_slots,
+        }
+    }
+
+    /// The slot it goes in, as the item data names it.
+    pub fn slot(&self, catalog: &Catalog) -> String {
+        match self.item.and_then(|id| catalog.item(id)) {
+            Some(item) => item.slot.clone(),
+            None => super::fit::slot_of(self.item_type.as_deref().unwrap_or("")).to_string(),
+        }
+    }
+
+    /// Its stats as the item data names them: its own as read, or the data's when none were.
+    pub fn data_stats(&self, catalog: &Catalog) -> Vec<(String, i64)> {
+        if self.stats.is_empty()
+            && let Some(item) = self.item.and_then(|id| catalog.item(id))
+        {
+            return item.stats.iter().map(|s| (s.label.clone(), s.value)).collect();
+        }
+        let data = |label: &str| DATA_LABELS.iter().find(|(t, _)| *t == label).map_or(label, |(_, d)| d).to_string();
+        self.stats.iter().map(|s| (data(&s.label), i64::from(s.value))).collect()
+    }
+
+    /// The level it needs: as read, or the data's.
+    pub fn req_level(&self, catalog: &Catalog) -> u32 {
+        self.level.or_else(|| self.item.and_then(|id| catalog.item(id)).map(|i| i.req_level)).unwrap_or(0)
+    }
+
+    /// Whether wearing one takes the other off: the same slot, or an overall and a top or bottom.
+    pub fn clashes(a: &str, b: &str) -> bool {
+        a == b || (a == "Overall" && (b == "Top" || b == "Bottom")) || (b == "Overall" && (a == "Top" || a == "Bottom"))
+    }
 }
 
 /// The part of a build that can be shared: nothing in it is about one character.
@@ -532,16 +586,21 @@ fn needs_met(skill: u32, have: &HashMap<u32, u32>, catalog: &Catalog) -> bool {
 
 /// What an item adds to the four base stats.
 fn bonus_of(item: &ItemRecord) -> Stats {
+    piece_bonus(&item.stats.iter().map(|s| (s.label.clone(), s.value)).collect::<Vec<_>>())
+}
+
+/// What stats, as the item data names them, add to the four base stats.
+fn piece_bonus(stats: &[(String, i64)]) -> Stats {
     let mut bonus = Stats::default();
-    for stat in &item.stats {
-        let target = match stat.label.as_str() {
+    for (label, value) in stats {
+        let target = match label.as_str() {
             "STR" => Stat::Str,
             "DEX" => Stat::Dex,
             "INT" => Stat::Int,
             "LUK" => Stat::Luk,
             _ => continue,
         };
-        bonus.add(target, stat.value.max(0) as u32);
+        bonus.add(target, (*value).max(0) as u32);
     }
     bonus
 }
@@ -557,8 +616,10 @@ fn check_gear(
     steps: &mut [LevelStep],
     problems: &mut Vec<Problem>,
 ) -> Vec<GearCheck> {
+    let owned: Vec<u32> = build.start.pieces.iter().filter_map(|p| p.item).collect();
     let mut gear = Vec::with_capacity(build.plan.gear.len());
-    for &id in &build.plan.gear {
+    // A goal already worn is done: it isn't new gear to look for.
+    for &id in build.plan.gear.iter().filter(|id| !owned.contains(id)) {
         let Some(item) = catalog.item(id) else {
             problems.push(Problem::warning(None, format!("A gear goal names an item Leafline doesn't know ({id}).")));
             continue;
@@ -571,11 +632,18 @@ fn check_gear(
     }
 
     let known = build.start.stats.is_some();
+    // What the character wears now counts from the start, with its own stats.
     let mut worn: Vec<Worn> = Vec::new();
+    if rules.gear_counts {
+        for piece in &build.start.pieces {
+            let bonus = piece_bonus(&piece.data_stats(catalog));
+            worn.push(Worn { slot: piece.slot(catalog), bonus });
+        }
+    }
     for step in steps.iter_mut() {
         loop {
             let wearable = gear.iter().position(|check: &GearCheck| {
-                let others = worn.iter().filter(|w| w.slot != check.item.slot);
+                let others = worn.iter().filter(|w| !Piece::clashes(&w.slot, &check.item.slot));
                 let stats = others.fold(step.stats, |total, w| total.plus(w.bonus));
                 check.usable && check.level.is_none() && meets(&check.item, step.level, &stats, known)
             });
@@ -584,7 +652,7 @@ fn check_gear(
             check.level = Some(step.level);
             step.gear.push(check.item.name.clone());
             if rules.gear_counts {
-                worn.retain(|w| w.slot != check.item.slot);
+                worn.retain(|w| !Piece::clashes(&w.slot, &check.item.slot));
                 worn.push(Worn { slot: check.item.slot.clone(), bonus: bonus_of(&check.item) });
             }
         }

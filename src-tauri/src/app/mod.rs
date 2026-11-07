@@ -198,6 +198,8 @@ pub fn run() {
             builds::add_piece,
             builds::remove_piece,
             builds::update_piece,
+            builds::wear_item,
+            builds::build_outfit,
             builds::gear_suggestions,
             builds::find_gear,
             live::read_character_windows,

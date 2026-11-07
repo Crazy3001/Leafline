@@ -6,6 +6,7 @@
 
 pub mod catalog;
 pub mod fit;
+pub mod outfit;
 pub mod plan;
 pub mod progress;
 pub mod rules;
@@ -15,6 +16,7 @@ pub mod suggest;
 
 pub use catalog::{Catalog, ItemFilters, ItemPage, ItemQuery, JobChoice};
 pub use fit::{ItemFit, ItemJob};
+pub use outfit::{Outfit, outfit};
 pub use plan::{Build, Expansion, Plan, SkillLevel, Start, Stat, StatGoal, Stats, expand};
 pub use rules::{Branch, Rules};
 pub use starters::Starter;

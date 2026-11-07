@@ -13,7 +13,7 @@ use crate::build::plan::{MAX_LEVEL, Piece};
 use crate::build::progress::{self, CatchUp};
 use crate::build::{
     Branch, Build, Catalog, Expansion, GearFor, GearFound, GearSuggestions, ItemFilters, ItemFit, ItemJob, ItemPage,
-    ItemQuery, JobChoice, Rules, Starter, Wearer, expand, fit, share, starters, suggest,
+    ItemQuery, JobChoice, Outfit, Rules, Starter, Wearer, expand, fit, outfit, share, starters, suggest,
 };
 use crate::error::{Error, Result};
 use crate::mapdata::osms::{ItemRecord, SkillRecord};
@@ -151,10 +151,25 @@ pub fn show_item(app: AppHandle, id: Option<u32>, text: Option<String>) -> Resul
     Ok(app.emit(SHOW_ITEM_EVENT, ItemLink { id, text })?)
 }
 
-/// Adds a piece of equipment, as an item check read it, to the build for `character`. My build
-/// is one list: the piece's item joins the plan's gear too, so the plan counts it.
+/// Puts on a piece of equipment, as an item check read it, in the build for `character`. It takes
+/// the place of what was in its slot, as it would in game.
 #[tauri::command]
 pub fn add_piece(app: AppHandle, state: State<UserDataState>, piece: Piece, character: Option<String>) -> Result<()> {
+    wear(&app, &state, piece, character)
+}
+
+/// Puts on a clean copy of an item from the data, for gear the player names rather than checks.
+#[tauri::command]
+pub fn wear_item(app: AppHandle, state: State<UserDataState>, item: u32, character: Option<String>) -> Result<()> {
+    let catalog = catalog(&app)?;
+    let Some(record) = catalog.item(item) else {
+        return Err(Error::Invalid("Leafline doesn't know that item.".into()));
+    };
+    wear(&app, &state, Piece::of_item(record), character)
+}
+
+fn wear(app: &AppHandle, state: &UserDataState, piece: Piece, character: Option<String>) -> Result<()> {
+    let catalog = catalog(app)?;
     let Some(mut build) = state.with(|db| db.active_build(character.as_deref()))? else {
         return Err(Error::Invalid("Plan a build first, in the Character tab.".into()));
     };
@@ -163,11 +178,12 @@ pub fn add_piece(app: AppHandle, state: State<UserDataState>, piece: Piece, char
     if pieces.iter().any(|p| same_piece(p, &piece)) {
         return Ok(());
     }
+    let slot = piece.slot(&catalog);
+    pieces.retain(|p| !Piece::clashes(&p.slot(&catalog), &slot));
     let id = pieces.iter().map(|p| p.id).max().unwrap_or(0) + 1;
     pieces.push(Piece { id, ..piece });
-    sync_gear(&mut build);
     state.with(|db| db.save_build(&build, now()))?;
-    changed(&app)
+    changed(app)
 }
 
 /// Puts right a piece the item check misread: its name, item, stats, upgrades or slots.
@@ -177,44 +193,25 @@ pub fn update_piece(app: AppHandle, state: State<UserDataState>, piece: Piece, c
     let Some(old) = build.start.pieces.iter_mut().find(|p| p.id == piece.id) else {
         return Err(Error::Invalid("That piece is no longer in the build.".into()));
     };
-    let before = old.item;
     *old = piece;
-    if let Some(item) = before {
-        drop_unused_goal(&mut build, item);
-    }
-    sync_gear(&mut build);
     state.with(|db| db.save_build(&build, now()))?;
     changed(&app)
 }
 
-/// Takes a piece of equipment out of the build for `character`, and its item with it unless
-/// another copy of it stays.
+/// Takes off a piece of equipment in the build for `character`. Builds from before worn gear
+/// was kept apart made its item a goal too, so that goal goes with it.
 #[tauri::command]
 pub fn remove_piece(app: AppHandle, state: State<UserDataState>, id: i64, character: Option<String>) -> Result<()> {
     let Some(mut build) = state.with(|db| db.active_build(character.as_deref()))? else { return Ok(()) };
     let item = build.start.pieces.iter().find(|p| p.id == id).and_then(|p| p.item);
     build.start.pieces.retain(|p| p.id != id);
-    if let Some(item) = item {
-        drop_unused_goal(&mut build, item);
+    if let Some(item) = item
+        && !build.start.pieces.iter().any(|p| p.item == Some(item))
+    {
+        build.plan.gear.retain(|g| *g != item);
     }
     state.with(|db| db.save_build(&build, now()))?;
     changed(&app)
-}
-
-/// Every piece's item is in the plan's gear.
-fn sync_gear(build: &mut Build) {
-    for item in build.start.pieces.iter().filter_map(|p| p.item) {
-        if !build.plan.gear.contains(&item) {
-            build.plan.gear.push(item);
-        }
-    }
-}
-
-/// Takes an item out of the plan's gear when no piece of it is left.
-fn drop_unused_goal(build: &mut Build, item: u32) {
-    if !build.start.pieces.iter().any(|p| p.item == Some(item)) {
-        build.plan.gear.retain(|id| *id != item);
-    }
 }
 
 /// Everything read off the tooltip matches; only the id differs.
@@ -222,8 +219,7 @@ fn same_piece(a: &Piece, b: &Piece) -> bool {
     Piece { id: 0, ..a.clone() } == Piece { id: 0, ..b.clone() }
 }
 
-/// Adds an item to the gear goals of the build for `character`, or takes it off, with any pieces
-/// of it: My build is one list.
+/// Adds an item to the gear goals of the build for `character`, or takes it off.
 #[tauri::command]
 pub fn set_gear_goal(
     app: AppHandle,
@@ -238,11 +234,20 @@ pub fn set_gear_goal(
     build.plan.gear.retain(|id| *id != item);
     if wanted {
         build.plan.gear.push(item);
-    } else {
-        build.start.pieces.retain(|p| p.item != Some(item));
     }
     state.with(|db| db.save_build(&build, now()))?;
     changed(&app)
+}
+
+/// The build's gear at `level`, slot by slot: worn, next and suggested. `None` without the
+/// build or the map data.
+#[tauri::command]
+pub fn build_outfit(app: AppHandle, state: State<UserDataState>, id: i64, level: u32) -> Result<Option<Outfit>> {
+    let Some(catalog) = app.state::<MapDataState>().catalog() else { return Ok(None) };
+    let Some(build) = state.with(|db| db.build(id))? else { return Ok(None) };
+    let rules = rules(&app);
+    let expansion = expand(&build, &rules, &catalog);
+    Ok(Some(outfit(&build, &expansion, &rules, &catalog, level)))
 }
 
 /// How reading the character's windows went.

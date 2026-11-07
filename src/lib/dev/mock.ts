@@ -19,6 +19,7 @@ import type {
   Expansion,
   GearItem,
   GearPiece,
+  Outfit,
   ItemLink,
   MonsterLink,
   PlaceLink,
@@ -306,6 +307,15 @@ const mockItems: ItemRecord[] = [
   mockRecord(blankGear(506, "Moss Stool", "Install"), { kind: "setup", upgradeSlots: null, description: "Somewhere to sit and rest." }),
   mockRecord(blankGear(507, "Snail Tooth", "Etc"), { kind: "etc", upgradeSlots: null, price: 8, questItem: true, untradable: true, description: "A very small tooth." }),
 ];
+const MOCK_SLOTS = ["Weapon", "Hat", "Top", "Bottom", "Overall", "Shoes", "Glove", "Cape", "Shield", "Earring"];
+const mockSlotOf = (piece: GearPiece) => {
+  const known = mockItems.find((i) => i.id === piece.item);
+  if (known) return known.slot;
+  const type = (piece.itemType ?? "").toLowerCase();
+  return MOCK_SLOTS.slice(1).find((slot) => type.includes(slot.toLowerCase())) ?? "Weapon";
+};
+const mockClashes = (a: string, b: string) =>
+  a === b || (a === "Overall" && (b === "Top" || b === "Bottom")) || (b === "Overall" && (a === "Top" || a === "Bottom"));
 const showItemHandlers: ((link: ItemLink) => void)[] = [];
 const showQuestHandlers: ((id: number) => void)[] = [];
 const showPanelHandlers: ((panel: Panel) => void)[] = [];
@@ -393,8 +403,9 @@ function mockExpand(build: Build): Expansion {
     }
     steps.push({ ...step, stats: { ...stats }, apLeft: ap, spLeft: sp });
   }
-  const gear = build.plan.gear.flatMap((id) => {
-    const item = mockGear.find((g) => g.id === id);
+  const owned = (build.start.pieces ?? []).map((p) => p.item);
+  const gear = build.plan.gear.filter((id) => !owned.includes(id)).flatMap((id) => {
+    const item = mockItems.find((g) => g.id === id);
     if (!item) return [];
     const at = steps.find((s) => s.level >= item.reqLevel && s.stats.dex >= item.reqDex);
     at?.gear.push(item.name);
@@ -885,19 +896,34 @@ export const mockBackend: Backend = {
     const pieces = (build.start.pieces ??= []);
     const same = (p: GearPiece) => JSON.stringify({ ...p, id: 0 }) === JSON.stringify({ ...piece, id: 0 });
     if (pieces.some(same)) return;
-    pieces.push({ ...piece, id: Math.max(0, ...pieces.map((p) => p.id)) + 1 });
-    if (piece.item != null && !build.plan.gear.includes(piece.item)) build.plan.gear.push(piece.item);
+    const slot = mockSlotOf(piece);
+    build.start.pieces = pieces.filter((p) => !mockClashes(mockSlotOf(p), slot));
+    build.start.pieces.push({ ...piece, id: Math.max(0, ...pieces.map((p) => p.id)) + 1 });
     buildsChanged();
+  },
+  async wearItem(id) {
+    const item = mockItems.find((i) => i.id === id);
+    if (!item) throw new Error("Leafline doesn't know that item.");
+    const label = (l: string) => (l === "Attack" ? "Weapon Attack" : l === "Magic" ? "Magic Attack" : l);
+    await mockBackend.addPiece(
+      {
+        id: 0,
+        item: item.id,
+        name: item.name,
+        itemType: item.weaponType ?? item.slot,
+        level: item.reqLevel,
+        stats: item.stats.map((s) => ({ label: label(s.label), value: s.value })),
+        upgrades: null,
+        slotsLeft: item.upgradeSlots,
+        slots: item.upgradeSlots,
+      },
+      null,
+    );
   },
   async updatePiece(piece) {
     const build = newestBuild();
     if (!build) return;
-    const pieces = build.start.pieces ?? [];
-    const old = pieces.find((p) => p.id === piece.id);
-    build.start.pieces = pieces.map((p) => (p.id === piece.id ? piece : p));
-    const unused = (item: number) => !build.start.pieces!.some((p) => p.item === item);
-    if (old?.item != null && unused(old.item)) build.plan.gear = build.plan.gear.filter((id) => id !== old.item);
-    if (piece.item != null && !build.plan.gear.includes(piece.item)) build.plan.gear.push(piece.item);
+    build.start.pieces = (build.start.pieces ?? []).map((p) => (p.id === piece.id ? piece : p));
     buildsChanged();
   },
   async removePiece(id) {
@@ -912,8 +938,44 @@ export const mockBackend: Backend = {
     const build = newestBuild();
     if (!build) return;
     build.plan.gear = build.plan.gear.filter((id) => id !== item).concat(wanted ? [item] : []);
-    if (!wanted) build.start.pieces = (build.start.pieces ?? []).filter((p) => p.item !== item);
     buildsChanged();
+  },
+  async buildOutfit(id, level) {
+    const build = mockBuilds.find((b) => b.id === id);
+    if (!build) return null;
+    const { gear } = mockExpand(build);
+    const pieces = build.start.pieces ?? [];
+    const score = (stats: { label: string; value: number }[]) => {
+      const of = (label: string) => stats.filter((s) => s.label === label).reduce((sum, s) => sum + s.value, 0);
+      return [(of("Attack") + of("Weapon Attack")) * 3 + of("LUK") * 2 + of("DEX"), of("Weapon Def.")];
+    };
+    const beats = (a: number[], b: number[]) => a[0] > b[0] || (a[0] === b[0] && a[1] > b[1]);
+    const overall = pieces.some((p) => mockSlotOf(p) === "Overall");
+    const outfit: Outfit = { level, slots: [], empty: [] };
+    for (const slot of MOCK_SLOTS) {
+      if (overall && (slot === "Top" || slot === "Bottom")) continue;
+      const wearing = pieces.findLast((p) => mockSlotOf(p) === slot) ?? null;
+      const wornLevel = wearing?.level ?? 0;
+      const ahead = gear
+        .filter((g) => g.item.slot === slot && g.item.id !== wearing?.item && g.item.reqLevel > wornLevel)
+        .sort((a, b) => (a.level ?? 999) - (b.level ?? 999));
+      const ready = ahead.filter((g) => g.level != null && g.level <= level).length;
+      const at = Math.max(0, ready - 1);
+      const next = ahead[at] ?? null;
+      const later = Math.max(0, ahead.length - at - 1);
+      const best = mockItems
+        .filter((i) => i.kind === "equip" && i.slot === slot && i.reqLevel <= level)
+        .sort((a, b) => (beats(score(a.stats), score(b.stats)) ? -1 : 1))[0];
+      const suggested =
+        best && best.id !== wearing?.item && best.id !== next?.item.id && (!wearing || beats(score(best.stats), score(wearing.stats))) ? best : null;
+      const optional = slot === "Overall" || slot === "Shield";
+      if (!wearing && !next && (!suggested || optional)) {
+        if (!optional) outfit.empty.push(slot);
+        continue;
+      }
+      outfit.slots.push({ slot, wearing, next: next && { ...next, item: mockItems.find((i) => i.id === next.item.id) ?? next.item }, later, suggested });
+    }
+    return outfit;
   },
   async searchQuests(search) {
     const quests = mockQuests.filter((q) => q.name.toLowerCase().includes(search.text.toLowerCase()) && (!search.region || q.region === search.region));

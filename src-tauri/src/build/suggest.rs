@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use super::catalog::{Catalog, novelty, usable_by};
 use super::fit::ARMOUR;
-use super::plan::{Build, Expansion, MAX_LEVEL, Plan, Start, Stat, expand, meets};
+use super::plan::{Build, Expansion, MAX_LEVEL, Piece, Plan, Start, Stat, expand, meets};
 use super::rules::{Branch, Rules};
 use crate::mapdata::osms::{ItemKind, ItemRecord};
 
@@ -121,7 +121,7 @@ impl<'a> Wearer<'a> {
     /// Other gear worn by then counts, as it does for a hovered item, but not what this replaces.
     fn strong_enough(&self, item: &ItemRecord) -> bool {
         let Some(step) = self.expansion.step(self.level) else { return false };
-        let others = step.worn.iter().filter(|w| w.slot != item.slot);
+        let others = step.worn.iter().filter(|w| !Piece::clashes(&w.slot, &item.slot));
         let stats = others.fold(step.stats, |total, w| total.plus(w.bonus));
         meets(item, self.level, &stats, self.build.start.stats.is_some())
     }
@@ -144,8 +144,39 @@ fn weighted_stats(build: &Build) -> Vec<(Stat, i64)> {
     weights
 }
 
-fn stat(item: &ItemRecord, label: &str) -> i64 {
-    item.stats.iter().find(|s| s.label == label).map_or(0, |s| s.value)
+/// How the gear finder weighs gear for a build.
+pub struct Scorer {
+    weights: Vec<(Stat, i64)>,
+    pub attack: &'static str,
+    pub defence: &'static str,
+}
+
+impl Scorer {
+    pub fn new(build: &Build) -> Self {
+        let magician = Branch::of_job(build.plan.job) == Some(Branch::Magician);
+        let (attack, defence) = if magician { ("Magic", "Magic Def.") } else { ("Attack", "Weapon Def.") };
+        Self { weights: weighted_stats(build), attack, defence }
+    }
+
+    /// Attack and the stats the plan raises, then defence, from stats as the item data names
+    /// them. Higher is better.
+    pub fn score(&self, stats: &[(String, i64)]) -> (i64, i64) {
+        let stat = |label: &str| stats.iter().filter(|(l, _)| l == label).map(|(_, v)| v).sum::<i64>();
+        let raised: i64 = self.weights.iter().map(|(s, weight)| stat(s.label()) * weight).sum();
+        (stat(self.attack) * ATTACK_WEIGHT + raised, stat(self.defence))
+    }
+
+    pub fn of(&self, item: &ItemRecord) -> (i64, i64) {
+        self.score(&item.stats.iter().map(|s| (s.label.clone(), s.value)).collect::<Vec<_>>())
+    }
+
+    /// What it counted, the heaviest first.
+    fn ranked_by(&self) -> Vec<String> {
+        std::iter::once(self.attack.to_string())
+            .chain(self.weights.iter().map(|(s, _)| s.label().to_string()))
+            .chain(std::iter::once(self.defence.to_string()))
+            .collect()
+    }
 }
 
 /// The best few of what `build` can wear at `level`, slot by slot.
@@ -186,13 +217,11 @@ pub fn find_gear(who: &GearFor, own: Option<Build>, seen_job: Option<u32>, rules
 /// are left out: players can't get them or wouldn't want them.
 fn ranked(build: &Build, expansion: &Expansion, rules: &Rules, catalog: &Catalog, level: u32, limit: usize) -> GearSuggestions {
     let wearer = Wearer::new(build, expansion, rules, catalog, level);
-    let magician = Branch::of_job(build.plan.job) == Some(Branch::Magician);
-    let (attack, defence) = if magician { ("Magic", "Magic Def.") } else { ("Attack", "Weapon Def.") };
-    let weights = weighted_stats(build);
+    let scorer = Scorer::new(build);
     let trained = catalog.weapons_of_branch(build.plan.job);
     let score = |item: &ItemRecord| {
-        let stats: i64 = weights.iter().map(|(s, weight)| stat(item, s.label()) * weight).sum();
-        (stat(item, attack) * ATTACK_WEIGHT + stats, stat(item, defence), item.req_level)
+        let (main, defence) = scorer.of(item);
+        (main, defence, item.req_level)
     };
 
     let mut slots = Vec::new();
@@ -225,11 +254,7 @@ fn ranked(build: &Build, expansion: &Expansion, rules: &Rules, catalog: &Catalog
             slots.push(SlotPicks { slot: slot.to_string(), picks, total });
         }
     }
-    let ranked_by = std::iter::once(attack.to_string())
-        .chain(weights.iter().map(|(s, _)| s.label().to_string()))
-        .chain(std::iter::once(defence.to_string()))
-        .collect();
-    GearSuggestions { level, ranked_by, slots }
+    GearSuggestions { level, ranked_by: scorer.ranked_by(), slots }
 }
 
 #[cfg(test)]

@@ -64,6 +64,7 @@ import type {
   NpcQuery,
   NpcWhere,
   OverlayStatus,
+  Outfit,
   Panel,
   PinId,
   PinStatus,
@@ -303,6 +304,9 @@ export interface Backend {
   removePiece(id: number, character: string | null): Promise<void>;
   /** Puts right a piece the item check misread, found by its id. */
   updatePiece(piece: GearPiece, character: string | null): Promise<void>;
+  /** Puts on a clean copy of an item from the data, in place of what was in its slot. */
+  wearItem(item: number, character: string | null): Promise<void>;
+  buildOutfit(build: number, level: number): Promise<Outfit | null>;
   /** Reads the open stat and skill windows once and moves the build to match. */
   readCharacter(): Promise<void>;
   onCharacterRead(handler: (read: CharacterRead) => void): Promise<UnlistenFn>;
@@ -521,6 +525,8 @@ const tauriBackend: Backend = {
   addPiece: (piece, character) => invoke("add_piece", { piece, character }),
   removePiece: (id, character) => invoke("remove_piece", { id, character }),
   updatePiece: (piece, character) => invoke("update_piece", { piece, character }),
+  wearItem: (item, character) => invoke("wear_item", { item, character }),
+  buildOutfit: (build, level) => invoke("build_outfit", { id: build, level }),
   gearSuggestions: (build, level) => invoke("gear_suggestions", { id: build, level }),
   findGear: (who, character, seenJob) => invoke("find_gear", { who, character, seenJob }),
   readCharacter: () => invoke("read_character_windows"),

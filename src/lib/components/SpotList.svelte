@@ -17,6 +17,7 @@
   import MapDataPanel from "./map/MapDataPanel.svelte";
   import RouteSteps from "./map/RouteSteps.svelte";
   import { backend } from "$lib/api";
+  import { openTrainingLog } from "$lib/nav.svelte";
   import { formatCompact, formatDuration } from "$lib/format";
   import { measuredRates, watchHistory } from "$lib/history.svelte";
   import { mapData, watchMapData } from "$lib/mapdata.svelte";
@@ -389,7 +390,7 @@
         </Button>
       {/if}
       <span class="grow"></span>
-      <Button variant="primary" onclick={() => backend.showTraining()}>Training log <ExternalLink size={12} /></Button>
+      <Button variant="primary" onclick={openTrainingLog}>Training log <ExternalLink size={12} /></Button>
     </div>
   {/if}
 </Block>

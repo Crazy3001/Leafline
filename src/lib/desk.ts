@@ -1,14 +1,21 @@
-// The desk view's layout: columns side by side, each holding one panel or two stacked. Two presets
-// cover training and questing; any change the player makes is saved as their own layout, so the
-// presets stay as they are to go back to.
+// The desk view's layout: columns side by side, each holding one panel or two stacked. Presets
+// cover training, questing and looking back over the training log; any change the player makes is
+// saved as their own layout, so the presets stay as they are to go back to.
 
 import { PANELS } from "./panels";
 import type { Panel } from "./types";
 
-/** One column, top to bottom: one panel, or two sharing its height. */
-export type DeskColumn = Panel[];
+/** What a desk view column can show: the overlay's panels, and the training log, which is a
+ *  window of its own elsewhere. */
+export type DeskPanel = Panel | "log";
 
-export type PresetId = "training" | "questing" | "mine";
+/** Every desk panel, in the order the Change menu lists them. */
+export const DESK_PANELS: DeskPanel[] = [...PANELS.map((p) => p.id), "log"];
+
+/** One column, top to bottom: one panel, or two sharing its height. */
+export type DeskColumn = DeskPanel[];
+
+export type PresetId = "training" | "questing" | "log" | "mine";
 
 export interface DeskPrefs {
   preset: PresetId;
@@ -21,7 +28,13 @@ export interface DeskPrefs {
 export const PRESETS: Record<Exclude<PresetId, "mine">, DeskColumn[]> = {
   training: [["train"], ["map"], ["character"]],
   questing: [["quests"], ["map"], ["item"]],
+  log: [["train"], ["log"]],
 };
+
+/** How wide a column is against the others: the training log's tables and graphs want room. */
+export function weight(column: DeskColumn): number {
+  return column.includes("log") ? 2 : 1;
+}
 
 export const ZOOMS = [1, 1.25, 1.5];
 export const MAX_COLUMNS = 4;
@@ -37,7 +50,11 @@ export function loadPrefs(): DeskPrefs {
     if (!saved || typeof saved !== "object") return fallback;
     const mine = valid(saved.mine) ? saved.mine : null;
     const preset: PresetId =
-      saved.preset === "questing" || saved.preset === "training" ? saved.preset : saved.preset === "mine" && mine ? "mine" : "training";
+      saved.preset === "questing" || saved.preset === "training" || saved.preset === "log"
+        ? saved.preset
+        : saved.preset === "mine" && mine
+          ? "mine"
+          : "training";
     const zoom = ZOOMS.includes(saved.zoom) ? saved.zoom : 1;
     return { preset, mine, zoom };
   } catch {
@@ -56,7 +73,7 @@ export function savePrefs(prefs: DeskPrefs) {
 /** A saved layout must still name only panels that exist, each once, in 1 to 4 columns. */
 function valid(columns: unknown): columns is DeskColumn[] {
   if (!Array.isArray(columns) || columns.length < 1 || columns.length > MAX_COLUMNS) return false;
-  const ids = PANELS.map((p) => p.id as string);
+  const ids = DESK_PANELS as string[];
   const seen = new Set<string>();
   for (const column of columns) {
     if (!Array.isArray(column) || column.length < 1 || column.length > MAX_STACK) return false;
@@ -73,7 +90,7 @@ export function layoutOf(prefs: DeskPrefs): DeskColumn[] {
 }
 
 /** Where a panel is shown, as column and place in it. */
-export function find(columns: DeskColumn[], panel: Panel): [number, number] | null {
+export function find(columns: DeskColumn[], panel: DeskPanel): [number, number] | null {
   for (let c = 0; c < columns.length; c++) {
     const s = columns[c].indexOf(panel);
     if (s >= 0) return [c, s];
@@ -81,15 +98,15 @@ export function find(columns: DeskColumn[], panel: Panel): [number, number] | nu
   return null;
 }
 
-/** Panels no column shows, in tab order. */
-export function unused(columns: DeskColumn[]): Panel[] {
-  return PANELS.map((p) => p.id).filter((id) => !find(columns, id));
+/** Panels no column shows, in the Change menu's order. */
+export function unused(columns: DeskColumn[]): DeskPanel[] {
+  return DESK_PANELS.filter((id) => !find(columns, id));
 }
 
 const copy = (columns: DeskColumn[]) => columns.map((c) => [...c]);
 
 /** Shows `panel` at a place. One already shown elsewhere swaps places with what was there. */
-export function place(columns: DeskColumn[], column: number, slot: number, panel: Panel): DeskColumn[] {
+export function place(columns: DeskColumn[], column: number, slot: number, panel: DeskPanel): DeskColumn[] {
   const next = copy(columns);
   const here = next[column][slot];
   if (here === panel) return next;

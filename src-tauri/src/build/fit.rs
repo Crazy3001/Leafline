@@ -42,14 +42,15 @@ pub struct Shortfall {
 /// Armour slots as the item data names them. A tooltip type that is none of these is a weapon.
 pub const ARMOUR: [&str; 9] = ["Hat", "Top", "Bottom", "Overall", "Shoes", "Glove", "Cape", "Shield", "Earring"];
 
+/// The slot, as the item data names it, that an item of the tooltip's `item_type` goes in.
+pub fn slot_of(item_type: &str) -> &'static str {
+    let lower = item_type.to_lowercase();
+    ARMOUR.iter().find(|a| lower.contains(&a.to_lowercase())).copied().unwrap_or("Weapon")
+}
+
 /// Whether worn gear in `slot` would come off for an item of the tooltip's `item_type`.
 fn replaces(slot: &str, item_type: Option<&str>) -> bool {
-    let Some(item_type) = item_type else { return false };
-    let lower = item_type.to_lowercase();
-    match ARMOUR.iter().find(|a| lower.contains(&a.to_lowercase())) {
-        Some(armour) => slot.eq_ignore_ascii_case(armour),
-        None => slot.eq_ignore_ascii_case("Weapon"),
-    }
+    item_type.is_some_and(|t| slot.eq_ignore_ascii_case(slot_of(t)))
 }
 
 /// The stats that count toward an item at this step.
