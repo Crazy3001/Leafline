@@ -13,8 +13,16 @@
     build,
     level,
     full = false,
+    slot = null,
     onAdd,
-  }: { build: number; level: number; full?: boolean; onAdd?: (item: ItemRecord) => void } = $props();
+  }: {
+    build: number;
+    level: number;
+    full?: boolean;
+    /** Only this slot, as the item data names it. */
+    slot?: string | null;
+    onAdd?: (item: ItemRecord) => void;
+  } = $props();
 
   watchBuilds();
 
@@ -33,11 +41,12 @@
     const names = picks?.rankedBy ?? [];
     return names.length > 1 ? `${names.slice(0, -1).join(", ")}, then ${names[names.length - 1]}` : names.join("");
   });
+  const shownSlots = $derived(picks?.slots.filter((s) => slot == null || s.slot === slot) ?? []);
 </script>
 
-{#if picks?.slots.length}
+{#if shownSlots.length}
   <ul class="slots" class:full>
-    {#each picks.slots as slot (slot.slot)}
+    {#each shownSlots as slot (slot.slot)}
       <li>
         <span class="slot">{slot.slot}</span>
         <div class="picks">
@@ -59,7 +68,7 @@
     {/each}
   </ul>
   <p class="how">
-    Ranked by {ranked}, from what this plan can wear at Lv {picks.level}. Nobody has checked these in game, and it doesn't
+    Ranked by {ranked}, from what this plan can wear at Lv {picks?.level}. Nobody has checked these in game, and it doesn't
     know prices or how easy an item is to find.
   </p>
 {:else if picks}
