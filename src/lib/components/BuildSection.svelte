@@ -294,9 +294,9 @@
     </section>
   {/if}
 {:else}
-<section class="build" aria-label="Build plan">
-  <header class="head">
-    <span class="title">Build</span>
+<section class="build full" aria-label="Build plan">
+  <header class="head strip">
+    <span class="title strip-title">Build</span>
     {#if plan && step}<span class="plan" title={plan.build.name}>{plan.build.name}</span>{/if}
     {#if plan && step}
       <span class="tools">
@@ -588,6 +588,23 @@
     margin-top: 12px;
     padding-top: 10px;
     border-top: 1px solid var(--border);
+  }
+
+  /* In the tab, the build opens with a band like a section of its own, out to the card's edges. */
+  .build.full {
+    margin-top: 16px;
+    padding-top: 0;
+    border-top: 0;
+  }
+
+  .head.strip {
+    align-items: center;
+    margin: 0 -12px 10px;
+  }
+
+  .head.strip .title {
+    color: var(--text);
+    font-weight: 600;
   }
 
   .head {

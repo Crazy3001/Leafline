@@ -48,19 +48,21 @@
 
 <style>
   .section {
-    border-top: 1px solid var(--border);
-    padding-top: 8px;
-    margin-top: 10px;
+    margin-top: 12px;
   }
 
+  /* A part inside a section: a band like the section's own, set in from its edges. */
   .head {
     display: flex;
     align-items: center;
     gap: 5px;
     width: 100%;
-    padding: 0;
+    min-height: 26px;
+    padding: 3px 8px 3px 5px;
     border: 0;
-    background: transparent;
+    border-bottom: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    background: var(--surface-2);
     cursor: pointer;
     text-align: left;
   }
@@ -78,8 +80,18 @@
   .title {
     font-family: var(--font-display);
     font-size: var(--text-md);
-    font-weight: 400;
-    color: var(--muted);
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .head:hover .title,
+  .head:focus-visible .title {
+    color: var(--accent-strong);
+  }
+
+  .head:focus-visible {
+    outline: 1px solid var(--accent);
+    outline-offset: -1px;
   }
 
   .count {

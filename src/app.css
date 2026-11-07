@@ -12,8 +12,9 @@
   --surface-2: #201f1c;
   --surface-3: #2a2824;
   --glass: rgba(20, 20, 18, 0.95);
-  --border: rgba(236, 230, 216, 0.1);
-  --border-strong: rgba(236, 230, 216, 0.2);
+  /* Rules between rows: strong enough to show over a bright game scene behind a see-through overlay. */
+  --border: rgba(236, 230, 216, 0.14);
+  --border-strong: rgba(236, 230, 216, 0.24);
 
   --text: #ece6d8;
   --muted: #a8a193;
@@ -109,6 +110,30 @@ button {
 
 .num {
   font-family: var(--font-display);
+}
+
+/*
+ * The band that opens each section of a panel (Card, Block, the map card's parts, the build):
+ * a flat fill ruled above and below, its title in full text colour, so one section reads as
+ * ending before the next begins even over a busy game scene. The section bleeds it to its own
+ * edges with negative margins. Items inside a section (a quest, a spot) are framed blocks.
+ */
+.strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 4px 12px;
+  border-top: 1px solid var(--border-strong);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.strip-title {
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--text);
 }
 
 /*

@@ -148,10 +148,18 @@
 <style>
   .items {
     display: grid;
-    gap: 7px;
     margin: 0;
     padding: 0;
     list-style: none;
+  }
+
+  /* Each drop ruled off from the next, so its name and the monsters under it read as one entry. */
+  .items > li {
+    padding: 5px 0;
+  }
+
+  .items > li + li {
+    border-top: 1px solid var(--border);
   }
 
   .item {

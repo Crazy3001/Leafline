@@ -22,8 +22,8 @@
   </section>
 {:else}
   <section class="card">
-    <header>
-      <span class="eyebrow">{title}</span>
+    <header class="strip">
+      <span class="strip-title">{title}</span>
       {#if aside}<span class="aside">{@render aside()}</span>{/if}
     </header>
     {@render children()}
@@ -33,17 +33,18 @@
 <style>
   .card {
     background: transparent;
-    border-bottom: 1px solid var(--border);
     border-radius: 0;
-    padding: 10px 12px 12px;
+    padding: 0 12px 14px;
   }
 
   header {
-    display: flex;
-    align-items: center;
     justify-content: space-between;
-    gap: 8px;
-    margin-bottom: 8px;
+    margin: 0 -12px 10px;
+  }
+
+  /* The first section sits right under the tabs, which already rule it off. */
+  .card:first-child header {
+    border-top: 0;
   }
 
   .plain-aside {

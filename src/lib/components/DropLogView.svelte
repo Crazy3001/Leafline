@@ -139,10 +139,17 @@
     flex: 1;
   }
 
+  /* Each monster's drops in a block of their own, framed as the Quests tab frames a quest. */
+  .monster {
+    padding: 6px 8px;
+    border: 1px solid var(--border-strong);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+  }
+
   .monster + .monster {
-    margin-top: 8px;
-    padding-top: 8px;
-    border-top: 1px solid var(--border);
+    margin-top: 6px;
   }
 
   .mrow {

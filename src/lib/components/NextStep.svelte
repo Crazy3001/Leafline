@@ -4,7 +4,20 @@
   // the step to take from the map the player is on, how many follow, and a way to cancel. It
   // moves on by itself as the minimap reading changes (see wayfinder.svelte.ts). Also offers
   // the turn-in place of a quest whose counters just filled.
-  import { CarTaxiFront, Check, Navigation, Pin, ScrollText, X } from "@lucide/svelte";
+  import {
+    ArrowLeft,
+    ArrowRight,
+    ArrowUp,
+    CarTaxiFront,
+    Check,
+    DoorOpen,
+    LogIn,
+    LogOut,
+    Navigation,
+    Pin,
+    ScrollText,
+    X,
+  } from "@lucide/svelte";
 
   import GoButton from "./GoButton.svelte";
   import { backend } from "$lib/api";
@@ -13,7 +26,7 @@
   import { showNpcNamed } from "$lib/places.svelte";
   import { live } from "$lib/readings.svelte";
   import { display } from "$lib/settings.svelte";
-  import type { Destination } from "$lib/types";
+  import type { Destination, RouteStep } from "$lib/types";
   import { dismissOffer, endTrip, trip } from "$lib/wayfinder.svelte";
   import { stepVerb } from "$lib/wayfinding";
 
@@ -30,6 +43,20 @@
   const destination = $derived(nav.destination);
   const step = $derived(trip.route?.steps[trip.next] ?? null);
   const after = $derived(trip.route ? trip.route.steps.length - trip.next - 1 : 0);
+  const total = $derived(trip.route?.steps.length ?? 0);
+  /** Past this many steps the bar of segments gets too fine to read, and the count says it. */
+  const MAX_SEGMENTS = 16;
+
+  /** The picture for a step: the way to walk for a portal, the ride or scroll otherwise. */
+  function turnIcon(step: RouteStep) {
+    if (step.travel) return step.travel.kind === "scroll" ? ScrollText : CarTaxiFront;
+    if (step.side === "left" || (!step.side && step.direction === "west")) return ArrowLeft;
+    if (step.side === "right" || (!step.side && step.direction === "east")) return ArrowRight;
+    if (step.side === "centre") return ArrowUp;
+    if (step.direction === "in") return LogIn;
+    if (step.direction === "out") return LogOut;
+    return DoorOpen;
+  }
   /** The map the route ends on, which says where an NPC stands. */
   const end = $derived(trip.route?.to ?? null);
 
@@ -67,23 +94,27 @@
     <span class="line">{trip.arrived}</span>
   </div>
 {:else if destination}
-  <div class="bar trip" class:hud class:pin>
-    <span class="icon"><Navigation size={11} /></span>
+  {@const Turn = step ? turnIcon(step) : Navigation}
+  <div class="bar trip" class:hud class:pin class:lost={trip.lost}>
+    <!-- Which way to go, big enough to take in at a glance, as a sat-nav shows the next turn. -->
+    <span class="turn" class:ride={step?.travel}><Turn size={hud ? 13 : 18} strokeWidth={2.25} /></span>
     <div class="body">
+      {#if step && !hud}
+        <p class="head">
+          <span class="label">Next step</span>
+          {#if total > 1}<span class="faint tabular">{trip.next + 1} of {total}</span>{/if}
+        </p>
+      {/if}
       <p class="next">
         {#if step}
-          <span class="label">Next</span>
           {#if step.travel}
-            <span class="ride">
-              {#if step.travel.kind === "scroll"}<ScrollText size={11} />{:else}<CarTaxiFront size={11} />{/if}
-              {step.travel.service}
-            </span>
+            <span class="ride">{step.travel.service}</span>
           {:else}
             <span class="verb">{stepVerb(step)}</span>
           {/if}
           <span class="arrow">→</span>
           <span class="map">{step.to.name}</span>
-          {#if step.travel?.fare}<span class="faint tabular">{formatNumber(step.travel.fare)} mesos</span>{/if}
+          {#if step.travel?.fare}<span class="faint tabular fare">{formatNumber(step.travel.fare)} mesos</span>{/if}
         {:else if trip.lost}
           <span class="label">No known way</span>
           {#if trip.here}<span class="faint">from {trip.here.name}</span>{/if}
@@ -113,6 +144,12 @@
         {/if}
         {#if trip.unsure && !trip.rerouted}<span class="faint">{" · minimap unclear"}</span>{/if}
       </p>
+      {#if step && total > 1 && total <= MAX_SEGMENTS && !hud}
+        <!-- The trip so far: steps taken, the one to take now, and those after it. -->
+        <div class="progress" aria-hidden="true">
+          {#each { length: total } as _, i}<span class:done={i < trip.next} class:now={i === trip.next}></span>{/each}
+        </div>
+      {/if}
     </div>
     {#if canPin}
       <button class="close" title="Pin the route: keep the next step in a window of its own" aria-label="Pin the route" onclick={pinRoute}
@@ -145,8 +182,80 @@
   }
 
   .trip {
-    border-left: 2px solid var(--accent);
-    padding-left: 8px;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 6px 8px 8px;
+    border-left: 3px solid var(--accent);
+    background: color-mix(in srgb, var(--accent) 7%, var(--surface-2));
+  }
+
+  .trip.lost {
+    border-left-color: var(--warn);
+  }
+
+  .trip.hud {
+    gap: 7px;
+    padding: 4px 4px 4px 6px;
+    border-left-width: 2px;
+  }
+
+  /* The next turn, as a square tile: the one big shape on the bar. */
+  .turn {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+    border-radius: var(--radius-sm);
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+  }
+
+  .turn.ride {
+    border-color: color-mix(in srgb, var(--travel) 55%, transparent);
+    background: color-mix(in srgb, var(--travel) 14%, transparent);
+    color: var(--travel);
+  }
+
+  .lost .turn {
+    border-color: color-mix(in srgb, var(--warn) 55%, transparent);
+    background: var(--warn-soft);
+    color: var(--warn);
+  }
+
+  .hud .turn {
+    width: 22px;
+    height: 22px;
+  }
+
+  .head {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 0 0 1px;
+    font-size: var(--text-xs);
+    line-height: 1.2;
+  }
+
+  .progress {
+    display: flex;
+    gap: 2px;
+    margin-top: 5px;
+  }
+
+  .progress span {
+    flex: 1;
+    height: 3px;
+    background: var(--border-strong);
+  }
+
+  .progress .done {
+    background: color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+
+  .progress .now {
+    background: var(--accent-strong);
   }
 
   /* The pin's window frames it, and the next step is all it shows, so it reads larger. */
@@ -160,7 +269,7 @@
   }
 
   .pin .next {
-    font-size: var(--text-md);
+    font-size: var(--text-lg);
   }
 
   .idle {
@@ -200,8 +309,14 @@
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
-    gap: 0 5px;
-    font-weight: 500;
+    gap: 0 6px;
+    font-size: var(--text-md);
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  .hud .next {
+    font-size: var(--text-sm);
   }
 
   .label {
@@ -211,28 +326,35 @@
   }
 
   .verb {
-    color: var(--muted);
+    color: var(--text);
   }
 
   .ride {
-    display: inline-flex;
-    align-self: center;
-    align-items: center;
-    gap: 3px;
     color: var(--travel);
   }
 
   .arrow {
-    color: var(--faint);
+    color: var(--accent);
+    font-weight: 400;
   }
 
   .map {
     color: var(--ref-map);
   }
 
+  .fare {
+    font-size: var(--text-xs);
+    font-weight: 400;
+  }
+
   .rest {
+    margin-top: 1px;
     color: var(--muted);
     font-size: var(--text-xs);
+  }
+
+  .rest .ref {
+    font-weight: 600;
   }
 
   .line {

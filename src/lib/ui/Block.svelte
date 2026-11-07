@@ -14,8 +14,8 @@
 
 <section {id} class="block" class:last>
   {#if title || aside}
-    <header>
-      {#if title}<h2>{title}</h2>{/if}
+    <header class="strip">
+      {#if title}<h2 class="strip-title">{title}</h2>{/if}
       {#if aside}<span class="aside">{@render aside()}</span>{/if}
     </header>
   {/if}
@@ -27,28 +27,22 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
-    padding: var(--space-3);
-    border-bottom: 1px solid var(--border);
+    padding: 0 var(--space-3) 14px;
   }
 
-  .last {
-    border-bottom: 0;
+  /* A block with no heading still keeps its space from the one above. */
+  .block:not(:has(> header)) {
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--border-strong);
   }
 
   header {
-    display: flex;
-    align-items: center;
     justify-content: space-between;
-    gap: var(--space-2);
-    min-height: 20px;
+    margin: 0 calc(-1 * var(--space-3));
   }
 
   h2 {
     margin: 0;
-    font-family: var(--font-display);
-    font-size: var(--text-md);
-    font-weight: 400;
-    color: var(--muted);
   }
 
   .aside {

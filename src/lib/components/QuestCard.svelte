@@ -172,7 +172,7 @@
     {@const id = info?.quest?.quest.id}
     {@const sheet = id != null ? sheets[id] : null}
     {@const expanded = id != null && questView.expanded.includes(id)}
-    <div class="quest" class:dense={plain}>
+    <div class="quest" class:dense={plain} class:finished>
       <!-- The map data's spelling, once the title matched a quest there: OCR garbles some letters. -->
       <h3 class="title">
         {#if id != null}
@@ -378,14 +378,29 @@
     border-top: 1px solid var(--border);
   }
 
+  /* Each quest is its own block: a flat fill, a frame and an amber rule down the left, so one quest
+     ends visibly before the next begins. The rule turns green once every step is done. */
+  .quest {
+    padding: 0 10px 10px;
+    border: 1px solid var(--border-strong);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+  }
+
+  .quest.finished {
+    border-left-color: var(--good);
+  }
+
   .quest + .quest {
-    margin-top: 12px;
-    padding-top: 10px;
-    border-top: 1px solid var(--border);
+    margin-top: 10px;
   }
 
   .title {
-    margin: 0 0 8px;
+    margin: 0 -10px 8px;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-3);
     font-family: var(--font-display);
     font-size: var(--text-lg);
     font-weight: 600;
@@ -481,7 +496,8 @@
 
   /* Pinned: the same layout, packed tighter. */
   .dense .title {
-    margin-bottom: 4px;
+    margin-bottom: 5px;
+    padding: 4px 10px;
     font-size: var(--text-md);
   }
 
@@ -498,9 +514,12 @@
     font-size: var(--text-sm);
   }
 
+  .quest.dense {
+    padding-bottom: 7px;
+  }
+
   .quest.dense + .quest.dense {
-    margin-top: 8px;
-    padding-top: 7px;
+    margin-top: 7px;
   }
 
   .empty {
