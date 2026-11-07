@@ -189,6 +189,7 @@ pub fn run() {
             builds::set_gear_goal,
             builds::add_piece,
             builds::remove_piece,
+            builds::update_piece,
             builds::gear_suggestions,
             builds::find_gear,
             live::read_character_windows,

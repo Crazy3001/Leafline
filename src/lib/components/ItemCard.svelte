@@ -94,11 +94,12 @@
         : null;
     return { verdict, line, counted };
   });
+  // The slots line under it says slots left in full when the data's count is known.
   const summary = $derived(
     [
       item.itemType,
-      item.requirements.level != null ? `Lv ${item.requirements.level}` : null,
-      item.remainingEnhancements != null ? `${item.remainingEnhancements} slots left` : null,
+      item.requirements.level ? `Lv ${item.requirements.level}` : null,
+      item.remainingEnhancements != null && !scrolling?.line ? `${item.remainingEnhancements} slots left` : null,
     ].filter(Boolean),
   );
 </script>

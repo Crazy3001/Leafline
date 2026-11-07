@@ -293,6 +293,8 @@ export interface Backend {
   /** Adds a piece of equipment, as an item check read it, to the build for this character. */
   addPiece(piece: GearPiece, character: string | null): Promise<void>;
   removePiece(id: number, character: string | null): Promise<void>;
+  /** Puts right a piece the item check misread, found by its id. */
+  updatePiece(piece: GearPiece, character: string | null): Promise<void>;
   /** Reads the open stat and skill windows once and moves the build to match. */
   readCharacter(): Promise<void>;
   onCharacterRead(handler: (read: CharacterRead) => void): Promise<UnlistenFn>;
@@ -506,6 +508,7 @@ const tauriBackend: Backend = {
   setGearGoal: (item, wanted, character) => invoke("set_gear_goal", { item, wanted, character }),
   addPiece: (piece, character) => invoke("add_piece", { piece, character }),
   removePiece: (id, character) => invoke("remove_piece", { id, character }),
+  updatePiece: (piece, character) => invoke("update_piece", { piece, character }),
   gearSuggestions: (build, level) => invoke("gear_suggestions", { id: build, level }),
   findGear: (who, character, seenJob) => invoke("find_gear", { who, character, seenJob }),
   readCharacter: () => invoke("read_character_windows"),

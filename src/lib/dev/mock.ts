@@ -871,18 +871,33 @@ export const mockBackend: Backend = {
     const same = (p: GearPiece) => JSON.stringify({ ...p, id: 0 }) === JSON.stringify({ ...piece, id: 0 });
     if (pieces.some(same)) return;
     pieces.push({ ...piece, id: Math.max(0, ...pieces.map((p) => p.id)) + 1 });
+    if (piece.item != null && !build.plan.gear.includes(piece.item)) build.plan.gear.push(piece.item);
+    buildsChanged();
+  },
+  async updatePiece(piece) {
+    const build = newestBuild();
+    if (!build) return;
+    const pieces = build.start.pieces ?? [];
+    const old = pieces.find((p) => p.id === piece.id);
+    build.start.pieces = pieces.map((p) => (p.id === piece.id ? piece : p));
+    const unused = (item: number) => !build.start.pieces!.some((p) => p.item === item);
+    if (old?.item != null && unused(old.item)) build.plan.gear = build.plan.gear.filter((id) => id !== old.item);
+    if (piece.item != null && !build.plan.gear.includes(piece.item)) build.plan.gear.push(piece.item);
     buildsChanged();
   },
   async removePiece(id) {
     const build = newestBuild();
     if (!build) return;
+    const item = build.start.pieces?.find((p) => p.id === id)?.item;
     build.start.pieces = (build.start.pieces ?? []).filter((p) => p.id !== id);
+    if (item != null && !build.start.pieces.some((p) => p.item === item)) build.plan.gear = build.plan.gear.filter((g) => g !== item);
     buildsChanged();
   },
   async setGearGoal(item, wanted) {
     const build = newestBuild();
     if (!build) return;
     build.plan.gear = build.plan.gear.filter((id) => id !== item).concat(wanted ? [item] : []);
+    if (!wanted) build.start.pieces = (build.start.pieces ?? []).filter((p) => p.item !== item);
     buildsChanged();
   },
   async searchQuests(search) {

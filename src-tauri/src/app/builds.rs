@@ -151,7 +151,8 @@ pub fn show_item(app: AppHandle, id: Option<u32>, text: Option<String>) -> Resul
     Ok(app.emit(SHOW_ITEM_EVENT, ItemLink { id, text })?)
 }
 
-/// Adds a piece of equipment, as an item check read it, to the build for `character`.
+/// Adds a piece of equipment, as an item check read it, to the build for `character`. My build
+/// is one list: the piece's item joins the plan's gear too, so the plan counts it.
 #[tauri::command]
 pub fn add_piece(app: AppHandle, state: State<UserDataState>, piece: Piece, character: Option<String>) -> Result<()> {
     let Some(mut build) = state.with(|db| db.active_build(character.as_deref()))? else {
@@ -164,17 +165,56 @@ pub fn add_piece(app: AppHandle, state: State<UserDataState>, piece: Piece, char
     }
     let id = pieces.iter().map(|p| p.id).max().unwrap_or(0) + 1;
     pieces.push(Piece { id, ..piece });
+    sync_gear(&mut build);
     state.with(|db| db.save_build(&build, now()))?;
     changed(&app)
 }
 
-/// Takes a piece of equipment out of the build for `character`.
+/// Puts right a piece the item check misread: its name, item, stats, upgrades or slots.
+#[tauri::command]
+pub fn update_piece(app: AppHandle, state: State<UserDataState>, piece: Piece, character: Option<String>) -> Result<()> {
+    let Some(mut build) = state.with(|db| db.active_build(character.as_deref()))? else { return Ok(()) };
+    let Some(old) = build.start.pieces.iter_mut().find(|p| p.id == piece.id) else {
+        return Err(Error::Invalid("That piece is no longer in the build.".into()));
+    };
+    let before = old.item;
+    *old = piece;
+    if let Some(item) = before {
+        drop_unused_goal(&mut build, item);
+    }
+    sync_gear(&mut build);
+    state.with(|db| db.save_build(&build, now()))?;
+    changed(&app)
+}
+
+/// Takes a piece of equipment out of the build for `character`, and its item with it unless
+/// another copy of it stays.
 #[tauri::command]
 pub fn remove_piece(app: AppHandle, state: State<UserDataState>, id: i64, character: Option<String>) -> Result<()> {
     let Some(mut build) = state.with(|db| db.active_build(character.as_deref()))? else { return Ok(()) };
+    let item = build.start.pieces.iter().find(|p| p.id == id).and_then(|p| p.item);
     build.start.pieces.retain(|p| p.id != id);
+    if let Some(item) = item {
+        drop_unused_goal(&mut build, item);
+    }
     state.with(|db| db.save_build(&build, now()))?;
     changed(&app)
+}
+
+/// Every piece's item is in the plan's gear.
+fn sync_gear(build: &mut Build) {
+    for item in build.start.pieces.iter().filter_map(|p| p.item) {
+        if !build.plan.gear.contains(&item) {
+            build.plan.gear.push(item);
+        }
+    }
+}
+
+/// Takes an item out of the plan's gear when no piece of it is left.
+fn drop_unused_goal(build: &mut Build, item: u32) {
+    if !build.start.pieces.iter().any(|p| p.item == Some(item)) {
+        build.plan.gear.retain(|id| *id != item);
+    }
 }
 
 /// Everything read off the tooltip matches; only the id differs.
@@ -182,7 +222,8 @@ fn same_piece(a: &Piece, b: &Piece) -> bool {
     Piece { id: 0, ..a.clone() } == Piece { id: 0, ..b.clone() }
 }
 
-/// Adds an item to the gear goals of the build for `character`, or takes it off.
+/// Adds an item to the gear goals of the build for `character`, or takes it off, with any pieces
+/// of it: My build is one list.
 #[tauri::command]
 pub fn set_gear_goal(
     app: AppHandle,
@@ -197,6 +238,8 @@ pub fn set_gear_goal(
     build.plan.gear.retain(|id| *id != item);
     if wanted {
         build.plan.gear.push(item);
+    } else {
+        build.start.pieces.retain(|p| p.item != Some(item));
     }
     state.with(|db| db.save_build(&build, now()))?;
     changed(&app)

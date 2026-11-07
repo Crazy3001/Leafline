@@ -12,7 +12,7 @@
   import { STATS, buildState, statLabel, watchBuilds } from "$lib/builds.svelte";
   import { OSMS_CREDIT, OSMS_URL, mapData, watchMapData } from "$lib/mapdata.svelte";
   import { display, keyHint } from "$lib/settings.svelte";
-  import type { BuildPlan, GearItem, LevelStep } from "$lib/types";
+  import type { BuildPlan, GearCheck, GearItem, GearPiece, LevelStep } from "$lib/types";
   import Segmented from "$lib/ui/Segmented.svelte";
 
   let {
@@ -113,6 +113,76 @@
     }, SEARCH_DELAY);
     return () => clearTimeout(timer);
   });
+
+  /** One row of My build: an item the plan aims for, a copy of it you have, or both. */
+  type MineRow = { key: string; check: GearCheck | null; piece: GearPiece | null };
+  const myRows = $derived.by((): MineRow[] => {
+    if (!plan) return [];
+    const pieces = plan.build.start.pieces ?? [];
+    const rows: MineRow[] = [];
+    const placed = new Set<number>();
+    for (const check of plan.expansion.gear) {
+      const copies = pieces.filter((p) => p.item === check.item.id);
+      for (const p of copies) {
+        rows.push({ key: `p${p.id}`, check, piece: p });
+        placed.add(p.id);
+      }
+      if (!copies.length) rows.push({ key: `g${check.item.id}`, check, piece: null });
+    }
+    for (const p of pieces) if (!placed.has(p.id)) rows.push({ key: `p${p.id}`, check: null, piece: p });
+    return rows;
+  });
+
+  /** Stats an equip's tooltip can show, as it spells them. */
+  const STAT_LABELS = [
+    "STR",
+    "DEX",
+    "INT",
+    "LUK",
+    "MaxHP",
+    "MaxMP",
+    "Weapon Attack",
+    "Magic Attack",
+    "Weapon Def.",
+    "Magic Def.",
+    "Accuracy",
+    "Avoidability",
+    "Speed",
+    "Jump",
+  ];
+
+  /** A copy of the piece being put right; saved only on Save. */
+  let editing = $state<GearPiece | null>(null);
+  let editingName = "";
+
+  function startEdit(piece: GearPiece) {
+    editing = structuredClone($state.snapshot(piece));
+    editingName = piece.name;
+  }
+
+  async function saveEdit() {
+    if (!editing) return;
+    const draft = $state.snapshot(editing);
+    draft.name = draft.name.trim() || editingName;
+    draft.stats = draft.stats.filter((s) => Number.isFinite(s.value));
+    const whole = (n: number | null) => (n == null || !Number.isFinite(n) ? null : Math.max(0, Math.round(n)));
+    draft.upgrades = whole(draft.upgrades);
+    draft.slotsLeft = whole(draft.slotsLeft);
+    try {
+      // A new name is a different item: match it again, as an item check would.
+      if (draft.name !== editingName) {
+        const found = await backend.findItem(draft.name, draft.level);
+        draft.item = found?.id ?? null;
+        draft.slots = found?.upgradeSlots ?? null;
+        if (found) draft.itemType = found.weaponType ?? found.slot ?? draft.itemType;
+      }
+      await backend.updatePiece(draft, character);
+      editing = null;
+      goalError = null;
+    } catch (e) {
+      goalError = String(e);
+    }
+  }
 
   async function removePiece(id: number) {
     try {
@@ -289,61 +359,101 @@
         {character}
       />
     {:else}
-    <!-- My build: the pieces the character has, as item checks read them, then what the plan aims for. -->
-    {@const pieces = plan.build.start.pieces ?? []}
-    <h4 class="sub first">I have</h4>
-    {#if pieces.length}
-      <ul class="pieces">
-        {#each pieces as p (p.id)}
+    <!--
+      My build, one list: each item the plan aims for, shown as the very copy you have when an item
+      check added one (its own stats, scrolls and all, which can be put right here), and copies
+      whose name matched no item.
+    -->
+    {#if myRows.length}
+      <ul class="mine">
+        {#each myRows as row (row.key)}
+          {@const piece = row.piece}
+          {@const check = row.check}
+          {@const name = piece?.name ?? check?.item.name ?? ""}
           <li>
-            <div class="piece-head">
-              <button class="ref ref-item" class:upgraded={!!p.upgrades} onclick={() => backend.showItem(p.item, p.item == null ? p.name : null)}
-                >{p.name}{#if p.upgrades}{` (+${p.upgrades})`}{/if}</button
+            <div class="row-head">
+              <button
+                class="ref ref-item"
+                class:upgraded={!!piece?.upgrades}
+                onclick={() => backend.showItem(piece?.item ?? check?.item.id ?? null, piece && piece.item == null ? piece.name : null)}
+                >{name}{#if piece?.upgrades}{` (+${piece.upgrades})`}{/if}</button
               >
-              {#if p.itemType}<span class="slot">{p.itemType}</span>{/if}
+              <span class="slot">{piece?.itemType ?? check?.item.slot ?? ""}</span>
+              {#if check}
+                <span class="when tabular" class:warn={!check.usable || check.level == null}>
+                  {#if !check.usable}Wrong job{:else if check.level != null}Lv {check.level}{:else}Out of reach{/if}
+                </span>
+              {/if}
+              {#if piece}
+                <button
+                  class="remove"
+                  class:push={!check}
+                  title="Put right what the item check read"
+                  aria-label="Edit {name}"
+                  onclick={() => startEdit(piece)}><Pencil size={11} /></button
+                >
+              {/if}
               <button
                 class="remove"
+                class:push={!check && !piece}
                 title="Take it out of my build"
-                aria-label="Take {p.name} out of my build"
-                onclick={() => removePiece(p.id)}><X size={12} /></button
+                aria-label="Take {name} out of my build"
+                onclick={() => (piece ? removePiece(piece.id) : check && setGoal(check.item.id, false))}><X size={12} /></button
               >
             </div>
-            <p class="piece-line tabular">
-              {#each p.stats as s, k}{#if k}<span class="sep">{" · "}</span>{/if}<span class="nowrap">{s.label} {s.value > 0 ? "+" : ""}{s.value}</span>{/each}{#if p.slotsLeft != null}<span class="sep">{" · "}</span><span class="nowrap faint">{p.slotsLeft}{p.slots != null ? ` of ${p.slots}` : ""} slots left</span>{/if}
-            </p>
+            {#if piece && editing?.id === piece.id}
+              <div class="edit">
+                <label class="edit-field">
+                  <span>Name</span>
+                  <input bind:value={editing.name} />
+                </label>
+                {#each editing.stats as stat, k}
+                  <div class="stat-edit">
+                    <select bind:value={stat.label} aria-label="Stat">
+                      {#each STAT_LABELS as label (label)}<option>{label}</option>{/each}
+                      {#if !STAT_LABELS.includes(stat.label)}<option>{stat.label}</option>{/if}
+                    </select>
+                    <input type="number" bind:value={stat.value} aria-label="{stat.label} value" />
+                    <button class="remove" aria-label="Remove {stat.label}" onclick={() => editing?.stats.splice(k, 1)}
+                      ><X size={11} /></button
+                    >
+                  </div>
+                {/each}
+                <button class="link add-stat" onclick={() => editing?.stats.push({ label: "STR", value: 0 })}
+                  ><Plus size={11} />Add a stat</button
+                >
+                <div class="edit-pair">
+                  <label class="edit-field">
+                    <span>Scrolled (+N)</span>
+                    <input type="number" min="0" max="30" bind:value={editing.upgrades} />
+                  </label>
+                  <label class="edit-field">
+                    <span>Slots left</span>
+                    <input type="number" min="0" max="30" bind:value={editing.slotsLeft} />
+                  </label>
+                </div>
+                <div class="edit-actions">
+                  <button class="action small" onclick={saveEdit}>Save</button>
+                  <button class="link" onclick={() => (editing = null)}>Cancel</button>
+                </div>
+              </div>
+            {:else if piece}
+              <p class="piece-line tabular">
+                {#each piece.stats as s, k}{#if k}<span class="sep">{" · "}</span>{/if}<span class="nowrap"
+                    >{s.label} {s.value > 0 ? "+" : ""}{s.value}</span
+                  >{/each}{#if piece.slotsLeft != null}<span class="sep">{piece.stats.length ? " · " : ""}</span><span
+                    class="nowrap faint">{piece.slotsLeft}{piece.slots != null ? ` of ${piece.slots}` : ""} slots left</span
+                  >{/if}
+              </p>
+            {/if}
           </li>
         {/each}
       </ul>
     {:else}
       <p class="quiet-line">
-        Check an item in game{keyHint("ReadItem")}, then press <strong>Add this one to my build</strong> to keep it here with its
-        own stats, scrolls and all.
+        Nothing yet. Check an item in game{keyHint("ReadItem")} and press <strong>Add this one to my build</strong> to keep that
+        copy, scrolls and all, or add equipment by name below.
       </p>
-    {/if}
-
-    <h4 class="sub">Aiming for</h4>
-    {#if plan.expansion.gear.length}
-      <ul class="goals">
-        {#each plan.expansion.gear as check (check.item.id)}
-          <li>
-            <span class="goal-name">
-              <button class="ref ref-item" onclick={() => backend.showItem(check.item.id, null)}>{check.item.name}</button>
-              <span class="slot">{check.item.slot}</span>
-            </span>
-            <span class="tabular when" class:warn={!check.usable || check.level == null}>
-              {#if !check.usable}Wrong job{:else if check.level != null}Lv {check.level}{:else}Out of reach{/if}
-            </span>
-            <button
-              class="remove"
-              title="Take it out of my build"
-              aria-label="Take {check.item.name} out of my build"
-              onclick={() => setGoal(check.item.id, false)}><X size={12} /></button
-            >
-          </li>
-        {/each}
-      </ul>
-    {:else}
-      <p class="quiet-line">Nothing yet. Add equipment below, or with <strong>Add to my build</strong> on an item in Lookup.</p>
     {/if}
     {#if goalError}<p class="goal-error">{goalError}</p>{/if}
 
@@ -612,36 +722,6 @@
     color: var(--muted);
   }
 
-  .goals li {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 3px 0;
-  }
-
-  .goals li + li {
-    border-top: 1px solid var(--border);
-  }
-
-  .goals .goal-name {
-    display: flex;
-    flex: 1;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 0 6px;
-    min-width: 0;
-  }
-
-  .goals .slot {
-    color: var(--faint);
-    font-size: var(--text-xs);
-  }
-
-  .goals .when {
-    margin-left: auto;
-  }
-
-  .goals .remove,
   .remove {
     display: grid;
     flex: none;
@@ -656,8 +736,6 @@
     cursor: pointer;
   }
 
-  .goals .remove:hover,
-  .goals .remove:focus-visible,
   .remove:hover,
   .remove:focus-visible {
     background: rgba(255, 255, 255, 0.07);
@@ -666,42 +744,118 @@
     outline: none;
   }
 
-  .sub.first {
+  .mine {
     margin-top: 2px;
   }
 
-  .pieces li {
+  .mine li {
     padding: 4px 0;
   }
 
-  .pieces li + li {
+  .mine li + li {
     border-top: 1px solid var(--border);
   }
 
-  .piece-head {
+  .row-head {
     display: flex;
     align-items: baseline;
     gap: 6px;
   }
 
-  .piece-head .ref {
+  .row-head .ref {
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
     font-size: var(--text-sm);
     font-weight: 600;
+    text-align: left;
+    cursor: pointer;
   }
 
   /* Scrolled, in the game's amber, as the item check shows it. */
-  .piece-head .ref.upgraded {
+  .row-head .ref.upgraded {
     color: var(--accent-strong);
   }
 
-  .piece-head .slot {
+  .row-head .slot {
+    flex: none;
     color: var(--faint);
     font-size: var(--text-xs);
   }
 
-  .piece-head .remove {
-    align-self: center;
+  .row-head .when {
+    flex: none;
     margin-left: auto;
+    color: var(--muted);
+    font-size: var(--text-sm);
+  }
+
+  .row-head .when.warn {
+    color: var(--warn);
+  }
+
+  .row-head .remove {
+    align-self: center;
+  }
+
+  .row-head .remove.push {
+    margin-left: auto;
+  }
+
+  .edit {
+    display: grid;
+    gap: 6px;
+    margin-top: 6px;
+    padding: 8px;
+    background: var(--surface-2);
+  }
+
+  .edit-field {
+    display: grid;
+    gap: 2px;
+    font-size: var(--text-xs);
+    color: var(--muted);
+  }
+
+  .edit input,
+  .edit select {
+    min-width: 0;
+    height: 26px;
+    padding: 0 6px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text);
+    font-size: var(--text-sm);
+  }
+
+  .stat-edit {
+    display: grid;
+    grid-template-columns: 1fr 72px 20px;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .add-stat {
+    justify-self: start;
+  }
+
+  .edit-pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .edit-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .action.small {
+    height: 24px;
+    padding: 0 12px;
   }
 
   .piece-line {
@@ -811,32 +965,6 @@
   .found :global(svg) {
     flex: none;
     color: var(--accent);
-  }
-
-  .goals button {
-    padding: 0;
-    border: 0;
-    background: transparent;
-    font-size: var(--text-sm);
-    font-weight: 600;
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .goals button:hover,
-  .goals button:focus-visible {
-    color: var(--accent-strong);
-    text-decoration: underline;
-    outline: none;
-  }
-
-  .goals span {
-    flex: none;
-    color: var(--muted);
-  }
-
-  .goals .warn {
-    color: var(--warn);
   }
 
   .warnings li {
