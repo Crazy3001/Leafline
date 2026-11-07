@@ -798,6 +798,7 @@ export const mockBackend: Backend = {
     desk.onTop = onTop;
     return { ...desk };
   },
+  monitorCount: async () => 2,
   async setPageZoom(zoom) {
     document.documentElement.style.zoom = String(zoom);
   },

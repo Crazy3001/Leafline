@@ -1,8 +1,20 @@
 <script lang="ts">
-  // First-launch setup: what Leafline is, the hotkeys, game settings that help it read, and the
-  // map data. Nothing is bound or downloaded until the player says so. Finishing starts live
+  // First-launch setup: what Leafline is, the hotkeys, game settings that help it read, where to
+  // show it (over the game, or the desk view on a second screen) and the map data. Nothing is bound or downloaded until the player says so. Finishing starts live
   // reading if it is on; closing the window without finishing brings setup back next launch.
-  import { AppWindow, ArrowLeft, ArrowRight, Check, ExternalLink, Monitor, Sun, Type, X } from "@lucide/svelte";
+  import {
+    AppWindow,
+    ArrowLeft,
+    ArrowRight,
+    Check,
+    ExternalLink,
+    Layers,
+    Monitor,
+    MonitorUp,
+    Sun,
+    Type,
+    X,
+  } from "@lucide/svelte";
   import { onMount } from "svelte";
 
   import { backend } from "$lib/api";
@@ -13,7 +25,8 @@
   import { changeSettings, display, keyName, quietHotkeys, usesNumpad, watchSettings } from "$lib/settings.svelte";
   import type { ShortcutInfo } from "$lib/types";
 
-  const STEPS = ["Welcome", "Hotkeys", "Game settings", "Map data"];
+  const STEPS = ["Welcome", "Hotkeys", "Game settings", "Screens", "Map data"];
+  const SCREENS_STEP = 3;
 
   let step = $state(0);
   let shortcuts = $state<ShortcutInfo[]>([]);
@@ -27,6 +40,12 @@
     if (testing) return quietHotkeys();
   });
   let arrived = $state<Record<string, boolean>>({});
+  /** Screens Windows reports, or null until asked (or if it couldn't say). */
+  let monitors = $state<number | null>(null);
+  /** Where the player wants Leafline: over the game, or the desk view on a second screen. Only
+   *  the desk view needs anything doing, at the end: it opens. */
+  let place = $state<"overlay" | "desk" | null>(null);
+  let deskOpened = $state(false);
   let finishing = $state(false);
   let finishError = $state<string | null>(null);
 
@@ -37,6 +56,13 @@
       // Keys already set win; otherwise offer the suggestions.
       keys = Object.fromEntries(list.map((s) => [s.action, s.keys || s.suggestedKeys]));
     });
+    backend
+      .monitorCount()
+      .then((n) => {
+        monitors = n;
+        place ??= n > 1 ? "desk" : "overlay";
+      })
+      .catch(() => (place ??= "overlay"));
     const stop = backend.onHotkey((action) => (arrived[action] = true));
     return () => {
       stop.then((unlisten) => unlisten());
@@ -94,11 +120,22 @@
     else step -= 1;
   }
 
+  async function tryDesk() {
+    place = "desk";
+    try {
+      await backend.showDesk();
+      deskOpened = true;
+    } catch (e) {
+      finishError = String(e);
+    }
+  }
+
   async function finish() {
     finishing = true;
     finishError = null;
     try {
       await changeSettings({ setupDone: true });
+      if (place === "desk" && !deskOpened) await backend.showDesk();
       await backend.finishSetup();
     } catch (e) {
       finishError = String(e);
@@ -299,6 +336,58 @@
             </div>
           </li>
         </ul>
+      </section>
+    {:else if step === SCREENS_STEP}
+      <section>
+        <h1>Where to show Leafline</h1>
+        <p class="lead">
+          {#if monitors != null && monitors > 1}
+            Windows has {monitors} screens here. Leafline can sit over the game, or fill your other screen.
+          {:else if monitors === 1}
+            Windows has one screen here, so the overlay over the game suits you best. The desk view is there if you add a
+            second screen later.
+          {:else}
+            Leafline can sit over the game, or fill a second screen if you have one.
+          {/if}
+        </p>
+        <div class="places" role="radiogroup" aria-label="Where to show Leafline">
+          <button class="place" role="radio" aria-checked={place === "overlay"} onclick={() => (place = "overlay")}>
+            <span class="tip-icon"><Layers size={16} /></span>
+            <span>
+              <span class="name">Over the game</span>
+              <span class="help">
+                A small overlay beside the game, with tabs. Pin a tab into its own window, or shrink the overlay to a
+                compact HUD. Best on one screen.
+              </span>
+            </span>
+          </button>
+          <button class="place" role="radio" aria-checked={place === "desk"} onclick={() => (place = "desk")}>
+            <span class="tip-icon"><MonitorUp size={16} /></span>
+            <span>
+              <span class="name">On a second screen</span>
+              <span class="help">
+                The desk view: every panel side by side in a window you put on your other screen, with the session
+                graph, map details, quests and the training log in full. The overlay stays for quick looks over the game.
+              </span>
+            </span>
+          </button>
+        </div>
+        {#if place === "desk"}
+          <div class="try">
+            {#if deskOpened}
+              <p class="note good">
+                <Check size={12} /> The desk view is open. Drag it to your other screen and maximise it; Leafline remembers
+                where you put it.
+              </p>
+            {:else}
+              <button class="button" onclick={tryDesk}><MonitorUp size={13} />Open it now</button>
+              <span class="help">Or it opens when you finish setup.</span>
+            {/if}
+          </div>
+        {/if}
+        <p class="note">
+          Either way, the overlay's <MonitorUp size={11} /> button and the tray menu open the desk view any time.
+        </p>
       </section>
     {:else}
       <section>
@@ -562,6 +651,54 @@
     flex: none;
     margin-top: 1px;
     color: var(--accent);
+  }
+
+  .places {
+    display: grid;
+    gap: 8px;
+  }
+
+  .place {
+    display: flex;
+    gap: 12px;
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .place:hover {
+    background: var(--surface-2);
+  }
+
+  .place[aria-checked="true"] {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+
+  .place:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+
+  .try {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin-top: 12px;
+  }
+
+  .try .note {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
   }
 
   .box {

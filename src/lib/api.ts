@@ -6,7 +6,7 @@ import { invoke, isTauri } from "@tauri-apps/api/core";
 import { LogicalSize } from "@tauri-apps/api/dpi";
 import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { availableMonitors, getCurrentWindow } from "@tauri-apps/api/window";
 import { open, save } from "@tauri-apps/plugin-dialog";
 
 import type {
@@ -264,6 +264,8 @@ export interface Backend {
   setDeskOnTop(onTop: boolean): Promise<DeskStatus>;
   /** Draws the calling window's page larger or smaller, as browser zoom does. */
   setPageZoom(zoom: number): Promise<void>;
+  /** How many screens Windows has, for Setup's question about a second one. */
+  monitorCount(): Promise<number>;
   /** Lets this window take focus while a box in it is typed in, or gives the focus back up. */
   setTyping(typing: boolean): Promise<void>;
   deleteSession(id: number): Promise<void>;
@@ -501,6 +503,7 @@ const tauriBackend: Backend = {
   deskStatus: () => invoke("desk_status"),
   setDeskOnTop: (onTop) => invoke("set_desk_on_top", { onTop }),
   setPageZoom: (zoom) => getCurrentWebview().setZoom(zoom),
+  monitorCount: () => availableMonitors().then((list) => list.length),
   setTyping: (typing) => invoke("set_typing", { typing }),
   deleteSession: (id) => invoke("delete_session", { id }),
   onHistory: (handler) => listen("history", () => handler()),
