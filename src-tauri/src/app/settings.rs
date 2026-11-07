@@ -3,6 +3,7 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
@@ -191,14 +192,48 @@ pub fn keeps_game_focus(app: &AppHandle) -> bool {
 }
 
 /// Brings an open window forward: shown and unminimized, and focused too unless the game keeps
-/// the focus.
+/// the focus, in which case it is only put above the game.
 pub fn bring_forward(app: &AppHandle, window: &tauri::WebviewWindow) -> Result<()> {
     window.show()?;
     window.unminimize()?;
-    if !keeps_game_focus(app) {
+    if keeps_game_focus(app) {
+        raise(window);
+    } else {
         window.set_focus()?;
     }
     Ok(())
+}
+
+/// Puts a window above the others, the game included, without taking focus. A window opened
+/// without focus otherwise lands under the game, which keeps the front.
+pub fn raise(window: &tauri::WebviewWindow) {
+    if let Ok(hwnd) = window.hwnd() {
+        foreground::raise(hwnd.0 as isize);
+    }
+}
+
+/// A box is being typed in, in some Leafline window: that window has focus on purpose.
+static TYPING: AtomicBool = AtomicBool::new(false);
+
+/// Leafline's windows that leave the game focused, by label.
+fn game_side(label: &str) -> bool {
+    matches!(label, OVERLAY | SETTINGS | SETUP | super::desk::DESK | super::builds::BUILD)
+        || label.starts_with(pins::PREFIX)
+}
+
+/// One of Leafline's windows got focus. Windows gives it focus even when it asks not to take
+/// any, for one: clicking its taskbar button. Unless a box in it is being typed in, the focus goes
+/// straight back to the game and the window stays in front of it.
+pub fn focused(window: &tauri::Window) {
+    let app = window.app_handle();
+    if !game_side(window.label()) || !keeps_game_focus(app) || TYPING.load(Ordering::Relaxed) {
+        return;
+    }
+    let choice = app.state::<SettingsState>().get().live.window;
+    let Ok(Some(game)) = crate::capture::find(choice.as_ref()) else { return };
+    let Ok(hwnd) = window.hwnd() else { return };
+    foreground::hand_to(game.id);
+    foreground::raise(hwnd.0 as isize);
 }
 
 /// While the player types in a box on the overlay or a pinned panel, that window takes focus so
@@ -210,6 +245,7 @@ pub fn set_typing(app: AppHandle, window: tauri::WebviewWindow, typing: bool) ->
     if !app.state::<SettingsState>().get().keep_game_focus {
         return Ok(());
     }
+    TYPING.store(typing, Ordering::Relaxed);
     if typing {
         foreground::remember();
     }
@@ -218,6 +254,8 @@ pub fn set_typing(app: AppHandle, window: tauri::WebviewWindow, typing: bool) ->
         window.set_focus()?;
     } else {
         foreground::give_back();
+        // The game comes back in front; the window stays above it, as it was.
+        raise(&window);
     }
     Ok(())
 }
@@ -229,10 +267,35 @@ mod foreground {
 
     use windows::Win32::Foundation::HWND;
     use windows::Win32::UI::WindowsAndMessaging::{
-        GetForegroundWindow, GetWindowThreadProcessId, IsWindow, SetForegroundWindow,
+        GWL_EXSTYLE, GetForegroundWindow, GetWindowLongPtrW, GetWindowThreadProcessId, HWND_NOTOPMOST, HWND_TOPMOST,
+        IsWindow, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SetForegroundWindow, SetWindowPos, WS_EX_TOPMOST,
     };
 
     static BEFORE: AtomicIsize = AtomicIsize::new(0);
+
+    /// Puts a window at the top of the ordinary ones without activating it: briefly topmost, then
+    /// not, which leaves it above every other ordinary window. One that is always on top already
+    /// stays as it is.
+    pub fn raise(hwnd: isize) {
+        let hwnd = HWND(hwnd as *mut _);
+        let topmost = unsafe { GetWindowLongPtrW(hwnd, GWL_EXSTYLE) } as u32 & WS_EX_TOPMOST.0 != 0;
+        if topmost {
+            return;
+        }
+        let flags = SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE;
+        unsafe {
+            let _ = SetWindowPos(hwnd, Some(HWND_TOPMOST), 0, 0, 0, 0, flags);
+            let _ = SetWindowPos(hwnd, Some(HWND_NOTOPMOST), 0, 0, 0, 0, flags);
+        }
+    }
+
+    /// Gives the game focus back, while Leafline has the front (only then may it pass it on).
+    pub fn hand_to(game: isize) {
+        let game = HWND(game as *mut _);
+        if ours(unsafe { GetForegroundWindow() }) && unsafe { IsWindow(Some(game)) }.as_bool() {
+            let _ = unsafe { SetForegroundWindow(game) };
+        }
+    }
 
     fn ours(hwnd: HWND) -> bool {
         let mut pid = 0;
@@ -264,6 +327,8 @@ mod foreground {
 mod foreground {
     pub fn remember() {}
     pub fn give_back() {}
+    pub fn raise(_hwnd: isize) {}
+    pub fn hand_to(_game: isize) {}
 }
 
 #[tauri::command]
@@ -331,7 +396,7 @@ pub fn open_setup(app: &AppHandle) -> Result<()> {
         return bring_forward(app, &window);
     }
     let keep = keeps_game_focus(app);
-    WebviewWindowBuilder::new(app, SETUP, WebviewUrl::App("setup".into()))
+    let window = WebviewWindowBuilder::new(app, SETUP, WebviewUrl::App("setup".into()))
         .title("Leafline — Setup")
         .inner_size(600.0, 640.0)
         .min_inner_size(520.0, 520.0)
@@ -341,6 +406,9 @@ pub fn open_setup(app: &AppHandle) -> Result<()> {
         .background_color(tauri::window::Color(20, 20, 18, 255))
         .additional_browser_args(super::BROWSER_ARGS)
         .build()?;
+    if keep {
+        raise(&window);
+    }
     Ok(())
 }
 
@@ -367,7 +435,7 @@ pub fn open(app: &AppHandle) -> Result<()> {
         return bring_forward(app, &window);
     }
     let keep = keeps_game_focus(app);
-    WebviewWindowBuilder::new(app, SETTINGS, WebviewUrl::App("settings".into()))
+    let window = WebviewWindowBuilder::new(app, SETTINGS, WebviewUrl::App("settings".into()))
         .title("Leafline — Settings")
         .inner_size(640.0, 720.0)
         .min_inner_size(520.0, 480.0)
@@ -377,5 +445,8 @@ pub fn open(app: &AppHandle) -> Result<()> {
         .background_color(tauri::window::Color(13, 16, 23, 255))
         .additional_browser_args(super::BROWSER_ARGS)
         .build()?;
+    if keep {
+        raise(&window);
+    }
     Ok(())
 }

@@ -428,7 +428,7 @@ pub async fn show_build(app: AppHandle) -> Result<()> {
         return settings::bring_forward(&app, &window);
     }
     let keep = settings::keeps_game_focus(&app);
-    WebviewWindowBuilder::new(&app, BUILD, WebviewUrl::App("build".into()))
+    let window = WebviewWindowBuilder::new(&app, BUILD, WebviewUrl::App("build".into()))
         .title("Leafline — Build planner")
         .inner_size(960.0, 760.0)
         .min_inner_size(760.0, 520.0)
@@ -438,5 +438,8 @@ pub async fn show_build(app: AppHandle) -> Result<()> {
         .background_color(tauri::window::Color(20, 20, 18, 255))
         .additional_browser_args(super::BROWSER_ARGS)
         .build()?;
+    if keep {
+        settings::raise(&window);
+    }
     Ok(())
 }

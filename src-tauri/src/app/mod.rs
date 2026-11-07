@@ -106,6 +106,7 @@ pub fn run() {
                 let _ = window.hide();
             }
             WindowEvent::CloseRequested { .. } => desk::closed(window),
+            WindowEvent::Focused(true) => settings::focused(window),
             WindowEvent::Moved(_) => layout::changed(window.app_handle()),
             WindowEvent::Resized(size) => {
                 pins::resized(window, *size);
