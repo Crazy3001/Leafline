@@ -952,7 +952,7 @@ export const mockBackend: Backend = {
     };
     const beats = (a: number[], b: number[]) => a[0] > b[0] || (a[0] === b[0] && a[1] > b[1]);
     const overall = pieces.some((p) => mockSlotOf(p) === "Overall");
-    const outfit: Outfit = { level, slots: [], empty: [] };
+    const outfit: Outfit = { level, slots: [] };
     for (const slot of MOCK_SLOTS) {
       if (overall && (slot === "Top" || slot === "Bottom")) continue;
       const wearing = pieces.findLast((p) => mockSlotOf(p) === slot) ?? null;
@@ -962,19 +962,26 @@ export const mockBackend: Backend = {
         .sort((a, b) => (a.level ?? 999) - (b.level ?? 999));
       const ready = ahead.filter((g) => g.level != null && g.level <= level).length;
       const at = Math.max(0, ready - 1);
-      const next = ahead[at] ?? null;
-      const later = Math.max(0, ahead.length - at - 1);
+      let next = ahead[at] ?? null;
+      const planned = next != null;
+      const later = planned ? Math.max(0, ahead.length - at - 1) : 0;
       const best = mockItems
         .filter((i) => i.kind === "equip" && i.slot === slot && i.reqLevel <= level)
         .sort((a, b) => (beats(score(a.stats), score(b.stats)) ? -1 : 1))[0];
       const suggested =
         best && best.id !== wearing?.item && best.id !== next?.item.id && (!wearing || beats(score(best.stats), score(wearing.stats))) ? best : null;
-      const optional = slot === "Overall" || slot === "Shield";
-      if (!wearing && !next && (!suggested || optional)) {
-        if (!optional) outfit.empty.push(slot);
-        continue;
+      if (!next) {
+        // The first better piece a later level can wear.
+        const floors = [wearing && score(wearing.stats), suggested && score(suggested.stats)].filter((f): f is number[] => !!f);
+        const coming = mockItems
+          .filter((i) => i.kind === "equip" && i.slot === slot && i.reqLevel > level && floors.every((f) => beats(score(i.stats), f)))
+          .sort((a, b) => a.reqLevel - b.reqLevel)[0];
+        if (coming) next = { item: coming, level: coming.reqLevel, usable: true };
       }
-      outfit.slots.push({ slot, wearing, next: next && { ...next, item: mockItems.find((i) => i.id === next.item.id) ?? next.item }, later, suggested });
+      const optional = slot === "Overall" || slot === "Shield";
+      if (optional && !wearing && !planned) continue;
+      const item = next && (mockItems.find((i) => i.id === next.item.id) ?? next.item);
+      outfit.slots.push({ slot, wearing, suggested, next: next && item && { ...next, item }, planned, later });
     }
     return outfit;
   },

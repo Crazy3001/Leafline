@@ -1,14 +1,15 @@
-//! The character's gear slot by slot: what they wear, the plan's next goal for the slot, and the
-//! gear finder's pick when it beats what they wear. It reads like the game's equip window, so a
-//! player can see at a glance what to look for next.
+//! The character's gear slot by slot: what they wear, the gear finder's pick when it beats that,
+//! and what comes next: the plan's next goal for the slot, or else the first better piece the
+//! plan can wear at a later level. It reads like the game's equip window, so a player can see at
+//! a glance what to look for now and what to look forward to.
 
 use serde::Serialize;
 
-use super::catalog::Catalog;
+use super::catalog::{Catalog, novelty};
 use super::fit::ARMOUR;
 use super::plan::{Build, Expansion, GearCheck, MAX_LEVEL, Piece};
 use super::rules::Rules;
-use super::suggest::{Scorer, suggest};
+use super::suggest::{Scorer, Wearer, suggest};
 use crate::mapdata::osms::ItemRecord;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -17,22 +18,23 @@ pub struct SlotGear {
     /// As the item data names it.
     pub slot: String,
     pub wearing: Option<Piece>,
-    /// The plan's next goal for this slot.
-    pub next: Option<GearCheck>,
-    /// More goals for this slot after `next`.
-    pub later: usize,
-    /// The best the character can wear now, when it beats what they wear and isn't `next`.
+    /// The best the character can wear now, when it beats what they wear and isn't a planned `next`.
     pub suggested: Option<ItemRecord>,
+    /// The plan's next goal for this slot, or else the first piece that beats what they wear and
+    /// `suggested`, at the level the plan can wear it.
+    pub next: Option<GearCheck>,
+    /// `next` is one of the plan's goals, not the gear finder's.
+    pub planned: bool,
+    /// More goals for this slot after a planned `next`.
+    pub later: usize,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Outfit {
     pub level: u32,
-    /// Slots with something to show, in the equip window's order.
+    /// In the equip window's order. An overall or a shield only when worn or planned.
     pub slots: Vec<SlotGear>,
-    /// Slots with nothing worn, planned or suggested.
-    pub empty: Vec<String>,
 }
 
 /// The slots in order. An overall takes the top's and bottom's place.
@@ -47,6 +49,10 @@ pub fn outfit(build: &Build, expansion: &Expansion, rules: &Rules, catalog: &Cat
     let scorer = Scorer::new(build);
     let wearing = |slot: &str| build.start.pieces.iter().rev().find(|p| p.slot(catalog) == slot);
     let overall = wearing("Overall").is_some();
+    let end = expansion.steps.last().map_or(level, |s| s.level);
+    let later_wearers: Vec<(u32, Wearer)> =
+        (level + 1..=end).map(|at| (at, Wearer::new(build, expansion, rules, catalog, at))).collect();
+    let trained = catalog.weapons_of_branch(build.plan.job);
 
     let mut outfit = Outfit { level, ..Outfit::default() };
     for slot in slot_order() {
@@ -68,7 +74,8 @@ pub fn outfit(build: &Build, expansion: &Expansion, rules: &Rules, catalog: &Cat
         ahead.sort_by_key(|g| (g.level.unwrap_or(u32::MAX), g.item.req_level));
         let ready = ahead.iter().take_while(|g| g.level.is_some_and(|at| at <= level)).count();
         let at = ready.saturating_sub(1);
-        let next = ahead.get(at).map(|g| (*g).clone());
+        let mut next = ahead.get(at).map(|g| (*g).clone());
+        let planned = next.is_some();
         let later = ahead.len().saturating_sub(at + 1);
 
         let suggested = picks
@@ -81,18 +88,44 @@ pub fn outfit(build: &Build, expansion: &Expansion, rules: &Rules, catalog: &Cat
             .filter(|item| worn_score.is_none_or(|have| scorer.of(item) > have))
             .cloned();
 
-        // An overall, or a shield beside a two-handed weapon, is only worth a row when it is planned or worn.
+        // With no goal for the slot, the first piece a later level can wear that beats both what
+        // is worn and the suggestion.
+        if next.is_none() {
+            let floor = [worn_score, suggested.as_ref().map(|s| scorer.of(s))].into_iter().flatten().max();
+            next = coming_up(slot, floor, &later_wearers, &trained, &scorer, catalog)
+                .map(|(item, at)| GearCheck { item: item.clone(), level: Some(at), usable: true });
+        }
+
+        // An overall, or a shield, is only worth a row when it is worn or planned.
         let optional = slot == "Overall" || slot == "Shield";
-        let suggested = if optional && worn.is_none() && next.is_none() { None } else { suggested };
-        if worn.is_none() && next.is_none() && suggested.is_none() {
-            if !optional {
-                outfit.empty.push(slot.to_string());
-            }
+        if optional && worn.is_none() && !planned {
             continue;
         }
-        outfit.slots.push(SlotGear { slot: slot.to_string(), wearing: worn, next, later, suggested });
+        outfit.slots.push(SlotGear { slot: slot.to_string(), wearing: worn, suggested, next, planned, later });
     }
     outfit
+}
+
+/// The first piece for `slot` that a later level can wear and that scores above `floor`, with
+/// that level. Of several at the same level, the best. Weapons only of the kinds the job trains in.
+fn coming_up<'a>(
+    slot: &str,
+    floor: Option<(i64, i64)>,
+    wearers: &[(u32, Wearer)],
+    trained: &[String],
+    scorer: &Scorer,
+    catalog: &'a Catalog,
+) -> Option<(&'a ItemRecord, u32)> {
+    let better: Vec<&ItemRecord> = catalog
+        .equipment()
+        .filter(|i| i.slot == slot && !novelty(i))
+        .filter(|i| trained.is_empty() || i.weapon_type.as_ref().is_none_or(|w| trained.contains(w)))
+        .filter(|i| floor.is_none_or(|f| scorer.of(i) > f))
+        .collect();
+    wearers.iter().find_map(|(at, wearer)| {
+        let wearable = better.iter().filter(|i| wearer.can_wear(i));
+        wearable.max_by_key(|i| (scorer.of(i), std::cmp::Reverse(i.req_level))).map(|i| (*i, *at))
+    })
 }
 
 #[cfg(test)]
@@ -164,6 +197,7 @@ mod tests {
         let weapon = slot(&outfit, "Weapon");
         assert_eq!(weapon.wearing.as_ref().map(|p| p.name.as_str()), Some("Old Dagger"));
         assert_eq!(weapon.next.as_ref().map(|n| n.item.name.as_str()), Some("Field Dagger"));
+        assert!(weapon.planned);
         assert_eq!(weapon.later, 2);
     }
 
@@ -191,13 +225,28 @@ mod tests {
     }
 
     #[test]
-    fn empty_slots_with_nothing_to_say_are_listed_apart() {
+    fn every_slot_has_a_row_but_an_overall_or_shield_only_when_worn_or_planned() {
         let catalog = catalog();
-        let build = bandit(10, vec![], vec![]);
-        let outfit = at(&build, &catalog, 10);
+        let outfit = at(&bandit(10, vec![], vec![]), &catalog, 10);
+        let rows: Vec<&str> = outfit.slots.iter().map(|s| s.slot.as_str()).collect();
+        assert_eq!(rows, ["Weapon", "Hat", "Top", "Bottom", "Shoes", "Glove", "Cape", "Earring"]);
         assert_eq!(slot(&outfit, "Glove").suggested.as_ref().map(|i| i.name.as_str()), Some("Work Gloves"));
-        assert!(outfit.empty.contains(&"Cape".to_string()));
-        assert!(!outfit.empty.contains(&"Overall".to_string()), "an overall is optional");
+    }
+
+    #[test]
+    fn with_no_goal_next_is_the_first_better_piece_a_later_level_can_wear() {
+        let catalog = catalog();
+        // Wearing the Lv 10 dagger, with no goals: the next better dagger comes at Lv 15.
+        let build = bandit(10, vec![], vec![worn(1, &catalog)]);
+        let weapon = slot(&at(&build, &catalog, 10), "Weapon").clone();
+        assert_eq!(weapon.suggested, None, "nothing better to wear yet");
+        assert_eq!(weapon.next.as_ref().map(|n| (n.item.name.as_str(), n.level)), Some(("Field Dagger", Some(15))));
+        assert!(!weapon.planned);
+
+        // At Lv 22 the Coconut Knife can be worn: it is suggested, and Next is the one after it.
+        let weapon = slot(&at(&build, &catalog, 22), "Weapon").clone();
+        assert_eq!(weapon.suggested.map(|i| i.name), Some("Coconut Knife".into()));
+        assert_eq!(weapon.next.map(|n| (n.item.name, n.level)), Some(("Iron Dagger".into(), Some(25))));
     }
 
     #[test]

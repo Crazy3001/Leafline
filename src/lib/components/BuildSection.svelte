@@ -12,7 +12,7 @@
   import { OSMS_CREDIT, OSMS_URL, mapData, watchMapData } from "$lib/mapdata.svelte";
   import { gives } from "$lib/items.svelte";
   import { display, keyHint } from "$lib/settings.svelte";
-  import type { BuildPlan, GearItem, GearPiece, LevelStep, Outfit } from "$lib/types";
+  import type { BuildPlan, GearItem, GearPiece, ItemRecord, LevelStep, Outfit } from "$lib/types";
   import Segmented from "$lib/ui/Segmented.svelte";
 
   let {
@@ -82,8 +82,8 @@
   const canAdvance = $derived(!!nextAdvance?.advance && !!plan?.build.plan.job);
   const views = $derived([
     { id: "plan" as View, label: "Level up" },
-    ...(canAdvance ? [{ id: "advance" as View, label: "Job advance" }] : []),
     { id: "gear" as View, label: "Gear" },
+    ...(canAdvance ? [{ id: "advance" as View, label: "Job advance" }] : []),
   ]);
 
   // Gear, slot by slot: what is worn, the plan's next goal and a better pick. What is worn comes
@@ -140,7 +140,6 @@
   /** Slot names as the game's equip window shows them. */
   const SLOT_NAMES: Record<string, string> = { Glove: "Gloves", Earring: "Earrings" };
   const slotName = (slot: string) => SLOT_NAMES[slot] ?? slot;
-  const listed = (names: string[]) => (names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : (names[0] ?? ""));
 
   async function wear(id: number) {
     try {
@@ -479,50 +478,57 @@
               </p>
             {/if}
 
-            {#if row.next}
-              {@const next = row.next}
-              <div class="line">
-                <span class="label">Next</span>
-                <button class="ref ref-item" onclick={() => backend.showItem(next.item.id, null)}>{next.item.name}</button>
-                <span class="end">
-                  <span class="lv tabular" class:good={next.level != null && next.level <= at} class:warn={next.level == null}>
-                    {#if next.level == null}Out of reach{:else if next.level <= at}Wear it now{:else}Lv {next.level}{/if}
-                  </span>
-                  <button
-                    class="remove"
-                    title="Take it off the plan's gear goals"
-                    aria-label="Stop aiming for {next.item.name}"
-                    onclick={() => setGoal(next.item.id, false)}><X size={12} /></button
-                  >
-                </span>
-              </div>
-              {#if row.later}
-                <button class="link later" onclick={() => backend.showBuild()}>
-                  {row.later} more planned after it
-                </button>
-              {/if}
-            {/if}
-
             {#if row.suggested}
               {@const pick = row.suggested}
               <div class="line">
                 <span class="label">Suggested</span>
                 <button class="ref ref-item" onclick={() => backend.showItem(pick.id, null)}>{pick.name}</button>
                 <span class="end">
-                  {#if pick.reqLevel}<span class="lv tabular">Lv {pick.reqLevel}</span>{/if}
-                  <button class="remove" title="Aim for it: it shows as Next" aria-label="Aim for {pick.name}" onclick={() => setGoal(pick.id, true)}
+                  <span class="lv tabular good">{pick.reqLevel ? `Lv ${pick.reqLevel}` : "Any level"}</span>
+                  <button class="remove" title="Add it to the plan's gear goals" aria-label="Aim for {pick.name}" onclick={() => setGoal(pick.id, true)}
                     ><Plus size={12} /></button
                   >
                 </span>
               </div>
               <p class="piece-line">{gives(pick, 3)}</p>
             {/if}
+
+            <div class="line">
+              <span class="label">Next</span>
+              {#if row.next}
+                {@const next = row.next}
+                <button class="ref ref-item" onclick={() => backend.showItem(next.item.id, null)}>{next.item.name}</button>
+                <span class="end">
+                  <span class="lv tabular" class:good={next.level != null && next.level <= at} class:warn={next.level == null}>
+                    {#if next.level == null}Out of reach{:else if next.level <= at}Wear it now{:else}Lv {next.level}{/if}
+                  </span>
+                  {#if row.planned}
+                    <button
+                      class="remove"
+                      title="Take it off the plan's gear goals"
+                      aria-label="Stop aiming for {next.item.name}"
+                      onclick={() => setGoal(next.item.id, false)}><X size={12} /></button
+                    >
+                  {:else}
+                    <button class="remove" title="Add it to the plan's gear goals" aria-label="Aim for {next.item.name}" onclick={() => setGoal(next.item.id, true)}
+                      ><Plus size={12} /></button
+                    >
+                  {/if}
+                </span>
+              {:else}
+                <span class="none">Nothing better later in this plan</span>
+              {/if}
+            </div>
+            {#if row.next}
+              <p class="piece-line">
+                {gives(row.next.item as ItemRecord, 3)}{#if row.later}<span class="sep">{" · "}</span><button class="link later" onclick={() => backend.showBuild()}
+                    >{row.later} more planned after it</button
+                  >{/if}
+              </p>
+            {/if}
           </li>
         {/each}
       </ul>
-      {#if outfit.empty.length}
-        <p class="quiet-line">Nothing worn, planned or suggested for {listed(outfit.empty.map(slotName))}.</p>
-      {/if}
     {/if}
     {#if goalError}<p class="goal-error">{goalError}</p>{/if}
 
@@ -826,7 +832,7 @@
     color: var(--muted);
   }
 
-  /* Wearing, Next and Suggested: a label, the item, then its level and buttons. */
+  /* Wearing, Suggested and Next: a label, the item, then its level and buttons. */
   .line {
     display: grid;
     grid-template-columns: 64px minmax(0, 1fr) auto;
@@ -882,8 +888,7 @@
 
   /* Lines under an item line up with its name. */
   .outfit .piece-line,
-  .outfit .edit,
-  .link.later {
+  .outfit .edit {
     margin-left: 70px;
   }
 
