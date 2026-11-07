@@ -64,13 +64,18 @@
         {#each known as hunt (hunt.monster.name)}
           {@const open = isOpen(hunt)}
           <li>
-            <button class="mob-head" aria-expanded={open} onclick={() => toggle(hunt)}>
-              <span class="chevron" class:open><ChevronRight size={11} /></span>
-              <span class="mob-name">{hunt.monster.name}</span>
-              <span class="muted tabular">Lv {hunt.monster.level}{hunt.monster.boss ? " · boss" : ""}</span>
-              <span class="maps-count faint tabular">{hunt.maps.length} map{hunt.maps.length === 1 ? "" : "s"}</span>
-              {#if rate(hunt)}<span class="rate tabular" title={evidence(hunt)}>{rate(hunt)}</span>{/if}
-            </button>
+            <!-- The name opens the monster in Lookup; the rest of the row opens its maps. -->
+            <div class="mob-head">
+              <button class="chevron-button" aria-expanded={open} aria-label="Maps for {hunt.monster.name}" onclick={() => toggle(hunt)}>
+                <span class="chevron" class:open><ChevronRight size={11} /></span>
+              </button>
+              <button class="mob-name ref ref-mob" onclick={() => showMonsterNamed(hunt.monster.name)}>{hunt.monster.name}</button>
+              <button class="row-rest" tabindex="-1" onclick={() => toggle(hunt)}>
+                <span class="muted tabular">Lv {hunt.monster.level}{hunt.monster.boss ? " · boss" : ""}</span>
+                <span class="maps-count faint tabular">{hunt.maps.length} map{hunt.maps.length === 1 ? "" : "s"}</span>
+                {#if rate(hunt)}<span class="rate tabular" title={evidence(hunt)}>{rate(hunt)}</span>{/if}
+              </button>
+            </div>
             {#if open}
               <ul class="maps">
                 {#each hunt.maps as ground (ground.map.id)}
@@ -83,9 +88,6 @@
                 {:else}
                   <li class="faint">No map in the data spawns it.</li>
                 {/each}
-                <li class="card-link">
-                  <button class="ref ref-mob" onclick={() => showMonsterNamed(hunt.monster.name)}>{hunt.monster.name}'s card</button>
-                </li>
               </ul>
             {/if}
           </li>
@@ -196,6 +198,22 @@
     cursor: default;
   }
 
+  .chevron-button,
+  .row-rest {
+    display: flex;
+    align-items: center;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+  }
+
+  .row-rest {
+    flex: 1;
+    gap: 5px;
+    align-self: stretch;
+  }
+
   .maps-count {
     margin-left: auto;
   }
@@ -246,10 +264,6 @@
   .dist {
     margin-left: auto;
     color: var(--muted);
-    font-size: var(--text-xs);
-  }
-
-  .card-link .ref {
     font-size: var(--text-xs);
   }
 

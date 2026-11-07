@@ -19,6 +19,9 @@ const ITEM_PAGE: usize = 40;
 const MIN_WORD_SCORE: f64 = 0.7;
 /// How closely a name read from a tooltip must match an item in the data.
 const MIN_NAME_SCORE: f64 = 0.85;
+/// How closely the first words of a read must match an item when the whole read matches none:
+/// text seen through the tooltip (a store's list behind it) can run on after the name.
+const MIN_PREFIX_SCORE: f64 = 0.92;
 /// The slot all weapons share. Their kinds are in `weapon_type`.
 const WEAPON: &str = "Weapon";
 /// The data prices staff outfits and novelty items at a meso or less.
@@ -357,6 +360,16 @@ impl Catalog {
     /// The item a name read from the game most likely means. Several items can share a name, so
     /// `level` settles it when it is known.
     pub fn item_like(&self, name: &str, level: Option<u32>) -> Option<&ItemRecord> {
+        if let Some(item) = self.item_close_to(name, level, MIN_NAME_SCORE) {
+            return Some(item);
+        }
+        // The longest run of first words that names an item, as in `Iron Ore ushroom Cap A
+        // tough iron ore`, where a store's list and the description ran on after the name.
+        let words: Vec<&str> = name.split_whitespace().collect();
+        (1..words.len()).rev().find_map(|n| self.item_close_to(&words[..n].join(" "), level, MIN_PREFIX_SCORE))
+    }
+
+    fn item_close_to(&self, name: &str, level: Option<u32>, min_score: f64) -> Option<&ItemRecord> {
         let key = item_key(name);
         if key.is_empty() {
             return None;
@@ -364,7 +377,7 @@ impl Catalog {
         self.items
             .iter()
             .map(|item| (strsim::normalized_levenshtein(&item_key(&item.name), &key), item))
-            .filter(|(score, _)| *score >= MIN_NAME_SCORE)
+            .filter(|(score, _)| *score >= min_score)
             .max_by(|a, b| a.0.total_cmp(&b.0).then((Some(a.1.req_level) == level).cmp(&(Some(b.1.req_level) == level))))
             .map(|(_, item)| item)
     }
@@ -681,6 +694,13 @@ pub(crate) mod tests {
         assert_eq!(catalog.item_like("Red Cloth Vest", Some(25)).unwrap().id, 2);
         assert_eq!(catalog.item_like("Rcd Cloth Vest", Some(10)).unwrap().id, 1, "a misread letter");
         assert!(catalog.item_like("Pebble", None).is_none());
+    }
+
+    #[test]
+    fn a_name_with_text_run_on_after_it_finds_its_item() {
+        let catalog = Catalog::new(Vec::new(), vec![item(1, "Iron Ore", 0, &[]), item(2, "Orange Mushroom Cap", 0, &[])]);
+        assert_eq!(catalog.item_like("Iron Ore ushroom Cap A tough iron ore", None).unwrap().id, 1);
+        assert!(catalog.item_like("Iron Fist of the Ore", None).is_none(), "no run of first words names an item");
     }
 
     #[test]

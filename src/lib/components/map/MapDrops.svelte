@@ -155,11 +155,16 @@
         {@const open = opened.includes(entry.monster)}
         <li>
           {#if entry.drops.length}
-            <button class="mob-head" aria-expanded={open} onclick={() => toggle(entry.monster)}>
-              <span class="chevron" class:open><ChevronRight size={12} /></span>
-              <span class="mob-name">{entry.monster}</span>
-              <span class="summary tabular">{entry.summary}</span>
-            </button>
+            <!-- The name opens the monster in Lookup; the rest of the row opens its drops. -->
+            <div class="mob-head">
+              <button class="chevron-button" aria-expanded={open} aria-label="Drops of {entry.monster}" onclick={() => toggle(entry.monster)}>
+                <span class="chevron" class:open><ChevronRight size={12} /></span>
+              </button>
+              <button class="mob-name ref ref-mob" onclick={() => showMonsterNamed(entry.monster)}>{entry.monster}</button>
+              <button class="row-rest" tabindex="-1" onclick={() => toggle(entry.monster)}>
+                <span class="summary tabular">{entry.summary}</span>
+              </button>
+            </div>
             {#if open}
               <ul class="mob-drops">
                 {#each entry.drops as drop (drop.item)}
@@ -173,12 +178,9 @@
                     <span class="rate tabular">{percent(drop.rate)}{quantity(drop)}</span>
                   </li>
                 {/each}
-                <li class="card-link">
-                  <button class="ref ref-mob" onclick={() => showMonsterNamed(entry.monster)}>{entry.monster}'s card</button>
-                  {#if entry.sampleKills != null && entry.sampleKills < FEW_KILLS}
-                    <span class="faint">· only {entry.sampleKills} kills logged</span>
-                  {/if}
-                </li>
+                {#if entry.sampleKills != null && entry.sampleKills < FEW_KILLS}
+                  <li class="card-link faint">Only {entry.sampleKills} kills logged</li>
+                {/if}
               </ul>
             {/if}
           {:else}
@@ -328,6 +330,21 @@
     cursor: default;
   }
 
+  .chevron-button,
+  .row-rest {
+    display: flex;
+    align-items: center;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+  }
+
+  .row-rest {
+    flex: 1;
+    align-self: stretch;
+  }
+
   .chevron {
     display: grid;
     width: 12px;
@@ -374,10 +391,6 @@
 
   .card-link {
     margin-top: 2px;
-    font-size: var(--text-xs);
-  }
-
-  .card-link .ref {
     font-size: var(--text-xs);
   }
 

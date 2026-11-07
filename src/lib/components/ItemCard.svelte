@@ -44,7 +44,7 @@
   /** The data's record for a copy read from the game, to count the slots it started with. */
   let matched = $state<ItemRecord | null>(null);
   const ready = $derived(mapData.status?.ready ?? false);
-  const nameKey = $derived(read && !read.plain ? JSON.stringify([read.name, read.requirements.level, ready]) : null);
+  const nameKey = $derived(read ? JSON.stringify([read.name, read.requirements.level, ready]) : null);
 
   // Follows the key alone: every live reading brings new objects with the same content.
   $effect(() => {
@@ -78,6 +78,9 @@
     };
   });
   const upgraded = $derived(item.upgraded);
+  /** The data's spelling once the read matched an item: a read can garble letters, or run on
+   * into text seen through the tooltip. */
+  const name = $derived(matched?.name ?? item.name);
 
   /**
    * Clean or scrolled. Successful scrolls show as the name's (+N) and its amber colour; failed
@@ -134,7 +137,7 @@
     {/if}
   {/snippet}
 
-  <h3 class="name" class:upgraded>{item.name || "Unreadable name"}</h3>
+  <h3 class="name" class:upgraded>{name || "Unreadable name"}</h3>
   {#if summary.length}
     <p class="summary">{summary.join(" · ")}</p>
   {/if}
@@ -194,11 +197,11 @@
   <ItemDetails item={read} record={record ?? matched} {map} />
 
   <!-- Only for a copy read from the game: that's the one the player just got. -->
-  {#if read}<DropLogger item={item.name} itemId={matched?.id ?? null} {map} />{/if}
+  {#if read}<DropLogger item={name} itemId={matched?.id ?? null} {map} />{/if}
 
   <!-- No prices until a price source gives permission. Prices logged by earlier builds stay in
        the records file (src-tauri/src/userdata/prices.rs). -->
-  <ItemNotes name={item.name} />
+  <ItemNotes {name} />
 </Card>
 
 <style>
