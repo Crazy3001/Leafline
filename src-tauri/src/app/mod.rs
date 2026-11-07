@@ -2,6 +2,7 @@
 
 mod builds;
 mod commands;
+mod desk;
 mod launch;
 mod layout;
 mod live;
@@ -29,6 +30,7 @@ use tauri::{Manager, WindowEvent};
 pub const BROWSER_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,CalculateNativeWinOcclusion \
      --disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows";
 
+use desk::DeskState;
 use launch::LaunchImage;
 use live::LiveState;
 use mapdata::MapDataState;
@@ -79,6 +81,8 @@ pub fn run() {
             app.manage(NavState::load(app.handle())?);
             app.manage(PinState::load(app.handle())?);
             pins::restore(app.handle())?;
+            app.manage(DeskState::load(app.handle())?);
+            desk::restore(app.handle())?;
             tray::create(app)?;
             overlay::create_workbench(app.handle())?;
             update::check_at_startup(app.handle());
@@ -101,6 +105,7 @@ pub fn run() {
                 api.prevent_close();
                 let _ = window.hide();
             }
+            WindowEvent::CloseRequested { .. } => desk::closed(window),
             WindowEvent::Moved(_) => layout::changed(window.app_handle()),
             WindowEvent::Resized(size) => {
                 pins::resized(window, *size);
@@ -139,6 +144,9 @@ pub fn run() {
             pins::unpin_panel,
             pins::toggle_pins,
             pins::show_panel,
+            desk::desk_status,
+            desk::show_desk,
+            desk::set_desk_on_top,
             launch::take_launch_image,
             mapdata::map_data_status,
             mapdata::download_map_data,

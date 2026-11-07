@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Camera, Lock, LockOpen, Minimize2, PanelsTopLeft, Pin, PinOff, Settings, X } from "@lucide/svelte";
+  import { Camera, Lock, LockOpen, Minimize2, MonitorUp, PanelsTopLeft, Pin, PinOff, Settings, X } from "@lucide/svelte";
   import { onMount } from "svelte";
 
   import { backend, fileName } from "$lib/api";
@@ -218,6 +218,13 @@
             <PanelsTopLeft size={14} />
           </button>
         {/if}
+        <button
+          title="Desk view: every panel side by side in a window of its own, for a second screen"
+          aria-label="Desk view"
+          onclick={() => backend.showDesk()}
+        >
+          <MonitorUp size={14} />
+        </button>
         <button title="Settings" aria-label="Settings" onclick={() => backend.showSettings()}>
           <Settings size={14} />
         </button>

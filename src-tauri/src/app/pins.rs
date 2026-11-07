@@ -140,7 +140,7 @@ fn parse(json: &str) -> Vec<Panel> {
     pinned
 }
 
-/// Whether a pinned Lookup panel, which shows items and monsters, is on screen.
+/// Whether a pinned Lookup panel, which shows items and monsters, or the desk view is on screen.
 pub fn shows_item(app: &AppHandle) -> bool {
     shows(app, Panel::Item)
 }
@@ -149,9 +149,11 @@ pub fn shows_quests(app: &AppHandle) -> bool {
     shows(app, Panel::Quests)
 }
 
+/// The desk view brings up whatever a link opens in a column of its own, so it counts as showing
+/// every panel.
 fn shows(app: &AppHandle, panel: Panel) -> bool {
     let status = app.state::<PinState>().status();
-    !status.hidden && status.pinned.contains(&panel)
+    (!status.hidden && status.pinned.contains(&panel)) || super::desk::showing(app)
 }
 
 /// Reopens the panels that were pinned when Leafline last closed.

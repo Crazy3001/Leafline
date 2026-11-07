@@ -41,6 +41,7 @@ import type {
   OverlayStatus,
   Panel,
   PinStatus,
+  DeskStatus,
   Trip,
   TripMessage,
   QuestRow,
@@ -308,6 +309,7 @@ const mockItems: ItemRecord[] = [
 const showItemHandlers: ((link: ItemLink) => void)[] = [];
 const showQuestHandlers: ((id: number) => void)[] = [];
 const showPanelHandlers: ((panel: Panel) => void)[] = [];
+const desk: DeskStatus = { open: false, onTop: false };
 // Each window of the dev preview is a browser tab with its own mock, so trips, Route pin
 // messages and the destination go between tabs on a channel, as Tauri events go between windows.
 const tripHandlers: ((trip: Trip) => void)[] = [];
@@ -774,6 +776,19 @@ export const mockBackend: Backend = {
   },
   async showTraining() {
     window.open("/training", "_blank");
+  },
+  async showDesk() {
+    desk.open = true;
+    window.open("/desk", "_blank");
+    return { ...desk };
+  },
+  deskStatus: async () => ({ ...desk }),
+  async setDeskOnTop(onTop) {
+    desk.onTop = onTop;
+    return { ...desk };
+  },
+  async setPageZoom(zoom) {
+    document.documentElement.style.zoom = String(zoom);
   },
   knownMesos: async () => ({ name: "Mossbank", mesos: 36_644, seenAt: Math.floor(Date.now() / 1000) - 26 * 3600 }),
   onKnownMesos: async () => () => {},
