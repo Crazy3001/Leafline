@@ -150,6 +150,7 @@
     { id: "training" as const, label: "Training" },
     { id: "questing" as const, label: "Questing" },
     { id: "log" as const, label: "Log" },
+    { id: "planner" as const, label: "Build planner" },
     ...(prefs.mine ? [{ id: "mine" as const, label: "My layout" }] : []),
   ]);
 

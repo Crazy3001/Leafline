@@ -1,6 +1,6 @@
 // The desk view's layout: columns side by side, each holding one panel or two stacked. Presets
-// cover training, questing and looking back over the training log; any change the player makes is
-// saved as their own layout, so the presets stay as they are to go back to.
+// cover training, questing, looking back over the training log and the build planner; any change
+// the player makes is saved as their own layout, so the presets stay as they are to go back to.
 
 import { PANELS } from "./panels";
 import type { Panel } from "./types";
@@ -15,7 +15,7 @@ export const DESK_PANELS: DeskPanel[] = [...PANELS.map((p) => p.id), "log", "pla
 /** One column, top to bottom: one panel, or two sharing its height. */
 export type DeskColumn = DeskPanel[];
 
-export type PresetId = "training" | "questing" | "log" | "mine";
+export type PresetId = "training" | "questing" | "log" | "planner" | "mine";
 
 export interface DeskPrefs {
   preset: PresetId;
@@ -29,6 +29,8 @@ export const PRESETS: Record<Exclude<PresetId, "mine">, DeskColumn[]> = {
   training: [["train"], ["map"], ["character"]],
   questing: [["quests"], ["map"], ["item"]],
   log: [["train"], ["log"]],
+  /** The build planner on its own, the whole window wide. */
+  planner: [["planner"]],
 };
 
 /** How wide a column is against the others: the training log's tables and graphs, and the
@@ -51,7 +53,7 @@ export function loadPrefs(): DeskPrefs {
     if (!saved || typeof saved !== "object") return fallback;
     const mine = valid(saved.mine) ? saved.mine : null;
     const preset: PresetId =
-      saved.preset === "questing" || saved.preset === "training" || saved.preset === "log"
+      saved.preset === "questing" || saved.preset === "training" || saved.preset === "log" || saved.preset === "planner"
         ? saved.preset
         : saved.preset === "mine" && mine
           ? "mine"
