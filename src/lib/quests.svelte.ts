@@ -40,6 +40,72 @@ export function toggleExpanded(id: number) {
   questView.expanded = questView.expanded.includes(id) ? questView.expanded.filter((q) => q !== id) : [...questView.expanded, id];
 }
 
+/**
+ * A quest the player follows by hand: one the Quest Helper isn't showing, kept in view with its
+ * hints but no counts. Kept in this PC's storage, which every Leafline window shares.
+ */
+export interface FollowedQuest {
+  id: number;
+  name: string;
+  /** Whose quest log it's in, when a character was read; null shows it for everyone. */
+  character: string | null;
+}
+
+const FOLLOW_KEY = "leafline.quests.followed";
+const CHARACTER_KEY = "leafline.quests.character";
+
+function stored<T>(key: string, fallback: T): T {
+  try {
+    const value = localStorage.getItem(key);
+    return value == null ? fallback : (JSON.parse(value) as T);
+  } catch {
+    return fallback;
+  }
+}
+
+function store(key: string, value: unknown) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Following is a convenience; without storage it lasts until the window closes.
+  }
+}
+
+export const following = $state<{ list: FollowedQuest[]; character: string | null }>({
+  list: stored<FollowedQuest[]>(FOLLOW_KEY, []),
+  /** The character read last, so their quests stay in view while the HUD is hidden. */
+  character: stored<string | null>(CHARACTER_KEY, null),
+});
+
+const mine = (f: FollowedQuest) => f.character == null || following.character == null || f.character === following.character;
+
+/** The quests the current character follows, oldest first. */
+export function followedQuests(): FollowedQuest[] {
+  return following.list.filter(mine);
+}
+
+export function isFollowed(id: number): boolean {
+  return following.list.some((f) => f.id === id && mine(f));
+}
+
+export function follow(id: number, name: string) {
+  if (isFollowed(id)) return;
+  following.list = [...following.list, { id, name, character: following.character }];
+  store(FOLLOW_KEY, following.list);
+}
+
+export function unfollow(id: number) {
+  following.list = following.list.filter((f) => !(f.id === id && mine(f)));
+  store(FOLLOW_KEY, following.list);
+}
+
+/** Notes whose quests to show. A name not read leaves the last one in place. */
+export function noteCharacter(name: string | null) {
+  if (!name || name === following.character) return;
+  following.character = name;
+  store(CHARACTER_KEY, name);
+}
+
 let watching = false;
 
 export function watchQuests() {
@@ -48,5 +114,10 @@ export function watchQuests() {
   backend.onShowQuest((id) => {
     questView.id = id;
     questView.seen += 1;
+  });
+  // Another window followed or dropped a quest.
+  window.addEventListener("storage", (e) => {
+    if (e.key === FOLLOW_KEY) following.list = stored<FollowedQuest[]>(FOLLOW_KEY, []);
+    if (e.key === CHARACTER_KEY) following.character = stored<string | null>(CHARACTER_KEY, null);
   });
 }

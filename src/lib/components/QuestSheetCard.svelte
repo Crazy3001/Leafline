@@ -1,12 +1,13 @@
 <script lang="ts">
   // One quest from the search: who it comes from and how it goes, step by step.
-  import { LoaderCircle } from "@lucide/svelte";
+  import { Check, LoaderCircle, Plus } from "@lucide/svelte";
   import { untrack } from "svelte";
 
   import Card from "./Card.svelte";
   import QuestSteps from "./quest/QuestSteps.svelte";
   import { backend } from "$lib/api";
   import { OSMS_CREDIT, OSMS_URL, WIKI_CREDIT, WIKI_URL } from "$lib/mapdata.svelte";
+  import { follow, isFollowed, unfollow } from "$lib/quests.svelte";
   import type { MapReading, QuestWhere } from "$lib/types";
 
   let { id, map = null, plain = false }: { id: number; map?: MapReading | null; plain?: boolean } = $props();
@@ -44,6 +45,14 @@
   {#if sheet}
     <h3 class="name">{sheet.row.name}</h3>
     {#if meta.length}<p class="meta">{meta.join(" · ")}</p>{/if}
+    {#if isFollowed(sheet.row.id)}
+      <p class="following">
+        <Check size={12} /><span>Following in the Quests tab</span>
+        <button class="stop" onclick={() => unfollow(sheet.row.id)}>Stop</button>
+      </p>
+    {:else}
+      <button class="follow" onclick={() => follow(sheet.row.id, sheet.row.name)}><Plus size={12} />Follow</button>
+    {/if}
 
     <QuestSteps {sheet} from={found?.from ?? null} />
 
@@ -71,6 +80,55 @@
     margin: 2px 0 6px;
     color: var(--muted);
     font-size: var(--text-sm);
+  }
+
+  /* Keeps a quest in the Quests tab, with its hints, while the Quest Helper isn't showing it. */
+  .follow {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 26px;
+    margin: 0 0 8px;
+    padding: 0 9px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    font-size: var(--text-sm);
+    cursor: pointer;
+  }
+
+  .follow:hover,
+  .follow:focus-visible {
+    background: var(--surface-3);
+    outline: none;
+  }
+
+  .following {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-height: 26px;
+    margin: 0 0 8px;
+    color: var(--good);
+    font-size: var(--text-sm);
+  }
+
+  .stop {
+    margin-left: 4px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    font-size: var(--text-sm);
+    text-decoration: underline;
+    text-decoration-color: var(--border-strong);
+    cursor: pointer;
+  }
+
+  .stop:hover,
+  .stop:focus-visible {
+    color: var(--text);
+    outline: none;
   }
 
   .note {

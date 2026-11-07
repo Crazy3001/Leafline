@@ -42,6 +42,7 @@
     map={analysis?.map ?? null}
     {session}
     level={analysis?.hud?.level ?? session?.level ?? null}
+    character={session?.name ?? analysis?.hud?.name ?? null}
     {pinned}
   />
 {:else if panel === "item"}

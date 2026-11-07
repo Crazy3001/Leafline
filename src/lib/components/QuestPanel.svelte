@@ -8,10 +8,11 @@
   import MapDataPanel from "./map/MapDataPanel.svelte";
   import QuestCard from "./QuestCard.svelte";
   import QuestSheetCard from "./QuestSheetCard.svelte";
+  import FollowedQuests from "./quest/FollowedQuests.svelte";
   import { backend } from "$lib/api";
   import { formatCompact } from "$lib/format";
   import { OSMS_CREDIT, OSMS_URL, mapData, watchMapData } from "$lib/mapdata.svelte";
-  import { blankSearch, questView, watchQuests } from "$lib/quests.svelte";
+  import { blankSearch, followedQuests, noteCharacter, questView, watchQuests } from "$lib/quests.svelte";
   import type { MapReading, QuestPage, QuestReading, QuestRow, QuestSearch, SessionSummary } from "$lib/types";
 
   let {
@@ -19,9 +20,12 @@
     map = null,
     session = null,
     level = null,
+    character = null,
     pinned = false,
   }: {
     quest?: QuestReading | null;
+    /** The character read now, whose followed quests show. */
+    character?: string | null;
     map?: MapReading | null;
     session?: SessionSummary | null;
     level?: number | null;
@@ -37,6 +41,8 @@
 
   watchQuests();
   watchMapData();
+
+  $effect(() => noteCharacter(character));
 
   const ready = $derived(mapData.status?.ready ?? false);
   const search = $derived(questView.search);
@@ -194,9 +200,12 @@
 {:else}
   {#if quest}
     <QuestCard {quest} {map} {session} plain={pinned} />
-  {:else}
-    <p class="empty">Open the Quest Helper in game to track quest counters here.</p>
+  {:else if !(ready && followedQuests().length)}
+    <p class="empty">
+      Open the Quest Helper in game to track quest counters here, or search for a quest and follow it.
+    </p>
   {/if}
+  {#if ready}<FollowedQuests tracked={quest} {map} {session} plain={pinned} />{/if}
   {#if !ready && !pinned}
     <Card title="Quest search" plain={pinned}>
       <p class="lead">Search every quest once the map data is downloaded.</p>

@@ -1,7 +1,7 @@
 <script lang="ts">
   import GoButton from "$lib/components/GoButton.svelte";
   import { npcPlace } from "$lib/destination.svelte";
-  import { Check, ChevronRight, Gift, Hourglass, LoaderCircle, Search, UserRound } from "@lucide/svelte";
+  import { Check, ChevronRight, Gift, Hourglass, LoaderCircle, Search, UserRound, X } from "@lucide/svelte";
   import { untrack } from "svelte";
 
   import Card from "./Card.svelte";
@@ -14,7 +14,7 @@
   import { showMonsterNamed } from "$lib/monsters.svelte";
   import { showNpcNamed } from "$lib/places.svelte";
   import { OSMS_URL, WIKI_URL, mapData, watchMapData } from "$lib/mapdata.svelte";
-  import { payout, questView, toggleExpanded } from "$lib/quests.svelte";
+  import { payout, questView, toggleExpanded, unfollow } from "$lib/quests.svelte";
   import type { Guide, MapRef, MapReading, ObjectiveGuide, Objective, QuestReading, QuestWhere, SessionSummary } from "$lib/types";
 
   let {
@@ -22,8 +22,14 @@
     map = null,
     session = null,
     plain = false,
+    followed = null,
   }: {
     quest: QuestReading;
+    /**
+     * Quests followed by hand, by id, one for each of `quest.quests`: built from the data, with
+     * no counts, since the Quest Helper isn't showing them.
+     */
+    followed?: number[] | null;
     /** The minimap reading, so routes can start from the current map. */
     map?: MapReading | null;
     /** The session so far, for the player's own pace on each objective. */
@@ -161,9 +167,9 @@
   <button class="ref ref-npc" onclick={() => showNpcNamed(person)}>{person}</button>{#if maps.length}<span class="faint">{" · "}</span>{#each maps as m, k (m.id)}{#if k}<span class="faint">, </span>{/if}{#if m.known}<button class="ref ref-map" onclick={() => backend.showPlace("maps", m.id)}>{m.name}</button>{:else}<span class="faint">{m.name}</span>{/if}{/each}{/if}{" "}<GoButton place={npcPlace(person, maps)} />
 {/snippet}
 
-<Card title="Quests" {plain}>
+<Card title={followed ? "Followed quests" : "Quests"} {plain}>
   {#snippet aside()}
-    {#if quest.page}<span class="tabular">{quest.page[0]} tracked</span>{/if}
+    {#if followed}<span>No counts</span>{:else if quest.page}<span class="tabular">{quest.page[0]} tracked</span>{/if}
   {/snippet}
 
   {#each quest.quests as { title, objectives }, i}
@@ -185,6 +191,12 @@
         {:else}
           <!-- Leafline blanks a title too rough to name until it matches a quest. -->
           <span class="unread">Can't read this quest yet</span>
+        {/if}
+        {#if followed?.[i] != null}
+          {@const followedId = followed[i]}
+          <button class="stop" aria-label="Stop following {title}" title="Stop following" onclick={() => unfollow(followedId)}>
+            <X size={12} />
+          </button>
         {/if}
       </h3>
       <!--
@@ -240,7 +252,7 @@
           {/if}
         </ol>
       {/if}
-      {#if !objectives.length && !expanded}
+      {#if !objectives.length && !expanded && !followed}
         <p class="empty">Its lines could not be read.</p>
       {/if}
       {#if sheet && payout(sheet.sheet).length}
@@ -267,7 +279,7 @@
   {/each}
 
   {#if quest.quests.length}
-    {#if quest.quests.some((q) => !q.title)}
+    {#if !followed && quest.quests.some((q) => !q.title)}
       <!-- Only while something can't be read, so it says why without nagging. -->
       <p class="footer faint">Scenery behind the Quest Helper can hide its text for a moment. UI Size: Ideal Ratio reads best.</p>
     {/if}
@@ -292,6 +304,28 @@
 </Card>
 
 <style>
+  .stop {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    margin-left: auto;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--faint);
+    cursor: pointer;
+  }
+
+  .stop:hover,
+  .stop:focus-visible {
+    background: var(--surface-3);
+    color: var(--text);
+    outline: none;
+  }
+
   .open {
     display: flex;
     align-items: center;
@@ -397,6 +431,9 @@
   }
 
   .title {
+    display: flex;
+    align-items: center;
+    gap: 4px;
     margin: 0 -10px 8px;
     padding: 6px 10px;
     border-bottom: 1px solid var(--border);
