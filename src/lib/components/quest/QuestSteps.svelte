@@ -39,7 +39,7 @@
   {#if !tracked && info.giver}
     <li>
       <p class="step">Talk to <button class="ref ref-npc" onclick={() => showNpcNamed(info.giver!)}>{info.giver}</button></p>
-      <PlaceRoute maps={info.giverMaps} {from} />
+      <PlaceRoute maps={info.giverMaps} {from} npc={info.giver} />
     </li>
   {/if}
   {#each sheet.objectives as objective (objective.guide.target)}
@@ -60,11 +60,11 @@
   <li class:next={finished}>
     {#if info.turnIn}
       <p class="step">Turn in to <button class="ref ref-npc" onclick={() => showNpcNamed(info.turnIn!)}>{info.turnIn}</button></p>
-      <PlaceRoute maps={info.turnInMaps} {from} />
+      <PlaceRoute maps={info.turnInMaps} {from} npc={info.turnIn} />
     {:else if info.giver}
       <p class="step">Turn it in</p>
       <p class="unsure">Nothing says to whom yet. It came from <button class="ref ref-npc" onclick={() => showNpcNamed(info.giver!)}>{info.giver}</button>.</p>
-      <PlaceRoute maps={info.giverMaps} {from} />
+      <PlaceRoute maps={info.giverMaps} {from} npc={info.giver} />
     {:else}
       <p class="step">Turn it in</p>
     {/if}

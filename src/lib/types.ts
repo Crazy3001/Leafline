@@ -491,6 +491,22 @@ export interface MapRoute {
   walking: number | null;
 }
 
+/** A place to head for with "Go here" (see src-tauri/src/app/nav.rs): a map, or an NPC on any of their maps. */
+export interface Destination {
+  kind: "map" | "npc";
+  /** The map's or the NPC's name. */
+  name: string;
+  /** Reaching any of these is arriving; the nearest is headed for. */
+  maps: MapRef[];
+}
+
+/** The place headed for, shared by every window, and the places headed for lately. */
+export interface NavState {
+  destination: Destination | null;
+  /** The newest first. */
+  recent: Destination[];
+}
+
 /** Taxis and return scrolls (see src-tauri/src/mapdata/travel.rs). */
 export type TravelKind = "cab" | "vipCab" | "scroll";
 

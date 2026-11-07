@@ -1,5 +1,7 @@
 <script lang="ts">
   // One NPC from the search: where they stand with a route there, and their quests.
+  import GoButton from "$lib/components/GoButton.svelte";
+  import { npcPlace } from "$lib/destination.svelte";
   import { LoaderCircle } from "@lucide/svelte";
   import { untrack } from "svelte";
 
@@ -40,7 +42,7 @@
 
 <Card title="NPC" {plain}>
   {#if sheet}
-    <h3 class="name">{sheet.name}</h3>
+    <h3 class="name">{sheet.name} <GoButton place={npcPlace(sheet.name, sheet.maps.map((m) => m.map))} /></h3>
 
     <Section title="Where to find them" count={sheet.maps.length}>
       {#if sheet.maps.length}

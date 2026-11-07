@@ -9,6 +9,8 @@ import type {
   LoggedDrop,
   MapNote,
   SavedSpot,
+  Destination,
+  NavState,
   UpdateStatus,
   Build,
   BuildCatalog,
@@ -421,6 +423,45 @@ function partialSession(fraction: number, frames: number): SessionSummary {
 }
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** "Go here" in this browser tab, as src-tauri/src/app/nav.rs keeps it. */
+let nav: NavState = { destination: null, recent: [] };
+const navHandlers: ((nav: NavState) => void)[] = [];
+const samePlace = (a: Destination, b: Destination) =>
+  a.kind === b.kind &&
+  a.name.toLowerCase() === b.name.toLowerCase() &&
+  a.maps.map((m) => m.id).sort().join() === b.maps.map((m) => m.id).sort().join();
+function changeNav(next: NavState): NavState {
+  nav = next;
+  navHandlers.forEach((h) => h(nav));
+  return nav;
+}
+
+/**
+ * Dev-only controls for walking the sample world from the browser console, to try "Go here":
+ * `__leafline.walk("Mossbank")` reads that map's header next, `walk(null)` hides the minimap,
+ * `walk("Mosbank?")` reads a header too rough to trust, `finish()` fills the first quest's counters.
+ */
+let liveAnalysis: Analysis = sampleAnalysis;
+function emitAnalysis(change: Partial<Analysis>) {
+  liveAnalysis = { ...liveAnalysis, ...change };
+  analysisHandlers.forEach((h) => h(liveAnalysis));
+}
+if (typeof window !== "undefined") {
+  (window as unknown as { __leafline: object }).__leafline = {
+    walk(name: string | null) {
+      const map = name == null ? null : { street: "Fern Road", name, collapsed: false, rect: { x: 0, y: 0, w: 100, h: 20 }, twin: null };
+      emitAnalysis({ map });
+    },
+    finish() {
+      const quest = liveAnalysis.quest;
+      if (!quest) return;
+      const [first, ...rest] = quest.quests;
+      const done = { ...first, objectives: first.objectives.map((o) => ({ ...o, current: o.required })) };
+      emitAnalysis({ quest: { ...quest, quests: [done, ...rest] } });
+    },
+  };
+}
+
 export const mockBackend: Backend = {
   async analyzeImage() {
     await delay(350);
@@ -516,7 +557,7 @@ export const mockBackend: Backend = {
   onOpenImage: async () => () => {},
   async onAnalysis(handler) {
     analysisHandlers.push(handler);
-    if (!preview?.empty) setTimeout(() => handler(sampleAnalysis), 200);
+    if (!preview?.empty) setTimeout(() => handler(liveAnalysis), 200);
     return () => {};
   },
   async onReplayProgress(handler) {
@@ -554,6 +595,11 @@ export const mockBackend: Backend = {
     // header, which matches the sample's current map.
     const exact = sampleSearch(name).find((m) => m.name === name);
     if (exact) return { score: 1, card: sampleCard(exact.id)!, alternatives: [] };
+    // A header ending in "?" stands for a rough reading: a poor match with others nearly as close.
+    if (name.endsWith("?")) {
+      const near = sampleSearch(name.slice(0, 4));
+      if (near.length) return { score: 0.7, card: sampleCard(near[0].id)!, alternatives: near.slice(1, 3) };
+    }
     const card = sampleCard(2)!;
     return { score: 0.93, card, alternatives: [sampleSearch("Meadow II")[0]] };
   },
@@ -562,6 +608,22 @@ export const mockBackend: Backend = {
   searchMaps: async (text) => (mapStatus.ready ? sampleSearch(text) : []),
   mapRoute: async (from, to) =>
     preview?.routes ? (preview.routes.find((r) => r.from.id === from && r.to.id === to) ?? null) : sampleRoute(from, to),
+  destination: async () => nav,
+  async setDestination(destination) {
+    if (!destination) return changeNav({ ...nav, destination: null });
+    const recent = [destination, ...nav.recent.filter((d) => !samePlace(d, destination))].slice(0, 6);
+    return changeNav({ destination, recent });
+  },
+  async arriveAt(destination) {
+    return nav.destination && samePlace(nav.destination, destination) ? changeNav({ ...nav, destination: null }) : nav;
+  },
+  async forgetDestination(destination) {
+    return changeNav({ ...nav, recent: nav.recent.filter((d) => !samePlace(d, destination)) });
+  },
+  async onDestination(handler) {
+    navHandlers.push(handler);
+    return () => {};
+  },
   async monsterDrops(monsters) {
     await delay(900);
     return sampleDrops(monsters);

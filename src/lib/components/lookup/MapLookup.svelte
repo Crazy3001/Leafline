@@ -1,6 +1,8 @@
 <script lang="ts">
   // The Maps half of the Lookup tab: the map the player is on, and a search of every map in the
   // data by name, area, monster or NPC, down to a map's full card.
+  import GoButton from "$lib/components/GoButton.svelte";
+  import { mapPlace } from "$lib/destination.svelte";
   import { ArrowLeft, LoaderCircle } from "@lucide/svelte";
   import { untrack } from "svelte";
 
@@ -164,7 +166,7 @@
     {#if details}
       <Card title="Map" plain={pinned}>
         {#if details.map.street}<p class="street">{details.map.street}</p>{/if}
-        <h3 class="name">{details.map.name}</h3>
+        <h3 class="name">{details.map.name} <GoButton place={mapPlace(details.map)} /></h3>
         {#key details.map.id}
           <MapDetailsView {details} current={here?.card.map ?? null} variant="compact" onnavigate={open} />
         {/key}

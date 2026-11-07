@@ -5,11 +5,13 @@
   import { backend, fileName } from "$lib/api";
   import CompactHud from "$lib/components/CompactHud.svelte";
   import Logo from "$lib/components/Logo.svelte";
+  import NextStep from "$lib/components/NextStep.svelte";
   import PanelView from "$lib/components/PanelView.svelte";
   import { itemView, watchItems } from "$lib/items.svelte";
   import { monsterView, watchMonsters } from "$lib/monsters.svelte";
   import { tabRequest } from "$lib/nav.svelte";
   import { watchTyping } from "$lib/typing";
+  import { startWayfinder } from "$lib/wayfinder.svelte";
   import { PANELS, panelId, panelInfo, signature } from "$lib/panels";
   import { placeLinks, watchPlaces } from "$lib/places.svelte";
   import { questView, watchQuests } from "$lib/quests.svelte";
@@ -33,6 +35,7 @@
     watchMonsters();
     watchPlaces();
     watchQuests();
+    startWayfinder();
   });
 
   const signatures = $derived(
@@ -247,6 +250,8 @@
         {/if}
       </div>
     {/if}
+
+    <NextStep />
 
     <nav class="tabs">
       <div class="tablist" role="tablist" aria-label="Panels" tabindex="-1" onkeydown={onTabKey}>

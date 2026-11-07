@@ -45,6 +45,8 @@ import type {
   MapQuery,
   MapRef,
   MapRoute,
+  NavState,
+  Destination,
   MeasuredRate,
   NewPrice,
   SavedSpot,
@@ -137,6 +139,15 @@ export interface Backend {
   mapCard(id: number): Promise<MapDetails | null>;
   searchMaps(text: string): Promise<MapRef[]>;
   mapRoute(from: number, to: number): Promise<MapRoute | null>;
+  /** Where "Go here" is heading, and the places headed for lately. */
+  destination(): Promise<NavState>;
+  /** Heads for a place from any window, or with null, cancels. */
+  setDestination(destination: Destination | null): Promise<NavState>;
+  /** Clears the destination on arrival, unless another window has set a new one since. */
+  arriveAt(destination: Destination): Promise<NavState>;
+  /** Takes a place off the recent list. */
+  forgetDestination(destination: Destination): Promise<NavState>;
+  onDestination(handler: (nav: NavState) => void): Promise<UnlistenFn>;
   /** Player-observed drops, from a copy of mapleclassic.wiki's table renewed weekly. */
   monsterDrops(monsters: string[]): Promise<MonsterDrops[]>;
   /** Where to go for each quest objective, from cached data only. Null until map data is downloaded. */
@@ -389,6 +400,11 @@ const tauriBackend: Backend = {
   mapCard: (id) => invoke("map_card", { id }),
   searchMaps: (text) => invoke("search_maps", { text }),
   mapRoute: (from, to) => invoke("map_route", { from, to }),
+  destination: () => invoke("destination"),
+  setDestination: (destination) => invoke("set_destination", { destination }),
+  arriveAt: (destination) => invoke("arrive_at", { destination }),
+  forgetDestination: (destination) => invoke("forget_destination", { destination }),
+  onDestination: (handler) => listen<NavState>("destination", (e) => handler(e.payload)),
   monsterDrops: (monsters) => invoke("monster_drops", { monsters }),
   questGuide: (quests, mapName, mapStreet, mapTwin, measured) =>
     invoke("quest_guide", { quests, mapName, mapStreet, mapTwin, measured }),

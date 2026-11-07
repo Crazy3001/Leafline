@@ -1,4 +1,6 @@
 <script lang="ts">
+  import GoButton from "$lib/components/GoButton.svelte";
+  import { npcPlace } from "$lib/destination.svelte";
   import { Check, ChevronRight, Gift, Hourglass, LoaderCircle, Search, UserRound } from "@lucide/svelte";
   import { untrack } from "svelte";
 
@@ -156,7 +158,7 @@
 </script>
 
 {#snippet who(person: string, maps: MapRef[])}
-  <button class="ref ref-npc" onclick={() => showNpcNamed(person)}>{person}</button>{#if maps.length}<span class="faint">{" · "}</span>{#each maps as m, k (m.id)}{#if k}<span class="faint">, </span>{/if}{#if m.known}<button class="ref ref-map" onclick={() => backend.showPlace("maps", m.id)}>{m.name}</button>{:else}<span class="faint">{m.name}</span>{/if}{/each}{/if}
+  <button class="ref ref-npc" onclick={() => showNpcNamed(person)}>{person}</button>{#if maps.length}<span class="faint">{" · "}</span>{#each maps as m, k (m.id)}{#if k}<span class="faint">, </span>{/if}{#if m.known}<button class="ref ref-map" onclick={() => backend.showPlace("maps", m.id)}>{m.name}</button>{:else}<span class="faint">{m.name}</span>{/if}{/each}{/if}{" "}<GoButton place={npcPlace(person, maps)} />
 {/snippet}
 
 <Card title="Quests" {plain}>

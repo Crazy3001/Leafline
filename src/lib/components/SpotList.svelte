@@ -8,6 +8,8 @@
   // EXP per hour measured on each map, and for maps not tried yet an estimate: the map's base
   // EXP per clear times how the player's measured maps compare with theirs. No game formulas
   // are modelled. "Saved" lists the maps the player bookmarked, whatever their level.
+  import GoButton from "$lib/components/GoButton.svelte";
+  import { mapPlace } from "$lib/destination.svelte";
   import { Bookmark, ChevronRight, CircleHelp, ExternalLink, Minus, Plus } from "@lucide/svelte";
   import { onMount, untrack } from "svelte";
 
@@ -313,6 +315,7 @@
               </span>
               <span class="chevron" class:open={expanded}><ChevronRight size={12} /></span>
             </button>
+            {#if steps(spot) !== 0}<span class="go"><GoButton place={mapPlace(spot.map)} /></span>{/if}
             {@render saveToggle(spot.map.id, spot.map.name)}
           </div>
           {#if expanded}
@@ -392,6 +395,12 @@
 </Block>
 
 <style>
+  .go {
+    display: inline-flex;
+    align-items: center;
+    flex: none;
+  }
+
   .help {
     display: inline-grid;
     place-items: center;
