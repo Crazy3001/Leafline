@@ -1,7 +1,7 @@
 <script lang="ts">
   // The item check: one item, read from its tooltip or taken from the data. Its stats, whether
-  // it has been scrolled, where it comes from, and the player's own notes and prices. Leafline
-  // has no market prices: the prices here are only the ones the player logged.
+  // it has been scrolled, where it comes from, and the player's own notes. Leafline has no
+  // market prices.
   import { untrack } from "svelte";
 
   import BuildFit from "./BuildFit.svelte";

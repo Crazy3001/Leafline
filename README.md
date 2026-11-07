@@ -1,217 +1,165 @@
 # Leafline
 
-An unofficial, read-only overlay for **MapleStory Classic World**: EXP and meso tracking, item checks, routes, quest help and build planning, beside what is visible on screen. Windows only for now.
+**A free, read-only overlay for MapleStory Classic World.** It sits beside the game and shows your EXP and meso rates, where to train and how to get there, your quests, item checks and your build plan, all from what the game already shows on screen.
 
-> The project is not affiliated with or endorsed by Nexon.
+[**Download the latest release**](https://github.com/Crazy3001/leafline/releases/latest) · Windows 10 and 11 · [FAQ](#faq) · [Known limitations](#known-limitations)
 
-## What it does, and what it never does
+> [!WARNING]
+> **Leafline is unofficial, and you use it at your own risk.** Nexon has not said whether read-only overlays are allowed. One player reported a two-week ban while running a similar screen-reading overlay (unconfirmed). A penalty in one Nexon game carries to the others on the same account. If that worries you, play on a character you can afford to lose, ideally on a separate Nexon account. [More on the risk](#is-it-allowed-can-i-get-banned)
 
-Leafline only looks at your screen. It captures what is visible, reads it with OCR and shows information in a separate always-on-top window.
+<!-- Screenshots go here: Leafline's own windows only (overlay, desk view, training log, planner)
+     over a plain background or with the game area cropped out. No game art in the repo. -->
 
-It never reads or writes game memory or files, never touches network traffic, never injects into or draws inside the game client, and never sends keyboard or mouse input to the game. There is no automation of any kind. No Nexon assets are included.
+## What it does
 
-Nothing read from the game leaves your PC. Leafline goes online only to download the community data below when you ask for it, and, if you turn it on in setup or Settings, to ask GitHub for the latest version number at startup. That request carries Leafline's name and version and nothing else; when a newer release is out, Settings → About says so and links to it. Nothing is downloaded or installed for you.
+### Training
+- **EXP and meso rates as you play:** EXP gained, EXP/hour, % per hour, time to level, mesos/hour, overall, per map and over the last five minutes, with a trend graph.
+- **Readings are checked, not trusted:** EXP points and percent have to agree, a level-up has to show twice, and big meso jumps need several readings. Time in town, deaths and shop trades are kept out of the rates.
+- **Sessions save themselves** as you go, with a line for each map, level, party size and job. The **training log** compares sessions and maps, and lists the drops you logged. Export it all to CSV.
+- **Where to train:** the Train tab ranks maps near your level by EXP per kill, EXP per monster HP, the EXP/hour you measured there, or how close they are. Bookmark the spots you like.
+- **Share card:** turn a session into a picture to post anywhere. Leafline draws it from scratch (no game art), leaves your character's name off unless you add it, and never posts anything itself.
 
-**Use it at your own risk.** Leafline reads the game window from the moment it starts (you can turn that off in Settings). Nexon has not said whether read-only overlays are allowed. Its support replies quote the rule against unauthorised third-party software, and one player reported a two-week ban while running a similar screen-reading overlay (unconfirmed). Nexon's FAQ says a penalty in one of its games carries to the others on the same account. If that worries you, play on a character you can afford to lose, ideally on a separate Nexon account.
+### Items
+- **Item check:** hover an item in game and press your hotkey. Leafline reads the tooltip and shows its stats with the base and bonus, its requirements, whether it's clean or scrolled (and how many scrolls failed), and whether your build can wear it.
+- **Where to get it:** every monster players have seen drop it, each with the maps it lives on and a route there, plus the quests that give it.
+- **Drop log:** log an item as a drop from a monster on your map, and send it on to MeowDB's community drop lists with one click if you like.
+- **Your own notes** on any item, kept on your PC.
 
-## Getting started (Windows)
+### Getting around
+- **The map you're on:** its monsters, exits, NPCs, quests and drops, plus your rates there and your own notes.
+- **Go here:** pick a map, NPC, monster or quest target, and a small bar shows the next step (which portal, taxi or return scroll) and moves on as you travel.
+- **Lookup:** search every item, monster, map and NPC, with filters, and open any name you see in Leafline.
 
-Prerequisites: [Rust](https://rustup.rs), [Node.js](https://nodejs.org) 20+, Visual Studio C++ build tools, and WebView2 (built into Windows 11).
+### Quests
+- **Quest Helper, read live:** your tracked quests with their counters and rewards. Open one for its steps, directions to each monster, and who takes it in.
+- **Quest search** across every quest by name, NPC, monster or region.
 
-```bash
-npm install
-npm run tauri dev
-```
+### Your character
+- **Character tab:** level, job, HP, MP, EXP and mesos at a glance, with what your build plan says to do at this level.
+- **Build planner:** a job and a list of goals in order ("this skill to 20, DEX to 25, the rest into LUK"), laid out level by level. It warns when a goal comes too late or SP would be lost at a job advancement. Ready-made starting plans for each 2nd job.
+- **Follows your real character:** open your Stat or Skill window in game and the plan picks up from where you really are.
+- **Gear:** what you're wearing, the best you can wear now, and the next step up, ranked by the stats your plan raises.
+- **Job advancement checklist:** who to see and where, with a route, when an advancement comes up.
 
-The first launch opens **setup**: a line on what Leafline is, the hotkeys, game settings that help it read, and the map data download. Run it again from Settings → About. Then the **overlay** is there: the compact, transparent, always-on-top panel. Drag it by its title bar.
+### Fits around the game
+- **A small overlay** over the game, or shrink it to a **compact HUD**. Lock it so clicks pass through.
+- **Pin** any tab into its own small window, including a Route pin for Go here.
+- **Desk view:** every panel side by side in one big window, made for a second screen.
+- **Hotkeys** that work while the game is in front, without sending the game any input. Setup tests each key with the game in front.
+- **Countdown timers** for anything you want to keep time on.
 
-No hotkey is set until you pick it in setup or Settings, and a hotkey takes its key from the game. Setup suggests:
+## What it never does
 
-| Suggested | Action |
+Leafline only looks at the game window, the way OBS or Discord capture it, and reads the text with the OCR built into Windows.
+
+- It never reads or changes the game's memory, files or network traffic.
+- It never injects into the game or draws inside it. The overlay is its own window.
+- It never presses keys or clicks for you. Nothing is automated: no botting, macros or auto-potions.
+- It never saves pictures of your game unless you press **Save frame**, and never uploads screenshots, readings or records.
+- It ships no Nexon assets: no sprites, icons or extracted game data.
+
+### Privacy
+
+Nothing read from the game leaves your PC. Leafline only goes online to:
+
+- download the community map, monster, quest and drop data (when you ask, then weekly), and
+- ask GitHub for the latest version number at startup, if you leave the update check on. That request carries Leafline's name and version and nothing else. Nothing is downloaded or installed for you.
+
+Your sessions, notes, drop log, builds and settings stay in `%APPDATA%\app.leafline.overlay`, with a daily backup of the last 7 days. **Settings → Data** opens the folder.
+
+## Install
+
+1. Download `Leafline_x.y.z_x64-setup.exe` from the [latest release](https://github.com/Crazy3001/leafline/releases/latest). The `.msi` works too.
+2. Run it. The installer isn't code-signed yet, so Windows SmartScreen may say it "protected your PC". Choose **More info → Run anyway**.
+3. Leafline opens a short **setup** the first time.
+
+You need Windows 10 or 11 (64-bit) and the **English** MapleStory Classic World client. WebView2 comes with Windows 11; the installer adds it on Windows 10 if it's missing.
+
+**Updating:** Settings → About says when a new version is out and links to it. Install it over the old one; your records stay.
+**Uninstalling:** from Windows' *Installed apps*. Your records stay in the folder above, so delete that too if you want them gone.
+
+## Getting started
+
+Setup walks you through five short steps:
+
+1. **Welcome:** turn live reading and the update check on or off.
+2. **Hotkeys:** nothing is bound until you choose. It suggests `Win+F8` to read an item, `Win+F9` to show or hide the overlay and `Win+F7` to lock it, then asks you to press each one with the game in front to be sure it gets through.
+3. **Game settings** that help Leafline read (below).
+4. **How to show Leafline:** the overlay, the desk view, or both.
+5. **Map data:** the one-time download of community data.
+
+Then play. Leafline finds the game window by itself and starts reading. Closing a window hides it; Leafline keeps running in the tray until you choose **Quit**. Run setup again any time from **Settings → About**.
+
+### Recommended game settings
+
+| Setting | Why |
 |---|---|
-| `Win+F8` | Read the item you're hovering |
-| `Win+F9` | Show or hide the overlay |
-| `Win+F7` | Lock the overlay (clicks pass through to whatever is underneath) |
+| **UI Size: Ideal Ratio** (Graphics options) | Tested most. Other UI sizes can misread for now. |
+| **Windows HDR off**, then restart the game | HDR washes out captures. Leafline warns you if it's on. |
+| **Windowed or Full Screen** | Both work. The game's Full Screen isn't exclusive, so the overlay still shows. |
+| **English client** | Other languages aren't read yet. |
 
-The game can't bind Win, and adding it also keeps a key away from programs that grab plain F-keys. Setup then asks you to click into the game and press each key there, and ticks the ones that arrive: the game can keep some keys to itself while it's in front, even ones it doesn't bind, so a key has to be tested with the game in front. F12 can't be a hotkey: Windows keeps it for itself.
+### Hotkey tips
 
-Setup also asks about the compact HUD, reading your Character Stat and Skill windows, and saving the picture last read. Settings has the rest: pinned panels, starting or stopping live reading, pausing tracking, a new session and keeping a run out of the history.
+Add **Win** to every hotkey. While the game is in front it keeps plain keys to itself, even ones it doesn't use (Pause, the numpad), but Win combinations get through, and the game can't bind Win. Avoid **Ctrl** and **Alt**: the game sees them while you hold them, so a hotkey with Ctrl can make your character attack. F12 can't be used; Windows keeps it.
 
-Use Win with each hotkey. While the game is in front it keeps keys pressed on their own to itself, even ones it doesn't bind such as Pause and the numpad, so those never reach Leafline; Win+F-keys and Ctrl+Alt combinations do. Avoid Ctrl and Alt: the game sees them while you hold them, so a hotkey with Ctrl can make your character attack. Leafline still accepts F-keys, Pause and numpad keys on their own, in case they get through on your PC. If another program on your PC already uses a key, setup and Settings say so.
+## FAQ
 
-Closing a window hides it. Leafline keeps running in the tray until you choose **Quit**.
+### Is it allowed? Can I get banned?
+Nobody knows for sure. Nexon hasn't said either way: support replies to similar questions quote the rule against unauthorised third-party software and say they can't comment on specific programs. A support ticket asking whether read-only overlays are allowed has had no answer yet. One player reported a two-week ban while running a similar screen-reading overlay; it's unconfirmed, but the stated reason was third-party programs. Leafline is built to stay on the safe side of every line we know of (see [What it never does](#what-it-never-does)), but passive doesn't mean approved. Penalties carry across Nexon games on one account, so think about using a separate account.
 
-On Windows, the overlay and pinned panels snap to the edges of the screen and to each other as you drag them. Hold `Shift` to place one freely.
+### Is it free?
+Yes, and it stays free: no ads, no paid features, no account. The code is open source under the MIT licence.
 
-### Live reading
+### Why does Windows warn me when I install it?
+The installer isn't code-signed yet, and SmartScreen warns about any new unsigned program. Code signing is planned. Until then, **More info → Run anyway**, or build it yourself from this code.
 
-It starts with Leafline and waits for the game window if the game isn't open. Turn it off under **Settings → Live reading**, or stop it with the **Live** badge on the overlay. Every few seconds Leafline takes a picture of the game window with Windows Graphics Capture, the API OBS and Discord use, and runs it through the pipeline and the session tracker. The picture comes from the window itself, so the overlay and anything else in front of it are never in it, and a covered game is still read.
+### Does it work on Mac or Linux?
+Not yet. Windows only for now; a macOS version is planned.
 
-It only looks at the window. It asks Windows for the window's title, class, position and size, and never sends the game a message or opens its process. Pictures stay in memory unless you press **Save frame**, which saves one to a local folder that doesn't sync (Settings → Data shows it and lets you choose another). A picture that hasn't changed isn't read again, and pictures are always at least a second apart.
+### Does it need the game's files, or log in to anything?
+No. It only looks at the game window. It has no login and never asks for your Nexon account.
 
-Item tooltips aren't read as you play. Hover an item and press the Read item hotkey, and Leafline reads it from a single picture, whether live reading is running or not. The **Live reading** switch in Settings has to be on for this too.
+### Why doesn't it show market prices?
+Leafline won't use a price site's data without its permission, and it won't read chat or player shops as you play. Price data may come later if a site agrees. For now each item shows its NPC sell price from the data.
 
-### Item check
+### Something reads wrong. What should I check?
+Most misreads come from game settings: **UI Size: Ideal Ratio**, **HDR off** (restart the game after), and the English client. Bright, busy maps such as Henesys can make the Quest Helper hard to read, since its text is black on a see-through panel. Leafline prefers showing nothing over showing a wrong number, so a blank usually means it wasn't sure.
 
-The Read item hotkey opens an **item check** in the Lookup tab: the hovered item's stats with their base and bonus, its requirements and jobs, whether it's clean or scrolled, whether your build can wear it, who drops it and which quests give it, and your own note and prices for it.
+### How do I report a bug?
+[Open an issue](https://github.com/Crazy3001/leafline/issues). **Settings → Data → Bug report details → Copy** copies what Leafline knows about its own state, with no character names, chat or file paths. A picture helps too: **Save frame** on the overlay saves the last picture Leafline read. It shows your game, so only post it if you're happy to share it.
 
-Successful scrolls show in game as the `(+N)` after the name. Failed ones only show as fewer slots left than the item started with, so Leafline counts them against the slot count in the map data, and says that's where the number comes from, since Classic could differ. A copy with no `(+N)` reads as "No upgrades" until its slots can be checked.
-
-Leafline has no market prices. Write a note on any item (keep it, sell it, who wants one), and log prices you saw or paid, each marked traded or asking: the card shows their median, range and the ones for copies like this one. Links open price sites in your browser with the item's name copied, ready to paste. The note and prices stay on your PC and come back whenever you check or look up the item.
-
-The window is found by its title or class. If Leafline can't tell which window is the game, pick it in Settings; the choice is remembered. If Windows HDR is on for the game's display, the overlay warns you, because readings are unreliable until HDR is off and the game restarted.
-
-### Reading the HUD
-
-The HUD's numbers use a tiny pixel font that general OCR misreads, so Leafline tells each character apart by rules about its shape: how many closed holes it has, whether its top or bottom row is solid, and which sides have ink partway down. There is nothing to set up, and no font data ships with the app. A shape that fits no rule is left unread rather than guessed.
-
-The game lays its UI out on a 1024×768 grid and scales that to the window, so Leafline puts the HUD back on that grid before reading it.
-
-### Session tracking
-
-The session tracker turns a run of readings into rates: EXP gained, EXP/hour, % per hour, time to the next level, mesos gained and mesos/hour, overall, per map and over the last five minutes of active time, with a trend line. Live sessions save themselves to your history every 30 seconds once they have a minute of active time, with a line for each map, level, party size and class. Open a session under **History** to add a note, copy a line, or fix a misread map name, which stays fixed the next time it is read that way. Towns aren't logged. **Pause**, **New session** and **Log this run** sit on the Session card. Your records are copied to a `backups` folder once a day, and the last 7 copies are kept. Offline, the tracker runs on a folder of screenshots:
-
-- **File time** orders frames by each file's modified time and takes that as the moment it shows. Suits screenshots saved by hand. Copying files can reset their times, so replay the folder they were saved to.
-- **File name** orders frames by name, a fixed number of seconds apart. Suits frames extracted from a recording (for example `ffmpeg -i grind.mp4 -vf fps=1 frame_%05d.png`).
-
-OCR is sometimes wrong, so the tracker checks readings against each other rather than trusting each one:
-
-- EXP points and percent must agree. Together they imply how much EXP the level needs, which cannot change within a level, so a reading that implies a different amount is dropped as a misread. Tracking starts once two readings agree.
-- Levels only go up, and a level-up counts once the percent wraps round or two readings agree on the new level.
-- A meso amount counts once readings agree (two in a row for recordings; a single screenshot has to do for hand-taken ones). In live play a big jump needs three and a tenfold one eight, unless the mesos have been out of sight for two minutes. Changes while a shop, storage or trade window is open are left out of the rates.
-- EXP lost to a death is left out of the rates, once two readings agree on the drop. The Session card says how many deaths and how much they cost.
-- At high levels the HUD shows only a percentage. EXP/hour then stays blank, and % per hour and time to level come from the percentage alone.
-- Another character is noticed by a lower level or a different name, three readings in a row. The old session is saved and a new one starts.
-- If the minimap's name is hidden for 45 seconds, gains stop going to the last map read.
-- The clock pauses after 15 seconds without EXP (change it in Settings), and at once on a map change without EXP, so time in town does not dilute the rates. Rates appear after 30 seconds of active time.
-- A missing reading is skipped, never guessed. No EXP table is built in: each level's requirement is measured from the HUD, since Classic's table may differ from old GMS.
-
-### Training spots
-
-The **Train** tab ranks maps near your level by the map data's base EXP for a clear, EXP per monster HP, the EXP per hour you measured there, or how few portals away they are, with a route from where you are. The bookmark on a row saves it to **Your spots**, listed first whatever your level, so the places you like to grind stay one click away. Saved spots are kept on your PC with your other records.
-
-### Build planner
-
-The **Character** tab is your character at a glance: level, job, HP, MP, EXP and mesos, this session's rates, and under them what your build plan says at your level: this level's AP and SP, the next job advancement and what comes after. **Edit** opens the planner. The session's totals, your history and your timers follow below.
-
-When an advancement is coming up, a **job advancement checklist** under it says who to see and where they stand, with a route, and for the 2nd job the quests involved, each opening its steps in the Quests tab. Leafline finds these in the downloaded quest and NPC data by the job's name, so it is a pointer, not a rule: the data has no quest for the 1st job, and what the game's NPCs say comes first. Tick the steps as you go.
-
-A build is a job and a list of goals in order, the way written guides put them: this skill to 20, then that one; DEX to 25, the rest into LUK. Each new point goes to the first goal that can take it, and the planner lays the result out level by level. It says when a prerequisite comes too late, a goal can't finish in time, or 1st-job SP would be lost at the 2nd job advancement. Add gear to see the first level the plan can wear it, and a hovered item (the Read item hotkey) shows whether it suits the build.
-
-Starting late, or spent points your own way? While live reading runs, open your Character Stat or Skill window: when what it shows changes, Leafline moves the build's starting point to match and lays out the rest of the plan from there. These windows are read from the same pictures live reading already takes, and only while one is open. With live reading stopped, use **Read stats** in the Character tab or its hotkey to read them from a single picture. The skill window shows one job tab at a time, so open each tab you've spent points on.
-
-The Character tab also lists gear to look for at your level, ranked by the stats your plan raises. It doesn't know prices or how easy an item is to find, and nobody has checked its picks in game, so treat it as a list to look through.
-
-### Quest search
-
-The Quests tab and its pinned window show each quest in the Quest Helper with its counters and payout. Open one to see its steps, with directions to each monster and to whoever takes it in, plus its rewards and the quests before and after it. Search covers all the quests in the map data, by name, person, monster or region.
-
-Once a tracked quest matches the data it stays locked in, so scenery moving behind the Quest Helper can't change it.
-
-The game's data only says who gives a quest, so who takes it in comes from mapleclassic.wiki. Where the wiki doesn't say, Leafline goes by the next quest in a chain or a title like `to Heena`, and otherwise says it doesn't know rather than guess.
-
-### Lookup
-
-The Lookup tab searches Items, Monsters, Maps and NPCs. None of it needs live reading.
-
-**Items** searches every item in the map data by name or by what it does, with categories and filters for slot, job, level and stat. An item's card shows its stats, whether your build can wear it, your note and logged prices, who players saw drop it and which quests give it. Names in a build, its suggestions and a map's drops open here.
-
-Under **Equip**, the list starts with gear for you, slot by slot, the best first. It goes by your level, your job and your build's stats, using the same ranking as the Character tab's suggestions. Your level and job come from the game or your build, and you can change either, pick a gender, or look 5 to 20 levels ahead. Without a build it can't check stat requirements, and says so. Staff and novelty items are left out unless you search for them by name. **Everything** lists all equipment. Nobody has checked these picks in game, and they don't take prices into account.
-
-**Monsters** opens with what's on your map and near your level, above every monster players meet. Search by name, by something it drops, or by a map, and narrow it by boss, undead, element weakness, region or level. A monster's card shows its stats, elements and what it can do, each map it lives on with a route from where you are, what players saw it drop, the quests that want it and any other versions of it. Monster names on the Map, Train and Quests tabs open here.
-
-**Maps** starts with the map you're on, above every map. Search by name, area, a monster that lives there or an NPC who stands there, and narrow it by towns or hunting maps, region or monster level. A map opens the same card as the Map tab, with a route from where you are.
-
-**NPCs** starts with who's on your map, above everyone. Search by name, a quest they give or a map they stand on. An NPC's card shows where they stand with a route there, the quests they give, and the ones handed in to them where the data shows it. NPC names on a map's card and in quest steps open here.
-
-The numbers are the data's base values. Leafline doesn't work out damage, hits to kill or hit chance, because those are unsettled for Classic. Few monsters have drops logged on mapleclassic.wiki so far, and a card says so when there are none. A boss's listed respawn is a raw value from the client data, and the game's servers decide the real timing.
-
-**Start from a plan** offers one ready-made Lv 1-70 plan for each 2nd job, and using one fills in goals you can then change. Leafline's plans were written for it from what each skill does and what each weapon needs. They aren't copied from any guide, and nobody has played them yet, so treat them as a starting point. A blank build is always there for your own.
-
-**Guides** links to written guides for your job on MapleScanner and NiaDB. Those stay on their sites. If you follow another guide, keep its link on the build. **Copy plan** turns a build's goals into a line of text you can pass on, and **Paste a code** adds one. It holds goals only, not your character, stats or link.
-
-The planner counts points. It doesn't model damage, accuracy or HP, because those are unsettled for Classic. The numbers it counts by come from community guides and in-game checks, not from Nexon, so each can be changed under **How points are counted**. Your stats have to be typed in, because they differ by character. Everything is a plan you follow by hand: nothing is spent for you, and Leafline can't yet tell whether you followed it.
-
-## Testing the readers
-
-Put screenshots in `test-screenshots/` (git-ignored: game screenshots must never be committed or shipped), then:
-
-```bash
-cd src-tauri
-cargo test                                                      # unit tests
-cargo run --release --example check                             # score readers against expected.json
-cargo run --release --example analyze -- ../test-screenshots/   # readings as JSON
-cargo run --release --example replay -- ../test-screenshots/    # replay a folder as a session
-```
-
-`check` needs a `test-screenshots/expected.json` that maps each file to what the screenshot really shows (see `examples/check.rs`). It prints every mismatch and a score. For `analyze`, add `--overview` to include every line from the whole-frame OCR pass.
-
-`replay` prints what each frame read and the session summary as JSON; add `--every <seconds>` to order by name instead of file time.
-
-`npm run dev` serves the UI in a plain browser with a mock backend that returns a saved analysis and session, which is handy for design work. The mock is excluded from production builds.
-
-## How it works
-
-```
-frame ─┬─ HUD reader ──────── finds the HP/MP/EXP gauges by colour; numbers by shape rules,
-       │                     job and name by OCR
-       ├─ meso reader ─────── white box beside a gold coin; amount only when OCR readings agree
-       ├─ map reader ──────── anchored on the minimap's orange WORLD button; reads the expanded
-       │                     header or the collapsed title bar, four OCR passes voting per word
-       ├─ party reader ────── counts HP bars in an evenly spaced column; never reads names
-       ├─ shop reader ─────── an NPC shop, storage or trade window, by its column of buttons
-       └─ overview OCR ─┬──── tooltip reader ── finds each tooltip by its separator rule; REQ rows
-                        │                       by position, the rest read plain and colour-keyed
-                        └──── quest reader ──── anchored on the "Quest Helper" header; three
-                                                passes vote on each counter
-
-readings over time ─── session tracker ─── EXP and meso rates, per map, with misreads dropped
-```
-
-Every reader locates its UI element by appearance (colour, shape, nearby text) rather than fixed coordinates, and places the rest in units of the element's own size, so resolution should not matter. Readers prefer giving no value to giving a wrong one.
-
-```
-src/                     Svelte frontend
-  lib/components/          cards shared by the windows
-  routes/overlay/          overlay window
-src-tauri/src/
-  app/                     Tauri wiring: windows, tray, hotkeys, commands
-  capture/                 live pictures of the game window (Windows Graphics Capture)
-  vision/                  image handling, colour blocks, OCR (Windows.Media.Ocr)
-  readers/                 one module per game UI element: locate, read, parse
-  pipeline.rs              frame → readings, shared by live capture and the examples
-  session.rs               readings over time → EXP and meso rates
-  replay.rs                a folder of screenshots fed through both, in order
-```
+### Where's the data from?
+Map, monster, NPC, quest, skill and item facts come from OSMS Data Explorer, and player-seen drops and quest turn-ins from mapleclassic.wiki. See [Data and credits](#data-and-credits). Few monsters have drops logged on the wiki so far, so many show none yet.
 
 ## Known limitations
 
-- Tuned on 2560×1440 screenshots. HUD reading is checked on real frames at both 2x and 1.875x; other resolutions are checked on simulated frames only, and Default Ratio (Filter Applied) not at all.
-- **Windows HDR washes out screen captures** (the game itself looks fine). Readers expect HDR off; live reading warns when it is on.
-- Windows only. macOS capture and OCR are not built yet.
-- The Quest Helper is translucent with black text: it reads well over dark maps and poorly over bright, busy ones such as Henesys.
-- Meso amounts are skipped when OCR readings disagree (the pixel font's 6 and 8 look alike). When a storage window shows a second box, the amount most boxes agree on wins.
-- Tooltip `REQ` values sometimes go unread when OCR saw no clean digit to learn from, and the `(+N)` on wrapped item names can be garbled.
-- Without the map data, the session tracker keeps map names as read, so an OCR slip shows up as a separate map. Fix one under **History**.
-- Shop, storage and trade windows are recognised by their buttons. This has not been tried on real frames of those windows yet.
-- The party reader is checked on another project's reference frames, not on a party seen through Leafline.
-- The level's bolder digits are only proven for 0 to 3. Levels showing 4 to 9 rely on those digits having the same shapes as the smaller font.
-- When two readings are far apart and on different maps, the tracker cannot tell where the EXP was earned and lists it under *Between maps*. Frequent screenshots or a recording fix this.
-- A jump of several levels between two readings adds no EXP, because the levels in between were never measured.
-- Session rates have been checked on 14 hand-taken screenshots and synthetic tests, not yet on a continuous recording of real play.
-- macOS OCR (Apple Vision) and the Tesseract fallback are not built yet.
-- The build planner's item checks count your base stats and earlier gear goals, not what you really have on.
-- An SP reset can't be planned yet, so a route that resets SP at a job advancement needs a second build from that point.
+This is an early release for testers. Please [report](https://github.com/Crazy3001/leafline/issues) what doesn't work.
+
+- **Tested mostly at 2560×1440 and 1920×1080**, at Ideal Ratio. Other resolutions and UI sizes are less tested.
+- **The Quest Helper** reads well over dark maps and poorly over bright, busy ones.
+- **Mesos/hour** needs a look at your mesos now and then (inventory open, or a shop). It says how much of the session it covers.
+- **Shop, storage and trade windows** are recognised by their buttons, which hasn't been checked much on real frames.
+- **The party count** hasn't been checked on a real party yet.
+- **Starter build plans and gear picks** were written for Leafline from what each skill and item does. Nobody has played them through yet, so treat them as a starting point.
+- **The planner counts points.** It doesn't work out damage, accuracy or HP, because those are unsettled for Classic.
+- **A jump of several levels** between two readings adds no EXP, since the levels in between were never measured.
+- **Windows HDR** has to be off for reliable readings.
+- **Windows only**, English client only.
 
 ## Data and credits
 
-Leafline ships no game data. Map details are downloaded on your machine when you ask for them, kept in a local cache and credited in the app:
+Leafline ships no game data. It downloads community data on your PC when you ask, keeps it in a local cache, and credits it in the app:
 
 - Map, monster, NPC, quest, skill and equipment data: [OSMS Data Explorer](https://osmsdataexplorer.com), CC BY 4.0.
-- Player-observed drop rates, quest turn-ins, taxi routes and return scrolls: [mapleclassic.wiki](https://mapleclassic.wiki) contributors, CC BY-NC-SA 4.0.
+- Player-observed drops, quest turn-ins, taxi routes and return scrolls: [mapleclassic.wiki](https://mapleclassic.wiki) contributors, CC BY-NC-SA 4.0.
 
 Game content belongs to Nexon. Leafline is unofficial and not affiliated with or endorsed by Nexon.
 
+## Building from source
+
+See [DEVELOPMENT.md](DEVELOPMENT.md) for building, testing the readers, and how Leafline works inside.
+
 ## Licence
 
-Leafline's code is under the [MIT licence](LICENSE). It does not cover game content or the downloaded data above, which keep their own terms.
+Leafline's code is under the [MIT licence](LICENSE). It doesn't cover game content or the downloaded data above, which keep their own terms.

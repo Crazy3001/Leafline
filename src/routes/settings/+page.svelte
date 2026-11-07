@@ -294,10 +294,10 @@
   }
 
   const does = [
-    "Reads what the game window shows (or saved screenshots), with the OCR built into Windows on this PC. Live reading can be turned off at the top of Settings.",
+    "Reads what the game window shows, with the OCR built into Windows on this PC. Live reading can be turned off at the top of Settings.",
     "Shows map, monster, quest, skill and equipment facts from community data, downloaded only when you ask.",
     "Downloads the player-logged drop table from mapleclassic.wiki when you first need it, and who takes each quest in along with the map data. Both renew weekly and are looked up on this PC.",
-    "Keeps your settings, sessions, item notes, price log and builds on this PC.",
+    "Keeps your settings, sessions, notes, drop log and builds on this PC.",
     "Asks GitHub for the latest version number at startup, only if you turn the update check on below. That request carries nothing about the game or you.",
   ];
   const doesNot = [
@@ -874,7 +874,7 @@
       <div class="row">
         <div class="label">
           <span class="name">First-launch setup</span>
-          <span class="help">Hotkeys, game settings that help Leafline read, and the map data, in four steps.</span>
+          <span class="help">Hotkeys, game settings that help Leafline read, how to show it, and the map data.</span>
         </div>
         <div class="control">
           <button class="button" onclick={() => backend.showSetup()}>Run setup again</button>
