@@ -1,10 +1,12 @@
 <script lang="ts">
-  // Every drop players logged on mapleclassic.wiki for this map's monsters, by item, with who
-  // drops it. The first open downloads the wiki's whole table; lookups stay on this PC.
-  import { LoaderCircle, RefreshCw } from "@lucide/svelte";
+  // Every drop players logged on mapleclassic.wiki for this map's monsters: by item, with who
+  // drops it, or by monster, each opening to its own drops. The first open downloads the wiki's
+  // whole table; lookups stay on this PC.
+  import { ChevronRight, LoaderCircle, RefreshCw } from "@lucide/svelte";
   import { untrack } from "svelte";
 
   import { backend } from "$lib/api";
+  import Segmented from "$lib/ui/Segmented.svelte";
   import { showItemNamed } from "$lib/items.svelte";
   import { WIKI_CREDIT, WIKI_URL } from "$lib/mapdata.svelte";
   import { showMonsterNamed } from "$lib/monsters.svelte";
@@ -22,6 +24,38 @@
 
   let { monsters }: { monsters: string[] } = $props();
 
+  type View = "item" | "monster";
+  const VIEW_KEY = "leafline.map.dropsView";
+  const VIEWS: { id: View; label: string }[] = [
+    { id: "item", label: "By item" },
+    { id: "monster", label: "By monster" },
+  ];
+
+  function rememberedView(): View {
+    try {
+      return localStorage.getItem(VIEW_KEY) === "monster" ? "monster" : "item";
+    } catch {
+      return "item";
+    }
+  }
+
+  let view = $state<View>(rememberedView());
+  /** Monsters opened in the by-monster view. */
+  let opened = $state<string[]>([]);
+
+  function setView(next: View) {
+    view = next;
+    try {
+      localStorage.setItem(VIEW_KEY, next);
+    } catch {
+      // A convenience only.
+    }
+  }
+
+  function toggle(monster: string) {
+    opened = opened.includes(monster) ? opened.filter((m) => m !== monster) : [...opened, monster];
+  }
+
   let drops = $state<MonsterDrops[] | null>(null);
   let loading = $state(false);
   let error = $state<string | null>(null);
@@ -31,6 +65,7 @@
     void monsters.join("|");
     drops = null;
     error = null;
+    opened = [];
     untrack(load);
   });
 
@@ -53,6 +88,20 @@
     for (const item of list) item.sources.sort((a, b) => (b.rate ?? -1) - (a.rate ?? -1));
     return list.sort((a, b) => best(b) - best(a));
   });
+
+  /** Each monster with its drops, the best rate first, in the map's own order. */
+  const byMonster = $derived(
+    (drops ?? []).map((entry) => {
+      const sorted = [...entry.drops].sort((a, b) => (b.rate ?? -1) - (a.rate ?? -1));
+      const meso = sorted.find((d) => d.category === "meso");
+      const items = sorted.filter((d) => d.category !== "meso").length;
+      const summary = [
+        items ? `${items} item${items === 1 ? "" : "s"}` : null,
+        meso && meso.minQuantity != null ? `${quantity(meso).slice(2)} mesos` : null,
+      ].filter(Boolean);
+      return { ...entry, drops: sorted, summary: summary.join(" · ") };
+    }),
+  );
 
   const unlogged = $derived((drops ?? []).filter((e) => !e.drops.length).map((e) => e.monster));
   const fewKills = $derived((drops ?? []).filter((e) => e.sampleKills != null && e.sampleKills < FEW_KILLS));
@@ -98,6 +147,51 @@
 
 {#if drops}
   {#if items.length}
+    <div class="view"><Segmented label="Show drops" size="sm" options={VIEWS} value={view} onchange={setView} /></div>
+  {/if}
+  {#if items.length && view === "monster"}
+    <ul class="monsters">
+      {#each byMonster as entry (entry.monster)}
+        {@const open = opened.includes(entry.monster)}
+        <li>
+          {#if entry.drops.length}
+            <button class="mob-head" aria-expanded={open} onclick={() => toggle(entry.monster)}>
+              <span class="chevron" class:open><ChevronRight size={12} /></span>
+              <span class="mob-name">{entry.monster}</span>
+              <span class="summary tabular">{entry.summary}</span>
+            </button>
+            {#if open}
+              <ul class="mob-drops">
+                {#each entry.drops as drop (drop.item)}
+                  <li class:unmeasured={drop.rate == null} title={evidence(drop)}>
+                    {#if drop.category === "meso"}
+                      <span class="name mesos">{drop.item}</span>
+                    {:else}
+                      <button class="name ref ref-item" onclick={() => showItemNamed(drop.item)}>{drop.item}</button>
+                    {/if}
+                    {#if drop.quest}<span class="tag">quest</span>{/if}
+                    <span class="rate tabular">{percent(drop.rate)}{quantity(drop)}</span>
+                  </li>
+                {/each}
+                <li class="card-link">
+                  <button class="ref ref-mob" onclick={() => showMonsterNamed(entry.monster)}>{entry.monster}'s card</button>
+                  {#if entry.sampleKills != null && entry.sampleKills < FEW_KILLS}
+                    <span class="faint">· only {entry.sampleKills} kills logged</span>
+                  {/if}
+                </li>
+              </ul>
+            {/if}
+          {:else}
+            <div class="mob-head empty">
+              <span class="chevron"></span>
+              <span class="mob-name">{entry.monster}</span>
+              <span class="summary">nothing logged yet</span>
+            </div>
+          {/if}
+        </li>
+      {/each}
+    </ul>
+  {:else if items.length}
     <ul class="items">
       {#each items as item (item.name)}
         <li>
@@ -124,10 +218,10 @@
   {:else}
     <p class="note">No drops logged for this map's monsters yet.</p>
   {/if}
-  {#if items.length && unlogged.length}
+  {#if items.length && unlogged.length && view === "item"}
     <p class="note none">Nothing logged yet for {unlogged.join(", ")}.</p>
   {/if}
-  {#if fewKills.length}
+  {#if fewKills.length && view === "item"}
     <p class="few">
       Few kills logged for {fewKills.map((e) => `${e.monster} (${e.sampleKills})`).join(", ")}, so rarer drops, such as
       most equips and potions, may not show up yet.
@@ -199,7 +293,96 @@
   .rate {
     color: var(--text);
     font-weight: 600;
+  }
+
+  .view {
+    margin-bottom: 6px;
+  }
+
+  .monsters,
+  .mob-drops {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .monsters > li + li {
+    border-top: 1px solid var(--border);
+  }
+
+  .mob-head {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    width: 100%;
+    min-height: 28px;
+    padding: 4px 0;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .mob-head.empty {
+    cursor: default;
+  }
+
+  .chevron {
+    display: grid;
+    width: 12px;
+    color: var(--faint);
+    transition: transform 0.15s ease;
+  }
+
+  .chevron.open {
+    transform: rotate(90deg);
+  }
+
+  .mob-name {
+    font-size: var(--text-sm);
     font-weight: 600;
+  }
+
+  .empty .mob-name,
+  .empty .summary {
+    color: var(--faint);
+    font-weight: 400;
+  }
+
+  .summary {
+    margin-left: auto;
+    color: var(--muted);
+    font-size: var(--text-xs);
+  }
+
+  .mob-drops {
+    gap: 2px;
+    padding: 0 0 7px 17px;
+  }
+
+  .mob-drops > li {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+  }
+
+  .mob-drops .rate {
+    margin-left: auto;
+    font-size: var(--text-xs);
+  }
+
+  .card-link {
+    margin-top: 2px;
+    font-size: var(--text-xs);
+  }
+
+  .card-link .ref {
+    font-size: var(--text-xs);
+  }
+
+  .faint {
+    color: var(--faint);
   }
 
   .unmeasured .rate {
