@@ -5,7 +5,7 @@
 [**Download the latest release**](https://github.com/Crazy3001/leafline/releases/latest) · Windows 10 and 11 · [FAQ](#faq) · [Known limitations](#known-limitations)
 
 > [!WARNING]
-> **Leafline is unofficial, and you use it at your own risk.** Nexon has not said whether read-only overlays are allowed. One player reported a two-week ban while running a similar screen-reading overlay (unconfirmed). A penalty in one Nexon game carries to the others on the same account. If that worries you, play on a character you can afford to lose, ideally on a separate Nexon account. [More on the risk](#is-it-allowed-can-i-get-banned)
+> **Leafline is unofficial, and you use it at your own risk.** Nexon has not said whether read-only overlays are allowed. [More on the risk](#is-it-allowed-can-i-get-banned)
 
 <!-- Screenshots go here: Leafline's own windows only (overlay, desk view, training log, planner)
      over a plain background or with the game area cropped out. No game art in the repo. -->
