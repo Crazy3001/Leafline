@@ -1,0 +1,50 @@
+name: Something reads wrong or doesn't work
+description: A misread, a crash, or a feature that doesn't do what it says.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing Leafline. Please don't post your character name, chat, or anything else you'd rather keep private.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what Leafline showed, and what it should have shown.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Leafline version
+      description: Settings → About.
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: input
+    id: display
+    attributes:
+      label: Game window
+      description: Resolution, Full Screen or Windowed, and the UI Size from the game's Graphics options.
+      placeholder: "1920x1080, Windowed, Ideal Ratio"
+    validations:
+      required: true
+  - type: dropdown
+    id: hdr
+    attributes:
+      label: Is Windows HDR on for the game's screen?
+      options:
+        - "No"
+        - "Yes"
+        - "Not sure"
+  - type: textarea
+    id: report
+    attributes:
+      label: Bug report details
+      description: Settings → Data → Bug report details → Copy, then paste here. It holds no names, chat or file paths.
+      render: text
+  - type: textarea
+    id: picture
+    attributes:
+      label: Picture (optional)
+      description: "**Save frame** on the overlay saves the last picture Leafline read. It shows your game, so only attach it if you're happy to share it, and crop out names and chat."

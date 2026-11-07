@@ -2,7 +2,7 @@
 
 **A free, read-only overlay for MapleStory Classic World.** It sits beside the game and shows your EXP and meso rates, where to train and how to get there, your quests, item checks and your build plan, all from what the game already shows on screen.
 
-[**Download the latest release**](https://github.com/Crazy3001/leafline/releases/latest) · Windows 10 and 11 · [FAQ](#faq) · [Known limitations](#known-limitations)
+[**Download the latest release**](https://github.com/Crazy3001/Leafline/releases/latest) · Windows 10 and 11 · [FAQ](#faq) · [Known limitations](#known-limitations)
 
 > [!WARNING]
 > **Leafline is unofficial, and you use it at your own risk.** Nexon has not said whether read-only overlays are allowed. [More on the risk](#is-it-allowed-can-i-get-banned)
@@ -69,7 +69,7 @@ Your sessions, notes, drop log, builds and settings stay in `%APPDATA%\app.leafl
 
 ## Install
 
-1. Download `Leafline_x.y.z_x64-setup.exe` from the [latest release](https://github.com/Crazy3001/leafline/releases/latest). The `.msi` works too.
+1. Download `Leafline_x.y.z_x64-setup.exe` from the [latest release](https://github.com/Crazy3001/Leafline/releases/latest). The `.msi` works too. Only download Leafline from this repository: copies elsewhere may have been changed.
 2. Run it. The installer isn't code-signed yet, so Windows SmartScreen may say it "protected your PC". Choose **More info → Run anyway**.
 3. Leafline opens a short **setup** the first time.
 
@@ -127,14 +127,14 @@ Leafline won't use a price site's data without its permission, and it won't read
 Most misreads come from game settings: **UI Size: Ideal Ratio**, **HDR off** (restart the game after), and the English client. Bright, busy maps such as Henesys can make the Quest Helper hard to read, since its text is black on a see-through panel. Leafline prefers showing nothing over showing a wrong number, so a blank usually means it wasn't sure.
 
 ### How do I report a bug?
-[Open an issue](https://github.com/Crazy3001/leafline/issues). **Settings → Data → Bug report details → Copy** copies what Leafline knows about its own state, with no character names, chat or file paths. A picture helps too: **Save frame** on the overlay saves the last picture Leafline read. It shows your game, so only post it if you're happy to share it.
+[Open an issue](https://github.com/Crazy3001/Leafline/issues). **Settings → Data → Bug report details → Copy** copies what Leafline knows about its own state, with no character names, chat or file paths. A picture helps too: **Save frame** on the overlay saves the last picture Leafline read. It shows your game, so only post it if you're happy to share it.
 
 ### Where's the data from?
 Map, monster, NPC, quest, skill and item facts come from OSMS Data Explorer, and player-seen drops and quest turn-ins from mapleclassic.wiki. See [Data and credits](#data-and-credits). Few monsters have drops logged on the wiki so far, so many show none yet.
 
 ## Known limitations
 
-This is an early release for testers. Please [report](https://github.com/Crazy3001/leafline/issues) what doesn't work.
+This is an early release for testers. Please [report](https://github.com/Crazy3001/Leafline/issues) what doesn't work.
 
 - **Tested mostly at 2560×1440 and 1920×1080**, at Ideal Ratio. Other resolutions and UI sizes are less tested.
 - **The Quest Helper** reads well over dark maps and poorly over bright, busy ones.

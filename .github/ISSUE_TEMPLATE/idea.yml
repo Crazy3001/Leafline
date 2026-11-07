@@ -1,0 +1,15 @@
+name: An idea
+description: Something Leafline could do or do better.
+labels: [idea]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: The idea
+      description: What would help, and when in the game you'd use it.
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: |
+        Leafline stays read-only: it won't read game memory or network traffic, press keys for you, or automate anything. Ideas that need those can't be added.
