@@ -941,6 +941,15 @@ export const mockBackend: Backend = {
     build.plan.gear = build.plan.gear.filter((id) => id !== item).concat(wanted ? [item] : []);
     buildsChanged();
   },
+  async fillGear(id, level) {
+    const build = mockBuilds.find((b) => b.id === id);
+    if (!build) throw new Error("That build is gone.");
+    const planned = new Set(build.plan.gear.map((g) => mockItems.find((i) => i.id === g)?.slot));
+    const add = mockItems.filter((i) => i.kind === "equip" && !planned.has(i.slot) && i.reqLevel >= level - 10 && !build.plan.gear.includes(i.id));
+    build.plan.gear.push(...add.map((i) => i.id));
+    buildsChanged();
+    return add.length;
+  },
   async buildOutfit(id, level) {
     const build = mockBuilds.find((b) => b.id === id);
     if (!build) return null;

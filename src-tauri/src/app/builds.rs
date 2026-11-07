@@ -250,6 +250,34 @@ pub fn build_outfit(app: AppHandle, state: State<UserDataState>, id: i64, level:
     Ok(Some(outfit(&build, &expansion, &rules, &catalog, level)))
 }
 
+/// Fills each slot with no goals with an upgrade path from the data, starting at `level`, and
+/// returns how many goals were added. A build that doesn't say who its gear is for takes the
+/// gender of the gear worn, so the path holds nothing the character can't put on.
+#[tauri::command]
+pub fn fill_gear(app: AppHandle, state: State<UserDataState>, id: i64, level: u32) -> Result<usize> {
+    let catalog = catalog(&app)?;
+    let Some(mut build) = state.with(|db| db.build(id))? else {
+        return Err(Error::Invalid("That build is gone.".into()));
+    };
+    if build.start.gender.is_none() {
+        build.start.gender = outfit::worn_gender(&build, &catalog);
+    }
+    let rules = rules(&app);
+    let expansion = expand(&build, &rules, &catalog);
+    let mut added = 0;
+    for (_, path) in outfit::fill_paths(&build, &expansion, &rules, &catalog, level) {
+        for item in path {
+            if !build.plan.gear.contains(&item) {
+                build.plan.gear.push(item);
+                added += 1;
+            }
+        }
+    }
+    state.with(|db| db.save_build(&build, now()))?;
+    changed(&app)?;
+    Ok(added)
+}
+
 /// How reading the character's windows went.
 #[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]

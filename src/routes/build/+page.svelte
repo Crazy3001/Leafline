@@ -140,6 +140,7 @@
     copied = false;
     adding = null;
     gearText = "";
+    filled = null;
   }
 
   async function save(snapshot: string) {
@@ -454,6 +455,31 @@
     if (draft && !draft.plan.gear.includes(id)) draft.plan.gear.push(id);
   }
 
+  /** Slots with no goals, which the data can fill with an upgrade path. */
+  const emptySlots = $derived(gearSlots.filter((s) => s !== "Overall" && s !== "Shield" && !goalsBySlot.get(s)?.length));
+  let filling = $state(false);
+  let filled = $state<string | null>(null);
+
+  async function fillEmpty() {
+    if (!draft) return;
+    // Unsaved typing first, so the fill builds on it.
+    clearTimeout(saveTimer);
+    const snapshot = JSON.stringify(draft);
+    if (snapshot !== saved) await save(snapshot);
+    filling = true;
+    try {
+      const added = await backend.fillGear(draft.id, level ?? draft.start.level);
+      filled = added
+        ? `Added ${added} ${added === 1 ? "goal" : "goals"}, picked by stats alone: not by price or how easy they are to find. Drop any you don't want.`
+        : "Nothing in the data beats what you wear in those slots.";
+      error = null;
+    } catch (e) {
+      error = String(e);
+    } finally {
+      filling = false;
+    }
+  }
+
   function dropGoal(id: number) {
     if (draft) draft.plan.gear = draft.plan.gear.filter((g) => g !== id);
   }
@@ -705,6 +731,15 @@
             What you aim for in each slot, in the order this plan can wear it. The first one ahead shows as Next in Character →
             Gear; a slot with none gets the data's next better piece there.
           </p>
+          {#if emptySlots.length}
+            <div class="fill">
+              <button class="plain" disabled={filling} onclick={fillEmpty}><Plus size={13} />Fill empty slots</button>
+              <span class="faint">
+                {emptySlots.map(slotName).join(", ")}: an upgrade from the data every 10 levels, each one better than the last.
+              </span>
+            </div>
+          {/if}
+          {#if filled}<p class="help">{filled}</p>{/if}
           <ul class="slots">
             {#each gearSlots as slot (slot)}
               {@const worn = wearing(slot)}
@@ -1508,6 +1543,15 @@
   .add-chip.on {
     border-color: var(--accent);
     color: var(--accent-strong);
+  }
+
+  .fill {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+    margin: 4px 0 10px;
+    font-size: var(--text-sm);
   }
 
   .finder {

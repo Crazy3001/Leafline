@@ -128,6 +128,58 @@ fn coming_up<'a>(
     })
 }
 
+/// How far apart the levels a filled-in path looks at are.
+const PATH_STEP: u32 = 10;
+
+/// An upgrade path for each slot with no goals, as item ids in level order: starting from what is
+/// worn, at `level` and then every tenth level to the plan's end, the best piece the plan can wear
+/// by then, whenever it beats the one before. An overall or a shield is left alone.
+pub fn fill_paths(build: &Build, expansion: &Expansion, rules: &Rules, catalog: &Catalog, level: u32) -> Vec<(String, Vec<u32>)> {
+    let level = level.clamp(1, MAX_LEVEL);
+    let end = expansion.steps.last().map_or(level, |s| s.level).max(level);
+    let mut looks: Vec<u32> = std::iter::once(level).chain((level / PATH_STEP + 1..).map(|n| n * PATH_STEP).take_while(|&at| at < end)).collect();
+    if looks.last() != Some(&end) {
+        looks.push(end);
+    }
+    let wearers: Vec<(u32, Wearer)> = looks.iter().map(|&at| (at, Wearer::new(build, expansion, rules, catalog, at))).collect();
+    let scorer = Scorer::new(build);
+    let trained = catalog.weapons_of_branch(build.plan.job);
+
+    let mut paths = Vec::new();
+    for slot in slot_order().filter(|s| *s != "Overall" && *s != "Shield") {
+        if expansion.gear.iter().any(|g| g.item.slot == slot) {
+            continue;
+        }
+        let worn = build.start.pieces.iter().rev().find(|p| p.slot(catalog) == slot);
+        let mut floor = worn.map(|p| scorer.score(&p.data_stats(catalog)));
+        let candidates: Vec<&ItemRecord> = catalog
+            .equipment()
+            .filter(|i| i.slot == slot && !novelty(i))
+            .filter(|i| trained.is_empty() || i.weapon_type.as_ref().is_none_or(|w| trained.contains(w)))
+            .collect();
+        let mut path = Vec::new();
+        for (_, wearer) in &wearers {
+            let best = candidates
+                .iter()
+                .filter(|i| floor.is_none_or(|f| scorer.of(i) > f) && wearer.can_wear(i))
+                .max_by_key(|i| (scorer.of(i), std::cmp::Reverse(i.req_level)));
+            if let Some(item) = best {
+                path.push(item.id);
+                floor = Some(scorer.of(item));
+            }
+        }
+        if !path.is_empty() {
+            paths.push((slot.to_string(), path));
+        }
+    }
+    paths
+}
+
+/// The gender worn gear was made for, when the build doesn't say: pieces made for one tell.
+pub fn worn_gender(build: &Build, catalog: &Catalog) -> Option<String> {
+    build.start.pieces.iter().filter_map(|p| p.item).filter_map(|id| catalog.item(id)).find_map(|i| i.gender.clone())
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::catalog::tests::{item, skill};
@@ -247,6 +299,32 @@ mod tests {
         let weapon = slot(&at(&build, &catalog, 22), "Weapon").clone();
         assert_eq!(weapon.suggested.map(|i| i.name), Some("Coconut Knife".into()));
         assert_eq!(weapon.next.map(|n| (n.item.name, n.level)), Some(("Iron Dagger".into(), Some(25))));
+    }
+
+    #[test]
+    fn an_empty_slot_fills_with_an_upgrade_every_ten_levels() {
+        let catalog = Catalog::new(
+            vec![skill(1, "Double Stab", 400, 20, &[])],
+            vec![
+                dagger(1, "Old Dagger", 10, 17),
+                dagger(2, "Field Dagger", 15, 25),
+                with(item(10, "Plain Hat", 10, &[]), "Hat", &[("Weapon Def.", 5)]),
+                with(item(11, "Luk Hat", 10, &[]), "Hat", &[("LUK", 3)]),
+                with(item(12, "Better Hat", 15, &[]), "Hat", &[("LUK", 5)]),
+                with(item(13, "Big Hat", 25, &[]), "Hat", &[("LUK", 8)]),
+                with(item(14, "Same Hat", 28, &[]), "Hat", &[("LUK", 8)]),
+                with(item(20, "Work Gloves", 10, &[]), "Glove", &[("Weapon Def.", 2)]),
+            ],
+        );
+        // Wearing the plain hat, with a weapon goal already: the weapon is left as planned.
+        let build = bandit(10, vec![2], vec![worn(10, &catalog)]);
+        let rules = Rules::default();
+        let paths = fill_paths(&build, &expand(&build, &rules, &catalog), &rules, &catalog, 10);
+        let path = |slot: &str| paths.iter().find(|(s, _)| s == slot).map(|(_, ids)| ids.clone());
+        assert_eq!(path("Weapon"), None, "a slot with goals keeps them");
+        assert_eq!(path("Hat"), Some(vec![11, 12, 13]), "no step for a hat only as good");
+        assert_eq!(path("Glove"), Some(vec![20]));
+        assert_eq!(path("Cape"), None, "nothing in the data for it");
     }
 
     #[test]

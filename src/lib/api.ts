@@ -309,6 +309,8 @@ export interface Backend {
   /** Puts on a clean copy of an item from the data, in place of what was in its slot. */
   wearItem(item: number, character: string | null): Promise<void>;
   buildOutfit(build: number, level: number): Promise<Outfit | null>;
+  /** Fills each slot with no goals with an upgrade path from `level`; returns how many were added. */
+  fillGear(build: number, level: number): Promise<number>;
   /** Reads the open stat and skill windows once and moves the build to match. */
   readCharacter(): Promise<void>;
   onCharacterRead(handler: (read: CharacterRead) => void): Promise<UnlistenFn>;
@@ -530,6 +532,7 @@ const tauriBackend: Backend = {
   updatePiece: (piece, character) => invoke("update_piece", { piece, character }),
   wearItem: (item, character) => invoke("wear_item", { item, character }),
   buildOutfit: (build, level) => invoke("build_outfit", { id: build, level }),
+  fillGear: (build, level) => invoke("fill_gear", { id: build, level }),
   gearSuggestions: (build, level) => invoke("gear_suggestions", { id: build, level }),
   findGear: (who, character, seenJob) => invoke("find_gear", { who, character, seenJob }),
   readCharacter: () => invoke("read_character_windows"),
