@@ -4,7 +4,7 @@
   import { Check, LoaderCircle, Plus, ScrollText } from "@lucide/svelte";
   import { untrack } from "svelte";
 
-  import ObjectiveHint from "./quest/ObjectiveHint.svelte";
+  import ItemSources from "./item/ItemSources.svelte";
   import Section from "./map/Section.svelte";
   import { backend } from "$lib/api";
   import { buildState, watchBuilds } from "$lib/builds.svelte";
@@ -169,30 +169,7 @@
 
   <Section title="Where to get it">
     {#if found}
-      <ObjectiveHint guide={found.origin.drops} from={found.from} />
-      {#if !found.origin.drops.lookedUp}
-        <p class="note">The drop table isn't downloaded yet.</p>
-      {/if}
-      {#if found.origin.quests.length}
-        <h5>Quest reward</h5>
-        <ul class="quests">
-          {#each found.origin.quests as quest (quest.quest.id)}
-            {@const giverMap = quest.giverMaps[0]}
-            <li>
-              <button class="quest" onclick={() => backend.showQuest(quest.quest.id)}>{quest.quest.name}</button>
-              <span class="who">
-                {#if quest.quest.levelMin}Lv {quest.quest.levelMin}{/if}{#if quest.giver}{quest.quest.levelMin ? " · " : ""}<button
-                    class="ref ref-npc"
-                    onclick={() => showNpcNamed(quest.giver!)}>{quest.giver}</button
-                  >{/if}{#if giverMap}{quest.quest.levelMin || quest.giver ? " · " : ""}{#if giverMap.known}<button
-                      class="ref ref-map"
-                      onclick={() => backend.showPlace("maps", giverMap.id)}>{giverMap.name}</button
-                    >{:else}{giverMap.name}{/if}{/if}
-              </span>
-            </li>
-          {/each}
-        </ul>
-      {/if}
+      <ItemSources {found} />
       <p class="credit">
         <button onclick={() => backend.openLink(WIKI_URL)}>{WIKI_CREDIT}</button>
         <button onclick={() => backend.openLink(OSMS_URL)}>{OSMS_CREDIT}</button>
@@ -278,51 +255,6 @@
     border-color: color-mix(in srgb, var(--accent) 45%, transparent);
     background: var(--accent-soft);
     color: var(--accent-strong);
-  }
-
-  h5 {
-    margin: 8px 0 3px;
-    color: var(--muted);
-    font-size: var(--text-sm);
-    font-weight: 500;
-  }
-
-  .quests {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    font-size: var(--text-sm);
-  }
-
-  .quests li {
-    display: grid;
-    padding: 3px 0;
-  }
-
-  .quests li + li {
-    border-top: 1px solid var(--border);
-  }
-
-  .quest {
-    padding: 0;
-    border: 0;
-    background: transparent;
-    font-size: var(--text-sm);
-    font-weight: 600;
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .quest:hover,
-  .quest:focus-visible {
-    color: var(--accent-strong);
-    text-decoration: underline;
-    outline: none;
-  }
-
-  .who {
-    color: var(--muted);
-    font-size: var(--text-xs);
   }
 
   .note {
