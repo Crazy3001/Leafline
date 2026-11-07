@@ -140,7 +140,7 @@
         <div><dt>Success rate</dt><dd class="tabular">{rate}%</dd></div>
       {/if}
       {#if shown.price != null}
-        <div><dt>Listed price</dt><dd class="tabular">{formatMesos(shown.price)}</dd></div>
+        <div><dt>NPC sell price</dt><dd class="tabular">{formatMesos(shown.price)}</dd></div>
       {/if}
     </dl>
     {#if tags.length}<p class="tags">{tags.join(" · ")}</p>{/if}
