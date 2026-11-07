@@ -180,7 +180,7 @@ export interface PinStatus {
   hidden: boolean;
 }
 
-/** The desk view, the panels side by side in a window for a second screen. */
+/** The desk view, the panels side by side in one window of their own. */
 export interface DeskStatus {
   /** Open when Leafline last quit, so it opens again at launch. */
   open: boolean;
@@ -1425,18 +1425,20 @@ export interface SlotGear {
   /** As the item data names it: Weapon, Hat, Glove... */
   slot: string;
   wearing: GearPiece | null;
-  next: GearCheck | null;
-  /** More goals for the slot after `next`. */
-  later: number;
   /** The best the character can wear now, when it beats what they wear. */
   suggested: ItemRecord | null;
+  /** The plan's next goal for the slot, or else the first better piece a later level can wear. */
+  next: GearCheck | null;
+  /** `next` is one of the plan's goals. */
+  planned: boolean;
+  /** More goals for the slot after a planned `next`. */
+  later: number;
 }
 
 export interface Outfit {
   level: number;
+  /** In the equip window's order. An overall or a shield only when worn or planned. */
   slots: SlotGear[];
-  /** Slots with nothing worn, planned or suggested. */
-  empty: string[];
 }
 
 export interface Expansion {

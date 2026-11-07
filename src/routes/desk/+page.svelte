@@ -1,5 +1,6 @@
 <script lang="ts">
-  // The desk view: the overlay's panels, whole, side by side in one window for a second screen.
+  // The desk view: the overlay's panels, whole, side by side in one window, often on a second
+  // screen but just as well beside a windowed game.
   // It reads what the overlay reads, follows the overlay's "Go here" trip, and opens links in a
   // column of its own so the overlay needn't come up over the game.
   import { ArrowLeft, ChartLine, ChevronDown, Pin, PinOff, Plus, X } from "@lucide/svelte";
@@ -211,7 +212,7 @@
       <button
         class="ontop"
         aria-pressed={onTop}
-        title={onTop ? "Stop keeping the desk view above other windows" : "Keep the desk view above other windows, for when it shares the game's screen"}
+        title={onTop ? "Stop keeping the desk view above other windows" : "Keep the desk view above other windows, so it stays in view beside or over the game"}
         onclick={toggleOnTop}
         >{#if onTop}<PinOff size={13} />{:else}<Pin size={13} />{/if}Keep on top</button
       >

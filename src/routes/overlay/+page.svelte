@@ -219,7 +219,7 @@
           </button>
         {/if}
         <button
-          title="Desk view: every panel side by side in a window of its own, for a second screen"
+          title="Desk view: every panel side by side in one window you can put anywhere"
           aria-label="Desk view"
           onclick={() => backend.showDesk()}
         >

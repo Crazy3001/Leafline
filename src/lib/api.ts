@@ -264,7 +264,7 @@ export interface Backend {
   setDeskOnTop(onTop: boolean): Promise<DeskStatus>;
   /** Draws the calling window's page larger or smaller, as browser zoom does. */
   setPageZoom(zoom: number): Promise<void>;
-  /** How many screens Windows has, for Setup's question about a second one. */
+  /** How many screens Windows has, for Setup's choice of overlay or desk view. */
   monitorCount(): Promise<number>;
   /** Lets this window take focus while a box in it is typed in, or gives the focus back up. */
   setTyping(typing: boolean): Promise<void>;

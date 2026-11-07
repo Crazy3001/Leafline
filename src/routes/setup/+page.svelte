@@ -1,7 +1,8 @@
 <script lang="ts">
-  // First-launch setup: what Leafline is, the hotkeys, game settings that help it read, where to
-  // show it (over the game, or the desk view on a second screen) and the map data. Nothing is bound or downloaded until the player says so. Finishing starts live
-  // reading if it is on; closing the window without finishing brings setup back next launch.
+  // First-launch setup: what Leafline is, the hotkeys, game settings that help it read, how to
+  // show it (the overlay, or the desk view) and the map data. Nothing is bound or downloaded until
+  // the player says so. Finishing starts live reading if it is on; closing the window without
+  // finishing brings setup back next launch.
   import {
     AppWindow,
     ArrowLeft,
@@ -25,7 +26,7 @@
   import { changeSettings, display, keyName, quietHotkeys, usesNumpad, watchSettings } from "$lib/settings.svelte";
   import type { ShortcutInfo } from "$lib/types";
 
-  const STEPS = ["Welcome", "Hotkeys", "Game settings", "Screens", "Map data"];
+  const STEPS = ["Welcome", "Hotkeys", "Game settings", "Views", "Map data"];
   const SCREENS_STEP = 3;
 
   let step = $state(0);
@@ -42,7 +43,7 @@
   let arrived = $state<Record<string, boolean>>({});
   /** Screens Windows reports, or null until asked (or if it couldn't say). */
   let monitors = $state<number | null>(null);
-  /** Where the player wants Leafline: over the game, or the desk view on a second screen. Only
+  /** How the player wants Leafline: the overlay over the game, or the desk view. Only
    *  the desk view needs anything doing, at the end: it opens. */
   let place = $state<"overlay" | "desk" | null>(null);
   let deskOpened = $state(false);
@@ -339,35 +340,33 @@
       </section>
     {:else if step === SCREENS_STEP}
       <section>
-        <h1>Where to show Leafline</h1>
+        <h1>How to show Leafline</h1>
         <p class="lead">
+          Leafline can sit over the game as a small overlay, or show every panel at once in one big window, the desk view.
           {#if monitors != null && monitors > 1}
-            Windows has {monitors} screens here. Leafline can sit over the game, or fill your other screen.
-          {:else if monitors === 1}
-            Windows has one screen here, so the overlay over the game suits you best. The desk view is there if you add a
-            second screen later.
-          {:else}
-            Leafline can sit over the game, or fill a second screen if you have one.
+            Windows has {monitors} screens here, so the desk view can have one to itself.
           {/if}
+          You can switch or use both any time.
         </p>
-        <div class="places" role="radiogroup" aria-label="Where to show Leafline">
+        <div class="places" role="radiogroup" aria-label="How to show Leafline">
           <button class="place" role="radio" aria-checked={place === "overlay"} onclick={() => (place = "overlay")}>
             <span class="tip-icon"><Layers size={16} /></span>
             <span>
               <span class="name">Over the game</span>
               <span class="help">
                 A small overlay beside the game, with tabs. Pin a tab into its own window, or shrink the overlay to a
-                compact HUD. Best on one screen.
+                compact HUD.
               </span>
             </span>
           </button>
           <button class="place" role="radio" aria-checked={place === "desk"} onclick={() => (place = "desk")}>
             <span class="tip-icon"><MonitorUp size={16} /></span>
             <span>
-              <span class="name">On a second screen</span>
+              <span class="name">Desk view</span>
               <span class="help">
-                The desk view: every panel side by side in a window you put on your other screen, with the session
-                graph, map details, quests and the training log in full. The overlay stays for quick looks over the game.
+                Every panel side by side in one window you can move and resize, with the session graph, map details,
+                quests and the training log in full. Put it on another screen, beside a windowed game, or bring it up
+                between fights. The overlay stays for quick looks over the game.
               </span>
             </span>
           </button>
@@ -376,8 +375,7 @@
           <div class="try">
             {#if deskOpened}
               <p class="note good">
-                <Check size={12} /> The desk view is open. Drag it to your other screen and maximise it; Leafline remembers
-                where you put it.
+                <Check size={12} /> The desk view is open. Put it wherever suits you; Leafline remembers where.
               </p>
             {:else}
               <button class="button" onclick={tryDesk}><MonitorUp size={13} />Open it now</button>
