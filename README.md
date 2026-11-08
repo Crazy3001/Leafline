@@ -7,6 +7,9 @@
 > [!WARNING]
 > **Leafline is unofficial, and you use it at your own risk.** Nexon has not said whether read-only overlays are allowed. [More on the risk](#is-it-allowed-can-i-get-banned)
 
+> [!NOTE]
+> **Leafline is a work in progress.** This is an early version: some readings still slip, and plenty is still to come. It will keep growing and getting better with the community's help, so every bug report, misread picture and idea makes a difference. [How to help](#how-to-help)
+
 <!-- Screenshots: Leafline-only pictures live in .github/screenshots. Pictures that show the game
      are GitHub attachments, never files in the repo. -->
 
@@ -144,9 +147,19 @@ Most misreads come from game settings: **UI Size: Ideal Ratio**, **HDR off** (re
 ### Where's the data from?
 Map, monster, NPC, quest, skill and item facts come from OSMS Data Explorer, and player-seen drops and quest turn-ins from mapleclassic.wiki. See [Data and credits](#data-and-credits). Few monsters have drops logged on the wiki so far, so many show none yet.
 
+## How to help
+
+Leafline is built in the open, and what players send in decides what gets fixed and added next.
+
+- **Report what reads wrong.** [Open a bug report](https://github.com/Crazy3001/Leafline/issues/new?template=bug_report.yml) with **Settings → Data → Bug report details → Copy**. A saved frame of the misread (**Save frame**) is the single most useful thing you can send, since every reading fix so far started from one.
+- **Suggest what it should do.** [Share an idea](https://github.com/Crazy3001/Leafline/issues/new?template=idea.yml): something you look up mid-game, or a number you wish you could see.
+- **Add the drops you see to [mapleclassic.wiki](https://mapleclassic.wiki).** Leafline downloads its drop lists, so every drop you add there shows up for every player.
+- **Tell other players about it,** and star the repository if it helps you. That also helps Leafline qualify for free code signing, which gets rid of the Windows warning.
+- **Write code.** [DEVELOPMENT.md](DEVELOPMENT.md) explains how to build it and how it works inside.
+
 ## Known limitations
 
-This is an early release for testers. Please [report](https://github.com/Crazy3001/Leafline/issues) what doesn't work.
+This is an early release, and these are the rough edges known so far. Please [report](https://github.com/Crazy3001/Leafline/issues) anything else that doesn't work.
 
 - **Tested mostly at 2560×1440 and 1920×1080**, at Ideal Ratio. Other resolutions and UI sizes are less tested.
 - **The Quest Helper** reads well over dark maps and poorly over bright, busy ones.
