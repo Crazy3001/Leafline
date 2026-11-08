@@ -170,12 +170,12 @@ Game content belongs to Nexon. Leafline is unofficial and not affiliated with or
 
 ## Code signing policy
 
-Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org). Until signing is in place, releases are unsigned.
+Releases aren't code-signed yet. Free signing through [SignPath Foundation](https://signpath.org) is planned once Leafline qualifies for it.
+
+Until then, a download is genuine if it comes from this repository's [Releases](https://github.com/Crazy3001/Leafline/releases) page. Every release is built from this repository's source by its [release workflow](.github/workflows/release.yml) on GitHub Actions, not on anyone's PC.
 
 - Committers and reviewers: [Crazy3001](https://github.com/Crazy3001)
-- Approvers: [Crazy3001](https://github.com/Crazy3001)
-
-Every release is built from this repository's source by its [release workflow](.github/workflows/release.yml) on GitHub Actions, and each signing request is approved by hand.
+- Release approvers: [Crazy3001](https://github.com/Crazy3001)
 
 **Privacy policy:** this program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it. In detail: it downloads the community data from [OSMS Data Explorer](https://osmsdataexplorer.com) and [mapleclassic.wiki](https://mapleclassic.wiki) when you ask (then refreshes it weekly), and asks GitHub for the latest version number only if you turn the update check on. Nothing read from the game, and none of your records, is ever sent anywhere. See [Privacy](#privacy).
 
