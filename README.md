@@ -7,8 +7,10 @@
 > [!WARNING]
 > **Leafline is unofficial, and you use it at your own risk.** Nexon has not said whether read-only overlays are allowed. [More on the risk](#is-it-allowed-can-i-get-banned)
 
-<!-- Screenshots go here: Leafline's own windows only (overlay, desk view, training log, planner)
-     over a plain background or with the game area cropped out. No game art in the repo. -->
+<!-- Screenshots: Leafline-only pictures live in .github/screenshots. Pictures that show the game
+     are GitHub attachments, never files in the repo. -->
+
+![Leafline's overlay beside the game: the Quests tab with each step's directions, and a pinned Route showing the next portal to take](https://github.com/user-attachments/assets/c67687d5-de72-4b6e-bbae-68838a2d9dd5)
 
 ## What it does
 
@@ -19,11 +21,15 @@
 - **Where to train:** the Train tab ranks maps near your level by EXP per kill, EXP per monster HP, the EXP/hour you measured there, or how close they are. Bookmark the spots you like.
 - **Share card:** turn a session into a picture to post anywhere. Leafline draws it from scratch (no game art), leaves your character's name off unless you add it, and never posts anything itself.
 
+![The desk view with the Train panel and the training log: a session's EXP and mesos per hour, its rate over time, each map, and the drops logged](.github/screenshots/desk-log.png)
+
 ### Items
 - **Item check:** hover an item in game and press your hotkey. Leafline reads the tooltip and shows its stats with the base and bonus, its requirements, whether it's clean or scrolled (and how many scrolls failed), and whether your build can wear it.
 - **Where to get it:** every monster players have seen drop it, each with the maps it lives on and a route there, plus the quests that give it.
 - **Drop log:** log an item as a drop from a monster on your map, and send it on to MeowDB's community drop lists with one click if you like.
 - **Your own notes** on any item, kept on your PC.
+
+![Item check: an item hovered in game and Leafline's reading of it, with its stats, requirements, upgrade slots and whether the build can use it](https://github.com/user-attachments/assets/42d09ee0-da2e-4b64-9b6a-22e009952e03)
 
 ### Getting around
 - **The map you're on:** its monsters, exits, NPCs, quests and drops, plus your rates there and your own notes.
@@ -34,6 +40,8 @@
 - **Quest Helper, read live:** your tracked quests with their counters and rewards. Open one for its steps, directions to each monster, and who takes it in.
 - **Quest search** across every quest by name, NPC, monster or region.
 
+![The desk view with Quests, Map and Lookup: each quest's steps with directions, the map's exits and NPCs, and where a monster lives and what it drops](.github/screenshots/desk-questing.png)
+
 ### Your character
 - **Character tab:** level, job, HP, MP, EXP and mesos at a glance, with what your build plan says to do at this level.
 - **Build planner:** a job and a list of goals in order ("this skill to 20, DEX to 25, the rest into LUK"), laid out level by level. It warns when a goal comes too late or SP would be lost at a job advancement. Ready-made starting plans for each 2nd job.
@@ -41,12 +49,16 @@
 - **Gear:** what you're wearing, the best you can wear now, and the next step up, ranked by the stats your plan raises.
 - **Job advancement checklist:** who to see and where, with a route, when an advancement comes up.
 
+![The desk view with the build planner and the Character panel: skill goals in order, the plan level by level, and gear to wear now and next](.github/screenshots/desk-planner.png)
+
 ### Fits around the game
 - **A small overlay** over the game, or shrink it to a **compact HUD**. Lock it so clicks pass through.
 - **Pin** any tab into its own small window, including a Route pin for Go here.
 - **Desk view:** every panel side by side in one big window, made for a second screen.
 - **Hotkeys** that work while the game is in front, without sending the game any input. Setup tests each key with the game in front.
 - **Countdown timers** for anything you want to keep time on.
+
+![The overlay with Train, Lookup, Route, Quests, Character and Map each pinned into its own small window around the game](https://github.com/user-attachments/assets/b8d5ae3a-1122-4ef2-a91c-9f3864ad642c)
 
 ## What it never does
 
