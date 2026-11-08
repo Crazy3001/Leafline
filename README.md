@@ -129,6 +129,9 @@ Yes, and it stays free: no ads, no paid features, no account. The code is open s
 ### Why does Windows warn me when I install it?
 The installer isn't code-signed yet, and SmartScreen warns about any new unsigned program. Code signing is planned. Until then, **More info → Run anyway**, or build it yourself from this code.
 
+### Was it made with AI?
+Yes. Leafline is built with Claude, Anthropic's AI coding assistant. I decide what it does, test it in game and send back what goes wrong; Claude writes the code. All of it is open source here, so anyone can read exactly what it does and how.
+
 ### Does it work on Mac or Linux?
 Not yet. Windows only for now; a macOS version is planned.
 
