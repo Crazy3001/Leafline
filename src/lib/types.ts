@@ -418,6 +418,8 @@ export interface MobRow {
   count: number;
   boss: boolean;
   undead: boolean;
+  /** How much of a weapon blow it shrugs off, when the data says. */
+  weaponDef?: number | null;
 }
 
 export interface QuestRef {
@@ -743,6 +745,12 @@ export interface Assumptions {
   respawnSeconds: number;
   /** EXP a kill gives over the data's base EXP, for events or server rates. */
   expRate: number;
+  /** The player's attack range from their stat window; null until entered. With it the
+   *  estimates count each monster's weapon defence. */
+  attackMin: number | null;
+  attackMax: number | null;
+  /** How hard a blow of their usual skill hits over a plain attack. */
+  skillFactor: number;
 }
 
 /** How fast the player gets through monster HP, from their own solo play. */
@@ -758,6 +766,8 @@ export interface KillSpeed {
   widened: boolean;
   /** Seconds of walking between kills on the maps that play was on, from their layouts. */
   walkSecondsPerKill?: number | null;
+  /** Weapon defence of the monsters in that play, on average. */
+  defence?: number;
 }
 
 /** A map's EXP per hour for this player, worked out from their kill speed. */
@@ -776,6 +786,12 @@ export interface Estimate {
   sureness: 1 | 2 | 3;
   /** Seconds of walking between kills here; the rest of each kill scales with HP. */
   walkSecondsPerKill?: number | null;
+  /** Blows to defeat the average monster here, when the player's attack range is known. */
+  hitsPerKill?: number | null;
+  /** Weapon defence of the average monster here. */
+  weaponDef?: number;
+  /** Whether the player's attack range was counted, so defence is too. */
+  damageKnown?: boolean;
 }
 
 /** A map's size and how its monsters spread, in the game's pixels, from the client. */

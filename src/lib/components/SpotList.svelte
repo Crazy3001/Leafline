@@ -30,7 +30,9 @@
   import {
     assumptions,
     DEFAULT_ASSUMPTIONS,
+    ATTACK_RANGE,
     EXP_RATE_RANGE,
+    SKILL_FACTOR_RANGE,
     isDefault,
     RESPAWN_RANGE,
     setAssumptions,
@@ -280,6 +282,17 @@
           `from each map's floor and platforms at base walking speed.${spread}`,
       );
     }
+    if (guess.hitsPerKill != null) {
+      out.push(
+        `About ${guess.hitsPerKill < 10 ? guess.hitsPerKill.toFixed(1) : Math.round(guess.hitsPerKill)} blows to defeat one here at your attack, ` +
+          `counting its weapon defence of ${Math.round(guess.weaponDef ?? 0)}.`,
+      );
+    } else if ((guess.weaponDef ?? 0) - (speed.defence ?? 0) > 100) {
+      out.push(
+        `Its monsters have ${Math.round(guess.weaponDef ?? 0)} weapon defence, against about ${Math.round(speed.defence ?? 0)} where you trained. ` +
+          "That can cut your damage a lot, so they may take far more blows than their HP says. Enter your attack under Assumptions to count it.",
+      );
+    }
     if (guess.hpRatio > 2)
       out.push(`Its monsters have ${times(guess.hpRatio)}× the HP of the ones you usually fight, so they may take longer than HP alone says.`);
     else if (guess.hpRatio < 0.5)
@@ -477,7 +490,7 @@
     </div>
     {#if editing && (sort === "you" || sort === "saved")}
       <div class="assume">
-        <p>Estimates take these as given. Neither is a known fact about the game; change them if you know better.</p>
+        <p>Estimates take these as given. None is a known fact about the game; change them if you know better.</p>
         <label>
           <span>Monsters respawn after</span>
           <input
@@ -505,6 +518,50 @@
         <p>
           The respawn time only matters on maps where you'd defeat monsters faster than they come back. The EXP figure is
           used to count your kills from the EXP you gained.
+        </p>
+        <p>
+          Your attack counts each monster's weapon defence, which can make a monster take many more blows than its HP says.
+          Type the range from your stat window's Attack line.
+        </p>
+        <label>
+          <span>Your attack</span>
+          <input
+            type="number"
+            min={ATTACK_RANGE[0]}
+            max={ATTACK_RANGE[1]}
+            step="1"
+            placeholder="min"
+            aria-label="Lowest attack"
+            value={assumptions.value.attackMin ?? ""}
+            onchange={(e) => setAssumptions({ attackMin: e.currentTarget.value === "" ? null : Number(e.currentTarget.value) })}
+          />
+          <span class="suffix">–</span>
+          <input
+            type="number"
+            min={ATTACK_RANGE[0]}
+            max={ATTACK_RANGE[1]}
+            step="1"
+            placeholder="max"
+            aria-label="Highest attack"
+            value={assumptions.value.attackMax ?? ""}
+            onchange={(e) => setAssumptions({ attackMax: e.currentTarget.value === "" ? null : Number(e.currentTarget.value) })}
+          />
+        </label>
+        <label>
+          <span>Your skill hits for</span>
+          <input
+            type="number"
+            min={SKILL_FACTOR_RANGE[0]}
+            max={SKILL_FACTOR_RANGE[1]}
+            step="0.1"
+            value={assumptions.value.skillFactor}
+            onchange={(e) => setAssumptions({ skillFactor: Number(e.currentTarget.value) })}
+          />
+          <span class="suffix">×</span>
+        </label>
+        <p>
+          The second figure is how much more than a plain attack your usual skill does. Leave it at 1.4 if you aren't sure;
+          it fits Arrow Blow at about Lv 20.
         </p>
         {#if !isDefault(assumptions.value)}
           <Button variant="ghost" size="sm" onclick={() => setAssumptions(DEFAULT_ASSUMPTIONS)}>Back to defaults</Button>

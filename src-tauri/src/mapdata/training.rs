@@ -37,11 +37,70 @@ pub struct Assumptions {
     pub respawn_seconds: f64,
     /// EXP a kill gives over the data's base EXP, for events or server rates.
     pub exp_rate: f64,
+    /// The player's attack range from their stat window, when they entered it. With it the
+    /// estimates take each monster's weapon defence into account.
+    pub attack_min: Option<f64>,
+    pub attack_max: Option<f64>,
+    /// How hard a blow of their usual skill hits over a plain attack.
+    pub skill_factor: f64,
 }
 
 impl Default for Assumptions {
     fn default() -> Self {
-        Self { respawn_seconds: 8.0, exp_rate: 1.0 }
+        Self { respawn_seconds: 8.0, exp_rate: 1.0, attack_min: None, attack_max: None, skill_factor: 1.4 }
+    }
+}
+
+/// How much of a monster's weapon defence is taken off each blow. Fitted to a Lv 33 Crossbowman's
+/// fights: Wooden Masks (no defence) fell in one or two arrow blows, Iron Hogs (defence 500) took
+/// seven, most blows doing about 50. The real formula isn't published, so this is a fit.
+const DEFENCE_CUT: f64 = 0.45;
+
+/// What the player's blows do, for working out what a monster's defence costs them.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Damage {
+    low: f64,
+    high: f64,
+}
+
+impl Damage {
+    /// None unless the player has entered a sensible attack range.
+    pub fn from_assumptions(a: &Assumptions) -> Option<Self> {
+        let (low, high) = (a.attack_min?, a.attack_max?);
+        if !(low > 0.0 && high >= low) {
+            return None;
+        }
+        let factor = if a.skill_factor > 0.0 { a.skill_factor } else { 1.0 };
+        Some(Self { low: low * factor, high: high * factor })
+    }
+
+    /// What a blow does on average to a monster with no defence.
+    fn plain(&self) -> f64 {
+        (self.low + self.high) / 2.0
+    }
+
+    /// What a blow does on average to a monster with this weapon defence: each roll between the
+    /// range's ends loses `DEFENCE_CUT` of the defence, and none does less than 1.
+    pub fn blow(&self, defence: f64) -> f64 {
+        let cut = DEFENCE_CUT * defence.max(0.0);
+        let (a, b) = (self.low, self.high);
+        let floor = cut + 1.0;
+        if b <= floor {
+            return 1.0;
+        }
+        if b <= a {
+            return (a - cut).max(1.0);
+        }
+        // Rolls under `floor` do 1; those over do the roll less the cut.
+        let from = a.max(floor);
+        let under = ((from - a) / (b - a)).clamp(0.0, 1.0);
+        let over_mean = (from + b) / 2.0 - cut;
+        under + (b - from) / (b - a) * over_mean
+    }
+
+    /// How many times as much HP a monster is to this player as one with no defence.
+    fn weight(&self, defence: f64) -> f64 {
+        self.plain() / self.blow(defence)
     }
 }
 
@@ -61,6 +120,8 @@ pub struct KillSpeed {
     /// Seconds of walking between kills on the maps that play was on, from their layouts. None
     /// when too little of the play was on maps with a known layout.
     pub walk_seconds_per_kill: Option<f64>,
+    /// Weapon defence of the monsters in that play, on average.
+    pub defence: f64,
 }
 
 /// A map's EXP per hour for this player, worked out from their [`KillSpeed`].
@@ -83,6 +144,12 @@ pub struct Estimate {
     /// Seconds of walking between kills here, when the layout of this map and of the maps the
     /// kill speed came from are known. The rest of each kill scales with HP.
     pub walk_seconds_per_kill: Option<f64>,
+    /// Blows to defeat the average monster here, when the player's attack range is known.
+    pub hits_per_kill: Option<f64>,
+    /// Weapon defence of the average monster here.
+    pub weapon_def: f64,
+    /// Whether the player's attack was taken into account, so defence is counted.
+    pub damage_known: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -127,6 +194,8 @@ pub struct Estimator {
     pub speed: KillSpeed,
     pub level: Option<u32>,
     pub assumptions: Assumptions,
+    /// The player's blows, when they entered their attack range.
+    pub damage: Option<Damage>,
 }
 
 /// Less solo play than this and there is no kill speed to go on.
@@ -146,21 +215,33 @@ const MIN_FIGHT_SHARE: f64 = 0.25;
 
 /// The average monster a map's spawns give, bosses left out: what a kill is worth.
 struct PerKill {
+    /// HP, counted heavier for monsters that shrug off the player's blows when their attack is
+    /// known.
     hp: f64,
     exp: f64,
     level: f64,
     count: u32,
+    /// Blows to defeat it, when the player's attack is known.
+    hits: Option<f64>,
+    defence: f64,
 }
 
-fn per_kill(mobs: &[MobRow]) -> Option<PerKill> {
+fn per_kill(mobs: &[MobRow], damage: Option<&Damage>) -> Option<PerKill> {
     let common: Vec<&MobRow> = mobs.iter().filter(|m| !m.boss && m.count > 0).collect();
     let count: u32 = common.iter().map(|m| m.count).sum();
     if count == 0 {
         return None;
     }
-    let mean = |value: fn(&MobRow) -> f64| common.iter().map(|m| value(m) * m.count as f64).sum::<f64>() / count as f64;
-    let kill =
-        PerKill { hp: mean(|m| m.hp as f64), exp: mean(|m| m.exp as f64), level: mean(|m| m.level as f64), count };
+    let defence = |m: &MobRow| m.weapon_def.unwrap_or(0) as f64;
+    let mean = |value: &dyn Fn(&MobRow) -> f64| common.iter().map(|m| value(m) * m.count as f64).sum::<f64>() / count as f64;
+    let kill = PerKill {
+        hp: mean(&|m| m.hp as f64 * damage.map_or(1.0, |d| d.weight(defence(m)))),
+        exp: mean(&|m| m.exp as f64),
+        level: mean(&|m| m.level as f64),
+        count,
+        hits: damage.map(|d| mean(&|m| m.hp as f64 / d.blow(defence(m)))),
+        defence: mean(&defence),
+    };
     (kill.hp > 0.0 && kill.exp > 0.0).then_some(kill)
 }
 
@@ -279,15 +360,17 @@ impl Atlas {
             level: Option<u32>,
             map: u32,
             walk: Option<f64>,
+            defence: f64,
         }
         let exp_rate = if assumptions.exp_rate > 0.0 { assumptions.exp_rate } else { 1.0 };
+        let damage = Damage::from_assumptions(&assumptions);
         let places = self.places(measured);
         let all: Vec<Stretch> = measured
             .iter()
             .filter(|r| r.active_seconds >= MIN_STRETCH_SECONDS && r.exp_per_hour > 0.0 && r.party.unwrap_or(1) <= 1)
             .filter_map(|r| {
                 let found = places.get(r.label.as_str())?.as_ref()?;
-                let kill = per_kill(&found.card.mobs)?;
+                let kill = per_kill(&found.card.mobs, damage.as_ref())?;
                 let kills = r.exp_per_hour / (kill.exp * exp_rate);
                 Some(Stretch {
                     seconds: r.active_seconds,
@@ -296,6 +379,7 @@ impl Atlas {
                     level: r.level,
                     map: found.card.map.id,
                     walk: layouts.get(&found.card.map.id).and_then(|l| l.walk_seconds_per_kill()),
+                    defence: kill.defence,
                 })
             })
             .collect();
@@ -327,8 +411,9 @@ impl Atlas {
             levels: levels.clone().min().zip(levels.max()),
             widened,
             walk_seconds_per_kill,
+            defence: weighed(|s| s.defence),
         };
-        Some(Estimator { speed, level, assumptions: Assumptions { exp_rate, ..assumptions } })
+        Some(Estimator { speed, level, assumptions: Assumptions { exp_rate, ..assumptions }, damage })
     }
 }
 
@@ -336,7 +421,7 @@ impl Estimator {
     /// Kills an hour on a map from its average monster's HP, held to what the map can spawn
     /// in an hour at the assumed respawn time, then turned into EXP.
     pub fn estimate(&self, mobs: &[MobRow], layout: Option<&MapLayout>) -> Option<Estimate> {
-        let kill = per_kill(mobs)?;
+        let kill = per_kill(mobs, self.damage.as_ref())?;
         let respawn = self.assumptions.respawn_seconds.max(1.0);
         let ceiling = kill.count as f64 * 3600.0 / respawn;
         let hp_ratio = kill.hp / self.speed.hp_per_kill;
@@ -378,6 +463,11 @@ impl Estimator {
         if capped {
             sureness -= 1;
         }
+        // Without the player's attack, a monster far tougher in defence than the ones they
+        // measured on may take many more blows than its HP says.
+        if self.damage.is_none() && kill.defence - self.speed.defence > 100.0 {
+            sureness -= 2;
+        }
 
         Some(Estimate {
             exp_per_hour: kills * kill.exp * self.assumptions.exp_rate,
@@ -388,6 +478,9 @@ impl Estimator {
             level_gap,
             sureness: sureness.clamp(1, 3) as u8,
             walk_seconds_per_kill,
+            hits_per_kill: kill.hits,
+            weapon_def: kill.defence,
+            damage_known: self.damage.is_some(),
         })
     }
 }
@@ -478,7 +571,7 @@ mod tests {
     fn kills_are_held_to_what_the_map_can_respawn() {
         let atlas = world();
         let measured = [rate("Fern Road : Mossbank Meadow I", 60_000.0, 120.0, Some(5))];
-        let slow = Assumptions { respawn_seconds: 60.0, exp_rate: 1.0 };
+        let slow = Assumptions { respawn_seconds: 60.0, ..Assumptions::default() };
         let estimator = atlas.estimator(&measured, Some(5), slow, &Layouts::new()).unwrap();
         // Meadow II holds 2 snails: back once a minute, 120 kills an hour at most.
         let spots = atlas.training_spots(None, &measured, &Travel::none(), Some(&estimator), &Layouts::new());
@@ -511,6 +604,63 @@ mod tests {
         assert!(atlas.estimator(&[party], Some(5), Assumptions::default(), &Layouts::new()).is_none());
         let short = rate("Fern Road : Mossbank Meadow I", 600.0, 5.0, Some(5));
         assert!(atlas.estimator(&[short], Some(5), Assumptions::default(), &Layouts::new()).is_none());
+    }
+
+    fn armoured(defence: u32) -> Vec<MobRow> {
+        vec![MobRow { id: 1, name: "Iron Hog".into(), level: 28, hp: 572, exp: 52, count: 20, boss: false, undead: false, weapon_def: Some(defence) }]
+    }
+
+    fn estimator_with(attack: Option<(f64, f64)>) -> Estimator {
+        let assumptions = Assumptions { attack_min: attack.map(|a| a.0), attack_max: attack.map(|a| a.1), ..Assumptions::default() };
+        Estimator {
+            speed: KillSpeed {
+                hp_per_hour: 475_000.0,
+                hp_per_kill: 503.0,
+                active_seconds: 3600.0,
+                maps: 2,
+                levels: Some((32, 33)),
+                widened: false,
+                walk_seconds_per_kill: None,
+                defence: 10.0,
+            },
+            level: Some(33),
+            damage: Damage::from_assumptions(&assumptions),
+            assumptions,
+        }
+    }
+
+    #[test]
+    fn defence_costs_blows_as_a_lv33_crossbowman_saw() {
+        let damage = Damage::from_assumptions(&Assumptions {
+            attack_min: Some(107.0),
+            attack_max: Some(289.0),
+            ..Assumptions::default()
+        })
+        .unwrap();
+        // Wooden Masks (462 HP, no defence) fell in one or two blows.
+        let mask = 462.0 / damage.blow(0.0);
+        assert!((1.2..2.2).contains(&mask), "{mask}");
+        // Iron Hogs (572 HP, defence 500) took seven, most blows doing about 50.
+        let hog_blow = damage.blow(500.0);
+        assert!((40.0..80.0).contains(&hog_blow), "{hog_blow}");
+        assert!((5.0..11.0).contains(&(572.0 / hog_blow)));
+        // No blow does less than 1.
+        assert_eq!(damage.blow(5000.0), 1.0);
+    }
+
+    #[test]
+    fn armoured_monsters_rank_below_soft_ones_once_the_attack_is_known() {
+        let aware = estimator_with(Some((107.0, 289.0)));
+        let blind = estimator_with(None);
+        let soft = aware.estimate(&armoured(0), None).unwrap();
+        let hog = aware.estimate(&armoured(500), None).unwrap();
+        assert!(hog.exp_per_hour < soft.exp_per_hour / 3.0, "{} vs {}", hog.exp_per_hour, soft.exp_per_hour);
+        assert!(hog.hits_per_kill.unwrap() > 5.0 && soft.hits_per_kill.unwrap() < 3.0);
+        assert!(hog.damage_known);
+        // Without the attack the estimate can't see it, and says so by being less sure.
+        let unaware = blind.estimate(&armoured(500), None).unwrap();
+        assert!(!unaware.damage_known && unaware.hits_per_kill.is_none());
+        assert!(unaware.sureness < blind.estimate(&armoured(0), None).unwrap().sureness);
     }
 
     #[test]

@@ -113,6 +113,8 @@ pub struct MobRow {
     pub count: u32,
     pub boss: bool,
     pub undead: bool,
+    /// How much of a weapon blow it shrugs off, when the data says.
+    pub weapon_def: Option<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -495,6 +497,7 @@ impl Atlas {
                     count,
                     boss: m.is_boss,
                     undead: m.undead,
+                    weapon_def: m.details.weapon_def.map(|d| d.max(0) as u32),
                 })
             })
             .collect();
