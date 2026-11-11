@@ -301,6 +301,8 @@
     }
     confirmStarter = null;
     draft.plan = JSON.parse(JSON.stringify(starter.plan));
+    // A plan that follows a guide brings its link, unless the build already has one.
+    if (starter.source && !draft.guide.trim()) draft.guide = starter.source.url;
   }
 
   // Skills.
@@ -916,13 +918,24 @@
           {#if jobPlans.length}
             <section>
               <h2 class="group">Ready-made plans</h2>
-              <p class="help">Written for Leafline from what each skill does and what each weapon needs; untested in game. Using one replaces your goals; your stats stay.</p>
+              <p class="help">
+                Some are written for Leafline from what each skill does and what each weapon needs; others follow one guide and say
+                so. All are untested in game. Using one replaces your goals; your stats stay.
+              </p>
               <ul class="plans">
                 {#each jobPlans as starter (starter.id)}
                   <li>
                     <span class="goal-name">
                       <span>{starter.name}</span>
                       <small>{starter.summary}</small>
+                      {#if starter.source}
+                        <small>
+                          {starter.source.credit}
+                          <button class="plain" onclick={() => starter.source && backend.openGuide(starter.source.url)}>
+                            Open {starter.source.name}'s guide
+                          </button>
+                        </small>
+                      {/if}
                       {#if starter.missing.length}<small class="warn">Not in this data: {starter.missing.join(", ")}</small>{/if}
                     </span>
                     <button class="plain" class:danger={confirmStarter === starter.id} onclick={() => useStarter(starter)}>

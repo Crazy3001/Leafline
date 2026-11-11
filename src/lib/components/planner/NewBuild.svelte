@@ -72,7 +72,7 @@
         id: 0,
         name: shownName.trim() || suggested,
         character: forWho.trim() || null,
-        guide: "",
+        guide: starter?.source?.url ?? "",
         start: { level: level ?? 1, stats: null, ap: 0, sp: 0, skills: [] },
         plan,
       });
@@ -116,13 +116,17 @@
     <div class="starts">
       {#each plans as plan (plan.id)}
         <button class="choice start" class:on={from === plan.id} aria-pressed={from === plan.id} onclick={() => (from = plan.id)}>
-          <span class="start-name">{plan.name} <span class="faint">· ready-made, to Lv {plan.plan.planTo}</span></span>
+          <span class="start-name">
+            {plan.name}
+            <span class="faint">· {plan.source ? `from ${plan.source.name}'s guide` : "ready-made"}, to Lv {plan.plan.planTo}</span>
+          </span>
           <span class="muted">{plan.summary}</span>
           <span class="muted">
             {count(plan.plan.skills.length, "skill goal")}, {count(plan.plan.stats.length, "stat goal")},
             {count(plan.plan.gear.length, "piece", "pieces")} of gear.
           </span>
           {#if plan.missing.length}<span class="warn">Not in this data: {plan.missing.join(", ")}</span>{/if}
+          {#if plan.source}<span class="muted">{plan.source.credit} The guide's link is saved with the build.</span>{/if}
           <span class="warn">Untested in game: a starting point to change.</span>
         </button>
       {/each}

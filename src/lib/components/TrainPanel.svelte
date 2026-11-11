@@ -455,7 +455,10 @@
       {#each lastSessions as s (s.id)}
         <li>
           <span class="tabular muted day">{shortDay(s.startedAt ?? s.savedAt)}</span>
-          <span class="what">{s.label || mainMap(s.maps)}</span>
+          <span class="what"
+            >{#if !s.label && s.maps.length}<button class="ref ref-map" onclick={() => showMapNamed(s.maps[0].map)}>{mainMap(s.maps)}</button
+              >{:else}{s.label || mainMap(s.maps)}{/if}</span
+          >
           <span class="tabular">{formatCompact(s.expPerHour)}</span>
         </li>
       {/each}

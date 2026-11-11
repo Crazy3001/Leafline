@@ -1097,7 +1097,7 @@ export interface Build {
   plan: BuildGoals;
 }
 
-/** A ready-made plan written for Leafline. Nobody has played these yet. */
+/** A ready-made plan, written for Leafline or following one guide. Nobody has played these yet. */
 export interface StarterPlan {
   id: string;
   job: number;
@@ -1106,6 +1106,15 @@ export interface StarterPlan {
   plan: BuildGoals;
   /** Names the data doesn't have, left out of the plan. */
   missing: string[];
+  /** The guide a plan follows, to credit and link. `null` for a plan written for Leafline. */
+  source: StarterSource | null;
+}
+
+export interface StarterSource {
+  name: string;
+  /** The exact page the plan was taken from. */
+  url: string;
+  credit: string;
 }
 
 export interface BuildSummary {

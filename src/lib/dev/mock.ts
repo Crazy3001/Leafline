@@ -772,6 +772,22 @@ export const mockBackend: Backend = {
               planTo: 70,
             },
             missing: [],
+            source: null,
+          },
+          {
+            id: "fernblade-guide",
+            job: 420,
+            name: "Dagger Fernblade, example guide",
+            summary: "A made-up plan that follows a made-up guide.",
+            plan: {
+              job: 420,
+              skills: [{ skillId: 1, level: 3 }, { skillId: 10, level: 20 }],
+              stats: [{ stat: "luk", target: null, fromLevel: null }],
+              gear: [500],
+              planTo: 70,
+            },
+            missing: [],
+            source: { name: "NiaDB", url: "https://meowdb.com/msclassic/guides/example", credit: "Example guide by Someone, 2026-01-01." },
           },
         ]
       : [],
