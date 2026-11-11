@@ -10,6 +10,7 @@
 pub mod atlas;
 pub mod bestiary;
 pub mod drops;
+pub mod layout;
 pub mod fetch;
 pub mod guide;
 pub mod osms;

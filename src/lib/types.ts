@@ -526,6 +526,8 @@ export interface MapRoute {
   steps: RouteStep[];
   /** For a route that rides or scrolls: the portals the walk alone takes, or null when no portals lead there. */
   walking: number | null;
+  /** About how many seconds of walking, when every map on the way has a known layout. */
+  walkSeconds?: number | null;
 }
 
 /** A place to head for with "Go here" (see src-tauri/src/app/nav.rs): a map, or an NPC on any of their maps. */
@@ -754,6 +756,8 @@ export interface KillSpeed {
   levels: [number, number] | null;
   /** Too little play near the current level, so every solo session counts. */
   widened: boolean;
+  /** Seconds of walking between kills on the maps that play was on, from their layouts. */
+  walkSecondsPerKill?: number | null;
 }
 
 /** A map's EXP per hour for this player, worked out from their kill speed. */
@@ -770,6 +774,23 @@ export interface Estimate {
   levelGap: number | null;
   /** 3 fairly sure, 2 rough, 1 a guess. */
   sureness: 1 | 2 | 3;
+  /** Seconds of walking between kills here; the rest of each kill scales with HP. */
+  walkSecondsPerKill?: number | null;
+}
+
+/** A map's size and how its monsters spread, in the game's pixels, from the client. */
+export interface MapLayout {
+  map: number;
+  width: number | null;
+  height: number | null;
+  /** Summed length of every floor. */
+  walkable: number;
+  platforms: number;
+  spawnPoints: number;
+  /** How many platforms monsters spawn on. */
+  spawnPlatforms: number;
+  ropes: number;
+  ladders: number;
 }
 
 export interface TrainingSpot {
@@ -792,6 +813,8 @@ export interface TrainingSpot {
   measured: { expPerHour: number; activeSeconds: number } | null;
   /** From the player's kill speed, once enough solo play is saved. */
   estimate: Estimate | null;
+  /** The map's size, floors and how its monsters spread, when known. */
+  layout?: MapLayout | null;
 }
 
 export interface TrainingSpots {

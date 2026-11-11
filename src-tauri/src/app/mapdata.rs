@@ -15,7 +15,8 @@ use crate::build::Catalog;
 use crate::error::{Error, Result};
 use crate::mapdata::fetch::{self, Http};
 use crate::mapdata::osms::Dataset;
-use crate::mapdata::store::{DROPS_FAILED, TURN_INS_FAILED};
+use crate::mapdata::layout::{self, Layouts};
+use crate::mapdata::store::{DROPS_FAILED, LAYOUTS_FAILED, TURN_INS_FAILED};
 use crate::mapdata::{
     Assumptions, Atlas, DataStatus, ItemOrigin, KillSpeed, MapCard, MapMatch, MapPage, MapQuery, MapRef, MeasuredRate,
     MonsterDrops, MonsterFilters, MonsterPage, MonsterQuery, MonsterSheet, NpcPage, NpcQuery, NpcSheet, QuestGuide, QuestPage, QuestQuery, QuestSearch,
@@ -68,6 +69,8 @@ pub struct MapDataState {
     path: PathBuf,
     atlas: RwLock<Option<Arc<Atlas>>>,
     catalog: RwLock<Option<Arc<Catalog>>>,
+    /// Every map's layout, from Leafline's data repository. Empty until downloaded.
+    layouts: RwLock<Arc<Layouts>>,
     downloading: AtomicBool,
     osms: Http,
     /// Shared so every wiki request (travel) keeps to its one-a-second pace.
@@ -88,15 +91,31 @@ impl MapDataState {
                 (None, None)
             }
         };
+        let layouts = Store::open(&path).and_then(|store| store.layouts()).unwrap_or_default();
         Ok(Self {
             path,
             atlas: RwLock::new(atlas),
             catalog: RwLock::new(catalog),
+            layouts: RwLock::new(Arc::new(layouts)),
             downloading: AtomicBool::new(false),
             osms: Http::new(Duration::from_millis(250)),
             wiki: Http::new(Duration::from_secs(1)),
             drops_refresh: Mutex::new(()),
         })
+    }
+
+    pub(super) fn layouts(&self) -> Arc<Layouts> {
+        self.layouts.read().expect("layouts lock").clone()
+    }
+
+    /// Renews the map layouts, once a day at most, from Leafline's data repository.
+    fn refresh_layouts(&self) -> Result<()> {
+        let _turn = self.drops_refresh.lock().expect("drops refresh lock");
+        let mut store = Store::open(&self.path)?;
+        if layout::refresh(&mut store, &self.osms, now())? {
+            *self.layouts.write().expect("layouts lock") = Arc::new(store.layouts()?);
+        }
+        Ok(())
     }
 
     pub(super) fn atlas(&self) -> Option<Arc<Atlas>> {
@@ -187,6 +206,10 @@ pub fn check_for_updates(app: &AppHandle) {
         if let Err(err) = state.refresh_turn_ins() {
             eprintln!("turn-in table download failed: {err}");
         }
+        // Estimates and routes work without layouts, just more roughly.
+        if let Err(err) = state.refresh_layouts() {
+            eprintln!("map layout download failed: {err}");
+        }
         // The copy that came with the app keeps working when this fails.
         if let Err(err) = state.refresh_shops() {
             eprintln!("shop file download failed: {err}");
@@ -223,6 +246,10 @@ pub async fn download_map_data(app: AppHandle, force: bool) -> Result<Downloaded
         if let Err(err) = state.refresh_turn_ins() {
             eprintln!("turn-in table download failed: {err}");
         }
+        state.retry(LAYOUTS_FAILED)?;
+        if let Err(err) = state.refresh_layouts() {
+            eprintln!("map layout download failed: {err}");
+        }
         if let Err(err) = state.refresh_shops() {
             eprintln!("shop file download failed: {err}");
         }
@@ -255,11 +282,23 @@ pub fn search_maps(state: State<MapDataState>, text: String) -> Vec<MapRef> {
     state.atlas().map(|atlas| atlas.search(&text, 8)).unwrap_or_default()
 }
 
+/// A route with roughly how long it takes on foot.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RouteInfo {
+    #[serde(flatten)]
+    route: Route,
+    /// About how many seconds of walking, when every map on the way has a known layout.
+    walk_seconds: Option<f64>,
+}
+
 /// The fewest steps between two maps, through portals and any travel the player turned on.
 #[tauri::command]
-pub fn map_route(app: AppHandle, state: State<MapDataState>, from: u32, to: u32) -> Option<Route> {
+pub fn map_route(app: AppHandle, state: State<MapDataState>, from: u32, to: u32) -> Option<RouteInfo> {
     let atlas = state.atlas()?;
-    atlas.route_with(from, to, &travel(&app, &atlas))
+    let route = atlas.route_with(from, to, &travel(&app, &atlas))?;
+    let walk_seconds = layout::route_walk_seconds(&route, &state.layouts());
+    Some(RouteInfo { route, walk_seconds })
 }
 
 /// Where the travel connections in use come from.
@@ -688,9 +727,15 @@ pub fn training_spots(
 ) -> Option<Spots> {
     let atlas = state.atlas()?;
     let from = map_name.and_then(|name| atlas.find_twin(&name, map_street.as_deref(), map_twin)).map(|m| m.card.map);
-    let estimator = atlas.estimator(&measured, level, assumptions.unwrap_or_default());
-    let spots =
-        atlas.training_spots(from.as_ref().map(|m| m.id), &measured, &travel(&app, &atlas), estimator.as_ref());
+    let layouts = state.layouts();
+    let estimator = atlas.estimator(&measured, level, assumptions.unwrap_or_default(), &layouts);
+    let spots = atlas.training_spots(
+        from.as_ref().map(|m| m.id),
+        &measured,
+        &travel(&app, &atlas),
+        estimator.as_ref(),
+        &layouts,
+    );
     Some(Spots { from, speed: estimator.map(|e| e.speed), spots })
 }
 

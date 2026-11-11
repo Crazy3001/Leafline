@@ -5,6 +5,12 @@
 
   import { formatNumber } from "$lib/format";
   import type { MapRoute } from "$lib/types";
+
+  /** Rough walking time: under a minute in tens of seconds, then whole minutes. */
+  function walkTime(seconds: number) {
+    if (seconds < 60) return `${Math.max(10, Math.round(seconds / 10) * 10)} s`;
+    return `${Math.round(seconds / 60)} min`;
+  }
   import { stepVerb as verb } from "$lib/wayfinding";
 
   let {
@@ -60,7 +66,8 @@
     </p>
   {:else}
     <p class="note">
-      {route.steps.length} portal{route.steps.length === 1 ? "" : "s"}. Portal level or quest requirements are not checked.
+      {route.steps.length} portal{route.steps.length === 1 ? "" : "s"}{#if route.walkSeconds != null}, about {walkTime(route.walkSeconds)} on foot{/if}.
+      Portal level or quest requirements are not checked.
     </p>
   {/if}
 {/if}

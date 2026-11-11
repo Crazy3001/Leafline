@@ -15,6 +15,7 @@ use super::osms::{
     Dataset, FILES, FileMeta, Height, Ingredient, ItemKind, ItemNeed, ItemRecord, MapRecord, Meta, MobRequirement, MonsterDetails,
     MonsterRecord, NpcRecord, Portal, QuestRecord, Records, RecipeRecord, RewardItem, Side, SkillNeed, SkillRecord, Spawn,
 };
+use super::layout::{Layouts, MapLayout};
 use super::turnins::TurnIn;
 use crate::error::{Error, Result};
 
@@ -75,6 +76,11 @@ CREATE TABLE drop_fetches (monster TEXT PRIMARY KEY, fetched_at INTEGER NOT NULL
 /// download again.
 const ADDED: &str = "
 CREATE TABLE IF NOT EXISTS quest_turn_in_npcs (quest_id INTEGER PRIMARY KEY, npc_id INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS map_layouts (
+    map_id INTEGER PRIMARY KEY, width INTEGER, height INTEGER, walkable INTEGER NOT NULL,
+    platforms INTEGER NOT NULL, spawn_points INTEGER NOT NULL, spawn_platforms INTEGER NOT NULL,
+    ropes INTEGER NOT NULL, ladders INTEGER NOT NULL
+);
 ";
 
 /// Tables from when items were asked about one at a time, which the whole drop table replaced,
@@ -99,6 +105,9 @@ const TURN_INS_FETCHED_AT: &str = "turn_in_npcs_fetched_at";
 /// refusal is not asked again on every lookup. A download that works removes it.
 pub const DROPS_FAILED: &str = "drops_failed";
 pub const TURN_INS_FAILED: &str = "turn_in_npcs_failed";
+/// Likewise for Leafline's file of map layouts.
+const LAYOUTS_FETCHED_AT: &str = "layouts_fetched_at";
+pub const LAYOUTS_FAILED: &str = "layouts_failed";
 
 /// Kept in `source_info` when a new version of Leafline replaces the cache: the player had
 /// downloaded the map data or drop table, so each comes back without asking again.
@@ -613,6 +622,50 @@ impl Store {
             [TURN_INS_FETCHED_AT, &now.to_string()],
         )?;
         tx.execute("DELETE FROM source_info WHERE key = ?1", [TURN_INS_FAILED])?;
+        tx.commit()?;
+        Ok(())
+    }
+
+    pub fn layouts_fetched_at(&self) -> Result<Option<i64>> {
+        Ok(self.info(LAYOUTS_FETCHED_AT)?.and_then(|v| v.parse().ok()))
+    }
+
+    /// Every map's layout, as downloaded.
+    pub fn layouts(&self) -> Result<Layouts> {
+        let mut stmt = self.conn.prepare(
+            "SELECT map_id, width, height, walkable, platforms, spawn_points, spawn_platforms, ropes, ladders
+             FROM map_layouts",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok(MapLayout {
+                map: row.get(0)?,
+                width: row.get(1)?,
+                height: row.get(2)?,
+                walkable: row.get(3)?,
+                platforms: row.get(4)?,
+                spawn_points: row.get(5)?,
+                spawn_platforms: row.get(6)?,
+                ropes: row.get(7)?,
+                ladders: row.get(8)?,
+            })
+        })?;
+        Ok(rows.map(|r| r.map(|l| (l.map, l))).collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// Replaces every map's layout.
+    pub fn replace_layouts(&mut self, rows: &[MapLayout], now: i64) -> Result<()> {
+        let tx = self.conn.transaction()?;
+        tx.execute("DELETE FROM map_layouts", [])?;
+        for l in rows {
+            tx.execute(
+                "INSERT OR REPLACE INTO map_layouts
+                 (map_id, width, height, walkable, platforms, spawn_points, spawn_platforms, ropes, ladders)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                params![l.map, l.width, l.height, l.walkable, l.platforms, l.spawn_points, l.spawn_platforms, l.ropes, l.ladders],
+            )?;
+        }
+        tx.execute("INSERT OR REPLACE INTO source_info (key, value) VALUES (?1, ?2)", [LAYOUTS_FETCHED_AT, &now.to_string()])?;
+        tx.execute("DELETE FROM source_info WHERE key = ?1", [LAYOUTS_FAILED])?;
         tx.commit()?;
         Ok(())
     }

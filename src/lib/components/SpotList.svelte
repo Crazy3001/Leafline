@@ -268,6 +268,16 @@
         `Held to what the map can respawn: ${formatCompact(guess.ceiling)} kills an hour if every monster is back ` +
           `after ${assumptions.value.respawnSeconds} s. That respawn time is an assumption you can change below.`,
       );
+    if (guess.walkSecondsPerKill != null && speed.walkSecondsPerKill != null) {
+      const here = guess.walkSecondsPerKill;
+      const there = speed.walkSecondsPerKill;
+      const layout = spot.layout;
+      const spread = layout ? ` Monsters spawn on ${layout.spawnPlatforms} of its ${layout.platforms} platforms.` : "";
+      out.push(
+        `About ${here.toFixed(1)} s of walking between kills here, against ${there.toFixed(1)} s where you trained, ` +
+          `from each map's floor and platforms at base walking speed.${spread}`,
+      );
+    }
     if (guess.hpRatio > 2)
       out.push(`Its monsters have ${times(guess.hpRatio)}× the HP of the ones you usually fight, so they may take longer than HP alone says.`);
     else if (guess.hpRatio < 0.5)
