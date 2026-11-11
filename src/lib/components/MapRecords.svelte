@@ -2,7 +2,10 @@
   // The training log's Records view: every map the player trained on, and under each the ways
   // they trained there (level, party size and job), with EXP and mesos per hour. Built from the
   // saved sessions' lines; everything stays on this PC.
+  import { ChevronDown, ChevronRight } from "@lucide/svelte";
+
   import { formatCompact, formatDuration, partyLabel } from "$lib/format";
+  import { showMapNamed } from "$lib/places.svelte";
   import { bandRange, levelBands, mapRecords, mapStats, shortDay, SHORT_SECONDS, type LineFilter, type RecordRates } from "$lib/training";
   import type { SavedSession } from "$lib/types";
   import Segmented from "$lib/ui/Segmented.svelte";
@@ -117,9 +120,10 @@
           <tbody>
             <tr class="map" class:short={m.activeSeconds < SHORT_SECONDS}>
               <td>
-                <button class="fold" aria-expanded={open} onclick={() => toggle(m.map)}>
-                  <span class="name">{m.name}</span>
+                <button class="ref ref-map name" onclick={() => showMapNamed(m.map)}>{m.name}</button>
+                <button class="fold" aria-expanded={open} aria-label="{open ? 'Fold' : 'Unfold'} {m.name}" onclick={() => toggle(m.map)}>
                   {#if m.street}<span class="street">{m.street}</span>{/if}
+                  {#if open}<ChevronDown size={12} />{:else}<ChevronRight size={12} />{/if}
                 </button>
               </td>
               <td>{m.sessions}</td>
@@ -279,8 +283,13 @@
     cursor: pointer;
   }
 
-  .fold:hover .name {
-    color: var(--accent-strong);
+  .fold {
+    margin-left: 8px;
+    color: var(--muted);
+  }
+
+  .fold:hover {
+    color: var(--text);
   }
 
   .name {

@@ -14,7 +14,10 @@
   import ShareDialog from "./ShareDialog.svelte";
   import { backend } from "$lib/api";
   import { dropsBetween, watchDrops } from "$lib/drops.svelte";
+  import { showItemNamed } from "$lib/items.svelte";
   import { watchMapData, mapData } from "$lib/mapdata.svelte";
+  import { showMonsterNamed } from "$lib/monsters.svelte";
+  import { showMapNamed } from "$lib/places.svelte";
   import { formatCompact, formatDuration, formatNumber, partyLabel, splitMapLabel } from "$lib/format";
   import { history, watchHistory } from "$lib/history.svelte";
   import { live, watchLive } from "$lib/readings.svelte";
@@ -479,7 +482,10 @@
                                 }}
                               />
                             {:else}
-                              {l.map ? splitMapLabel(l.map).name : "Not placed on a map"}
+                              {#if l.map}
+                                {@const map = l.map}
+                                <button class="ref ref-map" onclick={() => showMapNamed(map)}>{splitMapLabel(map).name}</button>
+                              {:else}Not placed on a map{/if}
                               {#if l.map}
                                 {@const map = l.map}
                                 <button class="pen" title="Rename" aria-label="Rename map" onclick={() => startRename(map)}
@@ -503,7 +509,10 @@
                     <h3>Drops you logged</h3>
                     <ul class="drops">
                       {#each sessionDropRows as d (d.item + d.monster)}
-                        <li><span>{d.item}</span><span class="muted">{d.monster}{d.count > 1 ? ` ×${d.count}` : ""}</span></li>
+                        <li>
+                          <span><button class="ref ref-item" onclick={() => showItemNamed(d.item)}>{d.item}</button></span>
+                          <span class="muted"><button class="ref ref-mob" onclick={() => showMonsterNamed(d.monster)}>{d.monster}</button>{d.count > 1 ? ` ×${d.count}` : ""}</span>
+                        </li>
                       {/each}
                     </ul>
                   {/if}
@@ -623,7 +632,7 @@
                 <tbody>
                   {#each stats as m (m.map)}
                     <tr>
-                      <td>{m.name}</td>
+                      <td><button class="ref ref-map" onclick={() => showMapNamed(m.map)}>{m.name}</button></td>
                       <td>{m.sessions}</td>
                       <td>{dur(m.activeSeconds)}</td>
                       <td>{formatCompact(m.expPerHour)}</td>
