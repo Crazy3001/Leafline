@@ -133,6 +133,9 @@ pub struct Estimator {
 const MIN_SECONDS: f64 = 10.0 * 60.0;
 /// Less than this behind the kill speed and every estimate is at most rough.
 const SURE_SECONDS: f64 = 30.0 * 60.0;
+/// A stretch shorter than this is left out of the kill speed: a map passed through, or a party
+/// that changed for a moment, says little about how fast the player kills.
+const MIN_STRETCH_SECONDS: f64 = 60.0;
 /// Play this many levels below the character's (or one above) counts as near its level.
 const NEAR_LEVELS: u32 = 5;
 /// At least this much of the measured play must be on maps with a known layout before walking is
@@ -281,7 +284,7 @@ impl Atlas {
         let places = self.places(measured);
         let all: Vec<Stretch> = measured
             .iter()
-            .filter(|r| r.active_seconds > 0.0 && r.exp_per_hour > 0.0 && r.party.unwrap_or(1) <= 1)
+            .filter(|r| r.active_seconds >= MIN_STRETCH_SECONDS && r.exp_per_hour > 0.0 && r.party.unwrap_or(1) <= 1)
             .filter_map(|r| {
                 let found = places.get(r.label.as_str())?.as_ref()?;
                 let kill = per_kill(&found.card.mobs)?;
@@ -508,6 +511,17 @@ mod tests {
         assert!(atlas.estimator(&[party], Some(5), Assumptions::default(), &Layouts::new()).is_none());
         let short = rate("Fern Road : Mossbank Meadow I", 600.0, 5.0, Some(5));
         assert!(atlas.estimator(&[short], Some(5), Assumptions::default(), &Layouts::new()).is_none());
+    }
+
+    #[test]
+    fn brief_stretches_are_left_out_of_the_kill_speed() {
+        let atlas = world();
+        let mut measured = vec![rate("Fern Road : Mossbank Meadow I", 600.0, 60.0, Some(5))];
+        // Thirty seconds passing through at a poor rate must not drag the kill speed down.
+        measured.push(MeasuredRate { active_seconds: 30.0, exp_per_hour: 60.0, ..measured[0].clone() });
+        let estimator = atlas.estimator(&measured, Some(5), Assumptions::default(), &Layouts::new()).unwrap();
+        assert!((estimator.speed.hp_per_hour - 3200.0).abs() < 1e-9);
+        assert!((estimator.speed.active_seconds - 3600.0).abs() < 1e-9);
     }
 
     #[test]
