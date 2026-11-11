@@ -12,7 +12,8 @@ use serde::{Deserialize, Deserializer, Serialize};
 use super::turnins::TurnIn;
 
 /// The files Leafline needs, in the order they are fetched.
-pub const FILES: [&str; 6] = ["maps.json", "monsters.json", "npcs.json", "quests.json", "skills.json", "items.json"];
+pub const FILES: [&str; 7] =
+    ["maps.json", "monsters.json", "npcs.json", "quests.json", "skills.json", "items.json", "recipes.json"];
 
 /// The only `schema_version` this reader understands. OSMS ships breaking changes as `v2/`.
 pub const SCHEMA_VERSION: u32 = 1;
@@ -677,6 +678,37 @@ impl ItemKind {
     }
 }
 
+/// A crafting recipe: what a discipline makes, at which of its skill levels, from what.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RecipeRecord {
+    pub id: u32,
+    /// Smithing, Tailoring and so on, as the file names them.
+    pub discipline: String,
+    /// The discipline's skill level the recipe asks for.
+    #[serde(rename = "req_skill_level", default)]
+    pub skill_level: u32,
+    #[serde(default)]
+    pub craft_exp: u32,
+    #[serde(default)]
+    pub meso_cost: u64,
+    pub output_item_id: u32,
+    #[serde(default = "one")]
+    pub output_count: u32,
+    #[serde(default)]
+    pub ingredients: Vec<Ingredient>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Ingredient {
+    pub item_id: u32,
+    #[serde(default = "one")]
+    pub count: u32,
+}
+
+fn one() -> u32 {
+    1
+}
+
 /// An item of any kind. Icon and sprite URLs in the file are left out, like every other image.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(from = "RawItem", rename_all(serialize = "camelCase"))]
@@ -734,6 +766,7 @@ pub struct Dataset {
     pub quests: Vec<QuestRecord>,
     pub skills: Vec<SkillRecord>,
     pub items: Vec<ItemRecord>,
+    pub recipes: Vec<RecipeRecord>,
 }
 
 /// One downloaded file, parsed.
@@ -745,6 +778,7 @@ pub enum Records {
     Quests(Vec<QuestRecord>),
     Skills(Vec<SkillRecord>),
     Items(Vec<ItemRecord>),
+    Recipes(Vec<RecipeRecord>),
 }
 
 impl Records {
@@ -761,6 +795,7 @@ impl Records {
                 Self::Skills(skills)
             }
             "items.json" => Self::Items(serde_json::from_slice(body)?),
+            "recipes.json" => Self::Recipes(serde_json::from_slice(body)?),
             other => unreachable!("not a map data file: {other}"),
         })
     }

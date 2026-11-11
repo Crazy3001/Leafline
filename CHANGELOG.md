@@ -19,6 +19,10 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
 - **Your best maps:** the Train tab lists your best single run on each map before a session,
   **This map** compares your mesos with your best there as well as your EXP, and Records has a
   Best run column.
+- **Crafting:** an item's page shows the recipe that makes it and the recipes that use it, with
+  the discipline, skill level, ingredients and meso cost. **Lookup → Crafting** lists every
+  recipe, by discipline, searchable by the item made or any ingredient. The recipes come with the
+  map data, which downloads again once after this update.
 
 ### Changed
 - **Where to train → For you:** maps you haven't tried are now estimated from how fast you get

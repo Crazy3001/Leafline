@@ -885,6 +885,42 @@ export interface SavedSession {
   potionCost: number;
 }
 
+// Crafting (see src-tauri/src/build/crafting.rs): recipes from the map data.
+
+export interface ItemAmount {
+  id: number;
+  name: string;
+  count: number;
+}
+
+export interface Recipe {
+  id: number;
+  discipline: string;
+  /** The discipline's skill level the recipe asks for. */
+  skillLevel: number;
+  craftExp: number;
+  mesoCost: number;
+  output: ItemAmount;
+  ingredients: ItemAmount[];
+}
+
+export interface ItemCrafting {
+  madeBy: Recipe[];
+  usedIn: Recipe[];
+}
+
+export interface CraftingQuery {
+  discipline?: string | null;
+  search?: string | null;
+  maxLevel?: number | null;
+}
+
+export interface CraftingPage {
+  /** Every discipline with how many recipes it has. */
+  disciplines: [string, number][];
+  recipes: Recipe[];
+}
+
 /** The EXP a level takes, as the player's own HUD showed it (src-tauri/src/userdata/sessions.rs). */
 export interface LevelExp {
   level: number;

@@ -1,8 +1,9 @@
 <script lang="ts">
-  // The Lookup tab: items, monsters, maps and NPCs, each searched from the map data. None needs
+  // The Lookup tab: items, monsters, maps, NPCs and crafting recipes, each searched from the map data. None needs
   // anything from the game, so all work with live reading off.
   import { untrack } from "svelte";
 
+  import CraftingPanel from "./item/CraftingPanel.svelte";
   import ItemPanel from "./ItemPanel.svelte";
   import MapLookup from "./lookup/MapLookup.svelte";
   import NpcLookup from "./lookup/NpcLookup.svelte";
@@ -41,6 +42,7 @@
     { id: "monsters", label: "Monsters" },
     { id: "maps", label: "Maps" },
     { id: "npcs", label: "NPCs" },
+    { id: "crafting", label: "Crafting" },
   ] as const;
 
   watchMonsters();
@@ -76,6 +78,8 @@
   <MapLookup {here} {pinned} />
 {:else if lookup.mode === "npcs"}
   <NpcLookup {here} {map} {pinned} />
+{:else if lookup.mode === "crafting"}
+  <CraftingPanel {pinned} />
 {:else}
   <ItemPanel {tooltips} {level} {character} {job} {map} {pinned} />
 {/if}

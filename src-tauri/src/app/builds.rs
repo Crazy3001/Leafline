@@ -9,6 +9,7 @@ use super::mapdata::MapDataState;
 use super::records::{UserDataState, now};
 use super::settings::{self, SettingsState};
 use super::{overlay, pins};
+use crate::build::crafting::{CraftingPage, CraftingQuery, ItemCrafting};
 use crate::build::plan::{MAX_LEVEL, Piece};
 use crate::build::progress::{self, CatchUp};
 use crate::build::{
@@ -95,6 +96,18 @@ pub fn starter_plans(app: AppHandle) -> Vec<Starter> {
 #[tauri::command]
 pub fn search_gear(state: State<MapDataState>, text: String, job: u32) -> Vec<ItemRecord> {
     state.catalog().map_or_else(Vec::new, |c| c.search_gear(&text, Branch::of_job(job)))
+}
+
+/// The recipes that make an item and the ones that use it. None without map data.
+#[tauri::command]
+pub fn item_crafting(app: AppHandle, id: u32) -> Option<ItemCrafting> {
+    app.state::<MapDataState>().catalog().map(|catalog| catalog.crafting_of(id))
+}
+
+/// The Crafting section's recipes. Empty without map data.
+#[tauri::command]
+pub fn crafting_recipes(app: AppHandle, query: CraftingQuery) -> CraftingPage {
+    app.state::<MapDataState>().catalog().map(|catalog| catalog.crafting(&query)).unwrap_or_default()
 }
 
 /// One page of the item search. Without map data there is nothing to find.

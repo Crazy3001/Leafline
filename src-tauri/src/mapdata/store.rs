@@ -12,14 +12,14 @@ use serde::Serialize;
 
 use super::drops::{Drop, Dropper, MonsterDrops};
 use super::osms::{
-    Dataset, FILES, FileMeta, Height, ItemKind, ItemNeed, ItemRecord, MapRecord, Meta, MobRequirement, MonsterDetails,
-    MonsterRecord, NpcRecord, Portal, QuestRecord, Records, RewardItem, Side, SkillNeed, SkillRecord, Spawn,
+    Dataset, FILES, FileMeta, Height, Ingredient, ItemKind, ItemNeed, ItemRecord, MapRecord, Meta, MobRequirement, MonsterDetails,
+    MonsterRecord, NpcRecord, Portal, QuestRecord, Records, RecipeRecord, RewardItem, Side, SkillNeed, SkillRecord, Spawn,
 };
 use super::turnins::TurnIn;
 use crate::error::{Error, Result};
 
 /// Bump when the tables change; an older cache is then dropped and downloaded again.
-const CACHE_VERSION: i32 = 8;
+const CACHE_VERSION: i32 = 9;
 
 const SCHEMA: &str = "
 CREATE TABLE source_files (
@@ -58,6 +58,11 @@ CREATE TABLE items (
     req_int INTEGER NOT NULL, req_luk INTEGER NOT NULL, req_fame INTEGER NOT NULL, attack_speed INTEGER,
     upgrade_slots INTEGER, quest_item INTEGER NOT NULL, untradable INTEGER NOT NULL, stats TEXT NOT NULL,
     price INTEGER, description TEXT, scroll TEXT);
+CREATE TABLE recipes (
+    id INTEGER PRIMARY KEY, discipline TEXT NOT NULL, skill_level INTEGER NOT NULL, craft_exp INTEGER NOT NULL,
+    meso_cost INTEGER NOT NULL, output_item_id INTEGER NOT NULL, output_count INTEGER NOT NULL);
+CREATE TABLE recipe_ingredients (recipe_id INTEGER NOT NULL, seq INTEGER NOT NULL, item_id INTEGER NOT NULL,
+    count INTEGER NOT NULL, PRIMARY KEY (recipe_id, seq));
 CREATE TABLE drops (
     monster TEXT NOT NULL, item TEXT NOT NULL, category TEXT, rate REAL, rate_low REAL, rate_high REAL,
     min_quantity INTEGER, max_quantity INTEGER, sample_kills INTEGER, sample_drops INTEGER,
@@ -101,6 +106,7 @@ fn tables_of(file: &str) -> &'static [&'static str] {
         "quests.json" => &["quests", "quest_mobs", "quest_rewards", "quest_items", "quest_follows"],
         "skills.json" => &["skills", "skill_needs", "skill_levels"],
         "items.json" => &["items"],
+        "recipes.json" => &["recipes", "recipe_ingredients"],
         _ => &[],
     }
 }
@@ -218,6 +224,7 @@ impl Store {
                 Records::Quests(quests) => insert_quests(&tx, quests)?,
                 Records::Skills(skills) => insert_skills(&tx, skills)?,
                 Records::Items(items) => insert_items(&tx, items)?,
+                Records::Recipes(recipes) => insert_recipes(&tx, recipes)?,
             }
             tx.execute(
                 "INSERT OR REPLACE INTO source_files (name, sha256, records, updated_at, fetched_at)
@@ -268,7 +275,39 @@ impl Store {
             quests: self.load_quests()?,
             skills: self.load_skills()?,
             items: self.load_items()?,
+            recipes: self.load_recipes()?,
         }))
+    }
+
+    fn load_recipes(&self) -> Result<Vec<RecipeRecord>> {
+        let mut ingredients: HashMap<u32, Vec<Ingredient>> = HashMap::new();
+        let mut stmt = self.conn.prepare("SELECT recipe_id, item_id, count FROM recipe_ingredients ORDER BY recipe_id, seq")?;
+        for row in stmt.query_map([], |row| Ok((row.get::<_, u32>(0)?, Ingredient { item_id: row.get(1)?, count: row.get(2)? })))? {
+            let (recipe, ingredient) = row?;
+            ingredients.entry(recipe).or_default().push(ingredient);
+        }
+        let mut stmt = self.conn.prepare(
+            "SELECT id, discipline, skill_level, craft_exp, meso_cost, output_item_id, output_count FROM recipes ORDER BY id",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok(RecipeRecord {
+                id: row.get(0)?,
+                discipline: row.get(1)?,
+                skill_level: row.get(2)?,
+                craft_exp: row.get(3)?,
+                meso_cost: row.get::<_, i64>(4)? as u64,
+                output_item_id: row.get(5)?,
+                output_count: row.get(6)?,
+                ingredients: Vec::new(),
+            })
+        })?;
+        let mut recipes = Vec::new();
+        for row in rows {
+            let mut recipe = row?;
+            recipe.ingredients = ingredients.remove(&recipe.id).unwrap_or_default();
+            recipes.push(recipe);
+        }
+        Ok(recipes)
     }
 
     fn load_skills(&self) -> Result<Vec<SkillRecord>> {
@@ -771,6 +810,30 @@ fn insert_skills(tx: &Transaction, skills: &[SkillRecord]) -> Result<()> {
         }
         for (i, text) in s.level_descriptions.iter().enumerate() {
             level.execute(params![s.id, i as i64 + 1, text])?;
+        }
+    }
+    Ok(())
+}
+
+fn insert_recipes(tx: &Transaction, recipes: &[RecipeRecord]) -> Result<()> {
+    let mut recipe = tx.prepare(
+        "INSERT OR REPLACE INTO recipes (id, discipline, skill_level, craft_exp, meso_cost, output_item_id, output_count)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+    )?;
+    let mut ingredient =
+        tx.prepare("INSERT OR REPLACE INTO recipe_ingredients (recipe_id, seq, item_id, count) VALUES (?1, ?2, ?3, ?4)")?;
+    for r in recipes {
+        recipe.execute(params![
+            r.id,
+            r.discipline,
+            r.skill_level,
+            r.craft_exp,
+            r.meso_cost as i64,
+            r.output_item_id,
+            r.output_count
+        ])?;
+        for (i, g) in r.ingredients.iter().enumerate() {
+            ingredient.execute(params![r.id, i as i64, g.item_id, g.count])?;
         }
     }
     Ok(())

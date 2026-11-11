@@ -662,6 +662,8 @@ export const mockBackend: Backend = {
     return saved;
   },
   sessionHistory: async () => mockHistory(),
+  itemCrafting: async () => ({ madeBy: [], usedIn: [] }),
+  craftingRecipes: async () => ({ disciplines: [], recipes: [] }),
   levelExp: async () => [
     { level: 20, needed: 6_000 },
     { level: 21, needed: 6_900 },

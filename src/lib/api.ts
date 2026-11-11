@@ -55,6 +55,9 @@ import type {
   PotionSlot,
   SessionPotion,
   LevelExp,
+  ItemCrafting,
+  CraftingPage,
+  CraftingQuery,
   UpdateStatus,
   ItemNote,
   MonsterDrops,
@@ -247,6 +250,10 @@ export interface Backend {
   sessionHistory(): Promise<History>;
   /** The EXP each level takes, as far as the player's HUD has shown it, lowest first. */
   levelExp(): Promise<LevelExp[]>;
+  /** The recipes that make an item and the ones that use it; null without map data. */
+  itemCrafting(id: number): Promise<ItemCrafting | null>;
+  /** The Crafting section's recipes. */
+  craftingRecipes(query: CraftingQuery): Promise<CraftingPage>;
   /** How a saved session's rates moved over time. */
   sessionTimeline(id: number): Promise<SessionTimeline>;
   /** Opens the training log window, or brings it forward. */
@@ -476,6 +483,8 @@ const tauriBackend: Backend = {
   diagnostics: () => invoke("diagnostics"),
   sessionHistory: () => invoke("session_history"),
   levelExp: () => invoke("level_exp"),
+  itemCrafting: (id) => invoke("item_crafting", { id }),
+  craftingRecipes: (query) => invoke("crafting_recipes", { query }),
   sessionTimeline: (id) => invoke("session_timeline", { id }),
   showTraining: () => invoke("show_training"),
   showDesk: () => invoke("show_desk"),

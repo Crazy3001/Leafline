@@ -4,6 +4,7 @@
   import { Check, LoaderCircle, Plus, ScrollText } from "@lucide/svelte";
   import { untrack } from "svelte";
 
+  import ItemCraftingView from "./item/ItemCrafting.svelte";
   import ItemSources from "./item/ItemSources.svelte";
   import Section from "./map/Section.svelte";
   import { backend } from "$lib/api";
@@ -180,6 +181,8 @@
       <p class="note"><span class="spin"><LoaderCircle size={13} /></span> Looking it up…</p>
     {/if}
   </Section>
+
+  <ItemCraftingView id={shown.id} />
 {/if}
 
 <style>

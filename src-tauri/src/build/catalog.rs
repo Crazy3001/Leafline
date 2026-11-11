@@ -9,7 +9,7 @@ use super::fit::ARMOUR;
 use super::plan::Stat;
 use super::rules::Branch;
 use crate::mapdata::drops::item_key;
-use crate::mapdata::osms::{ItemKind, ItemRecord, SkillRecord};
+use crate::mapdata::osms::{ItemKind, ItemRecord, RecipeRecord, SkillRecord};
 
 /// The most gear a search returns.
 const SEARCH_LIMIT: usize = 40;
@@ -308,6 +308,8 @@ pub struct Catalog {
     /// For an item the data holds more than once, every ID it goes by, first one first. See
     /// `copies_of`.
     copies: HashMap<u32, Vec<u32>>,
+    /// Crafting recipes, in the data's order. See `super::crafting`.
+    recipes: Vec<RecipeRecord>,
 }
 
 impl Catalog {
@@ -315,7 +317,17 @@ impl Catalog {
         let skill_index = skills.iter().enumerate().map(|(i, s)| (s.id, i)).collect();
         let item_index = items.iter().enumerate().map(|(i, s)| (s.id, i)).collect();
         let copies = copies_in(&items);
-        Self { skills, items, skill_index, item_index, copies }
+        Self { skills, items, skill_index, item_index, copies, recipes: Vec::new() }
+    }
+
+    /// The same catalog with the crafting recipes that came with the data.
+    pub fn with_recipes(mut self, recipes: Vec<RecipeRecord>) -> Self {
+        self.recipes = recipes;
+        self
+    }
+
+    pub fn recipe_list(&self) -> &[RecipeRecord] {
+        &self.recipes
     }
 
     /// Every ID the item goes by: the data repeats some items under new numbers, such as a

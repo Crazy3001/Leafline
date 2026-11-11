@@ -163,6 +163,8 @@ pub fn run() {
             records::save_image,
             records::session_history,
             records::level_exp,
+            builds::item_crafting,
+            builds::crafting_recipes,
             records::session_timeline,
             records::show_training,
             records::delete_session,

@@ -157,6 +157,9 @@ pub(crate) mod tests {
         "req_classes": ["Magician", "Thief"], "stats": {"reqLevel": 8, "incMAD": 12}},
         {"id": 91, "name": "Moss Scroll", "category": "Consumable", "sub_category": "Scroll", "price": 40,
         "description": "Makes a hat mossier.", "scroll": {"slot": "Other", "tier": "Lesser", "success_rate": 60}}]"#;
+    const RECIPES: &str = r#"[{"id": 1, "discipline": "Whittling", "discipline_skill_id": 1, "output_item_id": 90,
+        "output_count": 1, "req_skill_level": 2, "craft_exp": 5, "meso_cost": 300,
+        "ingredients": [{"item_id": 91, "count": 3}]}]"#;
 
     pub fn fake_osms(maps: &str) -> FakeSource {
         let bodies = [
@@ -166,6 +169,7 @@ pub(crate) mod tests {
             ("quests.json", QUESTS),
             ("skills.json", SKILLS),
             ("items.json", ITEMS),
+            ("recipes.json", RECIPES),
         ];
         let files: Vec<String> = bodies
             .iter()
@@ -197,7 +201,16 @@ pub(crate) mod tests {
         assert_eq!(report.downloaded, FILES);
         assert_eq!(
             source.names(),
-            ["meta.json", "maps.json", "monsters.json", "npcs.json", "quests.json", "skills.json", "items.json"]
+            [
+                "meta.json",
+                "maps.json",
+                "monsters.json",
+                "npcs.json",
+                "quests.json",
+                "skills.json",
+                "items.json",
+                "recipes.json"
+            ]
         );
 
         let status = store.status().unwrap();
@@ -213,6 +226,8 @@ pub(crate) mod tests {
         assert_eq!(data.quests[0].reward_items[0].item_id, 90);
         assert_eq!(data.items[0].classes, ["Magician", "Thief"]);
         assert_eq!(data.items[0].stats[0].value, 12);
+        assert_eq!(data.recipes[0].skill_level, 2);
+        assert_eq!(data.recipes[0].ingredients, [crate::mapdata::osms::Ingredient { item_id: 91, count: 3 }]);
         let scroll = &data.items[1];
         assert_eq!((scroll.price, scroll.description.as_deref()), (Some(40), Some("Makes a hat mossier.")));
         assert_eq!(scroll.scroll.as_ref().unwrap().success_rate, Some(60));
