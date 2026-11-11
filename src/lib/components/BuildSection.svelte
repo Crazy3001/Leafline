@@ -63,6 +63,8 @@
   });
 
   const steps = $derived(plan?.expansion.steps ?? []);
+  /** The Character Stat window has been read, so the plan's stats start from the real ones. */
+  const statsKnown = $derived(plan?.build.start.stats != null);
   const at = $derived(level ?? plan?.build.start.level ?? 0);
   const step = $derived(steps.findLast((s) => s.level <= at) ?? steps[0] ?? null);
   const hasWork = (s: LevelStep) => s.ap.length > 0 || s.sp.length > 0 || s.advance != null;
@@ -330,11 +332,17 @@
     {@render todo(step)}
 
     <h4 class="sub">Your stats by the plan</h4>
+    {#if !statsKnown}
+      <p class="quiet-line">
+        Not read yet, so the plan counts from zero. Open your Character Stat and Skill windows in the game and Leafline reads
+        them, or press Read stats.
+      </p>
+    {/if}
     <dl class="stats">
       {#each STATS as stat (stat.id)}
         <div>
           <dt>{stat.label}</dt>
-          <dd class="tabular">{step.stats[stat.id]}</dd>
+          <dd class="tabular">{statsKnown ? step.stats[stat.id] : "—"}</dd>
         </div>
       {/each}
     </dl>
