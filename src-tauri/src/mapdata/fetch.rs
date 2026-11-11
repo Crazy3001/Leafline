@@ -13,6 +13,9 @@ use super::store::{Download, Store};
 use crate::error::{Error, Result};
 
 pub const OSMS_BASE: &str = "https://osmsdataexplorer.com/data/api/v1/";
+/// Byte-for-byte copies of OSMS's files in Leafline's data repository, refreshed daily. Used only
+/// when OSMS can't be reached or sends something unusable, so a new install still gets map data.
+pub const MIRROR_BASE: &str = "https://raw.githubusercontent.com/Crazy3001/Leafline-data/main/osms/v1/";
 
 /// Without a request from the user, OSMS is asked for changes at most this often.
 pub const CHECK_INTERVAL: i64 = 24 * 60 * 60;
@@ -75,13 +78,24 @@ pub struct RefreshReport {
 
 /// Brings the cache up to date with OSMS. Unless `force`d, does nothing if the last check was
 /// under [`CHECK_INTERVAL`] ago. Every changed file is verified against its checksum and parsed
-/// before any of them is stored.
+/// before any of them is stored. If OSMS fails, the same files are read from Leafline's mirror;
+/// if that fails too, OSMS's error is the one reported.
 pub fn refresh(store: &mut Store, source: &dyn Source, force: bool, now: i64) -> Result<RefreshReport> {
     let ready = store.status()?.ready;
     if !force && ready && store.checked_at()?.is_some_and(|at| now - at < CHECK_INTERVAL) {
         return Ok(RefreshReport::default());
     }
-    let meta: Meta = serde_json::from_slice(&source.get(&format!("{OSMS_BASE}meta.json"))?)
+    match refresh_from(store, source, OSMS_BASE, now) {
+        Ok(report) => Ok(report),
+        Err(err) => {
+            eprintln!("OSMS update failed ({err}); trying Leafline's mirror");
+            refresh_from(store, source, MIRROR_BASE, now).map_err(|_| err)
+        }
+    }
+}
+
+fn refresh_from(store: &mut Store, source: &dyn Source, base: &str, now: i64) -> Result<RefreshReport> {
+    let meta: Meta = serde_json::from_slice(&source.get(&format!("{base}meta.json"))?)
         .map_err(|err| Error::Download(format!("meta.json is not in the expected format: {err}")))?;
     if meta.schema_version != SCHEMA_VERSION {
         return Err(Error::Download(format!(
@@ -96,7 +110,7 @@ pub fn refresh(store: &mut Store, source: &dyn Source, force: bool, now: i64) ->
         if have.get(name).is_some_and(|sha| sha.eq_ignore_ascii_case(&file.sha256)) {
             continue;
         }
-        let body = source.get(&format!("{OSMS_BASE}{name}"))?;
+        let body = source.get(&format!("{base}{name}"))?;
         if !sha256_hex(&body).eq_ignore_ascii_case(&file.sha256) {
             return Err(Error::Download(format!(
                 "{name} did not match its checksum. OSMS may be mid-update; try again in a few minutes."
@@ -282,4 +296,36 @@ pub(crate) mod tests {
             String::from_utf8(meta.clone()).unwrap().replace(r#""schema_version": 1"#, r#""schema_version": 2"#).into();
         assert!(refresh(&mut store, &source, true, 1000).unwrap_err().to_string().contains("schema version 2"));
     }
+
+    /// `fake_osms`'s files served from the mirror instead.
+    fn mirror_only(osms: FakeSource) -> FakeSource {
+        let files = osms.files.into_iter().map(|(url, body)| (url.replace(OSMS_BASE, MIRROR_BASE), body)).collect();
+        FakeSource { files, ..FakeSource::default() }
+    }
+
+    #[test]
+    fn falls_back_to_the_mirror_when_osms_fails() {
+        let source = mirror_only(fake_osms(MAPS));
+        let mut store = Store::open_in_memory().unwrap();
+        let report = refresh(&mut store, &source, false, 1000).unwrap();
+        assert!(report.checked && !report.downloaded.is_empty());
+        assert!(store.status().unwrap().ready);
+        assert!(source.requests.borrow().iter().any(|u| u.starts_with(MIRROR_BASE)));
+    }
+
+    #[test]
+    fn the_mirror_is_left_alone_while_osms_answers() {
+        let source = fake_osms(MAPS);
+        let mut store = Store::open_in_memory().unwrap();
+        refresh(&mut store, &source, false, 1000).unwrap();
+        assert!(source.requests.borrow().iter().all(|u| u.starts_with(OSMS_BASE)));
+    }
+
+    #[test]
+    fn reports_osms_error_when_both_fail() {
+        let mut store = Store::open_in_memory().unwrap();
+        let err = refresh(&mut store, &FakeSource::default(), false, 1000).unwrap_err().to_string();
+        assert!(err.contains(OSMS_BASE), "{err}");
+    }
+
 }
