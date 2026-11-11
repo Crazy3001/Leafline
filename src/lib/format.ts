@@ -110,3 +110,9 @@ export function formatMesos(value: number | null | undefined): string {
 export function attackSpeedName(speed: number): string | null {
   return ({ 3: "Very Fast", 4: "Fast" } as Record<number, string>)[speed] ?? null;
 }
+
+/** The data's attack speed as one line: the name and number where the name is known, else the number. */
+export function attackSpeedText(speed: number): string {
+  const name = attackSpeedName(speed);
+  return name ? `${name} (${speed})` : String(speed);
+}

@@ -12,7 +12,7 @@
   import { backend } from "$lib/api";
   import { formatSigned, titleCase } from "$lib/format";
   import { mapData } from "$lib/mapdata.svelte";
-  import { tooltipOf } from "$lib/items.svelte";
+  import { statRows, tooltipOf } from "$lib/items.svelte";
   import type { ItemRecord, ItemTooltip, MapReading, Requirements } from "$lib/types";
 
   let {
@@ -78,6 +78,12 @@
     };
   });
   const upgraded = $derived(item.upgraded);
+  /** The stats shown: as read, each with the data's value where it differs, and any the read missed. */
+  const stats = $derived(read && matched ? statRows(item, matched) : item.stats.map((s) => ({ ...s, standard: null, fromData: false })));
+  /** Attack speed never changes with scrolls, so once the item is known the data's value is the one
+   * shown (under Attack speed, below) and a line OCR read for it is left out. */
+  const speedKnown = $derived(matched?.attackSpeed != null);
+  const properties = $derived(speedKnown ? item.properties.filter((p) => !/speed/i.test(p.label)) : item.properties);
   /** The data's spelling once the read matched an item: a read can garble letters, or run on
    * into text seen through the tooltip. */
   const name = $derived(matched?.name ?? item.name);
@@ -145,10 +151,10 @@
     <p class="slots tabular">{scrolling.line}</p>
   {/if}
 
-  {#if item.stats.length}
+  {#if stats.length}
     <table class="stats">
       <tbody>
-        {#each item.stats as stat}
+        {#each stats as stat (stat.label)}
           <tr>
             <th>{stat.label}</th>
             <td class="value tabular">{formatSigned(stat.value)}</td>
@@ -156,6 +162,12 @@
               {#if stat.base != null && stat.bonus != null}
                 <span>{stat.base} base</span>
                 <span class="bonus" class:negative={stat.bonus < 0}>{formatSigned(stat.bonus)}</span>
+              {:else if stat.fromData}
+                <span title="Not read from the tooltip: this is the item's own value">item's own</span>
+              {:else if stat.standard != null}
+                <span title="What this item has with no scrolls, from the data. A scroll, a rolled copy or a misread makes it differ.">
+                  item's own {formatSigned(stat.standard)}
+                </span>
               {/if}
             </td>
           </tr>
@@ -164,7 +176,7 @@
     </table>
   {/if}
 
-  {#each item.properties as property}
+  {#each properties as property}
     <p class="property"><span>{property.label}</span>{property.value}</p>
   {/each}
 

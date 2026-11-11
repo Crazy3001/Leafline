@@ -378,7 +378,29 @@ impl Catalog {
         // The longest run of first words that names an item, as in `Iron Ore ushroom Cap A
         // tough iron ore`, where a store's list and the description ran on after the name.
         let words: Vec<&str> = name.split_whitespace().collect();
-        (1..words.len()).rev().find_map(|n| self.item_close_to(&words[..n].join(" "), level, MIN_PREFIX_SCORE))
+        if let Some(item) = (1..words.len()).rev().find_map(|n| self.item_close_to(&words[..n].join(" "), level, MIN_PREFIX_SCORE)) {
+            return Some(item);
+        }
+        self.item_inside(name, level)
+    }
+
+    /// The longest item name that stands whole inside `text`, as words in a row: text seen through
+    /// the tooltip can come before or inside a name as well as after it, as in `ossbow Brown Hard
+    /// Leather Pants`. A name of one word is too short to trust anywhere but at the start, which
+    /// the other passes cover.
+    fn item_inside(&self, text: &str, level: Option<u32>) -> Option<&ItemRecord> {
+        let key = item_key(text);
+        let words: Vec<&str> = key.split_whitespace().collect();
+        self.items
+            .iter()
+            .filter_map(|item| {
+                let name = item_key(&item.name);
+                let held: Vec<&str> = name.split_whitespace().collect();
+                let inside = held.len() >= 2 && held.len() <= words.len() && words.windows(held.len()).any(|run| run == held.as_slice());
+                inside.then_some((name.len(), item))
+            })
+            .max_by(|a, b| a.0.cmp(&b.0).then((Some(a.1.req_level) == level).cmp(&(Some(b.1.req_level) == level))))
+            .map(|(_, item)| item)
     }
 
     fn item_close_to(&self, name: &str, level: Option<u32>, min_score: f64) -> Option<&ItemRecord> {
@@ -706,6 +728,21 @@ pub(crate) mod tests {
         assert_eq!(catalog.item_like("Red Cloth Vest", Some(25)).unwrap().id, 2);
         assert_eq!(catalog.item_like("Rcd Cloth Vest", Some(10)).unwrap().id, 1, "a misread letter");
         assert!(catalog.item_like("Pebble", None).is_none());
+    }
+
+    #[test]
+    fn text_before_or_inside_a_name_does_not_hide_the_item() {
+        let catalog = Catalog::new(
+            Vec::new(),
+            vec![item(1, "Brown Hard Leather Pants", 30, &[]), item(2, "Hard Leather Pants", 10, &[]), item(3, "Pan Lid", 10, &[])],
+        );
+        let id = |read: &str| catalog.item_like(read, None).map(|i| i.id);
+        assert_eq!(id("Brown Hard Leather Pants ossbow"), Some(1), "after it");
+        assert_eq!(id("ossbow Brown Hard Leather Pants"), Some(1), "before it");
+        assert_eq!(id("Eagle Brown Hard Leather Pants (+1) ossbow"), Some(1), "around it, and the longest name wins");
+        assert_eq!(id("Some Hard Leather Pants"), Some(2), "a shorter item stands where the longer one doesn't");
+        assert_eq!(id("The Lid Pan"), None, "words out of order are not a name");
+        assert_eq!(id("Eagle Pan"), None, "half a name is not a name");
     }
 
     #[test]
