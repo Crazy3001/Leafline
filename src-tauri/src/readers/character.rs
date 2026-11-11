@@ -223,7 +223,7 @@ fn stat_labels(view: &Frame) -> Option<[Rect; STAT_LABELS]> {
 
 fn read_stats(view: &Frame, labels: &[Rect; STAT_LABELS]) -> Option<StatWindow> {
     let row = |label: &Rect, top: f32| Rect::new(label.x + VALUE_LEFT, top - 2.0, VALUE_WIDTH, label.h + 4.0);
-    let value = |label: &Rect| number_in(view, row(label, label.y));
+    let value = |label: &Rect| base_in(view, row(label, label.y));
     let [str, dex, int, luk] = labels;
     let (x, y, w, h) = AP_BOX;
     Some(StatWindow {
@@ -236,13 +236,38 @@ fn read_stats(view: &Frame, labels: &[Rect; STAT_LABELS]) -> Option<StatWindow> 
     })
 }
 
+/// How many of `columns` make up the first number: it ends at the first gap wider than the space
+/// between digits.
+fn number_end(columns: &[(u32, u32)]) -> usize {
+    columns.windows(2).position(|pair| pair[1].0 - pair[0].1 > NUMBER_GAP).map_or(columns.len(), |i| i + 1)
+}
+
+/// A stat's own points. With gear on, the window shows the total and then the split, as in
+/// `30 (28+2)`: the plan counts the points put in, and works gear out itself, so this is the 28.
+/// A stat with no bonus is a plain number.
+fn base_in(view: &Frame, area: Rect) -> Option<u32> {
+    let columns = ink_columns(view, area, is_ink);
+    let end = number_end(&columns);
+    // After the total comes the bracket, then the digits of the base, then a `+`. The digits'
+    // height is taken from the first of them, since the brackets run taller.
+    let Some(after) = columns.get(end + 1..).filter(|rest| !rest.is_empty()) else { return number_in(view, area) };
+    let first = Rect::new(after[0].0 as f32, area.y, (after[0].1 - after[0].0) as f32, area.h);
+    let rows = ink_rows(view, first, is_ink)?;
+    let masks: Vec<Mask> = after.iter().map(|&cols| Mask::new(view, cols, rows, is_ink)).collect();
+    digits::window_prefix(&masks)?.parse().ok()
+}
+
 /// The first number in `area`. Anything after a gap is left alone, so a bonus shown beside a
 /// value can't be read into it, but one digit that can't be read leaves it all unread.
 fn number_in(view: &Frame, area: Rect) -> Option<u32> {
-    let rows = ink_rows(view, area, is_ink)?;
     let columns = ink_columns(view, area, is_ink);
-    let end = columns.windows(2).position(|pair| pair[1].0 - pair[0].1 > NUMBER_GAP).map_or(columns.len(), |i| i + 1);
-    let masks: Vec<Mask> = columns[..end].iter().map(|&cols| Mask::new(view, cols, rows, is_ink)).collect();
+    let end = number_end(&columns);
+    let digits = &columns[..end];
+    // The digits' height comes from the digits alone: a bonus bracket beside them, as in
+    // `30 (28+2)`, runs taller and would make every digit read the wrong size.
+    let (left, right) = (digits.first()?.0, digits.last()?.1);
+    let rows = ink_rows(view, Rect::new(left as f32, area.y, (right - left) as f32, area.h), is_ink)?;
+    let masks: Vec<Mask> = digits.iter().map(|&cols| Mask::new(view, cols, rows, is_ink)).collect();
     digits::window_number(&masks)?.parse().ok()
 }
 
@@ -369,6 +394,36 @@ mod tests {
         let mut frame = Frame::from_pixel(120, 40, PAPER);
         draw(&mut frame, 10, 10, &[(SEVEN, 10), (ONE, 0)]);
         assert_eq!(number_in(&frame, Rect::new(4.0, 4.0, 100.0, 30.0)), Some(7));
+    }
+
+    // Made-up marks of the right sizes: brackets run a dot above and below the digits.
+    const OPEN: &[&str] = &["..#", ".#.", "#..", "#..", "#..", "#..", "#..", "#..", "#..", ".#.", "..#"];
+    const CLOSE: &[&str] = &["#..", ".#.", "..#", "..#", "..#", "..#", "..#", "..#", "..#", ".#.", "#.."];
+    const PLUS: &[&str] = &[".....", "..#..", "..#..", "#####", "..#..", "..#..", ".....", ".....", "....."];
+
+    /// `7 (17+7)`: a total, then the points put in, then what gear adds, as the stat window shows it.
+    fn with_a_bonus() -> Frame {
+        let mut frame = Frame::from_pixel(120, 40, PAPER);
+        draw(&mut frame, 10, 10, &[(SEVEN, 10)]);
+        draw(&mut frame, 30, 8, &[(OPEN, 2)]);
+        draw(&mut frame, 38, 10, &[(ONE, 8), (SEVEN, 4), (PLUS, 4), (SEVEN, 4)]);
+        draw(&mut frame, 94, 8, &[(CLOSE, 0)]);
+        frame
+    }
+
+    #[test]
+    fn a_bonus_in_brackets_does_not_make_the_total_unreadable_and_the_points_put_in_are_what_counts() {
+        let area = Rect::new(4.0, 4.0, 110.0, 30.0);
+        // The bracket is taller than the digits, which used to make the total unreadable.
+        assert_eq!(number_in(&with_a_bonus(), area), Some(7));
+        assert_eq!(base_in(&with_a_bonus(), area), Some(17), "the 17, not the total 7 or the bonus");
+    }
+
+    #[test]
+    fn a_stat_with_no_gear_is_one_plain_number() {
+        let mut frame = Frame::from_pixel(120, 40, PAPER);
+        draw(&mut frame, 10, 10, &[(ONE, 8), (SEVEN, 0)]);
+        assert_eq!(base_in(&frame, Rect::new(4.0, 4.0, 110.0, 30.0)), Some(17));
     }
 
     #[test]
