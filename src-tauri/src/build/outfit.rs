@@ -9,7 +9,7 @@ use super::catalog::{Catalog, novelty};
 use super::fit::ARMOUR;
 use super::plan::{Build, Expansion, GearCheck, MAX_LEVEL, Piece, Stats, piece_bonus};
 use super::rules::Rules;
-use super::suggest::{Scorer, Wearer, suggest};
+use super::suggest::{Score, Scorer, Wearer, suggest};
 use crate::mapdata::osms::ItemRecord;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -121,19 +121,24 @@ pub fn outfit(build: &Build, expansion: &Expansion, rules: &Rules, catalog: &Cat
         let is_worn = |item: &ItemRecord| worn.as_ref().is_some_and(|p| p.is_copy_of(item, catalog));
         let worn_level = worn.as_ref().map_or(0, |p| p.req_level(catalog));
         let worn_score = worn.as_ref().map(|p| scorer.score(&p.data_stats(catalog)));
+        // A goal still ahead has to ask more than what is worn: a higher level, or the same level
+        // and better stats, as the Green Jack Boots are to the Brown ones.
+        let beyond = |item: &ItemRecord| {
+            item.req_level > worn_level || (item.req_level == worn_level && worn_score.is_some_and(|w| scorer.of(item) > w))
+        };
 
         // Goals still ahead: not what is worn, nor older than it, in the order the plan wears them.
         let mut ahead: Vec<&GearCheck> = expansion
             .gear
             .iter()
-            .filter(|g| g.item.slot == slot && g.usable && !is_worn(&g.item) && g.item.req_level > worn_level)
+            .filter(|g| g.item.slot == slot && g.usable && !is_worn(&g.item) && beyond(&g.item))
             .collect();
         ahead.sort_by_key(|g| (g.level.unwrap_or(u32::MAX), g.item.req_level));
         let (ready, waiting): (Vec<&GearCheck>, Vec<&GearCheck>) =
             ahead.into_iter().partition(|g| g.level.is_some_and(|at| at <= level));
         // A goal the plan chose counts as long as it is no worse; the gear finder's pick must beat.
-        let no_worse = |item: &ItemRecord, than: Option<(i64, i64)>| than.is_none_or(|f| scorer.of(item) >= f);
-        let beats = |item: &ItemRecord, than: Option<(i64, i64)>| than.is_none_or(|f| scorer.of(item) > f);
+        let no_worse = |item: &ItemRecord, than: Option<Score>| than.is_none_or(|f| scorer.of(item) >= f);
+        let beats = |item: &ItemRecord, than: Option<Score>| than.is_none_or(|f| scorer.of(item) > f);
 
         // Suggested: the best piece wearable now that beats what is worn. A goal in reach, unless
         // the gear finder's pick scores higher.
@@ -210,7 +215,7 @@ pub fn outfit(build: &Build, expansion: &Expansion, rules: &Rules, catalog: &Cat
 /// that level. Of several at the same level, the best. Weapons only of the kinds the job trains in.
 fn coming_up<'a>(
     slot: &str,
-    floor: Option<(i64, i64)>,
+    floor: Option<Score>,
     worn: Option<&Piece>,
     wearers: &[(u32, Wearer)],
     trained: &[String],
@@ -495,6 +500,38 @@ mod tests {
             let paths = fill_paths(&build, &e, &Rules::default(), &catalog, 20);
             assert!(paths.iter().all(|(slot, _)| slot != "Hat"), "nor a filled-in upgrade");
         }
+    }
+
+    #[test]
+    fn a_goal_of_the_same_level_stays_when_it_is_better_and_goes_when_it_is_not() {
+        let mut items = vec![dagger(1, "Worn Dagger", 25, 30), dagger(2, "Better Dagger", 25, 33), dagger(3, "Worse Dagger", 25, 28)];
+        items.push(dagger(4, "Younger Dagger", 20, 20));
+        let catalog = Catalog::new(Vec::new(), items);
+        let build = bandit(25, vec![2, 3, 4], vec![worn(1, &catalog)]);
+        let e = expand(&build, &Rules::default(), &catalog);
+        let kept: Vec<&str> = e.gear.iter().map(|g| g.item.name.as_str()).collect();
+        assert_eq!(kept, ["Better Dagger"], "the same level and better stays; worse, and a lower level, are outgrown");
+        let weapon = at(&build, &catalog, 25).slots.into_iter().find(|s| s.slot == "Weapon").unwrap();
+        assert_eq!(weapon.suggested.map(|i| i.name), Some("Better Dagger".into()));
+    }
+
+    #[test]
+    fn earrings_are_told_apart_by_crit_and_defence_not_all_tied() {
+        let earring = |id, name: &str, level, magic_def, crit| {
+            with(item(id, name, level, &[]), "Earring", &[("Magic Def.", magic_def), ("Crit. Damage", crit)])
+        };
+        let catalog = Catalog::new(Vec::new(), vec![earring(1, "Yellow Square", 20, 22, 1), earring(2, "Emerald", 30, 27, 2), earring(3, "Cat's Eye", 35, 30, 2)]);
+        // As a tooltip spelled it: the worn one's crit is `Critical Damage`, which counts all the same.
+        let worn = Piece {
+            id: 1,
+            stats: vec![PieceStat { label: "Magic Def.".into(), value: 22 }, PieceStat { label: "Critical Damage".into(), value: 1 }],
+            ..Piece::of_item(catalog.item(1).unwrap())
+        };
+        let build = bandit(33, Vec::new(), vec![worn]);
+        let outfit = at(&build, &catalog, 33);
+        let row = slot(&outfit, "Earring");
+        assert_eq!(row.suggested.as_ref().map(|i| i.name.as_str()), Some("Emerald"), "wearable now and better");
+        assert_eq!(row.next.as_ref().map(|n| (n.item.name.as_str(), n.level)), Some(("Cat's Eye", Some(35))));
     }
 
     #[test]

@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use super::catalog::{Catalog, path_of, tier_of, usable_by};
 use super::rules::{Branch, Rules};
+use super::suggest::Scorer;
 use crate::mapdata::drops::item_key;
 use crate::mapdata::osms::ItemRecord;
 
@@ -625,6 +626,7 @@ fn check_gear(
     steps: &mut [LevelStep],
     problems: &mut Vec<Problem>,
 ) -> Vec<GearCheck> {
+    let scorer = Scorer::new(build);
     let mut gear = Vec::with_capacity(build.plan.gear.len());
     for &id in &build.plan.gear {
         let Some(item) = catalog.item(id) else {
@@ -632,10 +634,15 @@ fn check_gear(
             continue;
         };
         // A goal already worn is done: it isn't new gear to look for, scrolled or not. Nor is one
-        // that asks no more than what is worn in its slot: the character has outgrown it.
+        // the character has outgrown: lower level than what is worn in its slot, or the same level
+        // and no better.
         let slot = &item.slot;
         let outgrown = |piece: &Piece| {
-            piece.is_copy_of(item, catalog) || (Piece::clashes(&piece.slot(catalog), slot) && item.req_level <= piece.req_level(catalog))
+            let level = piece.req_level(catalog);
+            piece.is_copy_of(item, catalog)
+                || (Piece::clashes(&piece.slot(catalog), slot)
+                    && (item.req_level < level
+                        || (item.req_level == level && scorer.of(item) <= scorer.score(&piece.data_stats(catalog)))))
         };
         if build.start.pieces.iter().any(outgrown) {
             continue;

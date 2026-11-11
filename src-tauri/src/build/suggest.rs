@@ -144,6 +144,9 @@ fn weighted_stats(build: &Build) -> Vec<(Stat, i64)> {
     weights
 }
 
+/// How well a piece does for a build, compared tier by tier: see [`Scorer::score`].
+pub type Score = (i64, i64, i64);
+
 /// How the gear finder weighs gear for a build.
 pub struct Scorer {
     weights: Vec<(Stat, i64)>,
@@ -158,15 +161,23 @@ impl Scorer {
         Self { weights: weighted_stats(build), attack, defence }
     }
 
-    /// Attack and the stats the plan raises, then defence, from stats as the item data names
-    /// them. Higher is better.
-    pub fn score(&self, stats: &[(String, i64)]) -> (i64, i64) {
+    /// Attack and the stats the plan raises, then defence, then the lesser stats: crit, accuracy
+    /// and the other kind of defence, which is all an earring or a cape has to tell them apart.
+    /// From stats as the item data names them, or a tooltip: `Crit. Rate` and `Critical Rate`
+    /// both count. Higher is better.
+    pub fn score(&self, stats: &[(String, i64)]) -> Score {
         let stat = |label: &str| stats.iter().filter(|(l, _)| l == label).map(|(_, v)| v).sum::<i64>();
         let raised: i64 = self.weights.iter().map(|(s, weight)| stat(s.label()) * weight).sum();
-        (stat(self.attack) * ATTACK_WEIGHT + raised, stat(self.defence))
+        let other_defence = if self.defence == "Magic Def." { "Weapon Def." } else { "Magic Def." };
+        let lesser: i64 = stats
+            .iter()
+            .filter(|(l, _)| l.starts_with("Crit") || l == "Accuracy" || l == other_defence)
+            .map(|(_, v)| v)
+            .sum();
+        (stat(self.attack) * ATTACK_WEIGHT + raised, stat(self.defence), lesser)
     }
 
-    pub fn of(&self, item: &ItemRecord) -> (i64, i64) {
+    pub fn of(&self, item: &ItemRecord) -> Score {
         self.score(&item.stats.iter().map(|s| (s.label.clone(), s.value)).collect::<Vec<_>>())
     }
 
@@ -220,8 +231,8 @@ fn ranked(build: &Build, expansion: &Expansion, rules: &Rules, catalog: &Catalog
     let scorer = Scorer::new(build);
     let trained = catalog.weapons_of_branch(build.plan.job);
     let score = |item: &ItemRecord| {
-        let (main, defence) = scorer.of(item);
-        (main, defence, item.req_level)
+        let (main, defence, lesser) = scorer.of(item);
+        (main, defence, lesser, item.req_level)
     };
 
     let mut slots = Vec::new();
