@@ -211,8 +211,14 @@ pub fn outfit(build: &Build, expansion: &Expansion, rules: &Rules, catalog: &Cat
     outfit
 }
 
-/// The first piece for `slot` that a later level can wear and that scores above `floor`, with
-/// that level. Of several at the same level, the best. Weapons only of the kinds the job trains in.
+/// How many levels past the first step up are looked at for a better one. A piece worn for a
+/// level or two before the next arrives isn't worth naming as the next step.
+const NEXT_WINDOW: u32 = 5;
+
+/// The next step up for `slot` that a later level can wear and that scores above `floor`, with the
+/// level it first can be worn: the best piece within `NEXT_WINDOW` levels of the first one that
+/// beats what is worn. Of several of a score, the lowest level. Weapons only of the kinds the job
+/// trains in.
 fn coming_up<'a>(
     slot: &str,
     floor: Option<Score>,
@@ -228,10 +234,20 @@ fn coming_up<'a>(
         .filter(|i| trained.is_empty() || i.weapon_type.as_ref().is_none_or(|w| trained.contains(w)))
         .filter(|i| floor.is_none_or(|f| scorer.of(i) > f))
         .collect();
-    wearers.iter().find_map(|(at, wearer)| {
+    let mut best: Option<(&ItemRecord, u32)> = None;
+    let mut first_at = None;
+    for (at, wearer) in wearers {
+        if first_at.is_some_and(|first| *at > first + NEXT_WINDOW) {
+            break;
+        }
         let wearable = better.iter().filter(|i| wearer.can_wear(i));
-        wearable.max_by_key(|i| (scorer.of(i), std::cmp::Reverse(i.req_level))).map(|i| (*i, *at))
-    })
+        let Some(item) = wearable.max_by_key(|i| (scorer.of(i), std::cmp::Reverse(i.req_level))) else { continue };
+        first_at.get_or_insert(*at);
+        if best.is_none_or(|(held, _)| scorer.of(item) > scorer.of(held)) {
+            best = Some((*item, *at));
+        }
+    }
+    best
 }
 
 /// How far apart the levels a filled-in path looks at are.
@@ -426,11 +442,12 @@ mod tests {
     #[test]
     fn with_no_goal_next_is_the_first_better_piece_a_later_level_can_wear() {
         let catalog = catalog();
-        // Wearing the Lv 10 dagger, with no goals: the next better dagger comes at Lv 15.
+        // Wearing the Lv 10 dagger, with no goals: the first better dagger comes at Lv 15, but the
+        // Coconut Knife follows five levels later, and that is the step worth naming.
         let build = bandit(10, vec![], vec![worn(1, &catalog)]);
         let weapon = slot(&at(&build, &catalog, 10), "Weapon").clone();
         assert_eq!(weapon.suggested, None, "nothing better to wear yet");
-        assert_eq!(weapon.next.as_ref().map(|n| (n.item.name.as_str(), n.level)), Some(("Field Dagger", Some(15))));
+        assert_eq!(weapon.next.as_ref().map(|n| (n.item.name.as_str(), n.level)), Some(("Coconut Knife", Some(20))));
         assert!(!weapon.planned);
 
         // At Lv 22 the Coconut Knife can be worn: it is suggested, and Next is the one after it.
@@ -503,6 +520,21 @@ mod tests {
     }
 
     #[test]
+    fn next_skips_a_piece_a_better_one_replaces_within_a_few_levels() {
+        // Shoes worn at Lv 10; a step up at Lv 40, a better one at Lv 41, a far better one at Lv 60.
+        let shoes = |id, name: &str, level, def| with(item(id, name, level, &[]), "Shoes", &[("Weapon Def.", def)]);
+        let catalog = Catalog::new(
+            Vec::new(),
+            vec![shoes(1, "Old Shoes", 10, 5), shoes(2, "Pierre", 40, 22), shoes(3, "Better", 41, 26), shoes(4, "Far Off", 60, 40)],
+        );
+        let mut build = bandit(10, Vec::new(), vec![worn(1, &catalog)]);
+        build.plan.plan_to = 70;
+        let outfit = at(&build, &catalog, 10);
+        let next = slot(&outfit, "Shoes").next.as_ref().map(|n| (n.item.name.as_str(), n.level));
+        assert_eq!(next, Some(("Better", Some(41))), "not the Lv 40 pair worn for one level, and not the one 20 levels off");
+    }
+
+    #[test]
     fn a_goal_of_the_same_level_stays_when_it_is_better_and_goes_when_it_is_not() {
         let mut items = vec![dagger(1, "Worn Dagger", 25, 30), dagger(2, "Better Dagger", 25, 33), dagger(3, "Worse Dagger", 25, 28)];
         items.push(dagger(4, "Younger Dagger", 20, 20));
@@ -538,11 +570,11 @@ mod tests {
     fn next_is_the_nearest_step_up_even_when_the_plan_only_names_a_later_one() {
         let catalog = catalog();
         // The plan aims for the Iron Dagger (Lv 25), but a better dagger than the worn Old Dagger
-        // is wearable at Lv 15: that is what comes next, and the goal still follows it.
+        // is wearable at Lv 20: that is what comes next, and the goal still follows it.
         let build = bandit(10, vec![4], vec![worn(1, &catalog)]);
         let outfit = at(&build, &catalog, 10);
         let weapon = slot(&outfit, "Weapon");
-        assert_eq!(weapon.next.as_ref().map(|n| (n.item.name.as_str(), n.level)), Some(("Field Dagger", Some(15))));
+        assert_eq!(weapon.next.as_ref().map(|n| (n.item.name.as_str(), n.level)), Some(("Coconut Knife", Some(20))));
         assert!(!weapon.planned, "it isn't one of the plan's goals");
         assert_eq!(weapon.later, 1, "the Iron Dagger is planned after it");
         // When the plan's goal is the nearest, it stays the one shown.
