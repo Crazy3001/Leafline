@@ -6,7 +6,7 @@
   import Card from "./Card.svelte";
   import QuestSteps from "./quest/QuestSteps.svelte";
   import { backend } from "$lib/api";
-  import { OSMS_CREDIT, OSMS_URL, WIKI_CREDIT, WIKI_URL } from "$lib/mapdata.svelte";
+  import { DROPS_CREDIT, DROPS_URL, OSMS_CREDIT, OSMS_URL } from "$lib/mapdata.svelte";
   import { follow, isFollowed, unfollow } from "$lib/quests.svelte";
   import type { MapReading, QuestWhere } from "$lib/types";
 
@@ -58,7 +58,7 @@
 
     <p class="credit">
       <button onclick={() => backend.openLink(OSMS_URL)}>{OSMS_CREDIT}</button>
-      <button onclick={() => backend.openLink(WIKI_URL)}>{WIKI_CREDIT}</button>
+      <button onclick={() => backend.openLink(DROPS_URL)}>{DROPS_CREDIT}</button>
     </p>
   {:else if error}
     <p class="note">{error}</p>

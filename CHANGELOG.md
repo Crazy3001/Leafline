@@ -33,6 +33,17 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
   through monster HP in your own solo play, near your level, and held to how many monsters the
   map can bring back in an hour. Each estimate shows how sure it is and why. The respawn time
   behind that limit is an assumption you can change under **Assumptions**.
+- **Quest turn-ins** now come from the game's own quest data instead of mapleclassic.wiki, which
+  stopped answering programs on 2026-11-11. Leafline names who takes a quest in on 333 of 343
+  quests, up from 287.
+- **Monster drops** now come from Leafline's own drop list, built from the game's item text,
+  StrategyWiki and players' reports, instead of the wiki's table. It covers every common monster's
+  etc drops, shared drops like Leather and ores included, but has no rates: it says who drops
+  what, not how often. Drops are checked for updates once a day, without needing a download first.
+
+### Fixed
+- When a download failed, every lookup tried again at once. Leafline now waits a day, unless you
+  press a download button.
 
 ## 0.1.1 (2026-11-10)
 

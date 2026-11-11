@@ -1,9 +1,9 @@
 <script lang="ts">
-  // What players logged a monster dropping on mapleclassic.wiki. Most monsters have little or
-  // nothing logged so far, so an empty list says so plainly.
+  // What a monster is known to drop, from Leafline's drop list: presence only, so rates show only
+  // where a drop has one. An empty list says so plainly.
   import { backend } from "$lib/api";
   import { showItemNamed } from "$lib/items.svelte";
-  import { WIKI_CREDIT, WIKI_URL } from "$lib/mapdata.svelte";
+  import { DROPS_CREDIT, DROPS_URL } from "$lib/mapdata.svelte";
   import type { MonsterDrops } from "$lib/types";
 
   type Drop = MonsterDrops["drops"][number];
@@ -17,7 +17,7 @@
   const few = $derived(drops?.sampleKills != null && drops.sampleKills < FEW_KILLS ? drops.sampleKills : null);
 
   function percent(value: number | null) {
-    if (value == null) return "?";
+    if (value == null) return "";
     return value >= 10 ? `${value.toFixed(0)}%` : `${value.toFixed(1)}%`;
   }
 
@@ -56,11 +56,11 @@
     <p class="few">Only {few} kills logged, so rarer drops, such as most equips and potions, may not show up yet.</p>
   {/if}
   <p class="credit">
-    Rates are what players saw, not the game's tables; small samples can be far off. "?" means listed but not measured.
-    <button onclick={() => backend.openLink(WIKI_URL)}>{WIKI_CREDIT}</button>
+    Known drops, without rates.
+    <button onclick={() => backend.openLink(DROPS_URL)}>{DROPS_CREDIT}</button>
   </p>
 {:else if drops}
-  <p class="note">Nothing logged for {name} yet. The wiki's drop table is small so far.</p>
+  <p class="note">No known drops for {name} yet.</p>
 {:else}
   <p class="note">The drop table isn't downloaded yet.</p>
 {/if}

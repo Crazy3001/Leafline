@@ -43,12 +43,12 @@
   });
 
   function rate(value: number | null) {
-    if (value == null) return "rate not logged";
+    if (value == null) return "";
     return `${value >= 10 ? value.toFixed(0) : value.toFixed(1)}%`;
   }
 
   function rateTitle(drop: NonNullable<ObjectiveGuide["hunts"][number]["drop"]>) {
-    const parts = ["Player-observed drop rate from mapleclassic.wiki"];
+    const parts = ["Drop rate players measured"];
     if (drop.sampleKills) parts.push(`over ${drop.sampleKills.toLocaleString()} kills`);
     if (drop.gameVersion) parts.push(`(v${drop.gameVersion})`);
     if (drop.rateLow != null && drop.rateHigh != null) parts.push(`· likely ${drop.rateLow.toFixed(1)}–${drop.rateHigh.toFixed(1)}%`);
@@ -65,7 +65,7 @@
       <span class="line">
         {#if guide.kind === "item"}
           <span class="who">{top.monster.name}</span>
-          {#if top.drop}<span class="muted" title={rateTitle(top.drop)}>{rate(top.drop.rate)}</span>{/if}
+          {#if top.drop?.rate != null}<span class="muted" title={rateTitle(top.drop)}>{rate(top.drop.rate)}</span>{/if}
           <span class="sep">·</span>
         {/if}
         <span class="where">{best.map.name}</span>
@@ -87,7 +87,7 @@
           <div class="mob">
             <button class="ref ref-mob" onclick={() => showMonsterNamed(hunt.monster.name)}>{hunt.monster.name}</button>
             <span class="muted">Lv {hunt.monster.level}{hunt.monster.boss ? " · boss" : ""}</span>
-            {#if hunt.drop}
+            {#if hunt.drop?.rate != null}
               <span class="rate" title={rateTitle(hunt.drop)}>{rate(hunt.drop.rate)} drop</span>
             {/if}
           </div>
@@ -117,7 +117,7 @@
       {/each}
       {#each guide.hunts.filter((h) => !h.monster.known) as hunt (hunt.monster.name)}
         <p class="note">
-          {hunt.monster.name}{#if hunt.drop}<span title={rateTitle(hunt.drop)}> ({rate(hunt.drop.rate)})</span>{/if} also drops
+          {hunt.monster.name}{#if hunt.drop?.rate != null}<span title={rateTitle(hunt.drop)}> ({rate(hunt.drop.rate)})</span>{/if} also drops
           it, but isn't in the map data.
         </p>
       {/each}
@@ -136,7 +136,7 @@
     Dropped by {guide.hunts.map((h) => h.monster.name).join(", ")}, not found in the map data.
   </p>
 {:else if guide.kind === "item" && guide.lookedUp}
-  <p class="hint quiet">No monster drops logged on mapleclassic.wiki.</p>
+  <p class="hint quiet">No known monster drops for this item.</p>
 {:else if guide.kind === "monster"}
   <p class="hint quiet">Not found spawning on any map in the data.</p>
 {/if}

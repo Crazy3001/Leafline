@@ -6,7 +6,10 @@ import type { MapDataStatus } from "./types";
 
 export const OSMS_CREDIT = "Data from OSMS Data Explorer (https://osmsdataexplorer.com), CC BY 4.0";
 export const OSMS_URL = "https://osmsdataexplorer.com";
-export const WIKI_CREDIT = "Player-observed drops from mapleclassic.wiki, CC BY-NC-SA 4.0";
+// Monster drops come from the game's item text, StrategyWiki and players' reports. StrategyWiki's
+// licence asks for this credit wherever they show.
+export const DROPS_CREDIT = "Drops: the game's item text, StrategyWiki (CC BY-SA 4.0) and players' reports";
+export const DROPS_URL = "https://strategywiki.org/wiki/MapleStory/Drops_(Victoria_Island)";
 export const WIKI_URL = "https://mapleclassic.wiki";
 
 export const mapData = $state<{

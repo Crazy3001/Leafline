@@ -11,7 +11,7 @@
   import { buildState, watchBuilds } from "$lib/builds.svelte";
   import { attackSpeedName, formatMesos } from "$lib/format";
   import { blankQuery, itemView } from "$lib/items.svelte";
-  import { OSMS_CREDIT, OSMS_URL, WIKI_CREDIT, WIKI_URL, mapData } from "$lib/mapdata.svelte";
+  import { DROPS_CREDIT, DROPS_URL, OSMS_CREDIT, OSMS_URL, mapData } from "$lib/mapdata.svelte";
   import { showNpcNamed } from "$lib/places.svelte";
   import { live } from "$lib/readings.svelte";
   import type { GearPiece, ItemRecord, ItemTooltip, ItemWhere, MapReading } from "$lib/types";
@@ -172,7 +172,7 @@
     {#if found}
       <ItemSources {found} />
       <p class="credit">
-        <button onclick={() => backend.openLink(WIKI_URL)}>{WIKI_CREDIT}</button>
+        <button onclick={() => backend.openLink(DROPS_URL)}>{DROPS_CREDIT}</button>
         <button onclick={() => backend.openLink(OSMS_URL)}>{OSMS_CREDIT}</button>
       </p>
     {:else if error}

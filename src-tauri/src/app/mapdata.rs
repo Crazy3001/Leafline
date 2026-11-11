@@ -70,7 +70,7 @@ pub struct MapDataState {
     catalog: RwLock<Option<Arc<Catalog>>>,
     downloading: AtomicBool,
     osms: Http,
-    /// Shared so every wiki request keeps to its one-a-second pace.
+    /// Shared so every wiki request (travel) keeps to its one-a-second pace.
     wiki: Http,
     /// One drop table download at a time; whoever waits then finds the table fresh.
     drops_refresh: Mutex<()>,
@@ -152,7 +152,7 @@ impl MapDataState {
 
     fn refresh_drops(&self) -> Result<()> {
         let _turn = self.drops_refresh.lock().expect("drops refresh lock");
-        drops::refresh(&mut Store::open(&self.path)?, &self.wiki, now())
+        drops::refresh(&mut Store::open(&self.path)?, &self.osms, now())
     }
 
     /// Forgets a failed download (see [`drops::RETRY_AFTER`]), so the next refresh asks at
@@ -163,9 +163,8 @@ impl MapDataState {
 }
 
 /// Once the user has downloaded map data, checks OSMS for changes in the background, at most
-/// once a day, renews the turn-in table once it is a day old, and the drop table too if it was
-/// ever downloaded. An update of Leafline that replaced the cache gets back what the user had
-/// the same way.
+/// once a day, and renews the turn-in table and drop list once they are a day old. An update of
+/// Leafline that replaced the cache gets back what the user had the same way.
 pub fn check_for_updates(app: &AppHandle) {
     let state = app.state::<MapDataState>();
     let wanted = Store::open(&state.path).and_then(|s| s.wants_maps()).unwrap_or(false);
@@ -192,8 +191,7 @@ pub fn check_for_updates(app: &AppHandle) {
         if let Err(err) = state.refresh_shops() {
             eprintln!("shop file download failed: {err}");
         }
-        let has_drops = Store::open(&state.path).and_then(|s| s.wants_drops()).unwrap_or(false);
-        if has_drops && let Err(err) = state.refresh_drops() {
+        if let Err(err) = state.refresh_drops() {
             eprintln!("drop table update failed: {err}");
         }
     });
@@ -636,7 +634,7 @@ pub fn show_place(app: AppHandle, mode: String, id: u32) -> Result<()> {
     Ok(app.emit(SHOW_PLACE_EVENT, PlaceLink { mode, id })?)
 }
 
-/// Downloads the drop table from mapleclassic.wiki if there is none or it is over a week old.
+/// Downloads Leafline's drop list if there is none or it is over a day old.
 /// `retry` is set when the player pressed a button for it, so a download that failed recently is
 /// tried again; panels that ask on their own leave it unset and wait out the back-off.
 #[tauri::command]

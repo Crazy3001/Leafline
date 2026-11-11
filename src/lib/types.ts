@@ -622,7 +622,7 @@ export interface TravelChoice {
   scrolls: boolean;
 }
 
-/** Drops players logged on mapleclassic.wiki. */
+/** A monster's known drops, from Leafline's drop list. */
 export interface MonsterDrops {
   monster: string;
   sampleKills: number | null;
@@ -677,7 +677,7 @@ export interface Pace {
 
 export interface Hunt {
   monster: { name: string; known: boolean; level: number; hp: number; exp: number; boss: boolean };
-  /** For an item: how often players saw this monster drop it (mapleclassic.wiki). */
+  /** For an item: that this monster drops it, with a rate where one is known. */
   drop: {
     rate: number | null;
     rateLow: number | null;
@@ -693,9 +693,9 @@ export interface Hunt {
 export interface ObjectiveGuide {
   target: string;
   kind: "monster" | "item";
-  /** The wiki's name for an item, once looked up and found. */
+  /** The drop list's name for an item, once looked up and found. */
   item: string | null;
-  /** Whether the wiki has been asked who drops this item. */
+  /** Whether the drop list has been searched for who drops this item. */
   lookedUp: boolean;
   hunts: Hunt[];
 }

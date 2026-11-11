@@ -148,7 +148,7 @@ Most misreads come from game settings: **UI Size: Ideal Ratio**, **HDR off** (re
 [Open an issue](https://github.com/Crazy3001/Leafline/issues). **Settings → Feedback → Bug report details → Copy** copies what Leafline knows about its own state, with no character names, chat or file paths. A picture helps too: **Save frame** on the overlay saves the last picture Leafline read. It shows your game, so only post it if you're happy to share it.
 
 ### Where's the data from?
-Map, monster, NPC, quest, skill and item facts come from OSMS Data Explorer, and player-seen drops and quest turn-ins from mapleclassic.wiki. See [Data and credits](#data-and-credits). Few monsters have drops logged on the wiki so far, so many show none yet.
+Map, monster, NPC, quest, skill and item facts come from OSMS Data Explorer. Quest turn-ins and monster drops come from Leafline's own data files: turn-ins as the game itself records them, drops from the game's item text, StrategyWiki and players' reports. See [Data and credits](#data-and-credits). The drop list covers etc items without rates, so it says who drops what, not how often.
 
 ## How to help
 
@@ -156,7 +156,7 @@ Leafline is built in the open, and what players send in decides what gets fixed 
 
 - **Report what reads wrong.** [Open a bug report](https://github.com/Crazy3001/Leafline/issues/new?template=bug_report.yml) with **Settings → Feedback → Bug report details → Copy**. A saved frame of the misread (**Save frame**) is the single most useful thing you can send, since every reading fix so far started from one.
 - **Suggest what it should do.** [Share an idea](https://github.com/Crazy3001/Leafline/issues/new?template=idea.yml): something you look up mid-game, or a number you wish you could see.
-- **Add the drops you see to [mapleclassic.wiki](https://mapleclassic.wiki).** Leafline downloads its drop lists, so every drop you add there shows up for every player.
+- **Send in the drops you see.** [Share them as an idea](https://github.com/Crazy3001/Leafline/issues/new?template=idea.yml) ("Ribbon Pig: Leather"). Leafline's drop list is partly built from players' reports, so every drop you send shows up for every player.
 - **Tell other players about it,** and star the repository if it helps you. That also helps Leafline qualify for free code signing, which gets rid of the Windows warning.
 - **Write code.** [DEVELOPMENT.md](DEVELOPMENT.md) explains how to build it and how it works inside.
 
@@ -180,7 +180,8 @@ This is an early release, and these are the rough edges known so far. Please [re
 Leafline ships no game data. It downloads community data on your PC when you ask, keeps it in a local cache, and credits it in the app:
 
 - Map, monster, NPC, quest, skill and equipment data: [OSMS Data Explorer](https://osmsdataexplorer.com), CC BY 4.0.
-- Player-observed drops, quest turn-ins, taxi routes and return scrolls: [mapleclassic.wiki](https://mapleclassic.wiki) contributors, CC BY-NC-SA 4.0.
+- Monster drops: built for Leafline from the game's item text, [StrategyWiki](https://strategywiki.org/wiki/MapleStory/Drops_(Victoria_Island)) contributors (CC BY-SA 4.0) and players' reports.
+- Taxi routes and return scrolls: [mapleclassic.wiki](https://mapleclassic.wiki) contributors, CC BY-NC-SA 4.0.
 
 Game content belongs to Nexon. Leafline is unofficial and not affiliated with or endorsed by Nexon.
 
@@ -193,7 +194,7 @@ Until then, a download is genuine if it comes from this repository's [Releases](
 - Committers and reviewers: [Crazy3001](https://github.com/Crazy3001)
 - Release approvers: [Crazy3001](https://github.com/Crazy3001)
 
-**Privacy policy:** this program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it. In detail: it downloads the community data from [OSMS Data Explorer](https://osmsdataexplorer.com) and [mapleclassic.wiki](https://mapleclassic.wiki) when you ask (then refreshes it weekly), and asks GitHub for the latest version number only if you turn the update check on. Nothing read from the game, and none of your records, is ever sent anywhere. See [Privacy](#privacy).
+**Privacy policy:** this program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it. In detail: it downloads the community data from [OSMS Data Explorer](https://osmsdataexplorer.com) and [mapleclassic.wiki](https://mapleclassic.wiki), and Leafline's own data files from GitHub, when you ask (then checks them for changes once a day), and asks GitHub for the latest version number only if you turn the update check on. Nothing read from the game, and none of your records, is ever sent anywhere. See [Privacy](#privacy).
 
 ## Building from source
 

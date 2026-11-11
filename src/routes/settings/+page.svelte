@@ -25,7 +25,7 @@
   import Logo from "$lib/components/Logo.svelte";
   import DataSources from "$lib/components/DataSources.svelte";
   import { IDEA_URL, reportUrl } from "$lib/feedback";
-  import { OSMS_URL, WIKI_URL } from "$lib/mapdata.svelte";
+  import { DROPS_URL, OSMS_URL, WIKI_URL } from "$lib/mapdata.svelte";
   import { live, watchLive } from "$lib/readings.svelte";
   import { changeSettings, display, hotkey, keyHint, keyName, usesNumpad, watchSettings } from "$lib/settings.svelte";
   import { watchTyping } from "$lib/typing";
@@ -317,7 +317,13 @@
       url: OSMS_URL,
     },
     {
-      what: "Player-observed drop rates, taxi routes and return scrolls",
+      what: "Monster drops",
+      who: "StrategyWiki contributors",
+      licence: "CC BY-SA 4.0",
+      url: DROPS_URL,
+    },
+    {
+      what: "Taxi routes and return scrolls",
       who: "mapleclassic.wiki contributors",
       licence: "CC BY-NC-SA 4.0",
       url: WIKI_URL,

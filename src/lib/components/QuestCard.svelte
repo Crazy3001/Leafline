@@ -13,7 +13,7 @@
   import { showItemNamed } from "$lib/items.svelte";
   import { showMonsterNamed } from "$lib/monsters.svelte";
   import { showNpcNamed } from "$lib/places.svelte";
-  import { OSMS_URL, WIKI_URL, mapData, watchMapData } from "$lib/mapdata.svelte";
+  import { DROPS_URL, OSMS_URL, mapData, watchMapData } from "$lib/mapdata.svelte";
   import { payout, questView, toggleExpanded, unfollow } from "$lib/quests.svelte";
   import type { Guide, MapRef, MapReading, ObjectiveGuide, Objective, QuestReading, QuestWhere, SessionSummary } from "$lib/types";
 
@@ -291,13 +291,13 @@
           {#if lookingUp}<span class="spin"><LoaderCircle size={12} /></span>{:else}<Search size={12} />{/if}
           Find who drops {unknownItems.length === 1 ? "the quest item" : `${unknownItems.length} quest items`}
         </button>
-        <span class="faint">Downloads mapleclassic.wiki's drop table</span>
+        <span class="faint">Downloads Leafline's drop list</span>
       </div>
       {#if lookupError}<p class="footer error">{lookupError}</p>{/if}
     {/if}
     {#if guide}
       <p class="credit">
-        Maps: <button onclick={() => backend.openLink(OSMS_URL)}>OSMS</button> (CC BY 4.0){#if showsDrops}{" · "}Drops: <button onclick={() => backend.openLink(WIKI_URL)}>mapleclassic.wiki</button>{/if}
+        Maps: <button onclick={() => backend.openLink(OSMS_URL)}>OSMS</button> (CC BY 4.0){#if showsDrops}{" · "}Drops: game text, <button onclick={() => backend.openLink(DROPS_URL)}>StrategyWiki</button> (CC BY-SA 4.0), players{/if}
       </p>
     {/if}
   {/if}

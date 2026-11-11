@@ -6,7 +6,7 @@
   import { onMount } from "svelte";
 
   import { backend } from "$lib/api";
-  import { OSMS_URL, WIKI_URL, ago, downloadMapData, mapData, watchMapData } from "$lib/mapdata.svelte";
+  import { DROPS_URL, OSMS_URL, ago, downloadMapData, mapData, watchMapData } from "$lib/mapdata.svelte";
   import { display } from "$lib/settings.svelte";
   import type { TravelInfo } from "$lib/types";
   import Button from "$lib/ui/Button.svelte";
@@ -94,8 +94,9 @@
     <div class="about">
       <span class="name">Drop table</span>
       <span class="help">
-        Who drops what, as players recorded it on <button class="link" onclick={() => backend.openLink(WIKI_URL)}>mapleclassic.wiki</button>.
-        Fetched the first time you open a Drops list, then renewed weekly.
+        Which monsters drop which items, from the game's own item text,
+        <button class="link" onclick={() => backend.openLink(DROPS_URL)}>StrategyWiki</button> and players' reports.
+        Checked once a day.
       </span>
       <span class="state tabular">{dropsAt != null ? `Downloaded ${ago(dropsAt)}` : "Not downloaded yet"}</span>
     </div>

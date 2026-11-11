@@ -136,7 +136,7 @@
     {/if}
   </div>
 {:else if drops.lookedUp}
-  <p class="note">No monster drops logged on mapleclassic.wiki.</p>
+  <p class="note">No known monster drops for this item.</p>
 {:else}
   <p class="note">The drop table isn't downloaded yet.</p>
 {/if}

@@ -1,41 +1,39 @@
-//! Player-observed drops from mapleclassic.wiki's Cargo API (`monster_drops`).
+//! Which monster drops what, from `drops/signature.json` in Leafline's data repository.
 //!
-//! The client has no drop tables, so these are counts players logged: each rate comes with
-//! the number of kills it was measured over and the game version. The whole table is downloaded
-//! when first needed and again after a week, and every lookup is answered from that copy, so no
-//! monster or item name, least of all one read from the screen, is ever sent to the wiki.
+//! The client has no drop tables. The file lists each monster's etc drops as the game's own item
+//! text, StrategyWiki's drop table and players' reports have it: presence only, no rates. The
+//! whole file is downloaded when first needed and checked again after a day, and every lookup is
+//! answered from that copy, so no monster or item name, least of all one read from the screen,
+//! is ever sent anywhere. Until 2026-11-11 this came from mapleclassic.wiki's `monster_drops`
+//! table, which no longer answers anonymous requests.
 //!
-//! Quest items are looked up the other way round, by item: which monsters players saw drop it.
-//! The item's name comes from OCR, so the closest name in the table is kept.
+//! Quest items are looked up the other way round, by item: which monsters drop it. The item's
+//! name comes from OCR, so the closest name in the table is kept.
 
 use std::collections::BTreeMap;
 
-use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 use super::fetch::Source;
 use super::store::{DROPS_FAILED, Store};
 use crate::error::{Error, Result};
 
-pub const WIKI_API: &str = "https://mapleclassic.wiki/api.php";
+/// Where the drop list lives. Nothing about the player goes with the request.
+pub const DROPS_URL: &str = "https://raw.githubusercontent.com/Crazy3001/Leafline-data/main/drops/signature.json";
+/// The only `schema` this reader understands.
+const SCHEMA: u32 = 1;
 
-/// How long the downloaded table is used before the wiki is asked again.
-pub const MAX_AGE: i64 = 7 * 24 * 60 * 60;
-
-/// Rows per request, the most the wiki gives an anonymous caller.
-const PAGE: usize = 500;
-
-/// Far more pages than the table needs, so a reply that ignores `offset` can't loop forever.
-const MAX_PAGES: usize = 200;
+/// How long the downloaded list is used before it is checked again.
+pub const MAX_AGE: i64 = 24 * 60 * 60;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Drop {
     pub item: String,
-    /// `etc`, `use`, `equip`, `meso` and so on, as the wiki files it.
+    /// `etc`, `use`, `equip`, `meso` and so on.
     pub category: Option<String>,
-    /// Observed drop rate in percent, with its confidence interval. Missing when the wiki
-    /// only lists the item as a known drop.
+    /// Observed drop rate in percent, with its confidence interval. The drop list has none, so
+    /// these are missing: the item is a known drop.
     pub rate: Option<f64>,
     pub rate_low: Option<f64>,
     pub rate_high: Option<f64>,
@@ -59,9 +57,9 @@ pub struct MonsterDrops {
     pub drops: Vec<Drop>,
 }
 
-/// How long after a failed download the wiki is left alone. Lookups come often, and a wiki that
-/// refused once (since 2026-11-11 it refuses anonymous reads of this table) would otherwise be
-/// asked again on every one. A download button the player presses tries again at once.
+/// How long after a failed download the source is left alone. Lookups come often, and a source
+/// that refused once would otherwise be asked again on every one. A download button the player
+/// presses tries again at once.
 pub const RETRY_AFTER: i64 = 24 * 60 * 60;
 
 /// Why the last download under `key` failed, if that was under [`RETRY_AFTER`] ago.
@@ -77,7 +75,7 @@ pub(super) fn reason(err: &Error) -> String {
     }
 }
 
-/// Downloads the whole table if there is no copy or it is over a week old. A failed download
+/// Downloads the whole list if there is no copy or it is over a day old. A failed download
 /// keeps the old copy, so drops still work offline, and is not tried again for a day.
 pub fn refresh(store: &mut Store, source: &dyn Source, now: i64) -> Result<()> {
     let fetched_at = store.drops_fetched_at()?;
@@ -87,7 +85,7 @@ pub fn refresh(store: &mut Store, source: &dyn Source, now: i64) -> Result<()> {
     if let Some(reason) = recent_failure(store, DROPS_FAILED, now)? {
         return if fetched_at.is_some() { Ok(()) } else { Err(Error::Download(reason)) };
     }
-    match download(source, now) {
+    match source.get(DROPS_URL).and_then(|body| parse(&body, now)) {
         Ok(table) => store.replace_drops(&table, now),
         Err(err) => {
             store.set_failure(DROPS_FAILED, Some((now, &reason(&err))))?;
@@ -100,20 +98,71 @@ pub fn refresh(store: &mut Store, source: &dyn Source, now: i64) -> Result<()> {
     }
 }
 
-fn download(source: &dyn Source, now: i64) -> Result<BTreeMap<String, MonsterDrops>> {
-    let mut rows = Vec::new();
-    for page in 0..MAX_PAGES {
-        let batch: Vec<Row> = cargo_rows(&source.get(&page_url(page * PAGE))?)?;
-        let last = batch.len() < PAGE;
-        rows.extend(batch);
-        if last && rows.is_empty() {
-            return Err(Error::Download("mapleclassic.wiki sent an empty drop table".into()));
+/// The list as written, grouped by monster name. Monsters that share a name (the same monster in
+/// another area) share their drops, and items that share a name (the three Omok sets) show once.
+fn parse(body: &[u8], now: i64) -> Result<BTreeMap<String, MonsterDrops>> {
+    #[derive(Deserialize)]
+    struct File {
+        schema: u32,
+        monsters: Vec<Monster>,
+    }
+    #[derive(Deserialize)]
+    struct Monster {
+        name: String,
+        drops: Vec<Listed>,
+    }
+    #[derive(Deserialize)]
+    struct Listed {
+        name: String,
+        #[serde(default)]
+        quest: bool,
+    }
+    let file: File = serde_json::from_slice(body)
+        .map_err(|err| Error::Download(format!("Leafline's drop list can't be read: {err}")))?;
+    if file.schema != SCHEMA {
+        return Err(Error::Download(format!(
+            "Leafline's drop list is in format {}; this version reads format {SCHEMA}. Update Leafline.",
+            file.schema
+        )));
+    }
+    let mut out: BTreeMap<String, MonsterDrops> = BTreeMap::new();
+    for monster in file.monsters {
+        let name = monster.name.trim().to_string();
+        if name.is_empty() {
+            continue;
         }
-        if last {
-            return Ok(group(rows, now));
+        let entry = out.entry(name.clone()).or_insert_with(|| MonsterDrops {
+            monster: name,
+            sample_kills: None,
+            game_version: None,
+            fetched_at: now,
+            drops: vec![],
+        });
+        for listed in monster.drops {
+            let item = listed.name.trim().to_string();
+            if item.is_empty() || entry.drops.iter().any(|d| d.item == item) {
+                continue;
+            }
+            entry.drops.push(Drop {
+                item,
+                category: Some("etc".into()),
+                rate: None,
+                rate_low: None,
+                rate_high: None,
+                min_quantity: None,
+                max_quantity: None,
+                sample_kills: None,
+                sample_drops: None,
+                game_version: None,
+                quest: listed.quest,
+            });
         }
     }
-    Err(Error::Download("mapleclassic.wiki's drop table is longer than expected".into()))
+    out.retain(|_, m| !m.drops.is_empty());
+    if out.is_empty() {
+        return Err(Error::Download("Leafline's drop list names no drops".into()));
+    }
+    Ok(out)
 }
 
 /// The monsters players saw drop one item.
@@ -199,267 +248,67 @@ fn droppers_of(store: &Store, item: &str) -> Result<Vec<Dropper>> {
     Ok(droppers)
 }
 
-/// One page of the whole table. It has no `where`: nothing the player is doing goes in the URL.
-fn page_url(offset: usize) -> String {
-    let query = [
-        ("action", "cargoquery".to_string()),
-        ("format", "json".to_string()),
-        ("tables", "monster_drops".to_string()),
-        (
-            "fields",
-            "monster_id=monster,item_id=item,category=category,drop_rate=rate,rate_low=low,rate_high=high,\
-             min_quantity=qmin,max_quantity=qmax,sample_kills=kills,sample_drops=drops,game_version=version,\
-             quest_flag=quest"
-                .to_string(),
-        ),
-        ("order_by", "_ID".to_string()),
-        ("limit", PAGE.to_string()),
-        ("offset", offset.to_string()),
-    ];
-    let encoded: Vec<String> = query.iter().map(|(k, v)| format!("{k}={}", encode(v))).collect();
-    format!("{WIKI_API}?{}", encoded.join("&"))
-}
-
-/// Percent-encodes everything but unreserved characters.
-pub(super) fn encode(text: &str) -> String {
-    text.bytes()
-        .map(|b| match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => (b as char).to_string(),
-            _ => format!("%{b:02X}"),
-        })
-        .collect()
-}
-
-/// Cargo returns every value as a string or null, under the aliases chosen in [`page_url`].
-#[derive(Deserialize)]
-struct Row {
-    monster: Option<String>,
-    item: Option<String>,
-    category: Option<String>,
-    rate: Option<String>,
-    low: Option<String>,
-    high: Option<String>,
-    qmin: Option<String>,
-    qmax: Option<String>,
-    kills: Option<String>,
-    drops: Option<String>,
-    version: Option<String>,
-    quest: Option<String>,
-}
-
-/// The rows of a Cargo reply, or the wiki's error.
-pub(super) fn cargo_rows<T: DeserializeOwned>(body: &[u8]) -> Result<Vec<T>> {
-    #[derive(Deserialize)]
-    struct Response<T> {
-        cargoquery: Option<Vec<Entry<T>>>,
-        error: Option<serde_json::Value>,
-    }
-    #[derive(Deserialize)]
-    struct Entry<T> {
-        title: T,
-    }
-    let response: Response<T> = serde_json::from_slice(body)
-        .map_err(|err| Error::Download(format!("mapleclassic.wiki sent an unexpected reply: {err}")))?;
-    if let Some(error) = response.error {
-        return Err(Error::Download(format!(
-            "mapleclassic.wiki: {}",
-            error["info"].as_str().unwrap_or("query failed")
-        )));
-    }
-    Ok(response.cargoquery.unwrap_or_default().into_iter().map(|e| e.title).collect())
-}
-
-fn group(rows: Vec<Row>, now: i64) -> BTreeMap<String, MonsterDrops> {
-    let mut out: BTreeMap<String, MonsterDrops> = BTreeMap::new();
-    for row in rows {
-        let Some(monster) = text(&row.monster) else { continue };
-        let entry = out.entry(monster.clone()).or_insert_with(|| MonsterDrops {
-            monster,
-            sample_kills: None,
-            game_version: None,
-            fetched_at: now,
-            drops: vec![],
-        });
-        let kills = number(&row.kills);
-        entry.sample_kills = entry.sample_kills.max(kills);
-        if entry.game_version.is_none() {
-            entry.game_version = text(&row.version);
-        }
-        // The "nothing dropped" row only carries the sample size.
-        let Some(item) = text(&row.item) else { continue };
-        if row.category.as_deref() == Some("nothing") {
-            continue;
-        }
-        entry.drops.push(Drop {
-            item,
-            category: text(&row.category),
-            rate: number(&row.rate),
-            rate_low: number(&row.low),
-            rate_high: number(&row.high),
-            min_quantity: number(&row.qmin),
-            max_quantity: number(&row.qmax),
-            sample_kills: kills,
-            sample_drops: number(&row.drops),
-            game_version: text(&row.version),
-            quest: row.quest.as_deref() == Some("1"),
-        });
-    }
-    for entry in out.values_mut() {
-        // Highest rate first; listed-but-unmeasured drops last.
-        entry.drops.sort_by(|a, b| b.rate.unwrap_or(-1.0).total_cmp(&a.rate.unwrap_or(-1.0)));
-    }
-    out
-}
-
-fn text(value: &Option<String>) -> Option<String> {
-    value.as_deref().map(str::trim).filter(|v| !v.is_empty()).map(unescape)
-}
-
-/// Cargo returns values HTML-escaped: `Bubbling&#039;s Huge Bubble`.
-pub fn unescape(text: &str) -> String {
-    let mut out = String::with_capacity(text.len());
-    let mut rest = text;
-    while let Some(at) = rest.find('&') {
-        out.push_str(&rest[..at]);
-        rest = &rest[at..];
-        let entity = rest.find(';').filter(|&end| end <= 10).map(|end| (&rest[1..end], end));
-        let decoded = entity.and_then(|(name, end)| {
-            let c = match name {
-                "amp" => Some('&'),
-                "quot" => Some('"'),
-                "apos" => Some('\''),
-                "lt" => Some('<'),
-                "gt" => Some('>'),
-                _ => name
-                    .strip_prefix("#x")
-                    .and_then(|hex| u32::from_str_radix(hex, 16).ok())
-                    .or_else(|| name.strip_prefix('#').and_then(|dec| dec.parse().ok()))
-                    .and_then(char::from_u32),
-            };
-            c.map(|c| (c, end))
-        });
-        match decoded {
-            Some((c, end)) => {
-                out.push(c);
-                rest = &rest[end + 1..];
-            }
-            None => {
-                out.push('&');
-                rest = &rest[1..];
-            }
-        }
-    }
-    out.push_str(rest);
-    out
-}
-
-fn number<T: std::str::FromStr>(value: &Option<String>) -> Option<T> {
-    value.as_deref().and_then(|v| v.trim().parse().ok())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::mapdata::fetch::tests::FakeSource;
 
-    // A made-up reply in Cargo's shape.
-    const REPLY: &str = r#"{"cargoquery": [
-        {"title": {"monster": "Pebble Snail", "item": null, "category": "nothing", "rate": "20", "kills": "120", "version": "0.1.0"}},
-        {"title": {"monster": "Pebble Snail", "item": "Pebble", "category": "etc", "rate": "48.5", "low": "39.1",
-                   "high": "58", "qmin": null, "qmax": null, "kills": "120", "drops": "58", "version": "0.1.0", "quest": "0"}},
-        {"title": {"monster": "Pebble Snail", "item": "Meso", "category": "meso", "rate": "70", "qmin": "3", "qmax": "5",
-                   "kills": "120", "drops": "84", "version": "0.1.0", "quest": "0"}},
-        {"title": {"monster": "Pebble Snail", "item": "Moss Ore", "category": "etc", "rate": null}}
+    // A made-up list in the data repository's shape; none of it is real game data.
+    const LIST: &str = r#"{"schema": 1, "about": "test", "monsters": [
+        {"id": 1, "name": "Pebble Snail", "drops": [
+            {"item": 10, "name": "Pebble", "sources": ["client"]},
+            {"item": 11, "name": "Moss Ore", "sources": ["player"]},
+            {"item": 12, "name": "Omok Piece: Snail", "sources": ["player"]},
+            {"item": 13, "name": "Omok Piece: Snail", "sources": ["player"]}]},
+        {"id": 2, "name": "Pebble Snail", "drops": [{"item": 14, "name": "Shell Dust", "sources": ["client"]}]},
+        {"id": 3, "name": "Elder Gloom Bat", "drops": [{"item": 20, "name": "Gloom Bat Wing", "sources": ["player"], "quest": true}]},
+        {"id": 4, "name": "Gloom Bat", "drops": [{"item": 21, "name": "Gloom Bat Wing Fragment", "sources": ["client"]}]},
+        {"id": 5, "name": "Cave Owl", "drops": [{"item": 20, "name": "Gloom Bat Wing", "sources": ["strategywiki"]}]},
+        {"id": 6, "name": "Spore", "drops": [{"item": 30, "name": "Green Mushroom Cap", "sources": ["client"]}]},
+        {"id": 7, "name": "Empty Thing", "drops": []}
     ]}"#;
 
     fn names(list: &[&str]) -> Vec<String> {
         list.iter().map(|s| s.to_string()).collect()
     }
 
-    /// A store holding `reply` as the whole table, downloaded at time 1000.
-    fn store_with(reply: &str) -> Store {
-        let mut store = Store::open_in_memory().unwrap();
+    fn source(body: &str) -> FakeSource {
         let mut source = FakeSource::default();
-        source.files.insert(page_url(0), reply.as_bytes().to_vec());
-        refresh(&mut store, &source, 1000).unwrap();
+        source.files.insert(DROPS_URL.to_string(), body.as_bytes().to_vec());
+        source
+    }
+
+    /// A store holding `LIST`, downloaded at time 1000.
+    fn store_with_list() -> Store {
+        let mut store = Store::open_in_memory().unwrap();
+        refresh(&mut store, &source(LIST), 1000).unwrap();
         store
     }
 
     #[test]
-    fn parses_observed_rates() {
-        let store = store_with(REPLY);
-        let drops = store.drops(&names(&["Pebble Snail", "Gloom Bat"])).unwrap();
-        let snail = &drops[0];
-        assert_eq!(snail.sample_kills, Some(120));
-        assert_eq!(snail.game_version.as_deref(), Some("0.1.0"));
+    fn lists_known_drops_without_rates() {
+        let store = store_with_list();
+        let snail = &store.drops(&names(&["Pebble Snail"])).unwrap()[0];
         let items: Vec<&str> = snail.drops.iter().map(|d| d.item.as_str()).collect();
-        assert_eq!(items, ["Meso", "Pebble", "Moss Ore"]);
-        assert_eq!((snail.drops[0].min_quantity, snail.drops[0].max_quantity), (Some(3), Some(5)));
-        assert_eq!(snail.drops[1].rate_low, Some(39.1));
-        assert_eq!((drops[1].monster.as_str(), drops[1].drops.len()), ("Gloom Bat", 0));
+        assert_eq!(items.len(), 4, "two areas' drops together, the Omok piece once: {items:?}");
+        assert!(items.contains(&"Shell Dust") && items.contains(&"Omok Piece: Snail"));
+        assert!(snail.drops.iter().all(|d| d.rate.is_none() && d.category.as_deref() == Some("etc")));
+        assert_eq!(snail.fetched_at, 1000);
+        assert!(store.drops(&names(&["Elder Gloom Bat"])).unwrap()[0].drops[0].quest);
     }
 
     #[test]
-    fn unescapes_names() {
-        assert_eq!(unescape("Gloom&#039;s Wing &amp; Tail"), "Gloom's Wing & Tail");
-        assert_eq!(unescape("&quot;Odd&#x27;s&quot; &lt;3&gt;"), "\"Odd's\" <3>");
-        assert_eq!(unescape("Fish & Chips &bogus; &"), "Fish & Chips &bogus; &");
-
-        let reply = r#"{"cargoquery": [{"title": {"monster": "Gloom&#039;s Bat", "item": "Bat&#039;s Wing",
-            "category": "etc", "rate": "12.5", "kills": "40"}}]}"#;
-        let drops = store_with(reply).drops(&names(&["Gloom's Bat"])).unwrap();
-        assert_eq!(drops[0].drops[0].item, "Bat's Wing");
-    }
-
-    #[test]
-    fn asks_for_the_whole_table_and_names_nothing() {
-        let url = page_url(1000);
-        assert!(
-            url.starts_with("https://mapleclassic.wiki/api.php?action=cargoquery&format=json&tables=monster_drops")
-        );
-        assert!(url.ends_with("&order_by=_ID&limit=500&offset=1000"), "{url}");
-        assert!(!url.contains("where="), "{url}");
-    }
-
-    #[test]
-    fn reads_every_page() {
-        let row = r#"{"title": {"monster": "Pebble Snail", "item": "Pebble", "rate": "1"}}"#;
-        let full = format!(r#"{{"cargoquery": [{}]}}"#, vec![row; PAGE].join(","));
-        let last = r#"{"cargoquery": [{"title": {"monster": "Gloom Bat", "item": "Wing", "rate": "2"}}]}"#;
-        let mut source = FakeSource::default();
-        source.files.insert(page_url(0), full.into_bytes());
-        source.files.insert(page_url(PAGE), last.as_bytes().to_vec());
-
+    fn asks_once_for_the_whole_file_and_names_nothing() {
         let mut store = Store::open_in_memory().unwrap();
-        refresh(&mut store, &source, 1000).unwrap();
-        assert_eq!(source.requests.borrow().len(), 2);
-        assert_eq!(store.drops(&names(&["Pebble Snail"])).unwrap()[0].drops.len(), PAGE);
-        assert_eq!(store.drops(&names(&["Gloom Bat"])).unwrap()[0].drops.len(), 1);
+        let list = source(LIST);
+        refresh(&mut store, &list, 1000).unwrap();
+        assert_eq!(*list.requests.borrow(), [DROPS_URL]);
+        assert!(!DROPS_URL.contains('?'));
     }
-
-    #[test]
-    fn stops_if_the_wiki_never_ends() {
-        let row = r#"{"title": {"monster": "Pebble Snail", "item": "Pebble", "rate": "1"}}"#;
-        let full = format!(r#"{{"cargoquery": [{}]}}"#, vec![row; PAGE].join(","));
-        let mut source = FakeSource::default();
-        for page in 0..MAX_PAGES {
-            source.files.insert(page_url(page * PAGE), full.clone().into_bytes());
-        }
-        let err = refresh(&mut Store::open_in_memory().unwrap(), &source, 1000).unwrap_err();
-        assert!(err.to_string().contains("longer than expected"), "{err}");
-    }
-
-    // A made-up table where a similar item sits beside the one wanted.
-    const ITEM_REPLY: &str = r#"{"cargoquery": [
-        {"title": {"monster": "Gloom Bat", "item": "Gloom Bat Wing", "rate": "4.5", "kills": "300", "version": "0.1.0", "quest": "1"}},
-        {"title": {"monster": "Elder Gloom Bat", "item": "Gloom Bat Wing", "rate": "9", "kills": "80", "quest": "1"}},
-        {"title": {"monster": "Gloom Bat", "item": "Gloom Bat Wing Fragment", "rate": "30", "kills": "300"}},
-        {"title": {"monster": "Cave Owl", "item": "Gloom Bat Wing", "rate": null}}
-    ]}"#;
 
     #[test]
     fn finds_who_drops_a_misread_item() {
-        let store = store_with(ITEM_REPLY);
+        let store = store_with_list();
         assert_eq!(item_key("Gloom Bat. Wing"), "gloom bat wing");
 
         let found = sources_for(&store, &names(&["Gloom Bat. Wing", "Gloom Bat Wing"])).unwrap();
@@ -467,9 +316,9 @@ mod tests {
         let wing = &found[0];
         assert_eq!(wing.item.as_deref(), Some("Gloom Bat Wing"));
         assert_eq!(wing.fetched_at, 1000);
-        let droppers: Vec<(&str, Option<f64>)> = wing.droppers.iter().map(|d| (d.monster.as_str(), d.rate)).collect();
-        assert_eq!(droppers, [("Elder Gloom Bat", Some(9.0)), ("Gloom Bat", Some(4.5)), ("Cave Owl", None)]);
-        assert!(wing.droppers[0].quest);
+        let mut droppers: Vec<&str> = wing.droppers.iter().map(|d| d.monster.as_str()).collect();
+        droppers.sort_unstable();
+        assert_eq!(droppers, ["Cave Owl", "Elder Gloom Bat"]);
 
         let dropped_letters = sources_for(&store, &names(&["Glom Bat Wng"])).unwrap();
         assert_eq!(dropped_letters[0].item.as_deref(), Some("Gloom Bat Wing"));
@@ -477,14 +326,13 @@ mod tests {
 
     #[test]
     fn a_similar_item_is_not_taken_for_the_one_read() {
-        let reply = r#"{"cargoquery": [{"title": {"monster": "Spore", "item": "Green Mushroom Cap", "rate": "5"}}]}"#;
-        let found = sources_for(&store_with(reply), &names(&["Orange Mushroom Cap"])).unwrap();
+        let found = sources_for(&store_with_list(), &names(&["Orange Mushroom Cap"])).unwrap();
         assert_eq!((found[0].item.as_ref(), found[0].droppers.len()), (None, 0));
     }
 
     #[test]
-    fn an_item_not_in_the_table_counts_as_looked_up() {
-        let found = sources_for(&store_with(REPLY), &names(&["Moon Rock"])).unwrap();
+    fn an_item_not_in_the_list_counts_as_looked_up() {
+        let found = sources_for(&store_with_list(), &names(&["Moon Rock"])).unwrap();
         assert_eq!((found[0].key.as_str(), found[0].item.as_ref(), found[0].droppers.len()), ("moon rock", None, 0));
     }
 
@@ -495,36 +343,25 @@ mod tests {
     }
 
     #[test]
-    fn downloads_at_most_weekly() {
+    fn downloads_at_most_daily_and_replaces_the_old_list() {
         let mut store = Store::open_in_memory().unwrap();
-        let mut source = FakeSource::default();
-        source.files.insert(page_url(0), REPLY.as_bytes().to_vec());
+        let first = source(LIST);
+        refresh(&mut store, &first, 1000).unwrap();
+        refresh(&mut store, &first, 1000 + MAX_AGE - 1).unwrap();
+        assert_eq!(first.requests.borrow().len(), 1, "served from the copy");
 
-        refresh(&mut store, &source, 1000).unwrap();
-        refresh(&mut store, &source, 1000 + MAX_AGE - 1).unwrap();
-        assert_eq!(source.requests.borrow().len(), 1, "served from the copy");
-
-        refresh(&mut store, &source, 1000 + MAX_AGE).unwrap();
-        assert_eq!(source.requests.borrow().len(), 2, "asked again once stale");
-    }
-
-    #[test]
-    fn a_new_download_replaces_the_old_table() {
-        let mut store = store_with(REPLY);
-        let reply = r#"{"cargoquery": [{"title": {"monster": "Gloom Bat", "item": "Wing", "rate": "2"}}]}"#;
-        let mut source = FakeSource::default();
-        source.files.insert(page_url(0), reply.as_bytes().to_vec());
-        refresh(&mut store, &source, 1000 + MAX_AGE).unwrap();
-
+        let later = source(r#"{"schema": 1, "monsters": [{"name": "Gloom Bat", "drops": [{"name": "Wing"}]}]}"#);
+        refresh(&mut store, &later, 1000 + MAX_AGE).unwrap();
         assert!(store.drops(&names(&["Pebble Snail"])).unwrap()[0].drops.is_empty());
         assert_eq!(store.drops(&names(&["Gloom Bat"])).unwrap()[0].drops[0].item, "Wing");
     }
 
     #[test]
-    fn keeps_the_old_table_when_offline() {
-        let mut store = store_with(REPLY);
+    fn keeps_the_old_list_when_offline_or_sent_nothing() {
+        let mut store = store_with_list();
         refresh(&mut store, &FakeSource::default(), 1000 + MAX_AGE).unwrap();
-        assert_eq!(store.drops(&names(&["Pebble Snail"])).unwrap()[0].drops.len(), 3);
+        refresh(&mut store, &source(r#"{"schema": 1, "monsters": []}"#), 1000 + MAX_AGE + RETRY_AFTER).unwrap();
+        assert_eq!(store.drops(&names(&["Pebble Snail"])).unwrap()[0].drops.len(), 4);
         assert_eq!(store.drops_fetched_at().unwrap(), Some(1000));
     }
 
@@ -536,67 +373,42 @@ mod tests {
     }
 
     #[test]
-    fn an_empty_reply_does_not_wipe_the_table() {
-        let mut store = store_with(REPLY);
-        let mut source = FakeSource::default();
-        source.files.insert(page_url(0), br#"{"cargoquery": []}"#.to_vec());
-        refresh(&mut store, &source, 1000 + MAX_AGE).unwrap();
-        assert_eq!(store.drops(&names(&["Pebble Snail"])).unwrap()[0].drops.len(), 3);
-    }
-
-    // The wiki's refusal since 2026-11-11, in Cargo's error shape.
-    const REFUSED: &str = r#"{"error": {"code": "cargogate-table", "info": "Log in to make this request."}}"#;
-
-    fn refusing() -> FakeSource {
-        let mut source = FakeSource::default();
-        source.files.insert(page_url(0), REFUSED.as_bytes().to_vec());
-        source
-    }
-
-    #[test]
-    fn a_refusal_is_not_asked_again_for_a_day() {
-        let mut store = store_with(REPLY);
-        let source = refusing();
-        let stale = 1000 + MAX_AGE;
-        refresh(&mut store, &source, stale).unwrap();
-        refresh(&mut store, &source, stale + RETRY_AFTER - 1).unwrap();
-        assert_eq!(source.requests.borrow().len(), 1, "lookups answered from the old copy");
-        assert_eq!(store.drops(&names(&["Pebble Snail"])).unwrap()[0].drops.len(), 3);
-
-        refresh(&mut store, &source, stale + RETRY_AFTER).unwrap();
-        assert_eq!(source.requests.borrow().len(), 2, "asked again a day later");
-    }
-
-    #[test]
-    fn without_a_copy_the_refusal_is_repeated_not_reasked() {
+    fn refuses_a_format_it_does_not_know() {
         let mut store = Store::open_in_memory().unwrap();
-        let source = refusing();
-        let first = refresh(&mut store, &source, 1000).unwrap_err().to_string();
-        let again = refresh(&mut store, &source, 1001).unwrap_err().to_string();
-        assert!(first.contains("Log in to make this request"), "{first}");
+        let err = refresh(&mut store, &source(r#"{"schema": 2, "monsters": []}"#), 1000).unwrap_err();
+        assert!(err.to_string().contains("Update Leafline"), "{err}");
+    }
+
+    #[test]
+    fn a_failure_is_not_asked_again_for_a_day() {
+        let mut store = store_with_list();
+        let offline = FakeSource::default();
+        let stale = 1000 + MAX_AGE;
+        refresh(&mut store, &offline, stale).unwrap();
+        refresh(&mut store, &offline, stale + RETRY_AFTER - 1).unwrap();
+        assert_eq!(offline.requests.borrow().len(), 1, "lookups answered from the old copy");
+
+        refresh(&mut store, &offline, stale + RETRY_AFTER).unwrap();
+        assert_eq!(offline.requests.borrow().len(), 2, "asked again a day later");
+    }
+
+    #[test]
+    fn without_a_copy_the_failure_is_repeated_not_reasked() {
+        let mut store = Store::open_in_memory().unwrap();
+        let offline = FakeSource::default();
+        let first = refresh(&mut store, &offline, 1000).unwrap_err().to_string();
+        let again = refresh(&mut store, &offline, 1001).unwrap_err().to_string();
         assert_eq!(first, again);
-        assert_eq!(source.requests.borrow().len(), 1);
+        assert_eq!(offline.requests.borrow().len(), 1);
     }
 
     #[test]
     fn forgetting_the_failure_asks_at_once_and_success_clears_it() {
         let mut store = Store::open_in_memory().unwrap();
-        refresh(&mut store, &refusing(), 1000).unwrap_err();
+        refresh(&mut store, &FakeSource::default(), 1000).unwrap_err();
         store.set_failure(DROPS_FAILED, None).unwrap();
-        let mut source = FakeSource::default();
-        source.files.insert(page_url(0), REPLY.as_bytes().to_vec());
-        refresh(&mut store, &source, 1001).unwrap();
+        refresh(&mut store, &source(LIST), 1001).unwrap();
         assert_eq!(store.drops_fetched_at().unwrap(), Some(1001));
-        assert_eq!(store.failure(DROPS_FAILED).unwrap(), None);
-    }
-
-    #[test]
-    fn a_download_that_works_after_the_wait_clears_the_failure() {
-        let mut store = Store::open_in_memory().unwrap();
-        refresh(&mut store, &refusing(), 1000).unwrap_err();
-        let mut source = FakeSource::default();
-        source.files.insert(page_url(0), REPLY.as_bytes().to_vec());
-        refresh(&mut store, &source, 1000 + RETRY_AFTER).unwrap();
         assert_eq!(store.failure(DROPS_FAILED).unwrap(), None);
     }
 }

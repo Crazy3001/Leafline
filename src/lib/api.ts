@@ -143,7 +143,7 @@ export interface Backend {
   /** Takes a place off the recent list. */
   forgetDestination(destination: Destination): Promise<NavState>;
   onDestination(handler: (nav: NavState) => void): Promise<UnlistenFn>;
-  /** Player-observed drops, from a copy of mapleclassic.wiki's table renewed weekly. */
+  /** Known drops, from a copy of Leafline's drop list renewed daily. */
   monsterDrops(monsters: string[]): Promise<MonsterDrops[]>;
   /** Where to go for each quest objective, from cached data only. Null until map data is downloaded. */
   questGuide(
@@ -153,7 +153,7 @@ export interface Backend {
     mapTwin: number | null,
     measured: MeasuredRate[],
   ): Promise<Guide | null>;
-  /** Downloads mapleclassic.wiki's whole drop table, so quest items can be looked up on this PC. */
+  /** Downloads Leafline's drop list, so quest items can be looked up on this PC. */
   downloadDrops(retry?: boolean): Promise<void>;
   /** When the drop table was last downloaded, in Unix seconds, or null before the first time. */
   dropsFetchedAt(): Promise<number | null>;
