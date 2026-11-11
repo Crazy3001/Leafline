@@ -15,6 +15,7 @@ use crate::build::Catalog;
 use crate::error::{Error, Result};
 use crate::mapdata::fetch::{self, Http};
 use crate::mapdata::osms::Dataset;
+use crate::mapdata::store::{DROPS_FAILED, TURN_INS_FAILED};
 use crate::mapdata::{
     Assumptions, Atlas, DataStatus, ItemOrigin, KillSpeed, MapCard, MapMatch, MapPage, MapQuery, MapRef, MeasuredRate,
     MonsterDrops, MonsterFilters, MonsterPage, MonsterQuery, MonsterSheet, NpcPage, NpcQuery, NpcSheet, QuestGuide, QuestPage, QuestQuery, QuestSearch,
@@ -152,6 +153,12 @@ impl MapDataState {
         let _turn = self.drops_refresh.lock().expect("drops refresh lock");
         drops::refresh(&mut Store::open(&self.path)?, &self.wiki, now())
     }
+
+    /// Forgets a failed wiki download (see [`drops::RETRY_AFTER`]), so the next refresh asks at
+    /// once. Only for the player's own request: automatic lookups keep waiting.
+    fn retry(&self, failed: &str) -> Result<()> {
+        Store::open(&self.path)?.set_failure(failed, None)
+    }
 }
 
 /// Once the user has downloaded map data, checks OSMS for changes in the background, at most
@@ -211,7 +218,9 @@ pub async fn download_map_data(app: AppHandle, force: bool) -> Result<Downloaded
     let downloaded = tauri::async_runtime::spawn_blocking(move || -> Result<Downloaded> {
         let state = handle.state::<MapDataState>();
         let report = state.refresh(force)?;
-        // Quest help still works without it, from what the map data shows.
+        // Quest help still works without it, from what the map data shows. The player asked, so
+        // a recent failure is tried again.
+        state.retry(TURN_INS_FAILED)?;
         if let Err(err) = state.refresh_turn_ins() {
             eprintln!("turn-in table download failed: {err}");
         }
@@ -626,13 +635,20 @@ pub fn show_place(app: AppHandle, mode: String, id: u32) -> Result<()> {
     Ok(app.emit(SHOW_PLACE_EVENT, PlaceLink { mode, id })?)
 }
 
-/// Downloads the drop table from mapleclassic.wiki, for finding who drops a quest item. Only on
-/// the player's request.
+/// Downloads the drop table from mapleclassic.wiki if there is none or it is over a week old.
+/// `retry` is set when the player pressed a button for it, so a download that failed recently is
+/// tried again; panels that ask on their own leave it unset and wait out the back-off.
 #[tauri::command]
-pub async fn download_drops(app: AppHandle) -> Result<()> {
-    tauri::async_runtime::spawn_blocking(move || app.state::<MapDataState>().refresh_drops())
-        .await
-        .map_err(|err| Error::Invalid(err.to_string()))?
+pub async fn download_drops(app: AppHandle, retry: Option<bool>) -> Result<()> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<MapDataState>();
+        if retry == Some(true) {
+            state.retry(DROPS_FAILED)?;
+        }
+        state.refresh_drops()
+    })
+    .await
+    .map_err(|err| Error::Invalid(err.to_string()))?
 }
 
 /// When the drop table was last downloaded, in Unix seconds, or `None` before the first time.

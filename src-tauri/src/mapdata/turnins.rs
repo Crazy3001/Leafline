@@ -9,9 +9,9 @@ use std::collections::HashMap;
 
 use serde::Deserialize;
 
-use super::drops::{MAX_AGE, WIKI_API, cargo_rows, encode, unescape};
+use super::drops::{MAX_AGE, WIKI_API, cargo_rows, encode, reason, recent_failure, unescape};
 use super::fetch::Source;
-use super::store::Store;
+use super::store::{Store, TURN_INS_FAILED};
 use crate::error::{Error, Result};
 
 /// Rows per request, the most the wiki gives an anonymous caller.
@@ -28,22 +28,28 @@ pub struct TurnIn {
 }
 
 /// Downloads the table if there is no copy or it is over a week old, and says whether it did. A
-/// failed download keeps the old copy.
+/// failed download keeps the old copy and, like the drop table's, is not tried again for a day.
 pub fn refresh(store: &mut Store, source: &dyn Source, now: i64) -> Result<bool> {
     let fetched_at = store.turn_ins_fetched_at()?;
     if fetched_at.is_some_and(|at| now - at < MAX_AGE) {
         return Ok(false);
+    }
+    if let Some(reason) = recent_failure(store, TURN_INS_FAILED, now)? {
+        return if fetched_at.is_some() { Ok(false) } else { Err(Error::Download(reason)) };
     }
     match download(source) {
         Ok(rows) => {
             store.replace_turn_ins(&rows, now)?;
             Ok(true)
         }
-        Err(err) if fetched_at.is_some() => {
+        Err(err) => {
+            store.set_failure(TURN_INS_FAILED, Some((now, &reason(&err))))?;
+            if fetched_at.is_none() {
+                return Err(err);
+            }
             eprintln!("turn-in table update failed: {err}");
             Ok(false)
         }
-        Err(err) => Err(err),
     }
 }
 
@@ -108,6 +114,7 @@ pub(super) fn resolve(turn_ins: &[TurnIn], npc_named: impl Fn(u32, &str) -> Opti
 mod tests {
     use super::*;
     use crate::mapdata::fetch::tests::FakeSource;
+    use crate::mapdata::drops::RETRY_AFTER;
 
     // A made-up reply in Cargo's shape.
     const REPLY: &str = r#"{"cargoquery": [
@@ -183,5 +190,18 @@ mod tests {
     fn drops_the_note_that_tells_pages_apart() {
         assert_eq!(plain_name("Sam (Maple Island)"), "Sam");
         assert_eq!(plain_name("Mrs. Ming Ming"), "Mrs. Ming Ming");
+    }
+
+    #[test]
+    fn a_refusal_is_not_asked_again_for_a_day() {
+        let refused = source(r#"{"error": {"code": "cargogate-table", "info": "Log in to make this request."}}"#);
+        let mut store = Store::open_in_memory().unwrap();
+        assert!(refresh(&mut store, &refused, 1000).is_err());
+        assert!(refresh(&mut store, &refused, 1000 + RETRY_AFTER - 1).is_err());
+        assert_eq!(refused.requests.borrow().len(), 1);
+
+        let fixed = source(REPLY);
+        assert!(refresh(&mut store, &fixed, 1000 + RETRY_AFTER).unwrap());
+        assert_eq!(store.failure(TURN_INS_FAILED).unwrap(), None);
     }
 }

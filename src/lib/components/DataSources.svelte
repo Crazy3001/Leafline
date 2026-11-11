@@ -41,7 +41,7 @@
     dropsBusy = true;
     problem = null;
     try {
-      await backend.downloadDrops();
+      await backend.downloadDrops(true);
       loadDrops();
     } catch (e) {
       problem = `Couldn't download the drop table: ${e}`;

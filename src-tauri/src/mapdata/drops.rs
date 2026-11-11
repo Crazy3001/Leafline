@@ -14,7 +14,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 use super::fetch::Source;
-use super::store::Store;
+use super::store::{DROPS_FAILED, Store};
 use crate::error::{Error, Result};
 
 pub const WIKI_API: &str = "https://mapleclassic.wiki/api.php";
@@ -59,20 +59,44 @@ pub struct MonsterDrops {
     pub drops: Vec<Drop>,
 }
 
+/// How long after a failed download the wiki is left alone. Lookups come often, and a wiki that
+/// refused once (since 2026-11-11 it refuses anonymous reads of this table) would otherwise be
+/// asked again on every one. A download button the player presses tries again at once.
+pub const RETRY_AFTER: i64 = 24 * 60 * 60;
+
+/// Why the last download under `key` failed, if that was under [`RETRY_AFTER`] ago.
+pub(super) fn recent_failure(store: &Store, key: &str, now: i64) -> Result<Option<String>> {
+    Ok(store.failure(key)?.filter(|(at, _)| now - at < RETRY_AFTER).map(|(_, reason)| reason))
+}
+
+/// The reason kept for a failed download: the message without "download failed: ".
+pub(super) fn reason(err: &Error) -> String {
+    match err {
+        Error::Download(reason) => reason.clone(),
+        other => other.to_string(),
+    }
+}
+
 /// Downloads the whole table if there is no copy or it is over a week old. A failed download
-/// keeps the old copy, so drops still work offline.
+/// keeps the old copy, so drops still work offline, and is not tried again for a day.
 pub fn refresh(store: &mut Store, source: &dyn Source, now: i64) -> Result<()> {
     let fetched_at = store.drops_fetched_at()?;
     if fetched_at.is_some_and(|at| now - at < MAX_AGE) {
         return Ok(());
     }
+    if let Some(reason) = recent_failure(store, DROPS_FAILED, now)? {
+        return if fetched_at.is_some() { Ok(()) } else { Err(Error::Download(reason)) };
+    }
     match download(source, now) {
         Ok(table) => store.replace_drops(&table, now),
-        Err(err) if fetched_at.is_some() => {
+        Err(err) => {
+            store.set_failure(DROPS_FAILED, Some((now, &reason(&err))))?;
+            if fetched_at.is_none() {
+                return Err(err);
+            }
             eprintln!("drop table update failed: {err}");
             Ok(())
         }
-        Err(err) => Err(err),
     }
 }
 
@@ -518,5 +542,61 @@ mod tests {
         source.files.insert(page_url(0), br#"{"cargoquery": []}"#.to_vec());
         refresh(&mut store, &source, 1000 + MAX_AGE).unwrap();
         assert_eq!(store.drops(&names(&["Pebble Snail"])).unwrap()[0].drops.len(), 3);
+    }
+
+    // The wiki's refusal since 2026-11-11, in Cargo's error shape.
+    const REFUSED: &str = r#"{"error": {"code": "cargogate-table", "info": "Log in to make this request."}}"#;
+
+    fn refusing() -> FakeSource {
+        let mut source = FakeSource::default();
+        source.files.insert(page_url(0), REFUSED.as_bytes().to_vec());
+        source
+    }
+
+    #[test]
+    fn a_refusal_is_not_asked_again_for_a_day() {
+        let mut store = store_with(REPLY);
+        let source = refusing();
+        let stale = 1000 + MAX_AGE;
+        refresh(&mut store, &source, stale).unwrap();
+        refresh(&mut store, &source, stale + RETRY_AFTER - 1).unwrap();
+        assert_eq!(source.requests.borrow().len(), 1, "lookups answered from the old copy");
+        assert_eq!(store.drops(&names(&["Pebble Snail"])).unwrap()[0].drops.len(), 3);
+
+        refresh(&mut store, &source, stale + RETRY_AFTER).unwrap();
+        assert_eq!(source.requests.borrow().len(), 2, "asked again a day later");
+    }
+
+    #[test]
+    fn without_a_copy_the_refusal_is_repeated_not_reasked() {
+        let mut store = Store::open_in_memory().unwrap();
+        let source = refusing();
+        let first = refresh(&mut store, &source, 1000).unwrap_err().to_string();
+        let again = refresh(&mut store, &source, 1001).unwrap_err().to_string();
+        assert!(first.contains("Log in to make this request"), "{first}");
+        assert_eq!(first, again);
+        assert_eq!(source.requests.borrow().len(), 1);
+    }
+
+    #[test]
+    fn forgetting_the_failure_asks_at_once_and_success_clears_it() {
+        let mut store = Store::open_in_memory().unwrap();
+        refresh(&mut store, &refusing(), 1000).unwrap_err();
+        store.set_failure(DROPS_FAILED, None).unwrap();
+        let mut source = FakeSource::default();
+        source.files.insert(page_url(0), REPLY.as_bytes().to_vec());
+        refresh(&mut store, &source, 1001).unwrap();
+        assert_eq!(store.drops_fetched_at().unwrap(), Some(1001));
+        assert_eq!(store.failure(DROPS_FAILED).unwrap(), None);
+    }
+
+    #[test]
+    fn a_download_that_works_after_the_wait_clears_the_failure() {
+        let mut store = Store::open_in_memory().unwrap();
+        refresh(&mut store, &refusing(), 1000).unwrap_err();
+        let mut source = FakeSource::default();
+        source.files.insert(page_url(0), REPLY.as_bytes().to_vec());
+        refresh(&mut store, &source, 1000 + RETRY_AFTER).unwrap();
+        assert_eq!(store.failure(DROPS_FAILED).unwrap(), None);
     }
 }

@@ -92,6 +92,11 @@ const SHOPS_FETCHED_AT: &str = "shops_fetched_at";
 /// Likewise for the wiki's table of who takes each quest in.
 const TURN_INS_FETCHED_AT: &str = "turn_ins_fetched_at";
 
+/// When a download of one of the wiki's tables last failed, and why, as `<time> <reason>`, so a
+/// refusal is not asked again on every lookup. A download that works removes it.
+pub const DROPS_FAILED: &str = "drops_failed";
+pub const TURN_INS_FAILED: &str = "turn_ins_failed";
+
 /// Kept in `source_info` when a new version of Leafline replaces the cache: the player had
 /// downloaded the map data or drop table, so each comes back without asking again.
 const WANTS_MAPS: &str = "wants_maps";
@@ -604,6 +609,7 @@ impl Store {
             "INSERT OR REPLACE INTO source_info (key, value) VALUES (?1, ?2)",
             [TURN_INS_FETCHED_AT, &now.to_string()],
         )?;
+        tx.execute("DELETE FROM source_info WHERE key = ?1", [TURN_INS_FAILED])?;
         tx.commit()?;
         Ok(())
     }
@@ -731,7 +737,29 @@ impl Store {
             "INSERT OR REPLACE INTO source_info (key, value) VALUES (?1, ?2)",
             [DROPS_FETCHED_AT, &now.to_string()],
         )?;
+        tx.execute("DELETE FROM source_info WHERE key = ?1", [DROPS_FAILED])?;
         tx.commit()?;
+        Ok(())
+    }
+
+    /// When a download kept under `key` ([`DROPS_FAILED`] or [`TURN_INS_FAILED`]) last failed,
+    /// and why.
+    pub fn failure(&self, key: &str) -> Result<Option<(i64, String)>> {
+        Ok(self.info(key)?.and_then(|value| {
+            let (at, reason) = value.split_once(' ').unwrap_or((&value, ""));
+            Some((at.parse().ok()?, reason.to_string()))
+        }))
+    }
+
+    /// Records a failed download under `key`, or with `None` forgets it so the next lookup asks again.
+    pub fn set_failure(&self, key: &str, failure: Option<(i64, &str)>) -> Result<()> {
+        match failure {
+            Some((at, reason)) => self.conn.execute(
+                "INSERT OR REPLACE INTO source_info (key, value) VALUES (?1, ?2)",
+                [key, &format!("{at} {reason}")],
+            )?,
+            None => self.conn.execute("DELETE FROM source_info WHERE key = ?1", [key])?,
+        };
         Ok(())
     }
 }

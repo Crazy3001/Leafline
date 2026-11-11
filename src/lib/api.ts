@@ -154,7 +154,7 @@ export interface Backend {
     measured: MeasuredRate[],
   ): Promise<Guide | null>;
   /** Downloads mapleclassic.wiki's whole drop table, so quest items can be looked up on this PC. */
-  downloadDrops(): Promise<void>;
+  downloadDrops(retry?: boolean): Promise<void>;
   /** When the drop table was last downloaded, in Unix seconds, or null before the first time. */
   dropsFetchedAt(): Promise<number | null>;
   /** Every map with monsters to hunt, with the rates the player measured. Null until map data is downloaded. */
@@ -424,7 +424,7 @@ const tauriBackend: Backend = {
   monsterDrops: (monsters) => invoke("monster_drops", { monsters }),
   questGuide: (quests, mapName, mapStreet, mapTwin, measured) =>
     invoke("quest_guide", { quests, mapName, mapStreet, mapTwin, measured }),
-  downloadDrops: () => invoke("download_drops"),
+  downloadDrops: (retry) => invoke("download_drops", { retry: retry ?? false }),
   dropsFetchedAt: () => invoke("drops_fetched_at"),
   trainingSpots: (mapName, mapStreet, mapTwin, measured, level, assumptions) =>
     invoke("training_spots", { mapName, mapStreet, mapTwin, measured, level, assumptions }),

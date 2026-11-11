@@ -153,7 +153,7 @@
     lookingUp = true;
     lookupError = null;
     try {
-      await backend.downloadDrops();
+      await backend.downloadDrops(true);
       await refresh();
     } catch (e) {
       lookupError = String(e);

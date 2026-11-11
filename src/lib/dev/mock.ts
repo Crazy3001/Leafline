@@ -592,7 +592,7 @@ export const mockBackend: Backend = {
     return sampleGuide(quests, 2, dropsDownloaded);
   },
   dropsFetchedAt: async () => (dropsDownloaded ? Date.now() / 1000 - 86400 : null),
-  async downloadDrops() {
+  async downloadDrops(_retry?: boolean) {
     await delay(900);
     dropsDownloaded = true;
   },
