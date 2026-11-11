@@ -42,6 +42,7 @@ jobs:
           shared-key: release
 
       - name: Build and upload to a draft release
+        id: tauri
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -51,10 +52,40 @@ jobs:
           releaseDraft: true
           prerelease: false
           releaseBody: |
-            An unofficial, read-only overlay for MapleStory Classic World. Windows 10 and 11.
+            An unofficial, read-only companion for MapleStory Classic World. Windows 10 and 11. What's new is in the [changelog](https://github.com/Crazy3001/Leafline/blob/main/CHANGELOG.md).
 
             Download the `-setup.exe` (or the `.msi`) below and run it. The installer isn't code-signed yet, so Windows SmartScreen may warn: choose **More info → Run anyway**.
 
             **Use it at your own risk.** Nexon has not said whether read-only overlays are allowed; the README explains what Leafline reads, what it never does, and the one reported ban. Leafline is not affiliated with or endorsed by Nexon.
 
             [Code signing policy](https://github.com/Crazy3001/Leafline#code-signing-policy)
+
+      # A SHA-256 for each installer, as SHA256SUMS.txt on the release and at the end of its
+      # notes, so a download can be checked against what this run built.
+      - name: Add SHA-256 checksums to the draft release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_ID: ${{ steps.tauri.outputs.releaseId }}
+          ARTIFACTS: ${{ steps.tauri.outputs.artifactPaths }}
+        run: |
+          $files = @((ConvertFrom-Json $env:ARTIFACTS) | ForEach-Object { $_ } | Where-Object { $_ -match '\.(exe|msi)$' })
+          if ($files.Count -eq 0) { throw "No installers among: $env:ARTIFACTS" }
+          $lines = foreach ($file in $files) {
+            '{0}  {1}' -f (Get-FileHash -Algorithm SHA256 $file).Hash.ToLower(), (Split-Path $file -Leaf)
+          }
+          $sums = Join-Path $env:RUNNER_TEMP 'SHA256SUMS.txt'
+          [IO.File]::WriteAllLines($sums, [string[]]$lines)
+          $release = "repos/$env:GITHUB_REPOSITORY/releases/$env:RELEASE_ID"
+          gh api --method POST -H 'Content-Type: text/plain' `
+            "https://uploads.github.com/$release/assets?name=SHA256SUMS.txt" --input $sums | Out-Null
+          if ($LASTEXITCODE) { throw 'Uploading SHA256SUMS.txt failed' }
+          $body = (gh api $release --jq .body) -join "`n"
+          $fence = '```'
+          $check = 'To check a download, run `Get-FileHash <file>` in PowerShell and compare.'
+          $notes = "$body`n`n### SHA-256`n$fence`n$($lines -join "`n")`n$fence`n$check"
+          $patch = Join-Path $env:RUNNER_TEMP 'release-body.json'
+          @{ body = $notes } | ConvertTo-Json | Set-Content -Encoding utf8 $patch
+          gh api --method PATCH $release --input $patch | Out-Null
+          if ($LASTEXITCODE) { throw 'Updating the release notes failed' }
+          $lines

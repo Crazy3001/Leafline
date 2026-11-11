@@ -1,8 +1,8 @@
 # Leafline
 
-**A free, read-only overlay for MapleStory Classic World.** It sits beside the game and shows your EXP and meso rates, where to train and how to get there, your quests, item checks and your build plan, all from what the game already shows on screen.
+**A free, read-only companion for MapleStory Classic World that tells you what to do next.** It sits beside the game, follows your quests and gives directions one step at a time, checks items, keeps your build plan on track, and measures your EXP and meso rates, all from what the game already shows on screen.
 
-[**Download the latest release**](https://github.com/Crazy3001/Leafline/releases/latest) · Windows 10 and 11 · [FAQ](#faq) · [Known limitations](#known-limitations) · [Code signing policy](#code-signing-policy)
+[**Download the latest release**](https://github.com/Crazy3001/Leafline/releases/latest) · Windows 10 and 11 · [FAQ](#faq) · [Known limitations](#known-limitations) · [Changelog](CHANGELOG.md) · [Code signing policy](#code-signing-policy)
 
 > [!WARNING]
 > **Leafline is unofficial, and you use it at your own risk.** Nexon has not said whether read-only overlays are allowed. [More on the risk](#is-it-allowed-can-i-get-banned)
@@ -145,7 +145,7 @@ Leafline won't use a price site's data without its permission, and it won't read
 Most misreads come from game settings: **UI Size: Ideal Ratio**, **HDR off** (restart the game after), and the English client. Bright, busy maps such as Henesys can make the Quest Helper hard to read, since its text is black on a see-through panel. Leafline prefers showing nothing over showing a wrong number, so a blank usually means it wasn't sure.
 
 ### How do I report a bug?
-[Open an issue](https://github.com/Crazy3001/Leafline/issues). **Settings → Data → Bug report details → Copy** copies what Leafline knows about its own state, with no character names, chat or file paths. A picture helps too: **Save frame** on the overlay saves the last picture Leafline read. It shows your game, so only post it if you're happy to share it.
+[Open an issue](https://github.com/Crazy3001/Leafline/issues). **Settings → Feedback → Bug report details → Copy** copies what Leafline knows about its own state, with no character names, chat or file paths. A picture helps too: **Save frame** on the overlay saves the last picture Leafline read. It shows your game, so only post it if you're happy to share it.
 
 ### Where's the data from?
 Map, monster, NPC, quest, skill and item facts come from OSMS Data Explorer, and player-seen drops and quest turn-ins from mapleclassic.wiki. See [Data and credits](#data-and-credits). Few monsters have drops logged on the wiki so far, so many show none yet.
@@ -154,7 +154,7 @@ Map, monster, NPC, quest, skill and item facts come from OSMS Data Explorer, and
 
 Leafline is built in the open, and what players send in decides what gets fixed and added next.
 
-- **Report what reads wrong.** [Open a bug report](https://github.com/Crazy3001/Leafline/issues/new?template=bug_report.yml) with **Settings → Data → Bug report details → Copy**. A saved frame of the misread (**Save frame**) is the single most useful thing you can send, since every reading fix so far started from one.
+- **Report what reads wrong.** [Open a bug report](https://github.com/Crazy3001/Leafline/issues/new?template=bug_report.yml) with **Settings → Feedback → Bug report details → Copy**. A saved frame of the misread (**Save frame**) is the single most useful thing you can send, since every reading fix so far started from one.
 - **Suggest what it should do.** [Share an idea](https://github.com/Crazy3001/Leafline/issues/new?template=idea.yml): something you look up mid-game, or a number you wish you could see.
 - **Add the drops you see to [mapleclassic.wiki](https://mapleclassic.wiki).** Leafline downloads its drop lists, so every drop you add there shows up for every player.
 - **Tell other players about it,** and star the repository if it helps you. That also helps Leafline qualify for free code signing, which gets rid of the Windows warning.
