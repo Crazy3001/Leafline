@@ -15,6 +15,9 @@
   import { Bookmark, ChevronRight, CircleHelp, ExternalLink, Minus, Plus } from "@lucide/svelte";
   import { onMount, untrack } from "svelte";
 
+  import SaveSpot from "./SaveSpot.svelte";
+  import { spots as spotStore, watchSpots } from "$lib/spots.svelte";
+
   import MapNote from "./MapNote.svelte";
   import MapDataPanel from "./map/MapDataPanel.svelte";
   import RouteSteps from "./map/RouteSteps.svelte";
@@ -33,7 +36,7 @@
     setAssumptions,
     watchAssumptions,
   } from "$lib/assumptions.svelte";
-  import type { Estimate, MapReading, MapRoute, SavedSpot, SessionSummary, TrainingSpot, TrainingSpots } from "$lib/types";
+  import type { Estimate, MapReading, MapRoute, SessionSummary, TrainingSpot, TrainingSpots } from "$lib/types";
   import Block from "$lib/ui/Block.svelte";
   import Button from "$lib/ui/Button.svelte";
   import Segmented from "$lib/ui/Segmented.svelte";
@@ -76,20 +79,13 @@
   let data = $state<TrainingSpots | null>(null);
   let open = $state<number | null>(null);
   let route = $state<MapRoute | null>(null);
-  let saved = $state<SavedSpot[]>([]);
-  let saveError = $state<string | null>(null);
   let editing = $state(false);
 
   onMount(() => {
-    backend
-      .savedSpots()
-      .then((list) => (saved = list))
-      .catch(() => (saved = []));
-    const stop = backend.onSavedSpots((list) => (saved = list));
-    return () => {
-      stop.then((unlisten) => unlisten());
-    };
+    watchSpots();
   });
+
+  const saved = $derived(spotStore.saved);
 
   const level = $derived(readLevel ?? manualLevel);
   const measured = $derived(measuredRates(session));
@@ -177,15 +173,6 @@
   });
   const shown = $derived(sort === "saved" ? ranked : ranked.slice(0, more ? 30 : SHOWN));
   const missingSaved = $derived(saved.filter((s) => !(data?.spots ?? []).some((spot) => spot.map.id === s.mapId)));
-
-  async function toggleSaved(mapId: number, name: string) {
-    saveError = null;
-    try {
-      saved = await backend.setSpotSaved(mapId, name, !savedIds.has(mapId));
-    } catch (e) {
-      saveError = String(e);
-    }
-  }
 
   function stored(key: string, fallback: string) {
     try {
@@ -312,20 +299,6 @@
   }
 </script>
 
-{#snippet saveToggle(mapId: number, name: string)}
-  {@const isSaved = savedIds.has(mapId)}
-  <button
-    class="save"
-    class:on={isSaved}
-    aria-pressed={isSaved}
-    title={isSaved ? "Remove from your spots" : "Save to your spots"}
-    aria-label={isSaved ? `Remove ${name} from your spots` : `Save ${name} to your spots`}
-    onclick={() => toggleSaved(mapId, name)}
-  >
-    <Bookmark size={13} fill={isSaved ? "currentColor" : "none"} />
-  </button>
-{/snippet}
-
 <Block id={SPOTS_ID} title="Where to train" {last}>
   {#snippet aside()}
     <span
@@ -360,7 +333,7 @@
     <p class="quiet">Loading maps…</p>
   {:else}
     <Segmented options={sorts} value={sort} label="Rank by" stretch onchange={pickSort} />
-    {#if saveError}<p class="warn">{saveError}</p>{/if}
+    {#if spotStore.error}<p class="warn">{spotStore.error}</p>{/if}
 
     <ol class="spots">
       {#each shown as spot, i (spot.map.id)}
@@ -414,7 +387,7 @@
               <span class="chevron" class:open={expanded}><ChevronRight size={12} /></span>
             </div>
             {#if steps(spot) !== 0}<span class="go"><GoButton place={mapPlace(spot.map)} /></span>{/if}
-            {@render saveToggle(spot.map.id, spot.map.name)}
+            <SaveSpot mapId={spot.map.id} name={spot.map.name} />
           </div>
           {#if expanded}
             {@const guess = estimate(spot)}
@@ -461,7 +434,7 @@
             {level != null ? `No maps with monsters near Lv ${level}. Tick Every level to see the rest.` : "Set your level to see maps that suit it."}
           </li>
         {:else if !missingSaved.length}
-          <li class="quiet empty">No saved spots yet. Click the bookmark beside a map to keep it here.</li>
+          <li class="quiet empty">No saved spots yet. Click the bookmark beside a map, here or on the Map tab, to keep it here.</li>
         {/if}
       {/each}
       {#each sort === "saved" ? missingSaved : [] as spot (spot.mapId)}
@@ -471,7 +444,7 @@
               <span class="rank"></span>
               <span class="names"><span class="name">{spot.name}</span><span class="meta">Not in the map data any more</span></span>
             </span>
-            {@render saveToggle(spot.mapId, spot.name)}
+            <SaveSpot mapId={spot.mapId} name={spot.name} />
           </div>
         </li>
       {/each}
@@ -708,29 +681,6 @@
 
   .chevron.open {
     transform: rotate(90deg);
-  }
-
-  .save {
-    display: grid;
-    flex: none;
-    place-items: center;
-    width: 26px;
-    height: 26px;
-    padding: 0;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--muted);
-    cursor: pointer;
-  }
-
-  .save:hover {
-    background: rgba(255, 255, 255, 0.07);
-    color: var(--text);
-  }
-
-  .save.on {
-    color: var(--accent);
   }
 
   .detail {

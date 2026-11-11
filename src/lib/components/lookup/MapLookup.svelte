@@ -2,6 +2,7 @@
   // The Maps half of the Lookup tab: the map the player is on, and a search of every map in the
   // data by name, area, monster or NPC, down to a map's full card.
   import GoButton from "$lib/components/GoButton.svelte";
+  import SaveSpot from "$lib/components/SaveSpot.svelte";
   import { mapPlace } from "$lib/destination.svelte";
   import { ArrowLeft, LoaderCircle } from "@lucide/svelte";
   import { untrack } from "svelte";
@@ -167,6 +168,7 @@
       <Card title="Map" plain={pinned}>
         {#if details.map.street}<p class="street">{details.map.street}</p>{/if}
         <h3 class="name">{details.map.name} <GoButton place={mapPlace(details.map)} /></h3>
+        <p class="save-row"><SaveSpot mapId={details.map.id} name={details.map.name} text /></p>
         {#key details.map.id}
           <MapDetailsView {details} current={here?.card.map ?? null} variant="compact" onnavigate={open} />
         {/key}
@@ -205,6 +207,10 @@
 {/if}
 
 <style>
+  .save-row {
+    margin: 2px 0 8px;
+  }
+
   .lead {
     margin: 0 0 10px;
     color: var(--muted);

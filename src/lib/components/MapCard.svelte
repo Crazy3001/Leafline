@@ -8,6 +8,7 @@
   import MapPicker from "./map/MapPicker.svelte";
   import GoTo from "./map/GoTo.svelte";
   import GoButton from "./GoButton.svelte";
+  import SaveSpot from "./SaveSpot.svelte";
   import { mapPlace } from "$lib/destination.svelte";
   import { backend } from "$lib/api";
   import { formatCompact, formatDuration, mapLabel } from "$lib/format";
@@ -110,6 +111,9 @@
         {/if}
       </div>
     </div>
+    {#if shown && variant !== "glance"}
+      <div class="save-row"><SaveSpot mapId={shown.map.id} name={shown.map.name} text /></div>
+    {/if}
     {#if here && !browsing}
       <dl class="here">
         <div><dt>Time here</dt><dd class="tabular">{formatDuration(here.activeSeconds)}</dd></div>
@@ -161,6 +165,10 @@
 <style>
   .goto {
     margin: var(--space-2) 0;
+  }
+
+  .save-row {
+    margin-top: 6px;
   }
 
   .where {

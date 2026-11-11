@@ -8,6 +8,7 @@
 
   import LevelGoal from "./LevelGoal.svelte";
   import PotionCosts from "./PotionCosts.svelte";
+  import SaveSpot from "./SaveSpot.svelte";
   import SpotList, { SPOTS_ID } from "./SpotList.svelte";
   import TimersCard from "./TimersCard.svelte";
   import { openTrainingLog } from "$lib/nav.svelte";
@@ -380,7 +381,7 @@
               <td>
                 {#if row.map === session.map}<span class="here" title="You are here"></span>{/if}
                 {#if row.map}<button class="ref ref-map" onclick={() => showMapNamed(row.map!)}>{splitMapLabel(row.map).name}</button
-                  >{:else}<span
+                  >{#if !town} <SaveSpot label={row.map} name={splitMapLabel(row.map).name} />{/if}{:else}<span
                     class="unplaced"
                     >Not placed on a map</span
                   >{/if}
@@ -428,7 +429,7 @@
         <tbody>
           {#each bests as m (m.map)}
             <tr>
-              <td><button class="ref ref-map" onclick={() => showMapNamed(m.map)}>{m.name}</button></td>
+              <td><button class="ref ref-map" onclick={() => showMapNamed(m.map)}>{m.name}</button> <SaveSpot label={m.map} name={m.name} /></td>
               <td class="tabular">{formatCompact(m.best!.expPerHour)}</td>
               <td class="tabular">{m.bestMesos ? formatCompact(m.bestMesos.mesosPerHour) : "—"}</td>
               <td class="tabular muted">{m.best!.level != null ? `Lv ${m.best!.level} · ` : ""}{shortDay(m.best!.at)}</td>
