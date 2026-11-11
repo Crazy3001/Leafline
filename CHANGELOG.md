@@ -6,6 +6,12 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
 ## Unreleased
 
 ### Added
+- **Ready-made build plans** for every 2nd job, Lv 1 to 70, each following one written guide
+  level by level: the skill points, the AP, and the gear to aim for. The plan credits its guide
+  and links to the exact page, and the link is saved with the build. Where a guide offers a
+  choice (Arrow Blow or Double Shot, axe or sword, spear or polearm, Magic Claw or Energy Bolt),
+  each choice is its own plan beside the first. They replace the plans Leafline had written
+  itself.
 - **Desk view tabs:** the desk view now has tabs: Training, Questing, Character, Training log,
   Build planner and two of your own. Rename any tab, change its columns and panels, or reset it;
   your tabs, the window's size and whether it is maximized are all remembered. The training log

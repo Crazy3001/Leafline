@@ -919,8 +919,8 @@
             <section>
               <h2 class="group">Ready-made plans</h2>
               <p class="help">
-                Some are written for Leafline from what each skill does and what each weapon needs; others follow one guide and say
-                so. All are untested in game. Using one replaces your goals; your stats stay.
+                Each follows one written guide and credits it. Untested in game. Using one replaces your goals; your stats
+                stay.
               </p>
               <ul class="plans">
                 {#each jobPlans as starter (starter.id)}

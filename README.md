@@ -47,7 +47,7 @@
 
 ### Your character
 - **Character tab:** level, job, HP, MP, EXP and mesos at a glance, with what your build plan says to do at this level.
-- **Build planner:** a job and a list of goals in order ("this skill to 20, DEX to 25, the rest into LUK"), laid out level by level. It warns when a goal comes too late or SP would be lost at a job advancement. Ready-made starting plans for each 2nd job.
+- **Build planner:** a job and a list of goals in order ("this skill to 20, DEX to 25, the rest into LUK"), laid out level by level. It warns when a goal comes too late or SP would be lost at a job advancement. Ready-made plans for each 2nd job, each following one credited guide.
 - **Follows your real character:** open your Stat or Skill window in game and the plan picks up from where you really are.
 - **Gear:** what you're wearing, the best you can wear now, and the next step up, ranked by the stats your plan raises.
 - **Job advancement checklist:** who to see and where, with a route, when an advancement comes up.
@@ -169,7 +169,7 @@ This is an early release, and these are the rough edges known so far. Please [re
 - **Mesos/hour** needs a look at your mesos now and then (inventory open, or a shop). It says how much of the session it covers.
 - **Shop, storage and trade windows** are recognised by their buttons, which hasn't been checked much on real frames.
 - **The party count** hasn't been checked on a real party yet.
-- **Starter build plans and gear picks** were written for Leafline from what each skill and item does. Nobody has played them through yet, so treat them as a starting point.
+- **Ready-made build plans** follow one written guide each and credit it in the app. Nobody has played them through yet, so treat them as a starting point.
 - **The planner counts points.** It doesn't work out damage, accuracy or HP, because those are unsettled for Classic.
 - **A jump of several levels** between two readings adds no EXP, since the levels in between were never measured.
 - **Windows HDR** has to be off for reliable readings.
