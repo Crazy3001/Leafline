@@ -196,22 +196,6 @@ export function mapBars(stats: MapStats[], metric: Metric): Bar[] {
     }));
 }
 
-/**
- * How the player's measured rates compare with the map data's base EXP per clear, weighted by
- * time played: EXP an hour per base point. Estimates for maps not tried yet are this times their
- * base EXP. Null until at least ten minutes are measured on maps the data knows.
- */
-export function rateRatio(measured: { expPerClear: number; expPerHour: number; activeSeconds: number }[]): number | null {
-  let weighted = 0;
-  let seconds = 0;
-  for (const m of measured) {
-    if (m.expPerClear <= 0 || m.activeSeconds <= 0) continue;
-    weighted += (m.expPerHour / m.expPerClear) * m.activeSeconds;
-    seconds += m.activeSeconds;
-  }
-  return seconds >= 600 ? weighted / seconds : null;
-}
-
 export interface Day {
   /** Local midnight, Unix seconds. */
   start: number;

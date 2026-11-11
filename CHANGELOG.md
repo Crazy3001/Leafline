@@ -3,6 +3,14 @@
 What changed in each release of Leafline. Leafline is a work in progress: if something reads
 wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?template=bug_report.yml).
 
+## Unreleased
+
+### Changed
+- **Where to train → For you:** maps you haven't tried are now estimated from how fast you get
+  through monster HP in your own solo play, near your level, and held to how many monsters the
+  map can bring back in an hour. Each estimate shows how sure it is and why. The respawn time
+  behind that limit is an assumption you can change under **Assumptions**.
+
 ## 0.1.1 (2026-11-10)
 
 ### Added

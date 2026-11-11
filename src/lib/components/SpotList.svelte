@@ -5,9 +5,11 @@
 
 <script lang="ts">
   // Where to train: maps near the character's level, ranked for this player. "For you" uses the
-  // EXP per hour measured on each map, and for maps not tried yet an estimate: the map's base
-  // EXP per clear times how the player's measured maps compare with theirs. No game formulas
-  // are modelled. "Saved" lists the maps the player bookmarked, whatever their level.
+  // EXP per hour measured on each map, and for maps not tried yet an estimate from the player's
+  // kill speed: the monster HP they get through an hour solo, over the HP of the map's average
+  // monster, held to what the map can respawn at an assumed respawn time (see training.rs). No
+  // damage formulas are modelled. "Saved" lists the maps the player bookmarked, whatever their
+  // level.
   import GoButton from "$lib/components/GoButton.svelte";
   import { mapPlace } from "$lib/destination.svelte";
   import { Bookmark, ChevronRight, CircleHelp, ExternalLink, Minus, Plus } from "@lucide/svelte";
@@ -22,8 +24,16 @@
   import { measuredRates, watchHistory } from "$lib/history.svelte";
   import { mapData, watchMapData } from "$lib/mapdata.svelte";
   import { travelKey } from "$lib/settings.svelte";
-  import { rateRatio } from "$lib/training";
-  import type { MapReading, MapRoute, SavedSpot, SessionSummary, TrainingSpot, TrainingSpots } from "$lib/types";
+  import {
+    assumptions,
+    DEFAULT_ASSUMPTIONS,
+    EXP_RATE_RANGE,
+    isDefault,
+    RESPAWN_RANGE,
+    setAssumptions,
+    watchAssumptions,
+  } from "$lib/assumptions.svelte";
+  import type { Estimate, MapReading, MapRoute, SavedSpot, SessionSummary, TrainingSpot, TrainingSpots } from "$lib/types";
   import Block from "$lib/ui/Block.svelte";
   import Button from "$lib/ui/Button.svelte";
   import Segmented from "$lib/ui/Segmented.svelte";
@@ -56,6 +66,7 @@
 
   watchMapData();
   watchHistory();
+  watchAssumptions();
   const ready = $derived(mapData.status?.ready ?? false);
 
   let sort = $state<Sort>(storedSort());
@@ -67,6 +78,7 @@
   let route = $state<MapRoute | null>(null);
   let saved = $state<SavedSpot[]>([]);
   let saveError = $state<string | null>(null);
+  let editing = $state(false);
 
   onMount(() => {
     backend
@@ -81,7 +93,9 @@
 
   const level = $derived(readLevel ?? manualLevel);
   const measured = $derived(measuredRates(session));
-  const queryKey = $derived(JSON.stringify([map?.name, map?.street, map?.twin, measured, travelKey()]));
+  const queryKey = $derived(
+    JSON.stringify([map?.name, map?.street, map?.twin, measured, travelKey(), level, assumptions.value]),
+  );
   const fromId = $derived(data?.from?.id);
 
   // Follows the key alone: every live reading brings new objects with the same content.
@@ -92,7 +106,9 @@
       data = null;
       return;
     }
-    untrack(() => backend.trainingSpots(map?.name ?? null, map?.street ?? null, map?.twin ?? null, measured))
+    untrack(() =>
+      backend.trainingSpots(map?.name ?? null, map?.street ?? null, map?.twin ?? null, measured, level, assumptions.value),
+    )
       .then((result) => {
         if (key === queryKey) data = result;
       })
@@ -114,7 +130,7 @@
   const near = (s: TrainingSpot) => level == null || (s.averageLevel >= level - BELOW && s.averageLevel <= level + ABOVE);
   const savedIds = $derived(new Set(saved.map((s) => s.mapId)));
   const sorts = $derived<{ id: Sort; label: string; title: string }[]>([
-    { id: "you", label: "For you", title: "Your EXP per hour where you have played, an estimate where you haven't" },
+    { id: "you", label: "For you", title: "Your EXP per hour where you have played, an estimate from your kill speed where you haven't" },
     { id: "exp", label: "EXP / clear", title: "Base EXP for defeating every monster on the map once" },
     { id: "near", label: "Nearest", title: "Fewest portals from where you are" },
     {
@@ -124,22 +140,17 @@
     },
   ]);
 
-  /** EXP an hour per base EXP point, from the maps the player measured. */
-  const ratio = $derived(
-    rateRatio(
-      (data?.spots ?? [])
-        .filter((s) => s.measured)
-        .map((s) => ({ expPerClear: s.expPerClear, expPerHour: s.measured!.expPerHour, activeSeconds: s.measured!.activeSeconds })),
-    ),
-  );
-  const estimate = (s: TrainingSpot) => (s.measured ? null : ratio != null ? s.expPerClear * ratio : null);
-  const forYou = (s: TrainingSpot) => s.measured?.expPerHour ?? estimate(s) ?? -1;
+  const speed = $derived(data?.speed ?? null);
+  /** The estimate for a map the player hasn't measured. */
+  const estimate = (s: TrainingSpot) => (s.measured ? null : s.estimate);
+  const forYou = (s: TrainingSpot) => s.measured?.expPerHour ?? estimate(s)?.expPerHour ?? -1;
 
   const ranked = $derived.by(() => {
     const spots = (data?.spots ?? []).filter((s) =>
       sort === "saved" ? savedIds.has(s.map.id) : s.reachable && (allLevels || near(s) || savedIds.has(s.map.id)),
     );
-    const you = (s: TrainingSpot) => (ratio == null && !s.measured ? s.expPerClear / 1e6 - 1 : forYou(s));
+    // With no kill speed yet, maps not tried fall back to base EXP, below every measured one.
+    const you = (s: TrainingSpot) => (speed == null && !s.measured ? s.expPerClear / 1e6 - 1 : forYou(s));
     const by: Record<Sort, (s: TrainingSpot) => number> = {
       you,
       exp: (s) => s.expPerClear,
@@ -225,7 +236,7 @@
     return [`Lv ${low}${high !== low ? `–${high}` : ""}`, ...(names.length ? [names.join(", ")] : [])].join(" · ");
   }
 
-  function metric(spot: TrainingSpot): { value: string; unit: string; quiet: boolean } {
+  function metric(spot: TrainingSpot): { value: string; unit: string; quiet: boolean; sure?: Estimate["sureness"] } {
     if (sort === "exp") return { value: formatCompact(spot.expPerClear), unit: "EXP / clear", quiet: false };
     if (sort === "near") {
       const hops = steps(spot);
@@ -234,15 +245,45 @@
     }
     if (spot.measured) return { value: formatCompact(spot.measured.expPerHour), unit: "your EXP / hr", quiet: false };
     const guess = estimate(spot);
-    if (guess != null) return { value: `≈${formatCompact(guess)}`, unit: "est. EXP / hr", quiet: true };
+    if (guess) return { value: `≈${formatCompact(guess.expPerHour)}`, unit: "est. EXP / hr", quiet: true, sure: guess.sureness };
     return { value: formatCompact(spot.expPerClear), unit: "EXP / clear", quiet: true };
+  }
+
+  const SURENESS = { 3: "Fairly sure", 2: "Rough", 1: "A guess" } as const;
+
+  const times = (ratio: number) => (ratio >= 10 ? Math.round(ratio) : Math.round(ratio * 10) / 10);
+
+  /** Where an estimate comes from, then what makes it less sure, one sentence each. */
+  function reasons(spot: TrainingSpot, guess: Estimate): string[] {
+    if (!speed) return [];
+    const levels = speed.levels
+      ? ` at Lv ${speed.levels[0]}${speed.levels[1] !== speed.levels[0] ? `–${speed.levels[1]}` : ""}`
+      : "";
+    const out = [
+      `From ${formatDuration(speed.activeSeconds)} of your solo play on ${speed.maps} map${speed.maps === 1 ? "" : "s"}${levels}: ` +
+        `about ${formatCompact(speed.hpPerHour)} monster HP an hour, so about ${formatCompact(guess.killsPerHour)} kills an hour here.`,
+    ];
+    if (guess.capped)
+      out.push(
+        `Held to what the map can respawn: ${formatCompact(guess.ceiling)} kills an hour if every monster is back ` +
+          `after ${assumptions.value.respawnSeconds} s. That respawn time is an assumption you can change below.`,
+      );
+    if (guess.hpRatio > 2)
+      out.push(`Its monsters have ${times(guess.hpRatio)}× the HP of the ones you usually fight, so they may take longer than HP alone says.`);
+    else if (guess.hpRatio < 0.5)
+      out.push(`Its monsters have ${times(1 / guess.hpRatio)}× less HP than the ones you usually fight. If those already fall in one hit, this reads high.`);
+    if (guess.levelGap != null && guess.levelGap > 3)
+      out.push(`They average ${Math.round(guess.levelGap)} levels above you, so expect more misses.`);
+    if (speed.widened)
+      out.push("Little of your solo play is near your level, so older sessions count too. You likely kill faster now.");
+    else if (speed.activeSeconds < 30 * 60) out.push("Under half an hour of play to go on.");
+    return out;
   }
 
   function why(spot: TrainingSpot) {
     if (spot.measured) return `Your rate over ${formatDuration(spot.measured.activeSeconds)} of play here.`;
-    if (estimate(spot) != null)
-      return "Not tried yet. The estimate scales its base EXP by how your measured maps compare with theirs, so it doesn't know how tough or spread out the monsters are.";
-    return "Not tried yet. Play a while on any map and Leafline can estimate this one from your own rate.";
+    if (estimate(spot)) return null;
+    return "Not tried yet. Play ten minutes solo on any map and Leafline can estimate this one from your kill speed.";
   }
 </script>
 
@@ -264,7 +305,7 @@
   {#snippet aside()}
     <span
       class="help"
-      title="Your rate is measured in your own sessions. Other maps are estimated from the map data, without EXP events, party bonus or respawn speed."
+      title="Where you have played, your own rate. Elsewhere, an estimate from how fast you get through monster HP solo, held to an assumed respawn time. Party bonus and misses aren't modelled."
     >
       <CircleHelp size={13} />
     </span>
@@ -312,7 +353,13 @@
               </span>
               <span class="metric">
                 <span class="value num">{m.value}</span>
-                <span class="unit" class:quiet={m.quiet}>{m.unit}</span>
+                <span class="unit" class:quiet={m.quiet}>
+                  {#if m.sure}
+                    <span class="sure" title={SURENESS[m.sure]} aria-label={SURENESS[m.sure]}>
+                      {#each [1, 2, 3] as step (step)}<i class:on={step <= m.sure}></i>{/each}
+                    </span>
+                  {/if}{m.unit}
+                </span>
               </span>
               <span class="chevron" class:open={expanded}><ChevronRight size={12} /></span>
             </button>
@@ -320,8 +367,16 @@
             {@render saveToggle(spot.map.id, spot.map.name)}
           </div>
           {#if expanded}
+            {@const guess = estimate(spot)}
             <div class="detail">
-              <p class="why">{why(spot)}</p>
+              {#if guess}
+                <div class="why">
+                  <p><strong>{SURENESS[guess.sureness]}.</strong> {reasons(spot, guess)[0]}</p>
+                  {#each reasons(spot, guess).slice(1) as line (line)}<p>{line}</p>{/each}
+                </div>
+              {:else}
+                <p class="why">{why(spot)}</p>
+              {/if}
               <MapNote mapId={spot.map.id} name={spot.map.name} flush />
               <table>
                 <thead><tr><th>Monster</th><th>Lv</th><th>Count</th><th>EXP</th></tr></thead>
@@ -390,8 +445,49 @@
         </Button>
       {/if}
       <span class="grow"></span>
+      {#if sort === "you" || sort === "saved"}
+        <Button variant="ghost" size="sm" pressed={editing} onclick={() => (editing = !editing)}>
+          Assumptions{isDefault(assumptions.value) ? "" : " *"}
+        </Button>
+      {/if}
       <Button variant="primary" onclick={openTrainingLog}>Training log <ExternalLink size={12} /></Button>
     </div>
+    {#if editing && (sort === "you" || sort === "saved")}
+      <div class="assume">
+        <p>Estimates take these as given. Neither is a known fact about the game; change them if you know better.</p>
+        <label>
+          <span>Monsters respawn after</span>
+          <input
+            type="number"
+            min={RESPAWN_RANGE[0]}
+            max={RESPAWN_RANGE[1]}
+            step="1"
+            value={assumptions.value.respawnSeconds}
+            onchange={(e) => setAssumptions({ respawnSeconds: Number(e.currentTarget.value) })}
+          />
+          <span class="suffix">s</span>
+        </label>
+        <label>
+          <span>EXP per kill, times base</span>
+          <input
+            type="number"
+            min={EXP_RATE_RANGE[0]}
+            max={EXP_RATE_RANGE[1]}
+            step="0.1"
+            value={assumptions.value.expRate}
+            onchange={(e) => setAssumptions({ expRate: Number(e.currentTarget.value) })}
+          />
+          <span class="suffix">×</span>
+        </label>
+        <p>
+          The respawn time only matters on maps where you'd defeat monsters faster than they come back. The EXP figure is
+          used to count your kills from the EXP you gained.
+        </p>
+        {#if !isDefault(assumptions.value)}
+          <Button variant="ghost" size="sm" onclick={() => setAssumptions(DEFAULT_ASSUMPTIONS)}>Back to defaults</Button>
+        {/if}
+      </div>
+    {/if}
   {/if}
 </Block>
 
@@ -589,6 +685,88 @@
     margin: 0;
     font-size: var(--text-xs);
     color: var(--muted);
+  }
+
+  div.why {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .why p {
+    margin: 0;
+  }
+
+  .why strong {
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .sure {
+    display: inline-flex;
+    gap: 2px;
+    margin-right: 5px;
+    vertical-align: middle;
+  }
+
+  .sure i {
+    width: 4px;
+    height: 4px;
+    border-radius: 1px;
+    background: var(--border-strong);
+  }
+
+  .sure i.on {
+    background: var(--muted);
+  }
+
+  .assume {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: var(--space-2);
+    padding: var(--space-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+  }
+
+  .assume p {
+    margin: 0;
+    font-size: var(--text-xs);
+    color: var(--muted);
+  }
+
+  .assume label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--text-sm);
+  }
+
+  .assume label > span:first-child {
+    flex: 1;
+  }
+
+  .assume input {
+    width: 56px;
+    height: 22px;
+    padding: 0 4px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    text-align: right;
+  }
+
+  .assume .suffix {
+    width: 10px;
+    color: var(--faint);
+  }
+
+  .assume :global(button) {
+    align-self: flex-start;
   }
 
   table {

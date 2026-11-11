@@ -585,9 +585,9 @@ export const mockBackend: Backend = {
     await delay(900);
     dropsDownloaded = true;
   },
-  async trainingSpots(_name, _street, _twin, measured) {
+  async trainingSpots(_name, _street, _twin, measured, level, assumptions) {
     if (!mapStatus.ready) return null;
-    return preview?.spots ?? sampleSpots(2, measured);
+    return preview?.spots ?? sampleSpots(2, measured, level, assumptions);
   },
   async openLink(url) {
     window.open(url, "_blank", "noopener");

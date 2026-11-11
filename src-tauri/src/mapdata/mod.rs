@@ -15,6 +15,7 @@ pub mod guide;
 pub mod osms;
 pub mod places;
 pub mod questbook;
+pub mod shops;
 pub mod store;
 pub mod training;
 pub mod travel;
@@ -28,7 +29,7 @@ pub use guide::{ItemOrigin, QuestGuide, QuestQuery, QuestTitles};
 pub use places::{MapPage, MapQuery, MapRow, NpcPage, NpcQuery, NpcRow, NpcSheet};
 pub use questbook::{QuestPage, QuestRow, QuestSearch, QuestSheet};
 pub use store::{DataStatus, Store};
-pub use training::{MeasuredRate, TrainingSpot};
+pub use training::{Assumptions, KillSpeed, MeasuredRate, TrainingSpot};
 pub use travel::{Travel, TravelChoice, TravelFile};
 
 /// The credit OSMS asks for, shown with any data from it.

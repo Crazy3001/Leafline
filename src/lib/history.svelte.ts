@@ -28,20 +28,22 @@ export function isSaved(session: SessionSummary | null): boolean {
 }
 
 /**
- * EXP per hour measured on each map: every saved session, plus the current one unless it has
- * been saved already.
+ * EXP per hour measured on each map, one entry per map, level and party size of a session: every
+ * saved session, plus the current one unless it has been saved already. The level and party let
+ * the kill speed behind the training estimates keep to solo play near the character's level.
  */
 export function measuredRates(session: SessionSummary | null): MeasuredRate[] {
-  const saved = (history.value?.maps ?? []).map((m) => ({
-    label: m.map,
-    expPerHour: m.expPerHour,
-    activeSeconds: m.activeSeconds,
-  }));
-  const current =
-    session && !isSaved(session)
-      ? session.maps
-          .filter((m) => m.map != null && m.expPerHour != null && m.activeSeconds > 0)
-          .map((m) => ({ label: m.map!, expPerHour: m.expPerHour!, activeSeconds: m.activeSeconds }))
-      : [];
-  return [...saved, ...current];
+  const lines = [
+    ...(history.value?.sessions ?? []).flatMap((s) => s.lines),
+    ...(session && !isSaved(session) ? session.lines : []),
+  ];
+  return lines
+    .filter((l) => l.map != null && !l.town && l.activeSeconds > 0 && l.expGained > 0)
+    .map((l) => ({
+      label: l.map!,
+      expPerHour: (l.expGained * 3600) / l.activeSeconds,
+      activeSeconds: l.activeSeconds,
+      level: l.level,
+      party: l.party,
+    }));
 }

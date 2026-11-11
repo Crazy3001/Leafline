@@ -50,6 +50,7 @@ import type {
   NavState,
   Destination,
   MeasuredRate,
+  Assumptions,
   SavedSpot,
   UpdateStatus,
   ItemNote,
@@ -156,6 +157,8 @@ export interface Backend {
     mapStreet: string | null,
     mapTwin: number | null,
     measured: MeasuredRate[],
+    level: number | null,
+    assumptions: Assumptions,
   ): Promise<TrainingSpots | null>;
   /** One page of the quest search. */
   searchQuests(search: QuestSearch): Promise<QuestPage>;
@@ -401,8 +404,8 @@ const tauriBackend: Backend = {
     invoke("quest_guide", { quests, mapName, mapStreet, mapTwin, measured }),
   downloadDrops: () => invoke("download_drops"),
   dropsFetchedAt: () => invoke("drops_fetched_at"),
-  trainingSpots: (mapName, mapStreet, mapTwin, measured) =>
-    invoke("training_spots", { mapName, mapStreet, mapTwin, measured }),
+  trainingSpots: (mapName, mapStreet, mapTwin, measured, level, assumptions) =>
+    invoke("training_spots", { mapName, mapStreet, mapTwin, measured, level, assumptions }),
   searchQuests: (search) => invoke("search_quests", { search }),
   questRegions: () => invoke("quest_regions"),
   questSheet: (id, mapName, mapStreet, mapTwin) => invoke("quest_sheet", { id, mapName, mapStreet, mapTwin }),

@@ -202,7 +202,7 @@ fn main() {
     if let Some(level) = value("--train", 1) {
         let level: f64 = level.parse().expect("level");
         let from = value("--from", 1).map(|id| id.parse().expect("map id"));
-        let mut spots = atlas.training_spots(from, &[], &Travel::none());
+        let mut spots = atlas.training_spots(from, &[], &Travel::none(), None);
         spots.retain(|s| s.reachable && (s.average_level - level).abs() <= 5.0);
         spots.sort_by_key(|s| std::cmp::Reverse(s.exp_per_clear));
         for s in spots {
@@ -276,7 +276,7 @@ fn main() {
             "map": found,
             "routes": routes,
             "guide": { "from": found.as_ref().map(|m| &m.card.map), "quests": guide },
-            "spots": { "from": found.as_ref().map(|m| &m.card.map), "spots": atlas.training_spots(from, &[], &travel) },
+            "spots": { "from": found.as_ref().map(|m| &m.card.map), "spots": atlas.training_spots(from, &[], &travel, None) },
         });
         std::fs::write(&out, serde_json::to_string(&preview).expect("serialise")).expect("write preview");
         println!("wrote {out}");

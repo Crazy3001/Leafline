@@ -16,8 +16,8 @@ use crate::error::{Error, Result};
 use crate::mapdata::fetch::{self, Http};
 use crate::mapdata::osms::Dataset;
 use crate::mapdata::{
-    Atlas, DataStatus, ItemOrigin, MapCard, MapMatch, MapPage, MapQuery, MapRef, MeasuredRate, MonsterDrops, MonsterFilters,
-    MonsterPage, MonsterQuery, MonsterSheet, NpcPage, NpcQuery, NpcSheet, QuestGuide, QuestPage, QuestQuery, QuestSearch,
+    Assumptions, Atlas, DataStatus, ItemOrigin, KillSpeed, MapCard, MapMatch, MapPage, MapQuery, MapRef, MeasuredRate,
+    MonsterDrops, MonsterFilters, MonsterPage, MonsterQuery, MonsterSheet, NpcPage, NpcQuery, NpcSheet, QuestGuide, QuestPage, QuestQuery, QuestSearch,
     QuestSheet, RefreshReport, Route, Store, TrainingSpot, Travel, TravelFile, drops, turnins,
 };
 
@@ -624,12 +624,18 @@ pub fn drops_fetched_at(state: State<MapDataState>) -> Result<Option<i64>> {
 pub struct Spots {
     /// The map portals are counted from, when the minimap was read and matched.
     from: Option<MapRef>,
+    /// How fast the player gets through monster HP, behind every estimate. None until enough
+    /// solo play is saved.
+    speed: Option<KillSpeed>,
     spots: Vec<TrainingSpot>,
 }
 
 /// Every map with monsters to hunt, for the training spot finder, with the EXP per hour the
-/// player measured on each. `None` until map data has been downloaded.
+/// player measured on each and an estimate from their kill speed for the rest. `level` is the
+/// character's; `assumptions` what the player set for respawn time and EXP rate. `None` until
+/// map data has been downloaded.
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub fn training_spots(
     app: AppHandle,
     state: State<MapDataState>,
@@ -637,11 +643,15 @@ pub fn training_spots(
     map_street: Option<String>,
     map_twin: Option<u32>,
     measured: Vec<MeasuredRate>,
+    level: Option<u32>,
+    assumptions: Option<Assumptions>,
 ) -> Option<Spots> {
     let atlas = state.atlas()?;
     let from = map_name.and_then(|name| atlas.find_twin(&name, map_street.as_deref(), map_twin)).map(|m| m.card.map);
-    let spots = atlas.training_spots(from.as_ref().map(|m| m.id), &measured, &travel(&app, &atlas));
-    Some(Spots { from, spots })
+    let estimator = atlas.estimator(&measured, level, assumptions.unwrap_or_default());
+    let spots =
+        atlas.training_spots(from.as_ref().map(|m| m.id), &measured, &travel(&app, &atlas), estimator.as_ref());
+    Some(Spots { from, speed: estimator.map(|e| e.speed), spots })
 }
 
 /// Opens one of the card's links in the default browser. Only the sites it links to are allowed.

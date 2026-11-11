@@ -1234,6 +1234,7 @@ mod tests {
             label: "Fern Road : Mossbank Meadow I".into(),
             exp_per_hour: 600.0,
             active_seconds: 900.0,
+            ..MeasuredRate::default()
         }];
         let guide =
             atlas.quest_guide(&[query("Shell Sorting", &["Pebble Snail"])], Some(1), &[], &measured, &Travel::none());

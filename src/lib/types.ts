@@ -688,6 +688,50 @@ export interface MeasuredRate {
   label: string;
   expPerHour: number;
   activeSeconds: number;
+  /** The character's level then, when read. */
+  level?: number | null;
+  /** Party size then; none or one is solo. */
+  party?: number | null;
+}
+
+/**
+ * What the training estimates take as given because the map data doesn't say (see
+ * src-tauri/src/mapdata/training.rs). The player can change both.
+ */
+export interface Assumptions {
+  /** Seconds before a defeated monster is back. */
+  respawnSeconds: number;
+  /** EXP a kill gives over the data's base EXP, for events or server rates. */
+  expRate: number;
+}
+
+/** How fast the player gets through monster HP, from their own solo play. */
+export interface KillSpeed {
+  hpPerHour: number;
+  /** HP of the average monster defeated in that play. */
+  hpPerKill: number;
+  activeSeconds: number;
+  maps: number;
+  /** Lowest and highest character level in that play, when read. */
+  levels: [number, number] | null;
+  /** Too little play near the current level, so every solo session counts. */
+  widened: boolean;
+}
+
+/** A map's EXP per hour for this player, worked out from their kill speed. */
+export interface Estimate {
+  expPerHour: number;
+  killsPerHour: number;
+  /** Kills an hour if every monster were defeated as soon as it came back. */
+  ceiling: number;
+  /** Held to the ceiling: the player would outpace the respawn. */
+  capped: boolean;
+  /** HP of the average monster here over the average one in the player's play. */
+  hpRatio: number;
+  /** Average monster level here minus the character's level. */
+  levelGap: number | null;
+  /** 3 fairly sure, 2 rough, 1 a guess. */
+  sureness: 1 | 2 | 3;
 }
 
 export interface TrainingSpot {
@@ -708,10 +752,14 @@ export interface TrainingSpot {
   /** Portals lead here from some town; party quest stages and other instances are not. */
   reachable: boolean;
   measured: { expPerHour: number; activeSeconds: number } | null;
+  /** From the player's kill speed, once enough solo play is saved. */
+  estimate: Estimate | null;
 }
 
 export interface TrainingSpots {
   from: MapRef | null;
+  /** Behind every estimate; null until enough solo play is saved. */
+  speed: KillSpeed | null;
   spots: TrainingSpot[];
 }
 
