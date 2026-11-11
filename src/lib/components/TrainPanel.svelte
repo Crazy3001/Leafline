@@ -13,6 +13,7 @@
   import { openTrainingLog } from "$lib/nav.svelte";
   import { formatCompact, formatDuration, formatNumber, splitMapLabel } from "$lib/format";
   import { history, watchHistory } from "$lib/history.svelte";
+  import { showMapNamed } from "$lib/places.svelte";
   import { live } from "$lib/readings.svelte";
   import {
     chartPoints,
@@ -378,7 +379,8 @@
             <tr class:town>
               <td>
                 {#if row.map === session.map}<span class="here" title="You are here"></span>{/if}
-                {#if row.map}{splitMapLabel(row.map).name}{:else}<span
+                {#if row.map}<button class="ref ref-map" onclick={() => showMapNamed(row.map!)}>{splitMapLabel(row.map).name}</button
+                  >{:else}<span
                     class="unplaced"
                     >Not placed on a map</span
                   >{/if}
@@ -426,7 +428,7 @@
         <tbody>
           {#each bests as m (m.map)}
             <tr>
-              <td>{m.name}</td>
+              <td><button class="ref ref-map" onclick={() => showMapNamed(m.map)}>{m.name}</button></td>
               <td class="tabular">{formatCompact(m.best!.expPerHour)}</td>
               <td class="tabular">{m.bestMesos ? formatCompact(m.bestMesos.mesosPerHour) : "—"}</td>
               <td class="tabular muted">{m.best!.level != null ? `Lv ${m.best!.level} · ` : ""}{shortDay(m.best!.at)}</td>

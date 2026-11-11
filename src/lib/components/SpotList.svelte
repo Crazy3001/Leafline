@@ -222,6 +222,15 @@
   /** How many of a map's monsters the row names, most common first. */
   const NAMED = 3;
 
+  /** Opens or closes a row from the keyboard, as its button role promises. */
+  function rowKey(event: KeyboardEvent, toggle: () => void) {
+    if (event.target !== event.currentTarget) return;
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      toggle();
+    }
+  }
+
   /**
    * The row's one line about the map: the levels of its main monsters, then their names. The
    * full list, bosses and rare spawns included, is in the open row.
@@ -232,9 +241,15 @@
     const [low, high] = main.length
       ? [Math.min(...main.map((m) => m.level)), Math.max(...main.map((m) => m.level))]
       : spot.levelRange;
-    const names = [...main].sort((a, b) => a.level - b.level).map((m) => m.name);
-    return [`Lv ${low}${high !== low ? `–${high}` : ""}`, ...(names.length ? [names.join(", ")] : [])].join(" · ");
+    const mobs = [...main].sort((a, b) => a.level - b.level);
+    return { levels: `Lv ${low}${high !== low ? `–${high}` : ""}`, mobs };
   }
+
+  /** The same line as plain text, for the row's tooltip. */
+  const summaryText = (spot: TrainingSpot) => {
+    const { levels, mobs } = summary(spot);
+    return [levels, ...(mobs.length ? [mobs.map((m) => m.name).join(", ")] : [])].join(" · ");
+  };
 
   function metric(spot: TrainingSpot): { value: string; unit: string; quiet: boolean; sure?: Estimate["sureness"] } {
     if (sort === "exp") return { value: formatCompact(spot.expPerClear), unit: "EXP / clear", quiet: false };
@@ -350,15 +365,40 @@
     <ol class="spots">
       {#each shown as spot, i (spot.map.id)}
         {@const m = metric(spot)}
+        {@const line = summary(spot)}
         {@const expanded = open === spot.map.id}
         <li>
           <div class="line">
-            <button class="row" aria-expanded={expanded} onclick={() => (open = expanded ? null : spot.map.id)}>
+            <!-- A div, not a button: the map and monster names inside are buttons of their own. -->
+            <div
+              class="row"
+              role="button"
+              tabindex="0"
+              aria-expanded={expanded}
+              onclick={() => (open = expanded ? null : spot.map.id)}
+              onkeydown={(e) => rowKey(e, () => (open = expanded ? null : spot.map.id))}
+            >
               <span class="rank tabular">{i + 1}</span>
               <span class="names">
-                <span class="name">{spot.map.name}</span>
-                <span class="meta" title={summary(spot)}>
-                  {#if steps(spot) === 0}<span class="here">You're here</span>{" · "}{/if}{summary(spot)}
+                <span class="name"
+                  ><button
+                    class="ref ref-map"
+                    title="Open {spot.map.name} in Lookup"
+                    onclick={(e) => {
+                      e.stopPropagation();
+                      void backend.showPlace("maps", spot.map.id);
+                    }}>{spot.map.name}</button
+                  ></span
+                >
+                <span class="meta" title={summaryText(spot)}>
+                  {#if steps(spot) === 0}<span class="here">You're here</span>{" · "}{/if}{line.levels}{#each line.mobs as mob, n (mob.id)}{n === 0 ? " · " : ", "}<button
+                      class="ref ref-mob"
+                      title="Open {mob.name} in Lookup"
+                      onclick={(e) => {
+                        e.stopPropagation();
+                        void backend.showMonster(mob.id, null);
+                      }}>{mob.name}</button
+                    >{/each}
                 </span>
               </span>
               <span class="metric">
@@ -372,7 +412,7 @@
                 </span>
               </span>
               <span class="chevron" class:open={expanded}><ChevronRight size={12} /></span>
-            </button>
+            </div>
             {#if steps(spot) !== 0}<span class="go"><GoButton place={mapPlace(spot.map)} /></span>{/if}
             {@render saveToggle(spot.map.id, spot.map.name)}
           </div>
@@ -592,6 +632,16 @@
 
   .row:hover .name {
     color: var(--accent-strong);
+  }
+
+  .row:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+
+  /* The names inside the row are links; the line still trims to one row. */
+  .meta .ref {
+    font-size: inherit;
   }
 
   .rank {
