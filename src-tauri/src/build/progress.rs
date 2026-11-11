@@ -54,6 +54,8 @@ pub fn catch_up(
                 note(&mut result.changes, label, from, to);
             }
             start.stats = Some(now);
+            let gear = window.bonus;
+            start.gear_bonus = Some(Stats { str: gear.str, dex: gear.dex, int: gear.int, luk: gear.luk });
             note(&mut result.changes, "Unspent AP", start.ap, window.ability_points);
             start.ap = window.ability_points;
         }
@@ -118,7 +120,7 @@ mod tests {
     }
 
     fn stats(level: u32, luk: u32, ability_points: u32) -> StatWindow {
-        StatWindow { level, str: 4, dex: 5, int: 4, luk, ability_points }
+        StatWindow { level, str: 4, dex: 5, int: 4, luk, ability_points, ..StatWindow::default() }
     }
 
     fn start() -> Start {

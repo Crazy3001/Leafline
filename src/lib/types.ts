@@ -1055,6 +1055,8 @@ export interface BuildStart {
   gender?: string | null;
   /** Equipment the character has, each as an item check read it. Changed only by add/removePiece. */
   pieces?: GearPiece[];
+  /** What worn gear added to each stat when the Character Stat window was last read. Shown only. */
+  gearBonus?: BaseStats | null;
 }
 
 /** One copy of an item, as its tooltip showed it, scrolls and all. */

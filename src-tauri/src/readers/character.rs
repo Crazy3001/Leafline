@@ -60,16 +60,29 @@ pub struct CharacterReading {
     pub skills: Option<SkillWindow>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StatWindow {
     pub level: u32,
+    /// Each stat's own points: the number inside the brackets of `30 (28+2)` when gear adds to it.
     pub str: u32,
     pub dex: u32,
     pub int: u32,
     pub luk: u32,
+    /// What gear adds to each, the `+2` of `30 (28+2)`. Zero when it adds nothing or didn't read.
+    pub bonus: Bonus,
     /// Unspent AP.
     pub ability_points: u32,
+}
+
+/// What worn gear adds to each stat.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Bonus {
+    pub str: u32,
+    pub dex: u32,
+    pub int: u32,
+    pub luk: u32,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
@@ -223,16 +236,21 @@ fn stat_labels(view: &Frame) -> Option<[Rect; STAT_LABELS]> {
 
 fn read_stats(view: &Frame, labels: &[Rect; STAT_LABELS]) -> Option<StatWindow> {
     let row = |label: &Rect, top: f32| Rect::new(label.x + VALUE_LEFT, top - 2.0, VALUE_WIDTH, label.h + 4.0);
-    let value = |label: &Rect| base_in(view, row(label, label.y));
-    let [str, dex, int, luk] = labels;
+    let value = |label: &Rect| stat_in(view, row(label, label.y));
+    let [str_label, dex_label, int_label, luk_label] = labels;
     let (x, y, w, h) = AP_BOX;
+    let (str, str_gear) = value(str_label)?;
+    let (dex, dex_gear) = value(dex_label)?;
+    let (int, int_gear) = value(int_label)?;
+    let (luk, luk_gear) = value(luk_label)?;
     Some(StatWindow {
-        level: number_in(view, row(str, str.y - LEVEL_ABOVE_STR))?,
-        str: value(str)?,
-        dex: value(dex)?,
-        int: value(int)?,
-        luk: value(luk)?,
-        ability_points: number_in(view, Rect::new(luk.x + x, luk.y + y, w, h))?,
+        level: number_in(view, row(str_label, str_label.y - LEVEL_ABOVE_STR))?,
+        str,
+        dex,
+        int,
+        luk,
+        bonus: Bonus { str: str_gear, dex: dex_gear, int: int_gear, luk: luk_gear },
+        ability_points: number_in(view, Rect::new(luk_label.x + x, luk_label.y + y, w, h))?,
     })
 }
 
@@ -242,19 +260,26 @@ fn number_end(columns: &[(u32, u32)]) -> usize {
     columns.windows(2).position(|pair| pair[1].0 - pair[0].1 > NUMBER_GAP).map_or(columns.len(), |i| i + 1)
 }
 
-/// A stat's own points. With gear on, the window shows the total and then the split, as in
-/// `30 (28+2)`: the plan counts the points put in, and works gear out itself, so this is the 28.
-/// A stat with no bonus is a plain number.
-fn base_in(view: &Frame, area: Rect) -> Option<u32> {
+/// A stat's own points, and what gear adds. With gear on, the window shows the total and then the
+/// split, as in `30 (28+2)`: the plan counts the points put in, and works gear out itself, so the
+/// 28 is the stat and the 2 is only shown. A stat with no bonus is a plain number. The bonus is
+/// best effort: unreadable, it is nothing, and the stat still reads.
+fn stat_in(view: &Frame, area: Rect) -> Option<(u32, u32)> {
     let columns = ink_columns(view, area, is_ink);
     let end = number_end(&columns);
-    // After the total comes the bracket, then the digits of the base, then a `+`. The digits'
-    // height is taken from the first of them, since the brackets run taller.
-    let Some(after) = columns.get(end + 1..).filter(|rest| !rest.is_empty()) else { return number_in(view, area) };
+    // After the total comes the bracket, then the points put in, a `+`, what gear adds and the
+    // closing bracket. Heights are taken from the first digit, since the brackets run taller.
+    let Some(after) = columns.get(end + 1..).filter(|rest| !rest.is_empty()) else { return Some((number_in(view, area)?, 0)) };
     let first = Rect::new(after[0].0 as f32, area.y, (after[0].1 - after[0].0) as f32, area.h);
     let rows = ink_rows(view, first, is_ink)?;
     let masks: Vec<Mask> = after.iter().map(|&cols| Mask::new(view, cols, rows, is_ink)).collect();
-    digits::window_prefix(&masks)?.parse().ok()
+    let own = digits::window_prefix(&masks)?;
+    let gear = masks
+        .get(own.len() + 1..masks.len().saturating_sub(1))
+        .and_then(digits::window_number)
+        .and_then(|digits| digits.parse().ok())
+        .unwrap_or(0);
+    Some((own.parse().ok()?, gear))
 }
 
 /// The first number in `area`. Anything after a gap is left alone, so a bonus shown beside a
@@ -340,7 +365,7 @@ mod tests {
     const SEVEN: &[&str] = &["#####", "...#.", "...#.", "..#..", "..#..", "..#..", ".#...", ".#...", ".#..."];
 
     fn a_glance(luk: u32) -> Option<Glance> {
-        let stats = StatWindow { level: 2, str: 4, dex: 5, int: 4, luk, ability_points: 0 };
+        let stats = StatWindow { level: 2, str: 4, dex: 5, int: 4, luk, ability_points: 0, ..StatWindow::default() };
         Some(Glance { stats: Some(stats), ..Glance::default() })
     }
 
@@ -416,14 +441,14 @@ mod tests {
         let area = Rect::new(4.0, 4.0, 110.0, 30.0);
         // The bracket is taller than the digits, which used to make the total unreadable.
         assert_eq!(number_in(&with_a_bonus(), area), Some(7));
-        assert_eq!(base_in(&with_a_bonus(), area), Some(17), "the 17, not the total 7 or the bonus");
+        assert_eq!(stat_in(&with_a_bonus(), area), Some((17, 7)), "the 17 put in, not the total 7, and the 7 gear adds");
     }
 
     #[test]
     fn a_stat_with_no_gear_is_one_plain_number() {
         let mut frame = Frame::from_pixel(120, 40, PAPER);
         draw(&mut frame, 10, 10, &[(ONE, 8), (SEVEN, 0)]);
-        assert_eq!(base_in(&frame, Rect::new(4.0, 4.0, 110.0, 30.0)), Some(17));
+        assert_eq!(stat_in(&frame, Rect::new(4.0, 4.0, 110.0, 30.0)), Some((17, 0)));
     }
 
     #[test]

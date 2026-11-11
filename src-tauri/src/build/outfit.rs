@@ -106,12 +106,19 @@ pub fn outfit(build: &Build, expansion: &Expansion, rules: &Rules, catalog: &Cat
         }
         // With the level it needs, from the data when the item check didn't read one.
         let worn = wearing(slot).cloned().map(|mut p| {
+            // A piece saved from a noisy read (`Brown Hard Leather Pants ossbow`), or never matched,
+            // is the data's item once its name does match; the name shown is the item's own.
+            if let Some(item) = p.item.and_then(|id| catalog.item(id)).or_else(|| catalog.item_like(&p.name, p.level)) {
+                p.item = Some(item.id);
+                p.name = item.name.clone();
+            }
             if p.level.is_none() && p.item.is_some_and(|id| catalog.item(id).is_some()) {
                 p.level = Some(p.req_level(catalog));
             }
             p
         });
-        let worn_item = worn.as_ref().and_then(|p| p.item);
+        // What is worn is never offered again as a goal, a pick or a step up, scrolled or not.
+        let is_worn = |item: &ItemRecord| worn.as_ref().is_some_and(|p| p.is_copy_of(item, catalog));
         let worn_level = worn.as_ref().map_or(0, |p| p.req_level(catalog));
         let worn_score = worn.as_ref().map(|p| scorer.score(&p.data_stats(catalog)));
 
@@ -119,7 +126,7 @@ pub fn outfit(build: &Build, expansion: &Expansion, rules: &Rules, catalog: &Cat
         let mut ahead: Vec<&GearCheck> = expansion
             .gear
             .iter()
-            .filter(|g| g.item.slot == slot && g.usable && Some(g.item.id) != worn_item && g.item.req_level > worn_level)
+            .filter(|g| g.item.slot == slot && g.usable && !is_worn(&g.item) && g.item.req_level > worn_level)
             .collect();
         ahead.sort_by_key(|g| (g.level.unwrap_or(u32::MAX), g.item.req_level));
         let (ready, waiting): (Vec<&GearCheck>, Vec<&GearCheck>) =
@@ -141,7 +148,7 @@ pub fn outfit(build: &Build, expansion: &Expansion, rules: &Rules, catalog: &Cat
             .find(|s| s.slot == slot)
             .and_then(|s| s.picks.first())
             .map(|p| &p.item)
-            .filter(|item| Some(item.id) != worn_item && beats(item, worn_score))
+            .filter(|item| !is_worn(item) && beats(item, worn_score))
             .cloned();
         let (suggested, suggested_planned) = match (goal_now, found_now) {
             (Some(goal), Some(found)) if scorer.of(&found) > scorer.of(&goal) => (Some(found), false),
@@ -158,7 +165,7 @@ pub fn outfit(build: &Build, expansion: &Expansion, rules: &Rules, catalog: &Cat
         let later = goal_at.map_or(0, |at| waiting.len() - at - 1);
         let next = match goal_at {
             Some(at) => Some(waiting[at].clone()),
-            None => coming_up(slot, floor, &later_wearers, &trained, &scorer, catalog)
+            None => coming_up(slot, floor, worn.as_ref(), &later_wearers, &trained, &scorer, catalog)
                 .map(|(item, at)| GearCheck { item: item.clone(), level: Some(at), usable: true }),
         };
 
@@ -198,6 +205,7 @@ pub fn outfit(build: &Build, expansion: &Expansion, rules: &Rules, catalog: &Cat
 fn coming_up<'a>(
     slot: &str,
     floor: Option<(i64, i64)>,
+    worn: Option<&Piece>,
     wearers: &[(u32, Wearer)],
     trained: &[String],
     scorer: &Scorer,
@@ -205,7 +213,7 @@ fn coming_up<'a>(
 ) -> Option<(&'a ItemRecord, u32)> {
     let better: Vec<&ItemRecord> = catalog
         .equipment()
-        .filter(|i| i.slot == slot && !novelty(i))
+        .filter(|i| i.slot == slot && !novelty(i) && !worn.is_some_and(|p| p.is_copy_of(i, catalog)))
         .filter(|i| trained.is_empty() || i.weapon_type.as_ref().is_none_or(|w| trained.contains(w)))
         .filter(|i| floor.is_none_or(|f| scorer.of(i) > f))
         .collect();
@@ -241,7 +249,7 @@ pub fn fill_paths(build: &Build, expansion: &Expansion, rules: &Rules, catalog: 
         let mut floor = worn.map(|p| scorer.score(&p.data_stats(catalog)));
         let candidates: Vec<&ItemRecord> = catalog
             .equipment()
-            .filter(|i| i.slot == slot && !novelty(i))
+            .filter(|i| i.slot == slot && !novelty(i) && !worn.is_some_and(|p| p.is_copy_of(i, catalog)))
             .filter(|i| trained.is_empty() || i.weapon_type.as_ref().is_none_or(|w| trained.contains(w)))
             .collect();
         let mut path = Vec::new();
@@ -453,6 +461,49 @@ mod tests {
         let e = expand(&build, &Rules::default(), &catalog);
         assert!(e.gear.iter().all(|g| g.item.id != 1), "what is worn isn't new gear");
         assert!(e.steps.iter().all(|s| !s.gear.contains(&"Old Dagger".to_string())));
+    }
+
+    #[test]
+    fn a_scrolled_copy_of_an_item_is_still_that_item_and_is_never_suggested_again() {
+        let robin = |id| with(item(id, "Green Robin Hat", 20, &[]), "Hat", &[("DEX", 2), ("Weapon Def.", 20), ("Accuracy", 2)]);
+        // The data repeats the hat under a second ID, as it does for some items.
+        let catalog = Catalog::new(Vec::new(), vec![robin(30), robin(31)]);
+        assert_eq!(catalog.copies_of(30), [30, 31]);
+
+        // Worn and scrolled, but the check lost the Accuracy line, so by its stats it scores
+        // below the data's copy.
+        let read = vec![PieceStat { label: "DEX".into(), value: 2 }, PieceStat { label: "Weapon Def.".into(), value: 21 }];
+        let scrolled = Piece { id: 1, upgrades: Some(1), stats: read, ..Piece::of_item(catalog.item(30).unwrap()) };
+        // The same, never matched to the data, so only its name says what it is.
+        let unmatched = Piece { item: None, ..scrolled.clone() };
+
+        for piece in [scrolled, unmatched] {
+            let build = bandit(20, vec![30, 31], vec![piece]);
+            let e = expand(&build, &Rules::default(), &catalog);
+            assert!(e.gear.is_empty(), "a worn goal isn't new gear, under either ID");
+            let outfit = at(&build, &catalog, 20);
+            let hat = slot(&outfit, "Hat");
+            assert!(hat.wearing.is_some());
+            assert_eq!(hat.suggested, None, "it is already worn");
+            assert_eq!(hat.next, None, "and it isn't a step up from itself");
+            let paths = fill_paths(&build, &e, &Rules::default(), &catalog, 20);
+            assert!(paths.iter().all(|(slot, _)| slot != "Hat"), "nor a filled-in upgrade");
+        }
+    }
+
+    #[test]
+    fn a_piece_saved_from_a_noisy_read_shows_the_items_own_name() {
+        let catalog = catalog();
+        let garbled = Piece { item: None, name: "Old Dagger ossbow".into(), ..worn(1, &catalog) };
+        let build = bandit(10, Vec::new(), vec![garbled]);
+        let outfit = at(&build, &catalog, 10);
+        let weapon = slot(&outfit, "Weapon");
+        let piece = weapon.wearing.as_ref().unwrap();
+        assert_eq!((piece.name.as_str(), piece.item), ("Old Dagger", Some(1)));
+        // A name the data has nothing like stays as the player wrote it.
+        let own = Piece { item: None, name: "My Homemade Blade".into(), ..worn(1, &catalog) };
+        let outfit = at(&bandit(10, Vec::new(), vec![own]), &catalog, 10);
+        assert_eq!(slot(&outfit, "Weapon").wearing.as_ref().map(|p| (p.name.as_str(), p.item)), Some(("My Homemade Blade", None)));
     }
 
     #[test]

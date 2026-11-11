@@ -65,6 +65,8 @@
   const steps = $derived(plan?.expansion.steps ?? []);
   /** The Character Stat window has been read, so the plan's stats start from the real ones. */
   const statsKnown = $derived(plan?.build.start.stats != null);
+  /** What gear added to each stat when the window was last read. */
+  const gearBonus = $derived(plan?.build.start.gearBonus ?? null);
   const at = $derived(level ?? plan?.build.start.level ?? 0);
   const step = $derived(steps.findLast((s) => s.level <= at) ?? steps[0] ?? null);
   const hasWork = (s: LevelStep) => s.ap.length > 0 || s.sp.length > 0 || s.advance != null;
@@ -79,13 +81,14 @@
 
   // What to spend, the next job advancement and gear each get a view of their own, so the tab
   // stays short. The one last picked is remembered.
-  type View = "plan" | "advance" | "gear";
+  type View = "plan" | "advance" | "gear" | "worn";
   const VIEW_KEY = "leafline.build.view";
   let view = $state<View>(storedView());
   const canAdvance = $derived(!!nextAdvance?.advance && !!plan?.build.plan.job);
   const views = $derived([
     { id: "plan" as View, label: "Level up" },
-    { id: "gear" as View, label: "Gear" },
+    { id: "worn" as View, label: "Equipped" },
+    { id: "gear" as View, label: "Upgrades" },
     ...(canAdvance ? [{ id: "advance" as View, label: "Job advance" }] : []),
   ]);
 
@@ -139,6 +142,15 @@
   });
 
   const worn = $derived(new Set((plan?.build.start.pieces ?? []).map((p) => p.item)));
+
+  /** What the worn pieces add up to, stat by stat, as their tooltips spelled them. */
+  const gearTotals = $derived.by(() => {
+    const totals = new Map<string, number>();
+    for (const piece of plan?.build.start.pieces ?? []) {
+      for (const stat of piece.stats) totals.set(stat.label, (totals.get(stat.label) ?? 0) + stat.value);
+    }
+    return [...totals].filter(([, value]) => value !== 0).map(([label, value]) => ({ label, value }));
+  });
 
   /** Slot names as the game's equip window shows them. */
   const SLOT_NAMES: Record<string, string> = { Glove: "Gloves", Earring: "Earrings" };
@@ -227,7 +239,7 @@
   function storedView(): View {
     try {
       const saved = localStorage.getItem(VIEW_KEY);
-      return saved === "advance" || saved === "gear" ? saved : "plan";
+      return saved === "advance" || saved === "gear" || saved === "worn" ? saved : "plan";
     } catch {
       return "plan";
     }
@@ -248,6 +260,104 @@
     }
   }
 </script>
+
+{#snippet wearing(row: Outfit["slots"][number])}
+  {@const piece = row.wearing}
+            <div class="line">
+              <span class="label">Wearing</span>
+              {#if piece}
+                <button
+                  class="ref ref-item"
+                  class:upgraded={!!piece.upgrades}
+                  onclick={() => backend.showItem(piece.item, piece.item == null ? piece.name : null)}
+                  >{piece.name}{#if piece.upgrades}{` (+${piece.upgrades})`}{/if}</button
+                >
+                <span class="end">
+                  {#if piece.level != null}<span class="lv tabular" class:good={row.wearingFit?.ok} class:bad={row.wearingFit && !row.wearingFit.ok} title={fitTitle(row.wearingFit)}
+                      >{piece.level ? `Lv ${piece.level}` : "Any level"}</span
+                    >{/if}
+                  <button class="remove" title="Edit" aria-label="Edit {piece.name}" onclick={() => startEdit(piece)}
+                    ><Pencil size={11} /></button
+                  >
+                  <button class="remove" title="Take it off" aria-label="Take off {piece.name}" onclick={() => removePiece(piece.id)}
+                    ><X size={12} /></button
+                  >
+                </span>
+              {:else}
+                <span class="none">Nothing added</span>
+              {/if}
+            </div>
+            {#if piece && editing?.id === piece.id}
+              <div class="edit">
+                <label class="edit-field">
+                  <span>Name</span>
+                  <input bind:value={editing.name} />
+                </label>
+                {#each editing.stats as stat, k}
+                  <div class="stat-edit">
+                    <select bind:value={stat.label} aria-label="Stat">
+                      {#each STAT_LABELS as label (label)}<option>{label}</option>{/each}
+                      {#if !STAT_LABELS.includes(stat.label)}<option>{stat.label}</option>{/if}
+                    </select>
+                    <input type="number" bind:value={stat.value} aria-label="{stat.label} value" />
+                    <button class="remove" aria-label="Remove {stat.label}" onclick={() => editing?.stats.splice(k, 1)}
+                      ><X size={11} /></button
+                    >
+                  </div>
+                {/each}
+                <button class="link add-stat" onclick={() => editing?.stats.push({ label: "STR", value: 0 })}
+                  ><Plus size={11} />Add a stat</button
+                >
+                <div class="edit-pair">
+                  <label class="edit-field">
+                    <span>Scrolled (+N)</span>
+                    <input type="number" min="0" max="30" bind:value={editing.upgrades} />
+                  </label>
+                  <label class="edit-field">
+                    <span>Slots left</span>
+                    <input type="number" min="0" max="30" bind:value={editing.slotsLeft} />
+                  </label>
+                </div>
+                <div class="edit-actions">
+                  <button class="action small" onclick={saveEdit}>Save</button>
+                  <button class="link" onclick={() => (editing = null)}>Cancel</button>
+                </div>
+              </div>
+            {:else if piece && (piece.stats.length || piece.slotsLeft != null)}
+              <p class="piece-line tabular">
+                {#each piece.stats as s, k}{#if k}<span class="sep">{" · "}</span>{/if}<span class="nowrap"
+                    >{s.label} {s.value > 0 ? "+" : ""}{s.value}</span
+                  >{/each}{#if piece.slotsLeft != null}<span class="sep">{piece.stats.length ? " · " : ""}</span><span
+                    class="nowrap faint">{piece.slotsLeft}{piece.slots != null ? ` of ${piece.slots}` : ""} slots left</span
+                  >{/if}
+              </p>
+            {/if}
+{/snippet}
+
+{#snippet putOn()}
+    {#if goalError}<p class="goal-error">{goalError}</p>{/if}
+
+    <label class="find">
+      <Search size={13} />
+      <input type="search" placeholder="Put on gear by name" aria-label="Find equipment you wear" bind:value={gearText} />
+    </label>
+    {#if gearFound.length}
+      <ul class="found">
+        {#each gearFound as item (item.id)}
+          {@const on = worn.has(item.id)}
+          <li>
+            <button disabled={on} onclick={() => wear(item.id)}>
+              <span class="found-name">{item.name}</span>
+              <small>{slotName(item.slot)}{item.reqLevel ? ` · Lv ${item.reqLevel}` : ""}</small>
+              {#if on}<Check size={12} />{:else}<Plus size={12} />{/if}
+            </button>
+          </li>
+        {/each}
+      </ul>
+    {:else if gearText.trim().length >= 2 && searched === gearText}
+      <p class="quiet-line">No equipment by that name for this job.</p>
+    {/if}
+{/snippet}
 
 {#snippet todo(step: LevelStep)}
   <div class="now">
@@ -342,7 +452,12 @@
       {#each STATS as stat (stat.id)}
         <div>
           <dt>{stat.label}</dt>
-          <dd class="tabular">{statsKnown ? step.stats[stat.id] : "—"}</dd>
+          <dd class="tabular">
+            {statsKnown ? step.stats[stat.id] : "—"}
+            {#if statsKnown && gearBonus?.[stat.id]}
+              <span class="gear" title="What your gear adds, as the Character Stat window last showed it">+{gearBonus[stat.id]}</span>
+            {/if}
+          </dd>
         </div>
       {/each}
     </dl>
@@ -405,6 +520,30 @@
         {level}
         {character}
       />
+    {:else if shown === "worn"}
+    <!-- What the character wears, slot by slot, with its own stats and scrolls: put right, take off or add here. -->
+    {#if outfit}
+      {#if !plan.build.start.pieces?.length}
+        <p class="quiet-line">
+          Check what you wear in game{keyHint("ReadItem")} and press <strong>I'm wearing this</strong>, or put it on by name below.
+        </p>
+      {/if}
+      <ul class="outfit worn">
+        {#each outfit.slots as row (row.slot)}
+          <li>
+            <h5 class="slot-name">{slotName(row.slot)}</h5>
+            {@render wearing(row)}
+          </li>
+        {/each}
+      </ul>
+      {#if gearTotals.length}
+        <p class="quiet-line totals tabular">
+          <strong>Your gear adds</strong>
+          {#each gearTotals as total, k}{#if k}<span class="sep">{" · "}</span>{/if}<span class="nowrap">{total.label} {total.value > 0 ? "+" : ""}{total.value}</span>{/each}
+        </p>
+      {/if}
+    {/if}
+    {@render putOn()}
     {:else}
     <!--
       Gear slot by slot, as the equip window has it: what you wear (its own stats, scrolls and all,
@@ -419,78 +558,9 @@
       {/if}
       <ul class="outfit">
         {#each outfit.slots as row (row.slot)}
-          {@const piece = row.wearing}
           <li>
             <h5 class="slot-name">{slotName(row.slot)}</h5>
-            <div class="line">
-              <span class="label">Wearing</span>
-              {#if piece}
-                <button
-                  class="ref ref-item"
-                  class:upgraded={!!piece.upgrades}
-                  onclick={() => backend.showItem(piece.item, piece.item == null ? piece.name : null)}
-                  >{piece.name}{#if piece.upgrades}{` (+${piece.upgrades})`}{/if}</button
-                >
-                <span class="end">
-                  {#if piece.level != null}<span class="lv tabular" class:good={row.wearingFit?.ok} class:bad={row.wearingFit && !row.wearingFit.ok} title={fitTitle(row.wearingFit)}
-                      >{piece.level ? `Lv ${piece.level}` : "Any level"}</span
-                    >{/if}
-                  <button class="remove" title="Edit" aria-label="Edit {piece.name}" onclick={() => startEdit(piece)}
-                    ><Pencil size={11} /></button
-                  >
-                  <button class="remove" title="Take it off" aria-label="Take off {piece.name}" onclick={() => removePiece(piece.id)}
-                    ><X size={12} /></button
-                  >
-                </span>
-              {:else}
-                <span class="none">Nothing added</span>
-              {/if}
-            </div>
-            {#if piece && editing?.id === piece.id}
-              <div class="edit">
-                <label class="edit-field">
-                  <span>Name</span>
-                  <input bind:value={editing.name} />
-                </label>
-                {#each editing.stats as stat, k}
-                  <div class="stat-edit">
-                    <select bind:value={stat.label} aria-label="Stat">
-                      {#each STAT_LABELS as label (label)}<option>{label}</option>{/each}
-                      {#if !STAT_LABELS.includes(stat.label)}<option>{stat.label}</option>{/if}
-                    </select>
-                    <input type="number" bind:value={stat.value} aria-label="{stat.label} value" />
-                    <button class="remove" aria-label="Remove {stat.label}" onclick={() => editing?.stats.splice(k, 1)}
-                      ><X size={11} /></button
-                    >
-                  </div>
-                {/each}
-                <button class="link add-stat" onclick={() => editing?.stats.push({ label: "STR", value: 0 })}
-                  ><Plus size={11} />Add a stat</button
-                >
-                <div class="edit-pair">
-                  <label class="edit-field">
-                    <span>Scrolled (+N)</span>
-                    <input type="number" min="0" max="30" bind:value={editing.upgrades} />
-                  </label>
-                  <label class="edit-field">
-                    <span>Slots left</span>
-                    <input type="number" min="0" max="30" bind:value={editing.slotsLeft} />
-                  </label>
-                </div>
-                <div class="edit-actions">
-                  <button class="action small" onclick={saveEdit}>Save</button>
-                  <button class="link" onclick={() => (editing = null)}>Cancel</button>
-                </div>
-              </div>
-            {:else if piece && (piece.stats.length || piece.slotsLeft != null)}
-              <p class="piece-line tabular">
-                {#each piece.stats as s, k}{#if k}<span class="sep">{" · "}</span>{/if}<span class="nowrap"
-                    >{s.label} {s.value > 0 ? "+" : ""}{s.value}</span
-                  >{/each}{#if piece.slotsLeft != null}<span class="sep">{piece.stats.length ? " · " : ""}</span><span
-                    class="nowrap faint">{piece.slotsLeft}{piece.slots != null ? ` of ${piece.slots}` : ""} slots left</span
-                  >{/if}
-              </p>
-            {/if}
+            {@render wearing(row)}
 
             {#if row.suggested}
               {@const pick = row.suggested}
@@ -561,28 +631,7 @@
         {/each}
       </ul>
     {/if}
-    {#if goalError}<p class="goal-error">{goalError}</p>{/if}
-
-    <label class="find">
-      <Search size={13} />
-      <input type="search" placeholder="Put on gear by name" aria-label="Find equipment you wear" bind:value={gearText} />
-    </label>
-    {#if gearFound.length}
-      <ul class="found">
-        {#each gearFound as item (item.id)}
-          {@const on = worn.has(item.id)}
-          <li>
-            <button disabled={on} onclick={() => wear(item.id)}>
-              <span class="found-name">{item.name}</span>
-              <small>{slotName(item.slot)}{item.reqLevel ? ` · Lv ${item.reqLevel}` : ""}</small>
-              {#if on}<Check size={12} />{:else}<Plus size={12} />{/if}
-            </button>
-          </li>
-        {/each}
-      </ul>
-    {:else if gearText.trim().length >= 2 && searched === gearText}
-      <p class="quiet-line">No equipment by that name for this job.</p>
-    {/if}
+    {@render putOn()}
     {/if}
 
     <footer>
@@ -784,6 +833,14 @@
   dd {
     margin: 0;
     font-weight: 600;
+  }
+
+  /* What gear adds, beside the stat: shown, never part of the plan's count. */
+  dd .gear {
+    margin-left: 4px;
+    color: var(--good);
+    font-size: var(--text-xs);
+    font-weight: 500;
   }
 
   .next {

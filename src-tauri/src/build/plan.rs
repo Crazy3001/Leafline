@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use super::catalog::{Catalog, path_of, tier_of, usable_by};
 use super::rules::{Branch, Rules};
+use crate::mapdata::drops::item_key;
 use crate::mapdata::osms::ItemRecord;
 
 /// The highest level a plan can run to.
@@ -107,11 +108,14 @@ pub struct Start {
     /// Equipment the character wears, each piece as an item check read it, scrolls and all, one
     /// to a slot. Its own stats count toward other gear's requirements, as the game counts them.
     pub pieces: Vec<Piece>,
+    /// What worn gear added to each stat when the Character Stat window was last read. Shown beside
+    /// the stats; the plan counts `stats`, the points put in, and works gear out from `pieces`.
+    pub gear_bonus: Option<Stats>,
 }
 
 impl Default for Start {
     fn default() -> Self {
-        Self { level: 1, stats: None, ap: 0, sp: 0, skills: Vec::new(), gender: None, pieces: Vec::new() }
+        Self { level: 1, stats: None, ap: 0, sp: 0, skills: Vec::new(), gender: None, pieces: Vec::new(), gear_bonus: None }
     }
 }
 
@@ -164,6 +168,14 @@ impl Piece {
             slots_left: item.upgrade_slots,
             slots: item.upgrade_slots,
         }
+    }
+
+    /// Whether this is a copy of `item`: the same item, another ID the data repeats it under, or
+    /// one of that name when the piece was never matched to the data. Scrolls and rolled stats
+    /// don't make it another item, and a read that misses a stat doesn't make it a worse one.
+    pub fn is_copy_of(&self, item: &ItemRecord, catalog: &Catalog) -> bool {
+        self.item.is_some_and(|id| id == item.id || catalog.copies_of(id).contains(&item.id))
+            || item_key(&self.name) == item_key(&item.name)
     }
 
     /// The slot it goes in, as the item data names it.
@@ -613,14 +625,16 @@ fn check_gear(
     steps: &mut [LevelStep],
     problems: &mut Vec<Problem>,
 ) -> Vec<GearCheck> {
-    let owned: Vec<u32> = build.start.pieces.iter().filter_map(|p| p.item).collect();
     let mut gear = Vec::with_capacity(build.plan.gear.len());
-    // A goal already worn is done: it isn't new gear to look for.
-    for &id in build.plan.gear.iter().filter(|id| !owned.contains(id)) {
+    for &id in &build.plan.gear {
         let Some(item) = catalog.item(id) else {
             problems.push(Problem::warning(None, format!("A gear goal names an item Leafline doesn't know ({id}).")));
             continue;
         };
+        // A goal already worn is done: it isn't new gear to look for, scrolled or not.
+        if build.start.pieces.iter().any(|piece| piece.is_copy_of(item, catalog)) {
+            continue;
+        }
         let usable = branch.is_none_or(|b| usable_by(item, b));
         if !usable {
             problems.push(Problem::warning(None, format!("{} isn't usable by this job.", item.name)));
