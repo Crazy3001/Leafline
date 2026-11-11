@@ -6,8 +6,11 @@ import type { MapDataStatus } from "./types";
 
 export const OSMS_CREDIT = "Data from OSMS Data Explorer (https://osmsdataexplorer.com), CC BY 4.0";
 export const OSMS_URL = "https://osmsdataexplorer.com";
-export const WIKI_CREDIT = "Player-observed drops and quest turn-ins from mapleclassic.wiki, CC BY-NC-SA 4.0";
+export const WIKI_CREDIT = "Player-observed drops from mapleclassic.wiki, CC BY-NC-SA 4.0";
 export const WIKI_URL = "https://mapleclassic.wiki";
+// Facts OSMS does not publish (who takes each quest in), as the game client records them.
+export const DATA_CREDIT = "Quest turn-ins from the game client, via Leafline-data";
+export const DATA_URL = "https://github.com/Crazy3001/Leafline-data";
 
 export const mapData = $state<{
   status: MapDataStatus | null;

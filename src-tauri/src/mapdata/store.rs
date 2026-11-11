@@ -74,14 +74,17 @@ CREATE TABLE drop_fetches (monster TEXT PRIMARY KEY, fetched_at INTEGER NOT NULL
 /// Tables added since the last `CACHE_VERSION`, which hold nothing the player would have to
 /// download again.
 const ADDED: &str = "
-CREATE TABLE IF NOT EXISTS quest_turn_ins (quest_id INTEGER PRIMARY KEY, npc TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS quest_turn_in_npcs (quest_id INTEGER PRIMARY KEY, npc_id INTEGER NOT NULL);
 ";
 
-/// Tables from when items were asked about one at a time. The whole drop table replaces them,
-/// so they are removed from an existing cache without forcing a new download.
+/// Tables from when items were asked about one at a time, which the whole drop table replaced,
+/// and the wiki's turn-in names, which NPC ids from Leafline's own quest file replaced
+/// (2026-11-11). Removed from an existing cache without forcing a new download.
 const RETIRED: &str = "
 DROP TABLE IF EXISTS item_lookups;
 DROP TABLE IF EXISTS item_droppers;
+DROP TABLE IF EXISTS quest_turn_ins;
+DELETE FROM source_info WHERE key IN ('turn_ins_fetched_at', 'turn_ins_failed');
 ";
 
 /// Where the time the drop table was downloaded is kept in `source_info`.
@@ -89,13 +92,13 @@ const DROPS_FETCHED_AT: &str = "drops_fetched_at";
 /// Leafline's shop file, kept whole as downloaded, and when.
 const SHOP_FILE: &str = "shop_file";
 const SHOPS_FETCHED_AT: &str = "shops_fetched_at";
-/// Likewise for the wiki's table of who takes each quest in.
-const TURN_INS_FETCHED_AT: &str = "turn_ins_fetched_at";
+/// Likewise for Leafline's file of who takes each quest in.
+const TURN_INS_FETCHED_AT: &str = "turn_in_npcs_fetched_at";
 
 /// When a download of one of the wiki's tables last failed, and why, as `<time> <reason>`, so a
 /// refusal is not asked again on every lookup. A download that works removes it.
 pub const DROPS_FAILED: &str = "drops_failed";
-pub const TURN_INS_FAILED: &str = "turn_ins_failed";
+pub const TURN_INS_FAILED: &str = "turn_in_npcs_failed";
 
 /// Kept in `source_info` when a new version of Leafline replaces the cache: the player had
 /// downloaded the map data or drop table, so each comes back without asking again.
@@ -593,7 +596,7 @@ impl Store {
 
     /// Who takes each quest in, as downloaded.
     pub fn turn_ins(&self) -> Result<Vec<TurnIn>> {
-        let mut stmt = self.conn.prepare("SELECT quest_id, npc FROM quest_turn_ins ORDER BY quest_id")?;
+        let mut stmt = self.conn.prepare("SELECT quest_id, npc_id FROM quest_turn_in_npcs ORDER BY quest_id")?;
         let rows = stmt.query_map([], |row| Ok(TurnIn { quest: row.get(0)?, npc: row.get(1)? }))?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
@@ -601,9 +604,9 @@ impl Store {
     /// Replaces the whole turn-in table.
     pub fn replace_turn_ins(&mut self, rows: &[TurnIn], now: i64) -> Result<()> {
         let tx = self.conn.transaction()?;
-        tx.execute("DELETE FROM quest_turn_ins", [])?;
+        tx.execute("DELETE FROM quest_turn_in_npcs", [])?;
         for row in rows {
-            tx.execute("INSERT OR REPLACE INTO quest_turn_ins (quest_id, npc) VALUES (?1, ?2)", params![row.quest, row.npc])?;
+            tx.execute("INSERT OR REPLACE INTO quest_turn_in_npcs (quest_id, npc_id) VALUES (?1, ?2)", params![row.quest, row.npc])?;
         }
         tx.execute(
             "INSERT OR REPLACE INTO source_info (key, value) VALUES (?1, ?2)",
@@ -978,6 +981,29 @@ mod tests {
         let store = Store::init(conn).unwrap();
         assert_eq!(store.status().unwrap().files.len(), 1, "nothing to download again");
         assert!(store.turn_ins().unwrap().is_empty());
+    }
+
+    #[test]
+    fn the_wiki_turn_in_names_give_way_without_a_new_download() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(SCHEMA).unwrap();
+        conn.execute_batch(A_FILE).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE quest_turn_ins (quest_id INTEGER PRIMARY KEY, npc TEXT NOT NULL);
+             INSERT INTO quest_turn_ins VALUES (70, 'Warden Ilse');
+             INSERT INTO source_info VALUES ('turn_ins_fetched_at', '5');",
+        )
+        .unwrap();
+        conn.pragma_update(None, "user_version", CACHE_VERSION).unwrap();
+        let store = Store::init(conn).unwrap();
+        assert_eq!(store.status().unwrap().files.len(), 1, "the map data stays");
+        assert!(store.turn_ins().unwrap().is_empty());
+        assert_eq!(store.turn_ins_fetched_at().unwrap(), None, "so the new file is downloaded at once");
+        let gone: i64 = store
+            .conn
+            .query_row("SELECT COUNT(*) FROM sqlite_master WHERE name = 'quest_turn_ins'", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(gone, 0);
     }
 
     #[test]

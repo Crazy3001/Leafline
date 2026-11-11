@@ -125,11 +125,12 @@ impl MapDataState {
         result
     }
 
-    /// Renews the table of who takes each quest in, and brings the atlas up to date with it.
+    /// Renews the table of who takes each quest in, once a day at most, from Leafline's data
+    /// repository on GitHub, and brings the atlas up to date with it.
     fn refresh_turn_ins(&self) -> Result<()> {
         let _turn = self.drops_refresh.lock().expect("drops refresh lock");
         let mut store = Store::open(&self.path)?;
-        if turnins::refresh(&mut store, &self.wiki, now())? {
+        if turnins::refresh(&mut store, &self.osms, now())? {
             let (atlas, catalog) = store.load()?.map(split).unzip();
             *self.atlas.write().expect("atlas lock") = atlas;
             *self.catalog.write().expect("catalog lock") = catalog;
@@ -154,7 +155,7 @@ impl MapDataState {
         drops::refresh(&mut Store::open(&self.path)?, &self.wiki, now())
     }
 
-    /// Forgets a failed wiki download (see [`drops::RETRY_AFTER`]), so the next refresh asks at
+    /// Forgets a failed download (see [`drops::RETRY_AFTER`]), so the next refresh asks at
     /// once. Only for the player's own request: automatic lookups keep waiting.
     fn retry(&self, failed: &str) -> Result<()> {
         Store::open(&self.path)?.set_failure(failed, None)
@@ -162,7 +163,7 @@ impl MapDataState {
 }
 
 /// Once the user has downloaded map data, checks OSMS for changes in the background, at most
-/// once a day, renews the turn-in table once it is a week old, and the drop table too if it was
+/// once a day, renews the turn-in table once it is a day old, and the drop table too if it was
 /// ever downloaded. An update of Leafline that replaced the cache gets back what the user had
 /// the same way.
 pub fn check_for_updates(app: &AppHandle) {

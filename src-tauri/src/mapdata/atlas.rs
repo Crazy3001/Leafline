@@ -340,7 +340,7 @@ impl Atlas {
             keys,
         };
         atlas.exits = atlas.maps.values().map(|m| (m.id, atlas.exits_of(m))).collect();
-        atlas.turn_ins = turnins::resolve(&data.turn_ins, |quest, name| atlas.turn_in_npc(quest, name));
+        atlas.turn_ins = turnins::resolve(&data.turn_ins, |npc| atlas.npc_names.contains_key(&npc));
         atlas.item_keys = item_keys(data.items.iter().map(|i| (i.id, i.name.as_str(), i.gender.as_deref())));
         atlas.shops = atlas.place_shops(data.shops);
         atlas.match_shop_items();
