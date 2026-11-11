@@ -8,6 +8,27 @@ import type { LevelExp, SavedSession, SessionEvent, SessionLine, SessionSummary,
 /** Less time than this on a map makes its rate a rough guess. */
 export const SHORT_SECONDS = 30 * 60;
 
+/** The graph skips the first stretch of a session, where a rate rests on too little play. */
+export const GRAPH_WARMUP_SECONDS = 150;
+
+/** Runs shorter than this are too thin to rank as a record, so they list below the rest. */
+export const MIN_RECORD_SECONDS = 60;
+
+/** Width of the level bands the Maps and Records views filter by. */
+const BAND_WIDTH = 5;
+
+/** The level bands that hold some play, as the options both views offer. */
+export function levelBands(sessions: SavedSession[]): { id: string; label: string }[] {
+  const lows = new Set<number>();
+  for (const s of sessions) for (const l of s.lines) if (l.level != null) lows.add(Math.floor(l.level / BAND_WIDTH) * BAND_WIDTH);
+  return [...lows].sort((a, b) => a - b).map((low) => ({ id: String(low), label: `Lv ${low}–${low + BAND_WIDTH - 1}` }));
+}
+
+/** The levels a band option covers, for a [`LineFilter`]. */
+export function bandRange(id: string): [number, number] | null {
+  return id === "any" ? null : [Number(id), Number(id) + BAND_WIDTH - 1];
+}
+
 /** Active time with the mesos out of sight before the player is reminded, once they stop. */
 const MESOS_UNSEEN_REMINDER = 5 * 60;
 
@@ -50,7 +71,10 @@ export function showUnplaced(row: { map: string | null; activeSeconds: number },
 
 /** What a session's graph plots. At high levels the HUD shows only a percent, so EXP is in %. */
 export function chartPoints(timeline: TimelinePoint[], metric: Metric, percentOnly: boolean): ChartPoint[] {
-  return timeline.map((p) => ({
+  // A point is the rate over the five minutes before it, so the first ones rest on a few
+  // seconds of play and swing wildly. They are left out once the rest has enough to draw.
+  const settled = timeline.filter((p) => p.at >= GRAPH_WARMUP_SECONDS);
+  return (settled.length >= 4 ? settled : timeline).map((p) => ({
     x: p.at,
     y: metric === "mesos" ? p.mesosPerHour : percentOnly ? p.percentPerHour : p.expPerHour,
   }));
@@ -212,6 +236,7 @@ export function mapRecords(
       ...rates(e.total),
       rows: [...e.rows.values()]
         .map(({ row, tally }) => ({ ...row, ...rates(tally) }))
+        .filter((row) => row.activeSeconds >= MIN_RECORD_SECONDS)
         .sort((a, b) => (b.level ?? 0) - (a.level ?? 0) || value(b) - value(a)),
     }))
     .sort((a, b) => value(b) - value(a));
@@ -223,13 +248,14 @@ export interface MapStats {
   sessions: number;
   activeSeconds: number;
   expPerHour: number;
-  mesosPerHour: number;
+  /** Null when the mesos were never looked at twice there, which isn't the same as earning none. */
+  mesosPerHour: number | null;
   /** The best single session's rate on the map, with when and at what level. */
   best: { sessionId: number; expPerHour: number; at: number; level: number | null; party: number | null } | null;
   /** The best single session's mesos rate on the map, where the mesos were seen for most of it. */
   bestMesos: { sessionId: number; mesosPerHour: number; at: number; level: number | null } | null;
   /** Rates at each character level. */
-  byLevel: { level: number | null; activeSeconds: number; expPerHour: number; mesosPerHour: number }[];
+  byLevel: { level: number | null; activeSeconds: number; expPerHour: number; mesosPerHour: number | null }[];
 }
 
 /** Rates per map over the saved sessions that pass the filter, best EXP rate first. */
@@ -286,7 +312,7 @@ export function mapStats(sessions: SavedSession[], filter: LineFilter = {}): Map
       sessions: e.ids.size,
       activeSeconds: e.seconds,
       expPerHour: (e.exp * 3600) / e.seconds,
-      mesosPerHour: e.mesosSeconds > 0 ? (e.mesos * 3600) / e.mesosSeconds : 0,
+      mesosPerHour: e.mesosSeconds > 0 ? (e.mesos * 3600) / e.mesosSeconds : null,
       best: e.best,
       bestMesos: e.bestMesos,
       byLevel: [...e.levels]
@@ -294,7 +320,7 @@ export function mapStats(sessions: SavedSession[], filter: LineFilter = {}): Map
           level,
           activeSeconds: l.seconds,
           expPerHour: (l.exp * 3600) / l.seconds,
-          mesosPerHour: l.mesosSeconds > 0 ? (l.mesos * 3600) / l.mesosSeconds : 0,
+          mesosPerHour: l.mesosSeconds > 0 ? (l.mesos * 3600) / l.mesosSeconds : null,
         }))
         .sort((a, b) => (a.level ?? 0) - (b.level ?? 0)),
     }))
@@ -304,12 +330,13 @@ export function mapStats(sessions: SavedSession[], filter: LineFilter = {}): Map
 
 export function mapBars(stats: MapStats[], metric: Metric): Bar[] {
   return [...stats]
-    .sort((a, b) => (metric === "exp" ? b.expPerHour - a.expPerHour : b.mesosPerHour - a.mesosPerHour))
+    .sort((a, b) => (metric === "exp" ? b.expPerHour - a.expPerHour : (b.mesosPerHour ?? -1) - (a.mesosPerHour ?? -1)))
     .map((m) => ({
       id: m.map,
       label: m.name,
       sub: `${formatDuration(m.activeSeconds)} · ${m.sessions} session${m.sessions === 1 ? "" : "s"}`,
-      value: metric === "exp" ? m.expPerHour : m.mesosPerHour,
+      value: (metric === "exp" ? m.expPerHour : m.mesosPerHour) ?? 0,
+      // A map whose mesos were never seen has no rate, not a rate of zero.
       display: formatCompact(metric === "exp" ? m.expPerHour : m.mesosPerHour),
       faded: m.activeSeconds < SHORT_SECONDS,
     }));

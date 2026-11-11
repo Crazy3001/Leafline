@@ -320,7 +320,7 @@
         label="{metric === 'exp' ? 'EXP' : 'Mesos'} per hour over this session"
       />
       <p class="caption">
-        Each point is the rate over the 5 minutes before it.
+        Each point is the rate over the 5 minutes before it; the first 2½ minutes are left out.
         {#if metric === "mesos"}Mesos are spread evenly between your looks at them, so the line reaches only your last look.{/if}
         {#if session.events?.length}Green dots are level-ups, red ones deaths.{/if}
       </p>

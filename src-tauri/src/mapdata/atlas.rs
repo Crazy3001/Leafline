@@ -384,9 +384,23 @@ impl Atlas {
     /// session's per-map numbers. Near matches are left as read for the player to settle; maps
     /// sharing the name and street exactly read the same either way.
     pub fn settled(&self, name: &str, street: Option<&str>) -> Option<MapRef> {
-        self.find(name, street)
-            .filter(|found| found.score >= SETTLED_SCORE && self.twins(found).len() > found.alternatives.len())
-            .map(|found| found.card.map)
+        let found = self.find(name, street)?;
+        let certain = found.score >= SETTLED_SCORE && self.twins(&found).len() > found.alternatives.len();
+        (certain || self.reads_the_same(&found, name)).then_some(found.card.map)
+    }
+
+    /// Whether the reading differs from the best match only by OCR look-alikes, and no map
+    /// with another name spells the same way. `Swalnp of Despair I` is `Swamp of Despair I`
+    /// even though `II` sits close by: the numeral was read, only the `m` was split.
+    fn reads_the_same(&self, found: &MapMatch, name: &str) -> bool {
+        let query = lookalike(&fold(name));
+        let place = &found.card.map;
+        let Some((_, key, _)) = self.keys.iter().find(|(id, ..)| *id == place.id) else { return false };
+        lookalike(key) == query
+            && found.alternatives.iter().all(|m| {
+                (m.name == place.name && m.street == place.street)
+                    || self.keys.iter().find(|(id, ..)| *id == m.id).is_none_or(|(_, k, _)| lookalike(k) != query)
+            })
     }
 
     /// The best match and the maps sharing its name and street exactly. A header can't tell
@@ -765,9 +779,13 @@ pub(super) fn fold(text: &str) -> String {
 /// Edit similarity, averaged with a pass that forgives the OCR's usual look-alikes
 /// (`l`/`1`/`I`, `0`/`O`, `rn`/`m`), so a misread letter costs less than a different one.
 pub(super) fn similarity(a: &str, b: &str) -> f64 {
-    let lookalike =
-        |s: &str| s.replace("rn", "m").replace(['l', '1', '|', 'j'], "i").replace('0', "o").replace('5', "s");
     (normalized_levenshtein(a, b) + normalized_levenshtein(&lookalike(a), &lookalike(b))) / 2.0
+}
+
+/// A name with the OCR's usual look-alikes collapsed, so spellings that differ only by them
+/// (`Swalnp` for `Swamp`, where `ln` is `m` read as two letters) come out the same.
+fn lookalike(s: &str) -> String {
+    s.replace("rn", "m").replace("ln", "m").replace(['l', '1', '|', 'j'], "i").replace('0', "o").replace('5', "s")
 }
 
 #[cfg(test)]
@@ -798,6 +816,10 @@ pub(crate) mod tests {
         assert_eq!(settled("Mossbank"), None);
         assert_eq!(settled("Mossbank Meadow"), None);
         assert_eq!(settled("Nowhere At All"), None);
+        // An `m` read as `ln` is a look-alike slip, so the numeral that was read still counts.
+        assert_eq!(settled("Mossbank Meadow I").as_deref(), Some("Mossbank Meadow I"), "I is read, II sits close but is another spelling");
+        assert_eq!(settled("Mosslnank Inn").as_deref(), Some("Mossbank Inn"));
+        assert!(super::lookalike("swalnp") == super::lookalike("swamp"));
     }
 
     #[test]

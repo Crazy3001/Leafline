@@ -27,6 +27,8 @@
     longDay,
     mapBands,
     mapBars,
+    levelBands,
+    bandRange,
     mapStats,
     pointDetail,
     rateFormat,
@@ -63,6 +65,8 @@
   let view = $state<View>(stored(VIEW_KEY, "sessions") as View);
   let range = $state<Range>("30");
   let character = $state<string>("");
+  /** Once the player has picked a character (or All), their pick stands. */
+  let characterChosen = false;
   let metric = $state<Metric>("exp");
   let selectedId = $state<number | null>(null);
   let timeline = $state<SessionTimeline | null>(null);
@@ -104,6 +108,11 @@
 
   const all = $derived(history.value?.sessions ?? []);
   const characters = $derived([...new Set(all.map((s) => s.character).filter((c): c is string => !!c))]);
+  // With more than one character, open on the one played last: a blend of two characters' levels
+  // and maps reads as nonsense, so All is there to ask for.
+  $effect(() => {
+    if (!characterChosen && characters.length > 1 && all[0]?.character) character = all[0].character;
+  });
   const since = $derived(range === "all" ? null : Date.now() / 1000 - Number(range) * 86400);
   const sessions = $derived(
     all.filter(
@@ -206,14 +215,10 @@
     }
   }
 
-  // Maps view: level bands of five that hold some play, then the stats under the filters.
-  const bands = $derived.by(() => {
-    const levels = new Set<number>();
-    for (const s of sessions) for (const l of s.lines) if (l.level != null) levels.add(Math.floor(l.level / 5) * 5);
-    return [...levels].sort((a, b) => a - b).map((low) => ({ id: String(low), label: `Lv ${low}–${low + 4}` }));
-  });
+  // Maps view: level bands that hold some play, then the stats under the filters.
+  const bands = $derived(levelBands(sessions));
   const filter = $derived<LineFilter>({
-    levels: band === "any" ? null : [Number(band), Number(band) + 4],
+    levels: bandRange(band),
     party,
   });
   const stats = $derived(mapStats(sessions, filter));
@@ -305,7 +310,7 @@
     {#if characters.length > 1}
       <label class="field">
         Character
-        <select bind:value={character}>
+        <select bind:value={character} onchange={() => (characterChosen = true)}>
           <option value="">All characters</option>
           {#each characters as name (name)}<option value={name}>{name}</option>{/each}
         </select>
@@ -440,7 +445,7 @@
                   <p class="caption">
                     <span class="key"><span class="dot good"></span>Level up</span>
                     <span class="key"><span class="dot bad"></span>Death</span>
-                    Shaded stretches are maps. Each point is the rate over the 5 minutes before it.
+                    Shaded stretches are maps. Each point is the rate over the 5 minutes before it; the first 2½ minutes are left out.
                     {#if metric === "mesos"}Mesos are spread evenly between your looks at them.{/if}
                   </p>
                 {:else if timeline}
@@ -486,7 +491,7 @@
                           <td>{l.level ?? "—"}</td>
                           <td>{partyLabel(l.party) ?? "Solo"}</td>
                           <td>{dur(l.activeSeconds)}</td>
-                          <td>{l.activeSeconds > 0 ? (l.expGained > 0 ? formatCompact((l.expGained * 3600) / l.activeSeconds) : `${((l.percentGained * 3600) / l.activeSeconds).toFixed(1)}%`) : "—"}</td>
+                          <td>{l.activeSeconds > 0 ? (l.expGained > 0 ? formatCompact((l.expGained * 3600) / l.activeSeconds) : l.percentGained > 0 ? `${((l.percentGained * 3600) / l.activeSeconds).toFixed(1)}%` : "—") : "—"}</td>
                           <td>{l.mesosSeconds > 0 ? formatCompact((l.mesosGained * 3600) / l.mesosSeconds) : "—"}</td>
                         </tr>
                       {/each}

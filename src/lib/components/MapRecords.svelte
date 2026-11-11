@@ -3,7 +3,7 @@
   // they trained there (level, party size and job), with EXP and mesos per hour. Built from the
   // saved sessions' lines; everything stays on this PC.
   import { formatCompact, formatDuration, partyLabel } from "$lib/format";
-  import { mapRecords, mapStats, shortDay, SHORT_SECONDS, type LineFilter, type RecordRates } from "$lib/training";
+  import { bandRange, levelBands, mapRecords, mapStats, shortDay, SHORT_SECONDS, type LineFilter, type RecordRates } from "$lib/training";
   import type { SavedSession } from "$lib/types";
   import Segmented from "$lib/ui/Segmented.svelte";
 
@@ -18,14 +18,10 @@
   /** Maps with their rows folded away. */
   let folded = $state<Set<string>>(new Set());
 
-  const bands = $derived.by(() => {
-    const levels = new Set<number>();
-    for (const s of sessions) for (const l of s.lines) if (l.level != null) levels.add(Math.floor(l.level / 10) * 10);
-    return [...levels].sort((a, b) => a - b).map((low) => ({ id: String(low), label: `${low}–${low + 9}` }));
-  });
+  const bands = $derived(levelBands(sessions));
   const jobs = $derived([...new Set(sessions.flatMap((s) => s.lines.map((l) => l.job)).filter((j): j is string => !!j))].sort());
   const filter = $derived<LineFilter>({
-    levels: band === "any" ? null : [Number(band), Number(band) + 9],
+    levels: bandRange(band),
     party,
     job: job || null,
   });
