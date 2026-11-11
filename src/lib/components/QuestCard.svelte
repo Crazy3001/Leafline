@@ -13,7 +13,7 @@
   import { showItemNamed } from "$lib/items.svelte";
   import { showMonsterNamed } from "$lib/monsters.svelte";
   import { showNpcNamed } from "$lib/places.svelte";
-  import { DATA_URL, OSMS_URL, WIKI_URL, mapData, watchMapData } from "$lib/mapdata.svelte";
+  import { OSMS_URL, WIKI_URL, mapData, watchMapData } from "$lib/mapdata.svelte";
   import { payout, questView, toggleExpanded, unfollow } from "$lib/quests.svelte";
   import type { Guide, MapRef, MapReading, ObjectiveGuide, Objective, QuestReading, QuestWhere, SessionSummary } from "$lib/types";
 
@@ -297,7 +297,7 @@
     {/if}
     {#if guide}
       <p class="credit">
-        Maps: <button onclick={() => backend.openLink(OSMS_URL)}>OSMS</button> (CC BY 4.0){" · "}Turn-ins: <button onclick={() => backend.openLink(DATA_URL)}>game client</button>{#if showsDrops}{" · "}Drops: <button onclick={() => backend.openLink(WIKI_URL)}>mapleclassic.wiki</button>{/if}
+        Maps: <button onclick={() => backend.openLink(OSMS_URL)}>OSMS</button> (CC BY 4.0){#if showsDrops}{" · "}Drops: <button onclick={() => backend.openLink(WIKI_URL)}>mapleclassic.wiki</button>{/if}
       </p>
     {/if}
   {/if}
