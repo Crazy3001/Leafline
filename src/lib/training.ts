@@ -3,7 +3,7 @@
 
 import type { Bar, ChartPoint } from "./ui/types";
 import { formatCompact, formatDuration, splitMapLabel } from "./format";
-import type { SavedSession, SessionEvent, SessionLine, SessionSummary, TimelinePoint } from "./types";
+import type { LevelExp, SavedSession, SessionEvent, SessionLine, SessionSummary, TimelinePoint } from "./types";
 
 /** Less time than this on a map makes its rate a rough guess. */
 export const SHORT_SECONDS = 30 * 60;
@@ -226,6 +226,8 @@ export interface MapStats {
   mesosPerHour: number;
   /** The best single session's rate on the map, with when and at what level. */
   best: { sessionId: number; expPerHour: number; at: number; level: number | null; party: number | null } | null;
+  /** The best single session's mesos rate on the map, where the mesos were seen for most of it. */
+  bestMesos: { sessionId: number; mesosPerHour: number; at: number; level: number | null } | null;
   /** Rates at each character level. */
   byLevel: { level: number | null; activeSeconds: number; expPerHour: number; mesosPerHour: number }[];
 }
@@ -234,15 +236,15 @@ export interface MapStats {
 export function mapStats(sessions: SavedSession[], filter: LineFilter = {}): MapStats[] {
   const maps = new Map<
     string,
-    { ids: Set<number>; seconds: number; exp: number; mesos: number; mesosSeconds: number; best: MapStats["best"]; levels: Map<number | null, { seconds: number; exp: number; mesos: number; mesosSeconds: number }> }
+    { ids: Set<number>; seconds: number; exp: number; mesos: number; mesosSeconds: number; best: MapStats["best"]; bestMesos: MapStats["bestMesos"]; levels: Map<number | null, { seconds: number; exp: number; mesos: number; mesosSeconds: number }> }
   >();
   for (const session of sessions) {
     // A session's lines on one map, summed, give its rate there.
-    const perMap = new Map<string, { seconds: number; exp: number; level: number | null; party: number | null }>();
+    const perMap = new Map<string, { seconds: number; exp: number; mesos: number; mesosSeconds: number; level: number | null; party: number | null }>();
     for (const line of session.lines) {
       if (!keep(session, line, filter)) continue;
       const map = line.map!;
-      const entry = maps.get(map) ?? { ids: new Set(), seconds: 0, exp: 0, mesos: 0, mesosSeconds: 0, best: null, levels: new Map() };
+      const entry = maps.get(map) ?? { ids: new Set(), seconds: 0, exp: 0, mesos: 0, mesosSeconds: 0, best: null, bestMesos: null, levels: new Map() };
       entry.ids.add(session.id);
       entry.seconds += line.activeSeconds;
       entry.exp += line.expGained;
@@ -255,9 +257,11 @@ export function mapStats(sessions: SavedSession[], filter: LineFilter = {}): Map
       level.mesosSeconds += line.mesosSeconds;
       entry.levels.set(line.level, level);
       maps.set(map, entry);
-      const run = perMap.get(map) ?? { seconds: 0, exp: 0, level: line.level, party: line.party };
+      const run = perMap.get(map) ?? { seconds: 0, exp: 0, mesos: 0, mesosSeconds: 0, level: line.level, party: line.party };
       run.seconds += line.activeSeconds;
       run.exp += line.expGained;
+      run.mesos += line.mesosGained;
+      run.mesosSeconds += line.mesosSeconds;
       perMap.set(map, run);
     }
     for (const [map, run] of perMap) {
@@ -267,6 +271,12 @@ export function mapStats(sessions: SavedSession[], filter: LineFilter = {}): Map
       const entry = maps.get(map)!;
       if (!entry.best || rate > entry.best.expPerHour)
         entry.best = { sessionId: session.id, expPerHour: rate, at: session.startedAt ?? session.savedAt, level: run.level, party: run.party };
+      // A mesos best needs the mesos in view for most of the run.
+      if (run.mesosSeconds >= Math.max(600, run.seconds * 0.5)) {
+        const mesos = (run.mesos * 3600) / run.mesosSeconds;
+        if (!entry.bestMesos || mesos > entry.bestMesos.mesosPerHour)
+          entry.bestMesos = { sessionId: session.id, mesosPerHour: mesos, at: session.startedAt ?? session.savedAt, level: run.level };
+      }
     }
   }
   return [...maps]
@@ -278,6 +288,7 @@ export function mapStats(sessions: SavedSession[], filter: LineFilter = {}): Map
       expPerHour: (e.exp * 3600) / e.seconds,
       mesosPerHour: e.mesosSeconds > 0 ? (e.mesos * 3600) / e.mesosSeconds : 0,
       best: e.best,
+      bestMesos: e.bestMesos,
       byLevel: [...e.levels]
         .map(([level, l]) => ({
           level,
@@ -302,6 +313,98 @@ export function mapBars(stats: MapStats[], metric: Metric): Bar[] {
       display: formatCompact(metric === "exp" ? m.expPerHour : m.mesosPerHour),
       faded: m.activeSeconds < SHORT_SECONDS,
     }));
+}
+
+/**
+ * Rates from saved sessions at or just below a level, weighted by time: what the player gets now
+ * when no session is running. Null with under ten minutes of such play.
+ */
+export function rateNear(sessions: SavedSession[], level: number): { expPerHour: number | null; percentPerHour: number | null } | null {
+  let seconds = 0;
+  let exp = 0;
+  let percent = 0;
+  for (const s of sessions)
+    for (const l of s.lines)
+      if (l.level != null && l.level <= level && l.level >= level - 2 && l.activeSeconds > 0) {
+        seconds += l.activeSeconds;
+        exp += l.expGained;
+        percent += l.percentGained;
+      }
+  if (seconds < 600) return null;
+  return { expPerHour: exp > 0 ? (exp * 3600) / seconds : null, percentPerHour: percent > 0 ? (percent * 3600) / seconds : null };
+}
+
+/** Active play per day over the last two weeks, counting only days played. */
+export function dailyPace(sessions: SavedSession[], now = Date.now() / 1000): number | null {
+  const recent = days(sessions.filter((s) => (s.startedAt ?? s.savedAt) >= now - 14 * 86400));
+  if (!recent.length) return null;
+  return recent.reduce((a, d) => a + d.activeSeconds, 0) / recent.length;
+}
+
+export interface GoalEstimate {
+  /** Levels left, counting the part of this one still to go. */
+  levels: number;
+  /** Active play to reach the goal at the rate given; null with no rate. */
+  seconds: number | null;
+  /** "exp" when the EXP each level takes is known or carried on from the levels seen; "percent"
+   *  when each level is taken to need as long as this one. */
+  method: "exp" | "percent" | null;
+  /** Some levels' EXP was carried on from the levels seen rather than seen. */
+  extrapolated: boolean;
+}
+
+/**
+ * Time left to a level goal. With the EXP each level takes (learned from the HUD), the EXP left
+ * over the EXP rate; levels not seen yet grow from the last one seen by the average step between
+ * the levels seen. Without that, each level is taken to need as much of an hour as this one, from
+ * the percent rate.
+ */
+export function goalEstimate(o: {
+  level: number;
+  percent: number | null;
+  target: number;
+  table: LevelExp[];
+  expPerHour: number | null;
+  percentPerHour: number | null;
+}): GoalEstimate {
+  const done = (o.percent ?? 0) / 100;
+  const levels = Math.max(0, o.target - o.level - done);
+  if (levels <= 0) return { levels: 0, seconds: 0, method: null, extrapolated: false };
+  const known = new Map(o.table.map((t) => [t.level, t.needed]));
+  const steps: number[] = [];
+  for (const t of o.table) {
+    const next = known.get(t.level + 1);
+    if (next && t.needed > 0) steps.push(next / t.needed);
+  }
+  const growth = steps.length
+    ? Math.min(1.6, Math.max(1, Math.exp(steps.reduce((a, r) => a + Math.log(r), 0) / steps.length)))
+    : null;
+  let extrapolated = false;
+  const needed = (level: number): number | null => {
+    const seen = known.get(level);
+    if (seen) return seen;
+    if (growth == null) return null;
+    const below = o.table.filter((t) => t.level < level).at(-1);
+    if (!below) return null;
+    extrapolated = true;
+    return below.needed * growth ** (level - below.level);
+  };
+  if (o.expPerHour && o.expPerHour > 0) {
+    let exp = 0;
+    let ok = true;
+    for (let l = o.level; l < o.target; l++) {
+      const n = needed(l);
+      if (n == null) {
+        ok = false;
+        break;
+      }
+      exp += l === o.level ? n * (1 - done) : n;
+    }
+    if (ok) return { levels, seconds: (exp / o.expPerHour) * 3600, method: "exp", extrapolated };
+  }
+  if (o.percentPerHour && o.percentPerHour > 0)
+    return { levels, seconds: ((levels * 100) / o.percentPerHour) * 3600, method: "percent", extrapolated: false };
+  return { levels, seconds: null, method: null, extrapolated: false };
 }
 
 export interface Day {

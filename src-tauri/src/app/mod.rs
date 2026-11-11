@@ -162,6 +162,7 @@ pub fn run() {
             records::delete_drop,
             records::save_image,
             records::session_history,
+            records::level_exp,
             records::session_timeline,
             records::show_training,
             records::delete_session,

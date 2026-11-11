@@ -43,6 +43,15 @@ pub struct SavedSession {
     pub potion_cost: i64,
 }
 
+/// The EXP a level takes, as the player's own HUD showed it. Leafline ships no EXP table; this
+/// one is learned as the player levels, for the time left to a level goal.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LevelExp {
+    pub level: u32,
+    pub needed: u64,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SavedMap {
@@ -129,6 +138,13 @@ impl UserData {
         tx.execute("DELETE FROM sessions WHERE id = ?1", [id])?;
         tx.commit()?;
         Ok(())
+    }
+
+    /// The EXP each level takes, as far as the player's HUD has shown it, lowest level first.
+    pub fn level_exp(&self) -> Result<Vec<LevelExp>> {
+        let mut stmt = self.conn.prepare("SELECT level, needed FROM level_exp ORDER BY level")?;
+        let rows = stmt.query_map([], |row| Ok(LevelExp { level: row.get(0)?, needed: row.get::<_, i64>(1)? as u64 }))?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
     /// Every saved session, newest first.
@@ -294,6 +310,14 @@ fn write_session(tx: &rusqlite::Transaction, id: i64, session: &SessionSummary, 
     tx.execute("DELETE FROM session_lines WHERE session_id = ?1", [id])?;
     tx.execute("DELETE FROM session_points WHERE session_id = ?1", [id])?;
     tx.execute("DELETE FROM session_events WHERE session_id = ?1", [id])?;
+    // What the current level takes, once the tracker has narrowed it down from the HUD.
+    if let (Some(level), Some(needed)) = (session.level, session.exp_needed) {
+        tx.execute(
+            "INSERT INTO level_exp (level, needed, seen_at) VALUES (?1, ?2, ?3)
+             ON CONFLICT (level) DO UPDATE SET needed = excluded.needed, seen_at = excluded.seen_at",
+            params![level, needed as i64, now],
+        )?;
+    }
     let renamed = |map: &str| -> rusqlite::Result<String> {
         match tx.query_row("SELECT name FROM map_renames WHERE read_as = ?1", [map], |row| row.get(0)) {
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(map.to_string()),
@@ -414,6 +438,22 @@ mod tests {
         assert_eq!(saved.exp_gained, 2000);
         assert_eq!(saved.maps.len(), 1);
         assert_eq!(saved.maps[0].active_seconds, 1200.0);
+    }
+
+    #[test]
+    fn the_exp_a_level_takes_is_learned_from_saves() {
+        let mut db = UserData::open_in_memory().unwrap();
+        let mut at_30 = session(10.0, 1000, &[]);
+        at_30.exp_needed = Some(25_000);
+        let id = db.save_session(&at_30, "", 1).unwrap();
+        let mut at_31 = session(20.0, 2000, &[]);
+        at_31.level = Some(31);
+        at_31.exp_needed = Some(27_500);
+        db.update_session(id, &at_31, 2).unwrap();
+        let mut unknown = session(30.0, 3000, &[]);
+        unknown.level = Some(32);
+        db.update_session(id, &unknown, 3).unwrap();
+        assert_eq!(db.level_exp().unwrap(), [LevelExp { level: 30, needed: 25_000 }, LevelExp { level: 31, needed: 27_500 }]);
     }
 
     #[test]

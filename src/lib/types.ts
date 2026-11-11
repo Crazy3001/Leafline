@@ -885,6 +885,12 @@ export interface SavedSession {
   potionCost: number;
 }
 
+/** The EXP a level takes, as the player's own HUD showed it (src-tauri/src/userdata/sessions.rs). */
+export interface LevelExp {
+  level: number;
+  needed: number;
+}
+
 /** A potion the player hunts with (src-tauri/src/userdata/potions.rs). Nothing here is bundled. */
 export interface PotionSlot {
   /** Stays with the slot; 0 for a new one. */

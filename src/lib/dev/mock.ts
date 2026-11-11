@@ -662,6 +662,10 @@ export const mockBackend: Backend = {
     return saved;
   },
   sessionHistory: async () => mockHistory(),
+  levelExp: async () => [
+    { level: 20, needed: 6_000 },
+    { level: 21, needed: 6_900 },
+  ],
   sessionTimeline: async (id) => sampleTimelines.get(id) ?? { points: [], events: [] },
   setTyping: async () => {},
   mapNote: async (mapId) => mapNotes.get(mapId) ?? null,

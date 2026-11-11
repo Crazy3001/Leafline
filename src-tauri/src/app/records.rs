@@ -13,7 +13,7 @@ use crate::userdata::characters::KnownMesos;
 use crate::userdata::drops::{LoggedDrop, NewDrop};
 use crate::userdata::notes::{ItemNote, MapNote};
 use crate::userdata::potions::{PotionSlot, SessionPotion};
-use crate::userdata::sessions::{MapRate, SavedSession, SessionTimeline};
+use crate::userdata::sessions::{LevelExp, MapRate, SavedSession, SessionTimeline};
 use crate::userdata::spots::SavedSpot;
 
 const FILE_NAME: &str = "leafline.sqlite3";
@@ -203,6 +203,12 @@ pub struct History {
 #[tauri::command]
 pub fn session_history(state: State<UserDataState>) -> Result<History> {
     state.with(|db| Ok(History { sessions: db.sessions()?, maps: db.map_rates()? }))
+}
+
+/// The EXP each level takes, as far as the player's HUD has shown it.
+#[tauri::command]
+pub fn level_exp(state: State<UserDataState>) -> Result<Vec<LevelExp>> {
+    state.with(|db| db.level_exp())
 }
 
 /// The training log window's label.

@@ -13,6 +13,12 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
   then type how many you had at the start of a session and how many you have now. The Train tab,
   the session's page in the training log and Records show mesos per hour with that cost taken
   out.
+- **Level goal:** set a goal level on the Train tab and see how many levels are left, about how
+  much play that is, and how many days at your usual pace. Leafline learns the EXP each level
+  takes from your own HUD as you level.
+- **Your best maps:** the Train tab lists your best single run on each map before a session,
+  **This map** compares your mesos with your best there as well as your EXP, and Records has a
+  Best run column.
 
 ### Changed
 - **Where to train → For you:** maps you haven't tried are now estimated from how fast you get

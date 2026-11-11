@@ -3,7 +3,7 @@
   // they trained there (level, party size and job), with EXP and mesos per hour. Built from the
   // saved sessions' lines; everything stays on this PC.
   import { formatCompact, formatDuration, partyLabel } from "$lib/format";
-  import { mapRecords, SHORT_SECONDS, type LineFilter, type RecordRates } from "$lib/training";
+  import { mapRecords, mapStats, shortDay, SHORT_SECONDS, type LineFilter, type RecordRates } from "$lib/training";
   import type { SavedSession } from "$lib/types";
   import Segmented from "$lib/ui/Segmented.svelte";
 
@@ -30,9 +30,11 @@
     job: job || null,
   });
   const records = $derived(mapRecords(sessions, filter, sort));
+  /** Each map's best single run under the same filters. */
+  const bests = $derived(new Map(mapStats(sessions, filter).map((m) => [m.map, m])));
   /** Show the after-potions column once any session has potion counts. */
   const withPotions = $derived(sessions.some((s) => s.potionCost > 0));
-  const columns = $derived(withPotions ? 6 : 5);
+  const columns = $derived(withPotions ? 7 : 6);
 
   const exp = (r: RecordRates) =>
     r.expPerHour != null ? formatCompact(r.expPerHour) : r.percentPerHour != null ? `${r.percentPerHour.toFixed(1)}%` : "—";
@@ -111,6 +113,7 @@
             <th>EXP / hr</th>
             <th>Mesos / hr</th>
             {#if withPotions}<th>After potions</th>{/if}
+            <th>Best run</th>
           </tr>
         </thead>
         {#each records as m (m.map)}
@@ -128,6 +131,12 @@
               <td class="strong">{exp(m)}</td>
               <td class="strong" title={mesosTitle(m)}>{mesos(m)}{m.mesosPerHour != null && m.mesosShare < 0.9 ? "*" : ""}</td>
               {#if withPotions}<td class="strong">{net(m)}</td>{/if}
+              <td>
+                {#if bests.get(m.map)?.best}
+                  {@const best = bests.get(m.map)!.best!}
+                  <span title="{shortDay(best.at)}{best.level != null ? `, Lv ${best.level}` : ''}">{formatCompact(best.expPerHour)}</span>
+                {:else}—{/if}
+              </td>
             </tr>
             {#if open && m.rows.length > 1}
               {#each m.rows as row (row.key)}
@@ -140,6 +149,7 @@
                   <td>{exp(row)}</td>
                   <td title={mesosTitle(row)}>{mesos(row)}{row.mesosPerHour != null && row.mesosShare < 0.9 ? "*" : ""}</td>
                   {#if withPotions}<td>{net(row)}</td>{/if}
+                  <td></td>
                 </tr>
               {/each}
             {:else if open}
@@ -155,6 +165,7 @@
       </table>
     </div>
     <p class="caption">
+      Best run is the best single session of 10 minutes or more on the map, in EXP / hr.
       Faded rows rest on under 30 minutes of play. * Mesos / hr covers only part of the time, while the mesos were in view.
       {#if withPotions}After potions shares each session's potion cost across its maps by time played.{/if}
     </p>

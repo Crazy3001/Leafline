@@ -54,6 +54,7 @@ import type {
   SavedSpot,
   PotionSlot,
   SessionPotion,
+  LevelExp,
   UpdateStatus,
   ItemNote,
   MonsterDrops,
@@ -244,6 +245,8 @@ export interface Backend {
   onKnownMesos(handler: () => void): Promise<UnlistenFn>;
 
   sessionHistory(): Promise<History>;
+  /** The EXP each level takes, as far as the player's HUD has shown it, lowest first. */
+  levelExp(): Promise<LevelExp[]>;
   /** How a saved session's rates moved over time. */
   sessionTimeline(id: number): Promise<SessionTimeline>;
   /** Opens the training log window, or brings it forward. */
@@ -472,6 +475,7 @@ const tauriBackend: Backend = {
   openFramesFolder: () => invoke("open_frames_folder"),
   diagnostics: () => invoke("diagnostics"),
   sessionHistory: () => invoke("session_history"),
+  levelExp: () => invoke("level_exp"),
   sessionTimeline: (id) => invoke("session_timeline", { id }),
   showTraining: () => invoke("show_training"),
   showDesk: () => invoke("show_desk"),

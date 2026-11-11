@@ -160,6 +160,12 @@ CREATE TABLE session_potions (
     now_count INTEGER,
     PRIMARY KEY (started_at, slot));
 ",
+    "
+CREATE TABLE level_exp (
+    level INTEGER PRIMARY KEY,
+    needed INTEGER NOT NULL,
+    seen_at INTEGER NOT NULL);
+",
 ];
 
 /// Daily copies of the records that are kept.
