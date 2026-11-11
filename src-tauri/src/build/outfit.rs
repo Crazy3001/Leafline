@@ -161,13 +161,19 @@ pub fn outfit(build: &Build, expansion: &Expansion, rules: &Rules, catalog: &Cat
         // the data.
         let floor = [worn_score, suggested.as_ref().map(|s| scorer.of(s))].into_iter().flatten().max();
         let goal_at = waiting.iter().position(|g| no_worse(&g.item, floor));
-        let planned = goal_at.is_some();
-        let later = goal_at.map_or(0, |at| waiting.len() - at - 1);
-        let next = match goal_at {
-            Some(at) => Some(waiting[at].clone()),
-            None => coming_up(slot, floor, worn.as_ref(), &later_wearers, &trained, &scorer, catalog)
-                .map(|(item, at)| GearCheck { item: item.clone(), level: Some(at), usable: true }),
+        let goal = goal_at.map(|at| waiting[at].clone());
+        let found = coming_up(slot, floor, worn.as_ref(), &later_wearers, &trained, &scorer, catalog)
+            .map(|(item, at)| GearCheck { item: item.clone(), level: Some(at), usable: true });
+        // Whichever comes within reach first. A plan that names a few pieces for a slot can have
+        // its next one far off while a better piece than what is worn is there at a nearer level.
+        let (next, planned) = match (goal, found) {
+            (Some(goal), Some(found)) if found.level.unwrap_or(u32::MAX) < goal.level.unwrap_or(u32::MAX) => (Some(found), false),
+            (Some(goal), _) => (Some(goal), true),
+            (None, found) => (found, false),
         };
+        // Planned pieces after the one shown: all from the first no-worse goal on when the shown one
+        // is the data's, the rest of them when it is that goal.
+        let later = goal_at.map_or(0, |at| waiting.len() - at - usize::from(planned));
 
         // An overall, or a shield, is only worth a row when it is worn or planned.
         let optional = slot == "Overall" || slot == "Shield";
@@ -489,6 +495,25 @@ mod tests {
             let paths = fill_paths(&build, &e, &Rules::default(), &catalog, 20);
             assert!(paths.iter().all(|(slot, _)| slot != "Hat"), "nor a filled-in upgrade");
         }
+    }
+
+    #[test]
+    fn next_is_the_nearest_step_up_even_when_the_plan_only_names_a_later_one() {
+        let catalog = catalog();
+        // The plan aims for the Iron Dagger (Lv 25), but a better dagger than the worn Old Dagger
+        // is wearable at Lv 15: that is what comes next, and the goal still follows it.
+        let build = bandit(10, vec![4], vec![worn(1, &catalog)]);
+        let outfit = at(&build, &catalog, 10);
+        let weapon = slot(&outfit, "Weapon");
+        assert_eq!(weapon.next.as_ref().map(|n| (n.item.name.as_str(), n.level)), Some(("Field Dagger", Some(15))));
+        assert!(!weapon.planned, "it isn't one of the plan's goals");
+        assert_eq!(weapon.later, 1, "the Iron Dagger is planned after it");
+        // When the plan's goal is the nearest, it stays the one shown.
+        let build = bandit(10, vec![2, 4], vec![worn(1, &catalog)]);
+        let weapon = at(&build, &catalog, 10).slots.into_iter().find(|s| s.slot == "Weapon").unwrap();
+        assert_eq!(weapon.next.as_ref().map(|n| n.item.name.as_str()), Some("Field Dagger"));
+        assert!(weapon.planned);
+        assert_eq!(weapon.later, 1);
     }
 
     #[test]

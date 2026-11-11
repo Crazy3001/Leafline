@@ -18,9 +18,15 @@ export interface TimelineRow {
   steps: LevelStep[];
 }
 
-const hasWork = (s: LevelStep) => s.ap.length > 0 || s.sp.length > 0 || s.advance != null || s.gear.length > 0;
+/**
+ * Gear worth a line: what a level still ahead brings within reach. Gear the character can already
+ * wear, at or below their own level, isn't a thing to get later: the gear views have it.
+ */
+const gearAhead = (s: LevelStep, level: number | null) => s.gear.length > 0 && (level == null || s.level > level);
+const hasWork = (s: LevelStep, level: number | null) =>
+  s.ap.length > 0 || s.sp.length > 0 || s.advance != null || gearAhead(s, level);
 /** Levels that stand alone: something happens there besides spending points. */
-const special = (s: LevelStep) => s.advance != null || s.gear.length > 0;
+const special = (s: LevelStep, level: number | null) => s.advance != null || gearAhead(s, level);
 const skillSet = (s: LevelStep) => s.sp.map((g) => g.skillId).sort((a, b) => a - b).join(",");
 
 /**
@@ -28,7 +34,7 @@ const skillSet = (s: LevelStep) => s.sp.map((g) => g.skillId).sort((a, b) => a -
  * row; a job advancement, new gear and the character's own level each get a row of their own.
  */
 export function timeline(steps: LevelStep[], goals: SkillLevel[], level: number | null, fold: boolean): TimelineRow[] {
-  const worked = steps.filter(hasWork);
+  const worked = steps.filter((s) => hasWork(s, level));
   const runs: LevelStep[][] = [];
   for (const step of worked) {
     const run = runs.at(-1);
@@ -38,22 +44,22 @@ export function timeline(steps: LevelStep[], goals: SkillLevel[], level: number 
       run &&
       last &&
       step.level === last.level + 1 &&
-      !special(step) &&
-      !special(last) &&
+      !special(step, level) &&
+      !special(last, level) &&
       step.level !== level &&
       last.level !== level &&
       skillSet(step) === skillSet(last);
     if (joins) run.push(step);
     else runs.push([step]);
   }
-  return runs.map((run) => ({ from: run[0].level, to: run.at(-1)!.level, lines: describe(run, goals), steps: run }));
+  return runs.map((run) => ({ from: run[0].level, to: run.at(-1)!.level, lines: describe(run, goals, level), steps: run }));
 }
 
-function describe(run: LevelStep[], goals: SkillLevel[]): TimelineLine[] {
+function describe(run: LevelStep[], goals: SkillLevel[], level: number | null): TimelineLine[] {
   const one = run.length === 1;
   const lines: TimelineLine[] = [];
   for (const step of run) if (step.advance) lines.push({ text: step.advance, kind: "advance" });
-  for (const step of run) for (const name of step.gear) lines.push({ text: `Get ${name}`, kind: "gear" });
+  for (const step of run) if (gearAhead(step, level)) for (const name of step.gear) lines.push({ text: `Get ${name}`, kind: "gear" });
 
   const skills = new Map<number, { name: string; amounts: number[]; from: number; to: number }>();
   for (const step of run) {
