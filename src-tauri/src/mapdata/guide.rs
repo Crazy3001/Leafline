@@ -372,6 +372,8 @@ pub struct ItemOrigin {
     pub drops: ObjectiveGuide,
     /// Quests that can give it, the lowest level first.
     pub quests: Vec<QuestInfo>,
+    /// NPC shops that sell it, the cheapest first.
+    pub shops: Vec<super::shops::ShopOffer>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -585,6 +587,7 @@ impl Atlas {
         quests.sort();
         quests.dedup();
         ItemOrigin {
+            shops: self.sold_by(items, name, |map| context.hops.get(&map).copied()),
             drops: self.item_objective(name, sources, &context, true),
             quests: quests.iter().filter_map(|id| self.quest_info(*id)).collect(),
         }

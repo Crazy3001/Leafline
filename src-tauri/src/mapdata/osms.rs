@@ -758,6 +758,8 @@ pub struct ScrollInfo {
 /// Everything the map card and build planner are built from.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Dataset {
+    /// NPC shops, from Leafline's own shop file. Not from OSMS: the client data doesn't say.
+    pub shops: Vec<super::shops::ShopRecord>,
     /// Who takes quests in. Not from OSMS: the client data doesn't say.
     pub turn_ins: Vec<TurnIn>,
     pub maps: Vec<MapRecord>,

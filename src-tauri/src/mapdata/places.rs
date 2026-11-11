@@ -149,6 +149,8 @@ pub struct NpcSheet {
     pub quests: Vec<QuestRow>,
     /// Quests someone else gives that go by what shows they are handed in here.
     pub takes: Vec<QuestRef>,
+    /// What the NPC sells, from Leafline's shop file.
+    pub shop: Option<super::shops::Shop>,
 }
 
 impl Atlas {
@@ -369,7 +371,7 @@ impl Atlas {
             .filter_map(|q| self.quest_ref(q.id))
             .collect();
         takes.sort_by_key(|q| (q.level_min, q.name.clone()));
-        Some(NpcSheet { id, name, maps, quests, takes })
+        Some(NpcSheet { shop: self.shop_of(id), id, name, maps, quests, takes })
     }
 }
 

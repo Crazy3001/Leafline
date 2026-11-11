@@ -86,6 +86,9 @@ DROP TABLE IF EXISTS item_droppers;
 
 /// Where the time the drop table was downloaded is kept in `source_info`.
 const DROPS_FETCHED_AT: &str = "drops_fetched_at";
+/// Leafline's shop file, kept whole as downloaded, and when.
+const SHOP_FILE: &str = "shop_file";
+const SHOPS_FETCHED_AT: &str = "shops_fetched_at";
 /// Likewise for the wiki's table of who takes each quest in.
 const TURN_INS_FETCHED_AT: &str = "turn_ins_fetched_at";
 
@@ -269,6 +272,7 @@ impl Store {
         }
         Ok(Some(Dataset {
             turn_ins: self.turn_ins()?,
+            shops: self.shops()?,
             maps: self.load_maps()?,
             monsters: self.load_monsters()?,
             npcs: self.load_npcs()?,
@@ -547,6 +551,37 @@ impl Store {
     }
 
     /// When the turn-in table was downloaded, or `None` if it has not been.
+    pub fn shops_fetched_at(&self) -> Result<Option<i64>> {
+        Ok(self.info(SHOPS_FETCHED_AT)?.and_then(|v| v.parse().ok()))
+    }
+
+    /// The shop file as downloaded, if it ever was.
+    pub fn shop_file(&self) -> Result<Option<Vec<u8>>> {
+        Ok(self.info(SHOP_FILE)?.map(String::into_bytes))
+    }
+
+    /// The downloaded shops, or the copy that came with the app when none was downloaded or
+    /// the download no longer reads.
+    pub fn shops(&self) -> Result<Vec<super::shops::ShopRecord>> {
+        let downloaded = self.shop_file()?.and_then(|body| {
+            super::shops::parse(&body).map_err(|err| eprintln!("cached shop file unreadable: {err}")).ok()
+        });
+        Ok(match downloaded {
+            Some(file) => file.shops,
+            None => super::shops::parse(super::shops::BUNDLED.as_bytes()).map(|f| f.shops).unwrap_or_default(),
+        })
+    }
+
+    pub fn replace_shop_file(&mut self, body: &[u8], now: i64) -> Result<()> {
+        let text = std::str::from_utf8(body).map_err(|err| Error::Invalid(format!("The shop file isn't text: {err}")))?;
+        let tx = self.conn.transaction()?;
+        let set = "INSERT OR REPLACE INTO source_info (key, value) VALUES (?1, ?2)";
+        tx.execute(set, [SHOP_FILE, text])?;
+        tx.execute(set, [SHOPS_FETCHED_AT, &now.to_string()])?;
+        tx.commit()?;
+        Ok(())
+    }
+
     pub fn turn_ins_fetched_at(&self) -> Result<Option<i64>> {
         Ok(self.info(TURN_INS_FETCHED_AT)?.and_then(|v| v.parse().ok()))
     }

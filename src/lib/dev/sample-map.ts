@@ -29,7 +29,7 @@ import type {
   TrainingSpots,
 } from "../types";
 
-type Place = Omit<MapDetails, "map" | "links" | "returnMap" | "mobTotal" | "expPerClear" | "levelRange"> & {
+type Place = Omit<MapDetails, "map" | "links" | "returnMap" | "mobTotal" | "expPerClear" | "levelRange" | "shops"> & {
   name: string;
   street: string;
   returnTo: number | null;
@@ -150,6 +150,7 @@ export function sampleCard(id: number): MapDetails | null {
   return {
     ...place,
     map: ref(id),
+    shops: [],
     returnMap: place.returnTo == null ? null : ref(place.returnTo),
     levelRange: levels.length ? [Math.min(...levels), Math.max(...levels)] : null,
     mobTotal: place.mobs.reduce((sum, m) => sum + m.count, 0),
@@ -514,6 +515,7 @@ export function sampleNpcSheet(id: number, from: number | null): NpcSheet | null
     maps: [{ map: ref(npc.mapId), hops: route ? route.steps.length : null, travel: null }],
     quests: npc.quests.map((q) => ({ id: q.id, name: q.name, region: "Fern Isle", levelMin: q.levelMin, giver: npc.name, repeat: null, exp: 120, mesos: 0 })),
     takes: [],
+    shop: null,
   };
 }
 

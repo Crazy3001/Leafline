@@ -1,12 +1,13 @@
 <script lang="ts">
-  // Where an item comes from, by how you get it: the monsters that drop it, each opening to the
-  // maps it lives on, and the quests that give it.
+  // Where an item comes from, by how you get it: the NPC shops that sell it, the monsters that
+  // drop it, each opening to the maps it lives on, and the quests that give it.
   import { ChevronRight } from "@lucide/svelte";
 
   import GoButton from "$lib/components/GoButton.svelte";
   import { backend } from "$lib/api";
   import { mapPlace } from "$lib/destination.svelte";
-  import { groundDistance } from "$lib/format";
+  import { formatNumber, groundDistance } from "$lib/format";
+  import { seenLine, shortDate } from "$lib/shops";
   import { showMonsterNamed } from "$lib/monsters.svelte";
   import { showNpcNamed } from "$lib/places.svelte";
   import type { Hunt, ItemWhere } from "$lib/types";
@@ -15,6 +16,9 @@
 
   const drops = $derived(found.origin.drops);
   const quests = $derived(found.origin.quests);
+  const shops = $derived(found.origin.shops ?? []);
+  const shopsSeen = $derived(seenLine(shops.map((s) => s.seen)));
+  let shopsOpen = $state(true);
   const known = $derived(drops.hunts.filter((h) => h.monster.known));
   const unknown = $derived(drops.hunts.filter((h) => !h.monster.known));
 
@@ -55,6 +59,34 @@
     <span class="count tabular">{count}</span>
   </button>
 {/snippet}
+
+{#if shops.length}
+  <div class="group">
+    {@render head("Sold by", shops.length, shopsOpen, () => (shopsOpen = !shopsOpen))}
+    {#if shopsOpen}
+      <ul class="quests">
+        {#each shops as shop, i (i)}
+          <li>
+            <span class="shop-line">
+              {#if shop.npcId != null}<button class="ref ref-npc" onclick={() => backend.showPlace("npcs", shop.npcId!)}
+                  >{shop.npc}</button
+                >{:else}{shop.npc}{/if}
+              <span class="price tabular" title="Seen {shortDate(shop.seen)}">{formatNumber(shop.price)} mesos</span>
+            </span>
+            <span class="who">
+              {#if shop.map}<button class="ref ref-map" onclick={() => backend.showPlace("maps", shop.map!.id)}>{shop.map.name}</button
+                >{:else}{shop.mapName}{/if}{#if shop.hops != null && shop.hops > 0}{" · "}{shop.hops} portal{shop.hops === 1
+                  ? ""
+                  : "s"}{/if}{#if shop.needs}{" · "}<span class="needs">{shop.needs}</span>{/if}
+              {#if shop.map && shop.hops !== 0}<GoButton place={mapPlace(shop.map)} />{/if}
+            </span>
+          </li>
+        {/each}
+      </ul>
+      {#if shopsSeen}<p class="seen">{shopsSeen}. They can change; the game's shop window has the last word.</p>{/if}
+    {/if}
+  </div>
+{/if}
 
 {#if known.length || unknown.length}
   <div class="group">
@@ -137,6 +169,26 @@
 <style>
   .group + .group {
     margin-top: 6px;
+  }
+
+  .shop-line {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+
+  .shop-line .price {
+    margin-left: auto;
+  }
+
+  .needs {
+    color: var(--warn);
+  }
+
+  .seen {
+    margin: 4px 0 0;
+    font-size: var(--text-xs);
+    color: var(--faint);
   }
 
   .group-head,

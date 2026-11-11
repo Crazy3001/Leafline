@@ -801,7 +801,7 @@ export const mockBackend: Backend = {
     if (!item) return null;
     const guide = sampleGuide([{ title: "Moss Patrol", objectives: [item.name] }], null, true);
     const quest = guide.quests[0];
-    return { from: guide.from, origin: { drops: quest.objectives[0], quests: quest.quest ? [quest.quest] : [] } };
+    return { from: guide.from, origin: { drops: quest.objectives[0], quests: quest.quest ? [quest.quest] : [], shops: [] } };
   },
   async showItem(id, text) {
     showItemHandlers.forEach((h) => h({ id, text }));

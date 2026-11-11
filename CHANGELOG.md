@@ -23,6 +23,10 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
   the discipline, skill level, ingredients and meso cost. **Lookup → Crafting** lists every
   recipe, by discipline, searchable by the item made or any ingredient. The recipes come with the
   map data, which downloads again once after this update.
+- **NPC shops:** an item's page lists the shops that sell it, cheapest first, with the NPC, the
+  map, the price and any town standing the shop asks for. Map pages list their shops and NPC
+  pages what they sell. Covers Maple Island and Victoria Island at launch prices, each with the
+  day it was recorded; Leafline checks for an updated list once a day.
 
 ### Changed
 - **Where to train → For you:** maps you haven't tried are now estimated from how fast you get

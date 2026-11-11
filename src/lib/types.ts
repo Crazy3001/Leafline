@@ -462,6 +462,44 @@ export interface MapDetails {
   quests: QuestNeed[];
   exits: MapExit[];
   links: { label: string; url: string }[];
+  /** NPC shops here, from Leafline's shop file. */
+  shops: Shop[];
+}
+
+// NPC shops (see src-tauri/src/mapdata/shops.rs), from Leafline's own shop file.
+
+export interface ShopItem {
+  item: string;
+  /** The item in the map data, when its name matched one. */
+  itemId: number | null;
+  price: number;
+  /** A town standing the shop asks for first, as the game words it. */
+  needs: string | null;
+  /** The day the price was last seen, YYYY-MM-DD. */
+  seen: string;
+}
+
+export interface Shop {
+  npc: string;
+  npcId: number | null;
+  role: string | null;
+  map: MapRef | null;
+  /** The map as the shop file names it. */
+  mapName: string;
+  items: ShopItem[];
+}
+
+/** One shop selling an item. */
+export interface ShopOffer {
+  npc: string;
+  npcId: number | null;
+  role: string | null;
+  map: MapRef | null;
+  mapName: string;
+  hops: number | null;
+  price: number;
+  needs: string | null;
+  seen: string;
 }
 
 export interface MapMatch {
@@ -1174,6 +1212,8 @@ export interface ItemWhere {
     drops: ObjectiveGuide;
     /** Quests that can give it, the lowest level first. */
     quests: NonNullable<QuestGuide["quest"]>[];
+    /** NPC shops that sell it, the cheapest first. */
+    shops: ShopOffer[];
   };
 }
 
@@ -1379,6 +1419,8 @@ export interface NpcSheet {
   quests: QuestRow[];
   /** Quests someone else gives that go by what shows they are handed in here. */
   takes: QuestRef[];
+  /** What the NPC sells, from Leafline's shop file. */
+  shop: Shop | null;
 }
 
 export interface NpcWhere {

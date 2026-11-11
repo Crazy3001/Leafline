@@ -18,7 +18,7 @@ use crate::mapdata::osms::Dataset;
 use crate::mapdata::{
     Assumptions, Atlas, DataStatus, ItemOrigin, KillSpeed, MapCard, MapMatch, MapPage, MapQuery, MapRef, MeasuredRate,
     MonsterDrops, MonsterFilters, MonsterPage, MonsterQuery, MonsterSheet, NpcPage, NpcQuery, NpcSheet, QuestGuide, QuestPage, QuestQuery, QuestSearch,
-    QuestSheet, RefreshReport, Route, Store, TrainingSpot, Travel, TravelFile, drops, turnins,
+    QuestSheet, RefreshReport, Route, Store, TrainingSpot, Travel, TravelFile, drops, shops, turnins,
 };
 
 const FILE_NAME: &str = "map-data.sqlite3";
@@ -53,9 +53,14 @@ const LINK_HOSTS: [&str; 9] = [
 fn split(mut data: Dataset) -> (Arc<Atlas>, Arc<Catalog>) {
     // The Atlas keeps the item names too, for the items quests ask to bring.
     let item_names = data.items.iter().map(|i| (i.id, i.name.clone())).collect();
+    let genders: Vec<(u32, String, Option<String>)> =
+        data.items.iter().map(|i| (i.id, i.name.clone(), i.gender.clone())).collect();
     let catalog = Catalog::new(std::mem::take(&mut data.skills), std::mem::take(&mut data.items))
         .with_recipes(std::mem::take(&mut data.recipes));
-    (Arc::new(Atlas::new(data).with_item_names(item_names)), Arc::new(catalog))
+    let atlas = Atlas::new(data)
+        .with_item_names(item_names)
+        .with_item_genders(genders.iter().map(|(id, name, gender)| (*id, name.as_str(), gender.as_deref())));
+    (Arc::new(atlas), Arc::new(catalog))
 }
 
 pub struct MapDataState {
@@ -131,6 +136,18 @@ impl MapDataState {
         Ok(())
     }
 
+    /// Renews Leafline's shop file once a day, and brings the atlas up to date with it.
+    fn refresh_shops(&self) -> Result<()> {
+        let _turn = self.drops_refresh.lock().expect("drops refresh lock");
+        let mut store = Store::open(&self.path)?;
+        if shops::refresh(&mut store, &self.osms, now())? {
+            let (atlas, catalog) = store.load()?.map(split).unzip();
+            *self.atlas.write().expect("atlas lock") = atlas;
+            *self.catalog.write().expect("catalog lock") = catalog;
+        }
+        Ok(())
+    }
+
     fn refresh_drops(&self) -> Result<()> {
         let _turn = self.drops_refresh.lock().expect("drops refresh lock");
         drops::refresh(&mut Store::open(&self.path)?, &self.wiki, now())
@@ -163,6 +180,10 @@ pub fn check_for_updates(app: &AppHandle) {
         if let Err(err) = state.refresh_turn_ins() {
             eprintln!("turn-in table download failed: {err}");
         }
+        // The copy that came with the app keeps working when this fails.
+        if let Err(err) = state.refresh_shops() {
+            eprintln!("shop file download failed: {err}");
+        }
         let has_drops = Store::open(&state.path).and_then(|s| s.wants_drops()).unwrap_or(false);
         if has_drops && let Err(err) = state.refresh_drops() {
             eprintln!("drop table update failed: {err}");
@@ -193,6 +214,9 @@ pub async fn download_map_data(app: AppHandle, force: bool) -> Result<Downloaded
         // Quest help still works without it, from what the map data shows.
         if let Err(err) = state.refresh_turn_ins() {
             eprintln!("turn-in table download failed: {err}");
+        }
+        if let Err(err) = state.refresh_shops() {
+            eprintln!("shop file download failed: {err}");
         }
         Ok(Downloaded { report, status: Store::open(&state.path)?.status()? })
     })
