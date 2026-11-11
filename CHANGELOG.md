@@ -3,7 +3,7 @@
 What changed in each release of Leafline. Leafline is a work in progress: if something reads
 wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?template=bug_report.yml).
 
-## Unreleased
+## 0.1.1 (2026-11-10)
 
 ### Added
 - **Settings → Feedback:** open the bug form or the idea form on GitHub, copy the bug report
