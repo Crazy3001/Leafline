@@ -139,14 +139,17 @@
   {#if objectives.length}
     <ul class="counters">
       {#each objectives as objective, i (i)}
-        {@const progress = objectiveProgress(objective)}
+        <!-- A line the data says is there but no reading has counted shows no count, not a 0. -->
+        {@const progress = objective.unread ? 0 : objectiveProgress(objective)}
         {@const done = progress >= 1}
         <li class:done title={objective.quest}>
           <span class="target">
             {#if done}<Check size={10} />{/if}
             {objective.target}
           </span>
-          <span class="count tabular">{objective.current}/{objective.required}</span>
+          <span class="count tabular" class:faint={objective.unread}
+            >{objective.unread ? "–" : objective.current}/{objective.required}</span
+          >
           <span class="track"><span class="fill" style:width="{progress * 100}%"></span></span>
         </li>
       {/each}
@@ -305,6 +308,10 @@
 
   .count {
     color: var(--muted);
+  }
+
+  .count.faint {
+    color: var(--faint);
   }
 
   .track {

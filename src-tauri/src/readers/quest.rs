@@ -383,8 +383,10 @@ fn counter_readings(counter: &str) -> Vec<(u32, u32)> {
         if !tidy(&current) || !tidy(&required) {
             return;
         }
+        // Item lines count what the inventory holds and can pass their target (`9 / 5
+        // Leather`); a clear slash vouches for that too, where a lost one could make 10/10 of 1010.
         if let (Ok(c), Ok(r)) = (current.parse::<u32>(), required.parse::<u32>())
-            && ((r > 0 && c <= r) || (r == 0 && slashed))
+            && ((r > 0 && c <= r) || slashed)
             && !readings.contains(&(c, r))
         {
             readings.push((c, r));
@@ -660,8 +662,12 @@ mod tests {
             parse(&[plain, split], 30.0, 32.0),
             [Quest { title: "Bringing a Mirror to Heena".into(), objectives: vec![objective("Sera's Mirror", 1, 1)] }]
         );
-        // A counter OCR read past its target is still a counter, for the shapes to settle.
-        assert_eq!(parse(&[vec![line("31 / 30 Evil Eye", 50.0)]], 30.0, 32.0), Vec::<Quest>::new());
+        // A counter past its target, with a clear slash, is kept: an item line can hold more than
+        // it asks for, and the quest data decides (kills stop at their target).
+        assert_eq!(
+            parse(&[vec![line("31 / 30 Evil Eye", 50.0)]], 30.0, 32.0),
+            [Quest { title: String::new(), objectives: vec![objective("Evil Eye", 31, 30)] }]
+        );
     }
 
     #[test]
@@ -684,7 +690,8 @@ mod tests {
         assert_eq!(counter_readings("55 1 CICI"), [(55, 100)]);
         assert_eq!(counter_readings("0130"), [(0, 30)]);
         assert_eq!(counter_readings("12150"), [(12, 50)]);
-        assert!(counter_readings("31 / 30").is_empty());
+        assert_eq!(counter_readings("9 / 5"), [(9, 5)], "an item line past its target");
+        assert!(counter_readings("31 30").is_empty(), "no slash, no count past the target");
     }
 
     #[test]

@@ -179,13 +179,15 @@ impl QuestTitles {
                 }
             };
             if let Some(lines) = lines {
+                let item_name = |item: u32| atlas.item_names.get(&item).cloned();
+                let items = id.map(|id| atlas.quest_items(id, item_name)).unwrap_or_default();
                 if known.id.is_none() || known.objectives.len() != lines.len() {
                     // Matched in the data only now: start from its lines, keeping counts read.
                     let before = std::mem::replace(&mut known.objectives, lines);
-                    fill_counts(&mut known.objectives, &before, &mut Vec::new());
+                    fill_counts(&mut known.objectives, &before, &mut Vec::new(), &items);
                 }
                 known.id = id;
-                fill_counts(&mut known.objectives, &quest.objectives, &mut known.falling);
+                fill_counts(&mut known.objectives, &quest.objectives, &mut known.falling, &items);
             } else {
                 if let Some(found) = id {
                     atlas.fit_counts(found, &mut quest.objectives);
@@ -252,13 +254,14 @@ fn pair_lines(known: &[Objective], read: &[Objective]) -> Vec<(usize, usize)> {
 }
 
 /// Takes the counts read into a quest's lines from the data, whose names and targets stay. A
-/// line not read keeps its count, and a count above its line's target is a misread, since the
-/// game stops counting there. Once a reading shows every line, the lines take its order, the
-/// Quest Helper's.
-fn fill_counts(lines: &mut [Objective], read: &[Objective], falling: &mut Vec<(String, u32)>) {
+/// line not read keeps its count. A kill count above its line's target is a misread, since the
+/// game stops counting there, but an item line counts what the inventory holds, so `9 / 5
+/// Leather` is right: `items` names those lines. Once a reading shows every line, the lines
+/// take its order, the Quest Helper's.
+fn fill_counts(lines: &mut [Objective], read: &[Objective], falling: &mut Vec<(String, u32)>, items: &[String]) {
     let pairs = pair_lines(lines, read);
     for &(r, k) in &pairs {
-        if read[r].current <= lines[k].required {
+        if read[r].current <= lines[k].required || items.contains(&lines[k].target) {
             take_count(&mut lines[k], read[r].current, falling);
             lines[k].unread = false;
         }
@@ -991,7 +994,22 @@ mod tests {
         assert_eq!(read.quests, [quest("Shell Sorting", &lines)], "the data's lines, in the order read");
         let junk = quest("Shell Sorting", &[("Tillie", 9, 9), ("Pebble Snail", 9, 8)]);
         let read = held(&mut titles, &atlas, reading(vec![junk], None)).unwrap();
-        assert_eq!(read.quests, [quest("Shell Sorting", &lines)], "no junk line, no count over its target");
+        assert_eq!(read.quests, [quest("Shell Sorting", &lines)], "no junk line, no kill count over its target");
+    }
+
+    #[test]
+    fn an_item_line_can_count_past_its_target() {
+        // Seen live: the Quest Helper showed `9 / 5 Leather`, and Leafline showed 0/5.
+        let (mut atlas, mut titles) = (world(), QuestTitles::default());
+        atlas.item_names.insert(95, "Snail Shell".into());
+        atlas.quests.get_mut(&70).unwrap().items.push(ItemNeed { item_id: 95, count: 5 });
+        let full = quest("Shell Sorting", &[("Pebble Snail", 8, 8), ("Burrow Rat", 2, 2), ("Snail Shell", 9, 5)]);
+        held(&mut titles, &atlas, reading(vec![full.clone()], None));
+        let read = held(&mut titles, &atlas, reading(vec![full.clone()], None)).unwrap();
+        assert_eq!(read.quests, [full], "nine shells held for five wanted");
+        let over = quest("Shell Sorting", &[("Pebble Snail", 9, 8), ("Burrow Rat", 2, 2), ("Snail Shell", 9, 5)]);
+        let read = held(&mut titles, &atlas, reading(vec![over], None)).unwrap();
+        assert_eq!(read.quests[0].objectives[0].current, 8, "kills still stop at the target");
     }
 
     #[test]

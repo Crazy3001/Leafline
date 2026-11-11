@@ -127,7 +127,8 @@
   function tracked(name: string, monster: string) {
     const entry = quest?.quests.find((q) => q.title === name);
     const objective = entry?.objectives.find((o) => o.target === monster);
-    return objective ? `${objective.current} / ${objective.required}` : null;
+    if (!objective) return null;
+    return `${objective.unread ? "–" : objective.current} / ${objective.required}`;
   }
 
   const wikiPage = (name: string) => `${WIKI_URL}/index.php?search=${encodeURIComponent(name)}&go=Go`;

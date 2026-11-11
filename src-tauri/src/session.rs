@@ -91,6 +91,9 @@ impl Sample {
                 .iter()
                 .flat_map(|q| &q.quests)
                 .flat_map(|q| &q.objectives)
+                // A line no reading has counted holds a 0 that isn't one: its first real count
+                // would look like a burst of kills.
+                .filter(|o| !o.unread)
                 .map(|o| Counter { target: o.target.clone(), current: o.current, required: o.required })
                 .collect(),
         }
