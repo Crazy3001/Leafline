@@ -65,7 +65,7 @@
   const steps = $derived(plan?.expansion.steps ?? []);
   const at = $derived(level ?? plan?.build.start.level ?? 0);
   const step = $derived(steps.findLast((s) => s.level <= at) ?? steps[0] ?? null);
-  const hasWork = (s: LevelStep) => s.ap.length > 0 || s.sp.length > 0 || s.advance != null || s.gear.length > 0;
+  const hasWork = (s: LevelStep) => s.ap.length > 0 || s.sp.length > 0 || s.advance != null;
   const coming = $derived(steps.filter((s) => s.level > at && hasWork(s)).slice(0, COMING));
   const advance = $derived(steps.find((s) => s.level > at && s.advance));
   /** The next level that brings a gear goal within reach. */
@@ -266,9 +266,6 @@
         {/each}
         {#each step.ap as gain (gain.stat)}
           <p><span class="tag">{gain.amount} AP</span>{statLabel(gain.stat)} <span class="tabular dim">to {gain.total}</span></p>
-        {/each}
-        {#each step.gear as name (name)}
-          <p><span class="tag">Get</span><button class="ref ref-item" onclick={() => backend.showItem(null, name)}>{name}</button></p>
         {/each}
       {/if}
     </div>
