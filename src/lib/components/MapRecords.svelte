@@ -148,7 +148,8 @@
                   <td></td>
                 </tr>
               {/each}
-            {:else if open}
+            {:else if open && m.rows.length === 1}
+              <!-- A map with only brief visits has no row of its own to list. -->
               {@const row = m.rows[0]}
               <tr class="sub">
                 <td colspan={columns}>
