@@ -47,14 +47,15 @@ pub struct Assumptions {
 
 impl Default for Assumptions {
     fn default() -> Self {
-        Self { respawn_seconds: 8.0, exp_rate: 1.0, attack_min: None, attack_max: None, skill_factor: 1.4 }
+        Self { respawn_seconds: 8.0, exp_rate: 1.0, attack_min: None, attack_max: None, skill_factor: 2.4 }
     }
 }
 
 /// How much of a monster's weapon defence is taken off each blow. Fitted to a Lv 33 Crossbowman's
-/// fights: Wooden Masks (no defence) fell in one or two arrow blows, Iron Hogs (defence 500) took
-/// seven, most blows doing about 50. The real formula isn't published, so this is a fit.
-const DEFENCE_CUT: f64 = 0.45;
+/// fights (attack 107-289, Arrow Blow Lv 20 at 240%): Wooden Masks (no defence) fell in one or two
+/// blows, Iron Hogs (defence 500) took seven. The real formula isn't published, so this is a fit
+/// from one player's fights.
+const DEFENCE_CUT: f64 = 0.85;
 
 /// What the player's blows do, for working out what a monster's defence costs them.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -239,7 +240,7 @@ fn per_kill(mobs: &[MobRow], damage: Option<&Damage>) -> Option<PerKill> {
         exp: mean(&|m| m.exp as f64),
         level: mean(&|m| m.level as f64),
         count,
-        hits: damage.map(|d| mean(&|m| m.hp as f64 / d.blow(defence(m)))),
+        hits: damage.map(|d| mean(&|m| (m.hp as f64 / d.blow(defence(m))).max(1.0))),
         defence: mean(&defence),
     };
     (kill.hp > 0.0 && kill.exp > 0.0).then_some(kill)
@@ -639,11 +640,11 @@ mod tests {
         .unwrap();
         // Wooden Masks (462 HP, no defence) fell in one or two blows.
         let mask = 462.0 / damage.blow(0.0);
-        assert!((1.2..2.2).contains(&mask), "{mask}");
-        // Iron Hogs (572 HP, defence 500) took seven, most blows doing about 50.
+        assert!((0.8..2.2).contains(&mask), "{mask}");
+        // Iron Hogs (572 HP, defence 500) took seven.
         let hog_blow = damage.blow(500.0);
-        assert!((40.0..80.0).contains(&hog_blow), "{hog_blow}");
-        assert!((5.0..11.0).contains(&(572.0 / hog_blow)));
+        assert!((60.0..110.0).contains(&hog_blow), "{hog_blow}");
+        assert!((5.0..9.5).contains(&(572.0 / hog_blow)));
         // No blow does less than 1.
         assert_eq!(damage.blow(5000.0), 1.0);
     }

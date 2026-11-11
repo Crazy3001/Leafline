@@ -575,7 +575,7 @@ export function sampleSpots(
   from: number | null,
   rates: MeasuredRate[] = [],
   level: number | null = null,
-  assumptions: Assumptions = { respawnSeconds: 8, expRate: 1, attackMin: null, attackMax: null, skillFactor: 1.4 },
+  assumptions: Assumptions = { respawnSeconds: 8, expRate: 1, attackMin: null, attackMax: null, skillFactor: 2.4 },
 ): TrainingSpots {
   const speed = sampleSpeed(rates, assumptions);
   // The player's measured rates on a map, weighted by time, as the backend sums them.

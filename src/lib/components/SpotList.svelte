@@ -560,8 +560,8 @@
           <span class="suffix">×</span>
         </label>
         <p>
-          The second figure is how much more than a plain attack your usual skill does. Leave it at 1.4 if you aren't sure;
-          it fits Arrow Blow at about Lv 20.
+          The second figure is your main skill's damage as a multiple of a plain attack: its tooltip's Damage line, so 240% is 2.4.
+          Arrow Blow at Lv 20 is 2.4.
         </p>
         {#if !isDefault(assumptions.value)}
           <Button variant="ghost" size="sm" onclick={() => setAssumptions(DEFAULT_ASSUMPTIONS)}>Back to defaults</Button>

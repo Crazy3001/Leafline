@@ -7,7 +7,7 @@ import type { Assumptions } from "./types";
 
 const KEY = "leafline.train.assumptions";
 
-export const DEFAULT_ASSUMPTIONS: Assumptions = { respawnSeconds: 8, expRate: 1, attackMin: null, attackMax: null, skillFactor: 1.4 };
+export const DEFAULT_ASSUMPTIONS: Assumptions = { respawnSeconds: 8, expRate: 1, attackMin: null, attackMax: null, skillFactor: 2.4 };
 
 export const RESPAWN_RANGE: [number, number] = [1, 600];
 export const EXP_RATE_RANGE: [number, number] = [0.1, 20];
