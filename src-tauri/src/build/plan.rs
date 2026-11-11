@@ -631,8 +631,13 @@ fn check_gear(
             problems.push(Problem::warning(None, format!("A gear goal names an item Leafline doesn't know ({id}).")));
             continue;
         };
-        // A goal already worn is done: it isn't new gear to look for, scrolled or not.
-        if build.start.pieces.iter().any(|piece| piece.is_copy_of(item, catalog)) {
+        // A goal already worn is done: it isn't new gear to look for, scrolled or not. Nor is one
+        // that asks no more than what is worn in its slot: the character has outgrown it.
+        let slot = &item.slot;
+        let outgrown = |piece: &Piece| {
+            piece.is_copy_of(item, catalog) || (Piece::clashes(&piece.slot(catalog), slot) && item.req_level <= piece.req_level(catalog))
+        };
+        if build.start.pieces.iter().any(outgrown) {
             continue;
         }
         let usable = branch.is_none_or(|b| usable_by(item, b));
@@ -653,13 +658,25 @@ fn check_gear(
         .collect();
     for step in steps.iter_mut() {
         loop {
-            let wearable = gear.iter().position(|check: &GearCheck| {
-                let others = worn.iter().filter(|w| !Piece::clashes(&w.slot, &check.item.slot));
-                let stats = others.fold(step.stats, |total, w| total.plus(w.bonus));
-                check.usable && check.level.is_none() && meets(&check.item, step.level, &stats, known)
-            });
-            let Some(i) = wearable else { break };
-            let check = &mut gear[i];
+            let wearable: Vec<usize> = (0..gear.len())
+                .filter(|&i| {
+                    let check = &gear[i];
+                    let others = worn.iter().filter(|w| !Piece::clashes(&w.slot, &check.item.slot));
+                    let stats = others.fold(step.stats, |total, w| total.plus(w.bonus));
+                    check.usable && check.level.is_none() && meets(&check.item, step.level, &stats, known)
+                })
+                .collect();
+            // Of the goals for one slot that come within reach together, only the best is worth
+            // listing: the character goes straight to it, so the older ones are passed over rather
+            // than shown as things to get. They count as reached.
+            let Some(&best) = wearable.iter().max_by_key(|&&i| (gear[i].item.req_level, std::cmp::Reverse(i))) else { break };
+            for &i in &wearable {
+                let same_slot = gear[i].item.slot == gear[best].item.slot;
+                if i != best && same_slot && gear[i].item.req_level <= gear[best].item.req_level {
+                    gear[i].level = Some(step.level);
+                }
+            }
+            let check = &mut gear[best];
             check.level = Some(step.level);
             step.gear.push(check.item.name.clone());
             worn.retain(|w| !Piece::clashes(&w.slot, &check.item.slot));

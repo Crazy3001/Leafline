@@ -492,6 +492,25 @@ mod tests {
     }
 
     #[test]
+    fn the_timeline_lists_only_the_best_goal_a_slot_can_wear_at_once_and_nothing_outgrown() {
+        let catalog = catalog();
+        let listed = |build: &Build| -> Vec<String> {
+            let e = expand(build, &Rules::default(), &catalog);
+            e.steps.iter().flat_map(|s| s.gear.clone()).collect()
+        };
+        // At Lv 25 every dagger is within reach together: the character goes to the best, and
+        // the three before it aren't "things to get".
+        assert_eq!(listed(&bandit(25, vec![1, 2, 3, 4], Vec::new())), ["Iron Dagger"]);
+        // What is worn counts too: nothing at or below its level is a goal.
+        let build = bandit(25, vec![1, 2, 3, 4], vec![worn(3, &catalog)]);
+        assert_eq!(listed(&build), ["Iron Dagger"]);
+        let e = expand(&build, &Rules::default(), &catalog);
+        assert_eq!(e.gear.iter().map(|g| g.item.name.as_str()).collect::<Vec<_>>(), ["Iron Dagger"], "older goals are dropped");
+        // A goal still to come stays on its level.
+        assert_eq!(listed(&bandit(10, vec![1, 2, 3, 4], Vec::new())), ["Old Dagger", "Field Dagger", "Coconut Knife", "Iron Dagger"]);
+    }
+
+    #[test]
     fn a_piece_saved_from_a_noisy_read_shows_the_items_own_name() {
         let catalog = catalog();
         let garbled = Piece { item: None, name: "Old Dagger ossbow".into(), ..worn(1, &catalog) };
