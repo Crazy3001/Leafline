@@ -3,7 +3,7 @@
   // screen but just as well beside a windowed game.
   // It reads what the overlay reads, follows the overlay's "Go here" trip, and opens links in a
   // column of its own so the overlay needn't come up over the game.
-  import { ArrowLeft, ChartLine, ChevronDown, Milestone, Pin, PinOff, Plus, X } from "@lucide/svelte";
+  import { ArrowLeft, ChartLine, ChevronDown, Milestone, Pencil, Pin, PinOff, Plus, RotateCcw, X } from "@lucide/svelte";
   import { onMount, untrack } from "svelte";
 
   import { backend } from "$lib/api";
@@ -14,9 +14,10 @@
   import {
     DESK_PANELS,
     MAX_COLUMNS,
+    MAX_NAME,
     ZOOMS,
+    defaultTab,
     find,
-    layoutOf,
     loadPrefs,
     place,
     remove,
@@ -27,7 +28,6 @@
     withColumns,
     type DeskColumn,
     type DeskPanel,
-    type PresetId,
   } from "$lib/desk";
   import { itemView, watchItems } from "$lib/items.svelte";
   import { monsterView, watchMonsters } from "$lib/monsters.svelte";
@@ -45,7 +45,10 @@
   deskWindow.active = true;
 
   let prefs = $state(loadPrefs());
-  const columns = $derived(layoutOf(prefs));
+  const tab = $derived(prefs.tabs.find((t) => t.id === prefs.active) ?? prefs.tabs[0]);
+  const columns = $derived(tab.columns);
+  /** The tab being renamed, and what has been typed so far. */
+  let renaming = $state<{ id: string; text: string } | null>(null);
   let onTop = $state(false);
 
   /** A panel a link brought up where no column showed it, over another until put back. */
@@ -65,35 +68,76 @@
     watchQuests();
     followTrip();
     backend.deskStatus().then((s) => (onTop = s.onTop));
+    // Opened from a link to the training log or the build planner: show that tab.
+    backend.deskTakeTab().then((name) => name && openTab(name));
+    const stop = backend.onDeskTab(openTab);
     const close = (event: KeyboardEvent) => {
       if (event.key === "Escape") menu = null;
     };
     window.addEventListener("keydown", close);
-    return () => window.removeEventListener("keydown", close);
+    return () => {
+      window.removeEventListener("keydown", close);
+      void stop.then((unlisten) => unlisten());
+    };
   });
 
   $effect(() => {
     void backend.setPageZoom(prefs.zoom);
   });
 
-  function change(next: DeskColumn[]) {
-    visit = null;
-    menu = null;
-    prefs.mine = next;
-    prefs.preset = "mine";
+  function save() {
     savePrefs($state.snapshot(prefs));
   }
 
-  function choose(preset: PresetId) {
+  function change(next: DeskColumn[]) {
     visit = null;
     menu = null;
-    prefs.preset = preset;
-    savePrefs($state.snapshot(prefs));
+    tab.columns = next;
+    save();
+  }
+
+  function activate(id: string) {
+    visit = null;
+    menu = null;
+    renaming = null;
+    prefs.active = id;
+    save();
+  }
+
+  /** Puts the shown tab back to its name and layout from the start. */
+  function reset() {
+    const fresh = defaultTab(tab.id);
+    tab.name = fresh.name;
+    change(fresh.columns);
+  }
+
+  function startRename(id: string) {
+    const target = prefs.tabs.find((t) => t.id === id);
+    if (!target) return;
+    activate(id);
+    renaming = { id, text: target.name };
+  }
+
+  function finishRename(keep: boolean) {
+    if (!renaming) return;
+    const target = prefs.tabs.find((t) => t.id === renaming!.id);
+    const name = renaming.text.trim().slice(0, MAX_NAME);
+    renaming = null;
+    if (keep && target && name) {
+      target.name = name;
+      save();
+    }
+  }
+
+  /** Focuses and selects a box as it appears. */
+  function selectAll(node: HTMLInputElement) {
+    node.focus();
+    node.select();
   }
 
   function setZoom(zoom: number) {
     prefs.zoom = zoom;
-    savePrefs($state.snapshot(prefs));
+    save();
   }
 
   async function toggleOnTop() {
@@ -128,12 +172,31 @@
     if (tabRequest.seq && tabRequest.panel) bringUp(tabRequest.panel);
   });
 
+  /** The training log or the build planner: its own tab, or any tab the player put it in. */
+  function showTab(panel: "log" | "planner") {
+    untrack(() => {
+      if (find(columns, panel)) {
+        visit = null;
+        return;
+      }
+      const own = prefs.tabs.find((t) => t.id === panel && find(t.columns, panel));
+      const any = own ?? prefs.tabs.find((t) => find(t.columns, panel));
+      if (any) activate(any.id);
+      else bringUp(panel);
+    });
+  }
+
+  /** A tab the backend asked for when it opened or brought forward this window. */
+  function openTab(name: string) {
+    if (name === "log" || name === "planner") showTab(name);
+  }
+
   $effect(() => {
-    if (logRequest.seq) bringUp("log");
+    if (logRequest.seq) showTab("log");
   });
 
   $effect(() => {
-    if (plannerRequest.seq) bringUp("planner");
+    if (plannerRequest.seq) showTab("planner");
   });
 
   // Reading the character's windows by hotkey shows its result in the Character panel.
@@ -145,14 +208,6 @@
   $effect(() => {
     if (live.itemRead?.found) bringUp("item");
   });
-
-  const presetOptions = $derived([
-    { id: "training" as const, label: "Training" },
-    { id: "questing" as const, label: "Questing" },
-    { id: "log" as const, label: "Log" },
-    { id: "planner" as const, label: "Build planner" },
-    ...(prefs.mine ? [{ id: "mine" as const, label: "My layout" }] : []),
-  ]);
 
   const columnOptions = Array.from({ length: MAX_COLUMNS }, (_, i) => ({ id: i + 1, label: `${i + 1}` }));
   const zoomOptions = ZOOMS.map((z) => ({ id: z, label: `${Math.round(z * 100)}%` }));
@@ -202,7 +257,6 @@
       <span class="status {liveText.tone}"><span class="dot" aria-hidden="true"></span>{liveText.text}</span>
     </div>
     <div class="controls">
-      <Segmented label="Layout" options={presetOptions} value={prefs.preset} onchange={choose} />
       <span class="field">
         <span class="faint">Columns</span>
         <Segmented
@@ -226,6 +280,42 @@
       >
     </div>
   </header>
+
+  <nav class="tabs" aria-label="Desk tabs">
+    <div class="tablist" role="tablist">
+      {#each prefs.tabs as t (t.id)}
+        {#if renaming?.id === t.id}
+          <input
+            class="rename"
+            aria-label="Tab name"
+            maxlength={MAX_NAME}
+            bind:value={renaming.text}
+            use:selectAll
+            onblur={() => finishRename(true)}
+            onkeydown={(e) => {
+              if (e.key === "Enter") finishRename(true);
+              else if (e.key === "Escape") finishRename(false);
+            }}
+          />
+        {:else}
+          <button
+            role="tab"
+            class="tab"
+            aria-selected={t.id === tab.id}
+            title={t.id === tab.id ? "Double-click to rename" : undefined}
+            onclick={() => activate(t.id)}
+            ondblclick={() => startRename(t.id)}>{t.name}</button
+          >
+        {/if}
+      {/each}
+    </div>
+    <span class="tab-actions">
+      <button class="small" title="Rename this tab" onclick={() => startRename(tab.id)}><Pencil size={12} />Rename</button>
+      <button class="small" title="Put this tab back to how it started" onclick={reset}
+        ><RotateCcw size={12} />Reset tab</button
+      >
+    </span>
+  </nav>
 
   <NextStep />
 
@@ -436,6 +526,68 @@
   button:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 1px;
+  }
+
+  .tabs {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-4) 0;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border-strong);
+  }
+
+  .tablist {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .tab,
+  .rename {
+    height: 34px;
+    padding: 0 var(--space-4);
+    border: 1px solid transparent;
+    border-bottom: 0;
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    font-size: var(--text-md);
+    white-space: nowrap;
+  }
+
+  .tab {
+    margin-bottom: -1px;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+  }
+
+  .tab:hover {
+    background: var(--surface-2);
+    color: var(--text);
+  }
+
+  .tab[aria-selected="true"] {
+    background: var(--bg);
+    border-color: var(--border-strong);
+    border-bottom: 1px solid var(--bg);
+    color: var(--accent-strong);
+    font-weight: 600;
+  }
+
+  .rename {
+    width: 150px;
+    margin-bottom: -1px;
+    background: var(--surface-2);
+    border-color: var(--accent);
+    color: var(--text);
+  }
+
+  .tab-actions {
+    display: inline-flex;
+    gap: var(--space-2);
+    padding-bottom: var(--space-2);
   }
 
   /* The Go here bar runs the window's width, under the header. */

@@ -5,7 +5,7 @@ use std::sync::{Mutex, MutexGuard};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::error::{Error, Result};
 use crate::userdata::UserData;
@@ -211,29 +211,10 @@ pub fn level_exp(state: State<UserDataState>) -> Result<Vec<LevelExp>> {
     state.with(|db| db.level_exp())
 }
 
-/// The training log window's label.
-pub const TRAINING: &str = "training";
-
-/// Opens the training log, or brings it forward.
+/// Opens the training log: a tab of the desk view.
 #[tauri::command]
 pub async fn show_training(app: AppHandle) -> Result<()> {
-    if let Some(window) = app.get_webview_window(TRAINING) {
-        return super::settings::bring_forward(&app, &window);
-    }
-    // Like the overlay, it leaves the game focused when the setting is on.
-    let keep = super::settings::keeps_game_focus(&app);
-    WebviewWindowBuilder::new(&app, TRAINING, WebviewUrl::App("training".into()))
-        .title("Leafline — Training log")
-        .inner_size(1180.0, 800.0)
-        .min_inner_size(760.0, 520.0)
-        .center()
-        .focusable(!keep)
-        .focused(!keep)
-        .background_color(tauri::window::Color(20, 20, 18, 255))
-        .additional_browser_args(super::BROWSER_ARGS)
-        .on_page_load(super::settings::raise_when_loaded)
-        .build()?;
-    Ok(())
+    super::desk::open_tab(&app, "log")
 }
 
 /// How a saved session's rates moved over time.

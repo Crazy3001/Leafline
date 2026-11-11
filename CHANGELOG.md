@@ -6,6 +6,10 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
 ## Unreleased
 
 ### Added
+- **Desk view tabs:** the desk view now has tabs: Training, Questing, Character, Training log,
+  Build planner and two of your own. Rename any tab, change its columns and panels, or reset it;
+  your tabs, the window's size and whether it is maximized are all remembered. The training log
+  and build planner open in the desk view instead of windows of their own.
 - **Training log → Records:** every map you trained on, with EXP and mesos per hour for each
   level, party size and job you played it at. Filter by level, party and job, and order by EXP,
   mesos or time.

@@ -57,7 +57,7 @@
 ### Fits around the game
 - **A small overlay** over the game, or shrink it to a **compact HUD**. Lock it so clicks pass through.
 - **Pin** any tab into its own small window, including a Route pin for Go here.
-- **Desk view:** every panel side by side in one big window, made for a second screen.
+- **Desk view:** every panel side by side in one big window, in tabs you can rename and rearrange (the training log and build planner have their own), remembering its size and tabs.
 - **Hotkeys** that work while the game is in front, without sending the game any input. Setup tests each key with the game in front.
 - **Countdown timers** for anything you want to keep time on.
 

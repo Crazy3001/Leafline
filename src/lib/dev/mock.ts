@@ -705,7 +705,7 @@ export const mockBackend: Backend = {
     return true;
   },
   async showTraining() {
-    window.open("/training", "_blank");
+    window.open("/desk?tab=log", "_blank");
   },
   async showDesk() {
     desk.open = true;
@@ -713,6 +713,11 @@ export const mockBackend: Backend = {
     return { ...desk };
   },
   deskStatus: async () => ({ ...desk }),
+  // The dev preview opens tabs in the browser, by address.
+  deskTakeTab: async () => new URLSearchParams(location.search).get("tab"),
+  async onDeskTab() {
+    return () => {};
+  },
   async setDeskOnTop(onTop) {
     desk.onTop = onTop;
     return { ...desk };
@@ -1064,7 +1069,7 @@ export const mockBackend: Backend = {
     window.open(url, "_blank", "noopener");
   },
   async showBuild() {
-    window.open("/build", "_blank");
+    window.open("/desk?tab=planner", "_blank");
   },
   async onBuilds(handler) {
     buildHandlers.push(handler);

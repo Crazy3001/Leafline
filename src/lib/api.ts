@@ -256,11 +256,15 @@ export interface Backend {
   craftingRecipes(query: CraftingQuery): Promise<CraftingPage>;
   /** How a saved session's rates moved over time. */
   sessionTimeline(id: number): Promise<SessionTimeline>;
-  /** Opens the training log window, or brings it forward. */
+  /** Opens the desk view on its Training log tab, or brings it forward there. */
   showTraining(): Promise<void>;
   /** Opens the desk view, the panels side by side in a window of its own, or brings it forward. */
   showDesk(): Promise<DeskStatus>;
   deskStatus(): Promise<DeskStatus>;
+  /** The tab ("log" or "planner") the desk view was opened for, once; null otherwise. */
+  deskTakeTab(): Promise<string | null>;
+  /** The desk view is already open and is asked for one of its tabs. */
+  onDeskTab(handler: (tab: string) => void): Promise<() => void>;
   setDeskOnTop(onTop: boolean): Promise<DeskStatus>;
   /** Draws the calling window's page larger or smaller, as browser zoom does. */
   setPageZoom(zoom: number): Promise<void>;
@@ -337,7 +341,7 @@ export interface Backend {
   buildItemFit(item: ItemTooltip, level: number | null, character: string | null): Promise<ItemFit | null>;
   /** Opens the guide link the player typed for a build. */
   openGuide(url: string): Promise<void>;
-  /** Opens the build editor, or brings it forward. */
+  /** Opens the desk view on its Build planner tab, or brings it forward there. */
   showBuild(): Promise<void>;
   onBuilds(handler: () => void): Promise<UnlistenFn>;
 
@@ -489,6 +493,8 @@ const tauriBackend: Backend = {
   showTraining: () => invoke("show_training"),
   showDesk: () => invoke("show_desk"),
   deskStatus: () => invoke("desk_status"),
+  deskTakeTab: () => invoke("desk_take_tab"),
+  onDeskTab: (handler) => listen<string>("desk-tab", (e) => handler(e.payload)),
   setDeskOnTop: (onTop) => invoke("set_desk_on_top", { onTop }),
   setPageZoom: (zoom) => getCurrentWebview().setZoom(zoom),
   monitorCount: () => availableMonitors().then((list) => list.length),

@@ -128,6 +128,7 @@ pub fn run() {
             pins::toggle_pins,
             pins::show_panel,
             desk::desk_status,
+            desk::desk_take_tab,
             desk::show_desk,
             desk::set_desk_on_top,
             mapdata::map_data_status,
