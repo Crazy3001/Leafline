@@ -5,6 +5,11 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
 
 ## Unreleased
 
+### Added
+- **Training log → Records:** every map you trained on, with EXP and mesos per hour for each
+  level, party size and job you played it at. Filter by level, party and job, and order by EXP,
+  mesos or time.
+
 ### Changed
 - **Where to train → For you:** maps you haven't tried are now estimated from how fast you get
   through monster HP in your own solo play, near your level, and held to how many monsters the

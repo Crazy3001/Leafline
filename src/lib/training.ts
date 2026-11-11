@@ -97,6 +97,8 @@ export interface LineFilter {
   character?: string | null;
   /** Only sessions started at or after this, in Unix seconds. */
   since?: number | null;
+  /** The job read then; lines with no job read pass only an empty filter. */
+  job?: string | null;
 }
 
 function keep(session: SavedSession, line: SessionLine, filter: LineFilter) {
@@ -106,7 +108,105 @@ function keep(session: SavedSession, line: SessionLine, filter: LineFilter) {
   const solo = (line.party ?? 1) <= 1;
   if (filter.party === "solo" && !solo) return false;
   if (filter.party === "party" && solo) return false;
+  if (filter.job && line.job !== filter.job) return false;
   return line.map != null && line.activeSeconds > 0;
+}
+
+/** Totals behind a rate, so groups can be summed before dividing. */
+interface Tally {
+  seconds: number;
+  exp: number;
+  percent: number;
+  mesos: number;
+  mesosSeconds: number;
+  sessions: Set<number>;
+}
+
+const tally = (): Tally => ({ seconds: 0, exp: 0, percent: 0, mesos: 0, mesosSeconds: 0, sessions: new Set() });
+
+function add(t: Tally, sessionId: number, line: SessionLine) {
+  t.seconds += line.activeSeconds;
+  t.exp += line.expGained;
+  t.percent += line.percentGained;
+  t.mesos += line.mesosGained;
+  t.mesosSeconds += line.mesosSeconds;
+  t.sessions.add(sessionId);
+}
+
+export interface RecordRates {
+  activeSeconds: number;
+  sessions: number;
+  /** Null when the HUD showed only a percentage, so EXP amounts are unknown. */
+  expPerHour: number | null;
+  percentPerHour: number | null;
+  /** Null when the mesos were never looked at twice on this stretch. */
+  mesosPerHour: number | null;
+  /** The share of the time Mesos / hr covers. */
+  mesosShare: number;
+}
+
+function rates(t: Tally): RecordRates {
+  return {
+    activeSeconds: t.seconds,
+    sessions: t.sessions.size,
+    expPerHour: t.exp > 0 ? (t.exp * 3600) / t.seconds : t.percent > 0 ? null : 0,
+    percentPerHour: t.percent > 0 ? (t.percent * 3600) / t.seconds : null,
+    mesosPerHour: t.mesosSeconds > 0 ? (t.mesos * 3600) / t.mesosSeconds : null,
+    mesosShare: t.seconds > 0 ? Math.min(1, t.mesosSeconds / t.seconds) : 0,
+  };
+}
+
+/** One way the player trained on a map: a level, a party size and a job. */
+export interface RecordRow extends RecordRates {
+  key: string;
+  level: number | null;
+  party: number | null;
+  job: string | null;
+}
+
+export interface MapRecord extends RecordRates {
+  map: string;
+  name: string;
+  street: string | null;
+  rows: RecordRow[];
+}
+
+/**
+ * The player's records by map, then by level, party size and job, over the saved sessions that
+ * pass the filter. Maps and rows come in the order `by` asks for, most first.
+ */
+export function mapRecords(
+  sessions: SavedSession[],
+  filter: LineFilter = {},
+  by: "exp" | "mesos" | "time" = "exp",
+): MapRecord[] {
+  const maps = new Map<string, { total: Tally; rows: Map<string, { row: Omit<RecordRow, keyof RecordRates>; tally: Tally }> }>();
+  for (const session of sessions) {
+    for (const line of session.lines) {
+      if (!keep(session, line, filter) || line.town) continue;
+      const entry = maps.get(line.map!) ?? { total: tally(), rows: new Map() };
+      add(entry.total, session.id, line);
+      // No party read counts as solo, as the filters take it.
+      const party = (line.party ?? 1) <= 1 ? 1 : line.party;
+      const key = `${line.level ?? "?"}|${party ?? "?"}|${line.job ?? "?"}`;
+      const row = entry.rows.get(key) ?? { row: { key, level: line.level, party, job: line.job }, tally: tally() };
+      add(row.tally, session.id, line);
+      entry.rows.set(key, row);
+      maps.set(line.map!, entry);
+    }
+  }
+  const value = (r: RecordRates) =>
+    by === "time" ? r.activeSeconds : by === "mesos" ? (r.mesosPerHour ?? -1) : (r.expPerHour ?? r.percentPerHour ?? -1);
+  return [...maps]
+    .map(([map, e]) => ({
+      map,
+      ...splitMapLabel(map),
+      ...rates(e.total),
+      rows: [...e.rows.values()]
+        .map(({ row, tally }) => ({ ...row, ...rates(tally) }))
+        .sort((a, b) => (b.level ?? 0) - (a.level ?? 0) || value(b) - value(a)),
+    }))
+    .sort((a, b) => value(b) - value(a));
 }
 
 export interface MapStats {

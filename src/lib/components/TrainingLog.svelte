@@ -1,6 +1,6 @@
 <script lang="ts">
-  // The training log: every saved session with its graph, rates per map by level and party, and
-  // progress over days. Its own window opens from the Train tab, and the desk view can show it
+  // The training log: every saved session with its graph, rates per map by level and party, the
+  // player's records per map by level, party size and job, and progress over days. Its own window opens from the Train tab, and the desk view can show it
   // in a column (embedded). Everything here stays on this PC.
   import { Download, PenLine, Share2 } from "@lucide/svelte";
   import { onMount, untrack } from "svelte";
@@ -8,6 +8,7 @@
   import DropLogView from "./DropLogView.svelte";
   import Logo from "./Logo.svelte";
   import MapNote from "./MapNote.svelte";
+  import MapRecords from "./MapRecords.svelte";
   import ShareDialog from "./ShareDialog.svelte";
   import { backend } from "$lib/api";
   import { dropsBetween, watchDrops } from "$lib/drops.svelte";
@@ -44,7 +45,7 @@
   /** In a desk view column: no title of its own, and the views in a row above. */
   let { embedded = false }: { embedded?: boolean } = $props();
 
-  type View = "sessions" | "maps" | "progress" | "drops";
+  type View = "sessions" | "maps" | "records" | "progress" | "drops";
   type Range = "7" | "30" | "all";
 
   const VIEW_KEY = "leafline.training.view";
@@ -327,7 +328,7 @@
 
   <div class="body">
     <nav aria-label="Training log">
-      {#each [["sessions", "Sessions"], ["maps", "Maps"], ["progress", "Progress"], ["drops", "Drops"]] as [id, name] (id)}
+      {#each [["sessions", "Sessions"], ["maps", "Maps"], ["records", "Records"], ["progress", "Progress"], ["drops", "Drops"]] as [id, name] (id)}
         <button class="nav" aria-current={view === id ? "page" : undefined} onclick={() => pickView(id as View)}>{name}</button>
       {/each}
     </nav>
@@ -503,6 +504,8 @@
             </section>
           {/if}
         </div>
+      {:else if view === "records"}
+        <MapRecords {sessions} />
       {:else if view === "maps"}
         <div class="filters">
           <span class="field">
