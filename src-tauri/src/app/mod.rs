@@ -2,6 +2,7 @@
 
 mod builds;
 mod commands;
+mod damage;
 mod desk;
 mod layout;
 mod live;
@@ -60,6 +61,7 @@ pub fn run() {
         .setup(|app| {
             app.manage(MapDataState::load(app.handle())?);
             app.manage(UserDataState::load(app.handle())?);
+            app.manage(damage::DamageState::load(app.handle())?);
             mapdata::check_for_updates(app.handle());
             app.manage(SettingsState::load(app.handle())?);
             settings::apply(app.handle())?;
@@ -127,6 +129,7 @@ pub fn run() {
             pins::unpin_panel,
             pins::toggle_pins,
             pins::show_panel,
+            damage::player_damage,
             desk::desk_status,
             desk::desk_take_tab,
             desk::show_desk,

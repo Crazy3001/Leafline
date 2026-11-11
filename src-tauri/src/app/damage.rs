@@ -1,0 +1,185 @@
+//! What the player's blows do, as the game shows it: the attack range from the stat window's detail
+//! pane, and each damaging skill's level and damage from the skill window and the skill data. The
+//! training estimates use these to count a monster's weapon defence against the player's damage.
+//! Kept per character, so a read of one character doesn't change another's.
+
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::sync::Mutex;
+
+use serde::{Deserialize, Serialize};
+use tauri::{AppHandle, Emitter, Manager, State};
+
+use super::mapdata::MapDataState;
+use crate::build::Catalog;
+use crate::error::{Error, Result};
+use crate::pipeline::CharacterScan;
+use crate::readers::character::SkillWindow;
+
+const FILE_NAME: &str = "damage.json";
+
+/// Emitted to every window when a character's damage was read anew and differs.
+pub const DAMAGE_EVENT: &str = "player-damage";
+
+/// A skill name read from the window counts as this one when they are this alike.
+const MIN_SKILL_SCORE: f64 = 0.8;
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct PlayerDamage {
+    /// The Attack line, `107 - 289`.
+    pub attack_min: Option<u32>,
+    pub attack_max: Option<u32>,
+    /// The damaging skills last seen in the skill window.
+    pub skills: Vec<DamageSkill>,
+}
+
+/// A skill that hits for a share of the player's attack, at the level it was read.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DamageSkill {
+    pub name: String,
+    pub level: u32,
+    /// Its damage as the skill data gives it at that level: 240 is 240%.
+    pub percent: u32,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct Changed<'a> {
+    name: &'a str,
+    damage: &'a PlayerDamage,
+}
+
+pub struct DamageState {
+    path: PathBuf,
+    all: Mutex<HashMap<String, PlayerDamage>>,
+}
+
+impl DamageState {
+    /// A missing or unreadable file means nothing has been read yet.
+    pub fn load(app: &AppHandle) -> Result<Self> {
+        let path = app.path().app_data_dir()?.join(FILE_NAME);
+        let all = std::fs::read_to_string(&path).ok().and_then(|json| serde_json::from_str(&json).ok()).unwrap_or_default();
+        Ok(Self { path, all: Mutex::new(all) })
+    }
+
+    fn save(&self, all: &HashMap<String, PlayerDamage>) -> Result<()> {
+        if let Some(dir) = self.path.parent() {
+            std::fs::create_dir_all(dir)?;
+        }
+        let json = serde_json::to_string(all).map_err(|err| Error::Invalid(err.to_string()))?;
+        std::fs::write(&self.path, json)?;
+        Ok(())
+    }
+}
+
+/// The damage a skill level's description gives: `MP -14; Damage 240%` is 240.
+fn percent(description: &str) -> Option<u32> {
+    let rest = &description[description.find("Damage ")? + "Damage ".len()..];
+    let digits: String = rest.chars().take_while(char::is_ascii_digit).collect();
+    (rest[digits.len()..].starts_with('%')).then(|| digits.parse().ok()).flatten()
+}
+
+/// The skills in `window` that hit for a share of the attack, each at the level read.
+fn damaging_skills(window: &SkillWindow, catalog: &Catalog) -> Vec<DamageSkill> {
+    let mut found: Vec<DamageSkill> = Vec::new();
+    for row in window.rows.iter().filter(|r| r.level > 0) {
+        let best = catalog
+            .skills()
+            .iter()
+            .filter(|s| !s.passive)
+            .map(|s| (strsim::normalized_levenshtein(&s.name.to_lowercase(), &row.name.to_lowercase()), s))
+            .filter(|(score, _)| *score >= MIN_SKILL_SCORE)
+            .max_by(|a, b| a.0.total_cmp(&b.0));
+        let Some((_, skill)) = best else { continue };
+        let level = row.level.min(skill.level_descriptions.len() as u32).max(1) as usize;
+        let Some(percent) = skill.level_descriptions.get(level - 1).and_then(|d| percent(d)) else { continue };
+        if !found.iter().any(|f| f.name == skill.name) {
+            found.push(DamageSkill { name: skill.name.clone(), level: row.level, percent });
+        }
+    }
+    found
+}
+
+/// Takes in what a read of the character's windows shows of the damage, when it shows any. Best
+/// effort: a failure to save is logged and the read goes on.
+pub fn note(app: &AppHandle, scan: &CharacterScan) {
+    let Some(name) = scan.name.as_deref().filter(|n| !n.trim().is_empty()) else { return };
+    let (detail, skills) = (scan.windows.detail, scan.windows.skills.as_ref());
+    if detail.is_none() && skills.is_none() {
+        return;
+    }
+    let catalog = app.state::<MapDataState>().catalog();
+    let state = app.state::<DamageState>();
+    let mut all = state.all.lock().expect("damage lock");
+    let entry = all.entry(name.to_lowercase()).or_default();
+    let before = entry.clone();
+    if let Some(detail) = detail {
+        entry.attack_min = Some(detail.attack_min);
+        entry.attack_max = Some(detail.attack_max);
+    }
+    if let (Some(window), Some(catalog)) = (skills, catalog) {
+        entry.skills = damaging_skills(window, &catalog);
+    }
+    if *entry == before {
+        return;
+    }
+    let damage = entry.clone();
+    if let Err(err) = state.save(&all) {
+        eprintln!("could not save the damage read: {err}");
+    }
+    drop(all);
+    let _ = app.emit(DAMAGE_EVENT, Changed { name, damage: &damage });
+}
+
+/// What was last read of this character's damage.
+#[tauri::command]
+pub fn player_damage(state: State<DamageState>, name: String) -> Option<PlayerDamage> {
+    state.all.lock().expect("damage lock").get(&name.to_lowercase()).cloned()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_skill_level_gives_its_damage_percent() {
+        assert_eq!(percent("MP -14; Damage 240%"), Some(240));
+        assert_eq!(percent("HP -16; MP -14; Damage 130%; Range +150"), Some(130));
+        assert_eq!(percent("Critical Rate +20%, Critical Damage +15%"), None);
+        assert_eq!(percent("Damage 240"), None);
+        assert_eq!(percent("Fires an arrow"), None);
+    }
+
+    fn catalog() -> Catalog {
+        use crate::build::catalog::tests::skill;
+        let levelled = |id, name: &str, passive: bool, descriptions: &[&str]| {
+            let mut s = skill(id, name, 300, descriptions.len() as u32, &[]);
+            s.passive = passive;
+            s.level_descriptions = descriptions.iter().map(|d| d.to_string()).collect();
+            s
+        };
+        Catalog::new(
+            vec![
+                levelled(1, "Arrow Blow", false, &["MP -6; Damage 160%", "MP -7; Damage 165%", "MP -8; Damage 170%"]),
+                levelled(2, "Double Shot", false, &["MP -8; Damage 80%"]),
+                levelled(3, "Critical Shot", true, &["Critical Rate +5%, Critical Damage +1%"]),
+                levelled(4, "Focus", false, &["MP -10; Accuracy +5%"]),
+            ],
+            Vec::new(),
+        )
+    }
+
+    #[test]
+    fn the_skill_window_gives_each_damaging_skill_at_its_level() {
+        use crate::readers::character::SkillRow;
+        let row = |name: &str, level| SkillRow { name: name.into(), level };
+        let window = SkillWindow {
+            rows: vec![row("Critical Shot", 1), row("Focus", 1), row("Arrow Blow", 3), row("Double Shot", 0), row("Arrow B1ow", 2)],
+            skill_points: None,
+        };
+        let found = damaging_skills(&window, &catalog());
+        // Passive, not-damaging and unlearned skills are left out; a misread name still matches
+        // its skill once, and the first reading of it stands.
+        assert_eq!(found, vec![DamageSkill { name: "Arrow Blow".into(), level: 3, percent: 170 }]);
+    }
+}

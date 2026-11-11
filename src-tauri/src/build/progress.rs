@@ -133,7 +133,7 @@ mod tests {
     }
 
     fn caught_up(start: &mut Start, level: Option<u32>, stats: Option<StatWindow>, skills: Option<SkillWindow>) -> CatchUp {
-        let seen = CharacterReading { stats, skills };
+        let seen = CharacterReading { stats, skills, ..CharacterReading::default() };
         catch_up(start, level, &seen, 400, &Rules::default(), &catalog())
     }
 

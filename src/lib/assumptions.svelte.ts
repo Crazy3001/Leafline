@@ -7,7 +7,7 @@ import type { Assumptions } from "./types";
 
 const KEY = "leafline.train.assumptions";
 
-export const DEFAULT_ASSUMPTIONS: Assumptions = { respawnSeconds: 8, expRate: 1, attackMin: null, attackMax: null, skillFactor: 2.4 };
+export const DEFAULT_ASSUMPTIONS: Assumptions = { respawnSeconds: 8, expRate: 1, attackMin: null, attackMax: null, skillFactor: 2.4, skillName: "" };
 
 export const RESPAWN_RANGE: [number, number] = [1, 600];
 export const EXP_RATE_RANGE: [number, number] = [0.1, 20];
@@ -34,6 +34,7 @@ function clean(raw: Partial<Assumptions> | null | undefined, base: Assumptions):
     attackMin: low != null && high != null && high >= low ? low : null,
     attackMax: low != null && high != null && high >= low ? high : null,
     skillFactor: clamp(Number(raw?.skillFactor ?? base.skillFactor), SKILL_FACTOR_RANGE, DEFAULT_ASSUMPTIONS.skillFactor),
+    skillName: String(raw?.skillName ?? base.skillName ?? "").slice(0, 60),
   };
 }
 
@@ -74,6 +75,7 @@ export function isDefault(a: Assumptions) {
     a.expRate === d.expRate &&
     a.attackMin === d.attackMin &&
     a.attackMax === d.attackMax &&
-    a.skillFactor === d.skillFactor
+    a.skillFactor === d.skillFactor &&
+    a.skillName === d.skillName
   );
 }

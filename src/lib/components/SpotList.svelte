@@ -22,6 +22,8 @@
   import MapDataPanel from "./map/MapDataPanel.svelte";
   import RouteSteps from "./map/RouteSteps.svelte";
   import { backend } from "$lib/api";
+  import { damage, effective, followDamage } from "$lib/damage.svelte";
+  import { live } from "$lib/readings.svelte";
   import { openTrainingLog } from "$lib/nav.svelte";
   import { formatCompact, formatDuration } from "$lib/format";
   import { measuredRates, watchHistory } from "$lib/history.svelte";
@@ -90,9 +92,15 @@
   const saved = $derived(spotStore.saved);
 
   const level = $derived(readLevel ?? manualLevel);
+  // What Leafline read of the player's attack and skills fills what they haven't typed.
+  $effect(() => {
+    const name = session?.name ?? live.analysis?.hud?.name ?? null;
+    untrack(() => followDamage(name));
+  });
+  const used = $derived(effective(assumptions.value, damage.value));
   const measured = $derived(measuredRates(session));
   const queryKey = $derived(
-    JSON.stringify([map?.name, map?.street, map?.twin, measured, travelKey(), level, assumptions.value]),
+    JSON.stringify([map?.name, map?.street, map?.twin, measured, travelKey(), level, used.assumptions]),
   );
   const fromId = $derived(data?.from?.id);
 
@@ -105,7 +113,7 @@
       return;
     }
     untrack(() =>
-      backend.trainingSpots(map?.name ?? null, map?.street ?? null, map?.twin ?? null, measured, level, assumptions.value),
+      backend.trainingSpots(map?.name ?? null, map?.street ?? null, map?.twin ?? null, measured, level, used.assumptions),
     )
       .then((result) => {
         if (key === queryKey) data = result;
@@ -521,7 +529,11 @@
         </p>
         <p>
           Your attack counts each monster's weapon defence, which can make a monster take many more blows than its HP says.
-          Type the range from your stat window's Attack line.
+          {#if damage.value?.attackMin != null || damage.value?.skills.length}
+            Leafline read these from your game; type over them to use your own.
+          {:else}
+            Open your Character Stat window with Detail showing, and the Skill window, and Leafline fills these in. Or type them.
+          {/if}
         </p>
         <label>
           <span>Your attack</span>
@@ -530,7 +542,7 @@
             min={ATTACK_RANGE[0]}
             max={ATTACK_RANGE[1]}
             step="1"
-            placeholder="min"
+            placeholder={damage.value?.attackMin?.toString() ?? "min"}
             aria-label="Lowest attack"
             value={assumptions.value.attackMin ?? ""}
             onchange={(e) => setAssumptions({ attackMin: e.currentTarget.value === "" ? null : Number(e.currentTarget.value) })}
@@ -541,28 +553,44 @@
             min={ATTACK_RANGE[0]}
             max={ATTACK_RANGE[1]}
             step="1"
-            placeholder="max"
+            placeholder={damage.value?.attackMax?.toString() ?? "max"}
             aria-label="Highest attack"
             value={assumptions.value.attackMax ?? ""}
             onchange={(e) => setAssumptions({ attackMax: e.currentTarget.value === "" ? null : Number(e.currentTarget.value) })}
           />
         </label>
         <label>
-          <span>Your skill hits for</span>
-          <input
-            type="number"
-            min={SKILL_FACTOR_RANGE[0]}
-            max={SKILL_FACTOR_RANGE[1]}
-            step="0.1"
-            value={assumptions.value.skillFactor}
-            onchange={(e) => setAssumptions({ skillFactor: Number(e.currentTarget.value) })}
-          />
-          <span class="suffix">×</span>
+          <span>Main skill</span>
+          <select
+            aria-label="Main skill"
+            value={assumptions.value.skillName}
+            onchange={(e) => setAssumptions({ skillName: e.currentTarget.value })}
+          >
+            <option value="">{damage.value?.skills.length ? "Best one, automatically" : "Not read yet"}</option>
+            {#each damage.value?.skills ?? [] as skill (skill.name)}
+              <option value={skill.name}>{skill.name} · Lv {skill.level} · {skill.percent}%</option>
+            {/each}
+            <option value="custom">Other, I'll type it</option>
+          </select>
         </label>
-        <p>
-          The second figure is your main skill's damage as a multiple of a plain attack: its tooltip's Damage line, so 240% is 2.4.
-          Arrow Blow at Lv 20 is 2.4.
-        </p>
+        {#if used.skill}
+          <p>Counting {used.skill.name} at Lv {used.skill.level}: {used.skill.percent}% of your attack.</p>
+        {/if}
+        {#if assumptions.value.skillName === "custom" || !damage.value?.skills.length}
+          <label>
+            <span>Your skill hits for</span>
+            <input
+              type="number"
+              min={SKILL_FACTOR_RANGE[0]}
+              max={SKILL_FACTOR_RANGE[1]}
+              step="0.1"
+              value={assumptions.value.skillFactor}
+              onchange={(e) => setAssumptions({ skillFactor: Number(e.currentTarget.value) })}
+            />
+            <span class="suffix">×</span>
+          </label>
+          <p>Your skill's damage as a multiple of a plain attack: its tooltip's Damage line, so 240% is 2.4.</p>
+        {/if}
         {#if !isDefault(assumptions.value)}
           <Button variant="ghost" size="sm" onclick={() => setAssumptions(DEFAULT_ASSUMPTIONS)}>Back to defaults</Button>
         {/if}
@@ -813,6 +841,17 @@
 
   .assume label > span:first-child {
     flex: 1;
+  }
+
+  .assume select {
+    max-width: 200px;
+    height: 22px;
+    padding: 0 4px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
   }
 
   .assume input {

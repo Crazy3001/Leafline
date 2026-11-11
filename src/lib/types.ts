@@ -749,8 +749,27 @@ export interface Assumptions {
    *  estimates count each monster's weapon defence. */
   attackMin: number | null;
   attackMax: number | null;
-  /** How hard a blow of their usual skill hits over a plain attack. */
+  /** How hard a blow of their usual skill hits over a plain attack, when typed. */
   skillFactor: number;
+  /** Which skill is the main one, by name: empty to use the best one Leafline read, or
+   *  "custom" to use the typed `skillFactor`. */
+  skillName: string;
+}
+
+/** What Leafline read of a character's damage from the game (src-tauri/src/app/damage.rs). */
+export interface PlayerDamage {
+  /** The stat window's Attack line. */
+  attackMin: number | null;
+  attackMax: number | null;
+  /** The damaging skills last seen in the skill window. */
+  skills: DamageSkill[];
+}
+
+export interface DamageSkill {
+  name: string;
+  level: number;
+  /** Its damage at that level: 240 is 240%. */
+  percent: number;
 }
 
 /** How fast the player gets through monster HP, from their own solo play. */

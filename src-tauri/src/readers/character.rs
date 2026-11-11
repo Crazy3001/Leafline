@@ -1,5 +1,6 @@
 //! The Character Stat and Skill Inventory windows, so the build planner can start from the
-//! character as it really is. Live pictures are checked for them with [`glance`], which reads no
+//! character as it really is. The stat window's detail pane gives the attack range the training
+//! estimates count monsters' defence against. Live pictures are checked for them with [`glance`], which reads no
 //! text; the hotkey and a change that has settled read them in full with [`read`].
 //!
 //! Windows can be dragged anywhere, so each is found by appearance: the stat window by its four
@@ -27,6 +28,10 @@ const LEVEL_ABOVE_STR: f32 = 192.0;
 /// From a label's left edge to where its value can start, and how far values run.
 const VALUE_LEFT: f32 = 96.0;
 const VALUE_WIDTH: f32 = 170.0;
+/// The detail pane's labels stand at the same pitch; its values start this far from a label's left
+/// edge, and run this far.
+const DETAIL_VALUE_LEFT: f32 = 122.0;
+const DETAIL_VALUE_WIDTH: f32 = 200.0;
 /// The ABILITY POINT box, from the LUK label.
 const AP_BOX: (f32, f32, f32, f32) = (158.0, 60.0, 52.0, 26.0);
 /// A skill's level strip stands this far below its name strip, and rows this far apart.
@@ -58,6 +63,17 @@ const LOOK_STEP: usize = 8;
 pub struct CharacterReading {
     pub stats: Option<StatWindow>,
     pub skills: Option<SkillWindow>,
+    /// The stat window's detail pane, when it is open.
+    pub detail: Option<DetailWindow>,
+}
+
+/// What the detail pane shows that the plans use.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DetailWindow {
+    /// The Attack line, `107 - 289`.
+    pub attack_min: u32,
+    pub attack_max: u32,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
@@ -108,6 +124,7 @@ pub struct Glance {
     stats: Option<StatWindow>,
     skills: Vec<(Option<u32>, usize)>,
     skill_points: Option<u32>,
+    detail: Option<DetailWindow>,
 }
 
 /// Decides when a change in the windows is worth a full read: once it has shown the same in two
@@ -146,7 +163,8 @@ pub fn glance(frame: &Frame, hud: &HudLayout, level: Option<u32>) -> Option<Glan
         .map(|strip| (number_in(view, level_area(strip)), ink_in(view, name_area(strip))))
         .collect();
     let skill_points = strips.first().and_then(|first| number_in(view, sp_area(first)));
-    (stats.is_some() || !skills.is_empty()).then_some(Glance { level, stats, skills, skill_points })
+    let detail = read_detail(view);
+    (stats.is_some() || !skills.is_empty() || detail.is_some()).then_some(Glance { level, stats, skills, skill_points, detail })
 }
 
 /// Whether anything in `frame` has the colours of the windows.
@@ -154,7 +172,7 @@ fn any_window(frame: &Frame) -> bool {
     (0..frame.height()).step_by(LOOK_STEP).any(|y| {
         (0..frame.width()).step_by(LOOK_STEP).any(|x| {
             let px = frame.get_pixel(x, y);
-            is_stat_label(px) || is_skill_strip(px)
+            is_stat_label(px) || is_skill_strip(px) || is_detail_label(px)
         })
     })
 }
@@ -196,7 +214,8 @@ pub fn read(frame: &Frame, hud: Option<&HudLayout>, ocr: &Ocr) -> Result<Charact
 fn read_view(view: &Frame, ocr: &Ocr) -> Result<Option<CharacterReading>> {
     let stats = stat_labels(view).and_then(|labels| read_stats(view, &labels));
     let skills = read_skills(view, ocr)?;
-    Ok((stats.is_some() || skills.is_some()).then_some(CharacterReading { stats, skills }))
+    let detail = read_detail(view);
+    Ok((stats.is_some() || skills.is_some() || detail.is_some()).then_some(CharacterReading { stats, skills, detail }))
 }
 
 fn whole(frame: &Frame) -> Rect {
@@ -211,6 +230,10 @@ fn is_stat_label(px: &Rgba<u8>) -> bool {
     near(px, [184, 199, 77], 6)
 }
 
+fn is_detail_label(px: &Rgba<u8>) -> bool {
+    near(px, [90, 136, 182], 6)
+}
+
 fn is_skill_strip(px: &Rgba<u8>) -> bool {
     near(px, [205, 217, 227], 4)
 }
@@ -222,16 +245,33 @@ fn is_ink(px: &Rgba<u8>) -> bool {
 
 /// The STR, DEX, INT and LUK labels, top to bottom: four of a size, stacked at the right pitch.
 fn stat_labels(view: &Frame) -> Option<[Rect; STAT_LABELS]> {
-    let mut blocks = color::find_blocks(view, whole(view), MIN_LABEL_RUN, is_stat_label);
-    blocks.retain(|b| b.h >= 20.0 && b.h <= 36.0);
+    stacked_labels(view, is_stat_label, false)
+}
+
+/// Four labels of a colour, of a size, stacked at the right pitch: the first is the top one.
+/// With `broken`, the labels under the first may show only a sliver, since text across them
+/// splits their fill (the detail pane's do); the first must still be whole.
+fn stacked_labels(view: &Frame, is_label: fn(&Rgba<u8>) -> bool, broken: bool) -> Option<[Rect; STAT_LABELS]> {
+    let mut blocks = color::find_blocks(view, whole(view), MIN_LABEL_RUN, is_label);
+    blocks.retain(|b| b.h <= 36.0 && (broken || b.h >= 20.0));
     blocks.sort_by(|a, b| a.y.total_cmp(&b.y));
-    blocks.iter().find_map(|first| {
+    blocks.iter().filter(|b| b.h >= 20.0).find_map(|first| {
         let at = |i: usize| {
             let y = first.y + i as f32 * STAT_PITCH;
             blocks.iter().find(|b| (b.x - first.x).abs() <= SLACK && (b.y - y).abs() <= SLACK).copied()
         };
         Some([at(0)?, at(1)?, at(2)?, at(3)?])
     })
+}
+
+/// The Attack line of the detail pane: its blue labels stand four or more in a stack, ATTACK on top.
+fn read_detail(view: &Frame) -> Option<DetailWindow> {
+    let attack = stacked_labels(view, is_detail_label, true)?[0];
+    let (attack_min, attack_max) = range_in(
+        view,
+        Rect::new(attack.x + DETAIL_VALUE_LEFT, attack.y - 2.0, DETAIL_VALUE_WIDTH, attack.h + 4.0),
+    )?;
+    (attack_min <= attack_max).then_some(DetailWindow { attack_min, attack_max })
 }
 
 fn read_stats(view: &Frame, labels: &[Rect; STAT_LABELS]) -> Option<StatWindow> {
@@ -287,7 +327,28 @@ fn stat_in(view: &Frame, area: Rect) -> Option<(u32, u32)> {
 fn number_in(view: &Frame, area: Rect) -> Option<u32> {
     let columns = ink_columns(view, area, is_ink);
     let end = number_end(&columns);
-    let digits = &columns[..end];
+    number_of(view, area, &columns[..end])
+}
+
+/// A range such as `107 - 289`: two numbers with a dash between. The widest gap in the line is the
+/// one after the dash; the dash itself is a low mark that is left out of the first number.
+fn range_in(view: &Frame, area: Rect) -> Option<(u32, u32)> {
+    let columns = ink_columns(view, area, is_ink);
+    let split = (1..columns.len()).max_by_key(|&i| columns[i].0 - columns[i - 1].1)?;
+    let (first, second) = columns.split_at(split);
+    let height = |c: &(u32, u32)| {
+        ink_rows(view, Rect::new(c.0 as f32, area.y, (c.1 - c.0) as f32, area.h), is_ink).map_or(0, |(top, bottom)| bottom - top)
+    };
+    let tallest = first.iter().map(height).max()?;
+    let first = match first.split_last() {
+        Some((dash, digits)) if !digits.is_empty() && height(dash) * 2 < tallest => digits,
+        _ => first,
+    };
+    Some((number_of(view, area, first)?, number_of(view, area, second)?))
+}
+
+/// The number the ink columns `digits` make up.
+fn number_of(view: &Frame, area: Rect, digits: &[(u32, u32)]) -> Option<u32> {
     // The digits' height comes from the digits alone: a bonus bracket beside them, as in
     // `30 (28+2)`, runs taller and would make every digit read the wrong size.
     let (left, right) = (digits.first()?.0, digits.last()?.1);

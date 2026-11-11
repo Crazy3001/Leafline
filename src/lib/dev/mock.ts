@@ -646,6 +646,10 @@ export const mockBackend: Backend = {
     spotHandlers.forEach((h) => h([...savedSpots]));
     return [...savedSpots];
   },
+  playerDamage: async () => null,
+  async onPlayerDamage() {
+    return () => {};
+  },
   async onSavedSpots(handler) {
     spotHandlers.push(handler);
     return () => {};

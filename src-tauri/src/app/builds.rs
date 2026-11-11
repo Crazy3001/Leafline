@@ -323,6 +323,7 @@ impl CharacterRead {
 /// Moves the character's build to what its windows show, so the plan carries on from there. A
 /// build tied to another character is left alone.
 pub fn catch_up(app: &AppHandle, scan: CharacterScan) -> Result<CharacterRead> {
+    super::damage::note(app, &scan);
     let (stats, skills) = (scan.windows.stats.is_some(), scan.windows.skills.is_some());
     let done = |problem: &str| CharacterRead { stats, skills, problem: Some(problem.into()), ..CharacterRead::default() };
     if !stats && !skills {

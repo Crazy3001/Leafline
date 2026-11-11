@@ -51,6 +51,7 @@ import type {
   Destination,
   MeasuredRate,
   Assumptions,
+  PlayerDamage,
   SavedSpot,
   PotionSlot,
   SessionPotion,
@@ -214,6 +215,9 @@ export interface Backend {
   /** Saves a map as a training spot, or takes it off the list. Every window hears of it. */
   setSpotSaved(mapId: number, name: string, saved: boolean): Promise<SavedSpot[]>;
   onSavedSpots(handler: (spots: SavedSpot[]) => void): Promise<UnlistenFn>;
+  /** What was last read of a character's attack range and damaging skills. */
+  playerDamage(name: string): Promise<PlayerDamage | null>;
+  onPlayerDamage(handler: (change: { name: string; damage: PlayerDamage }) => void): Promise<UnlistenFn>;
   /** The potion slots the player set up, in slot order. */
   potionSlots(): Promise<PotionSlot[]>;
   /** Replaces the potion slots; a new slot has number 0. Returns them numbered. */
@@ -457,6 +461,8 @@ const tauriBackend: Backend = {
   savedSpots: () => invoke("saved_spots"),
   setSpotSaved: (mapId, name, saved) => invoke("set_spot_saved", { mapId, name, saved }),
   onSavedSpots: (handler) => listen<SavedSpot[]>("saved-spots", (e) => handler(e.payload)),
+  playerDamage: (name) => invoke("player_damage", { name }),
+  onPlayerDamage: (handler) => listen<{ name: string; damage: PlayerDamage }>("player-damage", (e) => handler(e.payload)),
   potionSlots: () => invoke("potion_slots"),
   setPotionSlots: (slots) => invoke("set_potion_slots", { slots }),
   sessionPotions: (startedAt) => invoke("session_potions", { startedAt }),
