@@ -41,7 +41,7 @@ body:
     id: report
     attributes:
       label: Bug report details
-      description: Settings → Data → Bug report details → Copy, then paste here. It holds no names, chat or file paths.
+      description: Settings → Feedback (Settings → Data in 0.1.0) → Bug report details → Copy, then paste here. It holds no names, chat or file paths.
       render: text
   - type: textarea
     id: picture

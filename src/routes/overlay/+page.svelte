@@ -14,6 +14,7 @@
   import { startWayfinder } from "$lib/wayfinder.svelte";
   import { PANELS, panelId, panelInfo, signature } from "$lib/panels";
   import { placeLinks, watchPlaces } from "$lib/places.svelte";
+  import { reportUrl } from "$lib/feedback";
   import { questView, watchQuests } from "$lib/quests.svelte";
   import { live, watchLive } from "$lib/readings.svelte";
   import { display, hotkey, keyHint, watchSettings } from "$lib/settings.svelte";
@@ -120,22 +121,26 @@
     const key = keyHint("ToggleLive");
     if (s.state === "reading") return `Reading ${s.window} every ${display.live.interval} s. Click to stop${key}.`;
     if (s.state === "waiting") return `${s.reason} Click to stop${key}.`;
-    if (!display.live.enabled) return "Reading saved screenshots only. Live reading is off; turn it on in Settings.";
+    if (!display.live.enabled) return "Live reading is off; turn it on in Settings.";
     return `Start reading the game window${key}`;
   });
 
-  /** One line under the header for what needs the player's attention, most urgent first. */
-  const notice = $derived.by((): { tone: "bad" | "warn" | "good" | "quiet"; text: string } | null => {
+  /**
+   * One line under the header for what needs the player's attention, most urgent first. `report`
+   * offers the bug form, for something Leafline got wrong rather than a setting to change.
+   */
+  const notice = $derived.by((): { tone: "bad" | "warn" | "good" | "quiet"; text: string; report?: boolean } | null => {
     const s = live.liveStatus;
-    if (liveError) return { tone: "bad", text: liveError };
-    if (s.state === "failed") return { tone: "bad", text: `Live reading stopped: ${s.message}` };
-    if (live.itemRead?.problem) return { tone: "warn", text: `Couldn't read the item: ${live.itemRead.problem}` };
+    if (liveError) return { tone: "bad", text: liveError, report: true };
+    if (s.state === "failed") return { tone: "bad", text: `Live reading stopped: ${s.message}`, report: true };
+    if (live.itemRead?.problem)
+      return { tone: "warn", text: `Couldn't read the item: ${live.itemRead.problem}`, report: true };
     if (live.itemRead?.found === 0)
       return {
         tone: "quiet",
         text: `No item tooltip found. Hover an item in game, then ${hotkey("ReadItem") ? `press ${hotkey("ReadItem")}` : "use the Read item hotkey"}. If one was showing, the camera button saves that picture so it can be looked at.`,
       };
-    if (live.characterRead?.problem) return { tone: "warn", text: live.characterRead.problem };
+    if (live.characterRead?.problem) return { tone: "warn", text: live.characterRead.problem, report: true };
     if (live.characterRead) {
       const { build, result } = live.characterRead;
       const unknown = result.unknown.length ? ` Not on this job: ${result.unknown.join(", ")}.` : "";
@@ -146,7 +151,8 @@
     if (s.state === "waiting") return { tone: "quiet", text: s.reason };
     if (s.state === "reading" && s.hdr)
       return { tone: "warn", text: "Windows HDR is on for the game's display, so readings will be off. Turn HDR off, then restart the game." };
-    if (live.analysis?.failed.length) return { tone: "warn", text: `Can't read the ${live.analysis.failed.join(", ")} right now.` };
+    if (live.analysis?.failed.length)
+      return { tone: "warn", text: `Can't read the ${live.analysis.failed.join(", ")} right now.`, report: true };
     return null;
   });
 
@@ -250,6 +256,11 @@
     {#if notice}
       <div class="notice {notice.tone}" role="status">
         <span>{notice.text}</span>
+        {#if notice.report}
+          <button class="report" title="Opens the bug form on GitHub" onclick={() => backend.openLink(reportUrl())}>
+            Report it
+          </button>
+        {/if}
         {#if notice.tone === "bad"}
           <button class="dismiss" aria-label="Dismiss" onclick={() => (liveError = null)}><X size={12} /></button>
         {/if}
@@ -460,6 +471,18 @@
   .notice.bad {
     color: var(--bad);
     background: color-mix(in srgb, var(--bad) 12%, transparent);
+  }
+
+  .report {
+    flex: none;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
   }
 
   .notice.good {

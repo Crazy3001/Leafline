@@ -24,6 +24,7 @@
   import HotkeyButton from "$lib/components/HotkeyButton.svelte";
   import Logo from "$lib/components/Logo.svelte";
   import DataSources from "$lib/components/DataSources.svelte";
+  import { IDEA_URL, reportUrl } from "$lib/feedback";
   import { OSMS_URL, WIKI_URL } from "$lib/mapdata.svelte";
   import { live, watchLive } from "$lib/readings.svelte";
   import { changeSettings, display, hotkey, keyHint, keyName, usesNumpad, watchSettings } from "$lib/settings.svelte";
@@ -46,6 +47,7 @@
     { id: "routes", title: "Routes" },
     { id: "hotkeys", title: "Hotkeys" },
     { id: "data", title: "Data" },
+    { id: "feedback", title: "Feedback" },
     { id: "about", title: "About" },
   ];
   const PAUSE_AFTER = [10, 15, 30, 60, 120];
@@ -792,12 +794,32 @@
           This folder looks like it syncs to the cloud, so saved pictures of your game would leave this PC.
         </p>
       {/if}
+    </section>
+
+    <section id="feedback">
+      <h2>Feedback</h2>
+      <p class="lead">
+        Leafline is a work in progress, and reports of what it reads wrong are what make it better. Both forms are on
+        GitHub and need a free account. Leafline never sends anything itself.
+      </p>
+
+      <div class="row">
+        <div class="label">
+          <span class="name">Report a problem</span>
+          <span class="help">A misread, a crash, or something that doesn't do what it says.</span>
+        </div>
+        <div class="control">
+          <button class="button" onclick={() => backend.openLink(reportUrl(version))}>
+            Open the form<ExternalLink size={11} />
+          </button>
+        </div>
+      </div>
 
       <div class="row">
         <div class="label">
           <span class="name">Bug report details</span>
           <span class="help">
-            Copies how Leafline is doing, for a bug report. Sent nowhere, and no names, chat or file paths.
+            Copies how Leafline is doing, to paste into the form. No names, chat or file paths.
           </span>
         </div>
         <div class="control">
@@ -805,6 +827,29 @@
         </div>
       </div>
       {#if copiedReport}<p class="note">{copiedReport}</p>{/if}
+
+      <div class="row">
+        <div class="label">
+          <span class="name">A picture of the misread</span>
+          <span class="help">
+            The camera button on the overlay saves the picture Leafline last read. It shows your game, so crop out
+            names and chat before attaching it.
+          </span>
+        </div>
+        <div class="control">
+          <button class="button" onclick={() => backend.openFramesFolder()}><FolderOpen size={13} />Open</button>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="label">
+          <span class="name">Suggest an idea</span>
+          <span class="help">Something you'd like Leafline to do.</span>
+        </div>
+        <div class="control">
+          <button class="button" onclick={() => backend.openLink(IDEA_URL)}>Open the form<ExternalLink size={11} /></button>
+        </div>
+      </div>
     </section>
 
     <section id="about">
@@ -826,7 +871,7 @@
       <div class="policy">
         <ShieldCheck size={16} />
         <p>
-          <strong>Read-only.</strong> Leafline reads the game window while live reading is on, and saved screenshots.
+          <strong>Read-only.</strong> Leafline reads the game window while live reading is on, and nothing else of the game.
           Nexon hasn't said whether read-only overlays are allowed; use Leafline at your own risk.
         </p>
       </div>

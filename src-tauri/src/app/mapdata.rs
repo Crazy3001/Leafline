@@ -648,13 +648,45 @@ pub fn training_spots(
 #[tauri::command]
 pub fn open_link(app: AppHandle, url: String) -> Result<()> {
     let parsed = Url::parse(&url).map_err(|err| Error::Invalid(format!("{url}: {err}")))?;
-    let allowed = parsed.scheme() == "https" && parsed.host_str().is_some_and(|host| LINK_HOSTS.contains(&host));
-    if !allowed {
+    if !link_allowed(&parsed) {
         return Err(Error::Invalid(format!("Leafline does not open links to {url}")));
     }
     app.opener().open_url(parsed.as_str(), None::<&str>).map_err(|err| Error::Invalid(err.to_string()))
 }
 
+/// A site from [`LINK_HOSTS`], or Leafline's own pages on GitHub: its releases and the forms
+/// for reporting a problem or suggesting an idea. Nowhere else on GitHub.
+fn link_allowed(url: &Url) -> bool {
+    if url.scheme() != "https" {
+        return false;
+    }
+    match url.host_str() {
+        Some("github.com") => {
+            let own = format!("/{}/", super::update::RELEASES_REPO).to_ascii_lowercase();
+            url.path().to_ascii_lowercase().starts_with(&own)
+        }
+        Some(host) => LINK_HOSTS.contains(&host),
+        None => false,
+    }
+}
+
 fn now() -> i64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0)
+}
+
+#[cfg(test)]
+mod link_tests {
+    use super::*;
+
+    #[test]
+    fn only_leaflines_own_github_pages_open() {
+        let allowed = |url: &str| link_allowed(&Url::parse(url).unwrap());
+        assert!(allowed("https://github.com/Crazy3001/Leafline/releases/tag/v0.1.1"));
+        assert!(allowed("https://github.com/Crazy3001/Leafline/issues/new?template=bug_report.yml"));
+        assert!(allowed("https://mapleclassic.wiki/index.php?search=Snail"));
+        assert!(!allowed("https://github.com/someone/else"));
+        assert!(!allowed("https://github.com/Crazy3001/LeaflineFake/issues"));
+        assert!(!allowed("http://github.com/Crazy3001/Leafline/issues"));
+        assert!(!allowed("https://example.com/"));
+    }
 }
