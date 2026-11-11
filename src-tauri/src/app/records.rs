@@ -12,6 +12,7 @@ use crate::userdata::UserData;
 use crate::userdata::characters::KnownMesos;
 use crate::userdata::drops::{LoggedDrop, NewDrop};
 use crate::userdata::notes::{ItemNote, MapNote};
+use crate::userdata::potions::{PotionSlot, SessionPotion};
 use crate::userdata::sessions::{MapRate, SavedSession, SessionTimeline};
 use crate::userdata::spots::SavedSpot;
 
@@ -84,6 +85,52 @@ pub fn set_spot_saved(
     })?;
     app.emit(SPOTS_EVENT, &spots)?;
     Ok(spots)
+}
+
+/// Emitted to every window when the potion slots or a session's potion counts change.
+const POTIONS_EVENT: &str = "potions";
+
+/// The potion slots the player set up, in slot order.
+#[tauri::command]
+pub fn potion_slots(state: State<UserDataState>) -> Result<Vec<PotionSlot>> {
+    state.with(|db| db.potion_slots())
+}
+
+/// Replaces the potion slots and returns them with their numbers.
+#[tauri::command]
+pub fn set_potion_slots(app: AppHandle, state: State<UserDataState>, slots: Vec<PotionSlot>) -> Result<Vec<PotionSlot>> {
+    let kept = state.with(|db| {
+        db.set_potion_slots(&slots)?;
+        db.potion_slots()
+    })?;
+    app.emit(POTIONS_EVENT, ())?;
+    Ok(kept)
+}
+
+/// The potion counts typed for the session that started at `started_at`.
+#[tauri::command]
+pub fn session_potions(state: State<UserDataState>, started_at: f64) -> Result<Vec<SessionPotion>> {
+    state.with(|db| db.session_potions(started_at))
+}
+
+/// Records how many of a slot's potion the player had at the start of a session and has now.
+#[tauri::command]
+pub fn set_session_potion(
+    app: AppHandle,
+    state: State<UserDataState>,
+    started_at: f64,
+    slot: u32,
+    start: Option<i64>,
+    now: Option<i64>,
+) -> Result<Vec<SessionPotion>> {
+    let kept = state.with(|db| {
+        db.set_session_potion(started_at, slot, start, now)?;
+        db.session_potions(started_at)
+    })?;
+    app.emit(POTIONS_EVENT, ())?;
+    // Saved sessions carry their potion cost.
+    app.emit(HISTORY_EVENT, ())?;
+    Ok(kept)
 }
 
 /// The player's note on an item, if they wrote one.

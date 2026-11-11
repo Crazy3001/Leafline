@@ -127,6 +127,8 @@ export const sampleSavedSessions: SavedSession[] = PLANS.map((plan, i) => {
     note: plan.note ?? "",
     lines,
     maps: lines.map((l) => ({ map: l.map!, activeSeconds: l.activeSeconds, expGained: l.expGained, mesosGained: l.mesosGained })),
+    potions: [],
+    potionCost: 0,
   };
 });
 

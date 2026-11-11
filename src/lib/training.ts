@@ -119,12 +119,17 @@ interface Tally {
   percent: number;
   mesos: number;
   mesosSeconds: number;
+  /** Potion cost, each session's shared out by active time. */
+  potions: number;
   sessions: Set<number>;
 }
 
-const tally = (): Tally => ({ seconds: 0, exp: 0, percent: 0, mesos: 0, mesosSeconds: 0, sessions: new Set() });
+const tally = (): Tally => ({ seconds: 0, exp: 0, percent: 0, mesos: 0, mesosSeconds: 0, potions: 0, sessions: new Set() });
 
-function add(t: Tally, sessionId: number, line: SessionLine) {
+function add(t: Tally, session: SavedSession, line: SessionLine) {
+  const sessionId = session.id;
+  if (session.potionCost > 0 && session.activeSeconds > 0)
+    t.potions += (session.potionCost * line.activeSeconds) / session.activeSeconds;
   t.seconds += line.activeSeconds;
   t.exp += line.expGained;
   t.percent += line.percentGained;
@@ -143,6 +148,8 @@ export interface RecordRates {
   mesosPerHour: number | null;
   /** The share of the time Mesos / hr covers. */
   mesosShare: number;
+  /** Mesos / hr with potion costs taken out; null where no potions were counted. */
+  netPerHour: number | null;
 }
 
 function rates(t: Tally): RecordRates {
@@ -153,6 +160,7 @@ function rates(t: Tally): RecordRates {
     percentPerHour: t.percent > 0 ? (t.percent * 3600) / t.seconds : null,
     mesosPerHour: t.mesosSeconds > 0 ? (t.mesos * 3600) / t.mesosSeconds : null,
     mesosShare: t.seconds > 0 ? Math.min(1, t.mesosSeconds / t.seconds) : 0,
+    netPerHour: t.potions > 0 && t.mesosSeconds > 0 ? (t.mesos * 3600) / t.mesosSeconds - (t.potions * 3600) / t.seconds : null,
   };
 }
 
@@ -185,12 +193,12 @@ export function mapRecords(
     for (const line of session.lines) {
       if (!keep(session, line, filter) || line.town) continue;
       const entry = maps.get(line.map!) ?? { total: tally(), rows: new Map() };
-      add(entry.total, session.id, line);
+      add(entry.total, session, line);
       // No party read counts as solo, as the filters take it.
       const party = (line.party ?? 1) <= 1 ? 1 : line.party;
       const key = `${line.level ?? "?"}|${party ?? "?"}|${line.job ?? "?"}`;
       const row = entry.rows.get(key) ?? { row: { key, level: line.level, party, job: line.job }, tally: tally() };
-      add(row.tally, session.id, line);
+      add(row.tally, session, line);
       entry.rows.set(key, row);
       maps.set(line.map!, entry);
     }

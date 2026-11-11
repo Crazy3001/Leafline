@@ -9,6 +9,10 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
 - **Training log → Records:** every map you trained on, with EXP and mesos per hour for each
   level, party size and job you played it at. Filter by level, party and job, and order by EXP,
   mesos or time.
+- **Mesos per hour after potions:** name the potions you hunt with and set what each costs you,
+  then type how many you had at the start of a session and how many you have now. The Train tab,
+  the session's page in the training log and Records show mesos per hour with that cost taken
+  out.
 
 ### Changed
 - **Where to train → For you:** maps you haven't tried are now estimated from how fast you get

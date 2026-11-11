@@ -30,10 +30,14 @@
     job: job || null,
   });
   const records = $derived(mapRecords(sessions, filter, sort));
+  /** Show the after-potions column once any session has potion counts. */
+  const withPotions = $derived(sessions.some((s) => s.potionCost > 0));
+  const columns = $derived(withPotions ? 6 : 5);
 
   const exp = (r: RecordRates) =>
     r.expPerHour != null ? formatCompact(r.expPerHour) : r.percentPerHour != null ? `${r.percentPerHour.toFixed(1)}%` : "—";
   const mesos = (r: RecordRates) => (r.mesosPerHour != null ? formatCompact(r.mesosPerHour) : "—");
+  const net = (r: RecordRates) => (r.netPerHour != null ? formatCompact(r.netPerHour) : "—");
   const mesosTitle = (r: RecordRates) =>
     r.mesosPerHour != null && r.mesosShare < 0.9
       ? `Over ${formatDuration(r.activeSeconds * r.mesosShare)} of ${formatDuration(r.activeSeconds)}: the mesos weren't in view for the rest.`
@@ -106,6 +110,7 @@
             <th>Played</th>
             <th>EXP / hr</th>
             <th>Mesos / hr</th>
+            {#if withPotions}<th>After potions</th>{/if}
           </tr>
         </thead>
         {#each records as m (m.map)}
@@ -122,6 +127,7 @@
               <td>{formatDuration(m.activeSeconds)}</td>
               <td class="strong">{exp(m)}</td>
               <td class="strong" title={mesosTitle(m)}>{mesos(m)}{m.mesosPerHour != null && m.mesosShare < 0.9 ? "*" : ""}</td>
+              {#if withPotions}<td class="strong">{net(m)}</td>{/if}
             </tr>
             {#if open && m.rows.length > 1}
               {#each m.rows as row (row.key)}
@@ -133,12 +139,13 @@
                   <td>{formatDuration(row.activeSeconds)}</td>
                   <td>{exp(row)}</td>
                   <td title={mesosTitle(row)}>{mesos(row)}{row.mesosPerHour != null && row.mesosShare < 0.9 ? "*" : ""}</td>
+                  {#if withPotions}<td>{net(row)}</td>{/if}
                 </tr>
               {/each}
             {:else if open}
               {@const row = m.rows[0]}
               <tr class="sub">
-                <td colspan="5">
+                <td colspan={columns}>
                   {[row.level != null ? `Lv ${row.level}` : "Level not read", partyLabel(row.party) ?? "Party not read", row.job ?? "Job not read"].join(" · ")}
                 </td>
               </tr>
@@ -149,6 +156,7 @@
     </div>
     <p class="caption">
       Faded rows rest on under 30 minutes of play. * Mesos / hr covers only part of the time, while the mesos were in view.
+      {#if withPotions}After potions shares each session's potion cost across its maps by time played.{/if}
     </p>
   </section>
 {/if}

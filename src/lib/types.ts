@@ -879,6 +879,30 @@ export interface SavedSession {
   lines: SessionLine[];
   /** Most active time first; time that couldn't be placed on a map is left out. */
   maps: { map: string; activeSeconds: number; expGained: number; mesosGained: number }[];
+  /** The potion counts the player typed, in slot order. */
+  potions: SessionPotion[];
+  /** What the potions used cost, in mesos. */
+  potionCost: number;
+}
+
+/** A potion the player hunts with (src-tauri/src/userdata/potions.rs). Nothing here is bundled. */
+export interface PotionSlot {
+  /** Stays with the slot; 0 for a new one. */
+  slot: number;
+  name: string;
+  /** What one costs the player, in mesos. */
+  price: number;
+}
+
+/** A slot's counts for a session, with the name and price as they were when typed. */
+export interface SessionPotion {
+  slot: number;
+  name: string;
+  price: number;
+  start: number | null;
+  now: number | null;
+  /** Start minus now once both are typed, never below zero. */
+  used: number;
 }
 
 /** One map's rates over every saved session that spent time there. */

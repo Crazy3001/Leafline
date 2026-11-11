@@ -52,6 +52,8 @@ import type {
   MeasuredRate,
   Assumptions,
   SavedSpot,
+  PotionSlot,
+  SessionPotion,
   UpdateStatus,
   ItemNote,
   MonsterDrops,
@@ -208,6 +210,16 @@ export interface Backend {
   /** Saves a map as a training spot, or takes it off the list. Every window hears of it. */
   setSpotSaved(mapId: number, name: string, saved: boolean): Promise<SavedSpot[]>;
   onSavedSpots(handler: (spots: SavedSpot[]) => void): Promise<UnlistenFn>;
+  /** The potion slots the player set up, in slot order. */
+  potionSlots(): Promise<PotionSlot[]>;
+  /** Replaces the potion slots; a new slot has number 0. Returns them numbered. */
+  setPotionSlots(slots: PotionSlot[]): Promise<PotionSlot[]>;
+  /** The potion counts typed for the session that started at `startedAt`. */
+  sessionPotions(startedAt: number): Promise<SessionPotion[]>;
+  /** How many of a slot's potion the player had at a session's start and has now. */
+  setSessionPotion(startedAt: number, slot: number, start: number | null, now: number | null): Promise<SessionPotion[]>;
+  /** Fires when the slots or any session's counts change. */
+  onPotions(handler: () => void): Promise<UnlistenFn>;
   /** The player's note on an item, matched like the price log. */
   itemNote(item: string): Promise<ItemNote | null>;
   /** Writes it; an empty note deletes it. */
@@ -431,6 +443,11 @@ const tauriBackend: Backend = {
   savedSpots: () => invoke("saved_spots"),
   setSpotSaved: (mapId, name, saved) => invoke("set_spot_saved", { mapId, name, saved }),
   onSavedSpots: (handler) => listen<SavedSpot[]>("saved-spots", (e) => handler(e.payload)),
+  potionSlots: () => invoke("potion_slots"),
+  setPotionSlots: (slots) => invoke("set_potion_slots", { slots }),
+  sessionPotions: (startedAt) => invoke("session_potions", { startedAt }),
+  setSessionPotion: (startedAt, slot, start, now) => invoke("set_session_potion", { startedAt, slot, start, now }),
+  onPotions: (handler) => listen("potions", () => handler()),
   itemNote: (item) => invoke("item_note", { item }),
   setItemNote: (item, note) => invoke("set_item_note", { item, note }),
   mapNote: (mapId) => invoke("map_note", { mapId }),

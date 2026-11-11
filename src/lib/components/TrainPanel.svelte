@@ -5,6 +5,7 @@
   import SessionControls from "./SessionControls.svelte";
   import { ArrowDown } from "@lucide/svelte";
 
+  import PotionCosts from "./PotionCosts.svelte";
   import SpotList, { SPOTS_ID } from "./SpotList.svelte";
   import TimersCard from "./TimersCard.svelte";
   import { openTrainingLog } from "$lib/nav.svelte";
@@ -251,6 +252,10 @@
       <Stat label="EXP gained" value={signed(session.expGained)} />
       <Stat label="Mesos gained" value={signed(session.mesosGained)} />
     </div>
+
+    {#if !glance}
+      <PotionCosts startedAt={session.startedAt} activeSeconds={session.activeSeconds} mesosPerHour={session.mesosPerHour} />
+    {/if}
 
     {#if reminder}
       <p class="reminder">{reminder}</p>

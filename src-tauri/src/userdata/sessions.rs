@@ -5,6 +5,7 @@ use rusqlite::params;
 use serde::Serialize;
 
 use super::UserData;
+use super::potions::{SessionPotion, cost_of, session_key};
 use crate::error::{Error, Result};
 use crate::session::{EventKind, SessionEvent, SessionLine, SessionSummary, TimelinePoint};
 
@@ -36,6 +37,10 @@ pub struct SavedSession {
     pub maps: Vec<SavedMap>,
     /// Per map, level, party size and job, most active time first.
     pub lines: Vec<SessionLine>,
+    /// The potion counts the player typed for the session, in slot order.
+    pub potions: Vec<SessionPotion>,
+    /// What the potions used cost, in mesos.
+    pub potion_cost: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -111,7 +116,12 @@ impl UserData {
     }
 
     pub fn delete_session(&mut self, id: i64) -> Result<()> {
+        let started_at: Option<f64> = self
+            .conn
+            .query_row("SELECT started_at FROM sessions WHERE id = ?1", [id], |row| row.get(0))
+            .or_else(|err| if err == rusqlite::Error::QueryReturnedNoRows { Ok(None) } else { Err(err) })?;
         let tx = self.conn.transaction()?;
+        UserData::delete_session_potions(&tx, started_at)?;
         tx.execute("DELETE FROM session_points WHERE session_id = ?1", [id])?;
         tx.execute("DELETE FROM session_events WHERE session_id = ?1", [id])?;
         tx.execute("DELETE FROM session_maps WHERE session_id = ?1", [id])?;
@@ -150,6 +160,8 @@ impl UserData {
                     character: row.get(16)?,
                     maps: Vec::new(),
                     lines: Vec::new(),
+                    potions: Vec::new(),
+                    potion_cost: 0,
                 })
             })?
             .collect::<rusqlite::Result<_>>()?;
@@ -161,7 +173,12 @@ impl UserData {
             "SELECT map, level, party, job, active_seconds, exp_gained, percent_gained, mesos_gained, mesos_seconds
              FROM session_lines WHERE session_id = ?1 ORDER BY active_seconds DESC",
         )?;
+        let mut potions = self.all_session_potions()?;
         for session in &mut sessions {
+            if let Some(typed) = session.started_at.and_then(|at| potions.remove(&session_key(at))) {
+                session.potion_cost = cost_of(&typed);
+                session.potions = typed;
+            }
             session.lines = lines
                 .query_map([session.id], |row| {
                     Ok(SessionLine {
@@ -397,6 +414,20 @@ mod tests {
         assert_eq!(saved.exp_gained, 2000);
         assert_eq!(saved.maps.len(), 1);
         assert_eq!(saved.maps[0].active_seconds, 1200.0);
+    }
+
+    #[test]
+    fn potions_typed_before_the_save_reach_the_saved_session() {
+        use crate::userdata::potions::PotionSlot;
+        let mut db = UserData::open_in_memory().unwrap();
+        db.set_potion_slots(&[PotionSlot { slot: 0, name: "White Potion".into(), price: 320 }]).unwrap();
+        // Typed in the first minutes, while the session wasn't saved yet.
+        db.set_session_potion(1000.0, 1, Some(300), Some(250)).unwrap();
+        let id = db.save_session(&session(30.0, 6000, &[]), "", 1).unwrap();
+        let saved = &db.sessions().unwrap()[0];
+        assert_eq!((saved.potions.len(), saved.potion_cost), (1, 50 * 320));
+        db.delete_session(id).unwrap();
+        assert!(db.session_potions(1000.0).unwrap().is_empty());
     }
 
     #[test]

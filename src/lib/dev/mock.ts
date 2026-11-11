@@ -9,6 +9,8 @@ import type {
   LoggedDrop,
   MapNote,
   SavedSpot,
+  PotionSlot,
+  SessionPotion,
   Destination,
   NavState,
   UpdateStatus,
@@ -136,6 +138,11 @@ let drops: LoggedDrop[] = [
 const dropHandlers: (() => void)[] = [];
 const historyHandlers: (() => void)[] = [];
 
+// Potion slots and per-session counts, as the backend keeps them.
+let potionSlots: PotionSlot[] = [];
+const sessionPotions = new Map<number, SessionPotion[]>();
+const potionHandlers: (() => void)[] = [];
+
 function mockHistory(): History {
   const byMap = new Map<string, { sessions: number; seconds: number; exp: number; mesos: number }>();
   for (const session of savedSessions) {
@@ -144,8 +151,12 @@ function mockHistory(): History {
       byMap.set(m.map, { sessions: row.sessions + 1, seconds: row.seconds + m.activeSeconds, exp: row.exp + m.expGained, mesos: row.mesos + m.mesosGained });
     }
   }
+  const withPotions = savedSessions.map((s) => {
+    const potions = s.startedAt != null ? (sessionPotions.get(s.startedAt) ?? []) : [];
+    return { ...s, potions, potionCost: potions.reduce((a, p) => a + p.used * p.price, 0) };
+  });
   return {
-    sessions: [...savedSessions].sort((a, b) => (b.startedAt ?? b.savedAt) - (a.startedAt ?? a.savedAt)),
+    sessions: withPotions.sort((a, b) => (b.startedAt ?? b.savedAt) - (a.startedAt ?? a.savedAt)),
     maps: [...byMap].map(([map, r]) => ({ map, sessions: r.sessions, activeSeconds: r.seconds, expPerHour: (r.exp * 3600) / r.seconds, mesosPerHour: (r.mesos * 3600) / r.seconds })).sort((a, b) => b.activeSeconds - a.activeSeconds),
   };
 }
@@ -597,6 +608,38 @@ export const mockBackend: Backend = {
     return () => {};
   },
   savedSpots: async () => [...savedSpots],
+  potionSlots: async () => [...potionSlots],
+  async setPotionSlots(slots) {
+    const taken = new Set(slots.map((s) => s.slot).filter((n) => n > 0));
+    potionSlots = slots
+      .map((s) => {
+        if (s.slot > 0) return { ...s, name: s.name.trim() };
+        let next = 1;
+        while (taken.has(next)) next++;
+        taken.add(next);
+        return { ...s, slot: next, name: s.name.trim() };
+      })
+      .sort((a, b) => a.slot - b.slot);
+    potionHandlers.forEach((h) => h());
+    return [...potionSlots];
+  },
+  sessionPotions: async (startedAt) => [...(sessionPotions.get(startedAt) ?? [])],
+  async setSessionPotion(startedAt, slot, start, now) {
+    const rows = (sessionPotions.get(startedAt) ?? []).filter((p) => p.slot !== slot);
+    const def = potionSlots.find((p) => p.slot === slot);
+    if ((start != null || now != null) && def) {
+      const used = start != null && now != null ? Math.max(0, start - now) : 0;
+      rows.push({ slot, name: def.name, price: def.price, start, now, used });
+    }
+    sessionPotions.set(startedAt, rows.sort((a, b) => a.slot - b.slot));
+    potionHandlers.forEach((h) => h());
+    historyHandlers.forEach((h) => h());
+    return [...rows];
+  },
+  async onPotions(handler) {
+    potionHandlers.push(handler);
+    return () => {};
+  },
   async setSpotSaved(mapId, name, saved) {
     savedSpots = savedSpots.filter((s) => s.mapId !== mapId);
     if (saved) savedSpots.unshift({ mapId, name, savedAt: Date.now() / 1000 });

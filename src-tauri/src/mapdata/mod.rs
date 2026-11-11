@@ -15,7 +15,6 @@ pub mod guide;
 pub mod osms;
 pub mod places;
 pub mod questbook;
-pub mod shops;
 pub mod store;
 pub mod training;
 pub mod travel;

@@ -9,6 +9,8 @@
   import Logo from "./Logo.svelte";
   import MapNote from "./MapNote.svelte";
   import MapRecords from "./MapRecords.svelte";
+  import PotionCosts from "./PotionCosts.svelte";
+  import { netMesosPerHour } from "$lib/potions.svelte";
   import ShareDialog from "./ShareDialog.svelte";
   import { backend } from "$lib/api";
   import { dropsBetween, watchDrops } from "$lib/drops.svelte";
@@ -392,11 +394,20 @@
 
               <div class="tiles">
                 <Stat size="lg" label={percentOnly(s) ? "% / hr" : "EXP / hr"} value={expRate(s)} />
-                <Stat size="lg" label="Mesos / hr" value={formatCompact(s.mesosPerHour)} />
+                <Stat
+                  size="lg"
+                  label="Mesos / hr"
+                  value={formatCompact(s.mesosPerHour)}
+                  sub={s.potionCost > 0 ? `${formatCompact(netMesosPerHour(s.mesosPerHour, s.potionCost, s.activeSeconds))} after potions` : null}
+                />
                 <Stat size="lg" label="Played" value={dur(s.activeSeconds)} />
                 <Stat size="lg" label="EXP gained" value={formatNumber(s.expGained)} />
                 <Stat size="lg" label="Levels" value={String(s.levelUps)} />
                 <Stat size="lg" label="Deaths" value={String(s.deaths)} />
+              </div>
+
+              <div class="panel">
+                <PotionCosts startedAt={s.startedAt} activeSeconds={s.activeSeconds} mesosPerHour={s.mesosPerHour} />
               </div>
 
               <div class="panel chart">
