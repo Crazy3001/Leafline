@@ -80,8 +80,18 @@ pub fn restore_mode(app: &AppHandle) -> Result<()> {
     if saved.compact {
         let state = app.state::<OverlayState>();
         state.compact.store(true, Ordering::Relaxed);
-        *state.full_size.lock().expect("overlay lock") = saved.full_size;
+        // The full size it goes back to is widened too, if it was saved narrower than it needs.
+        *state.full_size.lock().expect("overlay lock") =
+            saved.full_size.map(|(width, height)| if width < MIN_SIZE.0 { (FULL_SIZE.0, height.max(FULL_SIZE.1)) } else { (width, height) });
         window(app, OVERLAY)?.set_min_size(None::<LogicalSize<f64>>)?;
+    } else {
+        // An overlay remembered narrower than the Train tab now needs (the old 340x560 default) is
+        // given the new default size once, since a restored size ignores the new minimum. Dragged narrower later, it stops at the minimum.
+        let overlay = window(app, OVERLAY)?;
+        let size: LogicalSize<f64> = overlay.inner_size()?.to_logical(overlay.scale_factor()?);
+        if size.width < MIN_SIZE.0 {
+            overlay.set_size(LogicalSize::new(FULL_SIZE.0, size.height.max(FULL_SIZE.1)))?;
+        }
     }
     Ok(())
 }
