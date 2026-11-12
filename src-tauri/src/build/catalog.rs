@@ -2,6 +2,9 @@
 //! are worked out from the skills, so nothing about them is written into Leafline.
 
 use std::collections::HashMap;
+use std::sync::LazyLock;
+
+use regex::Regex;
 
 use serde::{Deserialize, Serialize};
 
@@ -19,6 +22,8 @@ const ITEM_PAGE: usize = 40;
 const MIN_WORD_SCORE: f64 = 0.7;
 /// How closely a name read from a tooltip must match an item in the data.
 const MIN_NAME_SCORE: f64 = 0.85;
+/// `(M)`, `(F)` and `(+1)` after an item's name on its tooltip, with the brackets OCR makes of them.
+static TAGS: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\s*[({\[]\s*(?:[MFU]|\+\s*\d{1,2})\s*(?:[)}\]|lI1]|$)").unwrap());
 /// How closely the first words of a read must match an item when the whole read matches none:
 /// text seen through the tooltip (a store's list behind it) can run on after the name.
 const MIN_PREFIX_SCORE: f64 = 0.92;
@@ -372,6 +377,10 @@ impl Catalog {
     /// The item a name read from the game most likely means. Several items can share a name, so
     /// `level` settles it when it is known.
     pub fn item_like(&self, name: &str, level: Option<u32>) -> Option<&ItemRecord> {
+        // The tooltip adds `(F)` or `(M)` after the name of gendered equipment, which the data keeps in
+        // a field of its own, and an upgrade count `(+N)`: neither is part of the name.
+        let bare = TAGS.replace_all(name, "");
+        let name = bare.trim();
         if let Some(item) = self.item_close_to(name, level, MIN_NAME_SCORE) {
             return Some(item);
         }
@@ -729,6 +738,7 @@ pub(crate) mod tests {
         assert_eq!(catalog.item_like("Red Cloth Vest", Some(25)).unwrap().id, 2);
         assert_eq!(catalog.item_like("Rcd Cloth Vest", Some(10)).unwrap().id, 1, "a misread letter");
         assert!(catalog.item_like("Pebble", None).is_none());
+        assert_eq!(catalog.item_like("Rcd Cloth Vest (F) (+1)", Some(10)).unwrap().id, 1, "the tooltip's tags are not part of the name");
     }
 
     #[test]

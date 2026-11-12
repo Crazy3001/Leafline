@@ -163,6 +163,7 @@ export function statRows(read: ItemTooltip, matched: ItemRecord | null): StatRow
 const nameKey = (name: string) =>
   name
     .replace(/\(\s*\+\s*\d+\s*\)?\s*$/, "")
+    .replace(/\(\s*[MFU]\s*\)/gi, "")
     .toLowerCase()
     .replace(/[^a-z0-9]/g, "");
 

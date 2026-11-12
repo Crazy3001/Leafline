@@ -220,20 +220,19 @@
             <td class="value tabular">{formatSigned(stat.value)}</td>
             <td class="detail tabular">
               {#if stat.base != null && stat.bonus != null}
-                <span>{stat.base} base</span>
-                <span class="bonus" class:negative={stat.bonus < 0}>{formatSigned(stat.bonus)}</span>
+                <span title="The item's own value, then what this copy has added or lost">
+                  ({stat.base}
+                  <span class="bonus" class:negative={stat.bonus < 0}>{formatSigned(stat.bonus)}</span>)
+                </span>
               {:else if stat.note}
                 <span class="unsure" title={stat.note}>item's own · unsure</span>
               {:else if stat.fromData}
                 <span title="Not read from the tooltip: this is the item's own value">item's own</span>
               {:else if stat.standard != null}
                 {@const diff = stat.value - stat.standard}
-                <span
-                  class="bonus"
-                  class:negative={diff < 0}
-                  title="What this item has with no scrolls is {formatSigned(stat.standard)}. A scroll, a rolled copy or a misread makes it differ."
-                >
-                  {formatSigned(diff)}
+                <span title="The item's own value, then what this copy has added or lost. A scroll, a rolled copy or a misread makes it differ.">
+                  ({stat.standard}
+                  <span class="bonus" class:negative={diff < 0}>{formatSigned(diff)}</span>)
                 </span>
               {/if}
             </td>
@@ -413,7 +412,7 @@
   }
 
   .bonus {
-    margin-left: 4px;
+    margin-left: 2px;
     color: var(--good);
   }
 
