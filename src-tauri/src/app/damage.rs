@@ -100,6 +100,17 @@ fn damaging_skills(window: &SkillWindow, catalog: &Catalog) -> Vec<DamageSkill> 
     found
 }
 
+/// Adds what a read of the skill window showed to the skills already known. The window shows a few
+/// skills at a time, so one read is only the page in view: skills not on it stay as they were.
+fn merge(known: &mut Vec<DamageSkill>, read: Vec<DamageSkill>) {
+    for skill in read {
+        match known.iter_mut().find(|k| k.name == skill.name) {
+            Some(existing) => *existing = skill,
+            None => known.push(skill),
+        }
+    }
+}
+
 /// Takes in what a read of the character's windows shows of the damage, when it shows any. Best
 /// effort: a failure to save is logged and the read goes on.
 pub fn note(app: &AppHandle, scan: &CharacterScan) {
@@ -118,7 +129,7 @@ pub fn note(app: &AppHandle, scan: &CharacterScan) {
         entry.attack_max = Some(detail.attack_max);
     }
     if let (Some(window), Some(catalog)) = (skills, catalog) {
-        entry.skills = damaging_skills(window, &catalog);
+        merge(&mut entry.skills, damaging_skills(window, &catalog));
     }
     if *entry == before {
         return;
@@ -167,6 +178,17 @@ mod tests {
             ],
             Vec::new(),
         )
+    }
+
+    #[test]
+    fn a_read_of_another_page_of_skills_adds_to_what_is_known() {
+        let skill = |name: &str, level, percent| DamageSkill { name: name.into(), level, percent };
+        let mut known = vec![skill("Arrow Blow", 20, 240)];
+        merge(&mut known, vec![skill("Iron Arrow", 1, 120)]);
+        assert_eq!(known, vec![skill("Arrow Blow", 20, 240), skill("Iron Arrow", 1, 120)]);
+        // Seen again at a higher level, a skill is updated in place.
+        merge(&mut known, vec![skill("Iron Arrow", 2, 125)]);
+        assert_eq!(known, vec![skill("Arrow Blow", 20, 240), skill("Iron Arrow", 2, 125)]);
     }
 
     #[test]
