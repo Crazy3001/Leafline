@@ -195,11 +195,11 @@ export function nameMatch(read: ItemTooltip, record: ItemRecord): "exact" | "lik
   const levelAgrees = level != null && level === record.reqLevel;
   // Text from behind or beside the tooltip can run on before or after the name ("GUida Eagle Crow",
   // "Studded Polearm I-I-I"). The whole name standing inside, with the level agreeing, is the item.
-  const trailing = ownKey.length >= 8 && readKey.includes(ownKey) && levelAgrees;
+  const trailing = ownKey.length >= 7 && readKey.includes(ownKey) && levelAgrees;
   if ((readKey === ownKey || trailing) && (level == null || levelAgrees)) return "exact";
   // The (M) or (F) after a name is judged apart, so one stray letter in a long name isn't made worse by it.
   const bare = (name: string) => nameKey(name.replace(/\(\s*[MFU]\s*\)/gi, ""));
-  return levelAgrees && bare(record.name).length >= 8 && likeness(bare(read.name), bare(record.name)) >= 0.85 ? "likely" : "close";
+  return levelAgrees && bare(record.name).length >= 7 && likeness(bare(read.name), bare(record.name)) >= 0.85 ? "likely" : "close";
 }
 
 /** One line of the item check: a value to show, how far to trust it, and why when it isn't sure. */
@@ -256,7 +256,17 @@ export function checkItem(read: ItemTooltip, record: ItemRecord): CheckedItem {
     const near = [...dataLabels].find((name) => {
       if (!(letters(name).length >= 3 && !exact(name) && !spelled.has(name))) return false;
       const value = record.stats.find((s) => s.label === name)?.value;
-      return likeness(letters(label), letters(name)) >= 0.7 || (got.base != null && got.bonus != null && got.base === value);
+      // Its letters are all there in order with a few extras (`LU-JK` has the L, U and K of LUK).
+      const inOrder = (own: string, read: string) => {
+        let at = 0;
+        for (const ch of read) if (ch === own[at]) at++;
+        return at === own.length && read.length <= own.length + 3;
+      };
+      return (
+        likeness(letters(label), letters(name)) >= 0.7 ||
+        inOrder(letters(name), letters(label)) ||
+        (got.base != null && got.bonus != null && got.base === value)
+      );
     });
     if (near) spelled.set(near, got);
   }
