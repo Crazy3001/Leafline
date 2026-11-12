@@ -64,8 +64,6 @@
   const BELOW = 8;
   const ABOVE = 3;
   const SHOWN = 6;
-  /** Maps scoring within this share of each other are a close call, listed nearest first. */
-  const CLOSE_CALL = 0.1;
 
   const SORT_KEY = "leafline.train.sort";
   const LEVEL_KEY = "leafline.train.level";
@@ -175,21 +173,8 @@
     };
     const value = by[sort];
     const sorted = [...spots].sort((a, b) => value(b) - value(a) || b.expPerClear - a.expPerClear);
-    if (sort === "near") return sorted;
-    // Walk down in bands of close calls and order each band by portals, so a slightly smaller
-    // map next door isn't buried.
-    const out: TrainingSpot[] = [];
-    let band: TrainingSpot[] = [];
-    const flush = () => out.push(...band.sort((a, b) => (steps(a) ?? Infinity) - (steps(b) ?? Infinity)));
-    for (const spot of sorted) {
-      if (band.length && value(spot) < value(band[0]) - Math.abs(value(band[0])) * CLOSE_CALL) {
-        flush();
-        band = [];
-      }
-      band.push(spot);
-    }
-    flush();
-    return out;
+    // Strictly by the rate shown: a close call is still the higher number first.
+    return sorted;
   });
   const shown = $derived(sort === "saved" ? ranked : ranked.slice(0, more ? 30 : SHOWN));
   const missingSaved = $derived(saved.filter((s) => !(data?.spots ?? []).some((spot) => spot.map.id === s.mapId)));

@@ -19,8 +19,10 @@ pub const STATUS_EVENT: &str = "overlay-status";
 /// kept across restarts.
 const MODE_FILE: &str = "overlay.json";
 /// The full overlay's size and smallest size, as in tauri.conf.json.
-const FULL_SIZE: (f64, f64) = (340.0, 560.0);
-const MIN_SIZE: (f64, f64) = (280.0, 120.0);
+/// The Train tab's four ranking tabs and its tables need about this much width, so the figures at
+/// the right of each row aren't cut off.
+const FULL_SIZE: (f64, f64) = (420.0, 660.0);
+const MIN_SIZE: (f64, f64) = (380.0, 120.0);
 
 #[derive(Default)]
 pub struct OverlayState {
@@ -201,11 +203,11 @@ pub fn show(app: &AppHandle) -> Result<()> {
 /// Below this many logical pixels of screen height, the overlay starts smaller.
 const SMALL_SCREEN_HEIGHT: f64 = 900.0;
 /// The overlay's first size on such a screen: narrower, and no taller than this share of it.
-const SMALL_SCREEN_WIDTH: f64 = 300.0;
+const SMALL_SCREEN_WIDTH: f64 = 380.0;
 const SMALL_SCREEN_SHARE: f64 = 0.5;
 
 /// On a new install, starts the overlay smaller on a short screen, such as a 1366x768 laptop,
-/// where its usual 340x560 would cover most of a game window's height. Only before setup is
+/// where its usual 420x660 would cover most of a game window's height. Only before setup is
 /// done, so a size the player chose stays.
 pub fn fit_first_launch(app: &AppHandle) -> Result<()> {
     let overlay = window(app, OVERLAY)?;
