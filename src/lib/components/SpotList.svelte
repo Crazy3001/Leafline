@@ -8,8 +8,8 @@
   // EXP per hour measured on each map, and for maps not tried yet an estimate from the player's
   // kill speed: the monster HP they get through an hour solo, over the HP of the map's average
   // monster, held to what the map can respawn at an assumed respawn time (see training.rs). No
-  // damage formulas are modelled. "Saved" lists the maps the player bookmarked, whatever their
-  // level.
+  // damage formulas are modelled. "Played" lists every map the player has data for, whatever its
+  // level, by their own rate. "Saved" lists the maps the player bookmarked, whatever their level.
   import GoButton from "$lib/components/GoButton.svelte";
   import { mapPlace } from "$lib/destination.svelte";
   import { Bookmark, ChevronRight, CircleHelp, ExternalLink, Minus, Plus } from "@lucide/svelte";
@@ -59,7 +59,7 @@
     last?: boolean;
   } = $props();
 
-  type Sort = "you" | "exp" | "near" | "saved";
+  type Sort = "you" | "played" | "near" | "saved";
   /** Maps whose average monster level is this far below or above the character count as near. */
   const BELOW = 8;
   const ABOVE = 3;
@@ -137,7 +137,7 @@
   const savedIds = $derived(new Set(saved.map((s) => s.mapId)));
   const sorts = $derived<{ id: Sort; label: string; title: string }[]>([
     { id: "you", label: "For you", title: "Your EXP per hour where you have played, an estimate from your kill speed where you haven't" },
-    { id: "exp", label: "EXP / clear", title: "Base EXP for defeating every monster on the map once" },
+    { id: "played", label: "Played", title: "Every map you have played, whatever its level, by your own EXP per hour" },
     { id: "near", label: "Nearest", title: "Fewest portals from where you are" },
     {
       id: "saved",
@@ -153,13 +153,17 @@
 
   const ranked = $derived.by(() => {
     const spots = (data?.spots ?? []).filter((s) =>
-      sort === "saved" ? savedIds.has(s.map.id) : s.reachable && (allLevels || near(s) || savedIds.has(s.map.id)),
+      sort === "saved"
+        ? savedIds.has(s.map.id)
+        : sort === "played"
+          ? s.measured != null && s.measured.activeSeconds >= 60
+          : s.reachable && (allLevels || near(s) || savedIds.has(s.map.id)),
     );
     // With no kill speed yet, maps not tried fall back to base EXP, below every measured one.
     const you = (s: TrainingSpot) => (speed == null && !s.measured ? s.expPerClear / 1e6 - 1 : forYou(s));
     const by: Record<Sort, (s: TrainingSpot) => number> = {
       you,
-      exp: (s) => s.expPerClear,
+      played: (s) => s.measured?.expPerHour ?? -1,
       near: (s) => -(steps(s) ?? 9999),
       saved: you,
     };
@@ -195,7 +199,7 @@
   function storedSort(): Sort {
     const value = stored(SORT_KEY, "you");
     // "EXP / HP" and "Your rate" were sorts of their own until the Train tab was redone.
-    return value === "exp" || value === "near" || value === "saved" ? value : "you";
+    return value === "played" || value === "near" || value === "saved" ? value : "you";
   }
 
   function remember(key: string, value: string) {
@@ -249,7 +253,6 @@
   };
 
   function metric(spot: TrainingSpot): { value: string; unit: string; quiet: boolean; sure?: Estimate["sureness"] } {
-    if (sort === "exp") return { value: formatCompact(spot.expPerClear), unit: "EXP / clear", quiet: false };
     if (sort === "near") {
       const hops = steps(spot);
       if (hops == null) return { value: "—", unit: "no route", quiet: true };
@@ -385,7 +388,7 @@
                   ></span
                 >
                 <span class="meta" title={summaryText(spot)}>
-                  {#if steps(spot) === 0}<span class="here">You're here</span>{" · "}{/if}{line.levels}{#each line.mobs as mob, n (mob.id)}{n === 0 ? " · " : ", "}<button
+                  {#if steps(spot) === 0}<span class="here">You're here</span>{" · "}{/if}{#if sort === "played" && spot.measured}{formatDuration(spot.measured.activeSeconds)} played · {/if}{line.levels}{#each line.mobs as mob, n (mob.id)}{n === 0 ? " · " : ", "}<button
                       class="ref ref-mob"
                       title="Open {mob.name} in Lookup"
                       onclick={(e) => {
@@ -450,7 +453,9 @@
           {/if}
         </li>
       {:else}
-        {#if sort !== "saved"}
+        {#if sort === "played"}
+          <li class="quiet empty">No maps played yet. Maps you train on show here with your own rate.</li>
+        {:else if sort !== "saved"}
           <li class="quiet empty">
             {level != null ? `No maps with monsters near Lv ${level}. Tick Every level to see the rest.` : "Set your level to see maps that suit it."}
           </li>
@@ -472,7 +477,7 @@
     </ol>
 
     <div class="footer">
-      <label class="check" class:hidden={sort === "saved"}>
+      <label class="check" class:hidden={sort === "saved" || sort === "played"}>
         <input
           type="checkbox"
           checked={allLevels}
