@@ -193,9 +193,9 @@ export function nameMatch(read: ItemTooltip, record: ItemRecord): "exact" | "lik
   const ownKey = nameKey(record.name);
   const level = read.requirements.level;
   const levelAgrees = level != null && level === record.reqLevel;
-  // Text from behind the tooltip can run on before the name ("GUida Eagle Crow"). The whole name
-  // standing at the end, with the level agreeing, is the item.
-  const trailing = ownKey.length >= 6 && readKey.endsWith(ownKey) && levelAgrees;
+  // Text from behind or beside the tooltip can run on before or after the name ("GUida Eagle Crow",
+  // "Studded Polearm I-I-I"). The whole name standing inside, with the level agreeing, is the item.
+  const trailing = ownKey.length >= 8 && readKey.includes(ownKey) && levelAgrees;
   if ((readKey === ownKey || trailing) && (level == null || levelAgrees)) return "exact";
   // The (M) or (F) after a name is judged apart, so one stray letter in a long name isn't made worse by it.
   const bare = (name: string) => nameKey(name.replace(/\(\s*[MFU]\s*\)/gi, ""));

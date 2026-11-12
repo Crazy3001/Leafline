@@ -186,13 +186,15 @@ pub fn parse(lines: &[Line], separator_y: f32) -> ItemTooltip {
         }
     }
 
-    // The name is the tallest remaining line above the requirement block.
-    let name_line = unclaimed
-        .into_iter()
-        .filter(|l| first_req_y.is_none_or(|y| l.rect.bottom() <= y + 1.0))
-        .max_by(|a, b| a.rect.h.total_cmp(&b.rect.h));
-    if let Some(line) = name_line {
-        (item.name, item.upgrades) = split_name(trim_noise(&line.text));
+    // The name is the tallest remaining line above the requirement block. A long name wraps onto
+    // a second line of the same height, so lines nearly as tall as the tallest are joined to it.
+    let above: Vec<&Line> =
+        unclaimed.into_iter().filter(|l| first_req_y.is_none_or(|y| l.rect.bottom() <= y + 1.0)).collect();
+    if let Some(tallest) = above.iter().map(|l| l.rect.h).max_by(f32::total_cmp) {
+        let mut title: Vec<&Line> = above.into_iter().filter(|l| l.rect.h >= tallest * 0.85).collect();
+        title.sort_by(|a, b| a.rect.y.total_cmp(&b.rect.y));
+        let text = title.iter().map(|l| trim_noise(&l.text)).collect::<Vec<_>>().join(" ");
+        (item.name, item.upgrades) = split_name(&text);
     }
     item
 }
@@ -355,6 +357,23 @@ mod tests {
     fn an_upgrade_count_is_found_out_of_order() {
         assert_eq!(upgrades_in("Brown Hard Leather (+1) Top"), Some(1));
         assert_eq!(upgrades_in("Brown Hard Leather Top"), None);
+    }
+
+    #[test]
+    fn a_long_name_wrapped_onto_two_lines_is_read_whole() {
+        let item = parse(
+            &lines(&[
+                ("Brown Hard Leather", 1440.0, 300.0, 18.0),
+                ("Top (M) (+1)", 1440.0, 324.0, 18.0),
+                ("REQ LEV : 20", 1510.0, 352.0, 10.0),
+                ("REQ STR : 10", 1510.0, 371.0, 10.0),
+                ("Type: Top", 1370.0, 470.0, 12.0),
+            ]),
+            440.0,
+        );
+        assert_eq!(item.name, "Brown Hard Leather Top (M)");
+        assert_eq!(item.upgrades, Some(1));
+        assert_eq!(item.requirements.level, Some(20));
     }
 
     #[test]
