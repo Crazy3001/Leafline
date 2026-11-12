@@ -475,12 +475,12 @@ export const mockBackend: Backend = {
   // Saved keys win over the starting ones, and F10 stands in for a key another program holds.
   shortcuts: async () =>
     [
-    { action: "ToggleOverlay", keys: "Super+F9", suggestedKeys: "Super+F9", label: "Show or hide the overlay", inSetup: true, taken: false },
-    { action: "ToggleClickThrough", keys: "Super+F7", suggestedKeys: "Super+F7", label: "Lock the overlay (click-through)", inSetup: true, taken: false },
+    { action: "ToggleOverlay", keys: "Super+Numpad0", suggestedKeys: "Super+Numpad0", label: "Show or hide the overlay", inSetup: true, taken: false },
+    { action: "ToggleClickThrough", keys: "Super+NumpadDecimal", suggestedKeys: "Super+NumpadDecimal", label: "Lock the overlay (click-through)", inSetup: true, taken: false },
     { action: "TogglePins", keys: "", suggestedKeys: "", label: "Show or hide pinned panels", inSetup: false, taken: false },
     { action: "ToggleCompact", keys: "", suggestedKeys: "", label: "Compact HUD", inSetup: true, taken: false },
     { action: "ToggleLive", keys: "", suggestedKeys: "", label: "Start or stop live reading", inSetup: false, taken: false },
-    { action: "ReadItem", keys: "F10", suggestedKeys: "Super+F8", label: "Read the item you're hovering", inSetup: true, taken: true },
+    { action: "ReadItem", keys: "F10", suggestedKeys: "Super+Numpad1", label: "Read the item you're hovering", inSetup: true, taken: true },
     { action: "ReadCharacter", keys: "", suggestedKeys: "", label: "Read your stat and skill windows, to update your build", inSetup: true, taken: false },
     { action: "PauseTracking", keys: "", suggestedKeys: "", label: "Pause or resume tracking", inSetup: false, taken: false },
     { action: "NewSession", keys: "", suggestedKeys: "", label: "Start a new session", inSetup: false, taken: false },

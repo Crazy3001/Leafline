@@ -672,7 +672,7 @@
     <section id="hotkeys">
       <h2>Hotkeys</h2>
       <p class="lead">
-        They work while you play. Use Win with an F-key, such as Win+F8: the game can't bind Win, and a key on its own
+        They work while you play. Use Win with a numpad key or an F-key, such as Win+Num 0: the game can't bind Win, and a key on its own
         may never reach Leafline while the game is in front.
       </p>
       <div class="row">
