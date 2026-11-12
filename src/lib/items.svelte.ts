@@ -199,8 +199,12 @@ export interface CheckedItem {
   slotsNote: string | null;
 }
 
-/** The most one successful scroll adds to a single stat. A guess at the generous end, so a real value isn't thrown out. */
-const PER_SCROLL = 5;
+/**
+ * The most one successful scroll adds to a single stat in Classic: +4 for the strongest (a Chaos
+ * scroll), and +10 for HP and MP, whose scrolls add ten. From a player-written scrolling guide, not
+ * the game, so a little room is left above it.
+ */
+const perScroll = (label: string) => (/^Max[HM]P$/.test(label) ? 10 : 4);
 
 /** How far a rolled copy's stat can sit from the data's value and still be believed as read. */
 const roll = (standard: number) => Math.max(2, Math.round(Math.abs(standard) * 0.2));
@@ -223,7 +227,7 @@ export function checkItem(read: ItemTooltip, record: ItemRecord): CheckedItem {
     // Every successful scroll can add several points, so a scrolled copy may sit well above the item's value.
     // The (+N) after the name says how many went on; when only the amber colour was read, any slot may have.
     const scrolls = read.upgrades ?? (read.upgraded ? (record.upgradeSlots ?? 7) : 0);
-    const reach = tolerance + scrolls * PER_SCROLL;
+    const reach = tolerance + scrolls * perScroll(own.label);
     // The tooltip's own split agrees with the item: its base is the item's value and the bonus adds up.
     if (split && got.base === own.value) {
       return { label, value: got.value, base: got.base, bonus: got.bonus, standard: null, source: "read", note: null };
@@ -236,7 +240,7 @@ export function checkItem(read: ItemTooltip, record: ItemRecord): CheckedItem {
       return { label, value: got.value, base: null, bonus: null, standard: own.value, source: "read", note: null };
     }
     // A base near the item's value with a total that adds up is a rolled copy with scrolls on it.
-    if (split && Math.abs(got.base! - own.value) <= tolerance && got.bonus! >= 0 && got.bonus! <= 5 * (record.upgradeSlots ?? 7)) {
+    if (split && Math.abs(got.base! - own.value) <= tolerance && got.bonus! >= 0 && got.bonus! <= perScroll(own.label) * (record.upgradeSlots ?? 7)) {
       return { label, value: got.value, base: got.base, bonus: got.bonus, standard: own.value, source: "read", note: null };
     }
     return fromData(`Read as ${formatSignedPlain(got.value)}, which doesn't fit this item: showing its own value`);
