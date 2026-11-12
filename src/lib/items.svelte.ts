@@ -166,19 +166,39 @@ const nameKey = (name: string) =>
     .toLowerCase()
     .replace(/[^a-z0-9]/g, "");
 
+/** How alike two strings are, 0 to 1, by the edits between them. */
+function likeness(a: string, b: string): number {
+  if (a === b) return 1;
+  if (!a.length || !b.length) return 0;
+  let row = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const next = [i];
+    for (let j = 1; j <= b.length; j++) {
+      next[j] = Math.min(row[j] + 1, next[j - 1] + 1, row[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    row = next;
+  }
+  return 1 - row[b.length] / Math.max(a.length, b.length);
+}
+
 /**
- * Whether a name read from the game is the data's item: "exact" when the names agree and the
- * level, if one was read, does too; "close" when the data's item is only the nearest guess.
+ * Whether a name read from the game is the data's item. "exact": the names agree (or the whole
+ * name stands after stray text) and the level, if one was read, does too. "likely": the spelling
+ * is nearly the same and the level agrees, as with a letter OCR split in two. "close": only the
+ * nearest guess in the data.
  */
-export function nameMatch(read: ItemTooltip, record: ItemRecord): "exact" | "close" {
+export function nameMatch(read: ItemTooltip, record: ItemRecord): "exact" | "likely" | "close" {
   const readKey = nameKey(read.name);
   const ownKey = nameKey(record.name);
   const level = read.requirements.level;
+  const levelAgrees = level != null && level === record.reqLevel;
   // Text from behind the tooltip can run on before the name ("GUida Eagle Crow"). The whole name
   // standing at the end, with the level agreeing, is the item.
-  const trailing = ownKey.length >= 6 && readKey.endsWith(ownKey) && level != null && level === record.reqLevel;
-  const sameName = readKey === ownKey || trailing;
-  return sameName && (level == null || level === record.reqLevel) ? "exact" : "close";
+  const trailing = ownKey.length >= 6 && readKey.endsWith(ownKey) && levelAgrees;
+  if ((readKey === ownKey || trailing) && (level == null || levelAgrees)) return "exact";
+  // The (M) or (F) after a name is judged apart, so one stray letter in a long name isn't made worse by it.
+  const bare = (name: string) => nameKey(name.replace(/\(\s*[MFU]\s*\)/gi, ""));
+  return levelAgrees && bare(record.name).length >= 8 && likeness(bare(read.name), bare(record.name)) >= 0.85 ? "likely" : "close";
 }
 
 /** One line of the item check: a value to show, how far to trust it, and why when it isn't sure. */
@@ -221,7 +241,21 @@ const roll = (standard: number) => Math.max(2, Math.round(Math.abs(standard) * 0
  * only when it is a scroll's bonus on an item with scrolls; otherwise it is listed as unconfirmed.
  */
 export function checkItem(read: ItemTooltip, record: ItemRecord): CheckedItem {
-  const readFor = (label: string) => read.stats.find((s) => (DATA_LABELS[s.label] ?? s.label) === label);
+  const exact = (label: string) => read.stats.find((s) => (DATA_LABELS[s.label] ?? s.label) === label);
+  const letters = (label: string) => label.toUpperCase().replace(/[^A-Z]/g, "");
+  const dataLabels = new Set(record.stats.map((s) => s.label));
+  // A label OCR garbled (`LU-JK` for LUK) is the item's stat when it is one edit from it, the item
+  // has that stat, and the tooltip didn't also show it right.
+  const spelled = new Map<string, ItemTooltip["stats"][number]>();
+  for (const got of read.stats) {
+    const label = DATA_LABELS[got.label] ?? got.label;
+    if (dataLabels.has(label) || spelled.size > 8) continue;
+    const near = [...dataLabels].find(
+      (own) => letters(own).length >= 3 && !exact(own) && !spelled.has(own) && likeness(letters(label), letters(own)) >= 0.7,
+    );
+    if (near) spelled.set(near, got);
+  }
+  const readFor = (label: string) => exact(label) ?? spelled.get(label);
   const stats: CheckedStat[] = record.stats.map((own) => {
     const label = TOOLTIP_LABELS[own.label] ?? own.label;
     const got = readFor(own.label);
@@ -254,7 +288,7 @@ export function checkItem(read: ItemTooltip, record: ItemRecord): CheckedItem {
   const scrolls = read.upgrades ?? (read.upgraded ? (record.upgradeSlots ?? 7) : 0);
   const unconfirmed: string[] = [];
   for (const got of read.stats) {
-    if ((known as Set<string>).has(DATA_LABELS[got.label] ?? got.label)) continue;
+    if ((known as Set<string>).has(DATA_LABELS[got.label] ?? got.label) || [...spelled.values()].includes(got)) continue;
     // A stat the item doesn't have is a scroll's: believed on a scrolled item when the amount is one
     // those scrolls can give and any (base +bonus) it shows is all bonus.
     const fits = got.value > 0 && got.value <= scrolls * perScroll(got.label);

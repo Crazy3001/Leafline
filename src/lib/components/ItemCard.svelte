@@ -68,14 +68,14 @@
    * nearest item is a guess, so only the data is shown. "none": nothing in the data fits. "unchecked":
    * the data isn't downloaded, so the read is shown as it came.
    */
-  const trust = $derived.by((): "data" | "exact" | "close" | "none" | "unchecked" | "looking" => {
+  const trust = $derived.by((): "data" | "exact" | "likely" | "close" | "none" | "unchecked" | "looking" => {
     if (!read) return "data";
     if (!ready) return "unchecked";
     if (!looked) return "looking";
     if (!matched) return "none";
     return nameMatch(read, matched);
   });
-  const checked = $derived(read && matched && trust === "exact" ? checkItem(read, matched) : null);
+  const checked = $derived(read && matched && (trust === "exact" || trust === "likely") ? checkItem(read, matched) : null);
 
   /** Requirements, type and jobs are the same on every copy, so once the item is known the data's stand. */
   const fromData = $derived(matched && trust !== "unchecked" ? tooltipOf(matched) : null);
@@ -85,7 +85,7 @@
     if (!fromData) return read;
     return { ...read, itemType: fromData.itemType, requirements: fromData.requirements, jobs: fromData.jobs };
   });
-  const upgraded = $derived(trust === "exact" && item.upgraded);
+  const upgraded = $derived((trust === "exact" || trust === "likely") && item.upgraded);
 
   interface Row {
     label: string;
@@ -120,7 +120,7 @@
    * when the name matched exactly: a guess at the item can't say how its copy was scrolled.
    */
   const scrolling = $derived.by(() => {
-    if (!read || read.plain || !item.name || (trust !== "exact" && trust !== "unchecked")) return null;
+    if (!read || read.plain || !item.name || (trust !== "exact" && trust !== "likely" && trust !== "unchecked")) return null;
     const total = matched?.upgradeSlots ?? null;
     const left = checked ? checked.slotsLeft : item.remainingEnhancements;
     const used = total != null && left != null && left <= total ? total - left : null;
@@ -147,7 +147,7 @@
     const line =
       total != null && left != null && left <= total
         ? `${left} of ${total} slots left` + (failed != null && used ? ` · ${passed} passed, ${failed} failed` : "")
-        : total != null && trust === "exact"
+        : total != null && checked
           ? `${total} upgrade slots · slots left not read`
           : null;
     return { verdict, line, counted };
@@ -163,6 +163,7 @@
     ].filter(Boolean),
   );
   const unsureName = $derived(trust === "close" && read ? read.name : null);
+  const likelyName = $derived(trust === "likely" && read ? read.name : null);
 </script>
 
 <Card {title} {plain}>
@@ -197,6 +198,8 @@
       Not sure this is {name}: the name read as “{unsureName}”. It could be a different item, so only {name}'s own stats are
       shown, not what was read.
     </p>
+  {:else if likelyName}
+    <p class="notice warn">The name read as “{likelyName}”. Matched to {name} by its spelling and level, so check it is the right item.</p>
   {:else if trust === "unchecked"}
     <p class="notice warn">The item data isn't downloaded, so this reading can't be checked against the item's real stats.</p>
   {/if}
@@ -224,8 +227,13 @@
               {:else if stat.fromData}
                 <span title="Not read from the tooltip: this is the item's own value">item's own</span>
               {:else if stat.standard != null}
-                <span title="What this item has with no scrolls, from the data. A scroll, a rolled copy or a misread makes it differ.">
-                  item's own {formatSigned(stat.standard)}
+                {@const diff = stat.value - stat.standard}
+                <span
+                  class="bonus"
+                  class:negative={diff < 0}
+                  title="What this item has with no scrolls is {formatSigned(stat.standard)}. A scroll, a rolled copy or a misread makes it differ."
+                >
+                  {formatSigned(diff)}
                 </span>
               {/if}
             </td>
