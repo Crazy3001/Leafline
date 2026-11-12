@@ -181,8 +181,10 @@
       enough, so no stats are shown rather than wrong ones.
     </p>
     <p class="notice-help">
-      Hover the item again with nothing behind its box, or search for it by name. If it keeps failing, press Save frame on the
-      overlay and send the picture in a bug report.
+      The tooltip is easiest to read over a plain background. Move the inventory or equipment window to a quiet part of the
+      screen, close any windows behind where the tooltip appears (chat, other panels), then hover the item and press the hotkey
+      again. You can also search for it by name. If it keeps failing, press Save frame on the overlay and send the picture in a
+      bug report.
     </p>
     <button class="fix" onclick={() => backend.showItem(null, read.name || null)}>
       {read.name ? `Search for “${read.name}”` : "Search items"}
