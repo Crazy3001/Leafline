@@ -159,6 +159,93 @@ export function statRows(read: ItemTooltip, matched: ItemRecord | null): StatRow
   return rows;
 }
 
+/** A name with its upgrade count, case and punctuation gone, for comparing a read name to the data's. */
+const nameKey = (name: string) =>
+  name
+    .replace(/\(\s*\+\s*\d+\s*\)?\s*$/, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+
+/**
+ * Whether a name read from the game is the data's item: "exact" when the names agree and the
+ * level, if one was read, does too; "close" when the data's item is only the nearest guess.
+ */
+export function nameMatch(read: ItemTooltip, record: ItemRecord): "exact" | "close" {
+  const sameName = nameKey(read.name) === nameKey(record.name);
+  const level = read.requirements.level;
+  return sameName && (level == null || level === record.reqLevel) ? "exact" : "close";
+}
+
+/** One line of the item check: a value to show, how far to trust it, and why when it isn't sure. */
+export interface CheckedStat {
+  label: string;
+  value: number;
+  base: number | null;
+  bonus: number | null;
+  /** The data's value, shown beside a read one that differs. */
+  standard: number | null;
+  /** Where the value came from. */
+  source: "read" | "data";
+  /** Why the value is the data's or doubtful, when it is. */
+  note: string | null;
+}
+
+export interface CheckedItem {
+  stats: CheckedStat[];
+  /** Read stats that are not in the data and could not be confirmed. */
+  unconfirmed: string[];
+  /** Slots left, when the read is believable. */
+  slotsLeft: number | null;
+  slotsNote: string | null;
+}
+
+/** How far a rolled copy's stat can sit from the data's value and still be believed as read. */
+const roll = (standard: number) => Math.max(2, Math.round(Math.abs(standard) * 0.2));
+
+/**
+ * The data's stats are the baseline. A read value replaces one only when it can be believed: it
+ * shows the item's own value as its base and the bonus adds up, or it sits within a roll of the
+ * data's. Anything else keeps the data's value with a note. A read stat the data lacks is shown
+ * only when it is a scroll's bonus on an item with scrolls; otherwise it is listed as unconfirmed.
+ */
+export function checkItem(read: ItemTooltip, record: ItemRecord): CheckedItem {
+  const readFor = (label: string) => read.stats.find((s) => (DATA_LABELS[s.label] ?? s.label) === label);
+  const stats: CheckedStat[] = record.stats.map((own) => {
+    const label = TOOLTIP_LABELS[own.label] ?? own.label;
+    const got = readFor(own.label);
+    const fromData = (note: string | null): CheckedStat => ({ label, value: own.value, base: null, bonus: null, standard: null, source: "data", note });
+    if (!got) return fromData(null);
+    const split = got.base != null && got.bonus != null;
+    if (got.base != null && got.bonus != null && got.base === own.value && got.base + got.bonus === got.value) {
+      return { label, value: got.value, base: got.base, bonus: got.bonus, standard: null, source: "read", note: null };
+    }
+    if (!split && got.value === own.value) return { label, value: got.value, base: null, bonus: null, standard: null, source: "read", note: null };
+    if (!split && Math.abs(got.value - own.value) <= roll(own.value)) {
+      return { label, value: got.value, base: null, bonus: null, standard: own.value, source: "read", note: null };
+    }
+    return fromData(`Read as ${formatSignedPlain(got.value)}, which doesn't fit this item: showing its own value`);
+  });
+  const known = new Set(record.stats.map((s) => s.label));
+  const scrolled = (read.upgrades ?? 0) > 0 || read.upgraded;
+  const unconfirmed: string[] = [];
+  for (const got of read.stats) {
+    if ((known as Set<string>).has(DATA_LABELS[got.label] ?? got.label)) continue;
+    const bonusOnly = got.base === 0 && got.bonus != null && got.bonus === got.value && got.value > 0 && got.value <= 30;
+    if (scrolled && bonusOnly) {
+      stats.push({ label: got.label, value: got.value, base: 0, bonus: got.bonus, standard: null, source: "read", note: null });
+    } else {
+      unconfirmed.push(`${got.label} ${formatSignedPlain(got.value)}`);
+    }
+  }
+  const total = record.upgradeSlots;
+  const left = read.remainingEnhancements;
+  const slotsLeft = total != null && left != null && left <= total ? left : null;
+  const slotsNote = left != null && slotsLeft == null ? `Slots left read as ${left}, which can't be right for ${total ?? "this item"} slots` : null;
+  return { stats, unconfirmed, slotsLeft, slotsNote };
+}
+
+const formatSignedPlain = (value: number) => (value >= 0 ? `+${value}` : String(value));
+
 /** The item's slot, or its group for items that have none. */
 export function itemSlot(item: ItemRecord): string {
   const groups = { equip: item.slot, use: "Use", scroll: "Scroll", setup: "Set-up", etc: "Etc" };

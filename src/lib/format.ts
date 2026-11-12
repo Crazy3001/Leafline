@@ -112,7 +112,7 @@ export function formatMesos(value: number | null | undefined): string {
  * beside a tooltip in Classic are named; others stay numbers rather than guess.
  */
 export function attackSpeedName(speed: number): string | null {
-  return ({ 3: "Very Fast", 4: "Fast" } as Record<number, string>)[speed] ?? null;
+  return ({ 3: "Very Fast", 4: "Fast", 7: "Slow" } as Record<number, string>)[speed] ?? null;
 }
 
 /** The data's attack speed as one line: the name and number where the name is known, else the number. */

@@ -256,6 +256,7 @@ const mockRecord = (gear: GearItem, more: Partial<ItemRecord> = {}): ItemRecord 
   kind: "equip",
   reqFame: 0,
   attackSpeed: null,
+  knockback: null,
   upgradeSlots: 7,
   questItem: false,
   untradable: false,

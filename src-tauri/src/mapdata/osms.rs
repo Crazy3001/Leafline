@@ -621,6 +621,7 @@ impl From<RawItem> for ItemRecord {
             req_fame: need("reqPOP"),
             weapon_type: raw.weapon.as_ref().and_then(|w| w.kind.clone()),
             attack_speed: number("attackSpeed").map(|v| v.max(0) as u32),
+            knockback: number("knockback").map(|v| v.max(0) as u32),
             upgrade_slots: number("tuc").map(|v| v.max(0) as u32),
             quest_item: flag("quest") || flag("pquest"),
             untradable: flag("tradeBlock"),
@@ -729,6 +730,8 @@ pub struct ItemRecord {
     pub req_fame: u32,
     /// The data's own number for a weapon's speed. Lower is faster.
     pub attack_speed: Option<u32>,
+    /// A weapon's knockback chance, in percent.
+    pub knockback: Option<u32>,
     /// Upgrade slots on a clean copy.
     pub upgrade_slots: Option<u32>,
     pub quest_item: bool,
@@ -892,7 +895,7 @@ mod tests {
         let json = br#"[
             {"id": 1, "name": "Twig Wand", "category": "Equipment", "sub_category": "Weapon", "price": "5",
              "req_classes": ["Magician"], "weapon": {"type": "Wand", "swing_reach_px": 88},
-             "stats": {"reqLevel": 8, "reqINT": 20, "reqPOP": 2, "incMAD": 12, "incPDD": "3", "tuc": 7, "attackSpeed": 6},
+             "stats": {"reqLevel": 8, "reqINT": 20, "reqPOP": 2, "incMAD": 12, "incPDD": "3", "tuc": 7, "attackSpeed": 6, "knockback": 30},
              "icon_url": "https://example.invalid/w.png", "sprite_urls": ["https://example.invalid/s.png"]},
             {"id": 2, "name": "Plain Cap", "category": "Equipment", "sub_category": "Hat", "gender": "male"},
             {"id": 3, "name": "Red Berry", "category": "Consumable", "sub_category": "Consume",
@@ -907,6 +910,7 @@ mod tests {
         assert_eq!(wand.weapon_type.as_deref(), Some("Wand"));
         assert_eq!(wand.classes, ["Magician"]);
         assert_eq!((wand.upgrade_slots, wand.attack_speed, wand.price), (Some(7), Some(6), Some(5)));
+        assert_eq!(wand.knockback, Some(30));
         let stats: Vec<_> = wand.stats.iter().map(|s| (s.label.as_str(), s.value)).collect();
         assert_eq!(stats, [("Magic", 12), ("Weapon Def.", 3)]);
         assert!(items[1].classes.is_empty() && items[1].req_level == 0);

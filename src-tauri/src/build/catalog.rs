@@ -581,6 +581,7 @@ pub(crate) mod tests {
             req_luk: 0,
             req_fame: 0,
             attack_speed: None,
+            knockback: None,
             upgrade_slots: None,
             quest_item: false,
             untradable: false,

@@ -51,7 +51,17 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
   etc drops, shared drops like Leather and ores included, but has no rates: it says who drops
   what, not how often. Drops are checked for updates once a day, without needing a download first.
 
+- **Item check starts from the item itself:** the name read from the tooltip is matched to the item
+  data, and the item's own stats, upgrade slots, attack speed and knockback chance are the
+  baseline. What the tooltip says replaces a stat only when it can be believed (its base matches
+  the item's, or it sits within a normal roll). Anything doubtful keeps the item's own value and
+  says so. When the name is only a close guess the card says it may be wrong and shows the item's
+  own stats; when nothing fits it shows no stats and a button to search. Weapon knockback comes
+  with the map data, which downloads again once.
+
 ### Fixed
+- Live reading kept saying "The game is minimised" after the game was brought back, until Live was
+  turned off and on again. It now opens a fresh capture when the game window returns.
 - When a download failed, every lookup tried again at once. Leafline now waits a day, unless you
   press a download button.
 

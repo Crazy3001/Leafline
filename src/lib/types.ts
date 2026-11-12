@@ -1221,6 +1221,8 @@ export interface ItemRecord extends GearItem {
   reqFame: number;
   /** The data's own number for a weapon's speed. Lower is faster. */
   attackSpeed: number | null;
+  /** A weapon's knockback chance, in percent. */
+  knockback: number | null;
   /** Upgrade slots on a clean copy. */
   upgradeSlots: number | null;
   questItem: boolean;

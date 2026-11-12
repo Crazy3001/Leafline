@@ -20,7 +20,7 @@ use super::turnins::TurnIn;
 use crate::error::{Error, Result};
 
 /// Bump when the tables change; an older cache is then dropped and downloaded again.
-const CACHE_VERSION: i32 = 9;
+const CACHE_VERSION: i32 = 10;
 
 const SCHEMA: &str = "
 CREATE TABLE source_files (
@@ -57,7 +57,7 @@ CREATE TABLE items (
     id INTEGER PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL, slot TEXT NOT NULL, gender TEXT, classes TEXT NOT NULL,
     weapon_type TEXT, req_level INTEGER NOT NULL, req_str INTEGER NOT NULL, req_dex INTEGER NOT NULL,
     req_int INTEGER NOT NULL, req_luk INTEGER NOT NULL, req_fame INTEGER NOT NULL, attack_speed INTEGER,
-    upgrade_slots INTEGER, quest_item INTEGER NOT NULL, untradable INTEGER NOT NULL, stats TEXT NOT NULL,
+    knockback INTEGER, upgrade_slots INTEGER, quest_item INTEGER NOT NULL, untradable INTEGER NOT NULL, stats TEXT NOT NULL,
     price INTEGER, description TEXT, scroll TEXT);
 CREATE TABLE recipes (
     id INTEGER PRIMARY KEY, discipline TEXT NOT NULL, skill_level INTEGER NOT NULL, craft_exp INTEGER NOT NULL,
@@ -369,7 +369,7 @@ impl Store {
     fn load_items(&self) -> Result<Vec<ItemRecord>> {
         let mut stmt = self.conn.prepare(
             "SELECT id, name, kind, slot, gender, classes, weapon_type, req_level, req_str, req_dex, req_int, req_luk,
-                    req_fame, attack_speed, upgrade_slots, quest_item, untradable, stats, price, description, scroll
+                    req_fame, attack_speed, upgrade_slots, quest_item, untradable, stats, price, description, scroll, knockback
              FROM items ORDER BY id",
         )?;
         let rows = stmt.query_map([], |row| {
@@ -399,6 +399,7 @@ impl Store {
                 price: row.get(18)?,
                 description: row.get(19)?,
                 scroll: None,
+                knockback: row.get(21)?,
             };
             Ok((item, stats, scroll))
         })?;
@@ -962,8 +963,8 @@ fn insert_items(tx: &Transaction, items: &[ItemRecord]) -> Result<()> {
     let mut item = tx.prepare(
         "INSERT OR REPLACE INTO items (id, name, kind, slot, gender, classes, weapon_type, req_level, req_str, req_dex,
                                        req_int, req_luk, req_fame, attack_speed, upgrade_slots, quest_item, untradable,
-                                       stats, price, description, scroll)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)",
+                                       stats, price, description, scroll, knockback)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22)",
     )?;
     for i in items {
         let json = |err: serde_json::Error| Error::Invalid(err.to_string());
@@ -990,7 +991,8 @@ fn insert_items(tx: &Transaction, items: &[ItemRecord]) -> Result<()> {
             stats,
             i.price,
             i.description,
-            scroll
+            scroll,
+            i.knockback
         ])?;
     }
     Ok(())
