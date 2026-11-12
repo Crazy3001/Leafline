@@ -83,14 +83,12 @@ pub fn outfit(build: &Build, expansion: &Expansion, rules: &Rules, catalog: &Cat
     let scorer = Scorer::new(build);
     let wearing = |slot: &str| build.start.pieces.iter().rev().find(|p| p.slot(catalog) == slot);
     // The character's stats now: as last read, or the plan's for a level reached since. Gear worn
-    // in other slots counts toward a piece's requirements, as in the game.
+    // counts toward a piece's requirements, as in the game, what the piece would replace included.
     let base = if level <= build.start.level { build.start.stats } else { expansion.step(level).map(|s| s.stats).or(build.start.stats) };
     let known = build.start.stats.is_some();
     let worn_bonus: Vec<(String, Stats)> = build.start.pieces.iter().map(|p| (p.slot(catalog), piece_bonus(&p.data_stats(catalog)))).collect();
     let fits = |item: &ItemRecord| {
-        let stats = known.then(|| {
-            worn_bonus.iter().filter(|(s, _)| !Piece::clashes(s, &item.slot)).fold(base.unwrap_or_default(), |total, (_, b)| total.plus(*b))
-        });
+        let stats = known.then(|| worn_bonus.iter().fold(base.unwrap_or_default(), |total, (_, b)| total.plus(*b)));
         fit(item, level, stats)
     };
     let overall = wearing("Overall").is_some();
@@ -517,6 +515,23 @@ mod tests {
             let paths = fill_paths(&build, &e, &Rules::default(), &catalog, 20);
             assert!(paths.iter().all(|(slot, _)| slot != "Hat"), "nor a filled-in upgrade");
         }
+    }
+
+    #[test]
+    fn the_piece_an_item_would_replace_still_counts_toward_its_requirements() {
+        // Boots that need 40 STR, a character with 38, and worn boots that give 2: the game's
+        // hover shows the requirement met, so the new boots are wearable as soon as the level is.
+        let mut steel = with(item(2, "Steel Boots", 50, &[]), "Shoes", &[("Weapon Def.", 26)]);
+        steel.req_str = 40;
+        let catalog = Catalog::new(Vec::new(), vec![with(item(1, "Old Boots", 25, &[]), "Shoes", &[("STR", 2)]), steel]);
+        let mut build = bandit(45, vec![2], vec![worn(1, &catalog)]);
+        build.start.stats = Some(Stats { str: 38, dex: 25, int: 4, luk: 40 });
+        build.plan.plan_to = 70;
+        let e = expand(&build, &Rules::default(), &catalog);
+        assert_eq!(e.gear.iter().map(|g| (g.item.name.as_str(), g.level)).collect::<Vec<_>>(), [("Steel Boots", Some(50))]);
+        // With 37 base STR the 2 from the old boots falls one short of 40 until the plan raises it.
+        build.start.stats = Some(Stats { str: 37, dex: 25, int: 4, luk: 40 });
+        assert_eq!(expand(&build, &Rules::default(), &catalog).gear[0].level, None);
     }
 
     #[test]

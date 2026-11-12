@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use super::catalog::{Catalog, novelty, usable_by};
 use super::fit::ARMOUR;
-use super::plan::{Build, Expansion, MAX_LEVEL, Piece, Plan, Start, Stat, expand, meets};
+use super::plan::{Build, Expansion, MAX_LEVEL, Plan, Start, Stat, expand, meets};
 use super::rules::{Branch, Rules};
 use crate::mapdata::osms::{ItemKind, ItemRecord};
 
@@ -118,11 +118,11 @@ impl<'a> Wearer<'a> {
         weapons.peek().is_some() && weapons.all(|i| i.id / 100_000 == TWO_HANDED_BLOCK)
     }
 
-    /// Other gear worn by then counts, as it does for a hovered item, but not what this replaces.
+    /// Gear worn by then counts, as it does for a hovered item: the piece this would replace too,
+    /// since the game checks with it still on.
     fn strong_enough(&self, item: &ItemRecord) -> bool {
         let Some(step) = self.expansion.step(self.level) else { return false };
-        let others = step.worn.iter().filter(|w| !Piece::clashes(&w.slot, &item.slot));
-        let stats = others.fold(step.stats, |total, w| total.plus(w.bonus));
+        let stats = step.worn.iter().fold(step.stats, |total, w| total.plus(w.bonus));
         meets(item, self.level, &stats, self.build.start.stats.is_some())
     }
 }

@@ -617,8 +617,8 @@ pub(super) fn piece_bonus(stats: &[(String, i64)]) -> Stats {
 }
 
 /// Marks the level each goal item comes within reach, walking up the levels so gear already
-/// worn can help with the next piece. A new piece replaces what was in its slot, and an item's
-/// own stats never count toward its requirements.
+/// worn can help with the next piece. A new piece replaces what was in its slot, but the piece it
+/// replaces still counts toward its requirements, and an item's own stats never do.
 fn check_gear(
     build: &Build,
     catalog: &Catalog,
@@ -668,8 +668,9 @@ fn check_gear(
             let wearable: Vec<usize> = (0..gear.len())
                 .filter(|&i| {
                     let check = &gear[i];
-                    let others = worn.iter().filter(|w| !Piece::clashes(&w.slot, &check.item.slot));
-                    let stats = others.fold(step.stats, |total, w| total.plus(w.bonus));
+                    // Everything worn counts, the piece this would replace too: the game's hover
+                    // shows a requirement met by it as met.
+                    let stats = worn.iter().fold(step.stats, |total, w| total.plus(w.bonus));
                     check.usable && check.level.is_none() && meets(&check.item, step.level, &stats, known)
                 })
                 .collect();
