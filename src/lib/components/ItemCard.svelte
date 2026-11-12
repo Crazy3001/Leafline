@@ -282,7 +282,13 @@
 
   {#if wearable}<BuildFit {item} />{/if}
 
-  <ItemDetails item={read} record={record ?? matched} {map} />
+  <ItemDetails
+    item={read}
+    record={record ?? matched}
+    {map}
+    checked={checked ? checked.stats : null}
+    slotsLeft={checked?.slotsLeft ?? null}
+  />
 
   <!-- Only for a copy read from the game: that's the one the player just got. -->
   {#if read}<DropLogger item={name} itemId={matched?.id ?? null} {map} />{/if}
