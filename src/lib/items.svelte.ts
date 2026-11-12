@@ -251,9 +251,13 @@ export function checkItem(read: ItemTooltip, record: ItemRecord): CheckedItem {
   for (const got of read.stats) {
     const label = DATA_LABELS[got.label] ?? got.label;
     if (dataLabels.has(label) || spelled.size > 8) continue;
-    const near = [...dataLabels].find(
-      (own) => letters(own).length >= 3 && !exact(own) && !spelled.has(own) && likeness(letters(label), letters(own)) >= 0.7,
-    );
+    // The label is close to the item's, or the tooltip's own (base +bonus) starts from the item's value for
+    // a stat nothing else was read for (`II BTR +3 (2 +1)` is the STR of 2).
+    const near = [...dataLabels].find((name) => {
+      if (!(letters(name).length >= 3 && !exact(name) && !spelled.has(name))) return false;
+      const value = record.stats.find((s) => s.label === name)?.value;
+      return likeness(letters(label), letters(name)) >= 0.7 || (got.base != null && got.bonus != null && got.base === value);
+    });
     if (near) spelled.set(near, got);
   }
   const readFor = (label: string) => exact(label) ?? spelled.get(label);

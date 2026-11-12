@@ -188,10 +188,23 @@ pub fn parse(lines: &[Line], separator_y: f32) -> ItemTooltip {
 
     // The name is the tallest remaining line above the requirement block. A long name wraps onto
     // a second line of the same height, so lines nearly as tall as the tallest are joined to it.
-    let above: Vec<&Line> =
-        unclaimed.into_iter().filter(|l| first_req_y.is_none_or(|y| l.rect.bottom() <= y + 1.0)).collect();
-    if let Some(tallest) = above.iter().map(|l| l.rect.h).max_by(f32::total_cmp) {
-        let mut title: Vec<&Line> = above.into_iter().filter(|l| l.rect.h >= tallest * 0.85).collect();
+    // Lines about the item's trade status sit under the name on some items and are not part of it.
+    let is_status = |text: &str| {
+        let lower = text.to_ascii_lowercase();
+        ["bound", "transferable", "tradable", "tradeable", "trade"].iter().any(|w| lower.contains(w))
+    };
+    let above: Vec<&Line> = unclaimed
+        .into_iter()
+        .filter(|l| first_req_y.is_none_or(|y| l.rect.bottom() <= y + 1.0))
+        .filter(|l| !is_status(trim_noise(&l.text)))
+        .collect();
+    if let Some(main) = above.iter().copied().max_by(|a, b| a.rect.h.total_cmp(&b.rect.h)) {
+        // The second line of a wrapped name is close to the first and about as tall, though its box
+        // can be shorter or taller than the first's by brackets and letters that hang below the line.
+        let mut title: Vec<&Line> = above
+            .into_iter()
+            .filter(|l| l.rect.h >= main.rect.h * 0.6 && (l.rect.center_y() - main.rect.center_y()).abs() <= main.rect.h * 1.8)
+            .collect();
         title.sort_by(|a, b| a.rect.y.total_cmp(&b.rect.y));
         let text = title.iter().map(|l| trim_noise(&l.text)).collect::<Vec<_>>().join(" ");
         (item.name, item.upgrades) = split_name(&text);
@@ -374,6 +387,34 @@ mod tests {
         assert_eq!(item.name, "Brown Hard Leather Top (M)");
         assert_eq!(item.upgrades, Some(1));
         assert_eq!(item.requirements.level, Some(20));
+    }
+
+    #[test]
+    fn a_trade_status_line_under_the_name_is_not_the_name() {
+        let item = parse(
+            &lines(&[
+                ("Pumpkin Basket", 1050.0, 300.0, 18.0),
+                ("Account-bound. Transferable within world.", 1050.0, 322.0, 20.0),
+                ("REQ LEV : 10", 1180.0, 352.0, 10.0),
+                ("Type: One-handed Sword", 1040.0, 470.0, 12.0),
+            ]),
+            440.0,
+        );
+        assert_eq!(item.name, "Pumpkin Basket");
+    }
+
+    #[test]
+    fn a_wrapped_name_whose_lines_differ_in_height_is_still_read_whole() {
+        let item = parse(
+            &lines(&[
+                ("Brown Hard Leather", 1440.0, 300.0, 15.0),
+                ("Top (M) (+1)", 1450.0, 322.0, 20.0),
+                ("REQ LEV : 20", 1510.0, 352.0, 10.0),
+                ("Type: Top", 1370.0, 470.0, 12.0),
+            ]),
+            440.0,
+        );
+        assert_eq!(item.name, "Brown Hard Leather Top (M)");
     }
 
     #[test]
