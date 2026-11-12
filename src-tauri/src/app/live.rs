@@ -443,6 +443,22 @@ pub fn save_frame(app: &AppHandle) -> Result<PathBuf> {
     Ok(path)
 }
 
+/// Saves the last item check's picture, however long ago it was taken, with what Leafline read from
+/// it beside it as a `.json` file, for a bug report about that reading.
+pub fn save_item_frame(app: &AppHandle, reading: Option<&str>) -> Result<PathBuf> {
+    let frame = app.state::<LiveState>().item_picture.lock().expect("live lock").clone().map(|(_, frame)| frame);
+    let frame = frame.ok_or_else(|| Error::Invalid("No item check has been taken yet.".into()))?;
+    let folder = frames_folder(app)?;
+    std::fs::create_dir_all(&folder)?;
+    let path = folder.join(format!("leafline-item-{}.png", file_stamp(SystemTime::now())));
+    frame.save(&path)?;
+    if let Some(text) = reading {
+        std::fs::write(path.with_extension("json"), text)?;
+    }
+    let _ = app.emit(FRAME_SAVED_EVENT, &path);
+    Ok(path)
+}
+
 fn read_until_stopped(app: &AppHandle) -> Result<()> {
     let state = app.state::<LiveState>();
     let ocr = Ocr::new()?;
