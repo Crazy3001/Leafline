@@ -171,8 +171,13 @@ const nameKey = (name: string) =>
  * level, if one was read, does too; "close" when the data's item is only the nearest guess.
  */
 export function nameMatch(read: ItemTooltip, record: ItemRecord): "exact" | "close" {
-  const sameName = nameKey(read.name) === nameKey(record.name);
+  const readKey = nameKey(read.name);
+  const ownKey = nameKey(record.name);
   const level = read.requirements.level;
+  // Text from behind the tooltip can run on before the name ("GUida Eagle Crow"). The whole name
+  // standing at the end, with the level agreeing, is the item.
+  const trailing = ownKey.length >= 6 && readKey.endsWith(ownKey) && level != null && level === record.reqLevel;
+  const sameName = readKey === ownKey || trailing;
   return sameName && (level == null || level === record.reqLevel) ? "exact" : "close";
 }
 
@@ -201,10 +206,10 @@ export interface CheckedItem {
 
 /**
  * The most one successful scroll adds to a single stat in Classic: +4 for the strongest (a Chaos
- * scroll), and +10 for HP and MP, whose scrolls add ten. From a player-written scrolling guide, not
- * the game, so a little room is left above it.
+ * scroll). HP and MP scrolls add more (the guide says 10, and a Top was seen with +15 after one
+ * scroll), so they get 20. From a player-written guide and one real item, not the game's data.
  */
-const perScroll = (label: string) => (/^Max[HM]P$/.test(label) ? 10 : 4);
+const perScroll = (label: string) => (/^Max[HM]P$/.test(label) ? 20 : 4);
 
 /** How far a rolled copy's stat can sit from the data's value and still be believed as read. */
 const roll = (standard: number) => Math.max(2, Math.round(Math.abs(standard) * 0.2));
@@ -246,13 +251,16 @@ export function checkItem(read: ItemTooltip, record: ItemRecord): CheckedItem {
     return fromData(`Read as ${formatSignedPlain(got.value)}, which doesn't fit this item: showing its own value`);
   });
   const known = new Set(record.stats.map((s) => s.label));
-  const scrolled = (read.upgrades ?? 0) > 0 || read.upgraded;
+  const scrolls = read.upgrades ?? (read.upgraded ? (record.upgradeSlots ?? 7) : 0);
   const unconfirmed: string[] = [];
   for (const got of read.stats) {
     if ((known as Set<string>).has(DATA_LABELS[got.label] ?? got.label)) continue;
-    const bonusOnly = got.base === 0 && got.bonus != null && got.bonus === got.value && got.value > 0 && got.value <= 30;
-    if (scrolled && bonusOnly) {
-      stats.push({ label: got.label, value: got.value, base: 0, bonus: got.bonus, standard: null, source: "read", note: null });
+    // A stat the item doesn't have is a scroll's: believed on a scrolled item when the amount is one
+    // those scrolls can give and any (base +bonus) it shows is all bonus.
+    const fits = got.value > 0 && got.value <= scrolls * perScroll(got.label);
+    const allBonus = got.base == null || (got.base === 0 && got.bonus === got.value);
+    if (fits && allBonus) {
+      stats.push({ label: got.label, value: got.value, base: got.base, bonus: got.bonus, standard: null, source: "read", note: null });
     } else {
       unconfirmed.push(`${got.label} ${formatSignedPlain(got.value)}`);
     }
