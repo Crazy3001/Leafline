@@ -294,6 +294,9 @@ export function checkItem(read: ItemTooltip, record: ItemRecord): CheckedItem {
     // those scrolls can give and any (base +bonus) it shows is all bonus.
     const fits = got.value > 0 && got.value <= scrolls * perScroll(got.label);
     const allBonus = got.base == null || (got.base === 0 && got.bonus === got.value);
+    // OCR often reads one line twice under a garbled label (`LU-JK +1` beside `LUK +1`), which would
+    // only add noise: a value already shown from a good read isn't listed again.
+    if (stats.some((s) => s.source === "read" && s.value === got.value)) continue;
     if (fits && allBonus) {
       stats.push({ label: got.label, value: got.value, base: got.base, bonus: got.bonus, standard: null, source: "read", note: null });
     } else {
