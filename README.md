@@ -142,7 +142,7 @@ No. It only looks at the game window. It has no login and never asks for your Ne
 Leafline won't use a price site's data without its permission, and it won't read chat or player shops as you play. Price data may come later if a site agrees. For now each item shows its NPC sell price from the data.
 
 ### Something reads wrong. What should I check?
-Most misreads come from game settings: **UI Size: Ideal Ratio**, **HDR off** (restart the game after), and the English client. Bright, busy maps such as Henesys can make the Quest Helper hard to read, since its text is black on a see-through panel. Leafline prefers showing nothing over showing a wrong number, so a blank usually means it wasn't sure.
+Most misreads come from game settings: **UI Size: Ideal Ratio**, **HDR off** (restart the game after), and the English client. Bright, busy maps such as Henesys can make the Quest Helper hard to read, since its text is black on a see-through panel. Item tooltips are the same: the box is drawn over whatever is behind it, so move your inventory or equipment window to a quiet part of the screen and close any windows (chat, other panels) behind where the tooltip appears, then hover the item and press the hotkey again. Leafline prefers showing nothing over showing a wrong number, so a blank usually means it wasn't sure.
 
 ### How do I report a bug?
 [Open an issue](https://github.com/Crazy3001/Leafline/issues). **Settings → Feedback → Bug report details → Copy** copies what Leafline knows about its own state, with no character names, chat or file paths. A picture helps too: **Save frame** on the overlay saves the last picture Leafline read. It shows your game, so only post it if you're happy to share it.
