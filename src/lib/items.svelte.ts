@@ -199,6 +199,9 @@ export interface CheckedItem {
   slotsNote: string | null;
 }
 
+/** The most one successful scroll adds to a single stat. A guess at the generous end, so a real value isn't thrown out. */
+const PER_SCROLL = 5;
+
 /** How far a rolled copy's stat can sit from the data's value and still be believed as read. */
 const roll = (standard: number) => Math.max(2, Math.round(Math.abs(standard) * 0.2));
 
@@ -217,6 +220,10 @@ export function checkItem(read: ItemTooltip, record: ItemRecord): CheckedItem {
     if (!got) return fromData(null);
     const split = got.base != null && got.bonus != null && got.base + got.bonus === got.value;
     const tolerance = roll(own.value);
+    // Every successful scroll can add several points, so a scrolled copy may sit well above the item's value.
+    // The (+N) after the name says how many went on; when only the amber colour was read, any slot may have.
+    const scrolls = read.upgrades ?? (read.upgraded ? (record.upgradeSlots ?? 7) : 0);
+    const reach = tolerance + scrolls * PER_SCROLL;
     // The tooltip's own split agrees with the item: its base is the item's value and the bonus adds up.
     if (split && got.base === own.value) {
       return { label, value: got.value, base: got.base, bonus: got.bonus, standard: null, source: "read", note: null };
@@ -225,10 +232,9 @@ export function checkItem(read: ItemTooltip, record: ItemRecord): CheckedItem {
     // own: a rolled or scrolled copy stays near the item's value, and the total is the number that
     // matters. The split is shown only when it agrees, as above.
     if (got.value === own.value) return { label, value: got.value, base: null, bonus: null, standard: null, source: "read", note: null };
-    if (Math.abs(got.value - own.value) <= tolerance) {
+    if (Math.abs(got.value - own.value) <= reach) {
       return { label, value: got.value, base: null, bonus: null, standard: own.value, source: "read", note: null };
     }
-    // A scroll can add well past a roll, and then the split's base is the item's own value (above).
     // A base near the item's value with a total that adds up is a rolled copy with scrolls on it.
     if (split && Math.abs(got.base! - own.value) <= tolerance && got.bonus! >= 0 && got.bonus! <= 5 * (record.upgradeSlots ?? 7)) {
       return { label, value: got.value, base: got.base, bonus: got.bonus, standard: own.value, source: "read", note: null };
