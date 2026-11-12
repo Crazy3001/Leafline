@@ -25,7 +25,7 @@
   import { damage, effective, followDamage } from "$lib/damage.svelte";
   import { live } from "$lib/readings.svelte";
   import { openTrainingLog } from "$lib/nav.svelte";
-  import { formatCompact, formatDuration } from "$lib/format";
+  import { formatCompact, formatDuration, monsterLabel } from "$lib/format";
   import { measuredRates, watchHistory } from "$lib/history.svelte";
   import { mapData, watchMapData } from "$lib/mapdata.svelte";
   import { travelKey } from "$lib/settings.svelte";
@@ -133,6 +133,12 @@
   });
 
   const steps = (s: TrainingSpot) => s.travel?.hops ?? s.hops;
+  /** Maps the player has put real time into stay in For you a while after their level passes them,
+   *  so their own rate there is weighed against the estimates. */
+  const PLAYED_WELL = 10 * 60;
+  const FAR_BELOW = 15;
+  const playedWell = (s: TrainingSpot) =>
+    s.measured != null && s.measured.activeSeconds >= PLAYED_WELL && (level == null || s.averageLevel >= level - FAR_BELOW);
   const near = (s: TrainingSpot) => level == null || (s.averageLevel >= level - BELOW && s.averageLevel <= level + ABOVE);
   const savedIds = $derived(new Set(saved.map((s) => s.mapId)));
   const sorts = $derived<{ id: Sort; label: string; title: string }[]>([
@@ -157,7 +163,7 @@
         ? savedIds.has(s.map.id)
         : sort === "played"
           ? s.measured != null && s.measured.activeSeconds >= 60
-          : s.reachable && (allLevels || near(s) || savedIds.has(s.map.id)),
+          : s.reachable && (allLevels || near(s) || savedIds.has(s.map.id) || playedWell(s)),
     );
     // With no kill speed yet, maps not tried fall back to base EXP, below every measured one.
     const you = (s: TrainingSpot) => (speed == null && !s.measured ? s.expPerClear / 1e6 - 1 : forYou(s));
@@ -242,14 +248,28 @@
     const [low, high] = main.length
       ? [Math.min(...main.map((m) => m.level)), Math.max(...main.map((m) => m.level))]
       : spot.levelRange;
-    const mobs = [...main].sort((a, b) => a.level - b.level);
+    // Variants that share a displayed name (Jr. Boogie 1 and 2) are one monster to the player.
+    const mobs = [...main]
+      .sort((a, b) => a.level - b.level)
+      .filter((m, i, all) => all.findIndex((o) => monsterLabel(o.name) === monsterLabel(m.name)) === i);
     return { levels: `Lv ${low}${high !== low ? `–${high}` : ""}`, mobs };
+  }
+
+  /** A map's monsters with the numbered variants of one name merged into a line, their counts added. */
+  function distinctMobs(mobs: TrainingSpot["mobs"]) {
+    const out: TrainingSpot["mobs"] = [];
+    for (const mob of mobs) {
+      const same = out.find((o) => monsterLabel(o.name) === monsterLabel(mob.name) && o.level === mob.level && o.boss === mob.boss);
+      if (same) out[out.indexOf(same)] = { ...same, count: same.count + mob.count };
+      else out.push(mob);
+    }
+    return out;
   }
 
   /** The same line as plain text, for the row's tooltip. */
   const summaryText = (spot: TrainingSpot) => {
     const { levels, mobs } = summary(spot);
-    return [levels, ...(mobs.length ? [mobs.map((m) => m.name).join(", ")] : [])].join(" · ");
+    return [levels, ...(mobs.length ? [mobs.map((m) => monsterLabel(m.name)).join(", ")] : [])].join(" · ");
   };
 
   function metric(spot: TrainingSpot): { value: string; unit: string; quiet: boolean; sure?: Estimate["sureness"] } {
@@ -390,11 +410,11 @@
                 <span class="meta" title={summaryText(spot)}>
                   {#if steps(spot) === 0}<span class="here">You're here</span>{" · "}{/if}{#if sort === "played" && spot.measured}{formatDuration(spot.measured.activeSeconds)} played · {/if}{line.levels}{#each line.mobs as mob, n (mob.id)}{n === 0 ? " · " : ", "}<button
                       class="ref ref-mob"
-                      title="Open {mob.name} in Lookup"
+                      title="Open {monsterLabel(mob.name)} in Lookup"
                       onclick={(e) => {
                         e.stopPropagation();
                         void backend.showMonster(mob.id, null);
-                      }}>{mob.name}</button
+                      }}>{monsterLabel(mob.name)}</button
                     >{/each}
                 </span>
               </span>
@@ -428,10 +448,10 @@
               <table>
                 <thead><tr><th>Monster</th><th>Lv</th><th>Count</th><th>EXP</th></tr></thead>
                 <tbody>
-                  {#each spot.mobs as mob (mob.id)}
+                  {#each distinctMobs(spot.mobs) as mob (mob.id)}
                     <tr>
                       <td>
-                        <button class="ref ref-mob" onclick={() => backend.showMonster(mob.id, null)}>{mob.name}</button
+                        <button class="ref ref-mob" onclick={() => backend.showMonster(mob.id, null)}>{monsterLabel(mob.name)}</button
                         >{mob.boss ? " (boss)" : ""}
                       </td>
                       <td class="tabular">{mob.level}</td>

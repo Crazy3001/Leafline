@@ -3,7 +3,7 @@
   import { ExternalLink, Skull } from "@lucide/svelte";
 
   import { backend } from "$lib/api";
-  import { formatCompact, formatNumber } from "$lib/format";
+  import { formatCompact, formatNumber, monsterLabel } from "$lib/format";
   import { OSMS_CREDIT, OSMS_URL } from "$lib/mapdata.svelte";
   import { showNpcNamed } from "$lib/places.svelte";
   import type { MapDetails, MapRef } from "$lib/types";
@@ -90,7 +90,7 @@
         {#each details.mobs as mob (mob.id)}
           <tr>
             <td class="mob">
-              <button class="ref ref-mob" onclick={() => backend.showMonster(mob.id, null)}>{mob.name}</button>
+              <button class="ref ref-mob" onclick={() => backend.showMonster(mob.id, null)}>{monsterLabel(mob.name)}</button>
               {#if mob.boss}<span class="boss" title="Boss"><Skull size={11} /></span>{/if}
               {#if mob.undead}<span class="tag">undead</span>{/if}
             </td>

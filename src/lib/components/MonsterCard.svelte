@@ -9,7 +9,7 @@
   import PlaceList from "./map/PlaceList.svelte";
   import Section from "./map/Section.svelte";
   import { backend } from "$lib/api";
-  import { formatCompact, formatDuration, formatNumber } from "$lib/format";
+  import { formatCompact, formatDuration, formatNumber, monsterLabel } from "$lib/format";
   import { measuredRates, watchHistory } from "$lib/history.svelte";
   import { OSMS_CREDIT, OSMS_URL, WIKI_URL } from "$lib/mapdata.svelte";
   import { openMonster } from "$lib/monsters.svelte";
@@ -140,7 +140,7 @@
   {/snippet}
 
   {#if sheet}
-    <h3 class="name">{sheet.name}</h3>
+    <h3 class="name">{monsterLabel(sheet.name)}</h3>
     <p class="meta tabular">{[`Lv ${sheet.level}`, yours?.gap].filter(Boolean).join(" · ")}</p>
 
     <dl class="facts">
@@ -178,7 +178,7 @@
       <p class="traits">
         Turns into
         {#each sheet.splits as split, i (split.id)}
-          {i ? ", " : ""}<button class="link" onclick={() => openMonster(split.id)}>{split.count} {split.name}</button>
+          {i ? ", " : ""}<button class="link" onclick={() => openMonster(split.id)}>{split.count} {monsterLabel(split.name)}</button>
         {/each}
         when defeated
       </p>

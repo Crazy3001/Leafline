@@ -76,6 +76,10 @@ export function partyLabel(size: number | null | undefined): string | null {
   return size <= 1 ? "Solo" : `${size} ppl`;
 }
 
+/** A monster's name as the game shows it. The map data numbers variants that share a name, such
+ *  as Jr. Boogie 1 and 2 or Fairy 1 to 4. */
+export const monsterLabel = (name: string) => name.replace(/ \d$/, "");
+
 /** The street and name of a map label, for two-line display. */
 export function splitMapLabel(label: string): { street: string | null; name: string } {
   const at = label.indexOf(" : ");
