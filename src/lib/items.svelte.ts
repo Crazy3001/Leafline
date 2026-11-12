@@ -215,13 +215,23 @@ export function checkItem(read: ItemTooltip, record: ItemRecord): CheckedItem {
     const got = readFor(own.label);
     const fromData = (note: string | null): CheckedStat => ({ label, value: own.value, base: null, bonus: null, standard: null, source: "data", note });
     if (!got) return fromData(null);
-    const split = got.base != null && got.bonus != null;
-    if (got.base != null && got.bonus != null && got.base === own.value && got.base + got.bonus === got.value) {
+    const split = got.base != null && got.bonus != null && got.base + got.bonus === got.value;
+    const tolerance = roll(own.value);
+    // The tooltip's own split agrees with the item: its base is the item's value and the bonus adds up.
+    if (split && got.base === own.value) {
       return { label, value: got.value, base: got.base, bonus: got.bonus, standard: null, source: "read", note: null };
     }
-    if (!split && got.value === own.value) return { label, value: got.value, base: null, bonus: null, standard: null, source: "read", note: null };
-    if (!split && Math.abs(got.value - own.value) <= roll(own.value)) {
+    // A misread digit in the split is common over a busy background, so the total is judged on its
+    // own: a rolled or scrolled copy stays near the item's value, and the total is the number that
+    // matters. The split is shown only when it agrees, as above.
+    if (got.value === own.value) return { label, value: got.value, base: null, bonus: null, standard: null, source: "read", note: null };
+    if (Math.abs(got.value - own.value) <= tolerance) {
       return { label, value: got.value, base: null, bonus: null, standard: own.value, source: "read", note: null };
+    }
+    // A scroll can add well past a roll, and then the split's base is the item's own value (above).
+    // A base near the item's value with a total that adds up is a rolled copy with scrolls on it.
+    if (split && Math.abs(got.base! - own.value) <= tolerance && got.bonus! >= 0 && got.bonus! <= 5 * (record.upgradeSlots ?? 7)) {
+      return { label, value: got.value, base: got.base, bonus: got.bonus, standard: own.value, source: "read", note: null };
     }
     return fromData(`Read as ${formatSignedPlain(got.value)}, which doesn't fit this item: showing its own value`);
   });
