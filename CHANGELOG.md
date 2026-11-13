@@ -6,6 +6,8 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
 ## Unreleased
 
 ### Added
+- **More hidden portals marked in routes.** Portals named like `h001` and `hide01`, which the game
+  uses for hidden ones, are now marked hidden too, not only `h_east` style names.
 - **Florina Beach in routes.** The map data has no way into Florina Beach, because it is reached
   by an NPC's flight from Lith Harbor. Routes now include that flight and the one back, without
   needing the taxi setting. The ride comes from a player's report and its fare isn't recorded

@@ -37,7 +37,10 @@ impl Direction {
     /// The direction a portal name suggests, and whether the name marks it as hidden.
     pub fn of_portal(name: &str) -> (Self, bool) {
         let name = name.to_ascii_lowercase();
-        let hidden = name.starts_with("h_") || name.starts_with("hide");
+        // The client names hidden portals `h_east`, `hide01` and `h001`; no other name starts that way.
+        let hidden = name.starts_with("h_")
+            || name.starts_with("hide")
+            || name.strip_prefix('h').is_some_and(|rest| rest.starts_with(|c: char| c.is_ascii_digit()));
         let base = name.trim_start_matches("h_");
         let direction = if base.starts_with("west") {
             Self::West
@@ -793,6 +796,16 @@ fn lookalike(s: &str) -> String {
 
 #[cfg(test)]
 pub(crate) mod tests {
+    #[test]
+    fn portal_names_that_mark_hidden_portals() {
+        for name in ["h_east00", "hide01", "h001", "h000", "H004"] {
+            assert!(Direction::of_portal(name).1, "{name}");
+        }
+        for name in ["east00", "in00", "hp01", "home", "h", "horn"] {
+            assert!(!Direction::of_portal(name).1, "{name}");
+        }
+    }
+
     use super::*;
     use crate::mapdata::osms::{
         MobRequirement, MonsterDetails, MonsterRecord, NpcRecord, Portal, QuestRecord, RewardItem, Spawn,
