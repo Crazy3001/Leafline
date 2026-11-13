@@ -511,6 +511,7 @@ export const mockBackend: Backend = {
     setLive({ state: "off" });
   },
   liveWindows: async () => mockWindows,
+  saveItemPicture: async () => "C:\Users\you\AppData\Local\app.leafline.overlay\frames\leafline-item-2026-10-30_13-05-09.png",
   saveLiveFrame: async () => "C:\\Users\\you\\AppData\\Local\\app.leafline.overlay\\frames\\leafline-2026-10-30_13-05-09.png",
   async onLive(handler) {
     liveHandlers.push(handler);

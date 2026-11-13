@@ -110,6 +110,7 @@ pub fn run() {
             live::stop_live,
             live::live_windows,
             live::save_live_frame,
+            live::save_item_picture,
             live::set_live_held,
             live::reset_session,
             commands::overlay_status,

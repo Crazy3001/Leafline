@@ -118,6 +118,8 @@ export interface Backend {
   liveWindows(): Promise<GameWindow[]>;
   /** Saves the last live picture to the saved pictures folder and returns its path. */
   saveLiveFrame(): Promise<string>;
+  /** Saves the last item check's picture, with `reading` (what was read) beside it. */
+  saveItemPicture(reading: string | null): Promise<string>;
   onLive(handler: (status: LiveStatus) => void): Promise<UnlistenFn>;
   onFrameSaved(handler: (path: string) => void): Promise<UnlistenFn>;
   /** An item check from the hotkey has ended. */
@@ -412,6 +414,7 @@ const tauriBackend: Backend = {
   stopLive: () => invoke("stop_live"),
   liveWindows: () => invoke("live_windows"),
   saveLiveFrame: () => invoke("save_live_frame"),
+  saveItemPicture: (reading) => invoke("save_item_picture", { reading }),
   onLive: (handler) => listen<LiveStatus>("live", (e) => handler(e.payload)),
   onFrameSaved: (handler) => listen<string>("frame-saved", (e) => handler(e.payload)),
   onItemRead: (handler) => listen<ItemRead>("item-read", (e) => handler(e.payload)),

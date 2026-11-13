@@ -10,6 +10,7 @@
   import ItemDetails from "./ItemDetails.svelte";
   import ItemNotes from "./ItemNotes.svelte";
   import { backend } from "$lib/api";
+  import { reportUrl } from "$lib/feedback";
   import { formatSigned, titleCase } from "$lib/format";
   import { mapData } from "$lib/mapdata.svelte";
   import { checkItem, nameMatch, statRows, tooltipOf } from "$lib/items.svelte";
@@ -162,6 +163,20 @@
         : null,
     ].filter(Boolean),
   );
+  /** Something on the card is a guess or couldn't be confirmed, so the picture may be the problem. */
+  const doubtful = $derived(
+    !!read && (trust === "close" || trust === "likely" || unconfirmed.length > 0 || !!checked?.slotsNote || stats.some((s) => s.note)),
+  );
+  let savedTo = $state<string | null>(null);
+  let saveFailed = $state(false);
+  async function savePicture() {
+    saveFailed = false;
+    try {
+      savedTo = await backend.saveItemPicture(JSON.stringify({ read, matched: matched?.name ?? null, trust, unconfirmed }));
+    } catch {
+      saveFailed = true;
+    }
+  }
   const unsureName = $derived(trust === "close" && read ? read.name : null);
   const likelyName = $derived(trust === "likely" && read ? read.name : null);
 </script>
@@ -202,6 +217,20 @@
     <p class="notice warn">The name read as “{likelyName}”. Matched to {name} by its spelling and level, so check it is the right item.</p>
   {:else if trust === "unchecked"}
     <p class="notice warn">The item data isn't downloaded, so this reading can't be checked against the item's real stats.</p>
+  {/if}
+  {#if doubtful}
+    <div class="notice-help doubt">
+      <p>
+        Not sure about this reading? Move the inventory or equipment window to a clear part of the screen, close any windows
+        behind the tooltip, then hover the item and press the hotkey again.
+      </p>
+      <span class="actions">
+        <button class="fix" onclick={savePicture}>Save this picture</button>
+        <button class="fix" onclick={() => backend.openLink(reportUrl())}>Report it</button>
+      </span>
+      {#if savedTo}<p class="saved">Saved to {savedTo}. Attach it to the report.</p>{/if}
+      {#if saveFailed}<p class="saved">Couldn't save the picture.</p>{/if}
+    </div>
   {/if}
   <h3 class="name" class:upgraded>{name || "Unreadable name"}</h3>
   {#if summary.length}
@@ -342,6 +371,21 @@
     margin: 0 0 8px;
     color: var(--muted);
     font-size: var(--text-sm);
+  }
+
+  .doubt p {
+    margin: 0 0 6px;
+  }
+
+  .doubt .actions {
+    display: flex;
+    gap: 6px;
+  }
+
+  .doubt .saved {
+    margin: 6px 0 0;
+    font-size: var(--text-xs);
+    word-break: break-all;
   }
 
   .fix {

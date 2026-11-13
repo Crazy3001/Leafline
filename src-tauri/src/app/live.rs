@@ -755,6 +755,12 @@ pub fn save_live_frame(app: AppHandle) -> Result<PathBuf> {
     save_frame(&app)
 }
 
+/// Saves the last item check's picture with what was read beside it, for a bug report.
+#[tauri::command]
+pub fn save_item_picture(app: AppHandle, reading: Option<String>) -> Result<PathBuf> {
+    save_item_frame(&app, reading.as_deref())
+}
+
 #[cfg(test)]
 mod tests {
     use std::time::{Duration, Instant, UNIX_EPOCH};

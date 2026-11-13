@@ -390,7 +390,26 @@ impl Catalog {
         if let Some(item) = (1..words.len()).rev().find_map(|n| self.item_close_to(&words[..n].join(" "), level, MIN_PREFIX_SCORE)) {
             return Some(item);
         }
-        self.item_inside(name, level)
+        self.item_inside(name, level).or_else(|| self.item_ending_with(name, level))
+    }
+
+    /// The one item at this level whose name ends with the words read, for a name whose first word
+    /// the screen hid (`Split Pants` for `Black Split Pants`). Needs the level and two words, and
+    /// says nothing when more than one item fits.
+    fn item_ending_with(&self, text: &str, level: Option<u32>) -> Option<&ItemRecord> {
+        let level = level?;
+        let key = item_key(text);
+        let words: Vec<&str> = key.split_whitespace().collect();
+        if words.len() < 2 {
+            return None;
+        }
+        let mut found = self.items.iter().filter(|item| {
+            let name = item_key(&item.name);
+            let held: Vec<&str> = name.split_whitespace().collect();
+            item.req_level == level && held.len() > words.len() && held.ends_with(&words)
+        });
+        let first = found.next()?;
+        found.next().is_none().then_some(first)
     }
 
     /// The longest item name that stands whole inside `text`, as words in a row: text seen through
@@ -739,6 +758,17 @@ pub(crate) mod tests {
         assert_eq!(catalog.item_like("Rcd Cloth Vest", Some(10)).unwrap().id, 1, "a misread letter");
         assert!(catalog.item_like("Pebble", None).is_none());
         assert_eq!(catalog.item_like("Rcd Cloth Vest (F) (+1)", Some(10)).unwrap().id, 1, "the tooltip's tags are not part of the name");
+    }
+
+    #[test]
+    fn a_name_missing_its_first_word_finds_the_one_item_that_ends_so() {
+        let catalog = Catalog::new(
+            Vec::new(),
+            vec![item(1, "Black Split Pants", 20, &[]), item(2, "Brown Split Pants", 30, &[]), item(3, "Grey Split Pants", 30, &[])],
+        );
+        assert_eq!(catalog.item_like("Split Pants", Some(20)).unwrap().id, 1);
+        assert!(catalog.item_like("Split Pants", Some(30)).is_none(), "two items fit, so none is guessed");
+        assert!(catalog.item_like("Split Pants", None).is_none(), "needs the level");
     }
 
     #[test]
