@@ -282,7 +282,7 @@
       .map((tier) => {
         const rows = skillRows.filter((k) => k.tier === tier);
         const title = tier ? `${tier}${rows[0]?.className && tier !== "Beginner" ? ` · ${rows[0].className}` : ""}` : "Other";
-        return { title, rows, maxed: rows.filter(isMaxed).length };
+        return { title, rows, spent: rows.reduce((n, k) => n + k.level, 0), total: rows.reduce((n, k) => n + (k.max ?? k.level), 0) };
       })
       .filter((g) => g.rows.length);
   });
@@ -417,7 +417,7 @@
     <p class="quiet-line">Not read yet. Open your Skill window in the game and Leafline reads it, or press Read stats.</p>
   {/if}
   {#each skillGroups as group (group.title)}
-    <h4 class="sub skill-group">{group.title}<span class="count tabular">{group.maxed} of {group.rows.length} maxed</span></h4>
+    <h4 class="sub skill-group">{group.title}<span class="count tabular">{skillsRead ? group.spent : "—"} / {group.total} points spent</span></h4>
     <ul class="skills">
       {#each group.rows as skill (skill.id)}
         {@const max = skill.max ?? Math.max(skill.goal, skill.level, 1)}
