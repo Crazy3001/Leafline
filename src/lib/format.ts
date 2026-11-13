@@ -76,6 +76,10 @@ export function partyLabel(size: number | null | undefined): string | null {
   return size <= 1 ? "Solo" : `${size} ppl`;
 }
 
+/** A monster's name as the game shows it. The map data numbers variants that share a name, such
+ *  as Jr. Boogie 1 and 2 or Fairy 1 to 4. */
+export const monsterLabel = (name: string) => name.replace(/ \d$/, "");
+
 /** The street and name of a map label, for two-line display. */
 export function splitMapLabel(label: string): { street: string | null; name: string } {
   const at = label.indexOf(" : ");
@@ -108,5 +112,11 @@ export function formatMesos(value: number | null | undefined): string {
  * beside a tooltip in Classic are named; others stay numbers rather than guess.
  */
 export function attackSpeedName(speed: number): string | null {
-  return ({ 3: "Very Fast", 4: "Fast" } as Record<number, string>)[speed] ?? null;
+  return ({ 3: "Very Fast", 4: "Fast", 7: "Slow" } as Record<number, string>)[speed] ?? null;
+}
+
+/** The data's attack speed as one line: the name and number where the name is known, else the number. */
+export function attackSpeedText(speed: number): string {
+  const name = attackSpeedName(speed);
+  return name ? `${name} (${speed})` : String(speed);
 }

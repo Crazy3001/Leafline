@@ -5,25 +5,42 @@
 
 <script lang="ts">
   // Where to train: maps near the character's level, ranked for this player. "For you" uses the
-  // EXP per hour measured on each map, and for maps not tried yet an estimate: the map's base
-  // EXP per clear times how the player's measured maps compare with theirs. No game formulas
-  // are modelled. "Saved" lists the maps the player bookmarked, whatever their level.
+  // EXP per hour measured on each map, and for maps not tried yet an estimate from the player's
+  // kill speed: the monster HP they get through an hour solo, over the HP of the map's average
+  // monster, held to what the map can respawn at an assumed respawn time (see training.rs). No
+  // damage formulas are modelled. "Played" lists every map the player has data for, whatever its
+  // level, by their own rate. "Saved" lists the maps the player bookmarked, whatever their level.
   import GoButton from "$lib/components/GoButton.svelte";
   import { mapPlace } from "$lib/destination.svelte";
   import { Bookmark, ChevronRight, CircleHelp, ExternalLink, Minus, Plus } from "@lucide/svelte";
   import { onMount, untrack } from "svelte";
 
+  import SaveSpot from "./SaveSpot.svelte";
+  import { spots as spotStore, watchSpots } from "$lib/spots.svelte";
+
   import MapNote from "./MapNote.svelte";
   import MapDataPanel from "./map/MapDataPanel.svelte";
   import RouteSteps from "./map/RouteSteps.svelte";
   import { backend } from "$lib/api";
+  import { damage, effective, followDamage } from "$lib/damage.svelte";
+  import { live } from "$lib/readings.svelte";
   import { openTrainingLog } from "$lib/nav.svelte";
-  import { formatCompact, formatDuration } from "$lib/format";
+  import { formatCompact, formatDuration, monsterLabel } from "$lib/format";
   import { measuredRates, watchHistory } from "$lib/history.svelte";
   import { mapData, watchMapData } from "$lib/mapdata.svelte";
   import { travelKey } from "$lib/settings.svelte";
-  import { rateRatio } from "$lib/training";
-  import type { MapReading, MapRoute, SavedSpot, SessionSummary, TrainingSpot, TrainingSpots } from "$lib/types";
+  import {
+    assumptions,
+    DEFAULT_ASSUMPTIONS,
+    ATTACK_RANGE,
+    EXP_RATE_RANGE,
+    SKILL_FACTOR_RANGE,
+    isDefault,
+    RESPAWN_RANGE,
+    setAssumptions,
+    watchAssumptions,
+  } from "$lib/assumptions.svelte";
+  import type { Estimate, MapReading, MapRoute, SessionSummary, TrainingSpot, TrainingSpots } from "$lib/types";
   import Block from "$lib/ui/Block.svelte";
   import Button from "$lib/ui/Button.svelte";
   import Segmented from "$lib/ui/Segmented.svelte";
@@ -42,13 +59,11 @@
     last?: boolean;
   } = $props();
 
-  type Sort = "you" | "exp" | "near" | "saved";
+  type Sort = "you" | "played" | "near" | "saved";
   /** Maps whose average monster level is this far below or above the character count as near. */
   const BELOW = 8;
   const ABOVE = 3;
   const SHOWN = 6;
-  /** Maps scoring within this share of each other are a close call, listed nearest first. */
-  const CLOSE_CALL = 0.1;
 
   const SORT_KEY = "leafline.train.sort";
   const LEVEL_KEY = "leafline.train.level";
@@ -56,6 +71,7 @@
 
   watchMapData();
   watchHistory();
+  watchAssumptions();
   const ready = $derived(mapData.status?.ready ?? false);
 
   let sort = $state<Sort>(storedSort());
@@ -65,23 +81,25 @@
   let data = $state<TrainingSpots | null>(null);
   let open = $state<number | null>(null);
   let route = $state<MapRoute | null>(null);
-  let saved = $state<SavedSpot[]>([]);
-  let saveError = $state<string | null>(null);
+  let editing = $state(false);
 
   onMount(() => {
-    backend
-      .savedSpots()
-      .then((list) => (saved = list))
-      .catch(() => (saved = []));
-    const stop = backend.onSavedSpots((list) => (saved = list));
-    return () => {
-      stop.then((unlisten) => unlisten());
-    };
+    watchSpots();
   });
 
+  const saved = $derived(spotStore.saved);
+
   const level = $derived(readLevel ?? manualLevel);
+  // What Leafline read of the player's attack and skills fills what they haven't typed.
+  $effect(() => {
+    const name = session?.name ?? live.analysis?.hud?.name ?? null;
+    untrack(() => followDamage(name));
+  });
+  const used = $derived(effective(assumptions.value, damage.value));
   const measured = $derived(measuredRates(session));
-  const queryKey = $derived(JSON.stringify([map?.name, map?.street, map?.twin, measured, travelKey()]));
+  const queryKey = $derived(
+    JSON.stringify([map?.name, map?.street, map?.twin, measured, travelKey(), level, used.assumptions]),
+  );
   const fromId = $derived(data?.from?.id);
 
   // Follows the key alone: every live reading brings new objects with the same content.
@@ -92,7 +110,9 @@
       data = null;
       return;
     }
-    untrack(() => backend.trainingSpots(map?.name ?? null, map?.street ?? null, map?.twin ?? null, measured))
+    untrack(() =>
+      backend.trainingSpots(map?.name ?? null, map?.street ?? null, map?.twin ?? null, measured, level, used.assumptions),
+    )
       .then((result) => {
         if (key === queryKey) data = result;
       })
@@ -111,11 +131,17 @@
   });
 
   const steps = (s: TrainingSpot) => s.travel?.hops ?? s.hops;
+  /** Maps the player has put real time into stay in For you a while after their level passes them,
+   *  so their own rate there is weighed against the estimates. */
+  const PLAYED_WELL = 10 * 60;
+  const FAR_BELOW = 15;
+  const playedWell = (s: TrainingSpot) =>
+    s.measured != null && s.measured.activeSeconds >= PLAYED_WELL && (level == null || s.averageLevel >= level - FAR_BELOW);
   const near = (s: TrainingSpot) => level == null || (s.averageLevel >= level - BELOW && s.averageLevel <= level + ABOVE);
   const savedIds = $derived(new Set(saved.map((s) => s.mapId)));
   const sorts = $derived<{ id: Sort; label: string; title: string }[]>([
-    { id: "you", label: "For you", title: "Your EXP per hour where you have played, an estimate where you haven't" },
-    { id: "exp", label: "EXP / clear", title: "Base EXP for defeating every monster on the map once" },
+    { id: "you", label: "For you", title: "Your EXP per hour where you have played, an estimate from your kill speed where you haven't" },
+    { id: "played", label: "Played", title: "Every map you have played, whatever its level, by your own EXP per hour" },
     { id: "near", label: "Nearest", title: "Fewest portals from where you are" },
     {
       id: "saved",
@@ -124,57 +150,34 @@
     },
   ]);
 
-  /** EXP an hour per base EXP point, from the maps the player measured. */
-  const ratio = $derived(
-    rateRatio(
-      (data?.spots ?? [])
-        .filter((s) => s.measured)
-        .map((s) => ({ expPerClear: s.expPerClear, expPerHour: s.measured!.expPerHour, activeSeconds: s.measured!.activeSeconds })),
-    ),
-  );
-  const estimate = (s: TrainingSpot) => (s.measured ? null : ratio != null ? s.expPerClear * ratio : null);
-  const forYou = (s: TrainingSpot) => s.measured?.expPerHour ?? estimate(s) ?? -1;
+  const speed = $derived(data?.speed ?? null);
+  /** The estimate for a map the player hasn't measured. */
+  const estimate = (s: TrainingSpot) => (s.measured ? null : s.estimate);
+  const forYou = (s: TrainingSpot) => s.measured?.expPerHour ?? estimate(s)?.expPerHour ?? -1;
 
   const ranked = $derived.by(() => {
     const spots = (data?.spots ?? []).filter((s) =>
-      sort === "saved" ? savedIds.has(s.map.id) : s.reachable && (allLevels || near(s) || savedIds.has(s.map.id)),
+      sort === "saved"
+        ? savedIds.has(s.map.id)
+        : sort === "played"
+          ? s.measured != null && s.measured.activeSeconds >= 60
+          : s.reachable && (allLevels || near(s) || savedIds.has(s.map.id) || playedWell(s)),
     );
-    const you = (s: TrainingSpot) => (ratio == null && !s.measured ? s.expPerClear / 1e6 - 1 : forYou(s));
+    // With no kill speed yet, maps not tried fall back to base EXP, below every measured one.
+    const you = (s: TrainingSpot) => (speed == null && !s.measured ? s.expPerClear / 1e6 - 1 : forYou(s));
     const by: Record<Sort, (s: TrainingSpot) => number> = {
       you,
-      exp: (s) => s.expPerClear,
+      played: (s) => s.measured?.expPerHour ?? -1,
       near: (s) => -(steps(s) ?? 9999),
       saved: you,
     };
     const value = by[sort];
     const sorted = [...spots].sort((a, b) => value(b) - value(a) || b.expPerClear - a.expPerClear);
-    if (sort === "near") return sorted;
-    // Walk down in bands of close calls and order each band by portals, so a slightly smaller
-    // map next door isn't buried.
-    const out: TrainingSpot[] = [];
-    let band: TrainingSpot[] = [];
-    const flush = () => out.push(...band.sort((a, b) => (steps(a) ?? Infinity) - (steps(b) ?? Infinity)));
-    for (const spot of sorted) {
-      if (band.length && value(spot) < value(band[0]) - Math.abs(value(band[0])) * CLOSE_CALL) {
-        flush();
-        band = [];
-      }
-      band.push(spot);
-    }
-    flush();
-    return out;
+    // Strictly by the rate shown: a close call is still the higher number first.
+    return sorted;
   });
   const shown = $derived(sort === "saved" ? ranked : ranked.slice(0, more ? 30 : SHOWN));
   const missingSaved = $derived(saved.filter((s) => !(data?.spots ?? []).some((spot) => spot.map.id === s.mapId)));
-
-  async function toggleSaved(mapId: number, name: string) {
-    saveError = null;
-    try {
-      saved = await backend.setSpotSaved(mapId, name, !savedIds.has(mapId));
-    } catch (e) {
-      saveError = String(e);
-    }
-  }
 
   function stored(key: string, fallback: string) {
     try {
@@ -187,7 +190,7 @@
   function storedSort(): Sort {
     const value = stored(SORT_KEY, "you");
     // "EXP / HP" and "Your rate" were sorts of their own until the Train tab was redone.
-    return value === "exp" || value === "near" || value === "saved" ? value : "you";
+    return value === "played" || value === "near" || value === "saved" ? value : "you";
   }
 
   function remember(key: string, value: string) {
@@ -211,6 +214,15 @@
   /** How many of a map's monsters the row names, most common first. */
   const NAMED = 3;
 
+  /** Opens or closes a row from the keyboard, as its button role promises. */
+  function rowKey(event: KeyboardEvent, toggle: () => void) {
+    if (event.target !== event.currentTarget) return;
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      toggle();
+    }
+  }
+
   /**
    * The row's one line about the map: the levels of its main monsters, then their names. The
    * full list, bosses and rare spawns included, is in the open row.
@@ -221,12 +233,31 @@
     const [low, high] = main.length
       ? [Math.min(...main.map((m) => m.level)), Math.max(...main.map((m) => m.level))]
       : spot.levelRange;
-    const names = [...main].sort((a, b) => a.level - b.level).map((m) => m.name);
-    return [`Lv ${low}${high !== low ? `–${high}` : ""}`, ...(names.length ? [names.join(", ")] : [])].join(" · ");
+    // Variants that share a displayed name (Jr. Boogie 1 and 2) are one monster to the player.
+    const mobs = [...main]
+      .sort((a, b) => a.level - b.level)
+      .filter((m, i, all) => all.findIndex((o) => monsterLabel(o.name) === monsterLabel(m.name)) === i);
+    return { levels: `Lv ${low}${high !== low ? `–${high}` : ""}`, mobs };
   }
 
-  function metric(spot: TrainingSpot): { value: string; unit: string; quiet: boolean } {
-    if (sort === "exp") return { value: formatCompact(spot.expPerClear), unit: "EXP / clear", quiet: false };
+  /** A map's monsters with the numbered variants of one name merged into a line, their counts added. */
+  function distinctMobs(mobs: TrainingSpot["mobs"]) {
+    const out: TrainingSpot["mobs"] = [];
+    for (const mob of mobs) {
+      const same = out.find((o) => monsterLabel(o.name) === monsterLabel(mob.name) && o.level === mob.level && o.boss === mob.boss);
+      if (same) out[out.indexOf(same)] = { ...same, count: same.count + mob.count };
+      else out.push(mob);
+    }
+    return out;
+  }
+
+  /** The same line as plain text, for the row's tooltip. */
+  const summaryText = (spot: TrainingSpot) => {
+    const { levels, mobs } = summary(spot);
+    return [levels, ...(mobs.length ? [mobs.map((m) => monsterLabel(m.name)).join(", ")] : [])].join(" · ");
+  };
+
+  function metric(spot: TrainingSpot): { value: string; unit: string; quiet: boolean; sure?: Estimate["sureness"] } {
     if (sort === "near") {
       const hops = steps(spot);
       if (hops == null) return { value: "—", unit: "no route", quiet: true };
@@ -234,37 +265,74 @@
     }
     if (spot.measured) return { value: formatCompact(spot.measured.expPerHour), unit: "your EXP / hr", quiet: false };
     const guess = estimate(spot);
-    if (guess != null) return { value: `≈${formatCompact(guess)}`, unit: "est. EXP / hr", quiet: true };
+    if (guess) return { value: `≈${formatCompact(guess.expPerHour)}`, unit: "est. EXP / hr", quiet: true, sure: guess.sureness };
     return { value: formatCompact(spot.expPerClear), unit: "EXP / clear", quiet: true };
+  }
+
+  const SURENESS = { 3: "Fairly sure", 2: "Rough", 1: "A guess" } as const;
+
+  const times = (ratio: number) => (ratio >= 10 ? Math.round(ratio) : Math.round(ratio * 10) / 10);
+
+  /** Where an estimate comes from, then what makes it less sure, one sentence each. */
+  function reasons(spot: TrainingSpot, guess: Estimate): string[] {
+    if (!speed) return [];
+    const levels = speed.levels
+      ? ` at Lv ${speed.levels[0]}${speed.levels[1] !== speed.levels[0] ? `–${speed.levels[1]}` : ""}`
+      : "";
+    const out = [
+      `From ${formatDuration(speed.activeSeconds)} of your solo play on ${speed.maps} map${speed.maps === 1 ? "" : "s"}${levels}: ` +
+        `about ${formatCompact(speed.hpPerHour)} monster HP an hour, so about ${formatCompact(guess.killsPerHour)} kills an hour here.`,
+    ];
+    if (guess.capped)
+      out.push(
+        `Held to what the map can respawn: ${formatCompact(guess.ceiling)} kills an hour if every monster is back ` +
+          `after ${assumptions.value.respawnSeconds} s. That respawn time is an assumption you can change below.`,
+      );
+    if (guess.walkSecondsPerKill != null && speed.walkSecondsPerKill != null) {
+      const here = guess.walkSecondsPerKill;
+      const there = speed.walkSecondsPerKill;
+      const layout = spot.layout;
+      const spread = layout ? ` Monsters spawn on ${layout.spawnPlatforms} of its ${layout.platforms} platforms.` : "";
+      out.push(
+        `About ${here.toFixed(1)} s of walking between kills here, against ${there.toFixed(1)} s where you trained, ` +
+          `from each map's floor and platforms at base walking speed.${spread}`,
+      );
+    }
+    if (guess.hitsPerKill != null) {
+      out.push(
+        `About ${guess.hitsPerKill < 10 ? guess.hitsPerKill.toFixed(1) : Math.round(guess.hitsPerKill)} blows to defeat one here at your attack, ` +
+          `counting its weapon defence of ${Math.round(guess.weaponDef ?? 0)}.`,
+      );
+    } else if ((guess.weaponDef ?? 0) - (speed.defence ?? 0) > 100) {
+      out.push(
+        `Its monsters have ${Math.round(guess.weaponDef ?? 0)} weapon defence, against about ${Math.round(speed.defence ?? 0)} where you trained. ` +
+          "That can cut your damage a lot, so they may take far more blows than their HP says. Enter your attack under Assumptions to count it.",
+      );
+    }
+    if (guess.hpRatio > 2)
+      out.push(`Its monsters have ${times(guess.hpRatio)}× the HP of the ones you usually fight, so they may take longer than HP alone says.`);
+    else if (guess.hpRatio < 0.5)
+      out.push(`Its monsters have ${times(1 / guess.hpRatio)}× less HP than the ones you usually fight. If those already fall in one hit, this reads high.`);
+    if (guess.levelGap != null && guess.levelGap > 3)
+      out.push(`They average ${Math.round(guess.levelGap)} levels above you, so expect more misses.`);
+    if (speed.widened)
+      out.push("Little of your solo play is near your level, so older sessions count too. You likely kill faster now.");
+    else if (speed.activeSeconds < 30 * 60) out.push("Under half an hour of play to go on.");
+    return out;
   }
 
   function why(spot: TrainingSpot) {
     if (spot.measured) return `Your rate over ${formatDuration(spot.measured.activeSeconds)} of play here.`;
-    if (estimate(spot) != null)
-      return "Not tried yet. The estimate scales its base EXP by how your measured maps compare with theirs, so it doesn't know how tough or spread out the monsters are.";
-    return "Not tried yet. Play a while on any map and Leafline can estimate this one from your own rate.";
+    if (estimate(spot)) return null;
+    return "Not tried yet. Play ten minutes solo on any map and Leafline can estimate this one from your kill speed.";
   }
 </script>
-
-{#snippet saveToggle(mapId: number, name: string)}
-  {@const isSaved = savedIds.has(mapId)}
-  <button
-    class="save"
-    class:on={isSaved}
-    aria-pressed={isSaved}
-    title={isSaved ? "Remove from your spots" : "Save to your spots"}
-    aria-label={isSaved ? `Remove ${name} from your spots` : `Save ${name} to your spots`}
-    onclick={() => toggleSaved(mapId, name)}
-  >
-    <Bookmark size={13} fill={isSaved ? "currentColor" : "none"} />
-  </button>
-{/snippet}
 
 <Block id={SPOTS_ID} title="Where to train" {last}>
   {#snippet aside()}
     <span
       class="help"
-      title="Your rate is measured in your own sessions. Other maps are estimated from the map data, without EXP events, party bonus or respawn speed."
+      title="Where you have played, your own rate. Elsewhere, an estimate from how fast you get through monster HP solo, held to an assumed respawn time. Party bonus and misses aren't modelled."
     >
       <CircleHelp size={13} />
     </span>
@@ -294,42 +362,81 @@
     <p class="quiet">Loading maps…</p>
   {:else}
     <Segmented options={sorts} value={sort} label="Rank by" stretch onchange={pickSort} />
-    {#if saveError}<p class="warn">{saveError}</p>{/if}
+    {#if spotStore.error}<p class="warn">{spotStore.error}</p>{/if}
 
     <ol class="spots">
       {#each shown as spot, i (spot.map.id)}
         {@const m = metric(spot)}
+        {@const line = summary(spot)}
         {@const expanded = open === spot.map.id}
         <li>
           <div class="line">
-            <button class="row" aria-expanded={expanded} onclick={() => (open = expanded ? null : spot.map.id)}>
+            <!-- A div, not a button: the map and monster names inside are buttons of their own. -->
+            <div
+              class="row"
+              role="button"
+              tabindex="0"
+              aria-expanded={expanded}
+              onclick={() => (open = expanded ? null : spot.map.id)}
+              onkeydown={(e) => rowKey(e, () => (open = expanded ? null : spot.map.id))}
+            >
               <span class="rank tabular">{i + 1}</span>
               <span class="names">
-                <span class="name">{spot.map.name}</span>
-                <span class="meta" title={summary(spot)}>
-                  {#if steps(spot) === 0}<span class="here">You're here</span>{" · "}{/if}{summary(spot)}
+                <span class="name"
+                  ><button
+                    class="ref ref-map"
+                    title="Open {spot.map.name} in Lookup"
+                    onclick={(e) => {
+                      e.stopPropagation();
+                      void backend.showPlace("maps", spot.map.id);
+                    }}>{spot.map.name}</button
+                  ></span
+                >
+                <span class="meta" title={summaryText(spot)}>
+                  {#if steps(spot) === 0}<span class="here">You're here</span>{" · "}{/if}{#if sort === "played" && spot.measured}{formatDuration(spot.measured.activeSeconds)} played · {/if}{line.levels}{#each line.mobs as mob, n (mob.id)}{n === 0 ? " · " : ", "}<button
+                      class="ref ref-mob"
+                      title="Open {monsterLabel(mob.name)} in Lookup"
+                      onclick={(e) => {
+                        e.stopPropagation();
+                        void backend.showMonster(mob.id, null);
+                      }}>{monsterLabel(mob.name)}</button
+                    >{/each}
                 </span>
               </span>
               <span class="metric">
                 <span class="value num">{m.value}</span>
-                <span class="unit" class:quiet={m.quiet}>{m.unit}</span>
+                <span class="unit" class:quiet={m.quiet}>
+                  {#if m.sure}
+                    <span class="sure" title={SURENESS[m.sure]} aria-label={SURENESS[m.sure]}>
+                      {#each [1, 2, 3] as step (step)}<i class:on={step <= m.sure}></i>{/each}
+                    </span>
+                  {/if}{m.unit}
+                </span>
               </span>
               <span class="chevron" class:open={expanded}><ChevronRight size={12} /></span>
-            </button>
+            </div>
             {#if steps(spot) !== 0}<span class="go"><GoButton place={mapPlace(spot.map)} /></span>{/if}
-            {@render saveToggle(spot.map.id, spot.map.name)}
+            <SaveSpot mapId={spot.map.id} name={spot.map.name} />
           </div>
           {#if expanded}
+            {@const guess = estimate(spot)}
             <div class="detail">
-              <p class="why">{why(spot)}</p>
+              {#if guess}
+                <div class="why">
+                  <p><strong>{SURENESS[guess.sureness]}.</strong> {reasons(spot, guess)[0]}</p>
+                  {#each reasons(spot, guess).slice(1) as line (line)}<p>{line}</p>{/each}
+                </div>
+              {:else}
+                <p class="why">{why(spot)}</p>
+              {/if}
               <MapNote mapId={spot.map.id} name={spot.map.name} flush />
               <table>
                 <thead><tr><th>Monster</th><th>Lv</th><th>Count</th><th>EXP</th></tr></thead>
                 <tbody>
-                  {#each spot.mobs as mob (mob.id)}
+                  {#each distinctMobs(spot.mobs) as mob (mob.id)}
                     <tr>
                       <td>
-                        <button class="ref ref-mob" onclick={() => backend.showMonster(mob.id, null)}>{mob.name}</button
+                        <button class="ref ref-mob" onclick={() => backend.showMonster(mob.id, null)}>{monsterLabel(mob.name)}</button
                         >{mob.boss ? " (boss)" : ""}
                       </td>
                       <td class="tabular">{mob.level}</td>
@@ -351,12 +458,14 @@
           {/if}
         </li>
       {:else}
-        {#if sort !== "saved"}
+        {#if sort === "played"}
+          <li class="quiet empty">No maps played yet. Maps you train on show here with your own rate.</li>
+        {:else if sort !== "saved"}
           <li class="quiet empty">
             {level != null ? `No maps with monsters near Lv ${level}. Tick Every level to see the rest.` : "Set your level to see maps that suit it."}
           </li>
         {:else if !missingSaved.length}
-          <li class="quiet empty">No saved spots yet. Click the bookmark beside a map to keep it here.</li>
+          <li class="quiet empty">No saved spots yet. Click the bookmark beside a map, here or on the Map tab, to keep it here.</li>
         {/if}
       {/each}
       {#each sort === "saved" ? missingSaved : [] as spot (spot.mapId)}
@@ -366,14 +475,14 @@
               <span class="rank"></span>
               <span class="names"><span class="name">{spot.name}</span><span class="meta">Not in the map data any more</span></span>
             </span>
-            {@render saveToggle(spot.mapId, spot.name)}
+            <SaveSpot mapId={spot.mapId} name={spot.name} />
           </div>
         </li>
       {/each}
     </ol>
 
     <div class="footer">
-      <label class="check" class:hidden={sort === "saved"}>
+      <label class="check" class:hidden={sort === "saved" || sort === "played"}>
         <input
           type="checkbox"
           checked={allLevels}
@@ -390,8 +499,113 @@
         </Button>
       {/if}
       <span class="grow"></span>
+      {#if sort === "you" || sort === "saved"}
+        <Button variant="ghost" size="sm" pressed={editing} onclick={() => (editing = !editing)}>
+          Assumptions{isDefault(assumptions.value) ? "" : " *"}
+        </Button>
+      {/if}
       <Button variant="primary" onclick={openTrainingLog}>Training log <ExternalLink size={12} /></Button>
     </div>
+    {#if editing && (sort === "you" || sort === "saved")}
+      <div class="assume">
+        <p>Estimates take these as given. None is a known fact about the game; change them if you know better.</p>
+        <label>
+          <span>Monsters respawn after</span>
+          <input
+            type="number"
+            min={RESPAWN_RANGE[0]}
+            max={RESPAWN_RANGE[1]}
+            step="1"
+            value={assumptions.value.respawnSeconds}
+            onchange={(e) => setAssumptions({ respawnSeconds: Number(e.currentTarget.value) })}
+          />
+          <span class="suffix">s</span>
+        </label>
+        <label>
+          <span>EXP per kill, times base</span>
+          <input
+            type="number"
+            min={EXP_RATE_RANGE[0]}
+            max={EXP_RATE_RANGE[1]}
+            step="0.1"
+            value={assumptions.value.expRate}
+            onchange={(e) => setAssumptions({ expRate: Number(e.currentTarget.value) })}
+          />
+          <span class="suffix">×</span>
+        </label>
+        <p>
+          The respawn time only matters on maps where you'd defeat monsters faster than they come back. The EXP figure is
+          used to count your kills from the EXP you gained.
+        </p>
+        <p>
+          Your attack counts each monster's weapon defence, which can make a monster take many more blows than its HP says.
+          {#if damage.value?.attackMin != null || damage.value?.skills.length}
+            Leafline read these from your game; type over them to use your own.
+          {:else}
+            Open your Character Stat window with Detail showing, and the Skill window, and Leafline fills these in. Or type them.
+          {/if}
+        </p>
+        <label>
+          <span>Your attack</span>
+          <input
+            type="number"
+            min={ATTACK_RANGE[0]}
+            max={ATTACK_RANGE[1]}
+            step="1"
+            placeholder={damage.value?.attackMin?.toString() ?? "min"}
+            aria-label="Lowest attack"
+            value={assumptions.value.attackMin ?? ""}
+            onchange={(e) => setAssumptions({ attackMin: e.currentTarget.value === "" ? null : Number(e.currentTarget.value) })}
+          />
+          <span class="suffix">–</span>
+          <input
+            type="number"
+            min={ATTACK_RANGE[0]}
+            max={ATTACK_RANGE[1]}
+            step="1"
+            placeholder={damage.value?.attackMax?.toString() ?? "max"}
+            aria-label="Highest attack"
+            value={assumptions.value.attackMax ?? ""}
+            onchange={(e) => setAssumptions({ attackMax: e.currentTarget.value === "" ? null : Number(e.currentTarget.value) })}
+          />
+        </label>
+        <label>
+          <span>Main skill</span>
+          <select
+            aria-label="Main skill"
+            value={assumptions.value.skillName}
+            onchange={(e) => setAssumptions({ skillName: e.currentTarget.value })}
+          >
+            <option value="">{damage.value?.skills.length ? "Best one, automatically" : "Not read yet"}</option>
+            {#each damage.value?.skills ?? [] as skill (skill.name)}
+              <option value={skill.name}>{skill.name} · Lv {skill.level} · {skill.percent}%</option>
+            {/each}
+            <option value="custom">Other, I'll type it</option>
+          </select>
+        </label>
+        {#if used.skill}
+          <p>Counting {used.skill.name} at Lv {used.skill.level}: {used.skill.percent}% of your attack.</p>
+        {/if}
+        {#if assumptions.value.skillName === "custom" || !damage.value?.skills.length}
+          <label>
+            <span>Your skill hits for</span>
+            <input
+              type="number"
+              min={SKILL_FACTOR_RANGE[0]}
+              max={SKILL_FACTOR_RANGE[1]}
+              step="0.1"
+              value={assumptions.value.skillFactor}
+              onchange={(e) => setAssumptions({ skillFactor: Number(e.currentTarget.value) })}
+            />
+            <span class="suffix">×</span>
+          </label>
+          <p>Your skill's damage as a multiple of a plain attack: its tooltip's Damage line, so 240% is 2.4.</p>
+        {/if}
+        {#if !isDefault(assumptions.value)}
+          <Button variant="ghost" size="sm" onclick={() => setAssumptions(DEFAULT_ASSUMPTIONS)}>Back to defaults</Button>
+        {/if}
+      </div>
+    {/if}
   {/if}
 </Block>
 
@@ -488,6 +702,16 @@
     color: var(--accent-strong);
   }
 
+  .row:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+
+  /* The names inside the row are links; the line still trims to one row. */
+  .meta .ref {
+    font-size: inherit;
+  }
+
   .rank {
     width: 14px;
     flex: none;
@@ -554,29 +778,6 @@
     transform: rotate(90deg);
   }
 
-  .save {
-    display: grid;
-    flex: none;
-    place-items: center;
-    width: 26px;
-    height: 26px;
-    padding: 0;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--muted);
-    cursor: pointer;
-  }
-
-  .save:hover {
-    background: rgba(255, 255, 255, 0.07);
-    color: var(--text);
-  }
-
-  .save.on {
-    color: var(--accent);
-  }
-
   .detail {
     display: flex;
     flex-direction: column;
@@ -589,6 +790,99 @@
     margin: 0;
     font-size: var(--text-xs);
     color: var(--muted);
+  }
+
+  div.why {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .why p {
+    margin: 0;
+  }
+
+  .why strong {
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .sure {
+    display: inline-flex;
+    gap: 2px;
+    margin-right: 5px;
+    vertical-align: middle;
+  }
+
+  .sure i {
+    width: 4px;
+    height: 4px;
+    border-radius: 1px;
+    background: var(--border-strong);
+  }
+
+  .sure i.on {
+    background: var(--muted);
+  }
+
+  .assume {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: var(--space-2);
+    padding: var(--space-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+  }
+
+  .assume p {
+    margin: 0;
+    font-size: var(--text-xs);
+    color: var(--muted);
+  }
+
+  .assume label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--text-sm);
+  }
+
+  .assume label > span:first-child {
+    flex: 1;
+  }
+
+  .assume select {
+    max-width: 200px;
+    height: 22px;
+    padding: 0 4px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+  }
+
+  .assume input {
+    width: 56px;
+    height: 22px;
+    padding: 0 4px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    text-align: right;
+  }
+
+  .assume .suffix {
+    width: 10px;
+    color: var(--faint);
+  }
+
+  .assume :global(button) {
+    align-self: flex-start;
   }
 
   table {

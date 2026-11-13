@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use strsim::normalized_levenshtein;
 
 use super::osms::{Dataset, Height, MapRecord, MonsterRecord, NO_MAP, QuestRecord, Side};
+use super::shops::{PlacedShop, Shop, ShopRecord};
 use super::travel::{Travel, TravelKind, TravelLink};
 use super::turnins;
 
@@ -97,6 +98,8 @@ pub struct MapCard {
     pub quests: Vec<QuestNeed>,
     pub exits: Vec<Exit>,
     pub links: Vec<Link>,
+    /// NPC shops here, from Leafline's shop file.
+    pub shops: Vec<Shop>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -110,6 +113,8 @@ pub struct MobRow {
     pub count: u32,
     pub boss: bool,
     pub undead: bool,
+    /// How much of a weapon blow it shrugs off, when the data says.
+    pub weapon_def: Option<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -233,6 +238,11 @@ pub struct Atlas {
     pub(super) npc_names: HashMap<u32, String>,
     /// Item names, for the items a quest asks to bring.
     pub(super) item_names: HashMap<u32, String>,
+    /// Folded item name → the lowest id going by it, for names written by hand (shops). Gear for
+    /// one gender also goes by its name with " m" or " f" after it, as "(M)" and "(F)" fold.
+    pub(super) item_keys: HashMap<String, u32>,
+    /// NPC shops from Leafline's own shop file, placed on the map data.
+    pub(super) shops: Vec<PlacedShop>,
     pub(super) quests: BTreeMap<u32, QuestRecord>,
     /// Map → (monster, count), from the monsters' spawn lists.
     pub(super) spawns: HashMap<u32, Vec<(u32, u32)>>,
@@ -256,6 +266,26 @@ impl Atlas {
     /// Adds item names, when the items went elsewhere before the Atlas was made.
     pub fn with_item_names(mut self, names: HashMap<u32, String>) -> Self {
         self.item_names.extend(names);
+        for (key, id) in item_keys(self.item_names.iter().map(|(&id, name)| (id, name.as_str(), None))) {
+            self.item_keys.entry(key).and_modify(|kept| *kept = (*kept).min(id)).or_insert(id);
+        }
+        self.match_shop_items();
+        self
+    }
+
+    /// Adds the keys gear for one gender goes by, from the items with their genders.
+    pub fn with_item_genders<'a>(mut self, items: impl Iterator<Item = (u32, &'a str, Option<&'a str>)>) -> Self {
+        for (key, id) in item_keys(items) {
+            self.item_keys.entry(key).and_modify(|kept| *kept = (*kept).min(id)).or_insert(id);
+        }
+        self.match_shop_items();
+        self
+    }
+
+    /// Places a shop file's shops, replacing any placed before.
+    pub fn with_shops(mut self, shops: Vec<ShopRecord>) -> Self {
+        self.shops = self.place_shops(shops);
+        self.match_shop_items();
         self
     }
 
@@ -297,7 +327,9 @@ impl Atlas {
         let mut atlas = Self {
             monsters: data.monsters.into_iter().map(|m| (m.id, m)).collect(),
             npc_names: data.npcs.into_iter().map(|n| (n.id, n.name)).collect(),
-            item_names: data.items.into_iter().map(|i| (i.id, i.name)).collect(),
+            item_names: data.items.iter().map(|i| (i.id, i.name.clone())).collect(),
+            item_keys: HashMap::new(),
+            shops: Vec::new(),
             quests: data.quests.into_iter().map(|q| (q.id, q)).collect(),
             maps,
             spawns,
@@ -310,7 +342,10 @@ impl Atlas {
             keys,
         };
         atlas.exits = atlas.maps.values().map(|m| (m.id, atlas.exits_of(m))).collect();
-        atlas.turn_ins = turnins::resolve(&data.turn_ins, |quest, name| atlas.turn_in_npc(quest, name));
+        atlas.turn_ins = turnins::resolve(&data.turn_ins, |npc| atlas.npc_names.contains_key(&npc));
+        atlas.item_keys = item_keys(data.items.iter().map(|i| (i.id, i.name.as_str(), i.gender.as_deref())));
+        atlas.shops = atlas.place_shops(data.shops);
+        atlas.match_shop_items();
         atlas
     }
 
@@ -351,9 +386,23 @@ impl Atlas {
     /// session's per-map numbers. Near matches are left as read for the player to settle; maps
     /// sharing the name and street exactly read the same either way.
     pub fn settled(&self, name: &str, street: Option<&str>) -> Option<MapRef> {
-        self.find(name, street)
-            .filter(|found| found.score >= SETTLED_SCORE && self.twins(found).len() > found.alternatives.len())
-            .map(|found| found.card.map)
+        let found = self.find(name, street)?;
+        let certain = found.score >= SETTLED_SCORE && self.twins(&found).len() > found.alternatives.len();
+        (certain || self.reads_the_same(&found, name)).then_some(found.card.map)
+    }
+
+    /// Whether the reading differs from the best match only by OCR look-alikes, and no map
+    /// with another name spells the same way. `Swalnp of Despair I` is `Swamp of Despair I`
+    /// even though `II` sits close by: the numeral was read, only the `m` was split.
+    fn reads_the_same(&self, found: &MapMatch, name: &str) -> bool {
+        let query = lookalike(&fold(name));
+        let place = &found.card.map;
+        let Some((_, key, _)) = self.keys.iter().find(|(id, ..)| *id == place.id) else { return false };
+        lookalike(key) == query
+            && found.alternatives.iter().all(|m| {
+                (m.name == place.name && m.street == place.street)
+                    || self.keys.iter().find(|(id, ..)| *id == m.id).is_none_or(|(_, k, _)| lookalike(k) != query)
+            })
     }
 
     /// The best match and the maps sharing its name and street exactly. A header can't tell
@@ -448,6 +497,7 @@ impl Atlas {
                     count,
                     boss: m.is_boss,
                     undead: m.undead,
+                    weapon_def: m.details.weapon_def.map(|d| d.max(0) as u32),
                 })
             })
             .collect();
@@ -489,6 +539,7 @@ impl Atlas {
             npcs,
             exits: self.exits.get(&id).cloned().unwrap_or_default(),
             links: links(map),
+            shops: self.shops_on(id),
         })
     }
 
@@ -700,6 +751,25 @@ fn links(map: &MapRecord) -> Vec<Link> {
 }
 
 /// Lowercase words with punctuation dropped: `<Area 1>` and `Area 1` compare equal.
+/// Folded item name → the lowest id going by it, plus "name m" or "name f" for gear made for
+/// one gender.
+fn item_keys<'a>(items: impl Iterator<Item = (u32, &'a str, Option<&'a str>)>) -> HashMap<String, u32> {
+    let mut keys: HashMap<String, u32> = HashMap::new();
+    for (id, name, gender) in items {
+        let key = fold(name);
+        let tag = match gender {
+            Some(g) if g.eq_ignore_ascii_case("male") => Some("m"),
+            Some(g) if g.eq_ignore_ascii_case("female") => Some("f"),
+            _ => None,
+        };
+        if let Some(tag) = tag {
+            keys.entry(format!("{key} {tag}")).and_modify(|kept| *kept = (*kept).min(id)).or_insert(id);
+        }
+        keys.entry(key).and_modify(|kept| *kept = (*kept).min(id)).or_insert(id);
+    }
+    keys
+}
+
 pub(super) fn fold(text: &str) -> String {
     text.chars()
         .map(|c| if c.is_alphanumeric() { c.to_ascii_lowercase() } else { ' ' })
@@ -712,9 +782,13 @@ pub(super) fn fold(text: &str) -> String {
 /// Edit similarity, averaged with a pass that forgives the OCR's usual look-alikes
 /// (`l`/`1`/`I`, `0`/`O`, `rn`/`m`), so a misread letter costs less than a different one.
 pub(super) fn similarity(a: &str, b: &str) -> f64 {
-    let lookalike =
-        |s: &str| s.replace("rn", "m").replace(['l', '1', '|', 'j'], "i").replace('0', "o").replace('5', "s");
     (normalized_levenshtein(a, b) + normalized_levenshtein(&lookalike(a), &lookalike(b))) / 2.0
+}
+
+/// A name with the OCR's usual look-alikes collapsed, so spellings that differ only by them
+/// (`Swalnp` for `Swamp`, where `ln` is `m` read as two letters) come out the same.
+fn lookalike(s: &str) -> String {
+    s.replace("rn", "m").replace("ln", "m").replace(['l', '1', '|', 'j'], "i").replace('0', "o").replace('5', "s")
 }
 
 #[cfg(test)]
@@ -745,6 +819,10 @@ pub(crate) mod tests {
         assert_eq!(settled("Mossbank"), None);
         assert_eq!(settled("Mossbank Meadow"), None);
         assert_eq!(settled("Nowhere At All"), None);
+        // An `m` read as `ln` is a look-alike slip, so the numeral that was read still counts.
+        assert_eq!(settled("Mossbank Meadow I").as_deref(), Some("Mossbank Meadow I"), "I is read, II sits close but is another spelling");
+        assert_eq!(settled("Mosslnank Inn").as_deref(), Some("Mossbank Inn"));
+        assert!(super::lookalike("swalnp") == super::lookalike("swamp"));
     }
 
     #[test]

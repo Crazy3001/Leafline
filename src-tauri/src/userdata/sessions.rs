@@ -5,6 +5,7 @@ use rusqlite::params;
 use serde::Serialize;
 
 use super::UserData;
+use super::potions::{SessionPotion, cost_of, session_key};
 use crate::error::{Error, Result};
 use crate::session::{EventKind, SessionEvent, SessionLine, SessionSummary, TimelinePoint};
 
@@ -36,6 +37,19 @@ pub struct SavedSession {
     pub maps: Vec<SavedMap>,
     /// Per map, level, party size and job, most active time first.
     pub lines: Vec<SessionLine>,
+    /// The potion counts the player typed for the session, in slot order.
+    pub potions: Vec<SessionPotion>,
+    /// What the potions used cost, in mesos.
+    pub potion_cost: i64,
+}
+
+/// The EXP a level takes, as the player's own HUD showed it. Leafline ships no EXP table; this
+/// one is learned as the player levels, for the time left to a level goal.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LevelExp {
+    pub level: u32,
+    pub needed: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -111,7 +125,12 @@ impl UserData {
     }
 
     pub fn delete_session(&mut self, id: i64) -> Result<()> {
+        let started_at: Option<f64> = self
+            .conn
+            .query_row("SELECT started_at FROM sessions WHERE id = ?1", [id], |row| row.get(0))
+            .or_else(|err| if err == rusqlite::Error::QueryReturnedNoRows { Ok(None) } else { Err(err) })?;
         let tx = self.conn.transaction()?;
+        UserData::delete_session_potions(&tx, started_at)?;
         tx.execute("DELETE FROM session_points WHERE session_id = ?1", [id])?;
         tx.execute("DELETE FROM session_events WHERE session_id = ?1", [id])?;
         tx.execute("DELETE FROM session_maps WHERE session_id = ?1", [id])?;
@@ -119,6 +138,13 @@ impl UserData {
         tx.execute("DELETE FROM sessions WHERE id = ?1", [id])?;
         tx.commit()?;
         Ok(())
+    }
+
+    /// The EXP each level takes, as far as the player's HUD has shown it, lowest level first.
+    pub fn level_exp(&self) -> Result<Vec<LevelExp>> {
+        let mut stmt = self.conn.prepare("SELECT level, needed FROM level_exp ORDER BY level")?;
+        let rows = stmt.query_map([], |row| Ok(LevelExp { level: row.get(0)?, needed: row.get::<_, i64>(1)? as u64 }))?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
     /// Every saved session, newest first.
@@ -150,6 +176,8 @@ impl UserData {
                     character: row.get(16)?,
                     maps: Vec::new(),
                     lines: Vec::new(),
+                    potions: Vec::new(),
+                    potion_cost: 0,
                 })
             })?
             .collect::<rusqlite::Result<_>>()?;
@@ -161,7 +189,12 @@ impl UserData {
             "SELECT map, level, party, job, active_seconds, exp_gained, percent_gained, mesos_gained, mesos_seconds
              FROM session_lines WHERE session_id = ?1 ORDER BY active_seconds DESC",
         )?;
+        let mut potions = self.all_session_potions()?;
         for session in &mut sessions {
+            if let Some(typed) = session.started_at.and_then(|at| potions.remove(&session_key(at))) {
+                session.potion_cost = cost_of(&typed);
+                session.potions = typed;
+            }
             session.lines = lines
                 .query_map([session.id], |row| {
                     Ok(SessionLine {
@@ -277,6 +310,14 @@ fn write_session(tx: &rusqlite::Transaction, id: i64, session: &SessionSummary, 
     tx.execute("DELETE FROM session_lines WHERE session_id = ?1", [id])?;
     tx.execute("DELETE FROM session_points WHERE session_id = ?1", [id])?;
     tx.execute("DELETE FROM session_events WHERE session_id = ?1", [id])?;
+    // What the current level takes, once the tracker has narrowed it down from the HUD.
+    if let (Some(level), Some(needed)) = (session.level, session.exp_needed) {
+        tx.execute(
+            "INSERT INTO level_exp (level, needed, seen_at) VALUES (?1, ?2, ?3)
+             ON CONFLICT (level) DO UPDATE SET needed = excluded.needed, seen_at = excluded.seen_at",
+            params![level, needed as i64, now],
+        )?;
+    }
     let renamed = |map: &str| -> rusqlite::Result<String> {
         match tx.query_row("SELECT name FROM map_renames WHERE read_as = ?1", [map], |row| row.get(0)) {
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(map.to_string()),
@@ -397,6 +438,36 @@ mod tests {
         assert_eq!(saved.exp_gained, 2000);
         assert_eq!(saved.maps.len(), 1);
         assert_eq!(saved.maps[0].active_seconds, 1200.0);
+    }
+
+    #[test]
+    fn the_exp_a_level_takes_is_learned_from_saves() {
+        let mut db = UserData::open_in_memory().unwrap();
+        let mut at_30 = session(10.0, 1000, &[]);
+        at_30.exp_needed = Some(25_000);
+        let id = db.save_session(&at_30, "", 1).unwrap();
+        let mut at_31 = session(20.0, 2000, &[]);
+        at_31.level = Some(31);
+        at_31.exp_needed = Some(27_500);
+        db.update_session(id, &at_31, 2).unwrap();
+        let mut unknown = session(30.0, 3000, &[]);
+        unknown.level = Some(32);
+        db.update_session(id, &unknown, 3).unwrap();
+        assert_eq!(db.level_exp().unwrap(), [LevelExp { level: 30, needed: 25_000 }, LevelExp { level: 31, needed: 27_500 }]);
+    }
+
+    #[test]
+    fn potions_typed_before_the_save_reach_the_saved_session() {
+        use crate::userdata::potions::PotionSlot;
+        let mut db = UserData::open_in_memory().unwrap();
+        db.set_potion_slots(&[PotionSlot { slot: 0, name: "White Potion".into(), price: 320 }]).unwrap();
+        // Typed in the first minutes, while the session wasn't saved yet.
+        db.set_session_potion(1000.0, 1, Some(300), Some(250)).unwrap();
+        let id = db.save_session(&session(30.0, 6000, &[]), "", 1).unwrap();
+        let saved = &db.sessions().unwrap()[0];
+        assert_eq!((saved.potions.len(), saved.potion_cost), (1, 50 * 320));
+        db.delete_session(id).unwrap();
+        assert!(db.session_potions(1000.0).unwrap().is_empty());
     }
 
     #[test]

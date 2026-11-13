@@ -372,6 +372,8 @@ pub struct ItemOrigin {
     pub drops: ObjectiveGuide,
     /// Quests that can give it, the lowest level first.
     pub quests: Vec<QuestInfo>,
+    /// NPC shops that sell it, the cheapest first.
+    pub shops: Vec<super::shops::ShopOffer>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -585,6 +587,7 @@ impl Atlas {
         quests.sort();
         quests.dedup();
         ItemOrigin {
+            shops: self.sold_by(items, name, |map| context.hops.get(&map).copied()),
             drops: self.item_objective(name, sources, &context, true),
             quests: quests.iter().filter_map(|id| self.quest_info(*id)).collect(),
         }
@@ -747,7 +750,9 @@ impl Atlas {
     /// `...` there, so those are compared with the start of each name.
     fn find_quest(&self, title: &str) -> Option<u32> {
         let trimmed = title.trim_end();
-        let truncated = trimmed.ends_with("...") || trimmed.ends_with('…');
+        // OCR can read the ellipsis as `..` or `. . .` as well as `...`.
+        let dots = trimmed.chars().rev().take_while(|c| matches!(c, '.' | '…' | ' ' | '·')).filter(|c| *c != ' ').count();
+        let truncated = dots >= 2 || trimmed.ends_with('…');
         let query = fold(trimmed);
         if query.len() < 4 {
             return None;
@@ -756,8 +761,17 @@ impl Atlas {
             .values()
             .map(|q| {
                 let name = fold(&q.name);
-                let name = if truncated { name.chars().take(query.chars().count()).collect() } else { name };
-                (similarity(&query, &name), q.id)
+                let start: String = name.chars().take(query.chars().count()).collect();
+                // A long reading that stands for the start of a name counts as that name even with no dots,
+                // as when OCR lost them.
+                let score = if truncated {
+                    similarity(&query, &start)
+                } else if query.len() >= 14 {
+                    similarity(&query, &name).max(similarity(&query, &start))
+                } else {
+                    similarity(&query, &name)
+                };
+                (score, q.id)
             })
             .filter(|(score, _)| *score >= MIN_QUEST_SCORE)
             .max_by(|a, b| a.0.total_cmp(&b.0).then(b.1.cmp(&a.1)))
@@ -791,17 +805,11 @@ impl Atlas {
         maps
     }
 
-    /// The NPC the wiki names as taking a quest in. Several can share a name, as the ones in a
-    /// job's instance do, so the quest's own giver wins, and then one standing on a map.
-    pub(super) fn turn_in_npc(&self, quest: u32, name: &str) -> Option<u32> {
-        let giver = self.quests.get(&quest).and_then(|q| q.npc_id);
-        giver.filter(|id| self.npc_names.get(id).is_some_and(|n| n == name)).or_else(|| self.npc_like(name))
-    }
-
-    /// Who a quest is handed in to. The client data has no field for it, so this is the wiki's
-    /// answer where it has one. Otherwise it goes by what shows it: the next quest of a chain
-    /// starts with them, or the title ends `to Heena`. Failing that it stays unknown: the giver
-    /// is not a safe guess, being someone else on half the quests the wiki covers.
+    /// Who a quest is handed in to. OSMS's data has no field for it, so this is the game
+    /// client's own answer from Leafline's quest file where it has one. Without that file it goes
+    /// by what shows it: the next quest of a chain starts with them, or the title ends
+    /// `to Heena`. Failing that it stays unknown: the giver is not a safe guess, being someone
+    /// else on more than half of all quests.
     pub(super) fn turn_in(&self, quest: &QuestRecord) -> Option<u32> {
         let next = quest.next_quest_id.and_then(|id| self.quests.get(&id)).and_then(|q| q.npc_id);
         self.turn_ins.get(&quest.id).copied().or(next).or_else(|| {
@@ -1168,7 +1176,7 @@ mod tests {
     }
 
     #[test]
-    fn the_wiki_says_who_takes_a_quest_in_before_anything_is_inferred() {
+    fn the_quest_file_says_who_takes_a_quest_in_before_anything_is_inferred() {
         use crate::mapdata::atlas::tests::map;
         use crate::mapdata::osms::{Dataset, NpcRecord, QuestRecord};
         use crate::mapdata::turnins::TurnIn;
@@ -1180,7 +1188,7 @@ mod tests {
             next_quest_id: next,
             ..QuestRecord::default()
         };
-        let turn_in = |quest: u32, npc: &str| TurnIn { quest, npc: npc.into() };
+        let turn_in = |quest: u32, npc: u32| TurnIn { quest, npc };
         let atlas = Atlas::new(Dataset {
             maps: vec![map(1, "Mossbank", "Fern Road", vec![]), map(2, "Split Road", "Fern Road", vec![]), map(9, "Instance", "Fern Road", vec![])],
             npcs: vec![
@@ -1198,21 +1206,21 @@ mod tests {
                 quest(14, "Unmatched", 1, Some(12)),
             ],
             turn_ins: vec![
-                turn_in(10, "Mai"),
-                turn_in(11, "Biggs"),
-                turn_in(12, "Tutor (Fern Road)"),
-                turn_in(14, "Nobody The Data Has"),
-                turn_in(99, "Mai"),
+                turn_in(10, 2),
+                turn_in(11, 5),
+                turn_in(12, 4),
+                turn_in(14, 77),
+                turn_in(99, 2),
             ],
             ..Dataset::default()
         });
         let who = |id: u32| atlas.quest_info(id).unwrap().turn_in;
         assert_eq!(who(10).as_deref(), Some("Mai"), "the client data has nothing to say on this one");
         assert_eq!(atlas.quest_info(10).unwrap().turn_in_maps[0].name, "Split Road");
-        assert_eq!(who(11).as_deref(), Some("Biggs"), "the wiki outranks the next quest's giver");
-        assert_eq!(atlas.quest_info(12).unwrap().turn_in_maps[0].name, "Split Road", "the giver wins among shared names");
+        assert_eq!(who(11).as_deref(), Some("Biggs"), "the file outranks the next quest's giver");
+        assert_eq!(atlas.quest_info(12).unwrap().turn_in_maps[0].name, "Split Road", "the id picks one of two Tutors");
         assert_eq!(who(13), None, "nothing to go on, so nothing is guessed");
-        assert_eq!(who(14).as_deref(), Some("Tutor"), "a name the data lacks falls back on the chain");
+        assert_eq!(who(14).as_deref(), Some("Tutor"), "an NPC the data lacks falls back on the chain");
     }
 
     #[test]
@@ -1234,6 +1242,7 @@ mod tests {
             label: "Fern Road : Mossbank Meadow I".into(),
             exp_per_hour: 600.0,
             active_seconds: 900.0,
+            ..MeasuredRate::default()
         }];
         let guide =
             atlas.quest_guide(&[query("Shell Sorting", &["Pebble Snail"])], Some(1), &[], &measured, &Travel::none());
@@ -1286,5 +1295,9 @@ mod tests {
         let guide = atlas.quest_guide(&[query("Slime Sam...", &[])], None, &[], &[], &Travel::none());
         assert_eq!(guide[0].quest.as_ref().map(|q| q.quest.id), Some(71));
         assert!(atlas.quest_guide(&[query("Slime", &[])], None, &[], &[], &Travel::none())[0].quest.is_none());
+        for read in ["Slime Sam..", "Slime Sam. . .", "Slime Sam…"] {
+            let guide = atlas.quest_guide(&[query(read, &[])], None, &[], &[], &Travel::none());
+            assert_eq!(guide[0].quest.as_ref().map(|q| q.quest.id), Some(71), "{read}");
+        }
     }
 }

@@ -4,13 +4,14 @@
   import { Check, LoaderCircle, Plus, ScrollText } from "@lucide/svelte";
   import { untrack } from "svelte";
 
+  import ItemCraftingView from "./item/ItemCrafting.svelte";
   import ItemSources from "./item/ItemSources.svelte";
   import Section from "./map/Section.svelte";
   import { backend } from "$lib/api";
   import { buildState, watchBuilds } from "$lib/builds.svelte";
-  import { attackSpeedName, formatMesos } from "$lib/format";
-  import { blankQuery, itemView } from "$lib/items.svelte";
-  import { OSMS_CREDIT, OSMS_URL, WIKI_CREDIT, WIKI_URL, mapData } from "$lib/mapdata.svelte";
+  import { attackSpeedText, formatMesos } from "$lib/format";
+  import { blankQuery, itemView, statRows, type CheckedStat } from "$lib/items.svelte";
+  import { DROPS_CREDIT, DROPS_URL, OSMS_CREDIT, OSMS_URL, mapData } from "$lib/mapdata.svelte";
   import { showNpcNamed } from "$lib/places.svelte";
   import { live } from "$lib/readings.svelte";
   import type { GearPiece, ItemRecord, ItemTooltip, ItemWhere, MapReading } from "$lib/types";
@@ -19,7 +20,17 @@
     item = null,
     record = null,
     map = null,
-  }: { item?: ItemTooltip | null; record?: ItemRecord | null; map?: MapReading | null } = $props();
+    checked = null,
+    slotsLeft = null,
+  }: {
+    item?: ItemTooltip | null;
+    record?: ItemRecord | null;
+    map?: MapReading | null;
+    /** The card's stats once checked against the data: a read the card believed, or the item's own value. */
+    checked?: CheckedStat[] | null;
+    /** Slots left, when the card believed its reading of them. */
+    slotsLeft?: number | null;
+  } = $props();
 
   watchBuilds();
 
@@ -80,23 +91,47 @@
     });
   });
 
-  /** This very copy, as read: its own stats and scrolls, for My build. */
+  /**
+   * This very copy, as read: its own stats and scrolls, for My build. What can't differ between
+   * copies, its name, type and level, is the data's: a read can pick up text from behind the tooltip.
+   */
   const piece = $derived.by((): GearPiece | null => {
     if (!item || item.plain || !item.name || !shown) return null;
     return {
       id: 0,
       item: shown.id,
-      name: item.name,
-      itemType: item.itemType,
-      level: item.requirements.level,
-      stats: item.stats.map((s) => ({ label: s.label, value: s.value })),
+      name: shown.name,
+      itemType: item.itemType ?? shown.weaponType ?? shown.slot,
+      level: shown.reqLevel ?? item.requirements.level,
+      stats: (checked ?? statRows(item, shown)).map((s) => ({ label: s.label, value: s.value })),
       upgrades: item.upgrades,
-      slotsLeft: item.remainingEnhancements,
+      slotsLeft: checked ? slotsLeft : item.remainingEnhancements,
       slots: shown.upgradeSlots ?? null,
     };
   });
   const samePiece = (a: GearPiece, b: GearPiece) => JSON.stringify({ ...a, id: 0 }) === JSON.stringify({ ...b, id: 0 });
-  const kept = $derived(piece && pieces ? (pieces.find((p) => samePiece(p, piece)) ?? null) : null);
+  /**
+   * The saved piece this copy is. With the card's checked stats, a saved piece is this copy when it is
+   * the same item and nothing the card believed contradicts it: one misread digit elsewhere on the
+   * tooltip, or a stat the card fell back to the item's own value for, doesn't make it a different copy.
+   */
+  const kept = $derived.by(() => {
+    if (!piece || !pieces) return null;
+    if (!checked) return pieces.find((p) => samePiece(p, piece)) ?? null;
+    const trusted = checked.filter((s) => s.source === "read");
+    return (
+      pieces.find(
+        (p) =>
+          p.item === piece.item &&
+          trusted.every((s) => {
+            const had = p.stats.find((t) => t.label === s.label);
+            return had == null || had.value === s.value;
+          }) &&
+          (slotsLeft == null || p.slotsLeft == null || p.slotsLeft === slotsLeft) &&
+          (piece.upgrades == null || p.upgrades == null || p.upgrades === piece.upgrades),
+      ) ?? null
+    );
+  });
 
   async function togglePiece() {
     if (!piece) return;
@@ -133,7 +168,7 @@
       {/if}
       {#if speed != null}
         <div>
-          <dt>Attack speed</dt><dd class="tabular">{attackSpeedName(speed) ?? speed}</dd>
+          <dt>Attack speed</dt><dd class="tabular">{attackSpeedText(speed)}</dd>
         </div>
       {/if}
       {#if rate != null}
@@ -171,7 +206,7 @@
     {#if found}
       <ItemSources {found} />
       <p class="credit">
-        <button onclick={() => backend.openLink(WIKI_URL)}>{WIKI_CREDIT}</button>
+        <button onclick={() => backend.openLink(DROPS_URL)}>{DROPS_CREDIT}</button>
         <button onclick={() => backend.openLink(OSMS_URL)}>{OSMS_CREDIT}</button>
       </p>
     {:else if error}
@@ -180,6 +215,8 @@
       <p class="note"><span class="spin"><LoaderCircle size={13} /></span> Looking it up…</p>
     {/if}
   </Section>
+
+  <ItemCraftingView id={shown.id} />
 {/if}
 
 <style>

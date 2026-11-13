@@ -5,6 +5,9 @@
 
   import { backend } from "$lib/api";
   import { drops, meowdbMonster, reportOnMeowdb, tallyByMonster, watchDrops } from "$lib/drops.svelte";
+  import { showItemNamed } from "$lib/items.svelte";
+  import { showMonsterNamed } from "$lib/monsters.svelte";
+  import { showMapNamed } from "$lib/places.svelte";
   import { formatDay } from "$lib/format";
   import { clock } from "$lib/training";
   import type { LoggedDrop } from "$lib/types";
@@ -60,7 +63,7 @@
       {#each tallies as t (t.monster)}
         <div class="monster">
           <div class="mrow">
-            <span class="mname">{t.monster}</span>
+            <span class="mname"><button class="ref ref-mob" onclick={() => showMonsterNamed(t.monster)}>{t.monster}</button></span>
             <span class="tabular quiet">{t.total}</span>
             <button class="icon" title="Open {t.monster} on MeowDB" aria-label="Open {t.monster} on MeowDB" onclick={() => backend.openLink(meowdbMonster(t.monster))}
               ><ExternalLink size={12} /></button
@@ -68,7 +71,7 @@
           </div>
           <ul>
             {#each t.items as i (i.item)}
-              <li><span>{i.item}</span><span class="tabular muted">×{i.count}</span></li>
+              <li><span><button class="ref ref-item" onclick={() => showItemNamed(i.item)}>{i.item}</button></span><span class="tabular muted">×{i.count}</span></li>
             {/each}
           </ul>
         </div>
@@ -90,9 +93,9 @@
           {#each shown as d (d.id)}
             <tr>
               <td class="tabular muted nowrap">{formatDay(d.seenAt)} {clock(d.seenAt)}</td>
-              <td>{d.item}</td>
-              <td>{d.monster}</td>
-              <td class="muted">{d.map ?? "—"}</td>
+              <td><button class="ref ref-item" onclick={() => showItemNamed(d.item)}>{d.item}</button></td>
+              <td><button class="ref ref-mob" onclick={() => showMonsterNamed(d.monster)}>{d.monster}</button></td>
+              <td>{#if d.map}<button class="ref ref-map" onclick={() => showMapNamed(d.map!)}>{d.map}</button>{:else}<span class="muted">—</span>{/if}</td>
               <td class="nowrap r">
                 <button class="report" title="Opens MeowDB and copies the item's name" onclick={() => report(d)}>
                   {#if copiedId === d.id}<Check size={12} />Name copied{:else}<ExternalLink size={12} />Report on MeowDB{/if}

@@ -2,6 +2,7 @@
 
 mod builds;
 mod commands;
+mod damage;
 mod desk;
 mod layout;
 mod live;
@@ -60,6 +61,7 @@ pub fn run() {
         .setup(|app| {
             app.manage(MapDataState::load(app.handle())?);
             app.manage(UserDataState::load(app.handle())?);
+            app.manage(damage::DamageState::load(app.handle())?);
             mapdata::check_for_updates(app.handle());
             app.manage(SettingsState::load(app.handle())?);
             settings::apply(app.handle())?;
@@ -108,6 +110,7 @@ pub fn run() {
             live::stop_live,
             live::live_windows,
             live::save_live_frame,
+            live::save_item_picture,
             live::set_live_held,
             live::reset_session,
             commands::overlay_status,
@@ -127,7 +130,9 @@ pub fn run() {
             pins::unpin_panel,
             pins::toggle_pins,
             pins::show_panel,
+            damage::player_damage,
             desk::desk_status,
+            desk::desk_take_tab,
             desk::show_desk,
             desk::set_desk_on_top,
             mapdata::map_data_status,
@@ -148,6 +153,10 @@ pub fn run() {
             records::item_note,
             records::saved_spots,
             records::set_spot_saved,
+            records::potion_slots,
+            records::set_potion_slots,
+            records::session_potions,
+            records::set_session_potion,
             update::update_status,
             update::check_for_update,
             records::set_item_note,
@@ -158,6 +167,9 @@ pub fn run() {
             records::delete_drop,
             records::save_image,
             records::session_history,
+            records::level_exp,
+            builds::item_crafting,
+            builds::crafting_recipes,
             records::session_timeline,
             records::show_training,
             records::delete_session,

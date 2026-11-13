@@ -50,7 +50,15 @@ import type {
   NavState,
   Destination,
   MeasuredRate,
+  Assumptions,
+  PlayerDamage,
   SavedSpot,
+  PotionSlot,
+  SessionPotion,
+  LevelExp,
+  ItemCrafting,
+  CraftingPage,
+  CraftingQuery,
   UpdateStatus,
   ItemNote,
   MonsterDrops,
@@ -110,6 +118,8 @@ export interface Backend {
   liveWindows(): Promise<GameWindow[]>;
   /** Saves the last live picture to the saved pictures folder and returns its path. */
   saveLiveFrame(): Promise<string>;
+  /** Saves the last item check's picture, with `reading` (what was read) beside it. */
+  saveItemPicture(reading: string | null): Promise<string>;
   onLive(handler: (status: LiveStatus) => void): Promise<UnlistenFn>;
   onFrameSaved(handler: (path: string) => void): Promise<UnlistenFn>;
   /** An item check from the hotkey has ended. */
@@ -136,7 +146,7 @@ export interface Backend {
   /** Takes a place off the recent list. */
   forgetDestination(destination: Destination): Promise<NavState>;
   onDestination(handler: (nav: NavState) => void): Promise<UnlistenFn>;
-  /** Player-observed drops, from a copy of mapleclassic.wiki's table renewed weekly. */
+  /** Known drops, from a copy of Leafline's drop list renewed daily. */
   monsterDrops(monsters: string[]): Promise<MonsterDrops[]>;
   /** Where to go for each quest objective, from cached data only. Null until map data is downloaded. */
   questGuide(
@@ -146,8 +156,8 @@ export interface Backend {
     mapTwin: number | null,
     measured: MeasuredRate[],
   ): Promise<Guide | null>;
-  /** Downloads mapleclassic.wiki's whole drop table, so quest items can be looked up on this PC. */
-  downloadDrops(): Promise<void>;
+  /** Downloads Leafline's drop list, so quest items can be looked up on this PC. */
+  downloadDrops(retry?: boolean): Promise<void>;
   /** When the drop table was last downloaded, in Unix seconds, or null before the first time. */
   dropsFetchedAt(): Promise<number | null>;
   /** Every map with monsters to hunt, with the rates the player measured. Null until map data is downloaded. */
@@ -156,6 +166,8 @@ export interface Backend {
     mapStreet: string | null,
     mapTwin: number | null,
     measured: MeasuredRate[],
+    level: number | null,
+    assumptions: Assumptions,
   ): Promise<TrainingSpots | null>;
   /** One page of the quest search. */
   searchQuests(search: QuestSearch): Promise<QuestPage>;
@@ -205,6 +217,19 @@ export interface Backend {
   /** Saves a map as a training spot, or takes it off the list. Every window hears of it. */
   setSpotSaved(mapId: number, name: string, saved: boolean): Promise<SavedSpot[]>;
   onSavedSpots(handler: (spots: SavedSpot[]) => void): Promise<UnlistenFn>;
+  /** What was last read of a character's attack range and damaging skills. */
+  playerDamage(name: string): Promise<PlayerDamage | null>;
+  onPlayerDamage(handler: (change: { name: string; damage: PlayerDamage }) => void): Promise<UnlistenFn>;
+  /** The potion slots the player set up, in slot order. */
+  potionSlots(): Promise<PotionSlot[]>;
+  /** Replaces the potion slots; a new slot has number 0. Returns them numbered. */
+  setPotionSlots(slots: PotionSlot[]): Promise<PotionSlot[]>;
+  /** The potion counts typed for the session that started at `startedAt`. */
+  sessionPotions(startedAt: number): Promise<SessionPotion[]>;
+  /** How many of a slot's potion the player had at a session's start and has now. */
+  setSessionPotion(startedAt: number, slot: number, start: number | null, now: number | null): Promise<SessionPotion[]>;
+  /** Fires when the slots or any session's counts change. */
+  onPotions(handler: () => void): Promise<UnlistenFn>;
   /** The player's note on an item, matched like the price log. */
   itemNote(item: string): Promise<ItemNote | null>;
   /** Writes it; an empty note deletes it. */
@@ -229,13 +254,23 @@ export interface Backend {
   onKnownMesos(handler: () => void): Promise<UnlistenFn>;
 
   sessionHistory(): Promise<History>;
+  /** The EXP each level takes, as far as the player's HUD has shown it, lowest first. */
+  levelExp(): Promise<LevelExp[]>;
+  /** The recipes that make an item and the ones that use it; null without map data. */
+  itemCrafting(id: number): Promise<ItemCrafting | null>;
+  /** The Crafting section's recipes. */
+  craftingRecipes(query: CraftingQuery): Promise<CraftingPage>;
   /** How a saved session's rates moved over time. */
   sessionTimeline(id: number): Promise<SessionTimeline>;
-  /** Opens the training log window, or brings it forward. */
+  /** Opens the desk view on its Training log tab, or brings it forward there. */
   showTraining(): Promise<void>;
   /** Opens the desk view, the panels side by side in a window of its own, or brings it forward. */
   showDesk(): Promise<DeskStatus>;
   deskStatus(): Promise<DeskStatus>;
+  /** The tab ("log" or "planner") the desk view was opened for, once; null otherwise. */
+  deskTakeTab(): Promise<string | null>;
+  /** The desk view is already open and is asked for one of its tabs. */
+  onDeskTab(handler: (tab: string) => void): Promise<() => void>;
   setDeskOnTop(onTop: boolean): Promise<DeskStatus>;
   /** Draws the calling window's page larger or smaller, as browser zoom does. */
   setPageZoom(zoom: number): Promise<void>;
@@ -312,7 +347,7 @@ export interface Backend {
   buildItemFit(item: ItemTooltip, level: number | null, character: string | null): Promise<ItemFit | null>;
   /** Opens the guide link the player typed for a build. */
   openGuide(url: string): Promise<void>;
-  /** Opens the build editor, or brings it forward. */
+  /** Opens the desk view on its Build planner tab, or brings it forward there. */
   showBuild(): Promise<void>;
   onBuilds(handler: () => void): Promise<UnlistenFn>;
 
@@ -379,6 +414,7 @@ const tauriBackend: Backend = {
   stopLive: () => invoke("stop_live"),
   liveWindows: () => invoke("live_windows"),
   saveLiveFrame: () => invoke("save_live_frame"),
+  saveItemPicture: (reading) => invoke("save_item_picture", { reading }),
   onLive: (handler) => listen<LiveStatus>("live", (e) => handler(e.payload)),
   onFrameSaved: (handler) => listen<string>("frame-saved", (e) => handler(e.payload)),
   onItemRead: (handler) => listen<ItemRead>("item-read", (e) => handler(e.payload)),
@@ -399,10 +435,10 @@ const tauriBackend: Backend = {
   monsterDrops: (monsters) => invoke("monster_drops", { monsters }),
   questGuide: (quests, mapName, mapStreet, mapTwin, measured) =>
     invoke("quest_guide", { quests, mapName, mapStreet, mapTwin, measured }),
-  downloadDrops: () => invoke("download_drops"),
+  downloadDrops: (retry) => invoke("download_drops", { retry: retry ?? false }),
   dropsFetchedAt: () => invoke("drops_fetched_at"),
-  trainingSpots: (mapName, mapStreet, mapTwin, measured) =>
-    invoke("training_spots", { mapName, mapStreet, mapTwin, measured }),
+  trainingSpots: (mapName, mapStreet, mapTwin, measured, level, assumptions) =>
+    invoke("training_spots", { mapName, mapStreet, mapTwin, measured, level, assumptions }),
   searchQuests: (search) => invoke("search_quests", { search }),
   questRegions: () => invoke("quest_regions"),
   questSheet: (id, mapName, mapStreet, mapTwin) => invoke("quest_sheet", { id, mapName, mapStreet, mapTwin }),
@@ -428,6 +464,13 @@ const tauriBackend: Backend = {
   savedSpots: () => invoke("saved_spots"),
   setSpotSaved: (mapId, name, saved) => invoke("set_spot_saved", { mapId, name, saved }),
   onSavedSpots: (handler) => listen<SavedSpot[]>("saved-spots", (e) => handler(e.payload)),
+  playerDamage: (name) => invoke("player_damage", { name }),
+  onPlayerDamage: (handler) => listen<{ name: string; damage: PlayerDamage }>("player-damage", (e) => handler(e.payload)),
+  potionSlots: () => invoke("potion_slots"),
+  setPotionSlots: (slots) => invoke("set_potion_slots", { slots }),
+  sessionPotions: (startedAt) => invoke("session_potions", { startedAt }),
+  setSessionPotion: (startedAt, slot, start, now) => invoke("set_session_potion", { startedAt, slot, start, now }),
+  onPotions: (handler) => listen("potions", () => handler()),
   itemNote: (item) => invoke("item_note", { item }),
   setItemNote: (item, note) => invoke("set_item_note", { item, note }),
   mapNote: (mapId) => invoke("map_note", { mapId }),
@@ -452,10 +495,15 @@ const tauriBackend: Backend = {
   openFramesFolder: () => invoke("open_frames_folder"),
   diagnostics: () => invoke("diagnostics"),
   sessionHistory: () => invoke("session_history"),
+  levelExp: () => invoke("level_exp"),
+  itemCrafting: (id) => invoke("item_crafting", { id }),
+  craftingRecipes: (query) => invoke("crafting_recipes", { query }),
   sessionTimeline: (id) => invoke("session_timeline", { id }),
   showTraining: () => invoke("show_training"),
   showDesk: () => invoke("show_desk"),
   deskStatus: () => invoke("desk_status"),
+  deskTakeTab: () => invoke("desk_take_tab"),
+  onDeskTab: (handler) => listen<string>("desk-tab", (e) => handler(e.payload)),
   setDeskOnTop: (onTop) => invoke("set_desk_on_top", { onTop }),
   setPageZoom: (zoom) => getCurrentWebview().setZoom(zoom),
   monitorCount: () => availableMonitors().then((list) => list.length),

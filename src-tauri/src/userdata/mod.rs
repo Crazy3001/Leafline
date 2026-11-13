@@ -1,6 +1,6 @@
 //! What the player records themselves: prices they saw or paid, notes on items, sessions they
-//! saved, training spots they picked, builds they planned, drops they logged, and each
-//! character's last known mesos. Kept in its own SQLite file, apart from
+//! saved, training spots they picked, builds they planned, drops they logged, the potions they
+//! hunt with, and each character's last known mesos. Kept in its own SQLite file, apart from
 //! the map data cache, because that cache can be thrown away and downloaded again while these
 //! records cannot.
 
@@ -8,6 +8,7 @@ pub mod builds;
 pub mod characters;
 pub mod drops;
 pub mod notes;
+pub mod potions;
 pub mod prices;
 pub mod sessions;
 pub mod spots;
@@ -144,6 +145,26 @@ CREATE TABLE drops (
     character TEXT,
     seen_at INTEGER NOT NULL);
 CREATE INDEX drops_by_time ON drops (seen_at);
+",
+    "
+CREATE TABLE potion_slots (
+    slot INTEGER PRIMARY KEY,
+    name TEXT NOT NULL,
+    price INTEGER NOT NULL);
+CREATE TABLE session_potions (
+    started_at INTEGER NOT NULL,
+    slot INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    price INTEGER NOT NULL,
+    start_count INTEGER,
+    now_count INTEGER,
+    PRIMARY KEY (started_at, slot));
+",
+    "
+CREATE TABLE level_exp (
+    level INTEGER PRIMARY KEY,
+    needed INTEGER NOT NULL,
+    seen_at INTEGER NOT NULL);
 ",
 ];
 

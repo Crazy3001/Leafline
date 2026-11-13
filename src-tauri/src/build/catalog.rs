@@ -2,6 +2,9 @@
 //! are worked out from the skills, so nothing about them is written into Leafline.
 
 use std::collections::HashMap;
+use std::sync::LazyLock;
+
+use regex::Regex;
 
 use serde::{Deserialize, Serialize};
 
@@ -9,7 +12,7 @@ use super::fit::ARMOUR;
 use super::plan::Stat;
 use super::rules::Branch;
 use crate::mapdata::drops::item_key;
-use crate::mapdata::osms::{ItemKind, ItemRecord, SkillRecord};
+use crate::mapdata::osms::{ItemKind, ItemRecord, RecipeRecord, SkillRecord};
 
 /// The most gear a search returns.
 const SEARCH_LIMIT: usize = 40;
@@ -19,6 +22,8 @@ const ITEM_PAGE: usize = 40;
 const MIN_WORD_SCORE: f64 = 0.7;
 /// How closely a name read from a tooltip must match an item in the data.
 const MIN_NAME_SCORE: f64 = 0.85;
+/// `(M)`, `(F)` and `(+1)` after an item's name on its tooltip, with the brackets OCR makes of them.
+static TAGS: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\s*[({\[]\s*(?:[MFU]|\+\s*\d{1,2})\s*(?:[)}\]|lI1]|$)").unwrap());
 /// How closely the first words of a read must match an item when the whole read matches none:
 /// text seen through the tooltip (a store's list behind it) can run on after the name.
 const MIN_PREFIX_SCORE: f64 = 0.92;
@@ -308,6 +313,8 @@ pub struct Catalog {
     /// For an item the data holds more than once, every ID it goes by, first one first. See
     /// `copies_of`.
     copies: HashMap<u32, Vec<u32>>,
+    /// Crafting recipes, in the data's order. See `super::crafting`.
+    recipes: Vec<RecipeRecord>,
 }
 
 impl Catalog {
@@ -315,7 +322,17 @@ impl Catalog {
         let skill_index = skills.iter().enumerate().map(|(i, s)| (s.id, i)).collect();
         let item_index = items.iter().enumerate().map(|(i, s)| (s.id, i)).collect();
         let copies = copies_in(&items);
-        Self { skills, items, skill_index, item_index, copies }
+        Self { skills, items, skill_index, item_index, copies, recipes: Vec::new() }
+    }
+
+    /// The same catalog with the crafting recipes that came with the data.
+    pub fn with_recipes(mut self, recipes: Vec<RecipeRecord>) -> Self {
+        self.recipes = recipes;
+        self
+    }
+
+    pub fn recipe_list(&self) -> &[RecipeRecord] {
+        &self.recipes
     }
 
     /// Every ID the item goes by: the data repeats some items under new numbers, such as a
@@ -360,13 +377,59 @@ impl Catalog {
     /// The item a name read from the game most likely means. Several items can share a name, so
     /// `level` settles it when it is known.
     pub fn item_like(&self, name: &str, level: Option<u32>) -> Option<&ItemRecord> {
+        // The tooltip adds `(F)` or `(M)` after the name of gendered equipment, which the data keeps in
+        // a field of its own, and an upgrade count `(+N)`: neither is part of the name.
+        let bare = TAGS.replace_all(name, "");
+        let name = bare.trim();
         if let Some(item) = self.item_close_to(name, level, MIN_NAME_SCORE) {
             return Some(item);
         }
         // The longest run of first words that names an item, as in `Iron Ore ushroom Cap A
         // tough iron ore`, where a store's list and the description ran on after the name.
         let words: Vec<&str> = name.split_whitespace().collect();
-        (1..words.len()).rev().find_map(|n| self.item_close_to(&words[..n].join(" "), level, MIN_PREFIX_SCORE))
+        if let Some(item) = (1..words.len()).rev().find_map(|n| self.item_close_to(&words[..n].join(" "), level, MIN_PREFIX_SCORE)) {
+            return Some(item);
+        }
+        self.item_inside(name, level).or_else(|| self.item_ending_with(name, level))
+    }
+
+    /// The one item at this level whose name ends with the words read, for a name whose first word
+    /// the screen hid (`Split Pants` for `Black Split Pants`). Needs the level and two words, and
+    /// says nothing when more than one item fits.
+    fn item_ending_with(&self, text: &str, level: Option<u32>) -> Option<&ItemRecord> {
+        let level = level?;
+        let key = item_key(text);
+        let words: Vec<&str> = key.split_whitespace().collect();
+        // The first word can be cut off or garbled as well (`ck Split Pants`), so shorter tails count too.
+        (0..words.len().saturating_sub(1)).find_map(|skip| {
+            let tail = &words[skip..];
+            let mut found = self.items.iter().filter(|item| {
+                let name = item_key(&item.name);
+                let held: Vec<&str> = name.split_whitespace().collect();
+                item.req_level == level && held.len() > tail.len() && held.ends_with(tail)
+            });
+            let first = found.next()?;
+            found.next().is_none().then_some(first)
+        })
+    }
+
+    /// The longest item name that stands whole inside `text`, as words in a row: text seen through
+    /// the tooltip can come before or inside a name as well as after it, as in `ossbow Brown Hard
+    /// Leather Pants`. A name of one word is too short to trust anywhere but at the start, which
+    /// the other passes cover.
+    fn item_inside(&self, text: &str, level: Option<u32>) -> Option<&ItemRecord> {
+        let key = item_key(text);
+        let words: Vec<&str> = key.split_whitespace().collect();
+        self.items
+            .iter()
+            .filter_map(|item| {
+                let name = item_key(&item.name);
+                let held: Vec<&str> = name.split_whitespace().collect();
+                let inside = held.len() >= 2 && held.len() <= words.len() && words.windows(held.len()).any(|run| run == held.as_slice());
+                inside.then_some((name.len(), item))
+            })
+            .max_by(|a, b| a.0.cmp(&b.0).then((Some(a.1.req_level) == level).cmp(&(Some(b.1.req_level) == level))))
+            .map(|(_, item)| item)
     }
 
     fn item_close_to(&self, name: &str, level: Option<u32>, min_score: f64) -> Option<&ItemRecord> {
@@ -547,6 +610,7 @@ pub(crate) mod tests {
             req_luk: 0,
             req_fame: 0,
             attack_speed: None,
+            knockback: None,
             upgrade_slots: None,
             quest_item: false,
             untradable: false,
@@ -694,6 +758,34 @@ pub(crate) mod tests {
         assert_eq!(catalog.item_like("Red Cloth Vest", Some(25)).unwrap().id, 2);
         assert_eq!(catalog.item_like("Rcd Cloth Vest", Some(10)).unwrap().id, 1, "a misread letter");
         assert!(catalog.item_like("Pebble", None).is_none());
+        assert_eq!(catalog.item_like("Rcd Cloth Vest (F) (+1)", Some(10)).unwrap().id, 1, "the tooltip's tags are not part of the name");
+    }
+
+    #[test]
+    fn a_name_missing_its_first_word_finds_the_one_item_that_ends_so() {
+        let catalog = Catalog::new(
+            Vec::new(),
+            vec![item(1, "Black Split Pants", 20, &[]), item(2, "Brown Split Pants", 30, &[]), item(3, "Grey Split Pants", 30, &[])],
+        );
+        assert_eq!(catalog.item_like("Split Pants", Some(20)).unwrap().id, 1);
+        assert!(catalog.item_like("Split Pants", Some(30)).is_none(), "two items fit, so none is guessed");
+        assert!(catalog.item_like("Split Pants", None).is_none(), "needs the level");
+        assert_eq!(catalog.item_like("Ck Split Pants (M)", Some(20)).unwrap().id, 1, "a cut-off first word");
+    }
+
+    #[test]
+    fn text_before_or_inside_a_name_does_not_hide_the_item() {
+        let catalog = Catalog::new(
+            Vec::new(),
+            vec![item(1, "Brown Hard Leather Pants", 30, &[]), item(2, "Hard Leather Pants", 10, &[]), item(3, "Pan Lid", 10, &[])],
+        );
+        let id = |read: &str| catalog.item_like(read, None).map(|i| i.id);
+        assert_eq!(id("Brown Hard Leather Pants ossbow"), Some(1), "after it");
+        assert_eq!(id("ossbow Brown Hard Leather Pants"), Some(1), "before it");
+        assert_eq!(id("Eagle Brown Hard Leather Pants (+1) ossbow"), Some(1), "around it, and the longest name wins");
+        assert_eq!(id("Some Hard Leather Pants"), Some(2), "a shorter item stands where the longer one doesn't");
+        assert_eq!(id("The Lid Pan"), None, "words out of order are not a name");
+        assert_eq!(id("Eagle Pan"), None, "half a name is not a name");
     }
 
     #[test]

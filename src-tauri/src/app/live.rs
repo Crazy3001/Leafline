@@ -443,6 +443,22 @@ pub fn save_frame(app: &AppHandle) -> Result<PathBuf> {
     Ok(path)
 }
 
+/// Saves the last item check's picture, however long ago it was taken, with what Leafline read from
+/// it beside it as a `.json` file, for a bug report about that reading.
+pub fn save_item_frame(app: &AppHandle, reading: Option<&str>) -> Result<PathBuf> {
+    let frame = app.state::<LiveState>().item_picture.lock().expect("live lock").clone().map(|(_, frame)| frame);
+    let frame = frame.ok_or_else(|| Error::Invalid("No item check has been taken yet.".into()))?;
+    let folder = frames_folder(app)?;
+    std::fs::create_dir_all(&folder)?;
+    let path = folder.join(format!("leafline-item-{}.png", file_stamp(SystemTime::now())));
+    frame.save(&path)?;
+    if let Some(text) = reading {
+        std::fs::write(path.with_extension("json"), text)?;
+    }
+    let _ = app.emit(FRAME_SAVED_EVENT, &path);
+    Ok(path)
+}
+
 fn read_until_stopped(app: &AppHandle) -> Result<()> {
     let state = app.state::<LiveState>();
     let ocr = Ocr::new()?;
@@ -458,6 +474,10 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
     let mut twin = None;
     let mut held = false;
     let mut game: Option<(Capturer, GameWindow, bool)> = None;
+    // Windows can stop delivering pictures to a capture that was open while the window was
+    // minimised, so the status would stay "minimised" after the game came back. A fresh capture
+    // is opened once the window is no longer minimised.
+    let mut was_minimized = false;
     let mut frames = 0u64;
     // The session's active time when it last grew, and when that was.
     let mut last_active = (0.0f64, Instant::now());
@@ -544,6 +564,11 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
                 continue;
             }
         };
+        if was_minimized && !matches!(grabbed, Grab::Minimized) {
+            was_minimized = false;
+            game = None;
+            continue;
+        }
         match grabbed {
             Grab::Frame(frame) => {
                 let started = Instant::now();
@@ -631,7 +656,10 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
             // The same picture again proves nothing, so it is not read twice: a misread would
             // otherwise confirm itself. A long quiet spell then pauses the clock like any idle time.
             Grab::Unchanged => {}
-            Grab::Minimized => set_status(app, LiveStatus::Waiting { reason: "The game is minimised.".into() }),
+            Grab::Minimized => {
+                was_minimized = true;
+                set_status(app, LiveStatus::Waiting { reason: "The game is minimised.".into() });
+            }
             Grab::Nothing => set_status(app, LiveStatus::Waiting { reason: "Waiting for the game to draw.".into() }),
             Grab::Closed => {
                 game = None;
@@ -725,6 +753,12 @@ pub fn live_windows() -> Result<Vec<GameWindow>> {
 #[tauri::command]
 pub fn save_live_frame(app: AppHandle) -> Result<PathBuf> {
     save_frame(&app)
+}
+
+/// Saves the last item check's picture with what was read beside it, for a bug report.
+#[tauri::command]
+pub fn save_item_picture(app: AppHandle, reading: Option<String>) -> Result<PathBuf> {
+    save_item_frame(&app, reading.as_deref())
 }
 
 #[cfg(test)]

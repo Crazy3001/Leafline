@@ -10,9 +10,22 @@
 use serde::{Deserialize, Serialize};
 
 use super::atlas::Atlas;
-use super::drops::{WIKI_API, encode};
 use super::fetch::Source;
 use crate::error::{Error, Result};
+
+/// mapleclassic.wiki's API, which travel still reads: the Route Planner page and the `items` table
+/// are among what it answers for anonymous visitors (checked 2026-11-11).
+pub const WIKI_API: &str = "https://mapleclassic.wiki/api.php";
+
+/// Percent-encodes everything but unreserved characters.
+fn encode(text: &str) -> String {
+    text.bytes()
+        .map(|b| match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => (b as char).to_string(),
+            _ => format!("%{b:02X}"),
+        })
+        .collect()
+}
 
 /// The wiki's Route Planner settings, which list its fast-travel services and their fares. Asked
 /// through the API: the wiki answers `index.php?action=raw` with 403 for programs (seen 2026-11-05).

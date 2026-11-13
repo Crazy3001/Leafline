@@ -418,6 +418,8 @@ export interface MobRow {
   count: number;
   boss: boolean;
   undead: boolean;
+  /** How much of a weapon blow it shrugs off, when the data says. */
+  weaponDef?: number | null;
 }
 
 export interface QuestRef {
@@ -462,6 +464,44 @@ export interface MapDetails {
   quests: QuestNeed[];
   exits: MapExit[];
   links: { label: string; url: string }[];
+  /** NPC shops here, from Leafline's shop file. */
+  shops: Shop[];
+}
+
+// NPC shops (see src-tauri/src/mapdata/shops.rs), from Leafline's own shop file.
+
+export interface ShopItem {
+  item: string;
+  /** The item in the map data, when its name matched one. */
+  itemId: number | null;
+  price: number;
+  /** A town standing the shop asks for first, as the game words it. */
+  needs: string | null;
+  /** The day the price was last seen, YYYY-MM-DD. */
+  seen: string;
+}
+
+export interface Shop {
+  npc: string;
+  npcId: number | null;
+  role: string | null;
+  map: MapRef | null;
+  /** The map as the shop file names it. */
+  mapName: string;
+  items: ShopItem[];
+}
+
+/** One shop selling an item. */
+export interface ShopOffer {
+  npc: string;
+  npcId: number | null;
+  role: string | null;
+  map: MapRef | null;
+  mapName: string;
+  hops: number | null;
+  price: number;
+  needs: string | null;
+  seen: string;
 }
 
 export interface MapMatch {
@@ -488,6 +528,8 @@ export interface MapRoute {
   steps: RouteStep[];
   /** For a route that rides or scrolls: the portals the walk alone takes, or null when no portals lead there. */
   walking: number | null;
+  /** About how many seconds of walking, when every map on the way has a known layout. */
+  walkSeconds?: number | null;
 }
 
 /** A place to head for with "Go here" (see src-tauri/src/app/nav.rs): a map, or an NPC on any of their maps. */
@@ -584,7 +626,7 @@ export interface TravelChoice {
   scrolls: boolean;
 }
 
-/** Drops players logged on mapleclassic.wiki. */
+/** A monster's known drops, from Leafline's drop list. */
 export interface MonsterDrops {
   monster: string;
   sampleKills: number | null;
@@ -639,7 +681,7 @@ export interface Pace {
 
 export interface Hunt {
   monster: { name: string; known: boolean; level: number; hp: number; exp: number; boss: boolean };
-  /** For an item: how often players saw this monster drop it (mapleclassic.wiki). */
+  /** For an item: that this monster drops it, with a rate where one is known. */
   drop: {
     rate: number | null;
     rateLow: number | null;
@@ -655,9 +697,9 @@ export interface Hunt {
 export interface ObjectiveGuide {
   target: string;
   kind: "monster" | "item";
-  /** The wiki's name for an item, once looked up and found. */
+  /** The drop list's name for an item, once looked up and found. */
   item: string | null;
-  /** Whether the wiki has been asked who drops this item. */
+  /** Whether the drop list has been searched for who drops this item. */
   lookedUp: boolean;
   hunts: Hunt[];
 }
@@ -688,6 +730,102 @@ export interface MeasuredRate {
   label: string;
   expPerHour: number;
   activeSeconds: number;
+  /** The character's level then, when read. */
+  level?: number | null;
+  /** Party size then; none or one is solo. */
+  party?: number | null;
+}
+
+/**
+ * What the training estimates take as given because the map data doesn't say (see
+ * src-tauri/src/mapdata/training.rs). The player can change both.
+ */
+export interface Assumptions {
+  /** Seconds before a defeated monster is back. */
+  respawnSeconds: number;
+  /** EXP a kill gives over the data's base EXP, for events or server rates. */
+  expRate: number;
+  /** The player's attack range from their stat window; null until entered. With it the
+   *  estimates count each monster's weapon defence. */
+  attackMin: number | null;
+  attackMax: number | null;
+  /** How hard a blow of their usual skill hits over a plain attack, when typed. */
+  skillFactor: number;
+  /** Which skill is the main one, by name: empty to use the best one Leafline read, or
+   *  "custom" to use the typed `skillFactor`. */
+  skillName: string;
+}
+
+/** What Leafline read of a character's damage from the game (src-tauri/src/app/damage.rs). */
+export interface PlayerDamage {
+  /** The stat window's Attack line. */
+  attackMin: number | null;
+  attackMax: number | null;
+  /** The damaging skills last seen in the skill window. */
+  skills: DamageSkill[];
+}
+
+export interface DamageSkill {
+  name: string;
+  level: number;
+  /** Its damage at that level: 240 is 240%. */
+  percent: number;
+}
+
+/** How fast the player gets through monster HP, from their own solo play. */
+export interface KillSpeed {
+  hpPerHour: number;
+  /** HP of the average monster defeated in that play. */
+  hpPerKill: number;
+  activeSeconds: number;
+  maps: number;
+  /** Lowest and highest character level in that play, when read. */
+  levels: [number, number] | null;
+  /** Too little play near the current level, so every solo session counts. */
+  widened: boolean;
+  /** Seconds of walking between kills on the maps that play was on, from their layouts. */
+  walkSecondsPerKill?: number | null;
+  /** Weapon defence of the monsters in that play, on average. */
+  defence?: number;
+}
+
+/** A map's EXP per hour for this player, worked out from their kill speed. */
+export interface Estimate {
+  expPerHour: number;
+  killsPerHour: number;
+  /** Kills an hour if every monster were defeated as soon as it came back. */
+  ceiling: number;
+  /** Held to the ceiling: the player would outpace the respawn. */
+  capped: boolean;
+  /** HP of the average monster here over the average one in the player's play. */
+  hpRatio: number;
+  /** Average monster level here minus the character's level. */
+  levelGap: number | null;
+  /** 3 fairly sure, 2 rough, 1 a guess. */
+  sureness: 1 | 2 | 3;
+  /** Seconds of walking between kills here; the rest of each kill scales with HP. */
+  walkSecondsPerKill?: number | null;
+  /** Blows to defeat the average monster here, when the player's attack range is known. */
+  hitsPerKill?: number | null;
+  /** Weapon defence of the average monster here. */
+  weaponDef?: number;
+  /** Whether the player's attack range was counted, so defence is too. */
+  damageKnown?: boolean;
+}
+
+/** A map's size and how its monsters spread, in the game's pixels, from the client. */
+export interface MapLayout {
+  map: number;
+  width: number | null;
+  height: number | null;
+  /** Summed length of every floor. */
+  walkable: number;
+  platforms: number;
+  spawnPoints: number;
+  /** How many platforms monsters spawn on. */
+  spawnPlatforms: number;
+  ropes: number;
+  ladders: number;
 }
 
 export interface TrainingSpot {
@@ -708,10 +846,16 @@ export interface TrainingSpot {
   /** Portals lead here from some town; party quest stages and other instances are not. */
   reachable: boolean;
   measured: { expPerHour: number; activeSeconds: number } | null;
+  /** From the player's kill speed, once enough solo play is saved. */
+  estimate: Estimate | null;
+  /** The map's size, floors and how its monsters spread, when known. */
+  layout?: MapLayout | null;
 }
 
 export interface TrainingSpots {
   from: MapRef | null;
+  /** Behind every estimate; null until enough solo play is saved. */
+  speed: KillSpeed | null;
   spots: TrainingSpot[];
 }
 
@@ -831,6 +975,72 @@ export interface SavedSession {
   lines: SessionLine[];
   /** Most active time first; time that couldn't be placed on a map is left out. */
   maps: { map: string; activeSeconds: number; expGained: number; mesosGained: number }[];
+  /** The potion counts the player typed, in slot order. */
+  potions: SessionPotion[];
+  /** What the potions used cost, in mesos. */
+  potionCost: number;
+}
+
+// Crafting (see src-tauri/src/build/crafting.rs): recipes from the map data.
+
+export interface ItemAmount {
+  id: number;
+  name: string;
+  count: number;
+}
+
+export interface Recipe {
+  id: number;
+  discipline: string;
+  /** The discipline's skill level the recipe asks for. */
+  skillLevel: number;
+  craftExp: number;
+  mesoCost: number;
+  output: ItemAmount;
+  ingredients: ItemAmount[];
+}
+
+export interface ItemCrafting {
+  madeBy: Recipe[];
+  usedIn: Recipe[];
+}
+
+export interface CraftingQuery {
+  discipline?: string | null;
+  search?: string | null;
+  maxLevel?: number | null;
+}
+
+export interface CraftingPage {
+  /** Every discipline with how many recipes it has. */
+  disciplines: [string, number][];
+  recipes: Recipe[];
+}
+
+/** The EXP a level takes, as the player's own HUD showed it (src-tauri/src/userdata/sessions.rs). */
+export interface LevelExp {
+  level: number;
+  needed: number;
+}
+
+/** A potion the player hunts with (src-tauri/src/userdata/potions.rs). Nothing here is bundled. */
+export interface PotionSlot {
+  /** Stays with the slot; 0 for a new one. */
+  slot: number;
+  name: string;
+  /** What one costs the player, in mesos. */
+  price: number;
+}
+
+/** A slot's counts for a session, with the name and price as they were when typed. */
+export interface SessionPotion {
+  slot: number;
+  name: string;
+  price: number;
+  start: number | null;
+  now: number | null;
+  /** Start minus now once both are typed, never below zero. */
+  used: number;
 }
 
 /** One map's rates over every saved session that spent time there. */
@@ -880,6 +1090,8 @@ export interface BuildStart {
   gender?: string | null;
   /** Equipment the character has, each as an item check read it. Changed only by add/removePiece. */
   pieces?: GearPiece[];
+  /** What worn gear added to each stat when the Character Stat window was last read. Shown only. */
+  gearBonus?: BaseStats | null;
 }
 
 /** One copy of an item, as its tooltip showed it, scrolls and all. */
@@ -922,7 +1134,7 @@ export interface Build {
   plan: BuildGoals;
 }
 
-/** A ready-made plan written for Leafline. Nobody has played these yet. */
+/** A ready-made plan, written for Leafline or following one guide. Nobody has played these yet. */
 export interface StarterPlan {
   id: string;
   job: number;
@@ -931,6 +1143,15 @@ export interface StarterPlan {
   plan: BuildGoals;
   /** Names the data doesn't have, left out of the plan. */
   missing: string[];
+  /** The guide a plan follows, to credit and link. `null` for a plan written for Leafline. */
+  source: StarterSource | null;
+}
+
+export interface StarterSource {
+  name: string;
+  /** The exact page the plan was taken from. */
+  url: string;
+  credit: string;
 }
 
 export interface BuildSummary {
@@ -1000,6 +1221,8 @@ export interface ItemRecord extends GearItem {
   reqFame: number;
   /** The data's own number for a weapon's speed. Lower is faster. */
   attackSpeed: number | null;
+  /** A weapon's knockback chance, in percent. */
+  knockback: number | null;
   /** Upgrade slots on a clean copy. */
   upgradeSlots: number | null;
   questItem: boolean;
@@ -1060,6 +1283,8 @@ export interface ItemWhere {
     drops: ObjectiveGuide;
     /** Quests that can give it, the lowest level first. */
     quests: NonNullable<QuestGuide["quest"]>[];
+    /** NPC shops that sell it, the cheapest first. */
+    shops: ShopOffer[];
   };
 }
 
@@ -1265,6 +1490,8 @@ export interface NpcSheet {
   quests: QuestRow[];
   /** Quests someone else gives that go by what shows they are handed in here. */
   takes: QuestRef[];
+  /** What the NPC sells, from Leafline's shop file. */
+  shop: Shop | null;
 }
 
 export interface NpcWhere {

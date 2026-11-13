@@ -1,6 +1,6 @@
 <script lang="ts">
-  // The training log: every saved session with its graph, rates per map by level and party, and
-  // progress over days. Its own window opens from the Train tab, and the desk view can show it
+  // The training log: every saved session with its graph, rates per map by level and party, the
+  // player's records per map by level, party size and job, and progress over days. Its own window opens from the Train tab, and the desk view can show it
   // in a column (embedded). Everything here stays on this PC.
   import { Download, PenLine, Share2 } from "@lucide/svelte";
   import { onMount, untrack } from "svelte";
@@ -8,10 +8,16 @@
   import DropLogView from "./DropLogView.svelte";
   import Logo from "./Logo.svelte";
   import MapNote from "./MapNote.svelte";
+  import MapRecords from "./MapRecords.svelte";
+  import PotionCosts from "./PotionCosts.svelte";
+  import { netMesosPerHour } from "$lib/potions.svelte";
   import ShareDialog from "./ShareDialog.svelte";
   import { backend } from "$lib/api";
   import { dropsBetween, watchDrops } from "$lib/drops.svelte";
+  import { showItemNamed } from "$lib/items.svelte";
   import { watchMapData, mapData } from "$lib/mapdata.svelte";
+  import { showMonsterNamed } from "$lib/monsters.svelte";
+  import { showMapNamed } from "$lib/places.svelte";
   import { formatCompact, formatDuration, formatNumber, partyLabel, splitMapLabel } from "$lib/format";
   import { history, watchHistory } from "$lib/history.svelte";
   import { live, watchLive } from "$lib/readings.svelte";
@@ -24,6 +30,8 @@
     longDay,
     mapBands,
     mapBars,
+    levelBands,
+    bandRange,
     mapStats,
     pointDetail,
     rateFormat,
@@ -44,7 +52,7 @@
   /** In a desk view column: no title of its own, and the views in a row above. */
   let { embedded = false }: { embedded?: boolean } = $props();
 
-  type View = "sessions" | "maps" | "progress" | "drops";
+  type View = "sessions" | "maps" | "records" | "progress" | "drops";
   type Range = "7" | "30" | "all";
 
   const VIEW_KEY = "leafline.training.view";
@@ -60,6 +68,8 @@
   let view = $state<View>(stored(VIEW_KEY, "sessions") as View);
   let range = $state<Range>("30");
   let character = $state<string>("");
+  /** Once the player has picked a character (or All), their pick stands. */
+  let characterChosen = false;
   let metric = $state<Metric>("exp");
   let selectedId = $state<number | null>(null);
   let timeline = $state<SessionTimeline | null>(null);
@@ -101,6 +111,11 @@
 
   const all = $derived(history.value?.sessions ?? []);
   const characters = $derived([...new Set(all.map((s) => s.character).filter((c): c is string => !!c))]);
+  // With more than one character, open on the one played last: a blend of two characters' levels
+  // and maps reads as nonsense, so All is there to ask for.
+  $effect(() => {
+    if (!characterChosen && characters.length > 1 && all[0]?.character) character = all[0].character;
+  });
   const since = $derived(range === "all" ? null : Date.now() / 1000 - Number(range) * 86400);
   const sessions = $derived(
     all.filter(
@@ -203,14 +218,10 @@
     }
   }
 
-  // Maps view: level bands of five that hold some play, then the stats under the filters.
-  const bands = $derived.by(() => {
-    const levels = new Set<number>();
-    for (const s of sessions) for (const l of s.lines) if (l.level != null) levels.add(Math.floor(l.level / 5) * 5);
-    return [...levels].sort((a, b) => a - b).map((low) => ({ id: String(low), label: `Lv ${low}–${low + 4}` }));
-  });
+  // Maps view: level bands that hold some play, then the stats under the filters.
+  const bands = $derived(levelBands(sessions));
   const filter = $derived<LineFilter>({
-    levels: band === "any" ? null : [Number(band), Number(band) + 4],
+    levels: bandRange(band),
     party,
   });
   const stats = $derived(mapStats(sessions, filter));
@@ -302,7 +313,7 @@
     {#if characters.length > 1}
       <label class="field">
         Character
-        <select bind:value={character}>
+        <select bind:value={character} onchange={() => (characterChosen = true)}>
           <option value="">All characters</option>
           {#each characters as name (name)}<option value={name}>{name}</option>{/each}
         </select>
@@ -327,7 +338,7 @@
 
   <div class="body">
     <nav aria-label="Training log">
-      {#each [["sessions", "Sessions"], ["maps", "Maps"], ["progress", "Progress"], ["drops", "Drops"]] as [id, name] (id)}
+      {#each [["sessions", "Sessions"], ["maps", "Maps"], ["records", "Records"], ["progress", "Progress"], ["drops", "Drops"]] as [id, name] (id)}
         <button class="nav" aria-current={view === id ? "page" : undefined} onclick={() => pickView(id as View)}>{name}</button>
       {/each}
     </nav>
@@ -391,11 +402,20 @@
 
               <div class="tiles">
                 <Stat size="lg" label={percentOnly(s) ? "% / hr" : "EXP / hr"} value={expRate(s)} />
-                <Stat size="lg" label="Mesos / hr" value={formatCompact(s.mesosPerHour)} />
+                <Stat
+                  size="lg"
+                  label="Mesos / hr"
+                  value={formatCompact(s.mesosPerHour)}
+                  sub={s.potionCost > 0 ? `${formatCompact(netMesosPerHour(s.mesosPerHour, s.potionCost, s.activeSeconds))} after potions` : null}
+                />
                 <Stat size="lg" label="Played" value={dur(s.activeSeconds)} />
                 <Stat size="lg" label="EXP gained" value={formatNumber(s.expGained)} />
                 <Stat size="lg" label="Levels" value={String(s.levelUps)} />
                 <Stat size="lg" label="Deaths" value={String(s.deaths)} />
+              </div>
+
+              <div class="panel">
+                <PotionCosts startedAt={s.startedAt} activeSeconds={s.activeSeconds} mesosPerHour={s.mesosPerHour} />
               </div>
 
               <div class="panel chart">
@@ -428,7 +448,7 @@
                   <p class="caption">
                     <span class="key"><span class="dot good"></span>Level up</span>
                     <span class="key"><span class="dot bad"></span>Death</span>
-                    Shaded stretches are maps. Each point is the rate over the 5 minutes before it.
+                    Shaded stretches are maps. Each point is the rate over the 5 minutes before it; the first 2½ minutes are left out.
                     {#if metric === "mesos"}Mesos are spread evenly between your looks at them.{/if}
                   </p>
                 {:else if timeline}
@@ -462,7 +482,10 @@
                                 }}
                               />
                             {:else}
-                              {l.map ? splitMapLabel(l.map).name : "Not placed on a map"}
+                              {#if l.map}
+                                {@const map = l.map}
+                                <button class="ref ref-map" onclick={() => showMapNamed(map)}>{splitMapLabel(map).name}</button>
+                              {:else}Not placed on a map{/if}
                               {#if l.map}
                                 {@const map = l.map}
                                 <button class="pen" title="Rename" aria-label="Rename map" onclick={() => startRename(map)}
@@ -474,7 +497,7 @@
                           <td>{l.level ?? "—"}</td>
                           <td>{partyLabel(l.party) ?? "Solo"}</td>
                           <td>{dur(l.activeSeconds)}</td>
-                          <td>{l.activeSeconds > 0 ? (l.expGained > 0 ? formatCompact((l.expGained * 3600) / l.activeSeconds) : `${((l.percentGained * 3600) / l.activeSeconds).toFixed(1)}%`) : "—"}</td>
+                          <td>{l.activeSeconds > 0 ? (l.expGained > 0 ? formatCompact((l.expGained * 3600) / l.activeSeconds) : l.percentGained > 0 ? `${((l.percentGained * 3600) / l.activeSeconds).toFixed(1)}%` : "—") : "—"}</td>
                           <td>{l.mesosSeconds > 0 ? formatCompact((l.mesosGained * 3600) / l.mesosSeconds) : "—"}</td>
                         </tr>
                       {/each}
@@ -486,7 +509,10 @@
                     <h3>Drops you logged</h3>
                     <ul class="drops">
                       {#each sessionDropRows as d (d.item + d.monster)}
-                        <li><span>{d.item}</span><span class="muted">{d.monster}{d.count > 1 ? ` ×${d.count}` : ""}</span></li>
+                        <li>
+                          <span><button class="ref ref-item" onclick={() => showItemNamed(d.item)}>{d.item}</button></span>
+                          <span class="muted"><button class="ref ref-mob" onclick={() => showMonsterNamed(d.monster)}>{d.monster}</button>{d.count > 1 ? ` ×${d.count}` : ""}</span>
+                        </li>
                       {/each}
                     </ul>
                   {/if}
@@ -503,6 +529,8 @@
             </section>
           {/if}
         </div>
+      {:else if view === "records"}
+        <MapRecords {sessions} />
       {:else if view === "maps"}
         <div class="filters">
           <span class="field">
@@ -604,7 +632,7 @@
                 <tbody>
                   {#each stats as m (m.map)}
                     <tr>
-                      <td>{m.name}</td>
+                      <td><button class="ref ref-map" onclick={() => showMapNamed(m.map)}>{m.name}</button></td>
                       <td>{m.sessions}</td>
                       <td>{dur(m.activeSeconds)}</td>
                       <td>{formatCompact(m.expPerHour)}</td>

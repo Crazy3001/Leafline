@@ -169,12 +169,20 @@ pub fn quest_number(masks: &[Mask]) -> Option<String> {
 }
 
 fn round_number(masks: &[Mask], font: Font) -> Option<String> {
-    let digit = |mask: &Mask| {
-        let shape = Shape::new(mask, font)?;
-        let straight = shape.width > ONE_WIDTH || (0..font.rows).all(|y| shape.right(y));
-        shape.digit().filter(|_| straight)
-    };
-    masks.iter().map(digit).collect()
+    masks.iter().map(|mask| round_digit(mask, font)).collect()
+}
+
+fn round_digit(mask: &Mask, font: Font) -> Option<char> {
+    let shape = Shape::new(mask, font)?;
+    let straight = shape.width > ONE_WIDTH || (0..font.rows).all(|y| shape.right(y));
+    shape.digit().filter(|_| straight)
+}
+
+/// Reads the digits a window number starts with, up to the first mark that isn't one, such as the
+/// `+` in `28+2`. `None` if the first mask isn't a digit.
+pub fn window_prefix(masks: &[Mask]) -> Option<String> {
+    let digits: String = masks.iter().map_while(|mask| round_digit(mask, WINDOW)).collect();
+    (!digits.is_empty()).then_some(digits)
 }
 
 #[cfg(test)]

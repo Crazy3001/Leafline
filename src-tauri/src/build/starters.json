@@ -1,146 +1,524 @@
 {
   "beginner": [["Three Snails", 3], ["Recovery", 3], ["Nimble Feet", 3]],
   "openings": {
-    "warrior": [
-      ["Power Strike", 20], ["Slash Blast", 10], ["Improved HP Recovery", 3], ["Max HP Increase", 3],
-      ["Precise Strikes", 15], ["Slash Blast", 20]
+    "bowman-niadb": [
+      ["Arrow Blow", 6], ["The Eye of Amazon", 1], ["Arrow Blow", 13], ["The Eye of Amazon", 3],
+      ["Arrow Blow", 20], ["Critical Shot", 15], ["The Eye of Amazon", 15], ["Focus", 10],
+      ["Power Knockback", 1]
     ],
-    "magician": [
-      ["Energy Bolt", 1], ["Magic Claw", 8], ["Improved MP Recovery", 5], ["Magic Claw", 20],
-      ["Magic Guard", 3], ["Improved MP Recovery", 15], ["Magic Guard", 15], ["Max MP Increase", 10]
+    "bowman-doubleshot-niadb": [
+      ["Arrow Blow", 1], ["Double Shot", 20], ["Critical Shot", 15], ["The Eye of Amazon", 15], ["Focus", 9],
+      ["Power Knockback", 1]
     ],
-    "bowman": [
-      ["Arrow Blow", 1], ["Double Shot", 8], ["Critical Shot", 5], ["Double Shot", 20], ["Critical Shot", 15],
-      ["The Eye of Amazon", 3], ["Focus", 10], ["The Eye of Amazon", 15]
+    "magician-energybolt-niadb": [
+      ["Energy Bolt", 3], ["Improved MP Recovery", 1], ["Energy Bolt", 20], ["Improved MP Recovery", 13],
+      ["Magic Guard", 1], ["Improved MP Recovery", 15], ["Magic Guard", 3], ["Magic Armor", 20],
+      ["Max MP Increase", 3]
     ],
-    "claw": [
-      ["Lucky Seven", 8], ["Nimble Body", 3], ["Keen Eyes", 3], ["Lucky Seven", 20], ["Nimble Body", 15],
-      ["Keen Eyes", 15], ["Disorder", 3], ["Dark Sight", 8]
+    "warrior-niadb": [
+      ["Power Strike", 3], ["Slash Blast", 1], ["Power Strike", 4], ["Slash Blast", 4], ["Precise Strikes", 5],
+      ["Power Strike", 20], ["Slash Blast", 19], ["Precise Strikes", 6], ["Improved HP Recovery", 1],
+      ["Precise Strikes", 15], ["Improved HP Recovery", 3], ["Max HP Increase", 3], ["Iron Body", 1]
     ],
-    "dagger": [
-      ["Double Stab", 20], ["Nimble Body", 15], ["Disorder", 6], ["Dark Sight", 20]
+    "magician-niadb": [
+      ["Energy Bolt", 1], ["Magic Claw", 2], ["Improved MP Recovery", 1], ["Magic Claw", 20],
+      ["Improved MP Recovery", 12], ["Magic Guard", 1], ["Improved MP Recovery", 15], ["Magic Guard", 3],
+      ["Magic Armor", 20], ["Max MP Increase", 2]
+    ],
+    "thief-claw-niadb": [
+      ["Lucky Seven", 1], ["Nimble Body", 3], ["Keen Eyes", 1], ["Lucky Seven", 20], ["Keen Eyes", 15],
+      ["Nimble Body", 15], ["Disorder", 3], ["Dark Sight", 8]
+    ],
+    "thief-dagger-niadb": [
+      ["Double Stab", 20], ["Nimble Body", 15], ["Disorder", 3], ["Dark Sight", 20], ["Disorder", 6]
     ]
   },
   "plans": [
     {
-      "id": "fighter-sword", "job": 110, "name": "Sword Fighter",
-      "summary": "One-handed swords for steady speed. Rage early, then Final Attack.",
-      "opening": "warrior",
+      "id": "fighter-niadb", "job": 110, "name": "Fighter (axe), NiaDB guide",
+      "summary": "Axe Mastery and Final Attack first, Rage to 30 by Lv 48, Rush last.",
+      "source": {
+        "name": "NiaDB",
+        "url": "https://meowdb.com/msclassic/guides/fighter-class-guide",
+        "credit": "Fighter guide by Nia Meow, from a Lv 70 build by Grummash, updated 2026-11-09. Lv 1-30 is from NiaDB's Warrior guide (meowdb.com/msclassic/guides/warrior-class-guide), its main path. This is the guide's axe order; the sword order swaps the three weapon skills."
+      },
+      "opening": "warrior-niadb",
       "skills": [
-        ["Sword Mastery", 5], ["Sword Booster", 1], ["Rage", 10], ["Sword Mastery", 20], ["Final Attack: Sword", 30],
-        ["Rage", 30], ["Sword Booster", 20], ["Rush", 20], ["Axe Mastery", 1]
+        ["Rush", 1], ["Rage", 1], ["Axe Mastery", 5], ["Axe Booster", 1], ["Final Attack: Axe", 1],
+        ["Axe Mastery", 20], ["Final Attack: Axe", 2], ["Rage", 30], ["Final Attack: Axe", 30],
+        ["Axe Booster", 20], ["Rush", 20], ["Sword Mastery", 1]
       ],
       "primary": "str", "secondary": "dex",
-      "steps": [[10, 15], [15, 20], [20, 25], [30, 30], [35, 40], [45, 50], [55, 60], [65, 70]],
-      "gear": ["Long Sword", "Sabre", "Viking Sword", "Eloon", "Gladius", "Traus", "Jeweled Katar", "Neocora", "Red Katana"]
+      "ap": [
+        ["dex", 8, 15], ["dex", 18, 19], ["dex", 22, 29], ["dex", 27, 30], ["dex", 31, 39], ["dex", 36, 40],
+        ["dex", 38, 49], ["dex", 43, 50], ["dex", 45, 67], ["dex", 60, 68]
+      ],
+      "gear": [
+        "Metal Axe", "Battle Axe", "Iron Axe", "Mithril Axe", "Fireman's Axe", "Blue Axe", "Blue Counter",
+        "Sabretooth", "Buck", "The Rising", "Mikhail", "Chrono", "Jousting Helmet", "White Fingerless Gloves",
+        "Steel Nordic Helm", "Steel Briggon", "Bronze Crusader Helm", "Iron Knuckle", "Green Icarus Cape",
+        "Green Napoleon"
+      ]
     },
     {
-      "id": "page-sword", "job": 120, "name": "Sword Page",
-      "summary": "One-handed swords for the accuracy from Sword Mastery. Threaten comes last.",
-      "opening": "warrior",
+      "id": "fighter-sword-niadb", "job": 110, "name": "Fighter (sword), NiaDB guide",
+      "summary": "The same order with Sword Mastery, Final Attack: Sword and Sword Booster. Steadier damage rolls and more Accuracy.",
+      "source": {
+        "name": "NiaDB",
+        "url": "https://meowdb.com/msclassic/guides/fighter-class-guide",
+        "credit": "Fighter guide by Nia Meow, from a Lv 70 build by Grummash, updated 2026-11-09. Lv 1-30 is from NiaDB's Warrior guide (meowdb.com/msclassic/guides/warrior-class-guide), its main path. This is the guide's sword order: its axe order with the sword skills in the weapon slots."
+      },
+      "opening": "warrior-niadb",
       "skills": [
-        ["Sword Mastery", 5], ["Sword Booster", 1], ["Sword Mastery", 20], ["Final Attack: Sword", 30], ["Sword Booster", 20],
-        ["Rush", 20], ["Threaten", 30], ["Blunt Weapon Mastery", 1]
+        ["Rush", 1], ["Rage", 1], ["Sword Mastery", 5], ["Sword Booster", 1], ["Final Attack: Sword", 1],
+        ["Sword Mastery", 20], ["Final Attack: Sword", 2], ["Rage", 30], ["Final Attack: Sword", 30],
+        ["Sword Booster", 20], ["Rush", 20], ["Axe Mastery", 1]
       ],
       "primary": "str", "secondary": "dex",
-      "steps": [[10, 15], [15, 20], [20, 25], [30, 30], [35, 40], [45, 50], [55, 60], [65, 70]],
-      "gear": ["Long Sword", "Sabre", "Viking Sword", "Eloon", "Gladius", "Traus", "Jeweled Katar", "Neocora", "Red Katana"]
+      "ap": [
+        ["dex", 8, 15], ["dex", 18, 19], ["dex", 22, 29], ["dex", 27, 30], ["dex", 31, 39], ["dex", 36, 40],
+        ["dex", 38, 49], ["dex", 43, 50], ["dex", 45, 67], ["dex", 60, 68]
+      ],
+      "gear": [
+        "Long Sword", "Sabre", "Viking Sword", "Broadsword", "Gladius", "Scimitar", "Traus", "Zard",
+        "Hero's Gladius", "Lion's Fang", "Red Katana", "Doombringer", "Jousting Helmet",
+        "White Fingerless Gloves", "Steel Nordic Helm", "Steel Briggon", "Bronze Crusader Helm", "Iron Knuckle",
+        "Green Icarus Cape", "Green Napoleon"
+      ]
     },
     {
-      "id": "spearman-spear", "job": 130, "name": "Spear Spearman",
-      "summary": "Spears over polearms for faster weapons. Iron Will early for safer grinding.",
-      "opening": "warrior",
+      "id": "page-niadb", "job": 120, "name": "Page (blunt), NiaDB guide",
+      "summary": "Blunt Weapon Mastery and Final Attack first, Threaten to 30 by Lv 57.",
+      "source": {
+        "name": "NiaDB",
+        "url": "https://meowdb.com/msclassic/guides/page-class-guide",
+        "credit": "Page guide by Nia Meow, from a Lv 70 build by Grummash, updated 2026-11-09. Lv 1-30 is from NiaDB's Warrior guide (meowdb.com/msclassic/guides/warrior-class-guide), its main path. This is the guide's blunt order; the sword order swaps the three weapon skills."
+      },
+      "opening": "warrior-niadb",
       "skills": [
-        ["Spear Mastery", 5], ["Spear Booster", 1], ["Iron Will", 5], ["Spear Mastery", 20], ["Final Attack: Spear", 30],
-        ["Spear Booster", 20], ["Iron Will", 30], ["Rush", 20], ["Polearm Mastery", 1]
+        ["Rush", 1], ["Blunt Weapon Mastery", 5], ["Blunt Weapon Booster", 1], ["Threaten", 1],
+        ["Blunt Weapon Mastery", 20], ["Final Attack: Blunt Weapon", 30], ["Threaten", 30],
+        ["Blunt Weapon Booster", 20], ["Rush", 20], ["Sword Mastery", 1]
       ],
       "primary": "str", "secondary": "dex",
-      "steps": [[30, 30], [35, 35], [40, 40], [50, 50], [60, 60], [70, 70]],
-      "gear": ["Spear", "Fork on a Stick", "Fish Spear", "Forked Spear", "Nakamaki", "Zeco", "Serpent's Tongue", "Holy Spear", "Redemption"]
+      "ap": [
+        ["dex", 8, 15], ["dex", 18, 19], ["dex", 22, 29], ["dex", 27, 30], ["dex", 32, 35], ["dex", 36, 40],
+        ["dex", 38, 49], ["dex", 43, 50], ["dex", 45, 67], ["dex", 60, 68]
+      ],
+      "gear": [
+        "Plunger", "Mithril Maul", "Heavy Hammer", "Sledgehammer", "Jacker", "Titan", "Knuckle Mace",
+        "Golden Mole", "The Judgement", "Gigantic Sledge", "Jousting Helmet", "White Fingerless Gloves",
+        "Steel Nordic Helm", "Steel Briggon", "Bronze Crusader Helm", "Iron Knuckle", "Green Icarus Cape",
+        "Green Napoleon"
+      ]
     },
     {
-      "id": "fp-wizard", "job": 210, "name": "Fire Arrow F/P Wizard",
-      "summary": "Fire Arrow first, then Meditation for the party, with Poison Breath for later.",
-      "opening": "magician",
+      "id": "page-sword-niadb", "job": 120, "name": "Page (sword), NiaDB guide",
+      "summary": "The same order with Sword Mastery, Final Attack: Sword and Sword Booster. More predictable minimum damage.",
+      "source": {
+        "name": "NiaDB",
+        "url": "https://meowdb.com/msclassic/guides/page-class-guide",
+        "credit": "Page guide by Nia Meow, from a Lv 70 build by Grummash, updated 2026-11-09. Lv 1-30 is from NiaDB's Warrior guide (meowdb.com/msclassic/guides/warrior-class-guide), its main path. This is the guide's sword order: its blunt order with the sword skills in the weapon slots."
+      },
+      "opening": "warrior-niadb",
       "skills": [
-        ["Teleport", 1], ["Fire Arrow", 15], ["MP Eater", 3], ["Meditation", 10], ["Fire Arrow", 30], ["Meditation", 20],
-        ["Teleport", 20], ["MP Eater", 20], ["Poison Breath", 30], ["Slow", 1]
+        ["Rush", 1], ["Sword Mastery", 5], ["Sword Booster", 1], ["Threaten", 1], ["Sword Mastery", 20],
+        ["Final Attack: Sword", 30], ["Threaten", 30], ["Sword Booster", 20], ["Rush", 20],
+        ["Blunt Weapon Mastery", 1]
+      ],
+      "primary": "str", "secondary": "dex",
+      "ap": [
+        ["dex", 8, 15], ["dex", 18, 19], ["dex", 22, 29], ["dex", 27, 30], ["dex", 32, 35], ["dex", 36, 40],
+        ["dex", 38, 49], ["dex", 43, 50], ["dex", 45, 67], ["dex", 60, 68]
+      ],
+      "gear": [
+        "Long Sword", "Sabre", "Viking Sword", "Broadsword", "Gladius", "Scimitar", "Traus", "Zard",
+        "Hero's Gladius", "Lion's Fang", "Red Katana", "Doombringer", "Jousting Helmet",
+        "White Fingerless Gloves", "Steel Nordic Helm", "Steel Briggon", "Bronze Crusader Helm", "Iron Knuckle",
+        "Green Icarus Cape", "Green Napoleon"
+      ]
+    },
+    {
+      "id": "spearman-niadb", "job": 130, "name": "Spearman (spear), NiaDB guide",
+      "summary": "Spear Mastery and Final Attack first, Booster and Rush next, Iron Will last.",
+      "source": {
+        "name": "NiaDB",
+        "url": "https://meowdb.com/msclassic/guides/spearman-class-guide",
+        "credit": "Spearman guide by Nia Meow, from a Lv 70 build by Grummash, updated 2026-11-09. Lv 1-30 is from NiaDB's Warrior guide (meowdb.com/msclassic/guides/warrior-class-guide), its main path. This is the guide's spear order; the polearm order swaps the three weapon skills."
+      },
+      "opening": "warrior-niadb",
+      "skills": [
+        ["Rush", 1], ["Spear Mastery", 5], ["Spear Booster", 1], ["Spear Mastery", 6],
+        ["Final Attack: Spear", 2], ["Spear Mastery", 20], ["Final Attack: Spear", 30], ["Spear Booster", 20],
+        ["Rush", 20], ["Iron Will", 30], ["Polearm Mastery", 1]
+      ],
+      "primary": "str", "secondary": "dex",
+      "ap": [
+        ["dex", 8, 15], ["dex", 18, 19], ["dex", 22, 29], ["dex", 27, 30], ["dex", 32, 35], ["dex", 36, 40],
+        ["dex", 38, 49], ["dex", 43, 50], ["dex", 45, 67], ["dex", 60, 68]
+      ],
+      "gear": [
+        "Forked Spear", "Nakamaki", "Zeco", "Serpent's Tongue", "Redemption", "Jousting Helmet",
+        "White Fingerless Gloves", "Steel Nordic Helm", "Steel Briggon", "Bronze Crusader Helm", "Iron Knuckle",
+        "Green Icarus Cape", "Green Napoleon"
+      ]
+    },
+    {
+      "id": "spearman-polearm-niadb", "job": 130, "name": "Spearman (polearm), NiaDB guide",
+      "summary": "The same order with Polearm Mastery, Final Attack: Polearm and Polearm Booster. More Power Strike damage and +20 Movement Speed.",
+      "source": {
+        "name": "NiaDB",
+        "url": "https://meowdb.com/msclassic/guides/spearman-class-guide",
+        "credit": "Spearman guide by Nia Meow, from a Lv 70 build by Grummash, updated 2026-11-09. Lv 1-30 is from NiaDB's Warrior guide (meowdb.com/msclassic/guides/warrior-class-guide), its main path. This is the guide's polearm order: its spear order with the polearm skills in the weapon slots."
+      },
+      "opening": "warrior-niadb",
+      "skills": [
+        ["Rush", 1], ["Polearm Mastery", 5], ["Polearm Booster", 1], ["Polearm Mastery", 6],
+        ["Final Attack: Polearm", 2], ["Polearm Mastery", 20], ["Final Attack: Polearm", 30],
+        ["Polearm Booster", 20], ["Rush", 20], ["Iron Will", 30], ["Spear Mastery", 1]
+      ],
+      "primary": "str", "secondary": "dex",
+      "ap": [
+        ["dex", 8, 15], ["dex", 18, 19], ["dex", 22, 29], ["dex", 27, 30], ["dex", 32, 35], ["dex", 36, 40],
+        ["dex", 38, 49], ["dex", 43, 50], ["dex", 45, 67], ["dex", 60, 68]
+      ],
+      "gear": [
+        "Mithril Pole Arm", "Axe Pole Arm", "Crescent Polearm", "The Nine Dragons", "The Gold Dragon",
+        "Jousting Helmet", "White Fingerless Gloves", "Steel Nordic Helm", "Steel Briggon",
+        "Bronze Crusader Helm", "Iron Knuckle", "Green Icarus Cape", "Green Napoleon"
+      ]
+    },
+    {
+      "id": "fp-wizard-niadb", "job": 210, "name": "F/P Wizard, NiaDB guide",
+      "summary": "Fire Arrow to 30 by Lv 40, Poison Breath by Lv 50, then Meditation, MP Eater and Teleport.",
+      "source": {
+        "name": "NiaDB",
+        "url": "https://meowdb.com/msclassic/guides/fp-wizard-class-guide",
+        "credit": "F/P Wizard guide by Nia Meow, from a Lv 70 build by Grummash, updated 2026-11-09. Lv 1-30 is from NiaDB's Magician guide (meowdb.com/msclassic/guides/magician-class-guide), its Magic Claw plan, which needs no SP reset."
+      },
+      "opening": "magician-niadb",
+      "skills": [
+        ["Teleport", 1], ["Fire Arrow", 30], ["Poison Breath", 30], ["MP Eater", 3], ["Meditation", 20],
+        ["MP Eater", 20], ["Teleport", 20], ["Slow", 1]
       ],
       "primary": "int", "secondary": "luk",
-      "steps": [[10, 20], [15, 25], [20, 30], [25, 35], [30, 40], [40, 50], [55, 60], [65, 70]],
-      "gear": ["Wooden Wand", "Hardwood Wand", "Metal Wand", "Ice Wand", "Mithril Wand", "Wizard Wand", "Fairy Wand", "Cromi", "Evil Tale", "Angel Wings"]
+      "ap": [
+        ["luk", 10, 20], ["luk", 15, 25], ["luk", 20, 30], ["luk", 25, 35], ["luk", 30, 45], ["luk", 40, 49],
+        ["luk", 50, 54], ["luk", 53, 68], ["luk", 63, 69]
+      ],
+      "gear": [
+        "Wooden Wand", "Hardwood Wand", "Metal Wand", "Ice Wand", "Mithril Wand", "Wizard Wand", "Fairy Wand",
+        "Cromi", "Thorns", "Angel Wings", "Pan Lid"
+      ]
     },
     {
-      "id": "il-wizard", "job": 220, "name": "Cold Beam I/L Wizard",
-      "summary": "Cold Beam to single out targets, Thunder Bolt alongside it for groups.",
-      "opening": "magician",
+      "id": "fp-wizard-energybolt-niadb", "job": 210, "name": "F/P Wizard, Energy Bolt start, NiaDB guide",
+      "summary": "The same Lv 30-70 skills; Lv 1-30 follows the Energy Bolt plan instead of Magic Claw.",
+      "source": {
+        "name": "NiaDB",
+        "url": "https://meowdb.com/msclassic/guides/fp-wizard-class-guide",
+        "credit": "F/P Wizard guide by Nia Meow, from a Lv 70 build by Grummash, updated 2026-11-09. Lv 1-30 is from NiaDB's Magician guide (meowdb.com/msclassic/guides/magician-class-guide), its Energy Bolt plan (Energy Bolt 20, Magic Armor 20), which can run through second job as it is. Moving to it from the Magic Claw plan needs an SP Reset Scroll."
+      },
+      "opening": "magician-energybolt-niadb",
       "skills": [
-        ["Teleport", 1], ["Cold Beam", 15], ["MP Eater", 3], ["Meditation", 10], ["Thunder Bolt", 15], ["Cold Beam", 30],
-        ["Meditation", 20], ["Thunder Bolt", 30], ["Teleport", 20], ["MP Eater", 20], ["Slow", 1]
+        ["Teleport", 1], ["Fire Arrow", 30], ["Poison Breath", 30], ["MP Eater", 3], ["Meditation", 20],
+        ["MP Eater", 20], ["Teleport", 20], ["Slow", 1]
       ],
       "primary": "int", "secondary": "luk",
-      "steps": [[10, 20], [15, 25], [20, 30], [25, 35], [30, 40], [40, 50], [55, 60], [65, 70]],
-      "gear": ["Wooden Wand", "Hardwood Wand", "Metal Wand", "Ice Wand", "Mithril Wand", "Wizard Wand", "Fairy Wand", "Cromi", "Evil Tale", "Angel Wings"]
+      "ap": [
+        ["luk", 10, 20], ["luk", 15, 25], ["luk", 20, 30], ["luk", 25, 35], ["luk", 30, 45], ["luk", 40, 49],
+        ["luk", 50, 54], ["luk", 53, 68], ["luk", 63, 69]
+      ],
+      "gear": [
+        "Wooden Wand", "Hardwood Wand", "Metal Wand", "Ice Wand", "Mithril Wand", "Wizard Wand", "Fairy Wand",
+        "Cromi", "Thorns", "Angel Wings", "Pan Lid"
+      ]
     },
     {
-      "id": "cleric", "job": 230, "name": "Party Cleric",
-      "summary": "Heal and Bless for parties, with Holy Arrow to grind between them. MP Eater is skipped.",
-      "opening": "magician",
+      "id": "il-wizard-niadb", "job": 220, "name": "I/L Wizard, NiaDB guide",
+      "summary": "Cold Beam to 30 by Lv 41, Meditation, Teleport, then Thunder Bolt to 30 by Lv 64.",
+      "source": {
+        "name": "NiaDB",
+        "url": "https://meowdb.com/msclassic/guides/il-wizard-class-guide",
+        "credit": "I/L Wizard guide by Nia Meow, from a Lv 70 build by Grummash with an SP order credited to xBucc, updated 2026-11-09. Lv 1-30 is from NiaDB's Magician guide (meowdb.com/msclassic/guides/magician-class-guide), its Magic Claw plan, which needs no SP reset."
+      },
+      "opening": "magician-niadb",
       "skills": [
-        ["Teleport", 1], ["Holy Arrow", 10], ["Heal", 15], ["Invincible", 5], ["Bless", 5], ["Holy Arrow", 30], ["Heal", 30],
-        ["Bless", 20], ["Invincible", 20], ["Teleport", 20], ["MP Eater", 1]
+        ["Teleport", 1], ["MP Eater", 1], ["Cold Beam", 1], ["Thunder Bolt", 1], ["Cold Beam", 30],
+        ["MP Eater", 3], ["Meditation", 20], ["Teleport", 20], ["Thunder Bolt", 30], ["MP Eater", 20],
+        ["Slow", 1]
       ],
       "primary": "int", "secondary": "luk",
-      "steps": [[10, 20], [15, 25], [20, 30], [25, 35], [30, 40], [40, 50], [55, 60], [65, 70]],
-      "gear": ["Wooden Wand", "Hardwood Wand", "Metal Wand", "Ice Wand", "Mithril Wand", "Wizard Wand", "Fairy Wand", "Cromi", "Evil Tale", "Angel Wings"]
+      "ap": [
+        ["luk", 10, 20], ["luk", 15, 25], ["luk", 20, 30], ["luk", 25, 35], ["luk", 30, 45], ["luk", 40, 49],
+        ["luk", 50, 54], ["luk", 53, 68], ["luk", 63, 69]
+      ],
+      "gear": [
+        "Wooden Wand", "Hardwood Wand", "Metal Wand", "Ice Wand", "Mithril Wand", "Wizard Wand", "Fairy Wand",
+        "Cromi", "Thorns", "Angel Wings", "Pan Lid", "Brown Jester", "Blue Doros Robe", "White Guiltian",
+        "Brown Starlight", "Flame Golden Circlet", "Red Calas"
+      ]
     },
     {
-      "id": "hunter", "job": 310, "name": "Arrow Bomb Hunter",
-      "summary": "Mastery first for steadier damage, then Arrow Bomb for groups.",
-      "opening": "bowman",
+      "id": "il-wizard-energybolt-niadb", "job": 220, "name": "I/L Wizard, Energy Bolt start, NiaDB guide",
+      "summary": "The same Lv 30-70 skills; Lv 1-30 follows the Energy Bolt plan instead of Magic Claw.",
+      "source": {
+        "name": "NiaDB",
+        "url": "https://meowdb.com/msclassic/guides/il-wizard-class-guide",
+        "credit": "I/L Wizard guide by Nia Meow, from a Lv 70 build by Grummash with an SP order credited to xBucc, updated 2026-11-09. Lv 1-30 is from NiaDB's Magician guide (meowdb.com/msclassic/guides/magician-class-guide), its Energy Bolt plan (Energy Bolt 20, Magic Armor 20), which can run through second job as it is. Moving to it from the Magic Claw plan needs an SP Reset Scroll."
+      },
+      "opening": "magician-energybolt-niadb",
       "skills": [
-        ["Bow Mastery", 5], ["Bow Booster", 1], ["Bow Mastery", 20], ["Arrow Bomb", 30], ["Final Attack: Bow", 30],
-        ["Bow Booster", 20], ["Soul Arrow: Bow", 20], ["Amazon's Judgement", 1]
+        ["Teleport", 1], ["MP Eater", 1], ["Cold Beam", 1], ["Thunder Bolt", 1], ["Cold Beam", 30],
+        ["MP Eater", 3], ["Meditation", 20], ["Teleport", 20], ["Thunder Bolt", 30], ["MP Eater", 20],
+        ["Slow", 1]
+      ],
+      "primary": "int", "secondary": "luk",
+      "ap": [
+        ["luk", 10, 20], ["luk", 15, 25], ["luk", 20, 30], ["luk", 25, 35], ["luk", 30, 45], ["luk", 40, 49],
+        ["luk", 50, 54], ["luk", 53, 68], ["luk", 63, 69]
+      ],
+      "gear": [
+        "Wooden Wand", "Hardwood Wand", "Metal Wand", "Ice Wand", "Mithril Wand", "Wizard Wand", "Fairy Wand",
+        "Cromi", "Thorns", "Angel Wings", "Pan Lid", "Brown Jester", "Blue Doros Robe", "White Guiltian",
+        "Brown Starlight", "Flame Golden Circlet", "Red Calas"
+      ]
+    },
+    {
+      "id": "cleric-niadb", "job": 230, "name": "Cleric (Party Support), NiaDB guide",
+      "summary": "Heal to 30 by Lv 41, Bless, Teleport and Invincible next, Holy Arrow last.",
+      "source": {
+        "name": "NiaDB",
+        "url": "https://meowdb.com/msclassic/guides/cleric-class-guide",
+        "credit": "Cleric guide by Nia Meow and Grummash, updated 2026-11-10. Lv 1-30 is from NiaDB's Magician guide (meowdb.com/msclassic/guides/magician-class-guide), its Magic Claw plan, which needs no SP reset. This is the guide's Party Support order; it also gives a Meso Saver and an xBucc order."
+      },
+      "opening": "magician-niadb",
+      "skills": [
+        ["Heal", 1], ["Teleport", 1], ["MP Eater", 1], ["Heal", 29], ["Invincible", 2], ["Heal", 30],
+        ["Invincible", 5], ["Bless", 20], ["Teleport", 20], ["Invincible", 20], ["Holy Arrow", 30]
+      ],
+      "primary": "int", "secondary": "luk",
+      "ap": [
+        ["luk", 10, 20], ["luk", 15, 25], ["luk", 20, 30], ["luk", 25, 35], ["luk", 30, 45], ["luk", 40, 49],
+        ["luk", 50, 54], ["luk", 53, 68], ["luk", 63, 69]
+      ],
+      "gear": [
+        "Wooden Wand", "Hardwood Wand", "Metal Wand", "Ice Wand", "Mithril Wand", "Wizard Wand", "Fairy Wand",
+        "Cromi", "Thorns", "Angel Wings", "Pan Lid", "Brown Jester", "Blue Doros Robe", "Brown Guiltian",
+        "Blue Starlight", "Aqua Golden Circlet", "Blue Calas", "Gold Moon Shoes"
+      ]
+    },
+    {
+      "id": "cleric-energybolt-niadb", "job": 230, "name": "Cleric, Energy Bolt start, NiaDB guide",
+      "summary": "The same Lv 30-70 skills; Lv 1-30 follows the Energy Bolt plan instead of Magic Claw.",
+      "source": {
+        "name": "NiaDB",
+        "url": "https://meowdb.com/msclassic/guides/cleric-class-guide",
+        "credit": "Cleric guide by Nia Meow and Grummash, updated 2026-11-10. Lv 1-30 is from NiaDB's Magician guide (meowdb.com/msclassic/guides/magician-class-guide), its Energy Bolt plan (Energy Bolt 20, Magic Armor 20), which can run through second job as it is. Moving to it from the Magic Claw plan needs an SP Reset Scroll. This is the guide's Party Support order; it also gives a Meso Saver and an xBucc order."
+      },
+      "opening": "magician-energybolt-niadb",
+      "skills": [
+        ["Heal", 1], ["Teleport", 1], ["MP Eater", 1], ["Heal", 29], ["Invincible", 2], ["Heal", 30],
+        ["Invincible", 5], ["Bless", 20], ["Teleport", 20], ["Invincible", 20], ["Holy Arrow", 30]
+      ],
+      "primary": "int", "secondary": "luk",
+      "ap": [
+        ["luk", 10, 20], ["luk", 15, 25], ["luk", 20, 30], ["luk", 25, 35], ["luk", 30, 45], ["luk", 40, 49],
+        ["luk", 50, 54], ["luk", 53, 68], ["luk", 63, 69]
+      ],
+      "gear": [
+        "Wooden Wand", "Hardwood Wand", "Metal Wand", "Ice Wand", "Mithril Wand", "Wizard Wand", "Fairy Wand",
+        "Cromi", "Thorns", "Angel Wings", "Pan Lid", "Brown Jester", "Blue Doros Robe", "Brown Guiltian",
+        "Blue Starlight", "Aqua Golden Circlet", "Blue Calas", "Gold Moon Shoes"
+      ]
+    },
+    {
+      "id": "cleric-mesosaver-niadb", "job": 230, "name": "Cleric (Meso Saver), NiaDB guide",
+      "summary": "For solo grinding: Holy Arrow first, MP Eater to 20, Teleport stays at 1.",
+      "source": {
+        "name": "NiaDB",
+        "url": "https://meowdb.com/msclassic/guides/cleric-class-guide",
+        "credit": "Cleric guide by Nia Meow and Grummash, updated 2026-11-10. Lv 1-30 is from NiaDB's Magician guide (meowdb.com/msclassic/guides/magician-class-guide), its Energy Bolt plan, which can run through second job as it is. This is the guide's Meso Saver order for solo grinding, without its reset."
+      },
+      "opening": "magician-energybolt-niadb",
+      "skills": [
+        ["Heal", 1], ["Teleport", 1], ["MP Eater", 1], ["Heal", 2], ["Holy Arrow", 21], ["Heal", 5],
+        ["Invincible", 5], ["Bless", 1], ["MP Eater", 20], ["Heal", 7], ["Holy Arrow", 30], ["Heal", 15],
+        ["Bless", 20], ["Invincible", 20], ["Heal", 30]
+      ],
+      "primary": "int", "secondary": "luk",
+      "ap": [
+        ["luk", 10, 20], ["luk", 15, 25], ["luk", 20, 30], ["luk", 25, 35], ["luk", 30, 45], ["luk", 40, 49],
+        ["luk", 50, 54], ["luk", 53, 68], ["luk", 63, 69]
+      ],
+      "gear": [
+        "Wooden Wand", "Hardwood Wand", "Metal Wand", "Ice Wand", "Mithril Wand", "Wizard Wand", "Fairy Wand",
+        "Cromi", "Thorns", "Angel Wings", "Pan Lid", "Brown Jester", "Blue Doros Robe", "Brown Guiltian",
+        "Blue Starlight", "Aqua Golden Circlet", "Blue Calas", "Gold Moon Shoes"
+      ]
+    },
+    {
+      "id": "hunter-niadb", "job": 310, "name": "Hunter, NiaDB guide",
+      "summary": "Mastery and Booster first, Arrow Bomb to 30 by Lv 49, then Final Attack and Soul Arrow.",
+      "source": {
+        "name": "NiaDB",
+        "url": "https://meowdb.com/msclassic/guides/hunter-class-guide",
+        "credit": "Hunter guide by Nia Meow, from a Lv 70 build by Grummash, updated 2026-11-09. Lv 1-30 is from NiaDB's Bowman guide (meowdb.com/msclassic/guides/bowman-class-guide), its no-reset bow order with Arrow Blow maxed, so no SP Reset Scroll is needed."
+      },
+      "opening": "bowman-niadb",
+      "skills": [
+        ["Arrow Bomb", 1], ["Bow Mastery", 5], ["Bow Booster", 5], ["Soul Arrow: Bow", 1], ["Bow Mastery", 20],
+        ["Final Attack: Bow", 1], ["Arrow Bomb", 30], ["Final Attack: Bow", 30], ["Amazon's Judgement", 1],
+        ["Bow Booster", 20], ["Soul Arrow: Bow", 20]
       ],
       "primary": "dex", "secondary": "str",
-      "steps": [[15, 15], [20, 20], [25, 25], [30, 30], [35, 35], [40, 40], [50, 50], [60, 60], [70, 70]],
-      "gear": ["War Bow", "Composite Bow", "Hunter's Bow", "Battle Bow", "Ryden", "Red Viper", "Vaulter 2000", "Olympus", "Asianic Bow", "Red Hinkel"]
+      "ap": [
+        ["str", 15, 14], ["str", 18, 20], ["str", 23, 25], ["str", 28, 30], ["str", 33, 35], ["str", 38, 45],
+        ["str", 48, 49], ["str", 50, 66], ["str", 70, 67]
+      ],
+      "gear": [
+        "War Bow", "Composite Bow", "Hunter's Bow", "Battle Bow", "Ryden", "Red Viper", "Vaulter 2000",
+        "Olympus", "Golden Hinkel", "Green Winter Hat", "Green Archer Top", "Green Feather Hat",
+        "Basic Archer Gloves", "Green Robin Hat", "Green Hunter", "Blue Diros", "Green Hawkeye",
+        "Green Bennis Chainmail", "Green Hunter's Pants", "Green Jack Boots", "Blue Savata", "Green Icarus Cape",
+        "Green Napoleon", "Green Patriot", "Beige Linnex", "Blue Eyes", "Green Elf Shoes", "White Gaia Cape",
+        "Metal Silver Earrings"
+      ]
     },
     {
-      "id": "crossbowman", "job": 320, "name": "Iron Arrow Crossbowman",
-      "summary": "Mastery first, then Iron Arrow. Crossbows ask for less STR than bows.",
-      "opening": "bowman",
+      "id": "hunter-doubleshot-niadb", "job": 310, "name": "Hunter, Double Shot start, NiaDB guide",
+      "summary": "Double Shot 20 and Arrow Blow 1 at Lv 30 instead of Arrow Blow 20. Needs an SP Reset Scroll unless planned from Lv 10.",
+      "source": {
+        "name": "NiaDB",
+        "url": "https://meowdb.com/msclassic/guides/hunter-class-guide",
+        "credit": "Hunter guide by Nia Meow, from a Lv 70 build by Grummash, updated 2026-11-09. Lv 1-30 is from NiaDB's Bowman guide (meowdb.com/msclassic/guides/bowman-class-guide), its Double Shot end point (Arrow Blow 1, Double Shot 20, Focus 9), reached with an SP Reset Scroll (7,000 NX) unless planned from Lv 10. The guide gives that end point only; the order up to it is Leafline's."
+      },
+      "opening": "bowman-doubleshot-niadb",
       "skills": [
-        ["Crossbow Mastery", 5], ["Crossbow Booster", 1], ["Crossbow Mastery", 20], ["Iron Arrow", 30],
-        ["Final Attack: Crossbow", 30], ["Crossbow Booster", 20], ["Soul Arrow: Crossbow", 20], ["Amazon's Judgement", 1]
+        ["Arrow Bomb", 1], ["Bow Mastery", 5], ["Bow Booster", 5], ["Soul Arrow: Bow", 1], ["Bow Mastery", 20],
+        ["Final Attack: Bow", 1], ["Arrow Bomb", 30], ["Final Attack: Bow", 30], ["Amazon's Judgement", 1],
+        ["Bow Booster", 20], ["Soul Arrow: Bow", 20]
       ],
       "primary": "dex", "secondary": "str",
-      "steps": [[10, 20], [15, 25], [20, 30], [30, 40], [35, 45], [40, 50], [50, 60], [60, 70]],
-      "gear": ["Crossbow", "Battle Crossbow", "Balanche", "Mountain Crossbow", "Eagle Crow", "Heckler", "Silver Crow", "Rower", "Golden Crow", "Gross Jaeger"]
+      "ap": [
+        ["str", 15, 14], ["str", 18, 20], ["str", 23, 25], ["str", 28, 30], ["str", 33, 35], ["str", 38, 45],
+        ["str", 48, 49], ["str", 50, 66], ["str", 70, 67]
+      ],
+      "gear": [
+        "War Bow", "Composite Bow", "Hunter's Bow", "Battle Bow", "Ryden", "Red Viper", "Vaulter 2000",
+        "Olympus", "Golden Hinkel", "Green Winter Hat", "Green Archer Top", "Green Feather Hat",
+        "Basic Archer Gloves", "Green Robin Hat", "Green Hunter", "Blue Diros", "Green Hawkeye",
+        "Green Bennis Chainmail", "Green Hunter's Pants", "Green Jack Boots", "Blue Savata", "Green Icarus Cape",
+        "Green Napoleon", "Green Patriot", "Beige Linnex", "Blue Eyes", "Green Elf Shoes", "White Gaia Cape",
+        "Metal Silver Earrings"
+      ]
     },
     {
-      "id": "assassin", "job": 410, "name": "Claw Assassin",
-      "summary": "Lucky Seven with claws throughout. Critical Throw first, then Drain for sustain.",
-      "opening": "claw",
+      "id": "crossbowman-niadb", "job": 320, "name": "Crossbowman, NiaDB guide",
+      "summary": "Mastery and Booster first, Iron Arrow maxed by Lv 49, STR only as far as the next crossbow needs.",
+      "source": {
+        "name": "NiaDB",
+        "url": "https://meowdb.com/msclassic/guides/crossbowman-class-guide",
+        "credit": "Crossbowman guide by Nia Meow, from a Lv 70 build by Grummash, updated 2026-11-09. Lv 1-30 is from NiaDB's Bowman guide (meowdb.com/msclassic/guides/bowman-class-guide), its no-reset crossbow order with Arrow Blow maxed, so no SP Reset Scroll is needed."
+      },
+      "opening": "bowman-niadb",
       "skills": [
-        ["Claw Mastery", 5], ["Claw Booster", 1], ["Claw Mastery", 20], ["Critical Throw", 30], ["Haste", 5], ["Claw Booster", 20],
-        ["Critical Recovery", 3], ["Drain", 28], ["Haste", 20]
+        ["Iron Arrow", 1], ["Crossbow Mastery", 5], ["Crossbow Booster", 3], ["Final Attack: Crossbow", 1],
+        ["Crossbow Booster", 5], ["Soul Arrow: Crossbow", 1], ["Crossbow Mastery", 20], ["Iron Arrow", 30],
+        ["Amazon's Judgement", 1], ["Crossbow Booster", 20], ["Soul Arrow: Crossbow", 20],
+        ["Final Attack: Crossbow", 30]
       ],
-      "primary": "luk", "secondary": "dex",
-      "steps": [[15, 15], [20, 20], [25, 25], [30, 30], [35, 35], [40, 40], [50, 50], [60, 60], [70, 70]],
-      "gear": ["Garnier", "Steel Titans", "Bronze Igor", "Meba", "Adamantium Guards", "Dark Guardian", "Dark Avarice", "Dark Slain", "Dark Gigantic", "Black Scarab"]
+      "primary": "dex", "secondary": "str",
+      "ap": [
+        ["str", 9, 20], ["str", 14, 25], ["str", 18, 30], ["str", 28, 39], ["str", 38, 49], ["str", 40, 66],
+        ["str", 60, 67]
+      ],
+      "gear": [
+        "Crossbow", "Battle Crossbow", "Balanche", "Mountain Crossbow", "Eagle Crow", "Heckler", "Rower",
+        "Gross Jaeger", "Green Winter Hat", "Green Archer Top", "Green Feather Hat", "Basic Archer Gloves",
+        "Green Robin Hat", "Green Hunter", "Blue Diros", "Green Hawkeye", "Green Bennis Chainmail",
+        "Green Hunter's Pants", "Green Jack Boots", "Blue Savata", "Green Icarus Cape", "Green Napoleon",
+        "Green Patriot", "Beige Linnex", "Blue Eyes", "Green Elf Shoes", "White Gaia Cape",
+        "Metal Silver Earrings"
+      ]
     },
     {
-      "id": "bandit", "job": 420, "name": "Dagger Bandit",
-      "summary": "Double Stab from the start, so no SP reset is needed at Lv 30. DEX daggers, not STR ones.",
-      "opening": "dagger",
+      "id": "crossbowman-doubleshot-niadb", "job": 320, "name": "Crossbowman, Double Shot start, NiaDB guide",
+      "summary": "Double Shot 20 and Arrow Blow 1 at Lv 30 instead of Arrow Blow 20. Needs an SP Reset Scroll unless planned from Lv 10.",
+      "source": {
+        "name": "NiaDB",
+        "url": "https://meowdb.com/msclassic/guides/crossbowman-class-guide",
+        "credit": "Crossbowman guide by Nia Meow, from a Lv 70 build by Grummash, updated 2026-11-09. Lv 1-30 is from NiaDB's Bowman guide (meowdb.com/msclassic/guides/bowman-class-guide), its Double Shot end point (Arrow Blow 1, Double Shot 20, Focus 9), reached with an SP Reset Scroll (7,000 NX) unless planned from Lv 10. The guide gives that end point only; the order up to it is Leafline's."
+      },
+      "opening": "bowman-doubleshot-niadb",
       "skills": [
-        ["Savage Blow", 1], ["Dagger Mastery", 5], ["Dagger Booster", 1], ["Dagger Mastery", 20], ["Savage Blow", 30], ["Haste", 5],
-        ["Dagger Booster", 20], ["Steal", 30], ["Haste", 20], ["Nimble Recovery", 1]
+        ["Iron Arrow", 1], ["Crossbow Mastery", 5], ["Crossbow Booster", 3], ["Final Attack: Crossbow", 1],
+        ["Crossbow Booster", 5], ["Soul Arrow: Crossbow", 1], ["Crossbow Mastery", 20], ["Iron Arrow", 30],
+        ["Amazon's Judgement", 1], ["Crossbow Booster", 20], ["Soul Arrow: Crossbow", 20],
+        ["Final Attack: Crossbow", 30]
+      ],
+      "primary": "dex", "secondary": "str",
+      "ap": [
+        ["str", 9, 20], ["str", 14, 25], ["str", 18, 30], ["str", 28, 39], ["str", 38, 49], ["str", 40, 66],
+        ["str", 60, 67]
+      ],
+      "gear": [
+        "Crossbow", "Battle Crossbow", "Balanche", "Mountain Crossbow", "Eagle Crow", "Heckler", "Rower",
+        "Gross Jaeger", "Green Winter Hat", "Green Archer Top", "Green Feather Hat", "Basic Archer Gloves",
+        "Green Robin Hat", "Green Hunter", "Blue Diros", "Green Hawkeye", "Green Bennis Chainmail",
+        "Green Hunter's Pants", "Green Jack Boots", "Blue Savata", "Green Icarus Cape", "Green Napoleon",
+        "Green Patriot", "Beige Linnex", "Blue Eyes", "Green Elf Shoes", "White Gaia Cape",
+        "Metal Silver Earrings"
+      ]
+    },
+    {
+      "id": "assassin-niadb", "job": 410, "name": "Assassin, NiaDB guide",
+      "summary": "Mastery, then Critical Throw to 30 by Lv 47, Haste, Booster and Critical Recovery, Drain last.",
+      "source": {
+        "name": "NiaDB",
+        "url": "https://meowdb.com/msclassic/guides/assassin-class-guide",
+        "credit": "Assassin guide by Nia Meow, from a Lv 70 build by Grummash, updated 2026-11-09. Lv 1-30 is from NiaDB's Thief guide (meowdb.com/msclassic/guides/thief-class-guide), its Lucky Seven plan with the claw AP plan."
+      },
+      "opening": "thief-claw-niadb",
+      "skills": [
+        ["Haste", 1], ["Claw Mastery", 5], ["Claw Booster", 1], ["Claw Mastery", 20], ["Critical Throw", 30],
+        ["Haste", 20], ["Claw Booster", 9], ["Critical Recovery", 20], ["Claw Booster", 20], ["Drain", 11]
       ],
       "primary": "luk", "secondary": "dex",
-      "steps": [[10, 15], [15, 20], [20, 25], [22, 27], [25, 30], [30, 35], [35, 40], [45, 50], [55, 60], [65, 70]],
-      "gear": ["Triangular Zamadar", "Field Dagger", "Coconut Knife", "Iron Dagger", "Forked Dagger", "Reef Claw", "Halfmoon Zamadar", "Gephart", "Shinkita", "Deadly Fin", "Kandine"]
+      "ap": [
+        ["dex", 15, 14], ["dex", 20, 20], ["dex", 25, 25], ["dex", 30, 30], ["dex", 35, 35], ["dex", 45, 49],
+        ["dex", 47, 66], ["dex", 67, 67]
+      ],
+      "gear": [
+        "Steel Titans", "Steel Igor", "Meba", "Steel Guards", "Bronze Guardian", "Steel Slain", "Black Scarab",
+        "Green Icarus Cape", "Green Napoleon", "White Nightfox", "Dark Studded Top", "Dark Studded Pants",
+        "Gold Rover", "Blue Mystique Shoes", "Black Gaia Cape", "Metal Silver Earrings"
+      ]
+    },
+    {
+      "id": "bandit-niadb", "job": 420, "name": "Bandit (no reset, STR daggers), NiaDB guide",
+      "summary": "Mastery, then Savage Blow to 30 by Lv 47, Haste, Nimble Recovery and Steal, Booster last. No SP reset.",
+      "source": {
+        "name": "NiaDB",
+        "url": "https://meowdb.com/msclassic/guides/bandit-class-guide",
+        "credit": "Bandit guide by Nia Meow, from a Lv 70 build by Grummash, updated 2026-11-09. Lv 1-30 is from NiaDB's Thief guide (meowdb.com/msclassic/guides/thief-class-guide), its no-reset Double Stab plan with the STR Bandit AP plan. This is the guide's F2P no-reset order; its main plan resets SP at Lv 40."
+      },
+      "opening": "thief-dagger-niadb",
+      "skills": [
+        ["Haste", 1], ["Dagger Mastery", 5], ["Dagger Booster", 1], ["Dagger Mastery", 20], ["Savage Blow", 30],
+        ["Haste", 20], ["Nimble Recovery", 12], ["Steal", 30], ["Dagger Booster", 9]
+      ],
+      "primary": "luk", "secondary": "str",
+      "ap": [
+        ["str", 6, 16], ["str", 11, 17], ["str", 12, 21], ["str", 17, 22], ["str", 20, 45], ["str", 45, 46],
+        ["str", 55, 59], ["str", 65, 69]
+      ],
+      "gear": [
+        "Triangular Zamadar", "Triple-Tipped Zamadar", "Stinger", "Cass", "Korean Fan", "Sai", "Serpent's Coil",
+        "Golden River", "Pan Lid", "Stolen Fence", "Green Icarus Cape", "Green Napoleon", "White Nightfox",
+        "Dark Studded Top", "Dark Studded Pants", "Gold Rover", "Blue Mystique Shoes", "Black Gaia Cape",
+        "Metal Silver Earrings"
+      ]
     }
   ]
 }

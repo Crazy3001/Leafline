@@ -1,12 +1,13 @@
 //! The desk view: the panels side by side in one ordinary window, for a second screen. Unlike the
 //! overlay and pins it is not meant to sit over the game, so it has a frame and a taskbar entry
 //! and stays off the top unless the player asks. It opens again at launch if it was open at quit.
+//! It also holds the training log and the build planner, as tabs of its own.
 
 use std::path::PathBuf;
 use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager, State, WebviewUrl, WebviewWindowBuilder, Window};
+use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder, Window};
 
 use super::settings::SettingsState;
 use crate::error::{Error, Result};
@@ -15,6 +16,9 @@ const FILE_NAME: &str = "desk.json";
 
 /// The desk view's window label.
 pub const DESK: &str = "desk";
+
+/// Emitted to the desk view to bring up one of its tabs.
+pub const TAB_EVENT: &str = "desk-tab";
 
 /// What is remembered about the desk view between runs. Its place and size are kept by the
 /// window-state plugin, like every other window's; the layout is the page's own.
@@ -30,6 +34,8 @@ pub struct DeskStatus {
 pub struct DeskState {
     path: PathBuf,
     status: Mutex<DeskStatus>,
+    /// A tab asked for while the window was still opening, taken by its page once it loads.
+    pending: Mutex<Option<String>>,
 }
 
 impl DeskState {
@@ -37,7 +43,7 @@ impl DeskState {
     pub fn load(app: &AppHandle) -> Result<Self> {
         let path = app.path().app_data_dir()?.join(FILE_NAME);
         let status = std::fs::read_to_string(&path).ok().map(|json| parse(&json)).unwrap_or_default();
-        Ok(Self { path, status: Mutex::new(status) })
+        Ok(Self { path, status: Mutex::new(status), pending: Mutex::new(None) })
     }
 
     fn get(&self) -> DeskStatus {
@@ -115,6 +121,24 @@ pub async fn show_desk(app: AppHandle) -> Result<DeskStatus> {
     let status = app.state::<DeskState>().update(|s| s.open = true)?;
     open(&app)?;
     Ok(status)
+}
+
+/// The tab asked for while the window opened, once.
+#[tauri::command]
+pub fn desk_take_tab(state: State<DeskState>) -> Option<String> {
+    state.pending.lock().expect("desk lock").take()
+}
+
+/// Opens the desk view on one of its tabs ("log" or "planner"), or brings it forward there.
+pub fn open_tab(app: &AppHandle, tab: &str) -> Result<()> {
+    let state = app.state::<DeskState>();
+    state.update(|s| s.open = true)?;
+    if app.get_webview_window(DESK).is_some() {
+        open(app)?;
+        return Ok(app.emit_to(DESK, TAB_EVENT, tab)?);
+    }
+    *state.pending.lock().expect("desk lock") = Some(tab.to_string());
+    open(app)
 }
 
 #[tauri::command]

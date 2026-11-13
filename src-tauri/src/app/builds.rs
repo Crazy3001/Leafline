@@ -2,13 +2,14 @@
 //! nothing about them leaves this PC unless the player copies a code themselves.
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, State, Url, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Emitter, Manager, State, Url};
 use tauri_plugin_opener::OpenerExt;
 
 use super::mapdata::MapDataState;
 use super::records::{UserDataState, now};
-use super::settings::{self, SettingsState};
+use super::settings::SettingsState;
 use super::{overlay, pins};
+use crate::build::crafting::{CraftingPage, CraftingQuery, ItemCrafting};
 use crate::build::plan::{MAX_LEVEL, Piece};
 use crate::build::progress::{self, CatchUp};
 use crate::build::{
@@ -20,8 +21,6 @@ use crate::mapdata::osms::{ItemRecord, SkillRecord};
 use crate::pipeline::CharacterScan;
 use crate::readers::tooltip::Requirements;
 use crate::userdata::builds::BuildSummary;
-
-pub const BUILD: &str = "build";
 
 /// Emitted to every window when a build is saved, deleted or chosen.
 pub const BUILDS_EVENT: &str = "builds";
@@ -95,6 +94,18 @@ pub fn starter_plans(app: AppHandle) -> Vec<Starter> {
 #[tauri::command]
 pub fn search_gear(state: State<MapDataState>, text: String, job: u32) -> Vec<ItemRecord> {
     state.catalog().map_or_else(Vec::new, |c| c.search_gear(&text, Branch::of_job(job)))
+}
+
+/// The recipes that make an item and the ones that use it. None without map data.
+#[tauri::command]
+pub fn item_crafting(app: AppHandle, id: u32) -> Option<ItemCrafting> {
+    app.state::<MapDataState>().catalog().map(|catalog| catalog.crafting_of(id))
+}
+
+/// The Crafting section's recipes. Empty without map data.
+#[tauri::command]
+pub fn crafting_recipes(app: AppHandle, query: CraftingQuery) -> CraftingPage {
+    app.state::<MapDataState>().catalog().map(|catalog| catalog.crafting(&query)).unwrap_or_default()
 }
 
 /// One page of the item search. Without map data there is nothing to find.
@@ -312,6 +323,7 @@ impl CharacterRead {
 /// Moves the character's build to what its windows show, so the plan carries on from there. A
 /// build tied to another character is left alone.
 pub fn catch_up(app: &AppHandle, scan: CharacterScan) -> Result<CharacterRead> {
+    super::damage::note(app, &scan);
     let (stats, skills) = (scan.windows.stats.is_some(), scan.windows.skills.is_some());
     let done = |problem: &str| CharacterRead { stats, skills, problem: Some(problem.into()), ..CharacterRead::default() };
     if !stats && !skills {
@@ -449,23 +461,8 @@ pub fn open_guide(app: AppHandle, url: String) -> Result<()> {
     app.opener().open_url(parsed.as_str(), None::<&str>).map_err(|err| Error::Invalid(err.to_string()))
 }
 
-/// Opens the build editor, or brings it forward.
+/// Opens the build planner: a tab of the desk view.
 #[tauri::command]
 pub async fn show_build(app: AppHandle) -> Result<()> {
-    if let Some(window) = app.get_webview_window(BUILD) {
-        return settings::bring_forward(&app, &window);
-    }
-    let keep = settings::keeps_game_focus(&app);
-    WebviewWindowBuilder::new(&app, BUILD, WebviewUrl::App("build".into()))
-        .title("Leafline — Build planner")
-        .inner_size(960.0, 760.0)
-        .min_inner_size(760.0, 520.0)
-        .center()
-        .focusable(!keep)
-        .focused(!keep)
-        .background_color(tauri::window::Color(20, 20, 18, 255))
-        .additional_browser_args(super::BROWSER_ARGS)
-        .on_page_load(settings::raise_when_loaded)
-        .build()?;
-    Ok(())
+    super::desk::open_tab(&app, "planner")
 }

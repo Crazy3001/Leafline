@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use super::catalog::{Catalog, novelty, usable_by};
 use super::fit::ARMOUR;
-use super::plan::{Build, Expansion, MAX_LEVEL, Piece, Plan, Start, Stat, expand, meets};
+use super::plan::{Build, Expansion, MAX_LEVEL, Plan, Start, Stat, expand, meets};
 use super::rules::{Branch, Rules};
 use crate::mapdata::osms::{ItemKind, ItemRecord};
 
@@ -118,11 +118,11 @@ impl<'a> Wearer<'a> {
         weapons.peek().is_some() && weapons.all(|i| i.id / 100_000 == TWO_HANDED_BLOCK)
     }
 
-    /// Other gear worn by then counts, as it does for a hovered item, but not what this replaces.
+    /// Gear worn by then counts, as it does for a hovered item: the piece this would replace too,
+    /// since the game checks with it still on.
     fn strong_enough(&self, item: &ItemRecord) -> bool {
         let Some(step) = self.expansion.step(self.level) else { return false };
-        let others = step.worn.iter().filter(|w| !Piece::clashes(&w.slot, &item.slot));
-        let stats = others.fold(step.stats, |total, w| total.plus(w.bonus));
+        let stats = step.worn.iter().fold(step.stats, |total, w| total.plus(w.bonus));
         meets(item, self.level, &stats, self.build.start.stats.is_some())
     }
 }
@@ -144,6 +144,9 @@ fn weighted_stats(build: &Build) -> Vec<(Stat, i64)> {
     weights
 }
 
+/// How well a piece does for a build, compared tier by tier: see [`Scorer::score`].
+pub type Score = (i64, i64, i64);
+
 /// How the gear finder weighs gear for a build.
 pub struct Scorer {
     weights: Vec<(Stat, i64)>,
@@ -158,15 +161,23 @@ impl Scorer {
         Self { weights: weighted_stats(build), attack, defence }
     }
 
-    /// Attack and the stats the plan raises, then defence, from stats as the item data names
-    /// them. Higher is better.
-    pub fn score(&self, stats: &[(String, i64)]) -> (i64, i64) {
+    /// Attack and the stats the plan raises, then defence, then the lesser stats: crit, accuracy
+    /// and the other kind of defence, which is all an earring or a cape has to tell them apart.
+    /// From stats as the item data names them, or a tooltip: `Crit. Rate` and `Critical Rate`
+    /// both count. Higher is better.
+    pub fn score(&self, stats: &[(String, i64)]) -> Score {
         let stat = |label: &str| stats.iter().filter(|(l, _)| l == label).map(|(_, v)| v).sum::<i64>();
         let raised: i64 = self.weights.iter().map(|(s, weight)| stat(s.label()) * weight).sum();
-        (stat(self.attack) * ATTACK_WEIGHT + raised, stat(self.defence))
+        let other_defence = if self.defence == "Magic Def." { "Weapon Def." } else { "Magic Def." };
+        let lesser: i64 = stats
+            .iter()
+            .filter(|(l, _)| l.starts_with("Crit") || l == "Accuracy" || l == other_defence)
+            .map(|(_, v)| v)
+            .sum();
+        (stat(self.attack) * ATTACK_WEIGHT + raised, stat(self.defence), lesser)
     }
 
-    pub fn of(&self, item: &ItemRecord) -> (i64, i64) {
+    pub fn of(&self, item: &ItemRecord) -> Score {
         self.score(&item.stats.iter().map(|s| (s.label.clone(), s.value)).collect::<Vec<_>>())
     }
 
@@ -220,8 +231,8 @@ fn ranked(build: &Build, expansion: &Expansion, rules: &Rules, catalog: &Catalog
     let scorer = Scorer::new(build);
     let trained = catalog.weapons_of_branch(build.plan.job);
     let score = |item: &ItemRecord| {
-        let (main, defence) = scorer.of(item);
-        (main, defence, item.req_level)
+        let (main, defence, lesser) = scorer.of(item);
+        (main, defence, lesser, item.req_level)
     };
 
     let mut slots = Vec::new();

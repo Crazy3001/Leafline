@@ -9,7 +9,7 @@ use super::catalog::{Catalog, novelty};
 use super::fit::ARMOUR;
 use super::plan::{Build, Expansion, GearCheck, MAX_LEVEL, Piece, Stats, piece_bonus};
 use super::rules::Rules;
-use super::suggest::{Scorer, Wearer, suggest};
+use super::suggest::{Score, Scorer, Wearer, suggest};
 use crate::mapdata::osms::ItemRecord;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -83,14 +83,12 @@ pub fn outfit(build: &Build, expansion: &Expansion, rules: &Rules, catalog: &Cat
     let scorer = Scorer::new(build);
     let wearing = |slot: &str| build.start.pieces.iter().rev().find(|p| p.slot(catalog) == slot);
     // The character's stats now: as last read, or the plan's for a level reached since. Gear worn
-    // in other slots counts toward a piece's requirements, as in the game.
+    // counts toward a piece's requirements, as in the game, what the piece would replace included.
     let base = if level <= build.start.level { build.start.stats } else { expansion.step(level).map(|s| s.stats).or(build.start.stats) };
     let known = build.start.stats.is_some();
     let worn_bonus: Vec<(String, Stats)> = build.start.pieces.iter().map(|p| (p.slot(catalog), piece_bonus(&p.data_stats(catalog)))).collect();
     let fits = |item: &ItemRecord| {
-        let stats = known.then(|| {
-            worn_bonus.iter().filter(|(s, _)| !Piece::clashes(s, &item.slot)).fold(base.unwrap_or_default(), |total, (_, b)| total.plus(*b))
-        });
+        let stats = known.then(|| worn_bonus.iter().fold(base.unwrap_or_default(), |total, (_, b)| total.plus(*b)));
         fit(item, level, stats)
     };
     let overall = wearing("Overall").is_some();
@@ -106,27 +104,39 @@ pub fn outfit(build: &Build, expansion: &Expansion, rules: &Rules, catalog: &Cat
         }
         // With the level it needs, from the data when the item check didn't read one.
         let worn = wearing(slot).cloned().map(|mut p| {
+            // A piece saved from a noisy read (`Brown Hard Leather Pants ossbow`), or never matched,
+            // is the data's item once its name does match; the name shown is the item's own.
+            if let Some(item) = p.item.and_then(|id| catalog.item(id)).or_else(|| catalog.item_like(&p.name, p.level)) {
+                p.item = Some(item.id);
+                p.name = item.name.clone();
+            }
             if p.level.is_none() && p.item.is_some_and(|id| catalog.item(id).is_some()) {
                 p.level = Some(p.req_level(catalog));
             }
             p
         });
-        let worn_item = worn.as_ref().and_then(|p| p.item);
+        // What is worn is never offered again as a goal, a pick or a step up, scrolled or not.
+        let is_worn = |item: &ItemRecord| worn.as_ref().is_some_and(|p| p.is_copy_of(item, catalog));
         let worn_level = worn.as_ref().map_or(0, |p| p.req_level(catalog));
         let worn_score = worn.as_ref().map(|p| scorer.score(&p.data_stats(catalog)));
+        // A goal still ahead has to ask more than what is worn: a higher level, or the same level
+        // and better stats, as the Green Jack Boots are to the Brown ones.
+        let beyond = |item: &ItemRecord| {
+            item.req_level > worn_level || (item.req_level == worn_level && worn_score.is_some_and(|w| scorer.of(item) > w))
+        };
 
         // Goals still ahead: not what is worn, nor older than it, in the order the plan wears them.
         let mut ahead: Vec<&GearCheck> = expansion
             .gear
             .iter()
-            .filter(|g| g.item.slot == slot && g.usable && Some(g.item.id) != worn_item && g.item.req_level > worn_level)
+            .filter(|g| g.item.slot == slot && g.usable && !is_worn(&g.item) && beyond(&g.item))
             .collect();
         ahead.sort_by_key(|g| (g.level.unwrap_or(u32::MAX), g.item.req_level));
         let (ready, waiting): (Vec<&GearCheck>, Vec<&GearCheck>) =
             ahead.into_iter().partition(|g| g.level.is_some_and(|at| at <= level));
         // A goal the plan chose counts as long as it is no worse; the gear finder's pick must beat.
-        let no_worse = |item: &ItemRecord, than: Option<(i64, i64)>| than.is_none_or(|f| scorer.of(item) >= f);
-        let beats = |item: &ItemRecord, than: Option<(i64, i64)>| than.is_none_or(|f| scorer.of(item) > f);
+        let no_worse = |item: &ItemRecord, than: Option<Score>| than.is_none_or(|f| scorer.of(item) >= f);
+        let beats = |item: &ItemRecord, than: Option<Score>| than.is_none_or(|f| scorer.of(item) > f);
 
         // Suggested: the best piece wearable now that beats what is worn. A goal in reach, unless
         // the gear finder's pick scores higher.
@@ -141,7 +151,7 @@ pub fn outfit(build: &Build, expansion: &Expansion, rules: &Rules, catalog: &Cat
             .find(|s| s.slot == slot)
             .and_then(|s| s.picks.first())
             .map(|p| &p.item)
-            .filter(|item| Some(item.id) != worn_item && beats(item, worn_score))
+            .filter(|item| !is_worn(item) && beats(item, worn_score))
             .cloned();
         let (suggested, suggested_planned) = match (goal_now, found_now) {
             (Some(goal), Some(found)) if scorer.of(&found) > scorer.of(&goal) => (Some(found), false),
@@ -154,13 +164,19 @@ pub fn outfit(build: &Build, expansion: &Expansion, rules: &Rules, catalog: &Cat
         // the data.
         let floor = [worn_score, suggested.as_ref().map(|s| scorer.of(s))].into_iter().flatten().max();
         let goal_at = waiting.iter().position(|g| no_worse(&g.item, floor));
-        let planned = goal_at.is_some();
-        let later = goal_at.map_or(0, |at| waiting.len() - at - 1);
-        let next = match goal_at {
-            Some(at) => Some(waiting[at].clone()),
-            None => coming_up(slot, floor, &later_wearers, &trained, &scorer, catalog)
-                .map(|(item, at)| GearCheck { item: item.clone(), level: Some(at), usable: true }),
+        let goal = goal_at.map(|at| waiting[at].clone());
+        let found = coming_up(slot, floor, worn.as_ref(), &later_wearers, &trained, &scorer, catalog)
+            .map(|(item, at)| GearCheck { item: item.clone(), level: Some(at), usable: true });
+        // Whichever comes within reach first. A plan that names a few pieces for a slot can have
+        // its next one far off while a better piece than what is worn is there at a nearer level.
+        let (next, planned) = match (goal, found) {
+            (Some(goal), Some(found)) if found.level.unwrap_or(u32::MAX) < goal.level.unwrap_or(u32::MAX) => (Some(found), false),
+            (Some(goal), _) => (Some(goal), true),
+            (None, found) => (found, false),
         };
+        // Planned pieces after the one shown: all from the first no-worse goal on when the shown one
+        // is the data's, the rest of them when it is that goal.
+        let later = goal_at.map_or(0, |at| waiting.len() - at - usize::from(planned));
 
         // An overall, or a shield, is only worth a row when it is worn or planned.
         let optional = slot == "Overall" || slot == "Shield";
@@ -193,11 +209,18 @@ pub fn outfit(build: &Build, expansion: &Expansion, rules: &Rules, catalog: &Cat
     outfit
 }
 
-/// The first piece for `slot` that a later level can wear and that scores above `floor`, with
-/// that level. Of several at the same level, the best. Weapons only of the kinds the job trains in.
+/// How many levels past the first step up are looked at for a better one. A piece worn for a
+/// level or two before the next arrives isn't worth naming as the next step.
+const NEXT_WINDOW: u32 = 5;
+
+/// The next step up for `slot` that a later level can wear and that scores above `floor`, with the
+/// level it first can be worn: the best piece within `NEXT_WINDOW` levels of the first one that
+/// beats what is worn. Of several of a score, the lowest level. Weapons only of the kinds the job
+/// trains in.
 fn coming_up<'a>(
     slot: &str,
-    floor: Option<(i64, i64)>,
+    floor: Option<Score>,
+    worn: Option<&Piece>,
     wearers: &[(u32, Wearer)],
     trained: &[String],
     scorer: &Scorer,
@@ -205,14 +228,24 @@ fn coming_up<'a>(
 ) -> Option<(&'a ItemRecord, u32)> {
     let better: Vec<&ItemRecord> = catalog
         .equipment()
-        .filter(|i| i.slot == slot && !novelty(i))
+        .filter(|i| i.slot == slot && !novelty(i) && !worn.is_some_and(|p| p.is_copy_of(i, catalog)))
         .filter(|i| trained.is_empty() || i.weapon_type.as_ref().is_none_or(|w| trained.contains(w)))
         .filter(|i| floor.is_none_or(|f| scorer.of(i) > f))
         .collect();
-    wearers.iter().find_map(|(at, wearer)| {
+    let mut best: Option<(&ItemRecord, u32)> = None;
+    let mut first_at = None;
+    for (at, wearer) in wearers {
+        if first_at.is_some_and(|first| *at > first + NEXT_WINDOW) {
+            break;
+        }
         let wearable = better.iter().filter(|i| wearer.can_wear(i));
-        wearable.max_by_key(|i| (scorer.of(i), std::cmp::Reverse(i.req_level))).map(|i| (*i, *at))
-    })
+        let Some(item) = wearable.max_by_key(|i| (scorer.of(i), std::cmp::Reverse(i.req_level))) else { continue };
+        first_at.get_or_insert(*at);
+        if best.is_none_or(|(held, _)| scorer.of(item) > scorer.of(held)) {
+            best = Some((*item, *at));
+        }
+    }
+    best
 }
 
 /// How far apart the levels a filled-in path looks at are.
@@ -241,7 +274,7 @@ pub fn fill_paths(build: &Build, expansion: &Expansion, rules: &Rules, catalog: 
         let mut floor = worn.map(|p| scorer.score(&p.data_stats(catalog)));
         let candidates: Vec<&ItemRecord> = catalog
             .equipment()
-            .filter(|i| i.slot == slot && !novelty(i))
+            .filter(|i| i.slot == slot && !novelty(i) && !worn.is_some_and(|p| p.is_copy_of(i, catalog)))
             .filter(|i| trained.is_empty() || i.weapon_type.as_ref().is_none_or(|w| trained.contains(w)))
             .collect();
         let mut path = Vec::new();
@@ -407,11 +440,12 @@ mod tests {
     #[test]
     fn with_no_goal_next_is_the_first_better_piece_a_later_level_can_wear() {
         let catalog = catalog();
-        // Wearing the Lv 10 dagger, with no goals: the next better dagger comes at Lv 15.
+        // Wearing the Lv 10 dagger, with no goals: the first better dagger comes at Lv 15, but the
+        // Coconut Knife follows five levels later, and that is the step worth naming.
         let build = bandit(10, vec![], vec![worn(1, &catalog)]);
         let weapon = slot(&at(&build, &catalog, 10), "Weapon").clone();
         assert_eq!(weapon.suggested, None, "nothing better to wear yet");
-        assert_eq!(weapon.next.as_ref().map(|n| (n.item.name.as_str(), n.level)), Some(("Field Dagger", Some(15))));
+        assert_eq!(weapon.next.as_ref().map(|n| (n.item.name.as_str(), n.level)), Some(("Coconut Knife", Some(20))));
         assert!(!weapon.planned);
 
         // At Lv 22 the Coconut Knife can be worn: it is suggested, and Next is the one after it.
@@ -453,6 +487,151 @@ mod tests {
         let e = expand(&build, &Rules::default(), &catalog);
         assert!(e.gear.iter().all(|g| g.item.id != 1), "what is worn isn't new gear");
         assert!(e.steps.iter().all(|s| !s.gear.contains(&"Old Dagger".to_string())));
+    }
+
+    #[test]
+    fn a_scrolled_copy_of_an_item_is_still_that_item_and_is_never_suggested_again() {
+        let robin = |id| with(item(id, "Green Robin Hat", 20, &[]), "Hat", &[("DEX", 2), ("Weapon Def.", 20), ("Accuracy", 2)]);
+        // The data repeats the hat under a second ID, as it does for some items.
+        let catalog = Catalog::new(Vec::new(), vec![robin(30), robin(31)]);
+        assert_eq!(catalog.copies_of(30), [30, 31]);
+
+        // Worn and scrolled, but the check lost the Accuracy line, so by its stats it scores
+        // below the data's copy.
+        let read = vec![PieceStat { label: "DEX".into(), value: 2 }, PieceStat { label: "Weapon Def.".into(), value: 21 }];
+        let scrolled = Piece { id: 1, upgrades: Some(1), stats: read, ..Piece::of_item(catalog.item(30).unwrap()) };
+        // The same, never matched to the data, so only its name says what it is.
+        let unmatched = Piece { item: None, ..scrolled.clone() };
+
+        for piece in [scrolled, unmatched] {
+            let build = bandit(20, vec![30, 31], vec![piece]);
+            let e = expand(&build, &Rules::default(), &catalog);
+            assert!(e.gear.is_empty(), "a worn goal isn't new gear, under either ID");
+            let outfit = at(&build, &catalog, 20);
+            let hat = slot(&outfit, "Hat");
+            assert!(hat.wearing.is_some());
+            assert_eq!(hat.suggested, None, "it is already worn");
+            assert_eq!(hat.next, None, "and it isn't a step up from itself");
+            let paths = fill_paths(&build, &e, &Rules::default(), &catalog, 20);
+            assert!(paths.iter().all(|(slot, _)| slot != "Hat"), "nor a filled-in upgrade");
+        }
+    }
+
+    #[test]
+    fn the_piece_an_item_would_replace_still_counts_toward_its_requirements() {
+        // Boots that need 40 STR, a character with 38, and worn boots that give 2: the game's
+        // hover shows the requirement met, so the new boots are wearable as soon as the level is.
+        let mut steel = with(item(2, "Steel Boots", 50, &[]), "Shoes", &[("Weapon Def.", 26)]);
+        steel.req_str = 40;
+        let catalog = Catalog::new(Vec::new(), vec![with(item(1, "Old Boots", 25, &[]), "Shoes", &[("STR", 2)]), steel]);
+        let mut build = bandit(45, vec![2], vec![worn(1, &catalog)]);
+        build.start.stats = Some(Stats { str: 38, dex: 25, int: 4, luk: 40 });
+        build.plan.plan_to = 70;
+        let e = expand(&build, &Rules::default(), &catalog);
+        assert_eq!(e.gear.iter().map(|g| (g.item.name.as_str(), g.level)).collect::<Vec<_>>(), [("Steel Boots", Some(50))]);
+        // With 37 base STR the 2 from the old boots falls one short of 40 until the plan raises it.
+        build.start.stats = Some(Stats { str: 37, dex: 25, int: 4, luk: 40 });
+        assert_eq!(expand(&build, &Rules::default(), &catalog).gear[0].level, None);
+    }
+
+    #[test]
+    fn next_skips_a_piece_a_better_one_replaces_within_a_few_levels() {
+        // Shoes worn at Lv 10; a step up at Lv 40, a better one at Lv 41, a far better one at Lv 60.
+        let shoes = |id, name: &str, level, def| with(item(id, name, level, &[]), "Shoes", &[("Weapon Def.", def)]);
+        let catalog = Catalog::new(
+            Vec::new(),
+            vec![shoes(1, "Old Shoes", 10, 5), shoes(2, "Pierre", 40, 22), shoes(3, "Better", 41, 26), shoes(4, "Far Off", 60, 40)],
+        );
+        let mut build = bandit(10, Vec::new(), vec![worn(1, &catalog)]);
+        build.plan.plan_to = 70;
+        let outfit = at(&build, &catalog, 10);
+        let next = slot(&outfit, "Shoes").next.as_ref().map(|n| (n.item.name.as_str(), n.level));
+        assert_eq!(next, Some(("Better", Some(41))), "not the Lv 40 pair worn for one level, and not the one 20 levels off");
+    }
+
+    #[test]
+    fn a_goal_of_the_same_level_stays_when_it_is_better_and_goes_when_it_is_not() {
+        let mut items = vec![dagger(1, "Worn Dagger", 25, 30), dagger(2, "Better Dagger", 25, 33), dagger(3, "Worse Dagger", 25, 28)];
+        items.push(dagger(4, "Younger Dagger", 20, 20));
+        let catalog = Catalog::new(Vec::new(), items);
+        let build = bandit(25, vec![2, 3, 4], vec![worn(1, &catalog)]);
+        let e = expand(&build, &Rules::default(), &catalog);
+        let kept: Vec<&str> = e.gear.iter().map(|g| g.item.name.as_str()).collect();
+        assert_eq!(kept, ["Better Dagger"], "the same level and better stays; worse, and a lower level, are outgrown");
+        let weapon = at(&build, &catalog, 25).slots.into_iter().find(|s| s.slot == "Weapon").unwrap();
+        assert_eq!(weapon.suggested.map(|i| i.name), Some("Better Dagger".into()));
+    }
+
+    #[test]
+    fn earrings_are_told_apart_by_crit_and_defence_not_all_tied() {
+        let earring = |id, name: &str, level, magic_def, crit| {
+            with(item(id, name, level, &[]), "Earring", &[("Magic Def.", magic_def), ("Crit. Damage", crit)])
+        };
+        let catalog = Catalog::new(Vec::new(), vec![earring(1, "Yellow Square", 20, 22, 1), earring(2, "Emerald", 30, 27, 2), earring(3, "Cat's Eye", 35, 30, 2)]);
+        // As a tooltip spelled it: the worn one's crit is `Critical Damage`, which counts all the same.
+        let worn = Piece {
+            id: 1,
+            stats: vec![PieceStat { label: "Magic Def.".into(), value: 22 }, PieceStat { label: "Critical Damage".into(), value: 1 }],
+            ..Piece::of_item(catalog.item(1).unwrap())
+        };
+        let build = bandit(33, Vec::new(), vec![worn]);
+        let outfit = at(&build, &catalog, 33);
+        let row = slot(&outfit, "Earring");
+        assert_eq!(row.suggested.as_ref().map(|i| i.name.as_str()), Some("Emerald"), "wearable now and better");
+        assert_eq!(row.next.as_ref().map(|n| (n.item.name.as_str(), n.level)), Some(("Cat's Eye", Some(35))));
+    }
+
+    #[test]
+    fn next_is_the_nearest_step_up_even_when_the_plan_only_names_a_later_one() {
+        let catalog = catalog();
+        // The plan aims for the Iron Dagger (Lv 25), but a better dagger than the worn Old Dagger
+        // is wearable at Lv 20: that is what comes next, and the goal still follows it.
+        let build = bandit(10, vec![4], vec![worn(1, &catalog)]);
+        let outfit = at(&build, &catalog, 10);
+        let weapon = slot(&outfit, "Weapon");
+        assert_eq!(weapon.next.as_ref().map(|n| (n.item.name.as_str(), n.level)), Some(("Coconut Knife", Some(20))));
+        assert!(!weapon.planned, "it isn't one of the plan's goals");
+        assert_eq!(weapon.later, 1, "the Iron Dagger is planned after it");
+        // When the plan's goal is the nearest, it stays the one shown.
+        let build = bandit(10, vec![2, 4], vec![worn(1, &catalog)]);
+        let weapon = at(&build, &catalog, 10).slots.into_iter().find(|s| s.slot == "Weapon").unwrap();
+        assert_eq!(weapon.next.as_ref().map(|n| n.item.name.as_str()), Some("Field Dagger"));
+        assert!(weapon.planned);
+        assert_eq!(weapon.later, 1);
+    }
+
+    #[test]
+    fn the_timeline_lists_only_the_best_goal_a_slot_can_wear_at_once_and_nothing_outgrown() {
+        let catalog = catalog();
+        let listed = |build: &Build| -> Vec<String> {
+            let e = expand(build, &Rules::default(), &catalog);
+            e.steps.iter().flat_map(|s| s.gear.clone()).collect()
+        };
+        // At Lv 25 every dagger is within reach together: the character goes to the best, and
+        // the three before it aren't "things to get".
+        assert_eq!(listed(&bandit(25, vec![1, 2, 3, 4], Vec::new())), ["Iron Dagger"]);
+        // What is worn counts too: nothing at or below its level is a goal.
+        let build = bandit(25, vec![1, 2, 3, 4], vec![worn(3, &catalog)]);
+        assert_eq!(listed(&build), ["Iron Dagger"]);
+        let e = expand(&build, &Rules::default(), &catalog);
+        assert_eq!(e.gear.iter().map(|g| g.item.name.as_str()).collect::<Vec<_>>(), ["Iron Dagger"], "older goals are dropped");
+        // A goal still to come stays on its level.
+        assert_eq!(listed(&bandit(10, vec![1, 2, 3, 4], Vec::new())), ["Old Dagger", "Field Dagger", "Coconut Knife", "Iron Dagger"]);
+    }
+
+    #[test]
+    fn a_piece_saved_from_a_noisy_read_shows_the_items_own_name() {
+        let catalog = catalog();
+        let garbled = Piece { item: None, name: "Old Dagger ossbow".into(), ..worn(1, &catalog) };
+        let build = bandit(10, Vec::new(), vec![garbled]);
+        let outfit = at(&build, &catalog, 10);
+        let weapon = slot(&outfit, "Weapon");
+        let piece = weapon.wearing.as_ref().unwrap();
+        assert_eq!((piece.name.as_str(), piece.item), ("Old Dagger", Some(1)));
+        // A name the data has nothing like stays as the player wrote it.
+        let own = Piece { item: None, name: "My Homemade Blade".into(), ..worn(1, &catalog) };
+        let outfit = at(&bandit(10, Vec::new(), vec![own]), &catalog, 10);
+        assert_eq!(slot(&outfit, "Weapon").wearing.as_ref().map(|p| (p.name.as_str(), p.item)), Some(("My Homemade Blade", None)));
     }
 
     #[test]

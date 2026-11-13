@@ -84,7 +84,7 @@ Live sessions save themselves every 30 seconds once they have a minute of active
 src/                     Svelte frontend
   lib/components/          cards shared by the windows
   lib/ui/                  shared UI pieces
-  routes/                  one route per window: overlay, desk, pin, settings, setup, build, training
+  routes/                  one route per window: overlay, desk (tabs, with the training log and build planner), pin, settings, setup
 src-tauri/src/
   app/                     Tauri wiring: windows, tray, hotkeys, commands
   capture/                 live pictures of the game window (Windows Graphics Capture)

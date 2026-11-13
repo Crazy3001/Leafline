@@ -12,14 +12,15 @@ use serde::Serialize;
 
 use super::drops::{Drop, Dropper, MonsterDrops};
 use super::osms::{
-    Dataset, FILES, FileMeta, Height, ItemKind, ItemNeed, ItemRecord, MapRecord, Meta, MobRequirement, MonsterDetails,
-    MonsterRecord, NpcRecord, Portal, QuestRecord, Records, RewardItem, Side, SkillNeed, SkillRecord, Spawn,
+    Dataset, FILES, FileMeta, Height, Ingredient, ItemKind, ItemNeed, ItemRecord, MapRecord, Meta, MobRequirement, MonsterDetails,
+    MonsterRecord, NpcRecord, Portal, QuestRecord, Records, RecipeRecord, RewardItem, Side, SkillNeed, SkillRecord, Spawn,
 };
+use super::layout::{Layouts, MapLayout};
 use super::turnins::TurnIn;
 use crate::error::{Error, Result};
 
 /// Bump when the tables change; an older cache is then dropped and downloaded again.
-const CACHE_VERSION: i32 = 8;
+const CACHE_VERSION: i32 = 10;
 
 const SCHEMA: &str = "
 CREATE TABLE source_files (
@@ -56,8 +57,13 @@ CREATE TABLE items (
     id INTEGER PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL, slot TEXT NOT NULL, gender TEXT, classes TEXT NOT NULL,
     weapon_type TEXT, req_level INTEGER NOT NULL, req_str INTEGER NOT NULL, req_dex INTEGER NOT NULL,
     req_int INTEGER NOT NULL, req_luk INTEGER NOT NULL, req_fame INTEGER NOT NULL, attack_speed INTEGER,
-    upgrade_slots INTEGER, quest_item INTEGER NOT NULL, untradable INTEGER NOT NULL, stats TEXT NOT NULL,
+    knockback INTEGER, upgrade_slots INTEGER, quest_item INTEGER NOT NULL, untradable INTEGER NOT NULL, stats TEXT NOT NULL,
     price INTEGER, description TEXT, scroll TEXT);
+CREATE TABLE recipes (
+    id INTEGER PRIMARY KEY, discipline TEXT NOT NULL, skill_level INTEGER NOT NULL, craft_exp INTEGER NOT NULL,
+    meso_cost INTEGER NOT NULL, output_item_id INTEGER NOT NULL, output_count INTEGER NOT NULL);
+CREATE TABLE recipe_ingredients (recipe_id INTEGER NOT NULL, seq INTEGER NOT NULL, item_id INTEGER NOT NULL,
+    count INTEGER NOT NULL, PRIMARY KEY (recipe_id, seq));
 CREATE TABLE drops (
     monster TEXT NOT NULL, item TEXT NOT NULL, category TEXT, rate REAL, rate_low REAL, rate_high REAL,
     min_quantity INTEGER, max_quantity INTEGER, sample_kills INTEGER, sample_drops INTEGER,
@@ -69,20 +75,39 @@ CREATE TABLE drop_fetches (monster TEXT PRIMARY KEY, fetched_at INTEGER NOT NULL
 /// Tables added since the last `CACHE_VERSION`, which hold nothing the player would have to
 /// download again.
 const ADDED: &str = "
-CREATE TABLE IF NOT EXISTS quest_turn_ins (quest_id INTEGER PRIMARY KEY, npc TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS quest_turn_in_npcs (quest_id INTEGER PRIMARY KEY, npc_id INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS map_layouts (
+    map_id INTEGER PRIMARY KEY, width INTEGER, height INTEGER, walkable INTEGER NOT NULL,
+    platforms INTEGER NOT NULL, spawn_points INTEGER NOT NULL, spawn_platforms INTEGER NOT NULL,
+    ropes INTEGER NOT NULL, ladders INTEGER NOT NULL
+);
 ";
 
-/// Tables from when items were asked about one at a time. The whole drop table replaces them,
-/// so they are removed from an existing cache without forcing a new download.
+/// Tables from when items were asked about one at a time, which the whole drop table replaced,
+/// and the wiki's turn-in names, which NPC ids from Leafline's own quest file replaced
+/// (2026-11-11). Removed from an existing cache without forcing a new download.
 const RETIRED: &str = "
 DROP TABLE IF EXISTS item_lookups;
 DROP TABLE IF EXISTS item_droppers;
+DROP TABLE IF EXISTS quest_turn_ins;
+DELETE FROM source_info WHERE key IN ('turn_ins_fetched_at', 'turn_ins_failed');
 ";
 
 /// Where the time the drop table was downloaded is kept in `source_info`.
 const DROPS_FETCHED_AT: &str = "drops_fetched_at";
-/// Likewise for the wiki's table of who takes each quest in.
-const TURN_INS_FETCHED_AT: &str = "turn_ins_fetched_at";
+/// Leafline's shop file, kept whole as downloaded, and when.
+const SHOP_FILE: &str = "shop_file";
+const SHOPS_FETCHED_AT: &str = "shops_fetched_at";
+/// Likewise for Leafline's file of who takes each quest in.
+const TURN_INS_FETCHED_AT: &str = "turn_in_npcs_fetched_at";
+
+/// When a download of one of the wiki's tables last failed, and why, as `<time> <reason>`, so a
+/// refusal is not asked again on every lookup. A download that works removes it.
+pub const DROPS_FAILED: &str = "drops_failed";
+pub const TURN_INS_FAILED: &str = "turn_in_npcs_failed";
+/// Likewise for Leafline's file of map layouts.
+const LAYOUTS_FETCHED_AT: &str = "layouts_fetched_at";
+pub const LAYOUTS_FAILED: &str = "layouts_failed";
 
 /// Kept in `source_info` when a new version of Leafline replaces the cache: the player had
 /// downloaded the map data or drop table, so each comes back without asking again.
@@ -101,6 +126,7 @@ fn tables_of(file: &str) -> &'static [&'static str] {
         "quests.json" => &["quests", "quest_mobs", "quest_rewards", "quest_items", "quest_follows"],
         "skills.json" => &["skills", "skill_needs", "skill_levels"],
         "items.json" => &["items"],
+        "recipes.json" => &["recipes", "recipe_ingredients"],
         _ => &[],
     }
 }
@@ -218,6 +244,7 @@ impl Store {
                 Records::Quests(quests) => insert_quests(&tx, quests)?,
                 Records::Skills(skills) => insert_skills(&tx, skills)?,
                 Records::Items(items) => insert_items(&tx, items)?,
+                Records::Recipes(recipes) => insert_recipes(&tx, recipes)?,
             }
             tx.execute(
                 "INSERT OR REPLACE INTO source_files (name, sha256, records, updated_at, fetched_at)
@@ -262,13 +289,46 @@ impl Store {
         }
         Ok(Some(Dataset {
             turn_ins: self.turn_ins()?,
+            shops: self.shops()?,
             maps: self.load_maps()?,
             monsters: self.load_monsters()?,
             npcs: self.load_npcs()?,
             quests: self.load_quests()?,
             skills: self.load_skills()?,
             items: self.load_items()?,
+            recipes: self.load_recipes()?,
         }))
+    }
+
+    fn load_recipes(&self) -> Result<Vec<RecipeRecord>> {
+        let mut ingredients: HashMap<u32, Vec<Ingredient>> = HashMap::new();
+        let mut stmt = self.conn.prepare("SELECT recipe_id, item_id, count FROM recipe_ingredients ORDER BY recipe_id, seq")?;
+        for row in stmt.query_map([], |row| Ok((row.get::<_, u32>(0)?, Ingredient { item_id: row.get(1)?, count: row.get(2)? })))? {
+            let (recipe, ingredient) = row?;
+            ingredients.entry(recipe).or_default().push(ingredient);
+        }
+        let mut stmt = self.conn.prepare(
+            "SELECT id, discipline, skill_level, craft_exp, meso_cost, output_item_id, output_count FROM recipes ORDER BY id",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok(RecipeRecord {
+                id: row.get(0)?,
+                discipline: row.get(1)?,
+                skill_level: row.get(2)?,
+                craft_exp: row.get(3)?,
+                meso_cost: row.get::<_, i64>(4)? as u64,
+                output_item_id: row.get(5)?,
+                output_count: row.get(6)?,
+                ingredients: Vec::new(),
+            })
+        })?;
+        let mut recipes = Vec::new();
+        for row in rows {
+            let mut recipe = row?;
+            recipe.ingredients = ingredients.remove(&recipe.id).unwrap_or_default();
+            recipes.push(recipe);
+        }
+        Ok(recipes)
     }
 
     fn load_skills(&self) -> Result<Vec<SkillRecord>> {
@@ -309,7 +369,7 @@ impl Store {
     fn load_items(&self) -> Result<Vec<ItemRecord>> {
         let mut stmt = self.conn.prepare(
             "SELECT id, name, kind, slot, gender, classes, weapon_type, req_level, req_str, req_dex, req_int, req_luk,
-                    req_fame, attack_speed, upgrade_slots, quest_item, untradable, stats, price, description, scroll
+                    req_fame, attack_speed, upgrade_slots, quest_item, untradable, stats, price, description, scroll, knockback
              FROM items ORDER BY id",
         )?;
         let rows = stmt.query_map([], |row| {
@@ -339,6 +399,7 @@ impl Store {
                 price: row.get(18)?,
                 description: row.get(19)?,
                 scroll: None,
+                knockback: row.get(21)?,
             };
             Ok((item, stats, scroll))
         })?;
@@ -508,13 +569,44 @@ impl Store {
     }
 
     /// When the turn-in table was downloaded, or `None` if it has not been.
+    pub fn shops_fetched_at(&self) -> Result<Option<i64>> {
+        Ok(self.info(SHOPS_FETCHED_AT)?.and_then(|v| v.parse().ok()))
+    }
+
+    /// The shop file as downloaded, if it ever was.
+    pub fn shop_file(&self) -> Result<Option<Vec<u8>>> {
+        Ok(self.info(SHOP_FILE)?.map(String::into_bytes))
+    }
+
+    /// The downloaded shops, or the copy that came with the app when none was downloaded or
+    /// the download no longer reads.
+    pub fn shops(&self) -> Result<Vec<super::shops::ShopRecord>> {
+        let downloaded = self.shop_file()?.and_then(|body| {
+            super::shops::parse(&body).map_err(|err| eprintln!("cached shop file unreadable: {err}")).ok()
+        });
+        Ok(match downloaded {
+            Some(file) => file.shops,
+            None => super::shops::parse(super::shops::BUNDLED.as_bytes()).map(|f| f.shops).unwrap_or_default(),
+        })
+    }
+
+    pub fn replace_shop_file(&mut self, body: &[u8], now: i64) -> Result<()> {
+        let text = std::str::from_utf8(body).map_err(|err| Error::Invalid(format!("The shop file isn't text: {err}")))?;
+        let tx = self.conn.transaction()?;
+        let set = "INSERT OR REPLACE INTO source_info (key, value) VALUES (?1, ?2)";
+        tx.execute(set, [SHOP_FILE, text])?;
+        tx.execute(set, [SHOPS_FETCHED_AT, &now.to_string()])?;
+        tx.commit()?;
+        Ok(())
+    }
+
     pub fn turn_ins_fetched_at(&self) -> Result<Option<i64>> {
         Ok(self.info(TURN_INS_FETCHED_AT)?.and_then(|v| v.parse().ok()))
     }
 
     /// Who takes each quest in, as downloaded.
     pub fn turn_ins(&self) -> Result<Vec<TurnIn>> {
-        let mut stmt = self.conn.prepare("SELECT quest_id, npc FROM quest_turn_ins ORDER BY quest_id")?;
+        let mut stmt = self.conn.prepare("SELECT quest_id, npc_id FROM quest_turn_in_npcs ORDER BY quest_id")?;
         let rows = stmt.query_map([], |row| Ok(TurnIn { quest: row.get(0)?, npc: row.get(1)? }))?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
@@ -522,14 +614,59 @@ impl Store {
     /// Replaces the whole turn-in table.
     pub fn replace_turn_ins(&mut self, rows: &[TurnIn], now: i64) -> Result<()> {
         let tx = self.conn.transaction()?;
-        tx.execute("DELETE FROM quest_turn_ins", [])?;
+        tx.execute("DELETE FROM quest_turn_in_npcs", [])?;
         for row in rows {
-            tx.execute("INSERT OR REPLACE INTO quest_turn_ins (quest_id, npc) VALUES (?1, ?2)", params![row.quest, row.npc])?;
+            tx.execute("INSERT OR REPLACE INTO quest_turn_in_npcs (quest_id, npc_id) VALUES (?1, ?2)", params![row.quest, row.npc])?;
         }
         tx.execute(
             "INSERT OR REPLACE INTO source_info (key, value) VALUES (?1, ?2)",
             [TURN_INS_FETCHED_AT, &now.to_string()],
         )?;
+        tx.execute("DELETE FROM source_info WHERE key = ?1", [TURN_INS_FAILED])?;
+        tx.commit()?;
+        Ok(())
+    }
+
+    pub fn layouts_fetched_at(&self) -> Result<Option<i64>> {
+        Ok(self.info(LAYOUTS_FETCHED_AT)?.and_then(|v| v.parse().ok()))
+    }
+
+    /// Every map's layout, as downloaded.
+    pub fn layouts(&self) -> Result<Layouts> {
+        let mut stmt = self.conn.prepare(
+            "SELECT map_id, width, height, walkable, platforms, spawn_points, spawn_platforms, ropes, ladders
+             FROM map_layouts",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok(MapLayout {
+                map: row.get(0)?,
+                width: row.get(1)?,
+                height: row.get(2)?,
+                walkable: row.get(3)?,
+                platforms: row.get(4)?,
+                spawn_points: row.get(5)?,
+                spawn_platforms: row.get(6)?,
+                ropes: row.get(7)?,
+                ladders: row.get(8)?,
+            })
+        })?;
+        Ok(rows.map(|r| r.map(|l| (l.map, l))).collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// Replaces every map's layout.
+    pub fn replace_layouts(&mut self, rows: &[MapLayout], now: i64) -> Result<()> {
+        let tx = self.conn.transaction()?;
+        tx.execute("DELETE FROM map_layouts", [])?;
+        for l in rows {
+            tx.execute(
+                "INSERT OR REPLACE INTO map_layouts
+                 (map_id, width, height, walkable, platforms, spawn_points, spawn_platforms, ropes, ladders)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                params![l.map, l.width, l.height, l.walkable, l.platforms, l.spawn_points, l.spawn_platforms, l.ropes, l.ladders],
+            )?;
+        }
+        tx.execute("INSERT OR REPLACE INTO source_info (key, value) VALUES (?1, ?2)", [LAYOUTS_FETCHED_AT, &now.to_string()])?;
+        tx.execute("DELETE FROM source_info WHERE key = ?1", [LAYOUTS_FAILED])?;
         tx.commit()?;
         Ok(())
     }
@@ -657,7 +794,29 @@ impl Store {
             "INSERT OR REPLACE INTO source_info (key, value) VALUES (?1, ?2)",
             [DROPS_FETCHED_AT, &now.to_string()],
         )?;
+        tx.execute("DELETE FROM source_info WHERE key = ?1", [DROPS_FAILED])?;
         tx.commit()?;
+        Ok(())
+    }
+
+    /// When a download kept under `key` ([`DROPS_FAILED`] or [`TURN_INS_FAILED`]) last failed,
+    /// and why.
+    pub fn failure(&self, key: &str) -> Result<Option<(i64, String)>> {
+        Ok(self.info(key)?.and_then(|value| {
+            let (at, reason) = value.split_once(' ').unwrap_or((&value, ""));
+            Some((at.parse().ok()?, reason.to_string()))
+        }))
+    }
+
+    /// Records a failed download under `key`, or with `None` forgets it so the next lookup asks again.
+    pub fn set_failure(&self, key: &str, failure: Option<(i64, &str)>) -> Result<()> {
+        match failure {
+            Some((at, reason)) => self.conn.execute(
+                "INSERT OR REPLACE INTO source_info (key, value) VALUES (?1, ?2)",
+                [key, &format!("{at} {reason}")],
+            )?,
+            None => self.conn.execute("DELETE FROM source_info WHERE key = ?1", [key])?,
+        };
         Ok(())
     }
 }
@@ -776,12 +935,36 @@ fn insert_skills(tx: &Transaction, skills: &[SkillRecord]) -> Result<()> {
     Ok(())
 }
 
+fn insert_recipes(tx: &Transaction, recipes: &[RecipeRecord]) -> Result<()> {
+    let mut recipe = tx.prepare(
+        "INSERT OR REPLACE INTO recipes (id, discipline, skill_level, craft_exp, meso_cost, output_item_id, output_count)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+    )?;
+    let mut ingredient =
+        tx.prepare("INSERT OR REPLACE INTO recipe_ingredients (recipe_id, seq, item_id, count) VALUES (?1, ?2, ?3, ?4)")?;
+    for r in recipes {
+        recipe.execute(params![
+            r.id,
+            r.discipline,
+            r.skill_level,
+            r.craft_exp,
+            r.meso_cost as i64,
+            r.output_item_id,
+            r.output_count
+        ])?;
+        for (i, g) in r.ingredients.iter().enumerate() {
+            ingredient.execute(params![r.id, i as i64, g.item_id, g.count])?;
+        }
+    }
+    Ok(())
+}
+
 fn insert_items(tx: &Transaction, items: &[ItemRecord]) -> Result<()> {
     let mut item = tx.prepare(
         "INSERT OR REPLACE INTO items (id, name, kind, slot, gender, classes, weapon_type, req_level, req_str, req_dex,
                                        req_int, req_luk, req_fame, attack_speed, upgrade_slots, quest_item, untradable,
-                                       stats, price, description, scroll)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)",
+                                       stats, price, description, scroll, knockback)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22)",
     )?;
     for i in items {
         let json = |err: serde_json::Error| Error::Invalid(err.to_string());
@@ -808,7 +991,8 @@ fn insert_items(tx: &Transaction, items: &[ItemRecord]) -> Result<()> {
             stats,
             i.price,
             i.description,
-            scroll
+            scroll,
+            i.knockback
         ])?;
     }
     Ok(())
@@ -852,6 +1036,29 @@ mod tests {
         let store = Store::init(conn).unwrap();
         assert_eq!(store.status().unwrap().files.len(), 1, "nothing to download again");
         assert!(store.turn_ins().unwrap().is_empty());
+    }
+
+    #[test]
+    fn the_wiki_turn_in_names_give_way_without_a_new_download() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(SCHEMA).unwrap();
+        conn.execute_batch(A_FILE).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE quest_turn_ins (quest_id INTEGER PRIMARY KEY, npc TEXT NOT NULL);
+             INSERT INTO quest_turn_ins VALUES (70, 'Warden Ilse');
+             INSERT INTO source_info VALUES ('turn_ins_fetched_at', '5');",
+        )
+        .unwrap();
+        conn.pragma_update(None, "user_version", CACHE_VERSION).unwrap();
+        let store = Store::init(conn).unwrap();
+        assert_eq!(store.status().unwrap().files.len(), 1, "the map data stays");
+        assert!(store.turn_ins().unwrap().is_empty());
+        assert_eq!(store.turn_ins_fetched_at().unwrap(), None, "so the new file is downloaded at once");
+        let gone: i64 = store
+            .conn
+            .query_row("SELECT COUNT(*) FROM sqlite_master WHERE name = 'quest_turn_ins'", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(gone, 0);
     }
 
     #[test]

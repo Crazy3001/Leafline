@@ -1,14 +1,14 @@
 <script lang="ts">
-  // Every drop players logged on mapleclassic.wiki for this map's monsters: by item, with who
-  // drops it, or by monster, each opening to its own drops. The first open downloads the wiki's
-  // whole table; lookups stay on this PC.
+  // Every known drop of this map's monsters: by item, with who drops it, or by monster, each
+  // opening to its own drops. The first open downloads Leafline's drop list if it isn't here yet;
+  // lookups stay on this PC.
   import { ChevronRight, LoaderCircle, RefreshCw } from "@lucide/svelte";
   import { untrack } from "svelte";
 
   import { backend } from "$lib/api";
   import Segmented from "$lib/ui/Segmented.svelte";
   import { showItemNamed } from "$lib/items.svelte";
-  import { WIKI_CREDIT, WIKI_URL } from "$lib/mapdata.svelte";
+  import { DROPS_CREDIT, DROPS_URL } from "$lib/mapdata.svelte";
   import { showMonsterNamed } from "$lib/monsters.svelte";
   import type { MonsterDrops } from "$lib/types";
 
@@ -121,7 +121,7 @@
   }
 
   function percent(value: number | null) {
-    if (value == null) return "?";
+    if (value == null) return "";
     return value >= 10 ? `${value.toFixed(0)}%` : `${value.toFixed(1)}%`;
   }
 
@@ -230,9 +230,8 @@
     </p>
   {/if}
   <p class="credit">
-    Rates are what players saw, not the game's tables; small samples can be far off. "?" means listed but not
-    measured.
-    <button class="link" onclick={() => backend.openLink(WIKI_URL)}>{WIKI_CREDIT}</button>
+    Known drops, without rates.
+    <button class="link" onclick={() => backend.openLink(DROPS_URL)}>{DROPS_CREDIT}</button>
   </p>
 {:else if error}
   <p class="error">{error}</p>

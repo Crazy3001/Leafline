@@ -573,7 +573,12 @@ mod tests {
 
     #[test]
     fn a_map_the_player_measured_gives_a_pace() {
-        let measured = [MeasuredRate { label: "Fern Road : Mossbank Meadow".into(), exp_per_hour: 1000.0, active_seconds: 600.0 }];
+        let measured = [MeasuredRate {
+            label: "Fern Road : Mossbank Meadow".into(),
+            exp_per_hour: 1000.0,
+            active_seconds: 600.0,
+            ..MeasuredRate::default()
+        }];
         let sheet = bestiary().monster_sheet(10, None, None, &measured, &Travel::none()).unwrap();
         let pace = sheet.maps[0].pace.as_ref().unwrap();
         // A clear is 6 × 9 + 2 × 30 = 114 EXP, with 6 of the slimes in it.

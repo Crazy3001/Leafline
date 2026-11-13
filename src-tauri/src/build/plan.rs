@@ -10,6 +10,8 @@ use serde::{Deserialize, Serialize};
 
 use super::catalog::{Catalog, path_of, tier_of, usable_by};
 use super::rules::{Branch, Rules};
+use super::suggest::Scorer;
+use crate::mapdata::drops::item_key;
 use crate::mapdata::osms::ItemRecord;
 
 /// The highest level a plan can run to.
@@ -107,11 +109,14 @@ pub struct Start {
     /// Equipment the character wears, each piece as an item check read it, scrolls and all, one
     /// to a slot. Its own stats count toward other gear's requirements, as the game counts them.
     pub pieces: Vec<Piece>,
+    /// What worn gear added to each stat when the Character Stat window was last read. Shown beside
+    /// the stats; the plan counts `stats`, the points put in, and works gear out from `pieces`.
+    pub gear_bonus: Option<Stats>,
 }
 
 impl Default for Start {
     fn default() -> Self {
-        Self { level: 1, stats: None, ap: 0, sp: 0, skills: Vec::new(), gender: None, pieces: Vec::new() }
+        Self { level: 1, stats: None, ap: 0, sp: 0, skills: Vec::new(), gender: None, pieces: Vec::new(), gear_bonus: None }
     }
 }
 
@@ -164,6 +169,14 @@ impl Piece {
             slots_left: item.upgrade_slots,
             slots: item.upgrade_slots,
         }
+    }
+
+    /// Whether this is a copy of `item`: the same item, another ID the data repeats it under, or
+    /// one of that name when the piece was never matched to the data. Scrolls and rolled stats
+    /// don't make it another item, and a read that misses a stat doesn't make it a worse one.
+    pub fn is_copy_of(&self, item: &ItemRecord, catalog: &Catalog) -> bool {
+        self.item.is_some_and(|id| id == item.id || catalog.copies_of(id).contains(&item.id))
+            || item_key(&self.name) == item_key(&item.name)
     }
 
     /// The slot it goes in, as the item data names it.
@@ -604,8 +617,8 @@ pub(super) fn piece_bonus(stats: &[(String, i64)]) -> Stats {
 }
 
 /// Marks the level each goal item comes within reach, walking up the levels so gear already
-/// worn can help with the next piece. A new piece replaces what was in its slot, and an item's
-/// own stats never count toward its requirements.
+/// worn can help with the next piece. A new piece replaces what was in its slot, but the piece it
+/// replaces still counts toward its requirements, and an item's own stats never do.
 fn check_gear(
     build: &Build,
     catalog: &Catalog,
@@ -613,14 +626,27 @@ fn check_gear(
     steps: &mut [LevelStep],
     problems: &mut Vec<Problem>,
 ) -> Vec<GearCheck> {
-    let owned: Vec<u32> = build.start.pieces.iter().filter_map(|p| p.item).collect();
+    let scorer = Scorer::new(build);
     let mut gear = Vec::with_capacity(build.plan.gear.len());
-    // A goal already worn is done: it isn't new gear to look for.
-    for &id in build.plan.gear.iter().filter(|id| !owned.contains(id)) {
+    for &id in &build.plan.gear {
         let Some(item) = catalog.item(id) else {
             problems.push(Problem::warning(None, format!("A gear goal names an item Leafline doesn't know ({id}).")));
             continue;
         };
+        // A goal already worn is done: it isn't new gear to look for, scrolled or not. Nor is one
+        // the character has outgrown: lower level than what is worn in its slot, or the same level
+        // and no better.
+        let slot = &item.slot;
+        let outgrown = |piece: &Piece| {
+            let level = piece.req_level(catalog);
+            piece.is_copy_of(item, catalog)
+                || (Piece::clashes(&piece.slot(catalog), slot)
+                    && (item.req_level < level
+                        || (item.req_level == level && scorer.of(item) <= scorer.score(&piece.data_stats(catalog)))))
+        };
+        if build.start.pieces.iter().any(outgrown) {
+            continue;
+        }
         let usable = branch.is_none_or(|b| usable_by(item, b));
         if !usable {
             problems.push(Problem::warning(None, format!("{} isn't usable by this job.", item.name)));
@@ -639,13 +665,26 @@ fn check_gear(
         .collect();
     for step in steps.iter_mut() {
         loop {
-            let wearable = gear.iter().position(|check: &GearCheck| {
-                let others = worn.iter().filter(|w| !Piece::clashes(&w.slot, &check.item.slot));
-                let stats = others.fold(step.stats, |total, w| total.plus(w.bonus));
-                check.usable && check.level.is_none() && meets(&check.item, step.level, &stats, known)
-            });
-            let Some(i) = wearable else { break };
-            let check = &mut gear[i];
+            let wearable: Vec<usize> = (0..gear.len())
+                .filter(|&i| {
+                    let check = &gear[i];
+                    // Everything worn counts, the piece this would replace too: the game's hover
+                    // shows a requirement met by it as met.
+                    let stats = worn.iter().fold(step.stats, |total, w| total.plus(w.bonus));
+                    check.usable && check.level.is_none() && meets(&check.item, step.level, &stats, known)
+                })
+                .collect();
+            // Of the goals for one slot that come within reach together, only the best is worth
+            // listing: the character goes straight to it, so the older ones are passed over rather
+            // than shown as things to get. They count as reached.
+            let Some(&best) = wearable.iter().max_by_key(|&&i| (gear[i].item.req_level, std::cmp::Reverse(i))) else { break };
+            for &i in &wearable {
+                let same_slot = gear[i].item.slot == gear[best].item.slot;
+                if i != best && same_slot && gear[i].item.req_level <= gear[best].item.req_level {
+                    gear[i].level = Some(step.level);
+                }
+            }
+            let check = &mut gear[best];
             check.level = Some(step.level);
             step.gear.push(check.item.name.clone());
             worn.retain(|w| !Piece::clashes(&w.slot, &check.item.slot));

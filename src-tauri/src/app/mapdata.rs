@@ -15,10 +15,12 @@ use crate::build::Catalog;
 use crate::error::{Error, Result};
 use crate::mapdata::fetch::{self, Http};
 use crate::mapdata::osms::Dataset;
+use crate::mapdata::layout::{self, Layouts};
+use crate::mapdata::store::{DROPS_FAILED, LAYOUTS_FAILED, TURN_INS_FAILED};
 use crate::mapdata::{
-    Atlas, DataStatus, ItemOrigin, MapCard, MapMatch, MapPage, MapQuery, MapRef, MeasuredRate, MonsterDrops, MonsterFilters,
-    MonsterPage, MonsterQuery, MonsterSheet, NpcPage, NpcQuery, NpcSheet, QuestGuide, QuestPage, QuestQuery, QuestSearch,
-    QuestSheet, RefreshReport, Route, Store, TrainingSpot, Travel, TravelFile, drops, turnins,
+    Assumptions, Atlas, DataStatus, ItemOrigin, KillSpeed, MapCard, MapMatch, MapPage, MapQuery, MapRef, MeasuredRate,
+    MonsterDrops, MonsterFilters, MonsterPage, MonsterQuery, MonsterSheet, NpcPage, NpcQuery, NpcSheet, QuestGuide, QuestPage, QuestQuery, QuestSearch,
+    QuestSheet, RefreshReport, Route, Store, TrainingSpot, Travel, TravelFile, drops, shops, turnins,
 };
 
 const FILE_NAME: &str = "map-data.sqlite3";
@@ -53,17 +55,25 @@ const LINK_HOSTS: [&str; 9] = [
 fn split(mut data: Dataset) -> (Arc<Atlas>, Arc<Catalog>) {
     // The Atlas keeps the item names too, for the items quests ask to bring.
     let item_names = data.items.iter().map(|i| (i.id, i.name.clone())).collect();
-    let catalog = Catalog::new(std::mem::take(&mut data.skills), std::mem::take(&mut data.items));
-    (Arc::new(Atlas::new(data).with_item_names(item_names)), Arc::new(catalog))
+    let genders: Vec<(u32, String, Option<String>)> =
+        data.items.iter().map(|i| (i.id, i.name.clone(), i.gender.clone())).collect();
+    let catalog = Catalog::new(std::mem::take(&mut data.skills), std::mem::take(&mut data.items))
+        .with_recipes(std::mem::take(&mut data.recipes));
+    let atlas = Atlas::new(data)
+        .with_item_names(item_names)
+        .with_item_genders(genders.iter().map(|(id, name, gender)| (*id, name.as_str(), gender.as_deref())));
+    (Arc::new(atlas), Arc::new(catalog))
 }
 
 pub struct MapDataState {
     path: PathBuf,
     atlas: RwLock<Option<Arc<Atlas>>>,
     catalog: RwLock<Option<Arc<Catalog>>>,
+    /// Every map's layout, from Leafline's data repository. Empty until downloaded.
+    layouts: RwLock<Arc<Layouts>>,
     downloading: AtomicBool,
     osms: Http,
-    /// Shared so every wiki request keeps to its one-a-second pace.
+    /// Shared so every wiki request (travel) keeps to its one-a-second pace.
     wiki: Http,
     /// One drop table download at a time; whoever waits then finds the table fresh.
     drops_refresh: Mutex<()>,
@@ -81,15 +91,31 @@ impl MapDataState {
                 (None, None)
             }
         };
+        let layouts = Store::open(&path).and_then(|store| store.layouts()).unwrap_or_default();
         Ok(Self {
             path,
             atlas: RwLock::new(atlas),
             catalog: RwLock::new(catalog),
+            layouts: RwLock::new(Arc::new(layouts)),
             downloading: AtomicBool::new(false),
             osms: Http::new(Duration::from_millis(250)),
             wiki: Http::new(Duration::from_secs(1)),
             drops_refresh: Mutex::new(()),
         })
+    }
+
+    pub(super) fn layouts(&self) -> Arc<Layouts> {
+        self.layouts.read().expect("layouts lock").clone()
+    }
+
+    /// Renews the map layouts, once a day at most, from Leafline's data repository.
+    fn refresh_layouts(&self) -> Result<()> {
+        let _turn = self.drops_refresh.lock().expect("drops refresh lock");
+        let mut store = Store::open(&self.path)?;
+        if layout::refresh(&mut store, &self.osms, now())? {
+            *self.layouts.write().expect("layouts lock") = Arc::new(store.layouts()?);
+        }
+        Ok(())
     }
 
     pub(super) fn atlas(&self) -> Option<Arc<Atlas>> {
@@ -118,11 +144,24 @@ impl MapDataState {
         result
     }
 
-    /// Renews the table of who takes each quest in, and brings the atlas up to date with it.
+    /// Renews the table of who takes each quest in, once a day at most, from Leafline's data
+    /// repository on GitHub, and brings the atlas up to date with it.
     fn refresh_turn_ins(&self) -> Result<()> {
         let _turn = self.drops_refresh.lock().expect("drops refresh lock");
         let mut store = Store::open(&self.path)?;
-        if turnins::refresh(&mut store, &self.wiki, now())? {
+        if turnins::refresh(&mut store, &self.osms, now())? {
+            let (atlas, catalog) = store.load()?.map(split).unzip();
+            *self.atlas.write().expect("atlas lock") = atlas;
+            *self.catalog.write().expect("catalog lock") = catalog;
+        }
+        Ok(())
+    }
+
+    /// Renews Leafline's shop file once a day, and brings the atlas up to date with it.
+    fn refresh_shops(&self) -> Result<()> {
+        let _turn = self.drops_refresh.lock().expect("drops refresh lock");
+        let mut store = Store::open(&self.path)?;
+        if shops::refresh(&mut store, &self.osms, now())? {
             let (atlas, catalog) = store.load()?.map(split).unzip();
             *self.atlas.write().expect("atlas lock") = atlas;
             *self.catalog.write().expect("catalog lock") = catalog;
@@ -132,14 +171,19 @@ impl MapDataState {
 
     fn refresh_drops(&self) -> Result<()> {
         let _turn = self.drops_refresh.lock().expect("drops refresh lock");
-        drops::refresh(&mut Store::open(&self.path)?, &self.wiki, now())
+        drops::refresh(&mut Store::open(&self.path)?, &self.osms, now())
+    }
+
+    /// Forgets a failed download (see [`drops::RETRY_AFTER`]), so the next refresh asks at
+    /// once. Only for the player's own request: automatic lookups keep waiting.
+    fn retry(&self, failed: &str) -> Result<()> {
+        Store::open(&self.path)?.set_failure(failed, None)
     }
 }
 
 /// Once the user has downloaded map data, checks OSMS for changes in the background, at most
-/// once a day, renews the turn-in table once it is a week old, and the drop table too if it was
-/// ever downloaded. An update of Leafline that replaced the cache gets back what the user had
-/// the same way.
+/// once a day, and renews the turn-in table and drop list once they are a day old. An update of
+/// Leafline that replaced the cache gets back what the user had the same way.
 pub fn check_for_updates(app: &AppHandle) {
     let state = app.state::<MapDataState>();
     let wanted = Store::open(&state.path).and_then(|s| s.wants_maps()).unwrap_or(false);
@@ -162,8 +206,15 @@ pub fn check_for_updates(app: &AppHandle) {
         if let Err(err) = state.refresh_turn_ins() {
             eprintln!("turn-in table download failed: {err}");
         }
-        let has_drops = Store::open(&state.path).and_then(|s| s.wants_drops()).unwrap_or(false);
-        if has_drops && let Err(err) = state.refresh_drops() {
+        // Estimates and routes work without layouts, just more roughly.
+        if let Err(err) = state.refresh_layouts() {
+            eprintln!("map layout download failed: {err}");
+        }
+        // The copy that came with the app keeps working when this fails.
+        if let Err(err) = state.refresh_shops() {
+            eprintln!("shop file download failed: {err}");
+        }
+        if let Err(err) = state.refresh_drops() {
             eprintln!("drop table update failed: {err}");
         }
     });
@@ -189,9 +240,18 @@ pub async fn download_map_data(app: AppHandle, force: bool) -> Result<Downloaded
     let downloaded = tauri::async_runtime::spawn_blocking(move || -> Result<Downloaded> {
         let state = handle.state::<MapDataState>();
         let report = state.refresh(force)?;
-        // Quest help still works without it, from what the map data shows.
+        // Quest help still works without it, from what the map data shows. The player asked, so
+        // a recent failure is tried again.
+        state.retry(TURN_INS_FAILED)?;
         if let Err(err) = state.refresh_turn_ins() {
             eprintln!("turn-in table download failed: {err}");
+        }
+        state.retry(LAYOUTS_FAILED)?;
+        if let Err(err) = state.refresh_layouts() {
+            eprintln!("map layout download failed: {err}");
+        }
+        if let Err(err) = state.refresh_shops() {
+            eprintln!("shop file download failed: {err}");
         }
         Ok(Downloaded { report, status: Store::open(&state.path)?.status()? })
     })
@@ -222,11 +282,23 @@ pub fn search_maps(state: State<MapDataState>, text: String) -> Vec<MapRef> {
     state.atlas().map(|atlas| atlas.search(&text, 8)).unwrap_or_default()
 }
 
+/// A route with roughly how long it takes on foot.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RouteInfo {
+    #[serde(flatten)]
+    route: Route,
+    /// About how many seconds of walking, when every map on the way has a known layout.
+    walk_seconds: Option<f64>,
+}
+
 /// The fewest steps between two maps, through portals and any travel the player turned on.
 #[tauri::command]
-pub fn map_route(app: AppHandle, state: State<MapDataState>, from: u32, to: u32) -> Option<Route> {
+pub fn map_route(app: AppHandle, state: State<MapDataState>, from: u32, to: u32) -> Option<RouteInfo> {
     let atlas = state.atlas()?;
-    atlas.route_with(from, to, &travel(&app, &atlas))
+    let route = atlas.route_with(from, to, &travel(&app, &atlas))?;
+    let walk_seconds = layout::route_walk_seconds(&route, &state.layouts());
+    Some(RouteInfo { route, walk_seconds })
 }
 
 /// Where the travel connections in use come from.
@@ -601,13 +673,20 @@ pub fn show_place(app: AppHandle, mode: String, id: u32) -> Result<()> {
     Ok(app.emit(SHOW_PLACE_EVENT, PlaceLink { mode, id })?)
 }
 
-/// Downloads the drop table from mapleclassic.wiki, for finding who drops a quest item. Only on
-/// the player's request.
+/// Downloads Leafline's drop list if there is none or it is over a day old.
+/// `retry` is set when the player pressed a button for it, so a download that failed recently is
+/// tried again; panels that ask on their own leave it unset and wait out the back-off.
 #[tauri::command]
-pub async fn download_drops(app: AppHandle) -> Result<()> {
-    tauri::async_runtime::spawn_blocking(move || app.state::<MapDataState>().refresh_drops())
-        .await
-        .map_err(|err| Error::Invalid(err.to_string()))?
+pub async fn download_drops(app: AppHandle, retry: Option<bool>) -> Result<()> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<MapDataState>();
+        if retry == Some(true) {
+            state.retry(DROPS_FAILED)?;
+        }
+        state.refresh_drops()
+    })
+    .await
+    .map_err(|err| Error::Invalid(err.to_string()))?
 }
 
 /// When the drop table was last downloaded, in Unix seconds, or `None` before the first time.
@@ -624,12 +703,18 @@ pub fn drops_fetched_at(state: State<MapDataState>) -> Result<Option<i64>> {
 pub struct Spots {
     /// The map portals are counted from, when the minimap was read and matched.
     from: Option<MapRef>,
+    /// How fast the player gets through monster HP, behind every estimate. None until enough
+    /// solo play is saved.
+    speed: Option<KillSpeed>,
     spots: Vec<TrainingSpot>,
 }
 
 /// Every map with monsters to hunt, for the training spot finder, with the EXP per hour the
-/// player measured on each. `None` until map data has been downloaded.
+/// player measured on each and an estimate from their kill speed for the rest. `level` is the
+/// character's; `assumptions` what the player set for respawn time and EXP rate. `None` until
+/// map data has been downloaded.
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub fn training_spots(
     app: AppHandle,
     state: State<MapDataState>,
@@ -637,11 +722,21 @@ pub fn training_spots(
     map_street: Option<String>,
     map_twin: Option<u32>,
     measured: Vec<MeasuredRate>,
+    level: Option<u32>,
+    assumptions: Option<Assumptions>,
 ) -> Option<Spots> {
     let atlas = state.atlas()?;
     let from = map_name.and_then(|name| atlas.find_twin(&name, map_street.as_deref(), map_twin)).map(|m| m.card.map);
-    let spots = atlas.training_spots(from.as_ref().map(|m| m.id), &measured, &travel(&app, &atlas));
-    Some(Spots { from, spots })
+    let layouts = state.layouts();
+    let estimator = atlas.estimator(&measured, level, assumptions.unwrap_or_default(), &layouts);
+    let spots = atlas.training_spots(
+        from.as_ref().map(|m| m.id),
+        &measured,
+        &travel(&app, &atlas),
+        estimator.as_ref(),
+        &layouts,
+    );
+    Some(Spots { from, speed: estimator.map(|e| e.speed), spots })
 }
 
 /// Opens one of the card's links in the default browser. Only the sites it links to are allowed.

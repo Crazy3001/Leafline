@@ -3,12 +3,13 @@
   import { ExternalLink, Skull } from "@lucide/svelte";
 
   import { backend } from "$lib/api";
-  import { formatCompact, formatNumber } from "$lib/format";
+  import { formatCompact, formatNumber, monsterLabel } from "$lib/format";
   import { OSMS_CREDIT, OSMS_URL } from "$lib/mapdata.svelte";
   import { showNpcNamed } from "$lib/places.svelte";
   import type { MapDetails, MapRef } from "$lib/types";
   import ConnectionCompass from "./ConnectionCompass.svelte";
   import MapDrops from "./MapDrops.svelte";
+  import ShopStock from "../item/ShopStock.svelte";
   import RouteFromHere from "./RouteFromHere.svelte";
   import RoutePlanner from "./RoutePlanner.svelte";
   import Section from "./Section.svelte";
@@ -32,6 +33,8 @@
   /** The player's map, while they look at another. */
   const away = $derived(current && current.id !== details.map.id ? current : null);
   const placed = $derived(details.exits.some((e) => e.side));
+  /** Shops opened to show what they sell, by NPC name. */
+  let openShops = $state<string[]>([]);
 
   const facts = $derived(
     [
@@ -87,7 +90,7 @@
         {#each details.mobs as mob (mob.id)}
           <tr>
             <td class="mob">
-              <button class="ref ref-mob" onclick={() => backend.showMonster(mob.id, null)}>{mob.name}</button>
+              <button class="ref ref-mob" onclick={() => backend.showMonster(mob.id, null)}>{monsterLabel(mob.name)}</button>
               {#if mob.boss}<span class="boss" title="Boss"><Skull size={11} /></span>{/if}
               {#if mob.undead}<span class="tag">undead</span>{/if}
             </td>
@@ -140,6 +143,35 @@
               {npc.quests.length} quest{npc.quests.length === 1 ? "" : "s"}
             </span>
           {/if}
+        </li>
+      {/each}
+    </ul>
+  </Section>
+{/if}
+
+{#if details.shops?.length}
+  <Section title="Shops" count={details.shops.length} open={!compact}>
+    <ul class="shops">
+      {#each details.shops as shop (shop.npc)}
+        {@const open = openShops.includes(shop.npc)}
+        <li>
+          <div class="shop-head">
+            <button
+              class="fold"
+              aria-expanded={open}
+              aria-label="{open ? 'Hide' : 'Show'} what {shop.npc} sells"
+              onclick={() => (openShops = open ? openShops.filter((n) => n !== shop.npc) : [...openShops, shop.npc])}
+            >
+              <span class="chev" class:open>›</span>
+            </button>
+            {#if shop.npcId != null}
+              <button class="ref ref-npc" onclick={() => backend.showPlace("npcs", shop.npcId!)}>{shop.npc}</button>
+            {:else}
+              <span>{shop.npc}</span>
+            {/if}
+            <span class="gives">{shop.role ? `${shop.role} · ` : ""}{shop.items.length} item{shop.items.length === 1 ? "" : "s"}</span>
+          </div>
+          {#if open}<div class="stock"><ShopStock {shop} /></div>{/if}
         </li>
       {/each}
     </ul>
@@ -300,6 +332,52 @@
   .gives {
     color: var(--faint);
     font-size: var(--text-xs);
+  }
+
+  .shops {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: var(--text-sm);
+  }
+
+  .shop-head {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    padding: 2px 0;
+  }
+
+  .shop-head .gives {
+    margin-left: auto;
+  }
+
+  .fold {
+    width: 14px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--faint);
+    cursor: pointer;
+  }
+
+  .chev {
+    display: inline-block;
+    transition: transform 0.12s ease;
+  }
+
+  .chev.open {
+    transform: rotate(90deg);
+  }
+
+  .stock {
+    padding: 0 0 6px 20px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .chev {
+      transition: none;
+    }
   }
 
   .links {

@@ -3,6 +3,68 @@
 What changed in each release of Leafline. Leafline is a work in progress: if something reads
 wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?template=bug_report.yml).
 
+## Unreleased
+
+### Added
+- **Ready-made build plans** for every 2nd job, Lv 1 to 70, each following one written guide
+  level by level: the skill points, the AP, and the gear to aim for. The plan credits its guide
+  and links to the exact page, and the link is saved with the build. Where a guide offers a
+  choice (Arrow Blow or Double Shot, axe or sword, spear or polearm, Magic Claw or Energy Bolt),
+  each choice is its own plan beside the first. They replace the plans Leafline had written
+  itself.
+- **Desk view tabs:** the desk view now has tabs: Training, Questing, Character, Training log,
+  Build planner and two of your own. Rename any tab, change its columns and panels, or reset it;
+  your tabs, the window's size and whether it is maximized are all remembered. The training log
+  and build planner open in the desk view instead of windows of their own.
+- **Training log → Records:** every map you trained on, with EXP and mesos per hour for each
+  level, party size and job you played it at. Filter by level, party and job, and order by EXP,
+  mesos or time.
+- **Mesos per hour after potions:** name the potions you hunt with and set what each costs you,
+  then type how many you had at the start of a session and how many you have now. The Train tab,
+  the session's page in the training log and Records show mesos per hour with that cost taken
+  out.
+- **Level goal:** set a goal level on the Train tab and see how many levels are left, about how
+  much play that is, and how many days at your usual pace. Leafline learns the EXP each level
+  takes from your own HUD as you level.
+- **Your best maps:** the Train tab lists your best single run on each map before a session,
+  **This map** compares your mesos with your best there as well as your EXP, and Records has a
+  Best run column.
+- **Crafting:** an item's page shows the recipe that makes it and the recipes that use it, with
+  the discipline, skill level, ingredients and meso cost. **Lookup → Crafting** lists every
+  recipe, by discipline, searchable by the item made or any ingredient. The recipes come with the
+  map data, which downloads again once after this update.
+- **NPC shops:** an item's page lists the shops that sell it, cheapest first, with the NPC, the
+  map, the price and any town standing the shop asks for. Map pages list their shops and NPC
+  pages what they sell. Covers Maple Island and Victoria Island at launch prices, each with the
+  day it was recorded; Leafline checks for an updated list once a day.
+
+### Changed
+- **Where to train → For you:** maps you haven't tried are now estimated from how fast you get
+  through monster HP in your own solo play, near your level, and held to how many monsters the
+  map can bring back in an hour. Each estimate shows how sure it is and why. The respawn time
+  behind that limit is an assumption you can change under **Assumptions**.
+- **Quest turn-ins** now come from the game's own quest data instead of mapleclassic.wiki, which
+  stopped answering programs on 2026-11-11. Leafline names who takes a quest in on 333 of 343
+  quests, up from 287.
+- **Monster drops** now come from Leafline's own drop list, built from the game's item text,
+  StrategyWiki and players' reports, instead of the wiki's table. It covers every common monster's
+  etc drops, shared drops like Leather and ores included, but has no rates: it says who drops
+  what, not how often. Drops are checked for updates once a day, without needing a download first.
+
+- **Item check starts from the item itself:** the name read from the tooltip is matched to the item
+  data, and the item's own stats, upgrade slots, attack speed and knockback chance are the
+  baseline. What the tooltip says replaces a stat only when it can be believed (its base matches
+  the item's, or it sits within a normal roll). Anything doubtful keeps the item's own value and
+  says so. When the name is only a close guess the card says it may be wrong and shows the item's
+  own stats; when nothing fits it shows no stats and a button to search. Weapon knockback comes
+  with the map data, which downloads again once.
+
+### Fixed
+- Live reading kept saying "The game is minimised" after the game was brought back, until Live was
+  turned off and on again. It now opens a fresh capture when the game window returns.
+- When a download failed, every lookup tried again at once. Leafline now waits a day, unless you
+  press a download button.
+
 ## 0.1.1 (2026-11-10)
 
 ### Added

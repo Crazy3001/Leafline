@@ -7,8 +7,8 @@ use std::time::Duration;
 use tauri::AppHandle;
 use tauri_plugin_window_state::{AppHandleExt, StateFlags};
 
-/// What is remembered about each window.
-pub const SAVED: StateFlags = StateFlags::POSITION.union(StateFlags::SIZE);
+/// What is remembered about each window: where it is, how big, and whether it is maximized.
+pub const SAVED: StateFlags = StateFlags::POSITION.union(StateFlags::SIZE).union(StateFlags::MAXIMIZED);
 
 /// How long windows must keep still before their places are saved.
 const QUIET: Duration = Duration::from_millis(500);

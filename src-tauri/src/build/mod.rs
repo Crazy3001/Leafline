@@ -5,6 +5,7 @@
 //! is information the player acts on by hand.
 
 pub mod catalog;
+pub mod crafting;
 pub mod fit;
 pub mod outfit;
 pub mod plan;

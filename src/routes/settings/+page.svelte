@@ -25,7 +25,7 @@
   import Logo from "$lib/components/Logo.svelte";
   import DataSources from "$lib/components/DataSources.svelte";
   import { IDEA_URL, reportUrl } from "$lib/feedback";
-  import { OSMS_URL, WIKI_URL } from "$lib/mapdata.svelte";
+  import { DROPS_URL, OSMS_URL, WIKI_URL } from "$lib/mapdata.svelte";
   import { live, watchLive } from "$lib/readings.svelte";
   import { changeSettings, display, hotkey, keyHint, keyName, usesNumpad, watchSettings } from "$lib/settings.svelte";
   import { watchTyping } from "$lib/typing";
@@ -317,7 +317,13 @@
       url: OSMS_URL,
     },
     {
-      what: "Player-observed drop rates, quest turn-ins, taxi routes and return scrolls",
+      what: "Monster drops",
+      who: "StrategyWiki contributors",
+      licence: "CC BY-SA 4.0",
+      url: DROPS_URL,
+    },
+    {
+      what: "Taxi routes and return scrolls",
       who: "mapleclassic.wiki contributors",
       licence: "CC BY-NC-SA 4.0",
       url: WIKI_URL,
@@ -666,7 +672,7 @@
     <section id="hotkeys">
       <h2>Hotkeys</h2>
       <p class="lead">
-        They work while you play. Use Win with an F-key, such as Win+F8: the game can't bind Win, and a key on its own
+        They work while you play. Use Win with a numpad key or an F-key, such as Win+Num 0: the game can't bind Win, and a key on its own
         may never reach Leafline while the game is in front.
       </p>
       <div class="row">

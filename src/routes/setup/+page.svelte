@@ -396,7 +396,7 @@
         <h1>Map data</h1>
         <p class="lead">
           The Map, Train and Quests tabs and the build planner need map, monster, quest, skill and item facts. They come
-          from community data, are downloaded once and kept on this PC. Drop rates, quest turn-ins and taxi routes come
+          from community data, are downloaded once and kept on this PC. Taxi routes come
           from what players recorded on
           <button class="link" onclick={() => backend.openLink(WIKI_URL)}>mapleclassic.wiki<ExternalLink size={11} /></button>,
           fetched when first needed.

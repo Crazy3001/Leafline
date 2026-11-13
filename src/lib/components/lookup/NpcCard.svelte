@@ -6,6 +6,7 @@
   import { untrack } from "svelte";
 
   import Card from "../Card.svelte";
+  import ShopStock from "../item/ShopStock.svelte";
   import PlaceList from "../map/PlaceList.svelte";
   import Section from "../map/Section.svelte";
   import { backend } from "$lib/api";
@@ -51,6 +52,12 @@
         <p class="note">Not on any map in the data. They may only appear during a quest or an event.</p>
       {/if}
     </Section>
+
+    {#if sheet.shop}
+      <Section title="Sells" count={sheet.shop.items.length}>
+        <ShopStock shop={sheet.shop} />
+      </Section>
+    {/if}
 
     {#if sheet.quests.length}
       <Section title="Quests they give" count={sheet.quests.length}>

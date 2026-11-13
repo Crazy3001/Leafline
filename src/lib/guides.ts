@@ -1,5 +1,6 @@
-// Written guides for each job on other sites. Leafline only links to them: their terms don't
-// allow copying the orders in, and linking needs no permission.
+// Written guides for each job on other sites, linked from the build planner. The ready-made plans
+// in src-tauri/src/build/starters.json follow NiaDB's guides and credit the exact page; nothing
+// else is copied from either site.
 
 const NIADB = "https://meowdb.com/msclassic/guides";
 const MAPLESCANNER = "https://maplescanner.com/classic/gms/en/build";

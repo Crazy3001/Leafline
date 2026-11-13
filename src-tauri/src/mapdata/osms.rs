@@ -12,7 +12,8 @@ use serde::{Deserialize, Deserializer, Serialize};
 use super::turnins::TurnIn;
 
 /// The files Leafline needs, in the order they are fetched.
-pub const FILES: [&str; 6] = ["maps.json", "monsters.json", "npcs.json", "quests.json", "skills.json", "items.json"];
+pub const FILES: [&str; 7] =
+    ["maps.json", "monsters.json", "npcs.json", "quests.json", "skills.json", "items.json", "recipes.json"];
 
 /// The only `schema_version` this reader understands. OSMS ships breaking changes as `v2/`.
 pub const SCHEMA_VERSION: u32 = 1;
@@ -620,6 +621,7 @@ impl From<RawItem> for ItemRecord {
             req_fame: need("reqPOP"),
             weapon_type: raw.weapon.as_ref().and_then(|w| w.kind.clone()),
             attack_speed: number("attackSpeed").map(|v| v.max(0) as u32),
+            knockback: number("knockback").map(|v| v.max(0) as u32),
             upgrade_slots: number("tuc").map(|v| v.max(0) as u32),
             quest_item: flag("quest") || flag("pquest"),
             untradable: flag("tradeBlock"),
@@ -677,6 +679,37 @@ impl ItemKind {
     }
 }
 
+/// A crafting recipe: what a discipline makes, at which of its skill levels, from what.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RecipeRecord {
+    pub id: u32,
+    /// Smithing, Tailoring and so on, as the file names them.
+    pub discipline: String,
+    /// The discipline's skill level the recipe asks for.
+    #[serde(rename = "req_skill_level", default)]
+    pub skill_level: u32,
+    #[serde(default)]
+    pub craft_exp: u32,
+    #[serde(default)]
+    pub meso_cost: u64,
+    pub output_item_id: u32,
+    #[serde(default = "one")]
+    pub output_count: u32,
+    #[serde(default)]
+    pub ingredients: Vec<Ingredient>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Ingredient {
+    pub item_id: u32,
+    #[serde(default = "one")]
+    pub count: u32,
+}
+
+fn one() -> u32 {
+    1
+}
+
 /// An item of any kind. Icon and sprite URLs in the file are left out, like every other image.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(from = "RawItem", rename_all(serialize = "camelCase"))]
@@ -697,6 +730,8 @@ pub struct ItemRecord {
     pub req_fame: u32,
     /// The data's own number for a weapon's speed. Lower is faster.
     pub attack_speed: Option<u32>,
+    /// A weapon's knockback chance, in percent.
+    pub knockback: Option<u32>,
     /// Upgrade slots on a clean copy.
     pub upgrade_slots: Option<u32>,
     pub quest_item: bool,
@@ -726,6 +761,8 @@ pub struct ScrollInfo {
 /// Everything the map card and build planner are built from.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Dataset {
+    /// NPC shops, from Leafline's own shop file. Not from OSMS: the client data doesn't say.
+    pub shops: Vec<super::shops::ShopRecord>,
     /// Who takes quests in. Not from OSMS: the client data doesn't say.
     pub turn_ins: Vec<TurnIn>,
     pub maps: Vec<MapRecord>,
@@ -734,6 +771,7 @@ pub struct Dataset {
     pub quests: Vec<QuestRecord>,
     pub skills: Vec<SkillRecord>,
     pub items: Vec<ItemRecord>,
+    pub recipes: Vec<RecipeRecord>,
 }
 
 /// One downloaded file, parsed.
@@ -745,6 +783,7 @@ pub enum Records {
     Quests(Vec<QuestRecord>),
     Skills(Vec<SkillRecord>),
     Items(Vec<ItemRecord>),
+    Recipes(Vec<RecipeRecord>),
 }
 
 impl Records {
@@ -761,6 +800,7 @@ impl Records {
                 Self::Skills(skills)
             }
             "items.json" => Self::Items(serde_json::from_slice(body)?),
+            "recipes.json" => Self::Recipes(serde_json::from_slice(body)?),
             other => unreachable!("not a map data file: {other}"),
         })
     }
@@ -855,7 +895,7 @@ mod tests {
         let json = br#"[
             {"id": 1, "name": "Twig Wand", "category": "Equipment", "sub_category": "Weapon", "price": "5",
              "req_classes": ["Magician"], "weapon": {"type": "Wand", "swing_reach_px": 88},
-             "stats": {"reqLevel": 8, "reqINT": 20, "reqPOP": 2, "incMAD": 12, "incPDD": "3", "tuc": 7, "attackSpeed": 6},
+             "stats": {"reqLevel": 8, "reqINT": 20, "reqPOP": 2, "incMAD": 12, "incPDD": "3", "tuc": 7, "attackSpeed": 6, "knockback": 30},
              "icon_url": "https://example.invalid/w.png", "sprite_urls": ["https://example.invalid/s.png"]},
             {"id": 2, "name": "Plain Cap", "category": "Equipment", "sub_category": "Hat", "gender": "male"},
             {"id": 3, "name": "Red Berry", "category": "Consumable", "sub_category": "Consume",
@@ -870,6 +910,7 @@ mod tests {
         assert_eq!(wand.weapon_type.as_deref(), Some("Wand"));
         assert_eq!(wand.classes, ["Magician"]);
         assert_eq!((wand.upgrade_slots, wand.attack_speed, wand.price), (Some(7), Some(6), Some(5)));
+        assert_eq!(wand.knockback, Some(30));
         let stats: Vec<_> = wand.stats.iter().map(|s| (s.label.as_str(), s.value)).collect();
         assert_eq!(stats, [("Magic", 12), ("Weapon Def.", 3)]);
         assert!(items[1].classes.is_empty() && items[1].req_level == 0);

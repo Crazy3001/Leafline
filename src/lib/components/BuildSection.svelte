@@ -13,7 +13,7 @@
   import { gives } from "$lib/items.svelte";
   import { openPlanner } from "$lib/nav.svelte";
   import { display, keyHint } from "$lib/settings.svelte";
-  import type { BuildPlan, Fit, GearItem, GearPiece, ItemRecord, LevelStep, Outfit } from "$lib/types";
+  import type { BuildCatalog, BuildPlan, Fit, GearItem, GearPiece, ItemRecord, LevelStep, Outfit } from "$lib/types";
   import Segmented from "$lib/ui/Segmented.svelte";
 
   let {
@@ -63,9 +63,13 @@
   });
 
   const steps = $derived(plan?.expansion.steps ?? []);
+  /** The Character Stat window has been read, so the plan's stats start from the real ones. */
+  const statsKnown = $derived(plan?.build.start.stats != null);
+  /** What gear added to each stat when the window was last read. */
+  const gearBonus = $derived(plan?.build.start.gearBonus ?? null);
   const at = $derived(level ?? plan?.build.start.level ?? 0);
   const step = $derived(steps.findLast((s) => s.level <= at) ?? steps[0] ?? null);
-  const hasWork = (s: LevelStep) => s.ap.length > 0 || s.sp.length > 0 || s.advance != null || s.gear.length > 0;
+  const hasWork = (s: LevelStep) => s.ap.length > 0 || s.sp.length > 0 || s.advance != null;
   const coming = $derived(steps.filter((s) => s.level > at && hasWork(s)).slice(0, COMING));
   const advance = $derived(steps.find((s) => s.level > at && s.advance));
   /** The next level that brings a gear goal within reach. */
@@ -77,13 +81,14 @@
 
   // What to spend, the next job advancement and gear each get a view of their own, so the tab
   // stays short. The one last picked is remembered.
-  type View = "plan" | "advance" | "gear";
+  type View = "plan" | "advance" | "gear" | "skills";
   const VIEW_KEY = "leafline.build.view";
   let view = $state<View>(storedView());
   const canAdvance = $derived(!!nextAdvance?.advance && !!plan?.build.plan.job);
   const views = $derived([
     { id: "plan" as View, label: "Level up" },
     { id: "gear" as View, label: "Gear" },
+    { id: "skills" as View, label: "Skills" },
     ...(canAdvance ? [{ id: "advance" as View, label: "Job advance" }] : []),
   ]);
 
@@ -137,6 +142,15 @@
   });
 
   const worn = $derived(new Set((plan?.build.start.pieces ?? []).map((p) => p.item)));
+
+  /** What the worn pieces add up to, stat by stat, as their tooltips spelled them. */
+  const gearTotals = $derived.by(() => {
+    const totals = new Map<string, number>();
+    for (const piece of plan?.build.start.pieces ?? []) {
+      for (const stat of piece.stats) totals.set(stat.label, (totals.get(stat.label) ?? 0) + stat.value);
+    }
+    return [...totals].filter(([, value]) => value !== 0).map(([label, value]) => ({ label, value }));
+  });
 
   /** Slot names as the game's equip window shows them. */
   const SLOT_NAMES: Record<string, string> = { Glove: "Gloves", Earring: "Earrings" };
@@ -220,12 +234,78 @@
       goalError = String(e);
     }
   }
+  // Skills: what the skill window last showed, what the plan wants by its end, and when the next point goes in.
+  let catalog = $state<BuildCatalog | null>(null);
+  $effect(() => {
+    if (shown !== "skills" || catalog) return;
+    backend.buildCatalog().then((c) => (catalog = c)).catch(() => {});
+  });
+  const skillRows = $derived.by(() => {
+    const info = new Map((catalog?.skills ?? []).map((k) => [k.id, k]));
+    const now = new Map((plan?.build.start.skills ?? []).map((k) => [k.skillId, k.level]));
+    const goal = new Map((plan?.expansion.skills ?? []).map((k) => [k.skillId, k.level]));
+    // Every skill of the job and the jobs before it, so skills not yet touched show too.
+    const job = plan?.build.plan.job ?? 0;
+    const path = new Set([0, Math.floor(job / 100) * 100, job]);
+    const ids = new Set([...now.keys(), ...goal.keys(), ...(catalog?.skills ?? []).filter((k) => path.has(k.jobId)).map((k) => k.id)]);
+    return [...ids]
+      .map((id) => {
+        const next = steps.find((st) => st.level > at && st.sp.some((g) => g.skillId === id));
+        const gain = next?.sp.find((g) => g.skillId === id);
+        const name = info.get(id)?.name ?? steps.flatMap((st) => st.sp).find((g) => g.skillId === id)?.name ?? `Skill ${id}`;
+        return {
+          id,
+          name,
+          level: now.get(id) ?? 0,
+          goal: goal.get(id) ?? now.get(id) ?? 0,
+          max: info.get(id)?.maxLevel ?? null,
+          passive: info.get(id)?.passive ?? false,
+          description: info.get(id)?.description ?? null,
+          tier: info.get(id)?.jobTier ?? "",
+          className: info.get(id)?.className ?? "",
+          nextLevel: next?.level ?? null,
+          nextGain: gain ? gain.to - gain.from : null,
+        };
+      })
+      .sort((a, b) => a.id - b.id);
+  });
+  type SkillRow = (typeof skillRows)[number];
+  const isMaxed = (k: SkillRow) => k.max != null && k.level >= k.max;
+  const TIERS = ["2nd Job", "1st Job", "Beginner"];
+  /** Where the 2nd job's points end: the 3rd job takes over. */
+  const THIRD_JOB_LEVEL = 70;
+  /** Skills by job, the latest job first, in the order the game's skill window lists them. */
+  const skillGroups = $derived.by(() => {
+    const tiers = [...new Set(skillRows.map((k) => k.tier))].sort((a, b) => {
+      const rank = (t: string) => (TIERS.includes(t) ? TIERS.indexOf(t) : TIERS.length);
+      return rank(a) - rank(b);
+    });
+    return tiers
+      .map((tier) => {
+        const rows = skillRows.filter((k) => k.tier === tier);
+        const title = tier ? `${tier}${rows[0]?.className && tier !== "Beginner" ? ` · ${rows[0].className}` : ""}` : "Other";
+        // The points a job gives over its whole span, or what its skills can take if that is less.
+        const r = display.buildRules;
+        const given =
+          tier === "Beginner"
+            ? (r.firstJobLevel - 1) * r.beginnerSpPerLevel
+            : tier === "1st Job"
+              ? (r.secondJobLevel - r.firstJobLevel) * r.spPerLevel + r.advancementSp
+              : tier === "2nd Job"
+                ? (THIRD_JOB_LEVEL - r.secondJobLevel) * r.spPerLevel + r.advancementSp
+                : Infinity;
+        const room = rows.reduce((n, k) => n + (k.max ?? k.level), 0);
+        return { title, rows, spent: rows.reduce((n, k) => n + k.level, 0), total: Math.min(room, given) };
+      })
+      .filter((g) => g.rows.length);
+  });
+  const skillsRead = $derived((plan?.build.start.skills?.length ?? 0) > 0);
   const shown = $derived(view === "advance" && !canAdvance ? "plan" : view);
 
   function storedView(): View {
     try {
       const saved = localStorage.getItem(VIEW_KEY);
-      return saved === "advance" || saved === "gear" ? saved : "plan";
+      return saved === "advance" || saved === "skills" ? saved : saved === "gear" || saved === "worn" ? "gear" : "plan";
     } catch {
       return "plan";
     }
@@ -247,176 +327,8 @@
   }
 </script>
 
-{#snippet todo(step: LevelStep)}
-  <div class="now">
-    <span class="at tabular">Lv {level ?? step.level}</span>
-    <div class="todo">
-      {#if past}
-        <p class="quiet">Past the end of this plan (Lv {step.level}).</p>
-      {:else if !hasWork(step)}
-        <p class="quiet">Nothing to spend at this level.</p>
-      {/if}
-      {#if !past}
-        {#if step.advance}<p class="advance">{step.advance}</p>{/if}
-        {#each step.sp as gain (gain.skillId)}
-          <p>
-            <span class="tag">{gain.to - gain.from} SP</span>{gain.name}
-            <span class="tabular dim">{gain.from} → {gain.to}</span>
-          </p>
-        {/each}
-        {#each step.ap as gain (gain.stat)}
-          <p><span class="tag">{gain.amount} AP</span>{statLabel(gain.stat)} <span class="tabular dim">to {gain.total}</span></p>
-        {/each}
-        {#each step.gear as name (name)}
-          <p><span class="tag">Get</span><button class="ref ref-item" onclick={() => backend.showItem(null, name)}>{name}</button></p>
-        {/each}
-      {/if}
-    </div>
-  </div>
-{/snippet}
-
-{#if glance}
-  <!-- Nothing to set up or browse in a pinned window: without a plan, it stays out of the way. -->
-  {#if ready && plan && step}
-    <section class="build" aria-label="Build plan">
-      <header class="head">
-        <span class="title">Build</span>
-        <span class="plan" title={plan.build.name}>{plan.build.name}</span>
-      </header>
-      {@render todo(step)}
-      {#if advance}
-        <p class="next">
-          Next job advancement: <strong>{advance.advance}</strong> at Lv {advance.level}
-        </p>
-      {/if}
-      {#if warnings.length}
-        <button class="link warn-line" onclick={() => openPlanner()}>
-          {warnings.length === 1 ? "1 thing to fix" : `${warnings.length} things to fix`} in this plan
-        </button>
-      {/if}
-      <footer>
-        <button class="credit" onclick={() => backend.openLink(OSMS_URL)}>{OSMS_CREDIT}</button>
-      </footer>
-    </section>
-  {/if}
-{:else}
-<section class="build full" aria-label="Build plan">
-  <header class="head strip">
-    <span class="title strip-title">Build</span>
-    {#if plan && step}<span class="plan" title={plan.build.name}>{plan.build.name}</span>{/if}
-    {#if plan && step}
-      <span class="tools">
-        <button
-          class="link"
-          title="Read your Character Stat and Skill windows{keyHint('ReadCharacter')}"
-          onclick={() => backend.readCharacter()}><RefreshCw size={12} />Read stats</button
-        >
-        <button class="link" onclick={() => openPlanner()}><Pencil size={12} />Edit</button>
-      </span>
-    {/if}
-  </header>
-
-  {#if !ready}
-    <p class="lead">Plan your AP and SP level by level. Builds use the skills and equipment in the map data.</p>
-    <MapDataPanel compact />
-  {:else if error}
-    <p class="lead">{error}</p>
-  {:else if loaded && !plan}
-    <p class="lead">
-      No build yet. Choose a job and write your goals in order, from a guide or your own idea, and Leafline lays them out
-      level by level.
-    </p>
-    <button class="action" onclick={() => openPlanner()}><Pencil size={13} />Plan a build</button>
-  {:else if plan && step}
-    <div class="views"><Segmented label="Build view" options={views} value={shown} stretch size="sm" onchange={pickView} /></div>
-    {#if shown === "plan"}
-    {@render todo(step)}
-
-    <h4 class="sub">Your stats by the plan</h4>
-    <dl class="stats">
-      {#each STATS as stat (stat.id)}
-        <div>
-          <dt>{stat.label}</dt>
-          <dd class="tabular">{step.stats[stat.id]}</dd>
-        </div>
-      {/each}
-    </dl>
-
-    {#if coming.length}
-      <h4 class="sub">Coming up</h4>
-        <ul class="coming">
-          {#each coming as s (s.level)}
-            <li>
-              <span class="when tabular">Lv {s.level}</span>
-              <span class="what">
-                {#if s.advance}<span class="advance">{s.advance}</span>{/if}
-                <!-- What the level adds, then the total it makes: "Double Stab +3 (4)". -->
-                {#each s.sp as gain (gain.skillId)}<span>{gain.name} <span class="tabular">+{gain.to - gain.from}</span> <span class="total tabular">({gain.to})</span></span>{/each}
-                {#each s.ap as gain (gain.stat)}<span>{statLabel(gain.stat)} <span class="tabular">+{gain.amount}</span> <span class="total tabular">({gain.total})</span></span>{/each}
-                {#each s.gear as name (name)}<button class="ref ref-item" onclick={() => backend.showItem(null, name)}>{name}</button>{/each}
-              </span>
-            </li>
-          {/each}
-        </ul>
-    {/if}
-
-    {#if nextGear || advance}
-      <h4 class="sub">Next</h4>
-      <ul class="coming">
-        {#if nextGear}
-          <li>
-            <span class="when tabular">Lv {nextGear.level}</span>
-            <span class="what"
-              ><span>New gear:</span>{#each nextGear.gear as name (name)}<button class="ref ref-item" onclick={() => backend.showItem(null, name)}
-                  >{name}</button
-                >{/each}</span
-            >
-          </li>
-        {/if}
-        {#if advance}
-          <li>
-            <span class="when tabular">Lv {advance.level}</span>
-            <span class="what"><span class="advance">{advance.advance}</span></span>
-          </li>
-        {/if}
-      </ul>
-    {/if}
-
-    {#if warnings.length}
-      <h4 class="warn-title">{warnings.length === 1 ? "1 thing to fix" : `${warnings.length} things to fix`}</h4>
-      <ul class="warnings">
-        {#each warnings.slice(0, 3) as problem (problem.message)}<li>{problem.message}</li>{/each}
-      </ul>
-      {#if warnings.length > 3}<button class="link" onclick={() => openPlanner()}>See all in the editor</button>{/if}
-    {/if}
-    {:else if shown === "advance" && nextAdvance?.advance && plan.build.plan.job}
-      <p class="next">
-        <strong>{nextAdvance.advance}</strong> at Lv {nextAdvance.level}
-      </p>
-      <AdvancementChecklist
-        job={plan.build.plan.job}
-        tier={nextAdvance.advance.startsWith("1st") ? 1 : 2}
-        at={nextAdvance.level}
-        {level}
-        {character}
-      />
-    {:else}
-    <!--
-      Gear slot by slot, as the equip window has it: what you wear (its own stats, scrolls and all,
-      which can be put right here), the plan's next goal for the slot, and the best you can wear
-      now when it beats what you wear.
-    -->
-    {#if outfit}
-      {#if !plan.build.start.pieces?.length}
-        <p class="quiet-line">
-          Check what you wear in game{keyHint("ReadItem")} and press <strong>I'm wearing this</strong>, or put it on by name below.
-        </p>
-      {/if}
-      <ul class="outfit">
-        {#each outfit.slots as row (row.slot)}
-          {@const piece = row.wearing}
-          <li>
-            <h5 class="slot-name">{slotName(row.slot)}</h5>
+{#snippet wearing(row: Outfit["slots"][number])}
+  {@const piece = row.wearing}
             <div class="line">
               <span class="label">Wearing</span>
               {#if piece}
@@ -486,6 +398,248 @@
                   >{/if}
               </p>
             {/if}
+{/snippet}
+
+{#snippet putOn()}
+    {#if goalError}<p class="goal-error">{goalError}</p>{/if}
+
+    <label class="find">
+      <Search size={13} />
+      <input type="search" placeholder="Put on gear by name" aria-label="Find equipment you wear" bind:value={gearText} />
+    </label>
+    {#if gearFound.length}
+      <ul class="found">
+        {#each gearFound as item (item.id)}
+          {@const on = worn.has(item.id)}
+          <li>
+            <button disabled={on} onclick={() => wear(item.id)}>
+              <span class="found-name">{item.name}</span>
+              <small>{slotName(item.slot)}{item.reqLevel ? ` · Lv ${item.reqLevel}` : ""}</small>
+              {#if on}<Check size={12} />{:else}<Plus size={12} />{/if}
+            </button>
+          </li>
+        {/each}
+      </ul>
+    {:else if gearText.trim().length >= 2 && searched === gearText}
+      <p class="quiet-line">No equipment by that name for this job.</p>
+    {/if}
+{/snippet}
+
+{#snippet skillsView()}
+  {#if !skillsRead}
+    <p class="quiet-line">Not read yet. Open your Skill window in the game and Leafline reads it, or press Read stats.</p>
+  {/if}
+  {#each skillGroups as group (group.title)}
+    <h4 class="sub skill-group">{group.title}<span class="count tabular">{skillsRead ? group.spent : "—"} / {group.total} points spent</span></h4>
+    <ul class="skills">
+      {#each group.rows as skill (skill.id)}
+        {@const max = skill.max ?? Math.max(skill.goal, skill.level, 1)}
+        {@const done = isMaxed(skill)}
+        <li class:done title={skill.description ?? undefined}>
+          <span class="skill-name">{skill.name}</span>
+          <span class="skill-level tabular">
+            {#if done}<span class="max">MAX</span>{:else}<b>{skillsRead ? skill.level : "—"}</b><span class="faint"> / {max}</span>{/if}
+          </span>
+          <span class="bar" aria-hidden="true">
+            <span class="planned" style="width: {(Math.min(skill.goal, max) / max) * 100}%"></span>
+            <span class="have" style="width: {(Math.min(skill.level, max) / max) * 100}%"></span>
+          </span>
+          {#if skill.nextLevel != null && skill.nextGain != null}
+            <span class="skill-next tabular">
+              <b>Lv {skill.nextLevel}</b> +{skill.nextGain}{#if skill.goal > skill.level}<span class="faint"> · plan to {skill.goal}</span>{/if}
+            </span>
+          {:else if skill.goal > skill.level}
+            <span class="skill-next tabular faint">plan to {skill.goal}</span>
+          {/if}
+        </li>
+      {/each}
+    </ul>
+  {/each}
+  {#if !skillRows.length}
+    <p class="quiet-line">No skills read yet.</p>
+  {/if}
+{/snippet}
+
+{#snippet todo(step: LevelStep)}
+  <div class="now">
+    <span class="at tabular">Lv {level ?? step.level}</span>
+    <div class="todo">
+      {#if past}
+        <p class="quiet">Past the end of this plan (Lv {step.level}).</p>
+      {:else if !hasWork(step)}
+        <p class="quiet">Nothing to spend at this level.</p>
+      {/if}
+      {#if !past}
+        {#if step.advance}<p class="advance">{step.advance}</p>{/if}
+        {#each step.sp as gain (gain.skillId)}
+          <p>
+            <span class="tag">{gain.to - gain.from} SP</span>{gain.name}
+            <span class="tabular dim">{gain.from} → {gain.to}</span>
+          </p>
+        {/each}
+        {#each step.ap as gain (gain.stat)}
+          <p><span class="tag">{gain.amount} AP</span>{statLabel(gain.stat)} <span class="tabular dim">to {gain.total}</span></p>
+        {/each}
+      {/if}
+    </div>
+  </div>
+{/snippet}
+
+{#if glance}
+  <!-- Nothing to set up or browse in a pinned window: without a plan, it stays out of the way. -->
+  {#if ready && plan && step}
+    <section class="build" aria-label="Build plan">
+      <header class="head">
+        <span class="title">Build</span>
+        <span class="plan" title={plan.build.name}>{plan.build.name}</span>
+      </header>
+      {@render todo(step)}
+      {#if advance}
+        <p class="next">
+          Next job advancement: <strong>{advance.advance}</strong> at Lv {advance.level}
+        </p>
+      {/if}
+      {#if warnings.length}
+        <button class="link warn-line" onclick={() => openPlanner()}>
+          {warnings.length === 1 ? "1 thing to fix" : `${warnings.length} things to fix`} in this plan
+        </button>
+      {/if}
+      <footer>
+        <button class="credit" onclick={() => backend.openLink(OSMS_URL)}>{OSMS_CREDIT}</button>
+      </footer>
+    </section>
+  {/if}
+{:else}
+<section class="build full" aria-label="Build plan">
+  <header class="head strip">
+    <span class="title strip-title">Build</span>
+    {#if plan && step}<span class="plan" title={plan.build.name}>{plan.build.name}</span>{/if}
+    {#if plan && step}
+      <span class="tools">
+        <button
+          class="link"
+          title="Read your Character Stat and Skill windows{keyHint('ReadCharacter')}"
+          onclick={() => backend.readCharacter()}><RefreshCw size={12} />Read stats</button
+        >
+        <button class="link" onclick={() => openPlanner()}><Pencil size={12} />Edit</button>
+      </span>
+    {/if}
+  </header>
+
+  {#if !ready}
+    <p class="lead">Plan your AP and SP level by level. Builds use the skills and equipment in the map data.</p>
+    <MapDataPanel compact />
+  {:else if error}
+    <p class="lead">{error}</p>
+  {:else if loaded && !plan}
+    <p class="lead">
+      No build yet. Choose a job and write your goals in order, from a guide or your own idea, and Leafline lays them out
+      level by level.
+    </p>
+    <button class="action" onclick={() => openPlanner()}><Pencil size={13} />Plan a build</button>
+  {:else if plan && step}
+    <div class="views"><Segmented label="Build view" options={views} value={shown} stretch size="sm" onchange={pickView} /></div>
+    {#if shown === "plan"}
+    {@render todo(step)}
+
+    <h4 class="sub">Your stats by the plan</h4>
+    {#if !statsKnown}
+      <p class="quiet-line">
+        Not read yet, so the plan counts from zero. Open your Character Stat and Skill windows in the game and Leafline reads
+        them, or press Read stats.
+      </p>
+    {/if}
+    <dl class="stats">
+      {#each STATS as stat (stat.id)}
+        <div>
+          <dt>{stat.label}</dt>
+          <dd class="tabular">
+            {statsKnown ? step.stats[stat.id] : "—"}
+            {#if statsKnown && gearBonus?.[stat.id]}
+              <span class="gear" title="What your gear adds, as the Character Stat window last showed it">+{gearBonus[stat.id]}</span>
+            {/if}
+          </dd>
+        </div>
+      {/each}
+    </dl>
+
+    {#if coming.length}
+      <h4 class="sub">Coming up</h4>
+        <ul class="coming">
+          {#each coming as s (s.level)}
+            <li>
+              <span class="when tabular">Lv {s.level}</span>
+              <span class="what">
+                {#if s.advance}<span class="advance">{s.advance}</span>{/if}
+                <!-- What the level adds, then the total it makes: "Double Stab +3 (4)". -->
+                {#each s.sp as gain (gain.skillId)}<span>{gain.name} <span class="tabular">+{gain.to - gain.from}</span> <span class="total tabular">({gain.to})</span></span>{/each}
+                {#each s.ap as gain (gain.stat)}<span>{statLabel(gain.stat)} <span class="tabular">+{gain.amount}</span> <span class="total tabular">({gain.total})</span></span>{/each}
+                {#each s.gear as name (name)}<button class="ref ref-item" onclick={() => backend.showItem(null, name)}>{name}</button>{/each}
+              </span>
+            </li>
+          {/each}
+        </ul>
+    {/if}
+
+    {#if nextGear || advance}
+      <h4 class="sub">Next</h4>
+      <ul class="coming">
+        {#if nextGear}
+          <li>
+            <span class="when tabular">Lv {nextGear.level}</span>
+            <span class="what"
+              ><span>New gear:</span>{#each nextGear.gear as name (name)}<button class="ref ref-item" onclick={() => backend.showItem(null, name)}
+                  >{name}</button
+                >{/each}</span
+            >
+          </li>
+        {/if}
+        {#if advance}
+          <li>
+            <span class="when tabular">Lv {advance.level}</span>
+            <span class="what"><span class="advance">{advance.advance}</span></span>
+          </li>
+        {/if}
+      </ul>
+    {/if}
+
+    {#if warnings.length}
+      <h4 class="warn-title">{warnings.length === 1 ? "1 thing to fix" : `${warnings.length} things to fix`}</h4>
+      <ul class="warnings">
+        {#each warnings.slice(0, 3) as problem (problem.message)}<li>{problem.message}</li>{/each}
+      </ul>
+      {#if warnings.length > 3}<button class="link" onclick={() => openPlanner()}>See all in the editor</button>{/if}
+    {/if}
+    {:else if shown === "advance" && nextAdvance?.advance && plan.build.plan.job}
+      <p class="next">
+        <strong>{nextAdvance.advance}</strong> at Lv {nextAdvance.level}
+      </p>
+      <AdvancementChecklist
+        job={plan.build.plan.job}
+        tier={nextAdvance.advance.startsWith("1st") ? 1 : 2}
+        at={nextAdvance.level}
+        {level}
+        {character}
+      />
+    {:else if shown === "skills"}
+    {@render skillsView()}
+    {:else}
+    <!--
+      Gear slot by slot, as the equip window has it: what you wear (its own stats, scrolls and all,
+      which can be put right here), the plan's next goal for the slot, and the best you can wear
+      now when it beats what you wear.
+    -->
+    {#if outfit}
+      {#if !plan.build.start.pieces?.length}
+        <p class="quiet-line">
+          Check what you wear in game{keyHint("ReadItem")} and press <strong>I'm wearing this</strong>, or put it on by name below.
+        </p>
+      {/if}
+      <ul class="outfit">
+        {#each outfit.slots as row (row.slot)}
+          <li>
+            <h5 class="slot-name">{slotName(row.slot)}</h5>
+            {@render wearing(row)}
 
             {#if row.suggested}
               {@const pick = row.suggested}
@@ -555,29 +709,14 @@
           </li>
         {/each}
       </ul>
+      {#if gearTotals.length}
+        <p class="quiet-line totals tabular">
+          <strong>Your gear adds</strong>
+          {#each gearTotals as total, k}{#if k}<span class="sep">{" · "}</span>{/if}<span class="nowrap">{total.label} {total.value > 0 ? "+" : ""}{total.value}</span>{/each}
+        </p>
+      {/if}
     {/if}
-    {#if goalError}<p class="goal-error">{goalError}</p>{/if}
-
-    <label class="find">
-      <Search size={13} />
-      <input type="search" placeholder="Put on gear by name" aria-label="Find equipment you wear" bind:value={gearText} />
-    </label>
-    {#if gearFound.length}
-      <ul class="found">
-        {#each gearFound as item (item.id)}
-          {@const on = worn.has(item.id)}
-          <li>
-            <button disabled={on} onclick={() => wear(item.id)}>
-              <span class="found-name">{item.name}</span>
-              <small>{slotName(item.slot)}{item.reqLevel ? ` · Lv ${item.reqLevel}` : ""}</small>
-              {#if on}<Check size={12} />{:else}<Plus size={12} />{/if}
-            </button>
-          </li>
-        {/each}
-      </ul>
-    {:else if gearText.trim().length >= 2 && searched === gearText}
-      <p class="quiet-line">No equipment by that name for this job.</p>
-    {/if}
+    {@render putOn()}
     {/if}
 
     <footer>
@@ -779,6 +918,14 @@
   dd {
     margin: 0;
     font-weight: 600;
+  }
+
+  /* What gear adds, beside the stat: shown, never part of the plan's count. */
+  dd .gear {
+    margin-left: 4px;
+    color: var(--good);
+    font-size: var(--text-xs);
+    font-weight: 500;
   }
 
   .next {
@@ -1105,6 +1252,109 @@
   .found :global(svg) {
     flex: none;
     color: var(--accent);
+  }
+
+  .skill-group {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin: 14px 0 4px;
+    padding-bottom: 3px;
+    border-bottom: 1px solid var(--border-strong);
+    color: var(--text);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .skill-group .count {
+    color: var(--faint);
+    font-weight: 400;
+  }
+
+  .skills li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 3px 10px;
+    padding: 7px 0;
+  }
+
+  .skills li + li {
+    border-top: 1px solid var(--border);
+  }
+
+  .skill-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--text-md);
+    font-weight: 600;
+  }
+
+  .skill-level {
+    font-size: var(--text-md);
+  }
+
+  .skill-level b {
+    font-weight: 700;
+  }
+
+  /* Level reached over the level the plan ends at, to the skill's maximum. */
+  .bar {
+    position: relative;
+    grid-column: 1 / -1;
+    height: 5px;
+    background: rgba(255, 255, 255, 0.07);
+  }
+
+  .bar span {
+    position: absolute;
+    inset: 0 auto 0 0;
+  }
+
+  .bar .planned {
+    background: color-mix(in srgb, var(--accent) 35%, transparent);
+  }
+
+  .bar .have {
+    background: var(--accent-strong);
+  }
+
+  .skill-next {
+    grid-column: 1 / -1;
+    color: var(--muted);
+    font-size: var(--text-sm);
+  }
+
+  .skill-next b {
+    color: var(--accent-strong);
+    font-weight: 600;
+  }
+
+  .skills .faint,
+  .skill-next .faint {
+    color: var(--faint);
+  }
+
+  .skills li.done .skill-name {
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  .skills li.done .bar .have {
+    background: var(--good);
+  }
+
+  .skills li.done {
+    padding: 5px 0;
+  }
+
+  .max {
+    color: var(--good);
+    font-size: var(--text-sm);
+    font-weight: 700;
+    letter-spacing: 0.06em;
   }
 
   .warnings li {

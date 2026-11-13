@@ -1,12 +1,12 @@
-// The desk view's layout: columns side by side, each holding one panel or two stacked. Presets
-// cover training, questing, looking back over the training log and the build planner; any change
-// the player makes is saved as their own layout, so the presets stay as they are to go back to.
+// The desk view's tabs: each a set of columns side by side, each column holding one panel or two
+// stacked. A few tabs come ready (training, questing, character, the training log, the build
+// planner) and two are left for the player; all of them can be renamed and rearranged, and what
+// the player sets is saved for the next session. A tab can go back to how it started.
 
 import { PANELS } from "./panels";
 import type { Panel } from "./types";
 
-/** What a desk view column can show: the overlay's panels, and the training log and the build
- *  planner, which are windows of their own elsewhere. */
+/** What a desk view column can show: the overlay's panels, the training log and the build planner. */
 export type DeskPanel = Panel | "log" | "planner";
 
 /** Every desk panel, in the order the Change menu lists them. */
@@ -15,23 +15,36 @@ export const DESK_PANELS: DeskPanel[] = [...PANELS.map((p) => p.id), "log", "pla
 /** One column, top to bottom: one panel, or two sharing its height. */
 export type DeskColumn = DeskPanel[];
 
-export type PresetId = "training" | "questing" | "log" | "planner" | "mine";
+/** One tab of the desk view: a name and the columns it shows. */
+export interface DeskTab {
+  id: string;
+  name: string;
+  columns: DeskColumn[];
+}
 
 export interface DeskPrefs {
-  preset: PresetId;
-  /** The player's own layout, once they have changed one. */
-  mine: DeskColumn[] | null;
+  /** Always every tab in DEFAULT_TABS, in that order, with the player's names and layouts. */
+  tabs: DeskTab[];
+  /** The tab shown, by id. */
+  active: string;
   /** How large the page is drawn, for reading from further away than the overlay. */
   zoom: number;
 }
 
-export const PRESETS: Record<Exclude<PresetId, "mine">, DeskColumn[]> = {
-  training: [["train"], ["map"], ["character"]],
-  questing: [["quests"], ["map"], ["item"]],
-  log: [["train"], ["log"]],
-  /** The build planner on its own, the whole window wide. */
-  planner: [["planner"]],
-};
+/** The tabs a desk starts with, and each tab's layout to go back to. The training log and the
+ *  build planner start alone at the window's full width; the two Custom tabs start as a
+ *  suggestion to change. Every tab can be renamed and rearranged. */
+export const DEFAULT_TABS: DeskTab[] = [
+  { id: "training", name: "Training", columns: [["train"], ["map"], ["character"]] },
+  { id: "questing", name: "Questing", columns: [["quests"], ["map"], ["item"]] },
+  { id: "character", name: "Character", columns: [["character"], ["item"]] },
+  { id: "log", name: "Training log", columns: [["log"]] },
+  { id: "planner", name: "Build planner", columns: [["planner"]] },
+  { id: "custom1", name: "Custom 1", columns: [["map"], ["quests"]] },
+  { id: "custom2", name: "Custom 2", columns: [["train"], ["item"]] },
+];
+
+export const MAX_NAME = 24;
 
 /** How wide a column is against the others: the training log's tables and graphs, and the
  *  planner's tabs beside its timeline, want room. */
@@ -46,22 +59,35 @@ const MAX_STACK = 2;
 
 const KEY = "leafline.desk";
 
+const copyColumns = (columns: DeskColumn[]) => columns.map((c) => [...c]);
+
+/** A tab as it starts. */
+export function defaultTab(id: string): DeskTab {
+  const tab = DEFAULT_TABS.find((t) => t.id === id) ?? DEFAULT_TABS[0];
+  return { id: tab.id, name: tab.name, columns: copyColumns(tab.columns) };
+}
+
 export function loadPrefs(): DeskPrefs {
-  const fallback: DeskPrefs = { preset: "training", mine: null, zoom: 1 };
+  const fresh = (): DeskPrefs => ({ tabs: DEFAULT_TABS.map((t) => defaultTab(t.id)), active: DEFAULT_TABS[0].id, zoom: 1 });
   try {
     const saved = JSON.parse(localStorage.getItem(KEY) ?? "null");
-    if (!saved || typeof saved !== "object") return fallback;
-    const mine = valid(saved.mine) ? saved.mine : null;
-    const preset: PresetId =
-      saved.preset === "questing" || saved.preset === "training" || saved.preset === "log" || saved.preset === "planner"
-        ? saved.preset
-        : saved.preset === "mine" && mine
-          ? "mine"
-          : "training";
+    if (!saved || typeof saved !== "object") return fresh();
+    const tabs = DEFAULT_TABS.map((d) => {
+      const own = Array.isArray(saved.tabs) ? saved.tabs.find((t: { id?: unknown }) => t?.id === d.id) : null;
+      const name = typeof own?.name === "string" ? own.name.trim().slice(0, MAX_NAME) : "";
+      const columns = valid(own?.columns)
+        ? own.columns
+        : // The layout of before tabs: the player's own one lives on in the first Custom tab.
+          d.id === "custom1" && valid(saved.mine)
+          ? saved.mine
+          : copyColumns(d.columns);
+      return { id: d.id, name: name || d.name, columns } as DeskTab;
+    });
+    const active = tabs.some((t) => t.id === saved.active) ? saved.active : tabs[0].id;
     const zoom = ZOOMS.includes(saved.zoom) ? saved.zoom : 1;
-    return { preset, mine, zoom };
+    return { tabs, active, zoom };
   } catch {
-    return fallback;
+    return fresh();
   }
 }
 
@@ -69,7 +95,7 @@ export function savePrefs(prefs: DeskPrefs) {
   try {
     localStorage.setItem(KEY, JSON.stringify(prefs));
   } catch {
-    // A convenience only: the presets still work.
+    // A convenience only: the default tabs still work.
   }
 }
 
@@ -88,10 +114,6 @@ function valid(columns: unknown): columns is DeskColumn[] {
   return true;
 }
 
-export function layoutOf(prefs: DeskPrefs): DeskColumn[] {
-  return prefs.preset === "mine" && prefs.mine ? prefs.mine : PRESETS[prefs.preset === "mine" ? "training" : prefs.preset];
-}
-
 /** Where a panel is shown, as column and place in it. */
 export function find(columns: DeskColumn[], panel: DeskPanel): [number, number] | null {
   for (let c = 0; c < columns.length; c++) {
@@ -106,7 +128,7 @@ export function unused(columns: DeskColumn[]): DeskPanel[] {
   return DESK_PANELS.filter((id) => !find(columns, id));
 }
 
-const copy = (columns: DeskColumn[]) => columns.map((c) => [...c]);
+const copy = copyColumns;
 
 /** Shows `panel` at a place. One already shown elsewhere swaps places with what was there. */
 export function place(columns: DeskColumn[], column: number, slot: number, panel: DeskPanel): DeskColumn[] {

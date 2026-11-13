@@ -5,14 +5,15 @@ use std::sync::{Mutex, MutexGuard};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::error::{Error, Result};
 use crate::userdata::UserData;
 use crate::userdata::characters::KnownMesos;
 use crate::userdata::drops::{LoggedDrop, NewDrop};
 use crate::userdata::notes::{ItemNote, MapNote};
-use crate::userdata::sessions::{MapRate, SavedSession, SessionTimeline};
+use crate::userdata::potions::{PotionSlot, SessionPotion};
+use crate::userdata::sessions::{LevelExp, MapRate, SavedSession, SessionTimeline};
 use crate::userdata::spots::SavedSpot;
 
 const FILE_NAME: &str = "leafline.sqlite3";
@@ -84,6 +85,52 @@ pub fn set_spot_saved(
     })?;
     app.emit(SPOTS_EVENT, &spots)?;
     Ok(spots)
+}
+
+/// Emitted to every window when the potion slots or a session's potion counts change.
+const POTIONS_EVENT: &str = "potions";
+
+/// The potion slots the player set up, in slot order.
+#[tauri::command]
+pub fn potion_slots(state: State<UserDataState>) -> Result<Vec<PotionSlot>> {
+    state.with(|db| db.potion_slots())
+}
+
+/// Replaces the potion slots and returns them with their numbers.
+#[tauri::command]
+pub fn set_potion_slots(app: AppHandle, state: State<UserDataState>, slots: Vec<PotionSlot>) -> Result<Vec<PotionSlot>> {
+    let kept = state.with(|db| {
+        db.set_potion_slots(&slots)?;
+        db.potion_slots()
+    })?;
+    app.emit(POTIONS_EVENT, ())?;
+    Ok(kept)
+}
+
+/// The potion counts typed for the session that started at `started_at`.
+#[tauri::command]
+pub fn session_potions(state: State<UserDataState>, started_at: f64) -> Result<Vec<SessionPotion>> {
+    state.with(|db| db.session_potions(started_at))
+}
+
+/// Records how many of a slot's potion the player had at the start of a session and has now.
+#[tauri::command]
+pub fn set_session_potion(
+    app: AppHandle,
+    state: State<UserDataState>,
+    started_at: f64,
+    slot: u32,
+    start: Option<i64>,
+    now: Option<i64>,
+) -> Result<Vec<SessionPotion>> {
+    let kept = state.with(|db| {
+        db.set_session_potion(started_at, slot, start, now)?;
+        db.session_potions(started_at)
+    })?;
+    app.emit(POTIONS_EVENT, ())?;
+    // Saved sessions carry their potion cost.
+    app.emit(HISTORY_EVENT, ())?;
+    Ok(kept)
 }
 
 /// The player's note on an item, if they wrote one.
@@ -158,29 +205,16 @@ pub fn session_history(state: State<UserDataState>) -> Result<History> {
     state.with(|db| Ok(History { sessions: db.sessions()?, maps: db.map_rates()? }))
 }
 
-/// The training log window's label.
-pub const TRAINING: &str = "training";
+/// The EXP each level takes, as far as the player's HUD has shown it.
+#[tauri::command]
+pub fn level_exp(state: State<UserDataState>) -> Result<Vec<LevelExp>> {
+    state.with(|db| db.level_exp())
+}
 
-/// Opens the training log, or brings it forward.
+/// Opens the training log: a tab of the desk view.
 #[tauri::command]
 pub async fn show_training(app: AppHandle) -> Result<()> {
-    if let Some(window) = app.get_webview_window(TRAINING) {
-        return super::settings::bring_forward(&app, &window);
-    }
-    // Like the overlay, it leaves the game focused when the setting is on.
-    let keep = super::settings::keeps_game_focus(&app);
-    WebviewWindowBuilder::new(&app, TRAINING, WebviewUrl::App("training".into()))
-        .title("Leafline — Training log")
-        .inner_size(1180.0, 800.0)
-        .min_inner_size(760.0, 520.0)
-        .center()
-        .focusable(!keep)
-        .focused(!keep)
-        .background_color(tauri::window::Color(20, 20, 18, 255))
-        .additional_browser_args(super::BROWSER_ARGS)
-        .on_page_load(super::settings::raise_when_loaded)
-        .build()?;
-    Ok(())
+    super::desk::open_tab(&app, "log")
 }
 
 /// How a saved session's rates moved over time.

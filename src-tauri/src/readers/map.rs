@@ -51,8 +51,30 @@ const MAX_WIDTH: f32 = 60.0;
 /// A row of the name band is at least this share of band blue, even through the name's letters
 /// (0.15 at worst under `Mushroom Town - West Entrance`); the frame below it has none.
 const BAND_ROW: f32 = 0.1;
+/// Rows that fail `BAND_ROW` for less than this many button heights are still inside the band.
+const BAND_GAP: f32 = 0.75;
+/// How much darker a capture can be than the game's own colours, when the game window is dimmed
+/// (the button reads (185, 128, 14) rather than (221, 153, 17)).
+const DIMMED: f32 = 0.84;
 
 pub fn read(frame: &Frame, ocr: &Ocr) -> Result<Option<MapReading>> {
+    if world_buttons(frame).is_empty() {
+        // A dimmed game window has every colour about 16% darker, so no button matches; look
+        // again with the brightness put back.
+        let lifted = Frame::from_fn(frame.width(), frame.height(), |x, y| {
+            let p = frame.get_pixel(x, y);
+            let lift = |c: u8| (c as f32 / DIMMED).round().min(255.0) as u8;
+            Rgba([lift(p.0[0]), lift(p.0[1]), lift(p.0[2]), 255])
+        });
+        if world_buttons(&lifted).is_empty() {
+            return Ok(None);
+        }
+        return read_with(&lifted, ocr);
+    }
+    read_with(frame, ocr)
+}
+
+fn read_with(frame: &Frame, ocr: &Ocr) -> Result<Option<MapReading>> {
     for button in world_buttons(frame) {
         if let Some(band) = expanded_band(frame, button) {
             if let Some(reading) = read_expanded(frame, ocr, band)? {
@@ -151,9 +173,12 @@ fn merge_passes(passes: &[Vec<Word>]) -> Vec<Word> {
         rect: Rect,
         readings: Vec<String>,
     }
+    // Passes put the same word up to a line's height apart vertically (`Hidden` at y 65 in one and
+    // 53 in another, 20 tall), so words match by how far apart their centres are, not by overlap.
     let same_place = |a: &Rect, b: &Rect| {
         let across = (a.right().min(b.right()) - a.x.max(b.x)).max(0.0);
-        a.vertical_overlap(b) >= 0.5 * a.h.min(b.h) && across >= 0.5 * a.w.min(b.w)
+        let apart = ((a.y + a.h / 2.0) - (b.y + b.h / 2.0)).abs();
+        apart <= 0.75 * a.h.min(b.h) && across >= 0.5 * a.w.min(b.w)
     };
     let mut slots: Vec<Slot> = Vec::new();
     // Lone marks are noise, except the colon that splits a collapsed title.
@@ -204,7 +229,17 @@ fn band_rows(frame: &Frame, button: Rect, search: f32, max: f32) -> Option<(f32,
     let from = button.bottom().max(0.0) as u32;
     let top = (from..(from + search as u32).min(height)).find(|&y| is_band(y))?;
     let limit = (top + max as u32).min(height);
-    let bottom = (top..limit).find(|&y| !is_band(y)).unwrap_or(limit);
+    // The second line's letters can cover nearly a whole row under the button (0.06 on
+    // `An Empty House`), so short runs of rows that fail are bridged, not the end of the band.
+    let gap = (button.h * BAND_GAP) as u32;
+    let mut bottom = top + 1;
+    for y in top..limit {
+        if is_band(y) {
+            bottom = y + 1;
+        } else if y - bottom >= gap {
+            break;
+        }
+    }
     Some((top as f32, bottom as f32))
 }
 
@@ -309,6 +344,18 @@ mod tests {
         ];
         let merged: Vec<String> = merge_passes(&passes).into_iter().map(|w| w.text).collect();
         assert_eq!(merged, ["Kerning", "City", "1>"]);
+    }
+
+    #[test]
+    fn passes_that_place_words_a_little_apart_still_agree() {
+        // Measured on `Hidden Street` / `Pig Park`: the same words sit up to 12 px apart.
+        let word = |text: &str, x: f32, y: f32, w: f32| Word { text: text.into(), rect: Rect::new(x, y, w, 20.0) };
+        let passes = vec![
+            vec![word("Hidden", 101.0, 65.0, 77.0), word("Pig", 102.0, 94.0, 35.0)],
+            vec![word("Hidden", 102.0, 53.0, 77.0), word("Pig", 101.0, 81.0, 35.0)],
+        ];
+        let merged: Vec<String> = merge_passes(&passes).into_iter().map(|w| w.text).collect();
+        assert_eq!(merged, ["Hidden", "Pig"]);
     }
 
     /// A drawn minimap: the WORLD button over a blue band, with no text to read.

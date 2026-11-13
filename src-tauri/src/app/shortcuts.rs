@@ -57,9 +57,10 @@ impl Action {
     /// The key offered at setup, or "" for none. Few keys are free in game by default.
     pub fn suggested_keys(self) -> &'static str {
         match self {
-            Action::ReadItem => "Super+F8",
-            Action::ToggleOverlay => "Super+F9",
-            Action::ToggleClickThrough => "Super+F7",
+            Action::ReadItem => "Super+Numpad1",
+            Action::ToggleOverlay => "Super+Numpad0",
+            Action::ToggleClickThrough => "Super+NumpadDecimal",
+            Action::SaveFrame => "Super+Numpad7",
             _ => "",
         }
     }
@@ -337,7 +338,7 @@ mod tests {
         assert!(check(&with(Action::ToggleLive, "Shift+1")).is_err(), "it would stop ! working in chat");
         assert!(check(&with(Action::ToggleLive, "K")).is_err(), "it would stop k working in chat");
         let mut both = suggested();
-        both.keys.insert(Action::ToggleLive.name(), "Super+F8".into());
+        both.keys.insert(Action::ToggleLive.name(), "Super+Numpad0".into());
         assert!(check(&both).is_err(), "taken by another action");
         assert!(check(&with(Action::ToggleLive, "Banana")).is_err());
         assert!(check(&with(Action::ToggleLive, "F12")).is_err(), "Windows keeps F12");

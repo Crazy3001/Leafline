@@ -1,6 +1,6 @@
 //! Whether a hovered item suits the build: its requirements, as the tooltip reader read them,
-//! against the plan's base stats and the goal gear worn by then, leaving out what the item
-//! itself would replace.
+//! against the plan's base stats and the gear worn by then. The piece an item would replace still
+//! counts: the game's own hover shows a requirement met by it as met.
 
 use serde::{Deserialize, Serialize};
 
@@ -48,14 +48,10 @@ pub fn slot_of(item_type: &str) -> &'static str {
     ARMOUR.iter().find(|a| lower.contains(&a.to_lowercase())).copied().unwrap_or("Weapon")
 }
 
-/// Whether worn gear in `slot` would come off for an item of the tooltip's `item_type`.
-fn replaces(slot: &str, item_type: Option<&str>) -> bool {
-    item_type.is_some_and(|t| slot.eq_ignore_ascii_case(slot_of(t)))
-}
-
-/// The stats that count toward an item at this step.
-fn stats_for(step: &LevelStep, item_type: Option<&str>) -> Stats {
-    step.worn.iter().filter(|w| !replaces(&w.slot, item_type)).fold(step.stats, |total, w| total.plus(w.bonus))
+/// The stats that count toward an item at this step: the plan's base stats and everything worn,
+/// including what the item would replace.
+fn stats_for(step: &LevelStep) -> Stats {
+    step.worn.iter().fold(step.stats, |total, w| total.plus(w.bonus))
 }
 
 /// Judges an item at `level`, or at the plan's start without one. `None` for a plan with no
@@ -63,7 +59,7 @@ fn stats_for(step: &LevelStep, item_type: Option<&str>) -> Stats {
 pub fn check(
     requirements: &Requirements,
     jobs: &[ItemJob],
-    item_type: Option<&str>,
+    _item_type: Option<&str>,
     expansion: &Expansion,
     branch: Option<Branch>,
     level: Option<u32>,
@@ -73,11 +69,11 @@ pub fn check(
         None => expansion.steps.first()?,
     };
     let level = level.unwrap_or(step.level);
-    let short = shortfalls(requirements, &stats_for(step, item_type), level);
+    let short = shortfalls(requirements, &stats_for(step), level);
     let wearable_at = expansion
         .steps
         .iter()
-        .find(|s| shortfalls(requirements, &stats_for(s, item_type), s.level).is_empty())
+        .find(|s| shortfalls(requirements, &stats_for(s), s.level).is_empty())
         .map(|s| s.level);
     let job_ok = branch.and_then(|b| jobs.iter().find(|f| f.job.eq_ignore_ascii_case(b.name()))).map(|f| f.eligible);
     let needs = [requirements.level, requirements.str, requirements.dex, requirements.int, requirements.luk];
@@ -141,7 +137,7 @@ mod tests {
     }
 
     #[test]
-    fn worn_gear_counts_unless_the_item_would_replace_it() {
+    fn worn_gear_counts_even_what_the_item_would_replace() {
         let mut plan = expansion();
         for step in &mut plan.steps {
             step.worn = vec![Worn { slot: "Hat".into(), bonus: Stats { dex: 20, ..Stats::default() } }];
@@ -150,15 +146,14 @@ mod tests {
         let judged = |item_type| check(&need, &[], item_type, &plan, None, Some(12)).unwrap();
         assert!(judged(Some("Claw")).wearable_now, "35 DEX and the hat's 20");
         assert!(judged(None).wearable_now);
-        assert!(!judged(Some("Hat")).wearable_now, "the hat would come off");
+        assert!(judged(Some("Hat")).wearable_now, "the hat comes off, but the game checks with it on");
     }
 
     #[test]
     fn tooltip_types_map_to_slots() {
-        assert!(replaces("Glove", Some("Gloves")));
-        assert!(replaces("Weapon", Some("Claw")));
-        assert!(!replaces("Weapon", Some("Hat")));
-        assert!(!replaces("Hat", None));
+        assert_eq!(slot_of("Gloves"), "Glove");
+        assert_eq!(slot_of("Claw"), "Weapon");
+        assert_eq!(slot_of("Hat"), "Hat");
     }
 
     #[test]

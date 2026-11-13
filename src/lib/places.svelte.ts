@@ -2,6 +2,7 @@
 // keeps a search, and so a link from another window or panel can bring a map or NPC up.
 
 import { backend } from "./api";
+import { splitMapLabel } from "./format";
 import { lookup } from "./items.svelte";
 import type { MapQuery, NpcQuery } from "./types";
 
@@ -36,6 +37,13 @@ export function watchPlaces() {
     lookup.mode = link.mode;
     placeLinks.seen += 1;
   });
+}
+
+/** Brings a map up from a session's `Street : Name` label, or does nothing if no map matches. */
+export async function showMapNamed(label: string) {
+  const { street, name } = splitMapLabel(label);
+  const match = await backend.findMap(name, street, null).catch(() => null);
+  if (match) await backend.showPlace("maps", match.card.map.id);
 }
 
 /** Brings an NPC up by name, or does nothing if no NPC goes by it. */

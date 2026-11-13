@@ -1,15 +1,20 @@
 <script lang="ts">
-  // The Train tab: the session being played (rates, a graph of the whole session, how this map
-  // compares with your best on it, the maps played), then where to train next, with a jump to it
-  // from the top. Before a session starts, where to train comes first and the last session after.
+  // The Train tab: the session being played (rates, the level goal, a graph of the whole session,
+  // how this map compares with your bests on it, the maps played), then where to train next, with
+  // a jump to it from the top. Before a session starts: the goal, where to train, your best maps
+  // and the last sessions.
   import SessionControls from "./SessionControls.svelte";
   import { ArrowDown } from "@lucide/svelte";
 
+  import LevelGoal from "./LevelGoal.svelte";
+  import PotionCosts from "./PotionCosts.svelte";
+  import SaveSpot from "./SaveSpot.svelte";
   import SpotList, { SPOTS_ID } from "./SpotList.svelte";
   import TimersCard from "./TimersCard.svelte";
   import { openTrainingLog } from "$lib/nav.svelte";
   import { formatCompact, formatDuration, formatNumber, splitMapLabel } from "$lib/format";
   import { history, watchHistory } from "$lib/history.svelte";
+  import { showMapNamed } from "$lib/places.svelte";
   import { live } from "$lib/readings.svelte";
   import {
     chartPoints,
@@ -136,6 +141,15 @@
 
   const dropped = $derived(session ? session.rejected.exp + session.rejected.mesos : 0);
 
+  /** Your best maps by EXP an hour, for before a session. */
+  const BESTS_SHOWN = 5;
+  const bests = $derived(
+    stats
+      .filter((s) => s.best)
+      .sort((a, b) => b.best!.expPerHour - a.best!.expPerHour)
+      .slice(0, BESTS_SHOWN),
+  );
+
   // Before a session: the last few saved ones.
   const lastSessions = $derived((history.value?.sessions ?? []).slice(0, 3));
   const lastOne = $derived(lastSessions[0] ?? null);
@@ -241,6 +255,15 @@
       </div>
     {/if}
 
+    {#if !glance}
+      <LevelGoal
+        level={lv}
+        {percent}
+        character={session.name}
+        rate={{ expPerHour: session.expPerHour, percentPerHour: session.percentPerHour }}
+      />
+    {/if}
+
     <div class="tiles">
       <Stat
         label="Mesos / hr"
@@ -251,6 +274,10 @@
       <Stat label="EXP gained" value={signed(session.expGained)} />
       <Stat label="Mesos gained" value={signed(session.mesosGained)} />
     </div>
+
+    {#if !glance}
+      <PotionCosts startedAt={session.startedAt} activeSeconds={session.activeSeconds} mesosPerHour={session.mesosPerHour} />
+    {/if}
 
     {#if reminder}
       <p class="reminder">{reminder}</p>
@@ -295,7 +322,7 @@
         label="{metric === 'exp' ? 'EXP' : 'Mesos'} per hour over this session"
       />
       <p class="caption">
-        Each point is the rate over the 5 minutes before it.
+        Each point is the rate over the 5 minutes before it; the first 2½ minutes are left out.
         {#if metric === "mesos"}Mesos are spread evenly between your looks at them, so the line reaches only your last look.{/if}
         {#if session.events?.length}Green dots are level-ups, red ones deaths.{/if}
       </p>
@@ -309,14 +336,25 @@
       {#snippet aside()}<span class="map-name">{here.name}</span>{/snippet}
       {@const best = here.saved?.best?.expPerHour ?? null}
       {@const top = Math.max(here.now ?? 0, best ?? 0, 1)}
+      {@const bestMesos = here.saved?.bestMesos?.mesosPerHour ?? null}
+      {@const mesosNow = session.maps.find((m) => m.map === session.map)?.mesosPerHour ?? null}
+      {@const mesosTop = Math.max(mesosNow ?? 0, bestMesos ?? 0, 1)}
       <div class="compare">
-        <span class="muted">Now</span>
+        <span class="muted">EXP now</span>
         <Meter value={(here.now ?? 0) / top} height={8} />
         <span class="tabular">{formatCompact(here.now)}</span>
         {#if best != null}
-          <span class="muted">Your best here</span>
+          <span class="muted">Best here</span>
           <Meter value={best / top} height={8} color="var(--muted)" />
           <span class="tabular">{formatCompact(best)}</span>
+        {/if}
+        {#if bestMesos != null}
+          <span class="muted">Mesos now</span>
+          <Meter value={(mesosNow ?? 0) / mesosTop} height={8} color="var(--accent)" />
+          <span class="tabular">{formatCompact(mesosNow)}</span>
+          <span class="muted">Best here</span>
+          <Meter value={bestMesos / mesosTop} height={8} color="var(--muted)" />
+          <span class="tabular">{formatCompact(bestMesos)}</span>
         {/if}
       </div>
       {#if here.saved?.best}
@@ -342,7 +380,8 @@
             <tr class:town>
               <td>
                 {#if row.map === session.map}<span class="here" title="You are here"></span>{/if}
-                {#if row.map}{splitMapLabel(row.map).name}{:else}<span
+                {#if row.map}<button class="ref ref-map" onclick={() => showMapNamed(row.map!)}>{splitMapLabel(row.map).name}</button
+                  >{#if !town} <SaveSpot label={row.map} name={splitMapLabel(row.map).name} />{/if}{:else}<span
                     class="unplaced"
                     >Not placed on a map</span
                   >{/if}
@@ -377,8 +416,29 @@
   {/if}
   {/if}
 {:else if !glance}
-  <!-- No session yet: where to train comes first, the last session after it. -->
-  <SpotList {level} {map} {session} last={!lastOne} />
+  <!-- No session yet: the goal and where to train come first, your bests and the last sessions after. -->
+  <Block title="Level goal">
+    <LevelGoal {level} percent={session?.percent ?? null} character={session?.name ?? lastOne?.character ?? null} />
+  </Block>
+  <SpotList {level} {map} {session} last={!lastOne && !bests.length} />
+  {#if bests.length}
+    <Block title="Your best maps" last={!lastOne}>
+      {#snippet aside()}<span>Best single run, 10 min or more</span>{/snippet}
+      <table>
+        <thead><tr><th>Map</th><th>EXP / hr</th><th>Mesos / hr</th><th>When</th></tr></thead>
+        <tbody>
+          {#each bests as m (m.map)}
+            <tr>
+              <td><button class="ref ref-map" onclick={() => showMapNamed(m.map)}>{m.name}</button> <SaveSpot label={m.map} name={m.name} /></td>
+              <td class="tabular">{formatCompact(m.best!.expPerHour)}</td>
+              <td class="tabular">{m.bestMesos ? formatCompact(m.bestMesos.mesosPerHour) : "—"}</td>
+              <td class="tabular muted">{m.best!.level != null ? `Lv ${m.best!.level} · ` : ""}{shortDay(m.best!.at)}</td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    </Block>
+  {/if}
 {/if}
 
 {#if !(tracking && session && headline) && lastOne && !glance}
@@ -395,7 +455,10 @@
       {#each lastSessions as s (s.id)}
         <li>
           <span class="tabular muted day">{shortDay(s.startedAt ?? s.savedAt)}</span>
-          <span class="what">{s.label || mainMap(s.maps)}</span>
+          <span class="what"
+            >{#if !s.label && s.maps.length}<button class="ref ref-map" onclick={() => showMapNamed(s.maps[0].map)}>{mainMap(s.maps)}</button
+              >{:else}{s.label || mainMap(s.maps)}{/if}</span
+          >
           <span class="tabular">{formatCompact(s.expPerHour)}</span>
         </li>
       {/each}

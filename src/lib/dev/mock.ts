@@ -9,6 +9,8 @@ import type {
   LoggedDrop,
   MapNote,
   SavedSpot,
+  PotionSlot,
+  SessionPotion,
   Destination,
   NavState,
   UpdateStatus,
@@ -136,6 +138,11 @@ let drops: LoggedDrop[] = [
 const dropHandlers: (() => void)[] = [];
 const historyHandlers: (() => void)[] = [];
 
+// Potion slots and per-session counts, as the backend keeps them.
+let potionSlots: PotionSlot[] = [];
+const sessionPotions = new Map<number, SessionPotion[]>();
+const potionHandlers: (() => void)[] = [];
+
 function mockHistory(): History {
   const byMap = new Map<string, { sessions: number; seconds: number; exp: number; mesos: number }>();
   for (const session of savedSessions) {
@@ -144,8 +151,12 @@ function mockHistory(): History {
       byMap.set(m.map, { sessions: row.sessions + 1, seconds: row.seconds + m.activeSeconds, exp: row.exp + m.expGained, mesos: row.mesos + m.mesosGained });
     }
   }
+  const withPotions = savedSessions.map((s) => {
+    const potions = s.startedAt != null ? (sessionPotions.get(s.startedAt) ?? []) : [];
+    return { ...s, potions, potionCost: potions.reduce((a, p) => a + p.used * p.price, 0) };
+  });
   return {
-    sessions: [...savedSessions].sort((a, b) => (b.startedAt ?? b.savedAt) - (a.startedAt ?? a.savedAt)),
+    sessions: withPotions.sort((a, b) => (b.startedAt ?? b.savedAt) - (a.startedAt ?? a.savedAt)),
     maps: [...byMap].map(([map, r]) => ({ map, sessions: r.sessions, activeSeconds: r.seconds, expPerHour: (r.exp * 3600) / r.seconds, mesosPerHour: (r.mesos * 3600) / r.seconds })).sort((a, b) => b.activeSeconds - a.activeSeconds),
   };
 }
@@ -245,6 +256,7 @@ const mockRecord = (gear: GearItem, more: Partial<ItemRecord> = {}): ItemRecord 
   kind: "equip",
   reqFame: 0,
   attackSpeed: null,
+  knockback: null,
   upgradeSlots: 7,
   questItem: false,
   untradable: false,
@@ -464,12 +476,12 @@ export const mockBackend: Backend = {
   // Saved keys win over the starting ones, and F10 stands in for a key another program holds.
   shortcuts: async () =>
     [
-    { action: "ToggleOverlay", keys: "Super+F9", suggestedKeys: "Super+F9", label: "Show or hide the overlay", inSetup: true, taken: false },
-    { action: "ToggleClickThrough", keys: "Super+F7", suggestedKeys: "Super+F7", label: "Lock the overlay (click-through)", inSetup: true, taken: false },
+    { action: "ToggleOverlay", keys: "Super+Numpad0", suggestedKeys: "Super+Numpad0", label: "Show or hide the overlay", inSetup: true, taken: false },
+    { action: "ToggleClickThrough", keys: "Super+NumpadDecimal", suggestedKeys: "Super+NumpadDecimal", label: "Lock the overlay (click-through)", inSetup: true, taken: false },
     { action: "TogglePins", keys: "", suggestedKeys: "", label: "Show or hide pinned panels", inSetup: false, taken: false },
     { action: "ToggleCompact", keys: "", suggestedKeys: "", label: "Compact HUD", inSetup: true, taken: false },
     { action: "ToggleLive", keys: "", suggestedKeys: "", label: "Start or stop live reading", inSetup: false, taken: false },
-    { action: "ReadItem", keys: "F10", suggestedKeys: "Super+F8", label: "Read the item you're hovering", inSetup: true, taken: true },
+    { action: "ReadItem", keys: "F10", suggestedKeys: "Super+Numpad1", label: "Read the item you're hovering", inSetup: true, taken: true },
     { action: "ReadCharacter", keys: "", suggestedKeys: "", label: "Read your stat and skill windows, to update your build", inSetup: true, taken: false },
     { action: "PauseTracking", keys: "", suggestedKeys: "", label: "Pause or resume tracking", inSetup: false, taken: false },
     { action: "NewSession", keys: "", suggestedKeys: "", label: "Start a new session", inSetup: false, taken: false },
@@ -499,6 +511,7 @@ export const mockBackend: Backend = {
     setLive({ state: "off" });
   },
   liveWindows: async () => mockWindows,
+  saveItemPicture: async () => "C:\Users\you\AppData\Local\app.leafline.overlay\frames\leafline-item-2026-10-30_13-05-09.png",
   saveLiveFrame: async () => "C:\\Users\\you\\AppData\\Local\\app.leafline.overlay\\frames\\leafline-2026-10-30_13-05-09.png",
   async onLive(handler) {
     liveHandlers.push(handler);
@@ -581,13 +594,13 @@ export const mockBackend: Backend = {
     return sampleGuide(quests, 2, dropsDownloaded);
   },
   dropsFetchedAt: async () => (dropsDownloaded ? Date.now() / 1000 - 86400 : null),
-  async downloadDrops() {
+  async downloadDrops(_retry?: boolean) {
     await delay(900);
     dropsDownloaded = true;
   },
-  async trainingSpots(_name, _street, _twin, measured) {
+  async trainingSpots(_name, _street, _twin, measured, level, assumptions) {
     if (!mapStatus.ready) return null;
-    return preview?.spots ?? sampleSpots(2, measured);
+    return preview?.spots ?? sampleSpots(2, measured, level, assumptions);
   },
   async openLink(url) {
     window.open(url, "_blank", "noopener");
@@ -597,11 +610,47 @@ export const mockBackend: Backend = {
     return () => {};
   },
   savedSpots: async () => [...savedSpots],
+  potionSlots: async () => [...potionSlots],
+  async setPotionSlots(slots) {
+    const taken = new Set(slots.map((s) => s.slot).filter((n) => n > 0));
+    potionSlots = slots
+      .map((s) => {
+        if (s.slot > 0) return { ...s, name: s.name.trim() };
+        let next = 1;
+        while (taken.has(next)) next++;
+        taken.add(next);
+        return { ...s, slot: next, name: s.name.trim() };
+      })
+      .sort((a, b) => a.slot - b.slot);
+    potionHandlers.forEach((h) => h());
+    return [...potionSlots];
+  },
+  sessionPotions: async (startedAt) => [...(sessionPotions.get(startedAt) ?? [])],
+  async setSessionPotion(startedAt, slot, start, now) {
+    const rows = (sessionPotions.get(startedAt) ?? []).filter((p) => p.slot !== slot);
+    const def = potionSlots.find((p) => p.slot === slot);
+    if ((start != null || now != null) && def) {
+      const used = start != null && now != null ? Math.max(0, start - now) : 0;
+      rows.push({ slot, name: def.name, price: def.price, start, now, used });
+    }
+    sessionPotions.set(startedAt, rows.sort((a, b) => a.slot - b.slot));
+    potionHandlers.forEach((h) => h());
+    historyHandlers.forEach((h) => h());
+    return [...rows];
+  },
+  async onPotions(handler) {
+    potionHandlers.push(handler);
+    return () => {};
+  },
   async setSpotSaved(mapId, name, saved) {
     savedSpots = savedSpots.filter((s) => s.mapId !== mapId);
     if (saved) savedSpots.unshift({ mapId, name, savedAt: Date.now() / 1000 });
     spotHandlers.forEach((h) => h([...savedSpots]));
     return [...savedSpots];
+  },
+  playerDamage: async () => null,
+  async onPlayerDamage() {
+    return () => {};
   },
   async onSavedSpots(handler) {
     spotHandlers.push(handler);
@@ -619,6 +668,12 @@ export const mockBackend: Backend = {
     return saved;
   },
   sessionHistory: async () => mockHistory(),
+  itemCrafting: async () => ({ madeBy: [], usedIn: [] }),
+  craftingRecipes: async () => ({ disciplines: [], recipes: [] }),
+  levelExp: async () => [
+    { level: 20, needed: 6_000 },
+    { level: 21, needed: 6_900 },
+  ],
   sessionTimeline: async (id) => sampleTimelines.get(id) ?? { points: [], events: [] },
   setTyping: async () => {},
   mapNote: async (mapId) => mapNotes.get(mapId) ?? null,
@@ -656,7 +711,7 @@ export const mockBackend: Backend = {
     return true;
   },
   async showTraining() {
-    window.open("/training", "_blank");
+    window.open("/desk?tab=log", "_blank");
   },
   async showDesk() {
     desk.open = true;
@@ -664,6 +719,11 @@ export const mockBackend: Backend = {
     return { ...desk };
   },
   deskStatus: async () => ({ ...desk }),
+  // The dev preview opens tabs in the browser, by address.
+  deskTakeTab: async () => new URLSearchParams(location.search).get("tab"),
+  async onDeskTab() {
+    return () => {};
+  },
   async setDeskOnTop(onTop) {
     desk.onTop = onTop;
     return { ...desk };
@@ -718,6 +778,22 @@ export const mockBackend: Backend = {
               planTo: 70,
             },
             missing: [],
+            source: null,
+          },
+          {
+            id: "fernblade-guide",
+            job: 420,
+            name: "Dagger Fernblade, example guide",
+            summary: "A made-up plan that follows a made-up guide.",
+            plan: {
+              job: 420,
+              skills: [{ skillId: 1, level: 3 }, { skillId: 10, level: 20 }],
+              stats: [{ stat: "luk", target: null, fromLevel: null }],
+              gear: [500],
+              planTo: 70,
+            },
+            missing: [],
+            source: { name: "NiaDB", url: "https://meowdb.com/msclassic/guides/example", credit: "Example guide by Someone, 2026-01-01." },
           },
         ]
       : [],
@@ -752,7 +828,7 @@ export const mockBackend: Backend = {
     if (!item) return null;
     const guide = sampleGuide([{ title: "Moss Patrol", objectives: [item.name] }], null, true);
     const quest = guide.quests[0];
-    return { from: guide.from, origin: { drops: quest.objectives[0], quests: quest.quest ? [quest.quest] : [] } };
+    return { from: guide.from, origin: { drops: quest.objectives[0], quests: quest.quest ? [quest.quest] : [], shops: [] } };
   },
   async showItem(id, text) {
     showItemHandlers.forEach((h) => h({ id, text }));
@@ -1015,7 +1091,7 @@ export const mockBackend: Backend = {
     window.open(url, "_blank", "noopener");
   },
   async showBuild() {
-    window.open("/build", "_blank");
+    window.open("/desk?tab=planner", "_blank");
   },
   async onBuilds(handler) {
     buildHandlers.push(handler);

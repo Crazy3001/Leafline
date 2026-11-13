@@ -2,8 +2,12 @@
 // data: the repo must never hold extracted map, monster or quest records.
 
 import type {
+  Assumptions,
+  Estimate,
   Guide,
+  KillSpeed,
   MeasuredRate,
+  MobRow,
   Hunt,
   HuntingGround,
   MapDetails,
@@ -25,7 +29,7 @@ import type {
   TrainingSpots,
 } from "../types";
 
-type Place = Omit<MapDetails, "map" | "links" | "returnMap" | "mobTotal" | "expPerClear" | "levelRange"> & {
+type Place = Omit<MapDetails, "map" | "links" | "returnMap" | "mobTotal" | "expPerClear" | "levelRange" | "shops"> & {
   name: string;
   street: string;
   returnTo: number | null;
@@ -146,6 +150,7 @@ export function sampleCard(id: number): MapDetails | null {
   return {
     ...place,
     map: ref(id),
+    shops: [],
     returnMap: place.returnTo == null ? null : ref(place.returnTo),
     levelRange: levels.length ? [Math.min(...levels), Math.max(...levels)] : null,
     mobTotal: place.mobs.reduce((sum, m) => sum + m.count, 0),
@@ -510,11 +515,69 @@ export function sampleNpcSheet(id: number, from: number | null): NpcSheet | null
     maps: [{ map: ref(npc.mapId), hops: route ? route.steps.length : null, travel: null }],
     quests: npc.quests.map((q) => ({ id: q.id, name: q.name, region: "Fern Isle", levelMin: q.levelMin, giver: npc.name, repeat: null, exp: 120, mesos: 0 })),
     takes: [],
+    shop: null,
   };
 }
 
 /** Every sample map with monsters, as the training spot finder lists them. */
-export function sampleSpots(from: number | null, rates: MeasuredRate[] = []): TrainingSpots {
+/** The average non-boss monster on a map: its HP, base EXP, level and how many spawn. */
+function perKill(mobs: MobRow[]) {
+  const common = mobs.filter((m) => !m.boss && m.count > 0);
+  const count = common.reduce((a, m) => a + m.count, 0);
+  if (!count) return null;
+  const mean = (v: (m: MobRow) => number) => common.reduce((a, m) => a + v(m) * m.count, 0) / count;
+  return { hp: mean((m) => m.hp), exp: mean((m) => m.exp), level: mean((m) => m.level), count };
+}
+
+/** A short version of the backend's kill speed model (src-tauri/src/mapdata/training.rs). */
+function sampleSpeed(rates: MeasuredRate[], assumptions: Assumptions): KillSpeed | null {
+  let seconds = 0;
+  let hp = 0;
+  let perHp = 0;
+  const maps = new Set<string>();
+  for (const r of rates.filter((r) => (r.party ?? 1) <= 1)) {
+    const id = Object.keys(places).map(Number).find((i) => r.label.endsWith(places[i].name));
+    const kill = id == null ? null : perKill(sampleCard(id)?.mobs ?? []);
+    if (!kill) continue;
+    seconds += r.activeSeconds;
+    hp += (r.expPerHour / (kill.exp * assumptions.expRate)) * kill.hp * r.activeSeconds;
+    perHp += kill.hp * r.activeSeconds;
+    maps.add(r.label);
+  }
+  if (seconds < 600) return null;
+  return { hpPerHour: hp / seconds, hpPerKill: perHp / seconds, activeSeconds: seconds, maps: maps.size, levels: null, widened: false };
+}
+
+function sampleEstimate(mobs: MobRow[], speed: KillSpeed, level: number | null, assumptions: Assumptions): Estimate | null {
+  const kill = perKill(mobs);
+  if (!kill) return null;
+  const ceiling = (kill.count * 3600) / Math.max(1, assumptions.respawnSeconds);
+  const free = speed.hpPerHour / kill.hp;
+  const kills = Math.min(free, ceiling);
+  const hpRatio = kill.hp / speed.hpPerKill;
+  const levelGap = level == null ? null : kill.level - level;
+  const spread = Math.max(hpRatio, 1 / hpRatio);
+  let sure = 3 - (speed.activeSeconds < 1800 ? 1 : 0) - (spread > 4 ? 2 : spread > 2 ? 1 : 0);
+  sure -= (levelGap ?? 0) > 3 ? 1 : 0;
+  sure -= free > ceiling ? 1 : 0;
+  return {
+    expPerHour: kills * kill.exp * assumptions.expRate,
+    killsPerHour: kills,
+    ceiling,
+    capped: free > ceiling,
+    hpRatio,
+    levelGap,
+    sureness: Math.max(1, Math.min(3, sure)) as 1 | 2 | 3,
+  };
+}
+
+export function sampleSpots(
+  from: number | null,
+  rates: MeasuredRate[] = [],
+  level: number | null = null,
+  assumptions: Assumptions = { respawnSeconds: 8, expRate: 1, attackMin: null, attackMax: null, skillFactor: 2.4, skillName: "" },
+): TrainingSpots {
+  const speed = sampleSpeed(rates, assumptions);
   // The player's measured rates on a map, weighted by time, as the backend sums them.
   const measured = (name: string) => {
     const mine = rates.filter((r) => r.label === name || r.label.endsWith(` : ${name}`));
@@ -541,7 +604,8 @@ export function sampleSpots(from: number | null, rates: MeasuredRate[] = []): Tr
         travel: null,
         reachable: true,
         measured: measured(card.map.name),
+        estimate: speed ? sampleEstimate(card.mobs, speed, level, assumptions) : null,
       };
     });
-  return { from: from == null ? null : ref(from), spots };
+  return { from: from == null ? null : ref(from), speed, spots };
 }
