@@ -750,7 +750,9 @@ impl Atlas {
     /// `...` there, so those are compared with the start of each name.
     fn find_quest(&self, title: &str) -> Option<u32> {
         let trimmed = title.trim_end();
-        let truncated = trimmed.ends_with("...") || trimmed.ends_with('…');
+        // OCR can read the ellipsis as `..` or `. . .` as well as `...`.
+        let dots = trimmed.chars().rev().take_while(|c| matches!(c, '.' | '…' | ' ' | '·')).filter(|c| *c != ' ').count();
+        let truncated = dots >= 2 || trimmed.ends_with('…');
         let query = fold(trimmed);
         if query.len() < 4 {
             return None;
@@ -759,8 +761,17 @@ impl Atlas {
             .values()
             .map(|q| {
                 let name = fold(&q.name);
-                let name = if truncated { name.chars().take(query.chars().count()).collect() } else { name };
-                (similarity(&query, &name), q.id)
+                let start: String = name.chars().take(query.chars().count()).collect();
+                // A long reading that stands for the start of a name counts as that name even with no dots,
+                // as when OCR lost them.
+                let score = if truncated {
+                    similarity(&query, &start)
+                } else if query.len() >= 14 {
+                    similarity(&query, &name).max(similarity(&query, &start))
+                } else {
+                    similarity(&query, &name)
+                };
+                (score, q.id)
             })
             .filter(|(score, _)| *score >= MIN_QUEST_SCORE)
             .max_by(|a, b| a.0.total_cmp(&b.0).then(b.1.cmp(&a.1)))
@@ -1284,5 +1295,9 @@ mod tests {
         let guide = atlas.quest_guide(&[query("Slime Sam...", &[])], None, &[], &[], &Travel::none());
         assert_eq!(guide[0].quest.as_ref().map(|q| q.quest.id), Some(71));
         assert!(atlas.quest_guide(&[query("Slime", &[])], None, &[], &[], &Travel::none())[0].quest.is_none());
+        for read in ["Slime Sam..", "Slime Sam. . .", "Slime Sam…"] {
+            let guide = atlas.quest_guide(&[query(read, &[])], None, &[], &[], &Travel::none());
+            assert_eq!(guide[0].quest.as_ref().map(|q| q.quest.id), Some(71), "{read}");
+        }
     }
 }
