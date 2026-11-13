@@ -55,7 +55,10 @@ const TAGS: [&str; 3] = ["Quest Item", "Untradable", "One-of-a-kind"];
 /// Whether a line under a name is a tag, such as `Untradable`. Equipment prints these in the
 /// same amber as an upgraded name.
 pub(super) fn is_tag(text: &str) -> bool {
-    best_match(trim_noise(text), &TAGS, 0.6).is_some()
+    // `Account-bound. Transferable within world.` and the like say how the item trades, not what it is.
+    let lower = text.to_ascii_lowercase();
+    ["bound", "transferable", "tradable", "tradeable"].iter().any(|w| lower.contains(w))
+        || best_match(trim_noise(text), &TAGS, 0.6).is_some()
 }
 
 /// The icon box's shade, lighter or darker with what is behind it.
