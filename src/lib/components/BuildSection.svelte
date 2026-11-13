@@ -295,7 +295,10 @@
                   : 0
                 : Infinity;
         const room = rows.reduce((n, k) => n + (k.max ?? k.level), 0);
-        return { title, rows, spent: rows.reduce((n, k) => n + k.level, 0), total: Math.min(room, earned) };
+        // A job left behind is judged by the points it gave. The job being played is still earning,
+        // so its total is what its skills can take.
+        const left = tier === "Beginner" ? at > r.firstJobLevel : tier === "1st Job" ? at > r.secondJobLevel : false;
+        return { title, rows, spent: rows.reduce((n, k) => n + k.level, 0), total: left ? Math.min(room, earned) : room };
       })
       .filter((g) => g.rows.length);
   });
