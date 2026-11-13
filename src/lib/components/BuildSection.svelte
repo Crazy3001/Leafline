@@ -262,7 +262,22 @@
           nextGain: gain ? gain.to - gain.from : null,
         };
       })
-      .sort((a, b) => b.goal - a.goal || a.name.localeCompare(b.name));
+      .sort((a, b) => a.name.localeCompare(b.name));
+  });
+  type SkillRow = (typeof skillRows)[number];
+  const isMaxed = (k: SkillRow) => k.max != null && k.level >= k.max;
+  /** Skills grouped by what to do about them: the next points first, soonest level first. */
+  const skillGroups = $derived.by(() => {
+    const open = skillRows.filter((k) => !isMaxed(k));
+    const next = open.filter((k) => k.nextLevel != null).sort((a, b) => a.nextLevel! - b.nextLevel! || a.name.localeCompare(b.name));
+    const later = open.filter((k) => k.nextLevel == null && k.goal > k.level);
+    const spare = open.filter((k) => k.nextLevel == null && k.goal <= k.level);
+    return [
+      { title: "Next points", rows: next },
+      { title: "Planned later", rows: later },
+      { title: "Not in the plan", rows: spare },
+      { title: "Maxed", rows: skillRows.filter(isMaxed) },
+    ].filter((g) => g.rows.length);
   });
   const skillsRead = $derived((plan?.build.start.skills?.length ?? 0) > 0);
   const shown = $derived(view === "advance" && !canAdvance ? "plan" : view);
@@ -392,28 +407,36 @@
 
 {#snippet skillsView()}
   {#if !skillsRead}
-    <p class="quiet-line">
-      Not read yet. Open your Skill window in the game and Leafline reads it, or press Read stats.
-    </p>
+    <p class="quiet-line">Not read yet. Open your Skill window in the game and Leafline reads it, or press Read stats.</p>
   {/if}
-  {#if skillRows.length}
-    <ul class="skills">
-      {#each skillRows as skill (skill.id)}
-        <li title={skill.description ?? undefined}>
-          <span class="skill-name">{skill.name}</span>
-          <span class="skill-level tabular">
-            <b>{skillsRead ? skill.level : "—"}</b>{#if skill.max != null}<span class="faint"> / {skill.max}</span>{/if}
-          </span>
-          <span class="skill-plan tabular">
-            {#if skill.goal > skill.level}plan → {skill.goal}{:else if skill.max != null && skill.level >= skill.max}maxed{:else}&nbsp;{/if}
-          </span>
-          {#if skill.nextLevel != null && skill.nextGain != null}
-            <span class="skill-next tabular">Lv {skill.nextLevel}: +{skill.nextGain}</span>
-          {/if}
-        </li>
-      {/each}
-    </ul>
-  {:else}
+  {#each skillGroups as group (group.title)}
+    <h4 class="sub skill-group">{group.title}<span class="count tabular">{group.rows.length}</span></h4>
+    {#if group.title === "Maxed"}
+      <p class="maxed-list">{group.rows.map((k) => k.name).join(" · ")}</p>
+    {:else}
+      <ul class="skills">
+        {#each group.rows as skill (skill.id)}
+          {@const max = skill.max ?? Math.max(skill.goal, skill.level, 1)}
+          <li title={skill.description ?? undefined}>
+            <span class="skill-name">{skill.name}</span>
+            <span class="skill-level tabular"><b>{skillsRead ? skill.level : "—"}</b><span class="faint"> / {max}</span></span>
+            <span class="bar" aria-hidden="true">
+              <span class="planned" style="width: {(Math.min(skill.goal, max) / max) * 100}%"></span>
+              <span class="have" style="width: {(Math.min(skill.level, max) / max) * 100}%"></span>
+            </span>
+            {#if skill.nextLevel != null && skill.nextGain != null}
+              <span class="skill-next tabular">
+                <b>Lv {skill.nextLevel}</b> +{skill.nextGain}{#if skill.goal > skill.level}<span class="faint"> · plan to {skill.goal}</span>{/if}
+              </span>
+            {:else if skill.goal > skill.level}
+              <span class="skill-next tabular faint">plan to {skill.goal}</span>
+            {/if}
+          </li>
+        {/each}
+      </ul>
+    {/if}
+  {/each}
+  {#if !skillRows.length}
     <p class="quiet-line">This plan spends no skill points.</p>
   {/if}
 {/snippet}
@@ -1212,11 +1235,30 @@
     color: var(--accent);
   }
 
+  .skill-group {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin: 14px 0 4px;
+    padding-bottom: 3px;
+    border-bottom: 1px solid var(--border-strong);
+    color: var(--text);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .skill-group .count {
+    color: var(--faint);
+    font-weight: 400;
+  }
+
   .skills li {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto auto;
-    gap: 2px 10px;
-    padding: 5px 0;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 3px 10px;
+    padding: 7px 0;
   }
 
   .skills li + li {
@@ -1227,22 +1269,60 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-size: var(--text-md);
     font-weight: 600;
   }
 
-  .skill-plan {
-    color: var(--accent-strong);
-    font-size: var(--text-sm);
+  .skill-level {
+    font-size: var(--text-md);
+  }
+
+  .skill-level b {
+    font-weight: 700;
+  }
+
+  /* Level reached over the level the plan ends at, to the skill's maximum. */
+  .bar {
+    position: relative;
+    grid-column: 1 / -1;
+    height: 5px;
+    background: rgba(255, 255, 255, 0.07);
+  }
+
+  .bar span {
+    position: absolute;
+    inset: 0 auto 0 0;
+  }
+
+  .bar .planned {
+    background: color-mix(in srgb, var(--accent) 35%, transparent);
+  }
+
+  .bar .have {
+    background: var(--accent-strong);
   }
 
   .skill-next {
     grid-column: 1 / -1;
-    color: var(--faint);
-    font-size: var(--text-xs);
+    color: var(--muted);
+    font-size: var(--text-sm);
   }
 
-  .skills .faint {
+  .skill-next b {
+    color: var(--accent-strong);
+    font-weight: 600;
+  }
+
+  .skills .faint,
+  .skill-next .faint {
     color: var(--faint);
+  }
+
+  .maxed-list {
+    margin: 4px 0 0;
+    color: var(--muted);
+    font-size: var(--text-sm);
+    line-height: 1.6;
   }
 
   .warnings li {
