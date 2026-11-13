@@ -272,6 +272,8 @@
   type SkillRow = (typeof skillRows)[number];
   const isMaxed = (k: SkillRow) => k.max != null && k.level >= k.max;
   const TIERS = ["2nd Job", "1st Job", "Beginner"];
+  /** Where the 2nd job's points end: the 3rd job takes over. */
+  const THIRD_JOB_LEVEL = 70;
   /** Skills by job, the latest job first, in the order the game's skill window lists them. */
   const skillGroups = $derived.by(() => {
     const tiers = [...new Set(skillRows.map((k) => k.tier))].sort((a, b) => {
@@ -282,23 +284,18 @@
       .map((tier) => {
         const rows = skillRows.filter((k) => k.tier === tier);
         const title = tier ? `${tier}${rows[0]?.className && tier !== "Beginner" ? ` · ${rows[0].className}` : ""}` : "Other";
-        // The points a job gives: what the skills can take, or the SP earned for it so far if that is less.
+        // The points a job gives over its whole span, or what its skills can take if that is less.
         const r = display.buildRules;
-        const earned =
+        const given =
           tier === "Beginner"
             ? (r.firstJobLevel - 1) * r.beginnerSpPerLevel
             : tier === "1st Job"
               ? (r.secondJobLevel - r.firstJobLevel) * r.spPerLevel + r.advancementSp
               : tier === "2nd Job"
-                ? at >= r.secondJobLevel
-                  ? (at - r.secondJobLevel) * r.spPerLevel + r.advancementSp
-                  : 0
+                ? (THIRD_JOB_LEVEL - r.secondJobLevel) * r.spPerLevel + r.advancementSp
                 : Infinity;
         const room = rows.reduce((n, k) => n + (k.max ?? k.level), 0);
-        // A job left behind is judged by the points it gave. The job being played is still earning,
-        // so its total is what its skills can take.
-        const left = tier === "Beginner" ? at > r.firstJobLevel : tier === "1st Job" ? at > r.secondJobLevel : false;
-        return { title, rows, spent: rows.reduce((n, k) => n + k.level, 0), total: left ? Math.min(room, earned) : room };
+        return { title, rows, spent: rows.reduce((n, k) => n + k.level, 0), total: Math.min(room, given) };
       })
       .filter((g) => g.rows.length);
   });
