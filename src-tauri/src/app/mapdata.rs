@@ -333,10 +333,10 @@ fn travel_file(app: &AppHandle) -> (Option<TravelFile>, TravelOrigin, Option<Str
 /// The rides and scrolls the player turned on in Settings, found in the map data.
 fn travel(app: &AppHandle, atlas: &Atlas) -> Travel {
     let choice = app.state::<SettingsState>().get().travel;
-    match travel_file(app).0 {
-        Some(file) if choice.enabled => atlas.travel(&file, choice).0,
-        _ => Travel::none(),
-    }
+    // NPC rides are always in: some maps can't be reached without one. Taxis and scrolls wait
+    // for the player's switch, which `choice` checks for each ride.
+    let file = travel_file(app).0.unwrap_or_else(TravelFile::empty).with_known_rides();
+    atlas.travel(&file, choice).0
 }
 
 #[derive(Serialize)]

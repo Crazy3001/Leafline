@@ -573,7 +573,7 @@ export interface Trip {
 export type TripMessage = "ask" | "dismiss-offer";
 
 /** Taxis and return scrolls (see src-tauri/src/mapdata/travel.rs). */
-export type TravelKind = "cab" | "vipCab" | "scroll";
+export type TravelKind = "cab" | "vipCab" | "scroll" | "npc";
 
 export interface TravelStep {
   kind: TravelKind;

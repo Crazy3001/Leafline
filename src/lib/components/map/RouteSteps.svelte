@@ -1,7 +1,7 @@
 <script lang="ts">
   // A route's steps as the player takes them, and how many portals it takes. Rides and return
   // scrolls, when the player turned them on, stand apart from portal steps.
-  import { CarTaxiFront, EyeOff, ScrollText } from "@lucide/svelte";
+  import { CarTaxiFront, EyeOff, Plane, ScrollText } from "@lucide/svelte";
 
   import { formatNumber } from "$lib/format";
   import type { MapRoute } from "$lib/types";
@@ -36,7 +36,7 @@
         <span class="text">
           {#if step.travel}
             <span class="service">
-              {#if step.travel.kind === "scroll"}<ScrollText size={12} />{:else}<CarTaxiFront size={12} />{/if}
+              {#if step.travel.kind === "scroll"}<ScrollText size={12} />{:else if step.travel.kind === "npc"}<Plane size={12} />{:else}<CarTaxiFront size={12} />{/if}
               {step.travel.service}
             </span>
           {:else}

@@ -9,6 +9,7 @@
     ArrowRight,
     ArrowUp,
     CarTaxiFront,
+    Plane,
     Check,
     DoorOpen,
     LogIn,
@@ -49,7 +50,7 @@
 
   /** The picture for a step: the way to walk for a portal, the ride or scroll otherwise. */
   function turnIcon(step: RouteStep) {
-    if (step.travel) return step.travel.kind === "scroll" ? ScrollText : CarTaxiFront;
+    if (step.travel) return step.travel.kind === "scroll" ? ScrollText : step.travel.kind === "npc" ? Plane : CarTaxiFront;
     if (step.side === "left" || (!step.side && step.direction === "west")) return ArrowLeft;
     if (step.side === "right" || (!step.side && step.direction === "east")) return ArrowRight;
     if (step.side === "centre") return ArrowUp;

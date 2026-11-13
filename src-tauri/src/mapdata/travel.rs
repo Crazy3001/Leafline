@@ -51,6 +51,9 @@ pub enum TravelKind {
     VipCab,
     /// Return scrolls, usable from any map.
     Scroll,
+    /// A ride an NPC gives, such as the flight to Florina Beach. Always in routes: some maps
+    /// can be reached no other way, so there is nothing to turn off.
+    Npc,
 }
 
 /// Which travel the player turned on, kept in the settings. Off by default.
@@ -71,12 +74,17 @@ impl Default for TravelChoice {
 
 impl TravelChoice {
     pub fn allows(&self, kind: TravelKind) -> bool {
-        self.enabled
-            && match kind {
-                TravelKind::Cab => self.cabs,
-                TravelKind::VipCab => self.vip_cabs,
-                TravelKind::Scroll => self.scrolls,
+        match kind {
+            TravelKind::Npc => true,
+            _ => {
+                self.enabled
+                    && match kind {
+                        TravelKind::Cab => self.cabs,
+                        TravelKind::VipCab => self.vip_cabs,
+                        _ => self.scrolls,
+                    }
             }
+        }
     }
 }
 
@@ -120,6 +128,36 @@ pub struct ServiceRoute {
 impl TravelFile {
     pub fn parse(json: &str) -> std::result::Result<Self, String> {
         serde_json::from_str(json).map_err(|err| format!("travel.json: {err}"))
+    }
+
+    /// The rides NPCs give that are not portals and are in no download. Written by hand from what
+    /// players report, so each says so, and the fare is left out until someone records it. Add
+    /// to this as more are confirmed in game.
+    fn known_rides() -> Vec<Service> {
+        const SOURCE: &str = "Reported by a player, not from the game's data or a download; the fare was not recorded.";
+        let ride = |name: &str, operator: &str, from: &str, to: &str| Service {
+            kind: TravelKind::Npc,
+            name: name.to_string(),
+            operator: Some(operator.to_string()),
+            note: Some("a flight by NPC, so the map data doesn't list it".to_string()),
+            source: SOURCE.to_string(),
+            routes: vec![ServiceRoute { from: Some(from.to_string()), to: to.to_string(), fare: None }],
+        };
+        vec![
+            ride("Pason's flight to Florina Beach", "Pason", "Lith Harbor", "Florina Beach"),
+            ride("Pison's flight to Lith Harbor", "Pison", "Florina Beach", "Lith Harbor"),
+        ]
+    }
+
+    /// This file with the known NPC rides added, unless it already has a service of that name
+    /// (the player may have edited one).
+    pub fn with_known_rides(mut self) -> Self {
+        for ride in Self::known_rides() {
+            if !self.services.iter().any(|s| s.name == ride.name) {
+                self.services.push(ride);
+            }
+        }
+        self
     }
 
     /// A file with nothing in it yet, for the player to fill in.
@@ -362,6 +400,22 @@ impl Atlas {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_npc_ride_is_in_routes_even_with_travel_turned_off() {
+        let off = TravelChoice::default();
+        assert!(!off.allows(TravelKind::Cab) && !off.allows(TravelKind::Scroll));
+        assert!(off.allows(TravelKind::Npc));
+
+        let file = TravelFile::empty().with_known_rides();
+        let names: Vec<_> = file.services.iter().map(|s| s.name.as_str()).collect();
+        assert_eq!(names, ["Pason's flight to Florina Beach", "Pison's flight to Lith Harbor"]);
+        // Adding them again changes nothing, and an edited copy keeps the player's version.
+        assert_eq!(file.clone().with_known_rides(), file);
+        let mut edited = file.clone();
+        edited.services[0].routes[0].fare = Some(1500);
+        assert_eq!(edited.clone().with_known_rides().services[0].routes[0].fare, Some(1500));
+    }
     use crate::mapdata::atlas::tests::{island_world, world};
 
     fn file(json: &str) -> TravelFile {
