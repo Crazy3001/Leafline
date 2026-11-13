@@ -143,7 +143,7 @@ const STEADY_READS: usize = 2;
 const OTHER_CHARACTER_READS: usize = 3;
 
 /// A value that changes only once several readings in a row agree on the new one.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct Steady<T> {
     value: Option<T>,
     candidate: Option<(T, usize)>,
@@ -266,7 +266,7 @@ pub struct MapSummary {
 }
 
 /// A stretch of play on one map at one level, party size and job.
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionLine {
     pub map: Option<String>,
@@ -282,7 +282,7 @@ pub struct SessionLine {
 }
 
 /// How fast one quest counter went up on one map.
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CounterRate {
     pub target: String,
@@ -326,7 +326,7 @@ pub struct SessionEvent {
     pub level: Option<u32>,
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
 pub struct Rejected {
     pub exp: usize,
     pub mesos: usize,
@@ -334,7 +334,7 @@ pub struct Rejected {
 
 /// The EXP a level needs, as a range: the HUD's percent has two decimals, and whether it rounds
 /// or truncates is not known, so the true percent is anywhere from 0.005 below to 0.01 above.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 struct Requirement {
     low: f64,
     high: f64,
@@ -377,7 +377,7 @@ fn narrow(a: Option<Requirement>, b: Option<Requirement>) -> Option<Requirement>
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct ExpPoint {
     at: f64,
     level: u32,
@@ -386,7 +386,7 @@ struct ExpPoint {
 }
 
 /// Progress when the HUD shows only a percentage.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct PercentPoint {
     at: f64,
     level: u32,
@@ -395,14 +395,14 @@ struct PercentPoint {
 }
 
 /// Running totals at one moment of active time, for the recent rates.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 struct Mark {
     clock: f64,
     exp: i64,
     percent: f64,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct MesoPoint {
     mesos: u64,
     /// The active clock when this amount first appeared.
@@ -411,7 +411,7 @@ struct MesoPoint {
 }
 
 /// A shop, storage or trade window that is open now.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct OpenWindow {
     opened_at: f64,
     /// An amount has been read in it.
@@ -420,7 +420,7 @@ struct OpenWindow {
     last: Option<u64>,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct MapTotals {
     map: Option<String>,
     active_seconds: f64,
@@ -430,7 +430,7 @@ struct MapTotals {
 }
 
 /// One quest counter as tracked: the value being read, and the last confirmed one.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct CounterTrack {
     target: String,
     required: u32,
@@ -442,8 +442,9 @@ struct CounterTrack {
     seen: bool,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SessionTracker {
+    #[serde(skip)]
     config: TrackerConfig,
     frames: usize,
     started_at: Option<f64>,
@@ -603,6 +604,16 @@ impl SessionTracker {
 
     /// Stops or restarts tracking by hand. Readings are not pushed while held, and the time
     /// held doesn't count once they come back.
+    /// Takes a saved tracker back (it serialises as a whole, see `serde_json::to_value`). The
+    /// time the app was away is not counted: the next reading starts a new stretch, and the
+    /// rates carry on from where they were.
+    pub fn restore(config: TrackerConfig, saved: serde_json::Value) -> Option<Self> {
+        let mut tracker: Self = serde_json::from_value(saved).ok()?;
+        tracker.config = config;
+        tracker.skip_gap = true;
+        Some(tracker)
+    }
+
     pub fn set_held(&mut self, held: bool) {
         self.held = held;
         self.skip_gap = true;
@@ -1340,6 +1351,40 @@ mod tests {
     fn on(mut sample: Sample, map: &str) -> Sample {
         sample.map = Some(map.into());
         sample
+    }
+
+    #[test]
+    fn a_restored_tracker_carries_on_without_counting_the_time_away() {
+        let config = TrackerConfig { confirmations: 1, ..TrackerConfig::default() };
+        let mut tracker = SessionTracker::new(config);
+        let mut points = 100;
+        for second in 0..=120 {
+            points += 20;
+            tracker.push(&with_mesos(sample(f64::from(second), 30, points, points as f32 / 10_000.0), 1_000 + 50 * points));
+        }
+        let before = tracker.summary();
+        assert!(before.active_seconds > 100.0 && before.exp_gained > 0);
+
+        let saved = serde_json::to_value(&tracker).unwrap();
+        let mut back = SessionTracker::restore(config, saved).expect("restores");
+        assert_eq!(back.summary().exp_gained, before.exp_gained);
+        assert_eq!(back.summary().maps, before.maps);
+
+        // Back an hour later: the hour is not play time, and the next gain counts in full.
+        points += 20;
+        back.push(&sample(4_000.0, 30, points, points as f32 / 10_000.0));
+        points += 20;
+        back.push(&sample(4_001.0, 30, points, points as f32 / 10_000.0));
+        let after = back.summary();
+        assert!(after.active_seconds - before.active_seconds < 5.0, "{}", after.active_seconds);
+        assert_eq!(after.exp_gained, before.exp_gained + 40);
+        assert_eq!(after.started_at, before.started_at);
+    }
+
+    #[test]
+    fn a_snapshot_that_cannot_be_read_is_refused() {
+        let config = TrackerConfig::default();
+        assert!(SessionTracker::restore(config, serde_json::json!({ "frames": "many" })).is_none());
     }
 
     #[test]

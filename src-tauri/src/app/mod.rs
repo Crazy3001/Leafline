@@ -11,6 +11,7 @@ mod nav;
 mod overlay;
 mod pins;
 mod readings;
+mod recovery;
 mod records;
 mod report;
 mod settings;

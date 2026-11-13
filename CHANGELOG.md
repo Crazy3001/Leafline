@@ -3,6 +3,14 @@
 What changed in each release of Leafline. Leafline is a work in progress: if something reads
 wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?template=bug_report.yml).
 
+## Unreleased
+
+### Added
+- **A session survives a crash or a restart.** Leafline keeps what the tracker has worked out
+  beside the saved session. If the app closes or crashes and you are back within 30 minutes, the
+  session carries on where it was: the same log entry, the same rates, with the time away left
+  out. **New session** starts fresh as before.
+
 ## 0.2.0 (2026-11-12)
 
 ### Added

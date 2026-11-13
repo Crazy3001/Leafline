@@ -53,7 +53,6 @@ sends input, and stays free.
 **Training details**
 - A choice of averaging window for EXP per hour
 - A mode that keeps one session going across maps
-- Automatic recovery of a session after a crash
 - Party quest mode: completion times and rewards
 - Kills per hour and a count of kills per monster
 
