@@ -15,9 +15,9 @@ use super::store::Store;
 use crate::error::{Error, Result};
 
 /// Where the latest shop file lives. Nothing about the player goes with the request.
-pub const SHOPS_URL: &str = "https://raw.githubusercontent.com/Crazy3001/Leafline/main/data/shops.json";
+pub const SHOPS_URL: &str = "https://raw.githubusercontent.com/Crazy3001/Leafline-data/main/shops/shops.json";
 /// The copy that comes with the app, used until a download replaces it.
-pub const BUNDLED: &str = include_str!("../../../data/shops.json");
+pub const BUNDLED: &str = include_str!("shops.json");
 /// The only `schema` this reader understands.
 pub const SCHEMA: u32 = 1;
 /// The file is checked for changes at most this often.
