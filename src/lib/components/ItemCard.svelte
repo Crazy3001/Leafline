@@ -363,12 +363,6 @@
     font-size: var(--text-xs);
   }
 
-  .notice-help {
-    margin: 0 0 8px;
-    color: var(--muted);
-    font-size: var(--text-sm);
-  }
-
   .tip {
     margin: 0 0 8px;
     padding: 7px 10px;
