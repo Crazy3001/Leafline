@@ -196,15 +196,14 @@
       Couldn't tell which item this is{read.name ? ` (read as “${read.name}”)` : ""}. Nothing in the item data fits closely
       enough, so no stats are shown rather than wrong ones.
     </p>
-    <p class="notice-help">
-      The tooltip is easiest to read over a plain background. Move the inventory or equipment window to a quiet part of the
-      screen, close any windows behind where the tooltip appears (chat, other panels), then hover the item and press the hotkey
-      again. You can also search for it by name. If it keeps failing, press Save frame on the overlay and send the picture in a
-      bug report.
-    </p>
-    <button class="fix" onclick={() => backend.showItem(null, read.name || null)}>
-      {read.name ? `Search for “${read.name}”` : "Search items"}
-    </button>
+    <p class="tip"><b>Tip:</b> move the window to a clear spot and close anything behind the tooltip, then press the hotkey again.</p>
+    <span class="actions">
+      <button class="fix" onclick={() => backend.showItem(null, read.name || null)}>
+        {read.name ? `Search for “${read.name}”` : "Search items"}
+      </button>
+      <button class="fix" onclick={savePicture}>Save this picture</button>
+    </span>
+    {#if savedTo}<p class="saved">Saved to {savedTo}</p>{/if}
   {:else}
   {#if trust === "looking"}
     <p class="notice">Checking the name against the item data…</p>
@@ -219,11 +218,8 @@
     <p class="notice warn">The item data isn't downloaded, so this reading can't be checked against the item's real stats.</p>
   {/if}
   {#if doubtful}
-    <div class="notice-help doubt">
-      <p>
-        Not sure about this reading? Move the inventory or equipment window to a clear part of the screen, close any windows
-        behind the tooltip, then hover the item and press the hotkey again.
-      </p>
+    <div class="doubt">
+      <p class="tip"><b>Tip:</b> move the window to a clear spot and close anything behind the tooltip, then press the hotkey again.</p>
       <span class="actions">
         <button class="fix" onclick={savePicture}>Save this picture</button>
         <button class="fix" onclick={() => backend.openLink(reportUrl())}>Report it</button>
@@ -373,8 +369,24 @@
     font-size: var(--text-sm);
   }
 
-  .doubt p {
-    margin: 0 0 6px;
+  .tip {
+    margin: 0 0 8px;
+    padding: 7px 10px;
+    border-left: 3px solid var(--accent-strong);
+    background: var(--warn-soft);
+    color: var(--text);
+    font-size: var(--text-sm);
+    font-weight: 500;
+  }
+
+  .tip b {
+    color: var(--accent-strong);
+  }
+
+  .actions {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 8px;
   }
 
   .doubt .actions {
@@ -382,7 +394,7 @@
     gap: 6px;
   }
 
-  .doubt .saved {
+  .saved {
     margin: 6px 0 0;
     font-size: var(--text-xs);
     word-break: break-all;
