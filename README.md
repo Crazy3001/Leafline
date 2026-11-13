@@ -121,7 +121,7 @@ Add **Win** to every hotkey. While the game is in front it keeps plain keys to i
 ## FAQ
 
 ### Is it allowed? Can I get banned?
-Nobody knows for sure. Nexon hasn't said either way: support replies to similar questions quote the rule against unauthorised third-party software and say they can't comment on specific programs. A support ticket asking whether read-only overlays are allowed has had no answer yet. One player reported a two-week ban while running a similar screen-reading overlay; it's unconfirmed, but the stated reason was third-party programs. Leafline is built to stay on the safe side of every line we know of (see [What it never does](#what-it-never-does)), but passive doesn't mean approved. Penalties carry across Nexon games on one account, so think about using a separate account.
+Nobody knows for sure. Nexon hasn't said either way: support replies to similar questions quote the rule against unauthorised third-party software and say they can't comment on specific programs. A support ticket asking whether read-only overlays are allowed has had no answer yet. Leafline is built to stay on the safe side of every line we know of (see [What it never does](#what-it-never-does)), but passive doesn't mean approved. Penalties carry across Nexon games on one account, so think about using a separate account.
 
 ### Is it free?
 Yes, and it stays free: no ads, no paid features, no account. The code is open source under the MIT licence.
