@@ -282,7 +282,20 @@
       .map((tier) => {
         const rows = skillRows.filter((k) => k.tier === tier);
         const title = tier ? `${tier}${rows[0]?.className && tier !== "Beginner" ? ` · ${rows[0].className}` : ""}` : "Other";
-        return { title, rows, spent: rows.reduce((n, k) => n + k.level, 0), total: rows.reduce((n, k) => n + (k.max ?? k.level), 0) };
+        // The points a job gives: what the skills can take, or the SP earned for it so far if that is less.
+        const r = display.buildRules;
+        const earned =
+          tier === "Beginner"
+            ? (r.firstJobLevel - 1) * r.beginnerSpPerLevel
+            : tier === "1st Job"
+              ? (r.secondJobLevel - r.firstJobLevel) * r.spPerLevel + r.advancementSp
+              : tier === "2nd Job"
+                ? at >= r.secondJobLevel
+                  ? (at - r.secondJobLevel) * r.spPerLevel + r.advancementSp
+                  : 0
+                : Infinity;
+        const room = rows.reduce((n, k) => n + (k.max ?? k.level), 0);
+        return { title, rows, spent: rows.reduce((n, k) => n + k.level, 0), total: Math.min(room, earned) };
       })
       .filter((g) => g.rows.length);
   });
