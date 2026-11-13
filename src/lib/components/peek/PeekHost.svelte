@@ -61,11 +61,11 @@
     };
     window.addEventListener("pointerdown", outside, true);
     window.addEventListener("keydown", key);
-    window.addEventListener("resize", closePeek);
+    window.addEventListener("resize", measure);
     return () => {
       window.removeEventListener("pointerdown", outside, true);
       window.removeEventListener("keydown", key);
-      window.removeEventListener("resize", closePeek);
+      window.removeEventListener("resize", measure);
     };
   });
 

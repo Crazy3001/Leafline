@@ -71,13 +71,14 @@ Leafline only looks at the game window, the way OBS or Discord capture it, and r
 - It never injects into the game or draws inside it. The overlay is its own window.
 - It never presses keys or clicks for you. Nothing is automated: no botting, macros or auto-potions.
 - It never saves pictures of your game unless you press **Save frame**, and never uploads screenshots, readings or records.
-- It ships no Nexon assets: no sprites, icons or extracted game data.
+- It ships no Nexon assets: no sprites, icons or extracted game data. Item, monster, NPC and map pictures are downloaded from OSMS Data Explorer the first time each is shown and kept on your PC; turn them off in **Settings → Data**.
 
 ### Privacy
 
 Nothing read from the game leaves your PC. Leafline only goes online to:
 
-- download the community map, monster, quest and drop data (when you ask, then weekly), and
+- download the community map, monster, quest and drop data (when you ask, then weekly),
+- download a game picture from OSMS Data Explorer the first time it is shown, if game pictures are on (they start on), and
 - ask GitHub for the latest version number at startup, if you turn the update check on (it starts off). That request carries Leafline's name and version and nothing else. Nothing is downloaded or installed for you.
 
 Your sessions, notes, drop log, builds and settings stay in `%APPDATA%\app.leafline.overlay`, with a daily backup of the last 7 days. **Settings → Data** opens the folder.

@@ -6,6 +6,7 @@
 
   import { page } from "$app/state";
   import { backend } from "$lib/api";
+  import { peek } from "$lib/peek.svelte";
   import NextStep from "$lib/components/NextStep.svelte";
   import PanelView from "$lib/components/PanelView.svelte";
   import { PIN_MAX_HEIGHT, PIN_WIDTH, pinId, pinInfo } from "$lib/panels";
@@ -82,7 +83,9 @@
     if (!frame || !body) return;
     const natural = Math.ceil(frame.offsetHeight - body.clientHeight + body.scrollHeight);
     capped = natural > maxHeight;
-    setWindow(PIN_WIDTH * display.scale, Math.min(maxHeight, natural) * display.scale);
+    // A link card needs room: the window grows to its cap while one is open.
+    const height = peek.stack.length ? maxHeight : Math.min(maxHeight, natural);
+    setWindow(PIN_WIDTH * display.scale, height * display.scale);
   }
 
   // Clicks leave the game focused; typing in a box takes focus while it lasts.
@@ -110,6 +113,12 @@
   // A new size setting changes the zoom but not the page's own measurements.
   $effect(() => {
     void display.scale;
+    untrack(fit);
+  });
+
+  // Opening or closing a link card refits the window.
+  $effect(() => {
+    void peek.stack.length;
     untrack(fit);
   });
 </script>

@@ -6,6 +6,7 @@
   import { onMount } from "svelte";
 
   import { backend } from "$lib/api";
+  import Pic from "$lib/ui/Pic.svelte";
   import Logo from "$lib/components/Logo.svelte";
   import NextStep from "$lib/components/NextStep.svelte";
   import { formatCompact, formatDuration, objectiveProgress } from "$lib/format";
@@ -145,6 +146,8 @@
         <li class:done title={objective.quest}>
           <span class="target">
             {#if done}<Check size={10} />{/if}
+            <!-- The counter names an item or a monster; whichever has a picture shows it. -->
+            <Pic kind="item" name={objective.target} size={16} /><Pic kind="mob" name={objective.target} size={16} />
             {objective.target}
           </span>
           <span class="count tabular" class:faint={objective.unread}

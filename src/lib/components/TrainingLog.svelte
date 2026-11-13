@@ -889,6 +889,7 @@
     gap: 10px;
     padding: var(--space-3);
     border: 1px solid var(--border);
+    border-radius: var(--radius);
     background: var(--surface);
   }
 
@@ -1185,6 +1186,7 @@
     gap: 4px;
     padding: var(--space-5);
     border: 1px solid var(--border);
+    border-radius: var(--radius);
     background: var(--surface);
     color: var(--muted);
   }

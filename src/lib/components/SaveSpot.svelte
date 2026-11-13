@@ -78,6 +78,7 @@
   .save.text {
     padding: 0 8px;
     border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
     background: var(--surface-2);
   }
 

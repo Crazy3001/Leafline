@@ -6,6 +6,19 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
 ## Unreleased
 
 ### Added
+- **Game pictures.** Items, monsters and NPCs show their icons beside their names, in lists and on
+  their cards, and maps show their area's emblem and a picture of the whole map. Each picture is
+  downloaded from OSMS Data Explorer the first time it is shown and kept on this PC. Turn them off
+  with **Show game pictures** in **Settings → Data**; names then stand alone, and nothing is
+  downloaded.
+- **Cards for coloured names.** Clicking an item, monster, NPC, map or quest name now opens a
+  small card beside it instead of jumping to another tab: an item's stats, needs, price, where to
+  get it and your notes; a monster's numbers, where it ranks for HP per EXP, its best maps and
+  drops; a map's monsters, exits and Go here; an NPC's maps, shop and quests; a quest's steps and
+  your counts. Names inside a card open the next card, with a back arrow. Esc or a click outside
+  closes it, and **Full view** opens the tab as before.
+- **A new look.** Rounded corners, softer surfaces, pill tabs, and the desk view's panels as
+  cards of their own. Routes read as a line of stops, the last one where you end up.
 - **More hidden portals marked in routes.** Portals named like `h001` and `hide01`, which the game
   uses for hidden ones, are now marked hidden too, not only `h_east` style names.
 - **Florina Beach in routes.** The map data has no way into Florina Beach, because it is reached

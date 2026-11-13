@@ -31,7 +31,7 @@
 {:else}
   <ol class="steps">
     {#each route.steps as step, i}
-      <li class:ride={step.travel}>
+      <li class:ride={step.travel} class:end={i === route.steps.length - 1}>
         <span class="n tabular">{i + 1}</span>
         <span class="text">
           {#if step.travel}
@@ -73,33 +73,68 @@
 {/if}
 
 <style>
+  /* A vertical line of stops: each step a dot on the rail, the last one filled, where it ends. */
   .steps {
     display: grid;
-    gap: 2px;
     margin: 8px 0 0;
     padding: 0;
     list-style: none;
   }
 
   .steps li {
+    position: relative;
     display: flex;
-    align-items: baseline;
-    gap: 8px;
+    align-items: center;
+    gap: 10px;
+    min-height: 28px;
     padding: 3px 0;
     font-size: var(--text-sm);
   }
 
+  .steps li::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 9px;
+    width: 2px;
+    border-radius: 1px;
+    background: color-mix(in srgb, var(--map) 28%, transparent);
+  }
+
+  .steps li:first-child::before {
+    top: 50%;
+  }
+
+  .steps li:last-child::before {
+    bottom: 50%;
+  }
+
+  .steps li:only-child::before {
+    display: none;
+  }
+
   .n {
+    position: relative;
+    z-index: 1;
     flex: none;
     display: grid;
     place-items: center;
-    width: 17px;
-    height: 17px;
-    border-radius: var(--radius-sm);
-    background: color-mix(in srgb, var(--map) 16%, transparent);
+    width: 20px;
+    height: 20px;
+    border: 1.5px solid color-mix(in srgb, var(--map) 70%, transparent);
+    border-radius: 50%;
+    background: var(--surface-2);
     color: var(--map);
     font-size: var(--text-xs);
     font-weight: 600;
+  }
+
+  .end .n {
+    border-color: var(--map);
+    background: var(--map);
+    box-shadow: 0 0 10px color-mix(in srgb, var(--map) 45%, transparent);
+    color: var(--accent-ink);
   }
 
   .text {
@@ -115,8 +150,13 @@
   }
 
   .ride .n {
-    background: color-mix(in srgb, var(--travel) 18%, transparent);
+    border-color: color-mix(in srgb, var(--travel) 70%, transparent);
     color: var(--travel);
+  }
+
+  .ride.end .n {
+    background: var(--travel);
+    color: var(--accent-ink);
   }
 
   .service {
