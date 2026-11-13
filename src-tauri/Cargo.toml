@@ -1,6 +1,6 @@
 [package]
 name = "leafline"
-version = "0.1.1"
+version = "0.2.0"
 description = "An unofficial, read-only overlay for MapleStory Classic"
 license = "MIT"
 edition = "2024"

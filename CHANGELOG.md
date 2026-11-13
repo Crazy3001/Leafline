@@ -3,7 +3,7 @@
 What changed in each release of Leafline. Leafline is a work in progress: if something reads
 wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?template=bug_report.yml).
 
-## Unreleased
+## 0.2.0 (2026-11-12)
 
 ### Added
 - **Ready-made build plans** for every 2nd job, Lv 1 to 70, each following one written guide
