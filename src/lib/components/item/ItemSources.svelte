@@ -83,7 +83,7 @@
           </li>
         {/each}
       </ul>
-      {#if shopsSeen}<p class="seen">{shopsSeen}. They can change; the game's shop window has the last word.</p>{/if}
+      {#if shopsSeen}<p class="seen">{shopsSeen}</p>{/if}
     {/if}
   </div>
 {/if}

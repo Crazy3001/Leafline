@@ -5,14 +5,14 @@
 export function shortDate(day: string): string {
   const [y, m, d] = day.split("-").map(Number);
   if (!y || !m || !d) return day;
-  return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return new Date(y, m - 1, d).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
 
-/** "Prices seen Nov 10", or a range when the entries were seen on different days. */
+/** "Prices updated 10 Nov", or a range when the entries were seen on different days. */
 export function seenLine(days: string[]): string | null {
   const sorted = [...new Set(days)].sort();
   if (!sorted.length) return null;
   const first = shortDate(sorted[0]);
   const last = shortDate(sorted[sorted.length - 1]);
-  return first === last ? `Prices seen ${first}` : `Prices seen ${first} to ${last}`;
+  return first === last ? `Prices updated ${first}` : `Prices updated ${first} to ${last}`;
 }

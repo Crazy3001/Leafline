@@ -225,9 +225,9 @@
                   <span class="bonus" class:negative={stat.bonus < 0}>{formatSigned(stat.bonus)}</span>)
                 </span>
               {:else if stat.note}
-                <span class="unsure" title={stat.note}>item's own · unsure</span>
+                <span class="unsure" title={stat.note}>base default · unsure</span>
               {:else if stat.fromData}
-                <span title="Not read from the tooltip: this is the item's own value">item's own</span>
+                <span title="Not read from the tooltip: this is the item's default base value">base default</span>
               {:else if stat.standard != null}
                 {@const diff = stat.value - stat.standard}
                 <span title="The item's own value, then what this copy has added or lost. A scroll, a rolled copy or a misread makes it differ.">

@@ -23,7 +23,7 @@
     </li>
   {/each}
 </ul>
-{#if seen}<p class="seen">{seen}. They can change; the game's shop window has the last word.</p>{/if}
+{#if seen}<p class="seen">{seen}</p>{/if}
 
 <style>
   .stock {
