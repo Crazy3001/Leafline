@@ -578,15 +578,14 @@ impl Store {
         Ok(self.info(SHOP_FILE)?.map(String::into_bytes))
     }
 
-    /// The downloaded shops, or the copy that came with the app when none was downloaded or
-    /// the download no longer reads.
+    /// The downloaded shops, or none when nothing was downloaded or the download no longer reads.
     pub fn shops(&self) -> Result<Vec<super::shops::ShopRecord>> {
         let downloaded = self.shop_file()?.and_then(|body| {
             super::shops::parse(&body).map_err(|err| eprintln!("cached shop file unreadable: {err}")).ok()
         });
         Ok(match downloaded {
             Some(file) => file.shops,
-            None => super::shops::parse(super::shops::BUNDLED.as_bytes()).map(|f| f.shops).unwrap_or_default(),
+            None => Vec::new(),
         })
     }
 

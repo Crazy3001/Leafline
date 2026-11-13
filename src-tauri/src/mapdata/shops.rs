@@ -1,7 +1,7 @@
 //! NPC shops: who sells what, where and for how much. The map data has no shop stock, so
-//! Leafline keeps its own file, `data/shops.json` in its repository. A copy comes with the app,
-//! and a newer one is downloaded from the repository like the other reference data, so prices can
-//! be corrected without a new release. Every entry carries the date it was last seen, because
+//! Leafline keeps its own file, `shops/shops.json` in the Leafline-data repository. It is
+//! downloaded like the other reference data and kept on the player's PC, so prices can be
+//! corrected without a new release. Every entry carries the date it was last seen, because
 //! prices can change after launch.
 //!
 //! The file names NPCs, maps and items as the game shows them. They are matched to the map
@@ -16,8 +16,6 @@ use crate::error::{Error, Result};
 
 /// Where the latest shop file lives. Nothing about the player goes with the request.
 pub const SHOPS_URL: &str = "https://raw.githubusercontent.com/Crazy3001/Leafline-data/main/shops/shops.json";
-/// The copy that comes with the app, used until a download replaces it.
-pub const BUNDLED: &str = include_str!("shops.json");
 /// The only `schema` this reader understands.
 pub const SCHEMA: u32 = 1;
 /// The file is checked for changes at most this often.
@@ -359,13 +357,6 @@ mod tests {
     }
 
     #[test]
-    fn the_copy_that_ships_reads() {
-        let file = parse(BUNDLED.as_bytes()).unwrap();
-        assert!(file.shops.len() >= 30);
-        assert!(file.shops.iter().all(|s| s.street.is_some() && !s.items.is_empty()));
-    }
-
-    #[test]
     fn a_file_in_another_format_or_without_dates_is_refused() {
         assert!(parse(br#"{"schema": 2, "shops": []}"#).is_err());
         let undated = r#"{"schema": 1, "shops": [{"npc": "A", "map": "B", "items": [{"item": "C", "price": 1, "seen": "soon"}]}]}"#;
@@ -376,7 +367,7 @@ mod tests {
     fn refresh_keeps_the_last_good_copy() {
         let mut store = Store::open_in_memory().unwrap();
         let mut source = FakeSource::default();
-        assert!(store.shops().unwrap().len() >= 30, "the copy that ships, before any download");
+        assert!(store.shops().unwrap().is_empty(), "no shops before the first download");
         assert!(refresh(&mut store, &source, 1000).is_err(), "nothing cached and nothing to download");
         source.files.insert(SHOPS_URL.to_string(), FILE.as_bytes().to_vec());
         assert!(refresh(&mut store, &source, 1000).unwrap());
