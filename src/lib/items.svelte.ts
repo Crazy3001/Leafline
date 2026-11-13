@@ -195,7 +195,9 @@ export function nameMatch(read: ItemTooltip, record: ItemRecord): "exact" | "lik
   const levelAgrees = level != null && level === record.reqLevel;
   // Text from behind or beside the tooltip can run on before or after the name ("GUida Eagle Crow",
   // "Studded Polearm I-I-I"). The whole name standing inside, with the level agreeing, is the item.
-  const trailing = ownKey.length >= 7 && readKey.includes(ownKey) && levelAgrees;
+  // A plain tooltip (a scroll, a potion) has no level to agree, so the read must begin with the whole name,
+  // as when its description runs on after it.
+  const trailing = ownKey.length >= 7 && (levelAgrees ? readKey.includes(ownKey) : level == null && readKey.startsWith(ownKey));
   if ((readKey === ownKey || trailing) && (level == null || levelAgrees)) return "exact";
   // The (M) or (F) after a name is judged apart, so one stray letter in a long name isn't made worse by it.
   const bare = (name: string) => nameKey(name.replace(/\(\s*[MFU]\s*\)/gi, ""));

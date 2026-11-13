@@ -400,16 +400,17 @@ impl Catalog {
         let level = level?;
         let key = item_key(text);
         let words: Vec<&str> = key.split_whitespace().collect();
-        if words.len() < 2 {
-            return None;
-        }
-        let mut found = self.items.iter().filter(|item| {
-            let name = item_key(&item.name);
-            let held: Vec<&str> = name.split_whitespace().collect();
-            item.req_level == level && held.len() > words.len() && held.ends_with(&words)
-        });
-        let first = found.next()?;
-        found.next().is_none().then_some(first)
+        // The first word can be cut off or garbled as well (`ck Split Pants`), so shorter tails count too.
+        (0..words.len().saturating_sub(1)).find_map(|skip| {
+            let tail = &words[skip..];
+            let mut found = self.items.iter().filter(|item| {
+                let name = item_key(&item.name);
+                let held: Vec<&str> = name.split_whitespace().collect();
+                item.req_level == level && held.len() > tail.len() && held.ends_with(tail)
+            });
+            let first = found.next()?;
+            found.next().is_none().then_some(first)
+        })
     }
 
     /// The longest item name that stands whole inside `text`, as words in a row: text seen through
@@ -769,6 +770,7 @@ pub(crate) mod tests {
         assert_eq!(catalog.item_like("Split Pants", Some(20)).unwrap().id, 1);
         assert!(catalog.item_like("Split Pants", Some(30)).is_none(), "two items fit, so none is guessed");
         assert!(catalog.item_like("Split Pants", None).is_none(), "needs the level");
+        assert_eq!(catalog.item_like("Ck Split Pants (M)", Some(20)).unwrap().id, 1, "a cut-off first word");
     }
 
     #[test]
