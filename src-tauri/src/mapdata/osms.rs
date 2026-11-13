@@ -126,12 +126,14 @@ impl PointKind {
 }
 
 /// A portal that leads somewhere, an NPC or a spawn point, at its place on the map's picture.
-/// `id` is the map a portal leads to, or the NPC or monster; `name` a portal's own name.
+/// `id` is the map a portal leads to, or the NPC or monster; `name` a portal's own name and
+/// `to_portal` the one it comes out at.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MapPoint {
     pub kind: PointKind,
     pub id: u32,
     pub name: Option<String>,
+    pub to_portal: Option<String>,
     pub x: i32,
     pub y: i32,
 }
@@ -173,11 +175,30 @@ impl From<RawMap> for MapRecord {
             .iter()
             .filter_map(|p| {
                 let dest = p.dest_map_id.filter(|d| *d != NO_MAP)?;
-                Some(MapPoint { kind: PointKind::Portal, id: dest, name: Some(p.name.clone()), x: p.x?, y: p.y? })
+                Some(MapPoint {
+                    kind: PointKind::Portal,
+                    id: dest,
+                    name: Some(p.name.clone()),
+                    to_portal: p.dest_portal.clone(),
+                    x: p.x?,
+                    y: p.y?,
+                })
             })
             .collect();
+        // Where teleports within the map come out: portals that lead nowhere themselves, named as
+        // the exit of one that leads back into this map. Marked as teleports too, to pair them.
+        let landings: Vec<&str> = raw
+            .portals
+            .iter()
+            .filter(|p| p.dest_map_id == Some(raw.id))
+            .filter_map(|p| p.dest_portal.as_deref())
+            .collect();
+        points.extend(raw.portals.iter().filter(|p| p.dest_map_id.is_none_or(|d| d == NO_MAP)).filter_map(|p| {
+            landings.contains(&p.name.as_str()).then_some(())?;
+            Some(MapPoint { kind: PointKind::Portal, id: raw.id, name: Some(p.name.clone()), to_portal: None, x: p.x?, y: p.y? })
+        }));
         let placed = |kind: PointKind, id: Option<u32>, p: &Point| {
-            Some(MapPoint { kind, id: id?, name: None, x: p.x?, y: p.y? })
+            Some(MapPoint { kind, id: id?, name: None, to_portal: None, x: p.x?, y: p.y? })
         };
         points.extend(raw.npcs.iter().filter_map(|p| placed(PointKind::Npc, p.npc_id, p)));
         points.extend(raw.mobs.iter().filter_map(|p| placed(PointKind::Mob, p.mob_id, p)));
@@ -895,6 +916,18 @@ mod tests {
         // The portal that leads somewhere and the monster, at their places; the spawn point not.
         let points: Vec<_> = maps[0].points.iter().map(|p| (p.kind, p.id, p.x, p.y)).collect();
         assert_eq!(points, [(PointKind::Portal, 8, 10, 20), (PointKind::Mob, 1, 5, 6)]);
+    }
+
+    #[test]
+    fn keeps_where_a_teleport_within_the_map_comes_out() {
+        // A made-up map with one teleport into itself, its landing spot, and a spare spawn point.
+        let json = br#"[{"id": 7, "name": "Fernway Farm", "portals": [
+            {"name": "t001", "x": 10, "y": 20, "dest_map_id": 7, "dest_portal": "st00"},
+            {"name": "st00", "x": 300, "y": 40}, {"name": "sp", "x": 1, "y": 2}]}]"#;
+        let Records::Maps(maps) = Records::parse("maps.json", json).unwrap() else { panic!() };
+        let points: Vec<_> =
+            maps[0].points.iter().map(|p| (p.id, p.name.as_deref(), p.to_portal.as_deref(), p.x)).collect();
+        assert_eq!(points, [(7, Some("t001"), Some("st00"), 10), (7, Some("st00"), None, 300)]);
     }
 
     fn portals_of(json: &[u8]) -> Vec<Portal> {

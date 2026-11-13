@@ -457,6 +457,11 @@ export interface ViewPoint {
   id: number;
   name: string;
   hidden: boolean;
+  /** A portal to another spot on the same map. */
+  teleport: boolean;
+  /** A portal's own name and the one it comes out at, to pair teleports. */
+  portal: string | null;
+  toPortal: string | null;
   /** In the data, so its card can open. */
   known: boolean;
   x: number;

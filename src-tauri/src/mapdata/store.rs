@@ -21,7 +21,7 @@ use super::turnins::TurnIn;
 use crate::error::{Error, Result};
 
 /// Bump when the tables change; an older cache is then dropped and downloaded again.
-const CACHE_VERSION: i32 = 12;
+const CACHE_VERSION: i32 = 13;
 
 const SCHEMA: &str = "
 CREATE TABLE source_files (
@@ -33,7 +33,8 @@ CREATE TABLE maps (
     is_town INTEGER NOT NULL, return_map_id INTEGER, map_mark TEXT, minimap_url TEXT, render_url TEXT, map_mark_url TEXT);
 CREATE TABLE map_exits (map_id INTEGER NOT NULL, dest_map_id INTEGER NOT NULL, PRIMARY KEY (map_id, dest_map_id));
 CREATE TABLE map_points (
-    map_id INTEGER NOT NULL, kind INTEGER NOT NULL, ref_id INTEGER NOT NULL, name TEXT, x INTEGER NOT NULL, y INTEGER NOT NULL);
+    map_id INTEGER NOT NULL, kind INTEGER NOT NULL, ref_id INTEGER NOT NULL, name TEXT, to_portal TEXT,
+    x INTEGER NOT NULL, y INTEGER NOT NULL);
 CREATE INDEX map_points_by_map ON map_points (map_id);
 CREATE TABLE portals (
     map_id INTEGER NOT NULL, seq INTEGER NOT NULL, name TEXT NOT NULL,
@@ -471,10 +472,18 @@ impl Store {
     /// A map's portals, NPCs and spawn points at their places on its picture, in file order.
     pub fn map_points(&self, map: u32) -> Result<Vec<MapPoint>> {
         let mut stmt =
-            self.conn.prepare("SELECT kind, ref_id, name, x, y FROM map_points WHERE map_id = ?1 ORDER BY rowid")?;
+            self.conn.prepare("SELECT kind, ref_id, name, to_portal, x, y FROM map_points WHERE map_id = ?1 ORDER BY rowid")?;
         let rows = stmt.query_map([map], |row| {
             let kind: u32 = row.get(0)?;
-            Ok((kind, MapPoint { kind: PointKind::Portal, id: row.get(1)?, name: row.get(2)?, x: row.get(3)?, y: row.get(4)? }))
+            let point = MapPoint {
+                kind: PointKind::Portal,
+                id: row.get(1)?,
+                name: row.get(2)?,
+                to_portal: row.get(3)?,
+                x: row.get(4)?,
+                y: row.get(5)?,
+            };
+            Ok((kind, point))
         })?;
         let mut points = Vec::new();
         for row in rows {
@@ -855,7 +864,7 @@ fn insert_maps(tx: &Transaction, maps: &[MapRecord]) -> Result<()> {
     )?;
     let mut exit = tx.prepare("INSERT OR IGNORE INTO map_exits (map_id, dest_map_id) VALUES (?1, ?2)")?;
     let mut point =
-        tx.prepare("INSERT INTO map_points (map_id, kind, ref_id, name, x, y) VALUES (?1, ?2, ?3, ?4, ?5, ?6)")?;
+        tx.prepare("INSERT INTO map_points (map_id, kind, ref_id, name, to_portal, x, y) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)")?;
     let mut portal = tx.prepare(
         "INSERT INTO portals (map_id, seq, name, dest_map_id, dest_portal, side, height)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
@@ -866,7 +875,7 @@ fn insert_maps(tx: &Transaction, maps: &[MapRecord]) -> Result<()> {
             exit.execute(params![m.id, dest])?;
         }
         for p in &m.points {
-            point.execute(params![m.id, p.kind as i64, p.id, p.name, p.x, p.y])?;
+            point.execute(params![m.id, p.kind as i64, p.id, p.name, p.to_portal, p.x, p.y])?;
         }
         // Portals that lead nowhere (spawn points, scripted ones) say nothing about the way out.
         for (seq, p) in m.portals.iter().filter(|p| p.dest_map_id.is_some()).enumerate() {
@@ -1066,6 +1075,8 @@ mod tests {
         let json = br#"[{"id": 7, "name": "Fernway Path", "portals": [
             {"name": "h_east00", "x": 10, "y": 20, "dest_map_id": 8}, {"name": "sp", "x": 1, "y": 2}],
             "npcs": [{"npc_id": 50, "x": 30, "y": 40}], "mobs": [{"mob_id": 3, "x": 50, "y": 60}]}]"#;
+        let json = String::from_utf8_lossy(json).replace(r#""dest_map_id": 8}"#, r#""dest_map_id": 8, "dest_portal": "west00"}"#);
+        let json = json.as_bytes();
         let Records::Maps(maps) = Records::parse("maps.json", json).unwrap() else { panic!() };
         let mut store = Store::open_in_memory().unwrap();
         let tx = store.conn.transaction().unwrap();
@@ -1081,6 +1092,7 @@ mod tests {
             ]
         );
         assert!(store.map_points(8).unwrap().is_empty());
+        assert_eq!(store.map_points(7).unwrap()[0].to_portal.as_deref(), Some("west00"));
     }
 
     #[test]

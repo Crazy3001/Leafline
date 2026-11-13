@@ -94,6 +94,11 @@ pub struct ViewPoint {
     pub name: String,
     /// A portal the game hides.
     pub hidden: bool,
+    /// A portal to another spot on the same map.
+    pub teleport: bool,
+    /// A portal's own name, and the one it comes out at, to pair teleports.
+    pub portal: Option<String>,
+    pub to_portal: Option<String>,
     /// The map, NPC or monster is in the data, so its card can open.
     pub known: bool,
     pub x: f64,
@@ -674,7 +679,7 @@ impl Atlas {
     }
 
     /// A map's points as markers on its cut picture, named; ones the cut left out are dropped.
-    pub fn view_points(&self, points: &[MapPoint], view: &MapView) -> Vec<ViewPoint> {
+    pub fn view_points(&self, map: u32, points: &[MapPoint], view: &MapView) -> Vec<ViewPoint> {
         points
             .iter()
             .filter_map(|p| {
@@ -693,7 +698,19 @@ impl Atlas {
                         None => ("Monster".into(), false, false),
                     },
                 };
-                Some(ViewPoint { kind: p.kind, id: p.id, name, hidden, known, x, y })
+                let teleport = p.kind == PointKind::Portal && p.id == map;
+                Some(ViewPoint {
+                    kind: p.kind,
+                    id: p.id,
+                    name,
+                    hidden,
+                    teleport,
+                    portal: p.name.clone(),
+                    to_portal: p.to_portal.clone(),
+                    known,
+                    x,
+                    y,
+                })
             })
             .collect()
     }
@@ -843,14 +860,14 @@ pub(crate) mod tests {
     fn names_and_places_the_points_on_a_maps_picture() {
         let atlas = world();
         let view = MapView { left: 100, top: 0, width: 200, height: 100, out_width: 200, out_height: 100 };
-        let point = |kind, id, name: Option<&str>, x| MapPoint { kind, id, name: name.map(str::to_string), x, y: 50 };
+        let point = |kind, id, name: Option<&str>, x| MapPoint { kind, id, name: name.map(str::to_string), to_portal: None, x, y: 50 };
         let points = [
             point(PointKind::Portal, 3, Some("h_east00"), 300),
             point(PointKind::Npc, 50, None, 200),
             point(PointKind::Mob, 10, None, 100),
             point(PointKind::Mob, 10, None, 50),
         ];
-        let marks: Vec<_> = atlas.view_points(&points, &view).into_iter().map(|p| (p.name, p.hidden, p.known, p.x)).collect();
+        let marks: Vec<_> = atlas.view_points(2, &points, &view).into_iter().map(|p| (p.name, p.hidden, p.known, p.x)).collect();
         assert_eq!(
             marks,
             [
@@ -860,6 +877,9 @@ pub(crate) mod tests {
             ],
             "the last spawn point was cut off"
         );
+        let teleport = [point(PointKind::Portal, 2, Some("t001"), 200)];
+        assert!(atlas.view_points(2, &teleport, &view)[0].teleport, "leads back into the same map");
+        assert!(!atlas.view_points(2, &points[..1], &view)[0].teleport);
     }
 
     #[test]

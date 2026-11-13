@@ -61,7 +61,7 @@ pub async fn map_picture(app: AppHandle, id: u32) -> Result<Option<MapPicture>> 
         let Some((view, _)) = map_view(&app, id)? else { return Ok(None) };
         let data = app.state::<MapDataState>();
         let points = match data.atlas() {
-            Some(atlas) => atlas.view_points(&data.map_points(id)?, &view),
+            Some(atlas) => atlas.view_points(id, &data.map_points(id)?, &view),
             None => Vec::new(),
         };
         Ok(Some(MapPicture { width: view.out_width, height: view.out_height, points }))

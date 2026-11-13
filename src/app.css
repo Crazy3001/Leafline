@@ -56,6 +56,14 @@
   --ref-npc: #6fd0bd;
   --ref-map: #e7b45a;
 
+  /*
+   * Marks on a map's picture: their own vivid set, apart from the link colours, so they stand out
+   * on the dimmed picture. Portals blue, NPCs green, monster spawns red-orange.
+   */
+  --marker-mob: #ff5440;
+  --marker-portal: #2e8cff;
+  --marker-npc: #30d660;
+
   --radius-sm: 6px;
   --radius: 10px;
   --radius-lg: 14px;
