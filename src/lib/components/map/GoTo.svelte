@@ -1,7 +1,7 @@
 <script lang="ts">
   // "Go to…": a search over maps and NPCs that heads for the one picked, with the places headed
   // for lately beside it for a second trip.
-  import { Navigation, X } from "@lucide/svelte";
+  import { MapPin, Navigation, UserRound, X } from "@lucide/svelte";
 
   import { backend } from "$lib/api";
   import { forgetPlace, goTo, isHeadingFor, mapPlace, nav, npcPlace, watchDestination } from "$lib/destination.svelte";
@@ -90,10 +90,10 @@
         <li role="option" aria-selected={i === active}>
           <button onmousedown={(e) => e.preventDefault()} onclick={() => pick(result)} class:active={i === active}>
             {#if result.kind === "map"}
-              <span class="name map">{result.map.name}</span>
+              <span class="name"><MapPin size={12} />{result.map.name}</span>
               {#if result.map.street}<span class="sub">{result.map.street}</span>{/if}
             {:else}
-              <span class="name npc">{result.npc.name}</span>
+              <span class="name"><UserRound size={12} />{result.npc.name}</span>
               {#if result.npc.map}<span class="sub">{result.npc.map}{result.npc.maps > 1 ? ` and ${result.npc.maps - 1} more` : ""}</span>{/if}
             {/if}
           </button>
@@ -108,8 +108,9 @@
     <ul class="recent" aria-label="Places headed for lately">
       {#each recent as place (place.kind + place.name + place.maps[0]?.id)}
         <li>
-          <button class="ref {place.kind === 'npc' ? 'ref-npc' : 'ref-map'}" onclick={() => goTo(place)}>{place.name}</button>
-          {#if where(place)}<span class="sub">{where(place)}</span>{/if}
+          <button class="chip" title="Head for {place.name}{where(place) ? ` (${where(place)})` : ''}" onclick={() => goTo(place)}
+            ><Navigation size={10} />{place.name}</button
+          >
           <button class="forget" aria-label="Forget {place.name}" onclick={() => forgetPlace(place)}><X size={10} /></button>
         </li>
       {/each}
@@ -187,15 +188,14 @@
   }
 
   .name {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     font-size: var(--text-sm);
   }
 
-  .name.map {
-    color: var(--ref-map);
-  }
-
-  .name.npc {
-    color: var(--ref-npc);
+  .name :global(svg) {
+    color: var(--faint);
   }
 
   .sub {
@@ -218,8 +218,8 @@
   .recent {
     display: flex;
     flex-wrap: wrap;
-    gap: 2px 12px;
-    margin: 5px 0 0;
+    gap: 6px;
+    margin: 6px 0 0;
     padding: 0;
     list-style: none;
     font-size: var(--text-sm);
@@ -227,9 +227,42 @@
 
   .recent li {
     display: inline-flex;
-    align-items: baseline;
-    gap: 4px;
+    align-items: center;
+    gap: 2px;
     min-width: 0;
+  }
+
+  /* A place to head for again: a small destination button with the Go mark. */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    max-width: 100%;
+    height: 24px;
+    padding: 0 10px;
+    overflow: hidden;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-pill);
+    background: var(--surface-2);
+    color: var(--text);
+    font-size: var(--text-xs);
+    font-weight: 500;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    cursor: pointer;
+    transition:
+      background 0.12s ease,
+      border-color 0.12s ease;
+  }
+
+  .chip :global(svg) {
+    flex: none;
+    color: var(--accent);
+  }
+
+  .chip:hover {
+    border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+    background: var(--accent-soft);
   }
 
   .forget {

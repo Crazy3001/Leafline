@@ -569,6 +569,15 @@ export const mockBackend: Backend = {
     const card = sampleCard(2)!;
     return { score: 0.93, card, alternatives: [sampleSearch("Meadow II")[0]] };
   },
+  // A preview server set up for it can stand in a real map's layout; otherwise there is none.
+  async mapPicture(id) {
+    try {
+      const response = await fetch(`/__preview/map-picture/${id}`);
+      return response.ok ? await response.json() : null;
+    } catch {
+      return null;
+    }
+  },
   mapCard: async (id) =>
     preview?.map ? (preview.map.card.map.id === id ? preview.map.card : null) : mapStatus.ready ? sampleCard(id) : null,
   searchMaps: async (text) => (mapStatus.ready ? sampleSearch(text) : []),

@@ -132,6 +132,11 @@ impl MapDataState {
         self.atlas.read().expect("atlas lock").clone()
     }
 
+    /// A map's portals, NPCs and spawn points, read from the cache when asked.
+    pub(super) fn map_points(&self, id: u32) -> Result<Vec<crate::mapdata::osms::MapPoint>> {
+        Store::open(&self.path)?.map_points(id)
+    }
+
     pub(super) fn pictures(&self) -> Arc<PictureIndex> {
         self.pictures.read().expect("pictures lock").clone()
     }
@@ -423,7 +428,17 @@ pub async fn monster_drops(app: AppHandle, monsters: Vec<String>) -> Result<Vec<
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<MapDataState>();
         state.refresh_drops()?;
-        Store::open(&state.path)?.drops(&monsters)
+        let mut drops = Store::open(&state.path)?.drops(&monsters)?;
+        // The drop list files everything as `etc`; the item data knows each item's kind, so the
+        // lists can group equips, use items and the rest.
+        if let Some(catalog) = state.catalog() {
+            for drop in drops.iter_mut().flat_map(|m| m.drops.iter_mut()) {
+                if let Some(item) = catalog.item_called(&drop.item) {
+                    drop.category = Some(item.kind.name().to_string());
+                }
+            }
+        }
+        Ok(drops)
     })
     .await
     .map_err(|err| Error::Invalid(err.to_string()))?

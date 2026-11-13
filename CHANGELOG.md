@@ -19,6 +19,16 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
   closes it, and **Full view** opens the tab as before.
 - **A new look.** Rounded corners, softer surfaces, pill tabs, and the desk view's panels as
   cards of their own. Routes read as a line of stops, the last one where you end up.
+- **One rule for links.** Coloured text opens a card; a row or box moves you within the tab
+  you're in, and shows a chevron. A card's **Full view** is the way into a tab. Places you headed
+  for lately are Go buttons under the search.
+- **See the map.** Map details (the Map tab, Lookup → Maps and a map's card) have a **Map**
+  section with the map's picture, its portals (hidden ones marked), NPCs and spawn points drawn
+  where they stand. Click a mark for its card; point at a monster in the list to light up where
+  it spawns. It starts folded over the game and open in the desk view, and is downloaded the
+  first time you open it.
+- **Tidier drop lists.** By item, each drop is one line under Equip, Use and Etc headings, with
+  the monsters that drop it as small pictures. By monster, each monster's items sit in one wrap.
 - **More hidden portals marked in routes.** Portals named like `h001` and `hide01`, which the game
   uses for hidden ones, are now marked hidden too, not only `h_east` style names.
 - **Florina Beach in routes.** The map data has no way into Florina Beach, because it is reached

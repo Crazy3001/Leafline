@@ -8,13 +8,25 @@
     title,
     count,
     open: startOpen = true,
+    memory,
     aside,
     children,
-  }: { title: string; count?: number | string; open?: boolean; aside?: Snippet; children: Snippet } = $props();
+  }: {
+    title: string;
+    count?: number | string;
+    open?: boolean;
+    /** What the open state is remembered by, when the title alone would share it too widely. */
+    memory?: string;
+    aside?: Snippet;
+    children: Snippet;
+  } = $props();
+
+  // svelte-ignore state_referenced_locally
+  const key = `leafline.section.${memory ?? title}`;
 
   function remembered() {
     try {
-      const value = localStorage.getItem(`leafline.section.${title}`);
+      const value = localStorage.getItem(key);
       return value === null ? null : value === "true";
     } catch {
       return null;
@@ -27,7 +39,7 @@
   function toggle() {
     open = !open;
     try {
-      localStorage.setItem(`leafline.section.${title}`, String(open));
+      localStorage.setItem(key, String(open));
     } catch {
       // A convenience only.
     }

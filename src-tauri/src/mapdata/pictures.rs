@@ -14,6 +14,8 @@ use std::path::{Path, PathBuf};
 use std::sync::{Condvar, Mutex};
 use std::time::{Duration, Instant};
 
+use image::imageops::FilterType;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tauri::Url;
 
@@ -34,6 +36,73 @@ const MAX_BYTES: u64 = 8 * 1024 * 1024;
 /// row up to [`LONGEST_WAIT`].
 const FIRST_WAIT: Duration = Duration::from_secs(60);
 const LONGEST_WAIT: Duration = Duration::from_secs(6 * 60 * 60);
+
+/// A map picture is cut to what is drawn on it and drawn at most this wide for the windows.
+const VIEW_WIDTH: u32 = 1200;
+/// Room kept around what is drawn and around every marked point, in the picture's pixels.
+const VIEW_MARGIN: i32 = 48;
+/// Darker than this, or more see-through, counts as the empty space around a map.
+const EMPTY_BELOW: u8 = 14;
+
+/// How a map's picture was cut down for the windows: the part kept, in the picture's own pixels
+/// (where OSMS's coordinates are), and the size it is drawn at.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MapView {
+    pub left: i32,
+    pub top: i32,
+    pub width: u32,
+    pub height: u32,
+    pub out_width: u32,
+    pub out_height: u32,
+}
+
+impl MapView {
+    /// Where a point of the full picture falls on the view, from 0 to 1 across and down, or
+    /// `None` when it was cut off.
+    pub fn place(&self, x: i32, y: i32) -> Option<(f64, f64)> {
+        let fx = f64::from(x - self.left) / f64::from(self.width);
+        let fy = f64::from(y - self.top) / f64::from(self.height);
+        ((0.0..=1.0).contains(&fx) && (0.0..=1.0).contains(&fy)).then_some((fx, fy))
+    }
+}
+
+/// Cuts a map's picture to what is drawn on it, keeping every marked point in view, and draws it
+/// at most [`VIEW_WIDTH`] wide as a JPEG.
+pub fn cut_map(bytes: &[u8], points: &[(i32, i32)]) -> Result<(Vec<u8>, MapView)> {
+    let picture = image::load_from_memory(bytes)?.to_rgba8();
+    let (full_w, full_h) = (picture.width() as i32, picture.height() as i32);
+    let (mut left, mut top, mut right, mut bottom) = (i32::MAX, i32::MAX, i32::MIN, i32::MIN);
+    for (x, y, pixel) in picture.enumerate_pixels().filter(|(x, y, _)| x % 2 == 0 && y % 2 == 0) {
+        let [r, g, b, a] = pixel.0;
+        if a > EMPTY_BELOW && r.max(g).max(b) > EMPTY_BELOW {
+            let (x, y) = (x as i32, y as i32);
+            (left, top, right, bottom) = (left.min(x), top.min(y), right.max(x), bottom.max(y));
+        }
+    }
+    if left > right {
+        (left, top, right, bottom) = (0, 0, full_w - 1, full_h - 1);
+    }
+    for &(x, y) in points.iter().filter(|(x, y)| (0..full_w).contains(x) && (0..full_h).contains(y)) {
+        (left, top, right, bottom) = (left.min(x), top.min(y), right.max(x), bottom.max(y));
+    }
+    let left = (left - VIEW_MARGIN).max(0);
+    let top = (top - VIEW_MARGIN).max(0);
+    let right = (right + VIEW_MARGIN).min(full_w - 1);
+    let bottom = (bottom + VIEW_MARGIN).min(full_h - 1);
+    let (width, height) = ((right - left + 1) as u32, (bottom - top + 1) as u32);
+    let cut = image::imageops::crop_imm(&picture, left as u32, top as u32, width, height).to_image();
+    let (out_width, out_height) = if width > VIEW_WIDTH {
+        (VIEW_WIDTH, ((u64::from(height) * u64::from(VIEW_WIDTH)) / u64::from(width)).max(1) as u32)
+    } else {
+        (width, height)
+    };
+    let drawn = image::imageops::resize(&cut, out_width, out_height, FilterType::Triangle);
+    let rgb = image::DynamicImage::ImageRgba8(drawn).to_rgb8();
+    let mut jpeg = Vec::new();
+    image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg, 85).encode_image(&rgb)?;
+    Ok((jpeg, MapView { left, top, width, height, out_width, out_height }))
+}
 
 /// What a picture shows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -57,6 +126,7 @@ impl PictureKind {
             "map" => Self::Map,
             "minimap" => Self::Minimap,
             "mark" => Self::Mark,
+
             _ => return None,
         })
     }
@@ -213,6 +283,35 @@ impl<S: Source> PictureCache<S> {
     fn kept(path: &Path) -> Option<Picture> {
         let bytes = std::fs::read(path).ok()?;
         Some(Picture { mime: sniff(&bytes)?, bytes })
+    }
+
+    fn view_paths(&self, url: &str) -> (PathBuf, PathBuf) {
+        let stem = self.dir.join(file_name(url));
+        (stem.with_extension("view.jpg"), stem.with_extension("view.json"))
+    }
+
+    /// A map's picture cut down for the windows (see [`cut_map`]), made once and kept. The full
+    /// picture is let go once it is cut, since only the cut one is shown.
+    pub fn map_view(&self, url: &str, points: &[(i32, i32)]) -> Result<MapView> {
+        let (picture, about) = self.view_paths(url);
+        if picture.exists()
+            && let Some(view) = std::fs::read(&about).ok().and_then(|json| serde_json::from_slice(&json).ok())
+        {
+            return Ok(view);
+        }
+        let full = self.get(url)?;
+        let (jpeg, view) = cut_map(&full.bytes, points)?;
+        let partial = picture.with_extension("part");
+        std::fs::write(&partial, &jpeg)?;
+        std::fs::rename(&partial, &picture)?;
+        std::fs::write(&about, serde_json::to_vec(&view).map_err(|err| Error::Invalid(err.to_string()))?)?;
+        let _ = std::fs::remove_file(self.path(url));
+        Ok(view)
+    }
+
+    /// The cut-down picture [`map_view`](Self::map_view) made.
+    pub fn map_view_picture(&self, url: &str) -> Option<Picture> {
+        Self::kept(&self.view_paths(url).0)
     }
 
     fn waiting(&self, url: &str) -> bool {
@@ -417,6 +516,48 @@ mod tests {
             assert_eq!(thread.join().unwrap().unwrap(), FAKE_PNG);
         }
         assert_eq!(calls.load(Ordering::SeqCst), 1);
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    /// A hand-made picture: black, with a lit block from (60, 30) to (99, 49).
+    fn fake_map() -> Vec<u8> {
+        let mut picture = image::RgbaImage::from_pixel(400, 200, image::Rgba([0, 0, 0, 255]));
+        for x in 60..100 {
+            for y in 30..50 {
+                picture.put_pixel(x, y, image::Rgba([200, 180, 90, 255]));
+            }
+        }
+        let mut png = Vec::new();
+        picture.write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png).unwrap();
+        png
+    }
+
+    #[test]
+    fn cuts_a_map_to_what_is_drawn_and_every_point() {
+        let (jpeg, view) = cut_map(&fake_map(), &[]).unwrap();
+        assert_eq!(sniff(&jpeg), Some("image/jpeg"));
+        assert_eq!((view.left, view.top), (60 - VIEW_MARGIN, 0), "the margin, held inside the picture");
+        assert_eq!(view.left + view.width as i32 - 1, 98 + VIEW_MARGIN);
+        assert_eq!((view.out_width, view.out_height), (view.width, view.height), "small enough to keep its size");
+        // A point out in the dark keeps its part of the picture; one off the picture is ignored.
+        let (_, view) = cut_map(&fake_map(), &[(300, 150), (900, 900)]).unwrap();
+        assert_eq!(view.left + view.width as i32 - 1, 300 + VIEW_MARGIN);
+        assert_eq!(view.top + view.height as i32 - 1, 150 + VIEW_MARGIN);
+        let (fx, fy) = view.place(300, 150).unwrap();
+        assert!(fx > 0.8 && fy > 0.7);
+        assert_eq!(view.place(0, 0), None, "cut off");
+    }
+
+    #[test]
+    fn keeps_a_cut_map_and_lets_the_full_picture_go() {
+        let png = fake_map();
+        let (cache, calls, dir) = cache(Some(&png), Duration::ZERO);
+        let url = "https://osmsdataexplorer.com/data/maps/fake.webp";
+        let view = cache.map_view(url, &[]).unwrap();
+        assert_eq!(cache.map_view(url, &[]).unwrap(), view);
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert!(!dir.join(file_name(url)).exists(), "only the cut picture is kept");
+        assert_eq!(cache.map_view_picture(url).unwrap().mime, "image/jpeg");
         let _ = std::fs::remove_dir_all(dir);
     }
 

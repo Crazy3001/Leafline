@@ -450,6 +450,26 @@ export interface MapExit {
   hidden: boolean;
 }
 
+/** A marker on a map's picture, placed from 0 to 1 across and down it. */
+export interface ViewPoint {
+  kind: "portal" | "npc" | "mob";
+  /** The map a portal leads to, or the NPC or monster. */
+  id: number;
+  name: string;
+  hidden: boolean;
+  /** In the data, so its card can open. */
+  known: boolean;
+  x: number;
+  y: number;
+}
+
+/** A map's picture cut to what is drawn, at the size it is drawn, with its markers. */
+export interface MapPicture {
+  width: number;
+  height: number;
+  points: ViewPoint[];
+}
+
 export interface MapDetails {
   map: MapRef;
   region: string | null;

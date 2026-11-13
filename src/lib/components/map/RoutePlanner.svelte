@@ -13,8 +13,7 @@
   let {
     from,
     region = null,
-    onnavigate,
-  }: { from: MapRef; region?: string | null; onnavigate: (id: number) => void } = $props();
+  }: { from: MapRef; region?: string | null } = $props();
 
   let target = $state<MapRef | null>(null);
   let route = $state<MapRoute | null>(null);
@@ -45,7 +44,7 @@
     <button class="clear" title="Clear the route" onclick={() => (target = null)}><X size={12} /></button>
   </div>
   {#if route}
-    <RouteSteps {route} {onnavigate} />
+    <RouteSteps {route} />
   {:else if !loading}
     <p class="note">
       {#if region === "Maple Island"}

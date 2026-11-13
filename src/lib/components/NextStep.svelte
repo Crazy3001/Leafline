@@ -65,11 +65,7 @@
 </script>
 
 {#snippet name(place: Destination)}
-  {#if hud}
-    <span class="who" class:npc={place.kind === "npc"}>{place.name}</span>
-  {:else}
-    <Ref kind={place.kind === "npc" ? "npc" : "map"} id={place.kind === "npc" ? null : place.maps[0].id} name={place.name} />
-  {/if}
+  <Ref kind={place.kind === "npc" ? "npc" : "map"} id={place.kind === "npc" ? null : place.maps[0].id} name={place.name} icon={!hud} />
 {/snippet}
 
 {#if trip.offer}
@@ -111,7 +107,7 @@
             <span class="verb">{stepVerb(step)}</span>
           {/if}
           <span class="arrow">→</span>
-          <span class="map">{step.to.name}</span>
+          {#if step.to.known}<Ref kind="map" id={step.to.id} name={step.to.name} icon={false} />{:else}<span class="map">{step.to.name}</span>{/if}
           {#if step.travel?.fare}<span class="faint tabular fare">{formatNumber(step.travel.fare)} mesos</span>{/if}
         {:else if trip.lost}
           <span class="label">No known way</span>
@@ -337,7 +333,7 @@
   }
 
   .map {
-    color: var(--ref-map);
+    color: var(--text);
   }
 
   .fare {
@@ -376,14 +372,6 @@
 
   .offer .icon {
     margin-top: 0;
-  }
-
-  .who {
-    color: var(--ref-map);
-  }
-
-  .who.npc {
-    color: var(--ref-npc);
   }
 
   .faint {

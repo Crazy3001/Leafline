@@ -12,15 +12,16 @@ use serde::Serialize;
 
 use super::drops::{Drop, Dropper, MonsterDrops};
 use super::osms::{
-    Dataset, FILES, FileMeta, Height, Ingredient, ItemKind, ItemNeed, ItemRecord, MapRecord, Meta, MobRequirement, MonsterDetails,
-    MonsterRecord, NpcRecord, Portal, QuestRecord, Records, RecipeRecord, RewardItem, Side, SkillNeed, SkillRecord, Spawn,
+    Dataset, FILES, FileMeta, Height, Ingredient, ItemKind, ItemNeed, ItemRecord, MapPoint, MapRecord, Meta, MobRequirement,
+    MonsterDetails, MonsterRecord, NpcRecord, PointKind, Portal, QuestRecord, Records, RecipeRecord, RewardItem, Side, SkillNeed,
+    SkillRecord, Spawn,
 };
 use super::layout::{Layouts, MapLayout};
 use super::turnins::TurnIn;
 use crate::error::{Error, Result};
 
 /// Bump when the tables change; an older cache is then dropped and downloaded again.
-const CACHE_VERSION: i32 = 11;
+const CACHE_VERSION: i32 = 12;
 
 const SCHEMA: &str = "
 CREATE TABLE source_files (
@@ -31,6 +32,9 @@ CREATE TABLE maps (
     id INTEGER PRIMARY KEY, name TEXT NOT NULL, street TEXT, region TEXT,
     is_town INTEGER NOT NULL, return_map_id INTEGER, map_mark TEXT, minimap_url TEXT, render_url TEXT, map_mark_url TEXT);
 CREATE TABLE map_exits (map_id INTEGER NOT NULL, dest_map_id INTEGER NOT NULL, PRIMARY KEY (map_id, dest_map_id));
+CREATE TABLE map_points (
+    map_id INTEGER NOT NULL, kind INTEGER NOT NULL, ref_id INTEGER NOT NULL, name TEXT, x INTEGER NOT NULL, y INTEGER NOT NULL);
+CREATE INDEX map_points_by_map ON map_points (map_id);
 CREATE TABLE portals (
     map_id INTEGER NOT NULL, seq INTEGER NOT NULL, name TEXT NOT NULL,
     dest_map_id INTEGER, dest_portal TEXT, side INTEGER, height INTEGER, PRIMARY KEY (map_id, seq));
@@ -120,7 +124,7 @@ const CLASS_SEPARATOR: &str = ",";
 /// The tables that hold each OSMS file, cleared before the file is stored again.
 fn tables_of(file: &str) -> &'static [&'static str] {
     match file {
-        "maps.json" => &["maps", "map_exits", "portals"],
+        "maps.json" => &["maps", "map_exits", "portals", "map_points"],
         "monsters.json" => &["monsters", "spawns"],
         "npcs.json" => &["npcs", "npc_maps"],
         "quests.json" => &["quests", "quest_mobs", "quest_rewards", "quest_items", "quest_follows"],
@@ -458,9 +462,28 @@ impl Store {
                 minimap_url: row.get(7)?,
                 render_url: row.get(8)?,
                 map_mark_url: row.get(9)?,
+                points: Vec::new(),
             })
         })?;
         Ok(maps.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// A map's portals, NPCs and spawn points at their places on its picture, in file order.
+    pub fn map_points(&self, map: u32) -> Result<Vec<MapPoint>> {
+        let mut stmt =
+            self.conn.prepare("SELECT kind, ref_id, name, x, y FROM map_points WHERE map_id = ?1 ORDER BY rowid")?;
+        let rows = stmt.query_map([map], |row| {
+            let kind: u32 = row.get(0)?;
+            Ok((kind, MapPoint { kind: PointKind::Portal, id: row.get(1)?, name: row.get(2)?, x: row.get(3)?, y: row.get(4)? }))
+        })?;
+        let mut points = Vec::new();
+        for row in rows {
+            let (kind, mut point) = row?;
+            let Some(kind) = PointKind::ALL.get(kind as usize) else { continue };
+            point.kind = *kind;
+            points.push(point);
+        }
+        Ok(points)
     }
 
     fn load_monsters(&self) -> Result<Vec<MonsterRecord>> {
@@ -831,6 +854,8 @@ fn insert_maps(tx: &Transaction, maps: &[MapRecord]) -> Result<()> {
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
     )?;
     let mut exit = tx.prepare("INSERT OR IGNORE INTO map_exits (map_id, dest_map_id) VALUES (?1, ?2)")?;
+    let mut point =
+        tx.prepare("INSERT INTO map_points (map_id, kind, ref_id, name, x, y) VALUES (?1, ?2, ?3, ?4, ?5, ?6)")?;
     let mut portal = tx.prepare(
         "INSERT INTO portals (map_id, seq, name, dest_map_id, dest_portal, side, height)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
@@ -839,6 +864,9 @@ fn insert_maps(tx: &Transaction, maps: &[MapRecord]) -> Result<()> {
         map.execute(params![m.id, m.name, m.street_name, m.region, m.is_town, m.return_map_id, m.map_mark, m.minimap_url, m.render_url, m.map_mark_url])?;
         for dest in &m.exits {
             exit.execute(params![m.id, dest])?;
+        }
+        for p in &m.points {
+            point.execute(params![m.id, p.kind as i64, p.id, p.name, p.x, p.y])?;
         }
         // Portals that lead nowhere (spawn points, scripted ones) say nothing about the way out.
         for (seq, p) in m.portals.iter().filter(|p| p.dest_map_id.is_some()).enumerate() {
@@ -1030,6 +1058,29 @@ mod tests {
         let store = Store::init(older_cache(A_FILE)).unwrap();
         assert!(store.wants_maps().unwrap());
         assert!(!store.wants_drops().unwrap(), "the drop table was never asked for");
+    }
+
+    #[test]
+    fn keeps_a_maps_points_apart_and_gives_them_back_in_order() {
+        // A made-up map in OSMS's shape: a portal that leads somewhere, a spawn point, an NPC, a monster.
+        let json = br#"[{"id": 7, "name": "Fernway Path", "portals": [
+            {"name": "h_east00", "x": 10, "y": 20, "dest_map_id": 8}, {"name": "sp", "x": 1, "y": 2}],
+            "npcs": [{"npc_id": 50, "x": 30, "y": 40}], "mobs": [{"mob_id": 3, "x": 50, "y": 60}]}]"#;
+        let Records::Maps(maps) = Records::parse("maps.json", json).unwrap() else { panic!() };
+        let mut store = Store::open_in_memory().unwrap();
+        let tx = store.conn.transaction().unwrap();
+        insert_maps(&tx, &maps).unwrap();
+        tx.commit().unwrap();
+        let points: Vec<_> = store.map_points(7).unwrap().into_iter().map(|p| (p.kind, p.id, p.name, p.x, p.y)).collect();
+        assert_eq!(
+            points,
+            [
+                (PointKind::Portal, 8, Some("h_east00".to_string()), 10, 20),
+                (PointKind::Npc, 50, None, 30, 40),
+                (PointKind::Mob, 3, None, 50, 60),
+            ]
+        );
+        assert!(store.map_points(8).unwrap().is_empty());
     }
 
     #[test]

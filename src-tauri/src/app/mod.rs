@@ -233,6 +233,7 @@ pub fn run() {
             mapdata::find_npc,
             mapdata::npc_sheet,
             mapdata::show_place,
+            pictures::map_picture,
             nav::destination,
             nav::set_destination,
             nav::arrive_at,

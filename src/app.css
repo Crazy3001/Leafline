@@ -251,6 +251,38 @@ button {
   font-weight: 400;
 }
 
+/*
+ * A row or box that moves you within the tab you're in (a search result, a list to open):
+ * a hover fill and a chevron, so it never reads as a link. Coloured text opens a card instead.
+ */
+.nav-row {
+  position: relative;
+}
+
+.nav-row::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  width: 6px;
+  height: 6px;
+  border-top: 1.5px solid currentColor;
+  border-right: 1.5px solid currentColor;
+  color: var(--faint);
+  opacity: 0.45;
+  transform: translateY(-50%) rotate(45deg);
+  transition:
+    opacity 0.12s ease,
+    right 0.12s ease;
+}
+
+.nav-row:hover::after,
+.nav-row:focus-visible::after {
+  right: 8px;
+  color: var(--text);
+  opacity: 1;
+}
+
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;

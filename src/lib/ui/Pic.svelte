@@ -1,6 +1,8 @@
 <script lang="ts">
   // A game picture, or nothing at all when pictures are off or this one is missing, so the name
   // beside it stands alone. Small icons sit in line with text; big ones fill a card's frame.
+  import type { Snippet } from "svelte";
+
   import { markMissing, pictureMissing, pictureUrl, type PictureKind } from "$lib/pictures";
 
   let {
@@ -11,6 +13,7 @@
     fit = "contain",
     class: extra = "",
     onstate,
+    fallback,
   }: {
     kind: PictureKind;
     id?: number | null;
@@ -22,6 +25,8 @@
     class?: string;
     /** Told whether the picture showed, for a frame that hides itself without one. */
     onstate?: (shown: boolean) => void;
+    /** Shown instead when there is no picture: pictures off, none in the data, or it failed. */
+    fallback?: Snippet;
   } = $props();
 
   const src = $derived(pictureUrl(kind, id ?? name));
@@ -51,6 +56,8 @@
       failed = src;
     }}
   />
+{:else if fallback}
+  {@render fallback()}
 {/if}
 
 <style>

@@ -99,7 +99,7 @@
     <p class="note">No route through portals is known from {from.name}.</p>
   {/if}
   {#if ground}
-    <Ref kind="map" id={ground.map.id} class="more">Open {ground.map.name}</Ref>
+    <p class="open">More on <Ref kind="map" id={ground.map.id} name={ground.map.name} /></p>
   {/if}
 {/if}
 
@@ -216,6 +216,12 @@
     color: var(--muted);
     font-size: var(--text-xs);
     cursor: pointer;
+  }
+
+  .open {
+    margin: 6px 0 0;
+    color: var(--faint);
+    font-size: var(--text-xs);
   }
 
   .more:hover,

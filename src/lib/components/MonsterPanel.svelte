@@ -169,7 +169,7 @@
   <ul class="rows">
     {#each list as mob (mob.id)}
       <li>
-        <button class="row" onclick={() => openMonster(mob.id)}>
+        <button class="row nav-row" onclick={() => openMonster(mob.id)}>
           {@render name(mob)}
           {@render numbers(mob)}
           {#if mob.note}<span class="note">{mob.note}</span>{/if}
@@ -184,7 +184,7 @@
   <ul class="rows">
     {#each list as mob (mob.id)}
       <li>
-        <button class="row" onclick={() => openMonster(mob.id)}>
+        <button class="row nav-row" onclick={() => openMonster(mob.id)}>
           {@render name(mob)}
           {@render numbers(mob)}
         </button>
@@ -336,8 +336,9 @@
     column-gap: 6px;
     align-items: baseline;
     width: 100%;
-    padding: 4px;
+    padding: 4px 24px 4px 4px;
     border: 0;
+    border-radius: var(--radius-sm);
     background: transparent;
     color: var(--muted);
     font-size: var(--text-sm);

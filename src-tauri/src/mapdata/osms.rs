@@ -3,8 +3,9 @@
 //! Only the fields listed here are read. Picture addresses (`icon_url`, `minimap_url`,
 //! `render_url`) are kept so the picture cache can download a picture the first time one is
 //! shown (allowed since 2026-11-13); the pictures themselves never pass through here.
-//! Coordinates are read only to tell which third of its map a portal stands in, and are dropped
-//! as the file is parsed.
+//! Coordinates tell which third of its map a portal stands in, and since 2026-11-13 are kept as
+//! [`MapPoint`]s too, to mark portals, NPCs and spawns on the map's picture. They are the
+//! picture's own pixels.
 
 use std::collections::HashMap;
 
@@ -107,6 +108,32 @@ struct RawPortal {
 struct Point {
     x: Option<i32>,
     y: Option<i32>,
+    mob_id: Option<u32>,
+    npc_id: Option<u32>,
+}
+
+/// What stands at a point on a map.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum PointKind {
+    Portal,
+    Npc,
+    Mob,
+}
+
+impl PointKind {
+    pub const ALL: [Self; 3] = [Self::Portal, Self::Npc, Self::Mob];
+}
+
+/// A portal that leads somewhere, an NPC or a spawn point, at its place on the map's picture.
+/// `id` is the map a portal leads to, or the NPC or monster; `name` a portal's own name.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MapPoint {
+    pub kind: PointKind,
+    pub id: u32,
+    pub name: Option<String>,
+    pub x: i32,
+    pub y: i32,
 }
 
 /// The lowest and highest of `values`, if they spread far enough to mean anything.
@@ -141,6 +168,19 @@ impl From<RawMap> for MapRecord {
                 height: p.y.zip(down).map(|(y, range)| Height::ALL[third(y, range)]),
             })
             .collect();
+        let mut points: Vec<MapPoint> = raw
+            .portals
+            .iter()
+            .filter_map(|p| {
+                let dest = p.dest_map_id.filter(|d| *d != NO_MAP)?;
+                Some(MapPoint { kind: PointKind::Portal, id: dest, name: Some(p.name.clone()), x: p.x?, y: p.y? })
+            })
+            .collect();
+        let placed = |kind: PointKind, id: Option<u32>, p: &Point| {
+            Some(MapPoint { kind, id: id?, name: None, x: p.x?, y: p.y? })
+        };
+        points.extend(raw.npcs.iter().filter_map(|p| placed(PointKind::Npc, p.npc_id, p)));
+        points.extend(raw.mobs.iter().filter_map(|p| placed(PointKind::Mob, p.mob_id, p)));
         Self {
             id: raw.id,
             name: raw.name,
@@ -154,6 +194,7 @@ impl From<RawMap> for MapRecord {
             minimap_url: raw.minimap_url,
             render_url: raw.render_url,
             map_mark_url: raw.map_mark_url,
+            points,
         }
     }
 }
@@ -176,6 +217,9 @@ pub struct MapRecord {
     pub render_url: Option<String>,
     /// Where OSMS publishes the emblem of the area it is in.
     pub map_mark_url: Option<String>,
+    /// Portals, NPCs and spawn points at their places. Filled as the file is read and stored
+    /// apart; the cache loads maps without them (see `Store::map_points`).
+    pub points: Vec<MapPoint>,
 }
 
 /// A portal's name, where it leads, and roughly where it stands: which third of the map across
@@ -848,6 +892,9 @@ mod tests {
         assert_eq!(maps[0].street_name.as_deref(), Some("Mossy Road"));
         assert_eq!(maps[0].minimap_url.as_deref(), Some("https://example.invalid/m.png"));
         assert_eq!(maps[0].render_url, None);
+        // The portal that leads somewhere and the monster, at their places; the spawn point not.
+        let points: Vec<_> = maps[0].points.iter().map(|p| (p.kind, p.id, p.x, p.y)).collect();
+        assert_eq!(points, [(PointKind::Portal, 8, 10, 20), (PointKind::Mob, 1, 5, 6)]);
     }
 
     fn portals_of(json: &[u8]) -> Vec<Portal> {

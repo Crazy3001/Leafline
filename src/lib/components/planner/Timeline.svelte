@@ -250,7 +250,7 @@
   }
 
   .line.gear {
-    color: var(--ref-item);
+    color: var(--text);
   }
 
   .tick {

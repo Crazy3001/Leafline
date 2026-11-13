@@ -7,7 +7,8 @@ use std::collections::{BTreeMap, HashMap, VecDeque};
 use serde::{Deserialize, Serialize};
 use strsim::normalized_levenshtein;
 
-use super::osms::{Dataset, Height, MapRecord, MonsterRecord, NO_MAP, QuestRecord, Side};
+use super::osms::{Dataset, Height, MapPoint, MapRecord, MonsterRecord, NO_MAP, PointKind, QuestRecord, Side};
+use super::pictures::MapView;
 use super::shops::{PlacedShop, Shop, ShopRecord};
 use super::travel::{Travel, TravelKind, TravelLink};
 use super::turnins;
@@ -80,6 +81,23 @@ pub struct MapMatch {
     pub card: MapCard,
     /// Other maps that matched nearly as well, such as maps sharing the name.
     pub alternatives: Vec<MapRef>,
+}
+
+/// A marker on a map's picture: a portal (`id` the map it leads to), an NPC or a spawn point,
+/// placed from 0 to 1 across and down the picture as the windows draw it.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ViewPoint {
+    pub kind: PointKind,
+    pub id: u32,
+    /// Where a portal leads, or who stands or spawns there.
+    pub name: String,
+    /// A portal the game hides.
+    pub hidden: bool,
+    /// The map, NPC or monster is in the data, so its card can open.
+    pub known: bool,
+    pub x: f64,
+    pub y: f64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -655,6 +673,31 @@ impl Atlas {
         visits
     }
 
+    /// A map's points as markers on its cut picture, named; ones the cut left out are dropped.
+    pub fn view_points(&self, points: &[MapPoint], view: &MapView) -> Vec<ViewPoint> {
+        points
+            .iter()
+            .filter_map(|p| {
+                let (x, y) = view.place(p.x, p.y)?;
+                let (name, known, hidden) = match p.kind {
+                    PointKind::Portal => {
+                        let to = self.map_ref(p.id);
+                        (to.name, to.known, p.name.as_deref().is_some_and(|n| Direction::of_portal(n).1))
+                    }
+                    PointKind::Npc => match self.npc_names.get(&p.id) {
+                        Some(name) => (name.clone(), true, false),
+                        None => ("NPC".into(), false, false),
+                    },
+                    PointKind::Mob => match self.monsters.get(&p.id) {
+                        Some(mob) => (mob.name.clone(), true, false),
+                        None => ("Monster".into(), false, false),
+                    },
+                };
+                Some(ViewPoint { kind: p.kind, id: p.id, name, hidden, known, x, y })
+            })
+            .collect()
+    }
+
     pub(super) fn map_ref(&self, id: u32) -> MapRef {
         match self.maps.get(&id) {
             Some(m) => MapRef { id, name: m.name.clone(), street: m.street_name.clone(), known: true },
@@ -797,6 +840,29 @@ fn lookalike(s: &str) -> String {
 #[cfg(test)]
 pub(crate) mod tests {
     #[test]
+    fn names_and_places_the_points_on_a_maps_picture() {
+        let atlas = world();
+        let view = MapView { left: 100, top: 0, width: 200, height: 100, out_width: 200, out_height: 100 };
+        let point = |kind, id, name: Option<&str>, x| MapPoint { kind, id, name: name.map(str::to_string), x, y: 50 };
+        let points = [
+            point(PointKind::Portal, 3, Some("h_east00"), 300),
+            point(PointKind::Npc, 50, None, 200),
+            point(PointKind::Mob, 10, None, 100),
+            point(PointKind::Mob, 10, None, 50),
+        ];
+        let marks: Vec<_> = atlas.view_points(&points, &view).into_iter().map(|p| (p.name, p.hidden, p.known, p.x)).collect();
+        assert_eq!(
+            marks,
+            [
+                ("Mossbank Meadow II".to_string(), true, true, 1.0),
+                ("Warden Ilse".to_string(), false, true, 0.5),
+                ("Pebble Snail".to_string(), false, true, 0.0),
+            ],
+            "the last spawn point was cut off"
+        );
+    }
+
+    #[test]
     fn portal_names_that_mark_hidden_portals() {
         for name in ["h_east00", "hide01", "h001", "h000", "H004"] {
             assert!(Direction::of_portal(name).1, "{name}");
@@ -879,6 +945,7 @@ pub(crate) mod tests {
             minimap_url: None,
             render_url: None,
             map_mark_url: None,
+            points: vec![],
         }
     }
 

@@ -9,6 +9,8 @@
   import { showNpcNamed } from "$lib/places.svelte";
   import type { MapDetails, MapRef } from "$lib/types";
   import ConnectionCompass from "./ConnectionCompass.svelte";
+  import MapPicture from "./MapPicture.svelte";
+  import { display } from "$lib/settings.svelte";
   import MapDrops from "./MapDrops.svelte";
   import ShopStock from "../item/ShopStock.svelte";
   import RouteFromHere from "./RouteFromHere.svelte";
@@ -49,6 +51,10 @@
     ].filter((f): f is string => !!f),
   );
   const monsterNames = $derived([...new Set(details.mobs.map((m) => m.name))]);
+  /** The desk view has room for the map's picture; over the game it waits to be opened. */
+  const desk = typeof location !== "undefined" && location.pathname.startsWith("/desk");
+  /** The monster under the pointer in the list, whose spawn points stand out on the picture. */
+  let hovered = $state<string | null>(null);
 </script>
 
 {#if facts.length || details.returnMap}
@@ -57,15 +63,21 @@
     {#if details.returnMap}
       <span class="return">
         Returns to
-        <button class="inline ref ref-map" onclick={() => onnavigate(details.returnMap!.id)}>{details.returnMap.name}</button>
+        <Ref kind="map" id={details.returnMap.id} name={details.returnMap.name} />
       </span>
     {/if}
   </div>
 {/if}
 
+{#if display.showPictures}
+  <Section title="Map" memory="map-picture-{desk ? 'desk' : 'overlay'}" open={desk}>
+    <MapPicture mapId={details.map.id} highlight={hovered} />
+  </Section>
+{/if}
+
 {#if away}
   <Section title="Route from your map">
-    <RouteFromHere from={away} to={details.map} {onnavigate} />
+    <RouteFromHere from={away} to={details.map} />
   </Section>
 {/if}
 
@@ -89,7 +101,7 @@
       </thead>
       <tbody>
         {#each details.mobs as mob (mob.id)}
-          <tr>
+          <tr onmouseenter={() => (hovered = mob.name)} onmouseleave={() => (hovered = null)}>
             <td class="mob">
               <Ref kind="mob" id={mob.id} name={monsterLabel(mob.name)} />
               {#if mob.boss}<span class="boss" title="Boss"><Skull size={11} /></span>{/if}
@@ -181,7 +193,7 @@
 
 {#if !away}
   <Section title="Route" open={!compact}>
-    <RoutePlanner from={details.map} region={details.region} {onnavigate} />
+    <RoutePlanner from={details.map} region={details.region} />
   </Section>
 {/if}
 
@@ -224,7 +236,7 @@
     color: var(--faint);
   }
 
-  .inline {
+  .return :global(.ref) {
     font-size: var(--text-xs);
   }
 

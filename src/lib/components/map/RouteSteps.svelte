@@ -3,6 +3,7 @@
   // scrolls, when the player turned them on, stand apart from portal steps.
   import { CarTaxiFront, EyeOff, Plane, ScrollText } from "@lucide/svelte";
 
+  import Ref from "$lib/components/Ref.svelte";
   import { formatNumber } from "$lib/format";
   import type { MapRoute } from "$lib/types";
 
@@ -13,14 +14,7 @@
   }
   import { stepVerb as verb } from "$lib/wayfinding";
 
-  let {
-    route,
-    onnavigate,
-  }: {
-    route: MapRoute;
-    /** Opens a map named in a step; without it the names are plain text. */
-    onnavigate?: (id: number) => void;
-  } = $props();
+  let { route }: { route: MapRoute } = $props();
 
   const rides =$derived(route.steps.filter((s) => s.travel).length);
   const portals = $derived(route.steps.length - rides);
@@ -44,11 +38,9 @@
             {#if step.hidden}<span class="hidden" title="The portal's name marks it as hidden"><EyeOff size={11} /></span>{/if}
           {/if}
           <span class="arrow">→</span>
-          {#if onnavigate}
-            <button class="map" onclick={() => onnavigate(step.to.id)}>{step.to.name}</button>
-          {:else}
-            <span class="map">{step.to.name}</span>
-          {/if}
+          {#if step.to.known}<Ref kind="map" id={step.to.id} name={step.to.name} class="step-map" />{:else}<span class="map"
+              >{step.to.name}</span
+            >{/if}
           {#if step.travel?.fare}
             <span class="fare tabular" title="Fare at level 20 and up, as players recorded it on mapleclassic.wiki"
               >{formatNumber(step.travel.fare)} mesos</span
@@ -186,21 +178,9 @@
     color: var(--faint);
   }
 
-  .map {
-    padding: 0;
-    border: 0;
-    background: transparent;
+  .map,
+  .text :global(.step-map) {
     font-weight: 500;
-    text-align: left;
-  }
-
-  button.map {
-    cursor: pointer;
-  }
-
-  button.map:hover {
-    color: var(--map);
-    text-decoration: underline;
   }
 
   .note {

@@ -273,7 +273,7 @@
         <ul class="results">
           {#each page.items as item (item.id)}
             <li>
-              <button onclick={() => (itemView.id = item.id)}>
+              <button class="nav-row" onclick={() => (itemView.id = item.id)}>
                 <span class="row-name"
                   ><Pic kind="item" id={item.id} size={18} class="row-pic" />{item.name}{#if gender(item)}<small>{gender(item)}</small>{/if}</span
                 >
@@ -366,8 +366,9 @@
     display: grid;
     gap: 1px;
     width: 100%;
-    padding: 5px 4px;
+    padding: 6px 24px 6px 6px;
     border: 0;
+    border-radius: var(--radius-sm);
     background: transparent;
     text-align: left;
     cursor: pointer;

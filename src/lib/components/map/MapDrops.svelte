@@ -1,16 +1,15 @@
 <script lang="ts">
-  // Every known drop of this map's monsters: by item, with who drops it, or by monster, each
-  // opening to its own drops. The first open downloads Leafline's drop list if it isn't here yet;
-  // lookups stay on this PC.
+  // Every known drop of this map's monsters, one line each: by item, grouped by kind, with the
+  // monsters that drop it as small pictures; or by monster, each with its items. The first open
+  // downloads Leafline's drop list if it isn't here yet; lookups stay on this PC.
+  import IconRef from "$lib/components/IconRef.svelte";
   import Ref from "$lib/components/Ref.svelte";
-  import { ChevronRight, LoaderCircle, RefreshCw } from "@lucide/svelte";
+  import { LoaderCircle, RefreshCw } from "@lucide/svelte";
   import { untrack } from "svelte";
 
   import { backend } from "$lib/api";
   import Segmented from "$lib/ui/Segmented.svelte";
-  import { showItemNamed } from "$lib/items.svelte";
   import { DROPS_CREDIT, DROPS_URL } from "$lib/mapdata.svelte";
-  import { showMonsterNamed } from "$lib/monsters.svelte";
   import type { MonsterDrops } from "$lib/types";
 
   type Drop = MonsterDrops["drops"][number];
@@ -41,8 +40,6 @@
   }
 
   let view = $state<View>(rememberedView());
-  /** Monsters opened in the by-monster view. */
-  let opened = $state<string[]>([]);
 
   function setView(next: View) {
     view = next;
@@ -51,10 +48,6 @@
     } catch {
       // A convenience only.
     }
-  }
-
-  function toggle(monster: string) {
-    opened = opened.includes(monster) ? opened.filter((m) => m !== monster) : [...opened, monster];
   }
 
   let drops = $state<MonsterDrops[] | null>(null);
@@ -66,7 +59,6 @@
     void monsters.join("|");
     drops = null;
     error = null;
-    opened = [];
     untrack(load);
   });
 
@@ -89,6 +81,27 @@
     for (const item of list) item.sources.sort((a, b) => (b.rate ?? -1) - (a.rate ?? -1));
     return list.sort((a, b) => best(b) - best(a));
   });
+
+  /** The kinds items are grouped under, in this order; anything else goes last as Other. */
+  const KINDS: { id: string; label: string }[] = [
+    { id: "equip", label: "Equip" },
+    { id: "use", label: "Use" },
+    { id: "scroll", label: "Scrolls" },
+    { id: "setup", label: "Set-up" },
+    { id: "etc", label: "Etc" },
+  ];
+
+  const isMeso = (item: { name?: string; item?: string; category: string | null }) => item.category === "meso";
+
+  /** The items under quiet headings, mesos apart; a heading with nothing under it is left out. */
+  const groups = $derived.by(() => {
+    const known = new Set(KINDS.map((k) => k.id));
+    const list = items.filter((i) => !isMeso(i));
+    const out = KINDS.map((k) => ({ label: k.label, items: list.filter((i) => i.category === k.id) }));
+    out.push({ label: "Other", items: list.filter((i) => !i.category || !known.has(i.category)) });
+    return out.filter((g) => g.items.length);
+  });
+  const mesos = $derived(items.find(isMeso) ?? null);
 
   /** Each monster with its drops, the best rate first, in the map's own order. */
   const byMonster = $derived(
@@ -133,17 +146,6 @@
     if (drop.minQuantity == null || drop.maxQuantity == null) return "";
     return ` ×${drop.minQuantity === drop.maxQuantity ? drop.minQuantity : `${drop.minQuantity}–${drop.maxQuantity}`}`;
   }
-
-  /** How solid a rate is, for the tooltip. */
-  function evidence(drop: Drop) {
-    return [
-      drop.rateLow != null && drop.rateHigh != null ? `Likely between ${drop.rateLow}% and ${drop.rateHigh}%` : null,
-      drop.sampleKills ? `${drop.sampleKills.toLocaleString()} kills logged` : null,
-      drop.gameVersion && `v${drop.gameVersion}`,
-    ]
-      .filter(Boolean)
-      .join(" · ");
-  }
 </script>
 
 {#if drops}
@@ -153,71 +155,49 @@
   {#if items.length && view === "monster"}
     <ul class="monsters">
       {#each byMonster as entry (entry.monster)}
-        {@const open = opened.includes(entry.monster)}
         <li>
-          {#if entry.drops.length}
-            <!-- The name opens the monster in Lookup; the rest of the row opens its drops. -->
-            <div class="mob-head">
-              <button class="chevron-button" aria-expanded={open} aria-label="Drops of {entry.monster}" onclick={() => toggle(entry.monster)}>
-                <span class="chevron" class:open><ChevronRight size={12} /></span>
-              </button>
-              <Ref kind="mob" name={entry.monster} class="mob-name" />
-              <button class="row-rest" tabindex="-1" onclick={() => toggle(entry.monster)}>
-                <span class="summary tabular">{entry.summary}</span>
-              </button>
-            </div>
-            {#if open}
-              <ul class="mob-drops">
-                {#each entry.drops as drop (drop.item)}
-                  <li class:unmeasured={drop.rate == null} title={evidence(drop)}>
-                    {#if drop.category === "meso"}
-                      <span class="name mesos">{drop.item}</span>
-                    {:else}
-                      <Ref kind="item" name={drop.item} class="name" />
-                    {/if}
-                    {#if drop.quest}<span class="tag">quest</span>{/if}
-                    <span class="rate tabular">{percent(drop.rate)}{quantity(drop)}</span>
-                  </li>
-                {/each}
-                {#if entry.sampleKills != null && entry.sampleKills < FEW_KILLS}
-                  <li class="card-link faint">Only {entry.sampleKills} kills logged</li>
-                {/if}
-              </ul>
-            {/if}
-          {:else}
-            <div class="mob-head empty">
-              <span class="chevron"></span>
-              <span class="mob-name">{entry.monster}</span>
-              <span class="summary">nothing logged yet</span>
-            </div>
+          <div class="mob-head" class:empty={!entry.drops.length}>
+            <Ref kind="mob" name={entry.monster} class="mob-name" />
+            <span class="summary tabular">{entry.drops.length ? entry.summary : "nothing logged yet"}</span>
+          </div>
+          {#if entry.drops.some((d) => !isMeso(d))}
+            <ul class="wrap">
+              {#each entry.drops.filter((d) => !isMeso(d)) as drop (drop.item)}
+                <li>
+                  <Ref kind="item" name={drop.item} />{#if drop.quest}<span class="tag">quest</span>{/if}{#if drop.rate != null}<span
+                      class="rate tabular">{percent(drop.rate)}</span
+                    >{/if}
+                </li>
+              {/each}
+            </ul>
           {/if}
         </li>
       {/each}
     </ul>
   {:else if items.length}
-    <ul class="items">
-      {#each items as item (item.name)}
-        <li>
-          <div class="item">
-            {#if item.category === "meso"}
-              <span class="name mesos">{item.name}</span>
-            {:else}
-              <Ref kind="item" name={item.name} class="name" />
-            {/if}
-            {#if item.quest}<span class="tag">quest</span>{/if}
-            {#if item.category}<span class="cat">{item.category}</span>{/if}
-          </div>
-          <div class="sources">
-            {#each item.sources as source (source.monster)}
-              <span class="source" class:unmeasured={source.rate == null} title={evidence(source)}>
-                <Ref kind="mob" name={source.monster} class="monster" />
-                <span class="rate tabular">{percent(source.rate)}{quantity(source)}</span>
-              </span>
-            {/each}
-          </div>
-        </li>
-      {/each}
-    </ul>
+    {#if mesos}
+      <p class="meso-line">
+        <span class="mesos">Mesos</span>
+        <span class="droppers">
+          {#each mesos.sources as source (source.monster)}<IconRef kind="mob" name={source.monster} />{/each}
+        </span>
+      </p>
+    {/if}
+    {#each groups as group (group.label)}
+      <h4 class="kind">{group.label} <span class="tabular">{group.items.length}</span></h4>
+      <ul class="items">
+        {#each group.items as item (item.name)}
+          <li>
+            <span class="item"
+              ><Ref kind="item" name={item.name} />{#if item.quest}<span class="tag">quest</span>{/if}</span
+            >
+            <span class="droppers">
+              {#each item.sources as source (source.monster)}<IconRef kind="mob" name={source.monster} />{/each}
+            </span>
+          </li>
+        {/each}
+      </ul>
+    {/each}
   {:else}
     <p class="note">No drops logged for this map's monsters yet.</p>
   {/if}
@@ -242,6 +222,25 @@
 {/if}
 
 <style>
+  /* A quiet heading over each kind of item, so no row has to say what it is. */
+  .kind {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin: 10px 0 2px;
+    color: var(--faint);
+    font-family: var(--font-display);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .kind span {
+    font-weight: 400;
+    letter-spacing: 0;
+  }
+
   .items {
     display: grid;
     margin: 0;
@@ -249,9 +248,14 @@
     list-style: none;
   }
 
-  /* Each drop ruled off from the next, so its name and the monsters under it read as one entry. */
-  .items > li {
-    padding: 5px 0;
+  /* One line an item: its picture and name, then who drops it as small pictures. */
+  .items > li,
+  .meso-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 30px;
+    padding: 2px 0;
   }
 
   .items > li + li {
@@ -260,111 +264,80 @@
 
   .item {
     display: flex;
-    align-items: baseline;
+    flex: 1;
+    align-items: center;
     gap: 4px;
+    min-width: 0;
+    overflow: hidden;
     font-size: var(--text-sm);
+    white-space: nowrap;
   }
 
-  .name {
+  .item :global(.ref) {
     min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .droppers {
+    display: flex;
+    flex: none;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 2px;
+    max-width: 55%;
+  }
+
+  .meso-line {
+    margin: 0;
+  }
+
+  .meso-line .mesos {
+    flex: 1;
     font-size: var(--text-sm);
     font-weight: 600;
-  }
-
-  .sources {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0 10px;
-    font-size: var(--text-xs);
-  }
-
-  .source {
-    display: inline-flex;
-    align-items: baseline;
-    gap: 4px;
   }
 
   .mesos {
     color: var(--mesos);
   }
 
-  .sources :global(.ref.monster) {
-    font-size: var(--text-xs);
-  }
-
   .rate {
-    color: var(--text);
-    font-weight: 600;
+    margin-left: 4px;
+    color: var(--muted);
+    font-size: var(--text-xs);
   }
 
   .view {
     margin-bottom: 6px;
   }
 
-  .monsters,
-  .mob-drops {
+  .monsters {
     display: grid;
+    gap: 8px;
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
   .monsters > li + li {
+    padding-top: 8px;
     border-top: 1px solid var(--border);
   }
 
   .mob-head {
     display: flex;
     align-items: center;
-    gap: 5px;
-    width: 100%;
-    min-height: 28px;
-    padding: 4px 0;
-    border: 0;
-    background: transparent;
-    text-align: left;
-    cursor: pointer;
+    gap: 6px;
+    min-height: 26px;
   }
 
-  .mob-head.empty {
-    cursor: default;
-  }
-
-  .chevron-button,
-  .row-rest {
-    display: flex;
-    align-items: center;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    cursor: pointer;
-  }
-
-  .row-rest {
-    flex: 1;
-    align-self: stretch;
-  }
-
-  .chevron {
-    display: grid;
-    width: 12px;
-    color: var(--faint);
-    transition: transform 0.15s ease;
-  }
-
-  .chevron.open {
-    transform: rotate(90deg);
-  }
-
-  .mob-name {
+  .mob-head :global(.ref.mob-name) {
     font-size: var(--text-sm);
-    font-weight: 600;
   }
 
-  .empty .mob-name,
   .empty .summary {
     color: var(--faint);
-    font-weight: 400;
   }
 
   .summary {
@@ -373,33 +346,21 @@
     font-size: var(--text-xs);
   }
 
-  .mob-drops {
-    gap: 2px;
-    padding: 0 0 7px 17px;
-  }
-
-  .mob-drops > li {
+  /* A monster's items as a compact wrap of picture and name. */
+  .wrap {
     display: flex;
-    align-items: baseline;
-    gap: 4px;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    margin: 2px 0 0;
+    padding: 0 0 0 4px;
+    list-style: none;
+    font-size: var(--text-sm);
   }
 
-  .mob-drops .rate {
-    margin-left: auto;
-    font-size: var(--text-xs);
-  }
-
-  .card-link {
-    margin-top: 2px;
-    font-size: var(--text-xs);
-  }
-
-  .faint {
-    color: var(--faint);
-  }
-
-  .unmeasured .rate {
-    color: var(--faint);
+  .wrap li {
+    display: inline-flex;
+    align-items: center;
+    min-width: 0;
   }
 
   .few {
@@ -420,11 +381,6 @@
     font-size: var(--text-xs);
   }
 
-  .cat {
-    margin-left: auto;
-    font-size: var(--text-xs);
-    color: var(--faint);
-  }
 
   .note {
     margin: 0;

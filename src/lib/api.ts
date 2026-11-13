@@ -42,6 +42,7 @@ import type {
   MapDataDownload,
   MapDataStatus,
   MapDetails,
+  MapPicture,
   MapMatch,
   MapPage,
   MapQuery,
@@ -135,6 +136,8 @@ export interface Backend {
   /** The card for an OCR'd minimap header, or null without a close enough match or any data. */
   findMap(name: string, street: string | null, twin: number | null): Promise<MapMatch | null>;
   mapCard(id: number): Promise<MapDetails | null>;
+  /** A map's picture cut down with its portals, NPCs and spawns placed on it; null when pictures are off or missing. */
+  mapPicture(id: number): Promise<MapPicture | null>;
   searchMaps(text: string): Promise<MapRef[]>;
   mapRoute(from: number, to: number): Promise<MapRoute | null>;
   /** Where "Go here" is heading, and the places headed for lately. */
@@ -431,6 +434,7 @@ const tauriBackend: Backend = {
   downloadMapData: (force) => invoke("download_map_data", { force }),
   findMap: (name, street, twin) => invoke("find_map", { name, street, twin }),
   mapCard: (id) => invoke("map_card", { id }),
+  mapPicture: (id) => invoke("map_picture", { id }),
   searchMaps: (text) => invoke("search_maps", { text }),
   mapRoute: (from, to) => invoke("map_route", { from, to }),
   destination: () => invoke("destination"),

@@ -25,7 +25,7 @@
   } = $props();
 </script>
 
-<button class="row" {onclick}>
+<button class="row nav-row" {onclick}>
   <span class="name" class:goal
     >{#if picture}<Pic kind={picture.kind} id={picture.id} size={18} class="row-pic" />{/if}{name}{#if small}<small>{small}</small>{/if}</span
   >
@@ -40,8 +40,9 @@
     column-gap: 8px;
     align-items: baseline;
     width: 100%;
-    padding: 5px 4px;
+    padding: 6px 24px 6px 6px;
     border: 0;
+    border-radius: var(--radius-sm);
     background: transparent;
     text-align: left;
     cursor: pointer;
