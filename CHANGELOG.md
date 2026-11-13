@@ -20,7 +20,11 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
   play, so a Lv 120 hunter no longer shifts the estimates of a Lv 30 mage. Potion slots and
   prices are kept per character too; a character with none of its own shows the ones you had set
   before, until you change them. Sessions that never read a name count for everyone while you
-  have one character, and for nobody once you have two.
+  have one character, and for nobody once you have two. Nothing is hidden: the picker also has
+  **All characters**, and any other character you have played, for the Train tab and the training
+  log (Records and best maps follow it). Potions and a level goal always belong to one character:
+  the one you pick, or on screen, or played last. A past session's potions use its own
+  character's slots.
 
 ## 0.2.0 (2026-11-12)
 

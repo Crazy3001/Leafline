@@ -19,6 +19,7 @@
   import { showMonsterNamed } from "$lib/monsters.svelte";
   import { showMapNamed } from "$lib/places.svelte";
   import { formatCompact, formatDuration, formatNumber, partyLabel, splitMapLabel } from "$lib/format";
+  import { characters as activeCharacter } from "$lib/characters.svelte";
   import { history, watchHistory } from "$lib/history.svelte";
   import { live, watchLive } from "$lib/readings.svelte";
   import { watchSettings } from "$lib/settings.svelte";
@@ -114,7 +115,7 @@
   // With more than one character, open on the one played last: a blend of two characters' levels
   // and maps reads as nonsense, so All is there to ask for.
   $effect(() => {
-    if (!characterChosen && characters.length > 1 && all[0]?.character) character = all[0].character;
+    if (!characterChosen && characters.length > 1) character = activeCharacter.viewing ?? (activeCharacter.all ? "" : (all[0]?.character ?? ""));
   });
   const since = $derived(range === "all" ? null : Date.now() / 1000 - Number(range) * 86400);
   const sessions = $derived(

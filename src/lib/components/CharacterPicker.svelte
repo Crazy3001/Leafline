@@ -5,21 +5,31 @@
   import { live } from "$lib/readings.svelte";
 
   const onScreen = $derived(live.session?.name ?? null);
-  const elsewhere = $derived(characters.active != null && onScreen != null && characters.active !== onScreen);
+  const elsewhere = $derived(characters.all || (characters.active != null && onScreen != null && characters.active !== onScreen));
+  const ALL = "";
+
+  function pick(value: string) {
+    if (value === ALL) characters.chooseAll();
+    else characters.choose(value);
+  }
 </script>
 
 {#if characters.known.length > 1}
   <div class="picker">
     <label for="character">Character</label>
-    <select id="character" value={characters.active ?? ""} onchange={(e) => characters.choose(e.currentTarget.value)}>
+    <select id="character" value={characters.all ? ALL : (characters.active ?? ALL)} onchange={(e) => pick(e.currentTarget.value)}>
+      <option value={ALL}>All characters</option>
       {#each characters.known as name (name)}
         <option value={name}>{name}</option>
       {/each}
     </select>
-    {#if elsewhere}
+    {#if characters.all}
+      <span class="hint">Goal and potions stay with {characters.active}.</span>
+      <button class="back" onclick={() => characters.choose(null)}>Back to {onScreen ?? characters.active}</button>
+    {:else if elsewhere}
       <button class="back" onclick={() => characters.choose(null)}>Back to {onScreen}</button>
     {:else}
-      <span class="hint">Rates, best maps and potions are kept per character.</span>
+      <span class="hint">Rates and best maps are kept per character.</span>
     {/if}
   </div>
 {/if}
