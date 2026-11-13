@@ -53,9 +53,8 @@ sends input, and stays free.
 **Training details**
 - A choice of averaging window for EXP per hour
 - A mode that keeps one session going across maps
-- Auto-pause when you have been idle, and automatic recovery of a session after a crash
+- Automatic recovery of a session after a crash
 - Party quest mode: completion times and rewards
-- Rename, note, copy and delete rows in the training log
 - Kills per hour and a count of kills per monster
 
 **Party and social**
