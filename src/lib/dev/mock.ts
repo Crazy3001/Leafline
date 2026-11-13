@@ -139,7 +139,12 @@ const dropHandlers: (() => void)[] = [];
 const historyHandlers: (() => void)[] = [];
 
 // Potion slots and per-session counts, as the backend keeps them.
-let potionSlots: PotionSlot[] = [];
+// Slots by lower-cased character name; the empty name is the shared set.
+const potionSlotSets = new Map<string, PotionSlot[]>();
+const slotsFor = (character: string | null) => {
+  const own = potionSlotSets.get((character ?? "").trim().toLowerCase()) ?? [];
+  return own.length || !character ? own : (potionSlotSets.get("") ?? []);
+};
 const sessionPotions = new Map<number, SessionPotion[]>();
 const potionHandlers: (() => void)[] = [];
 
@@ -610,10 +615,10 @@ export const mockBackend: Backend = {
     return () => {};
   },
   savedSpots: async () => [...savedSpots],
-  potionSlots: async () => [...potionSlots],
-  async setPotionSlots(slots) {
+  potionSlots: async (character) => [...slotsFor(character)],
+  async setPotionSlots(character, slots) {
     const taken = new Set(slots.map((s) => s.slot).filter((n) => n > 0));
-    potionSlots = slots
+    const kept = slots
       .map((s) => {
         if (s.slot > 0) return { ...s, name: s.name.trim() };
         let next = 1;
@@ -622,13 +627,14 @@ export const mockBackend: Backend = {
         return { ...s, slot: next, name: s.name.trim() };
       })
       .sort((a, b) => a.slot - b.slot);
+    potionSlotSets.set((character ?? "").trim().toLowerCase(), kept);
     potionHandlers.forEach((h) => h());
-    return [...potionSlots];
+    return [...kept];
   },
   sessionPotions: async (startedAt) => [...(sessionPotions.get(startedAt) ?? [])],
-  async setSessionPotion(startedAt, slot, start, now) {
+  async setSessionPotion(character, startedAt, slot, start, now) {
     const rows = (sessionPotions.get(startedAt) ?? []).filter((p) => p.slot !== slot);
-    const def = potionSlots.find((p) => p.slot === slot);
+    const def = slotsFor(character).find((p) => p.slot === slot);
     if ((start != null || now != null) && def) {
       const used = start != null && now != null ? Math.max(0, start - now) : 0;
       rows.push({ slot, name: def.name, price: def.price, start, now, used });

@@ -166,6 +166,17 @@ CREATE TABLE level_exp (
     needed INTEGER NOT NULL,
     seen_at INTEGER NOT NULL);
 ",
+    "
+CREATE TABLE potion_slots_by_character (
+    character TEXT NOT NULL DEFAULT '' COLLATE NOCASE,
+    slot INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    price INTEGER NOT NULL,
+    PRIMARY KEY (character, slot));
+INSERT INTO potion_slots_by_character (character, slot, name, price) SELECT '', slot, name, price FROM potion_slots;
+DROP TABLE potion_slots;
+ALTER TABLE potion_slots_by_character RENAME TO potion_slots;
+",
 ];
 
 /// Daily copies of the records that are kept.

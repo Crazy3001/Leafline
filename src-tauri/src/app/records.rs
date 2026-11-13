@@ -92,16 +92,21 @@ const POTIONS_EVENT: &str = "potions";
 
 /// The potion slots the player set up, in slot order.
 #[tauri::command]
-pub fn potion_slots(state: State<UserDataState>) -> Result<Vec<PotionSlot>> {
-    state.with(|db| db.potion_slots())
+pub fn potion_slots(state: State<UserDataState>, character: Option<String>) -> Result<Vec<PotionSlot>> {
+    state.with(|db| db.potion_slots(character.as_deref()))
 }
 
 /// Replaces the potion slots and returns them with their numbers.
 #[tauri::command]
-pub fn set_potion_slots(app: AppHandle, state: State<UserDataState>, slots: Vec<PotionSlot>) -> Result<Vec<PotionSlot>> {
+pub fn set_potion_slots(
+    app: AppHandle,
+    state: State<UserDataState>,
+    character: Option<String>,
+    slots: Vec<PotionSlot>,
+) -> Result<Vec<PotionSlot>> {
     let kept = state.with(|db| {
-        db.set_potion_slots(&slots)?;
-        db.potion_slots()
+        db.set_potion_slots(character.as_deref(), &slots)?;
+        db.potion_slots(character.as_deref())
     })?;
     app.emit(POTIONS_EVENT, ())?;
     Ok(kept)
@@ -118,13 +123,14 @@ pub fn session_potions(state: State<UserDataState>, started_at: f64) -> Result<V
 pub fn set_session_potion(
     app: AppHandle,
     state: State<UserDataState>,
+    character: Option<String>,
     started_at: f64,
     slot: u32,
     start: Option<i64>,
     now: Option<i64>,
 ) -> Result<Vec<SessionPotion>> {
     let kept = state.with(|db| {
-        db.set_session_potion(started_at, slot, start, now)?;
+        db.set_session_potion(character.as_deref(), started_at, slot, start, now)?;
         db.session_potions(started_at)
     })?;
     app.emit(POTIONS_EVENT, ())?;

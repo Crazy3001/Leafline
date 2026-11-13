@@ -415,7 +415,7 @@
               </div>
 
               <div class="panel">
-                <PotionCosts startedAt={s.startedAt} activeSeconds={s.activeSeconds} mesosPerHour={s.mesosPerHour} />
+                <PotionCosts startedAt={s.startedAt} activeSeconds={s.activeSeconds} mesosPerHour={s.mesosPerHour} character={s.character} />
               </div>
 
               <div class="panel chart">

@@ -2,6 +2,7 @@
 // deletes made in any window.
 
 import { backend } from "./api";
+import { characters } from "./characters.svelte";
 import type { History, MeasuredRate, SessionSummary } from "./types";
 
 export const history = $state<{ value: History | null }>({ value: null });
@@ -33,9 +34,10 @@ export function isSaved(session: SessionSummary | null): boolean {
  * the kill speed behind the training estimates keep to solo play near the character's level.
  */
 export function measuredRates(session: SessionSummary | null): MeasuredRate[] {
+  // The active character's own play: kill speed and best rates differ with the class and level.
   const lines = [
-    ...(history.value?.sessions ?? []).flatMap((s) => s.lines),
-    ...(session && !isSaved(session) ? session.lines : []),
+    ...characters.sessions(history.value?.sessions ?? []).flatMap((s) => s.lines),
+    ...(session && !isSaved(session) && characters.isActive(session.name) ? session.lines : []),
   ];
   return lines
     .filter((l) => l.map != null && !l.town && l.activeSeconds > 0 && l.expGained > 0)

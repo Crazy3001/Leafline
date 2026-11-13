@@ -220,14 +220,20 @@ export interface Backend {
   /** What was last read of a character's attack range and damaging skills. */
   playerDamage(name: string): Promise<PlayerDamage | null>;
   onPlayerDamage(handler: (change: { name: string; damage: PlayerDamage }) => void): Promise<UnlistenFn>;
-  /** The potion slots the player set up, in slot order. */
-  potionSlots(): Promise<PotionSlot[]>;
-  /** Replaces the potion slots; a new slot has number 0. Returns them numbered. */
-  setPotionSlots(slots: PotionSlot[]): Promise<PotionSlot[]>;
+  /** A character's potion slots, in slot order; the shared ones until it sets its own. */
+  potionSlots(character: string | null): Promise<PotionSlot[]>;
+  /** Replaces a character's potion slots; a new slot has number 0. Returns them numbered. */
+  setPotionSlots(character: string | null, slots: PotionSlot[]): Promise<PotionSlot[]>;
   /** The potion counts typed for the session that started at `startedAt`. */
   sessionPotions(startedAt: number): Promise<SessionPotion[]>;
   /** How many of a slot's potion the player had at a session's start and has now. */
-  setSessionPotion(startedAt: number, slot: number, start: number | null, now: number | null): Promise<SessionPotion[]>;
+  setSessionPotion(
+    character: string | null,
+    startedAt: number,
+    slot: number,
+    start: number | null,
+    now: number | null,
+  ): Promise<SessionPotion[]>;
   /** Fires when the slots or any session's counts change. */
   onPotions(handler: () => void): Promise<UnlistenFn>;
   /** The player's note on an item, matched like the price log. */
@@ -466,10 +472,11 @@ const tauriBackend: Backend = {
   onSavedSpots: (handler) => listen<SavedSpot[]>("saved-spots", (e) => handler(e.payload)),
   playerDamage: (name) => invoke("player_damage", { name }),
   onPlayerDamage: (handler) => listen<{ name: string; damage: PlayerDamage }>("player-damage", (e) => handler(e.payload)),
-  potionSlots: () => invoke("potion_slots"),
-  setPotionSlots: (slots) => invoke("set_potion_slots", { slots }),
+  potionSlots: (character) => invoke("potion_slots", { character }),
+  setPotionSlots: (character, slots) => invoke("set_potion_slots", { character, slots }),
   sessionPotions: (startedAt) => invoke("session_potions", { startedAt }),
-  setSessionPotion: (startedAt, slot, start, now) => invoke("set_session_potion", { startedAt, slot, start, now }),
+  setSessionPotion: (character, startedAt, slot, start, now) =>
+    invoke("set_session_potion", { character, startedAt, slot, start, now }),
   onPotions: (handler) => listen("potions", () => handler()),
   itemNote: (item) => invoke("item_note", { item }),
   setItemNote: (item, note) => invoke("set_item_note", { item, note }),

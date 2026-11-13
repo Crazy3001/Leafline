@@ -22,7 +22,6 @@ sends input, and stays free.
 - Drop rates per kill, built from your own kills
 
 **Your characters**
-- Separate records for each character you play
 - A history of each character: levels, maps, rates, gear and how fast you progress
 - Compare two characters, or this week with last
 

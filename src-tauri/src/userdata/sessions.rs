@@ -460,9 +460,9 @@ mod tests {
     fn potions_typed_before_the_save_reach_the_saved_session() {
         use crate::userdata::potions::PotionSlot;
         let mut db = UserData::open_in_memory().unwrap();
-        db.set_potion_slots(&[PotionSlot { slot: 0, name: "White Potion".into(), price: 320 }]).unwrap();
+        db.set_potion_slots(None, &[PotionSlot { slot: 0, name: "White Potion".into(), price: 320 }]).unwrap();
         // Typed in the first minutes, while the session wasn't saved yet.
-        db.set_session_potion(1000.0, 1, Some(300), Some(250)).unwrap();
+        db.set_session_potion(None, 1000.0, 1, Some(300), Some(250)).unwrap();
         let id = db.save_session(&session(30.0, 6000, &[]), "", 1).unwrap();
         let saved = &db.sessions().unwrap()[0];
         assert_eq!((saved.potions.len(), saved.potion_cost), (1, 50 * 320));

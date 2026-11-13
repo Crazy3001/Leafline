@@ -6,6 +6,7 @@
   import SessionControls from "./SessionControls.svelte";
   import { ArrowDown } from "@lucide/svelte";
 
+  import CharacterPicker from "./CharacterPicker.svelte";
   import LevelGoal from "./LevelGoal.svelte";
   import PotionCosts from "./PotionCosts.svelte";
   import SaveSpot from "./SaveSpot.svelte";
@@ -13,6 +14,7 @@
   import TimersCard from "./TimersCard.svelte";
   import { openTrainingLog } from "$lib/nav.svelte";
   import { formatCompact, formatDuration, formatNumber, splitMapLabel } from "$lib/format";
+  import { characters } from "$lib/characters.svelte";
   import { history, watchHistory } from "$lib/history.svelte";
   import { showMapNamed } from "$lib/places.svelte";
   import { live } from "$lib/readings.svelte";
@@ -106,7 +108,7 @@
   const towns = $derived(new Set((session?.lines ?? []).filter((l) => l.town).map((l) => l.map)));
 
   // This map against your best on it, over the saved sessions.
-  const stats = $derived(mapStats(history.value?.sessions ?? []));
+  const stats = $derived(mapStats(characters.sessions(history.value?.sessions ?? [])));
   const here = $derived.by(() => {
     if (!session?.map || towns.has(session.map)) return null;
     const now = session.maps.find((m) => m.map === session.map);
@@ -151,7 +153,7 @@
   );
 
   // Before a session: the last few saved ones.
-  const lastSessions = $derived((history.value?.sessions ?? []).slice(0, 3));
+  const lastSessions = $derived(characters.sessions(history.value?.sessions ?? []).slice(0, 3));
   const lastOne = $derived(lastSessions[0] ?? null);
 
   const liveState = $derived(live.liveStatus.state);
@@ -189,6 +191,7 @@
   </Button>
 {/snippet}
 
+{#if !glance}<CharacterPicker />{/if}
 <Block title="Session">
   {#snippet aside()}
     {#if session?.held}
@@ -259,7 +262,7 @@
       <LevelGoal
         level={lv}
         {percent}
-        character={session.name}
+        character={session.name ?? characters.active}
         rate={{ expPerHour: session.expPerHour, percentPerHour: session.percentPerHour }}
       />
     {/if}
@@ -276,7 +279,12 @@
     </div>
 
     {#if !glance}
-      <PotionCosts startedAt={session.startedAt} activeSeconds={session.activeSeconds} mesosPerHour={session.mesosPerHour} />
+      <PotionCosts
+        startedAt={session.startedAt}
+        activeSeconds={session.activeSeconds}
+        mesosPerHour={session.mesosPerHour}
+        character={session.name ?? characters.active}
+      />
     {/if}
 
     {#if reminder}
@@ -418,7 +426,7 @@
 {:else if !glance}
   <!-- No session yet: the goal and where to train come first, your bests and the last sessions after. -->
   <Block title="Level goal">
-    <LevelGoal {level} percent={session?.percent ?? null} character={session?.name ?? lastOne?.character ?? null} />
+    <LevelGoal {level} percent={session?.percent ?? null} character={session?.name ?? characters.active} />
   </Block>
   <SpotList {level} {map} {session} last={!lastOne && !bests.length} />
   {#if bests.length}

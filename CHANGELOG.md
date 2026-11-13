@@ -6,10 +6,21 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
 ## Unreleased
 
 ### Added
+- **Florina Beach in routes.** The map data has no way into Florina Beach, because it is reached
+  by an NPC's flight from Lith Harbor. Routes now include that flight and the one back, without
+  needing the taxi setting. The ride comes from a player's report and its fare isn't recorded
+  yet; check it in game.
 - **A session survives a crash or a restart.** Leafline keeps what the tracker has worked out
   beside the saved session. If the app closes or crashes and you are back within 30 minutes, the
   session carries on where it was: the same log entry, the same rates, with the time away left
   out. **New session** starts fresh as before.
+- **Each character keeps its own numbers.** The Train tab follows the name on your HUD, and with
+  two or more characters it shows a **Character** picker (with the game closed, or to look at
+  another one). Where to train, your best maps and the last sessions use only that character's
+  play, so a Lv 120 hunter no longer shifts the estimates of a Lv 30 mage. Potion slots and
+  prices are kept per character too; a character with none of its own shows the ones you had set
+  before, until you change them. Sessions that never read a name count for everyone while you
+  have one character, and for nobody once you have two.
 
 ## 0.2.0 (2026-11-12)
 

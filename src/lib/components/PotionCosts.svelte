@@ -6,7 +6,7 @@
 
   import { backend } from "$lib/api";
   import { formatCompact, formatNumber } from "$lib/format";
-  import { MAX_SLOTS, netMesosPerHour, potions, watchPotions } from "$lib/potions.svelte";
+  import { MAX_SLOTS, netMesosPerHour } from "$lib/potions.svelte";
   import type { PotionSlot, SessionPotion } from "$lib/types";
   import Button from "$lib/ui/Button.svelte";
 
@@ -14,20 +14,22 @@
     startedAt,
     activeSeconds,
     mesosPerHour,
+    character = null,
     collapsible = true,
   }: {
     /** The session's start, which its counts are kept by. */
     startedAt: number | null;
     activeSeconds: number;
     mesosPerHour: number | null;
+    /** Whose potions these are: slots are kept per character. */
+    character?: string | null;
     /** Folds behind a one-line summary, as on the Train tab. */
     collapsible?: boolean;
   } = $props();
 
   const OPEN_KEY = "leafline.train.potionsOpen";
 
-  watchPotions();
-
+  let slots = $state<PotionSlot[]>([]);
   let counts = $state<SessionPotion[]>([]);
   let opened = $state(stored(OPEN_KEY) === "true");
   const open = $derived(!collapsible || opened);
@@ -57,13 +59,31 @@
       .catch(() => {});
   }
 
+  function loadSlots() {
+    const who = character;
+    backend
+      .potionSlots(who)
+      .then((rows) => {
+        if (character === who) slots = rows;
+      })
+      .catch(() => {});
+  }
+
   $effect(() => {
     void startedAt;
     load();
   });
 
   $effect(() => {
-    const stop = backend.onPotions(load);
+    void character;
+    loadSlots();
+  });
+
+  $effect(() => {
+    const stop = backend.onPotions(() => {
+      load();
+      loadSlots();
+    });
     return () => {
       stop.then((unlisten) => unlisten());
     };
@@ -72,9 +92,9 @@
   /** Every slot set up now, plus counts typed under a slot since removed. */
   const rows = $derived.by(() => {
     const out: { slot: number; name: string; price: number; typed: SessionPotion | null; gone: boolean }[] =
-      potions.slots.map((s) => ({ ...s, typed: counts.find((c) => c.slot === s.slot) ?? null, gone: false }));
+      slots.map((s) => ({ ...s, typed: counts.find((c) => c.slot === s.slot) ?? null, gone: false }));
     for (const c of counts)
-      if (!potions.slots.some((s) => s.slot === c.slot)) out.push({ slot: c.slot, name: c.name, price: c.price, typed: c, gone: true });
+      if (!slots.some((s) => s.slot === c.slot)) out.push({ slot: c.slot, name: c.name, price: c.price, typed: c, gone: true });
     return out.sort((a, b) => a.slot - b.slot);
   });
   const cost = $derived(counts.reduce((a, c) => a + c.used * c.price, 0));
@@ -102,30 +122,30 @@
     const now = which === "now" ? count(value) : (typed?.now ?? null);
     problem = null;
     try {
-      counts = await backend.setSessionPotion(startedAt, slot, start, now);
+      counts = await backend.setSessionPotion(character, startedAt, slot, start, now);
     } catch (e) {
       problem = String(e);
     }
   }
 
   function startEditing() {
-    draft = potions.slots.map((s) => ({ slot: s.slot, name: s.name, price: String(s.price) }));
+    draft = slots.map((s) => ({ slot: s.slot, name: s.name, price: String(s.price) }));
     if (!draft.length) draft = [{ slot: 0, name: "", price: "" }];
     problem = null;
     editing = true;
   }
 
   async function saveSlots() {
-    const slots: PotionSlot[] = draft
+    const next: PotionSlot[] = draft
       .filter((d) => d.name.trim() || d.price.trim())
       .map((d) => ({ slot: d.slot, name: d.name.trim(), price: Math.round(Number(d.price)) }));
-    const bad = slots.find((s) => !s.name || !Number.isFinite(s.price) || s.price < 0);
+    const bad = next.find((s) => !s.name || !Number.isFinite(s.price) || s.price < 0);
     if (bad) {
       problem = bad.name ? `${bad.name}: set a price of 0 or more.` : "Each potion needs a name.";
       return;
     }
     try {
-      potions.slots = await backend.setPotionSlots(slots);
+      slots = await backend.setPotionSlots(character, next);
       editing = false;
       problem = null;
     } catch (e) {
@@ -142,7 +162,7 @@
       <span class="grow"></span>
       {#if anyUsed && net != null}
         <span class="sum tabular"><span class="muted">after potions</span> {formatCompact(net)} mesos / hr</span>
-      {:else if !potions.slots.length}
+      {:else if !slots.length}
         <span class="muted">Not set up</span>
       {/if}
     </button>
@@ -173,7 +193,7 @@
           <Button variant="ghost" size="sm" onclick={() => (editing = false)}>Cancel</Button>
           <Button size="sm" onclick={saveSlots}>Save</Button>
         </div>
-      {:else if !potions.slots.length && !counts.length}
+      {:else if !slots.length && !counts.length}
         <p class="muted">Name the potions you hunt with and set their prices to see your mesos per hour after potions.</p>
         <div class="actions"><Button size="sm" onclick={startEditing}>Set up potions</Button></div>
       {:else}
