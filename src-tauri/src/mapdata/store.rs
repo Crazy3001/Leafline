@@ -20,7 +20,7 @@ use super::turnins::TurnIn;
 use crate::error::{Error, Result};
 
 /// Bump when the tables change; an older cache is then dropped and downloaded again.
-const CACHE_VERSION: i32 = 10;
+const CACHE_VERSION: i32 = 11;
 
 const SCHEMA: &str = "
 CREATE TABLE source_files (
@@ -29,17 +29,17 @@ CREATE TABLE source_files (
 CREATE TABLE source_info (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE maps (
     id INTEGER PRIMARY KEY, name TEXT NOT NULL, street TEXT, region TEXT,
-    is_town INTEGER NOT NULL, return_map_id INTEGER, map_mark TEXT);
+    is_town INTEGER NOT NULL, return_map_id INTEGER, map_mark TEXT, minimap_url TEXT, render_url TEXT, map_mark_url TEXT);
 CREATE TABLE map_exits (map_id INTEGER NOT NULL, dest_map_id INTEGER NOT NULL, PRIMARY KEY (map_id, dest_map_id));
 CREATE TABLE portals (
     map_id INTEGER NOT NULL, seq INTEGER NOT NULL, name TEXT NOT NULL,
     dest_map_id INTEGER, dest_portal TEXT, side INTEGER, height INTEGER, PRIMARY KEY (map_id, seq));
 CREATE TABLE monsters (
     id INTEGER PRIMARY KEY, name TEXT NOT NULL, level INTEGER NOT NULL, hp INTEGER NOT NULL,
-    exp INTEGER NOT NULL, is_boss INTEGER NOT NULL, undead INTEGER NOT NULL, details TEXT NOT NULL);
+    exp INTEGER NOT NULL, is_boss INTEGER NOT NULL, undead INTEGER NOT NULL, details TEXT NOT NULL, icon_url TEXT);
 CREATE TABLE spawns (
     mob_id INTEGER NOT NULL, map_id INTEGER NOT NULL, count INTEGER NOT NULL, respawn INTEGER, PRIMARY KEY (mob_id, map_id));
-CREATE TABLE npcs (id INTEGER PRIMARY KEY, name TEXT NOT NULL);
+CREATE TABLE npcs (id INTEGER PRIMARY KEY, name TEXT NOT NULL, icon_url TEXT);
 CREATE TABLE npc_maps (npc_id INTEGER NOT NULL, map_id INTEGER NOT NULL, PRIMARY KEY (npc_id, map_id));
 CREATE TABLE quests (
     id INTEGER PRIMARY KEY, name TEXT NOT NULL, npc_id INTEGER, level_min INTEGER, next_quest_id INTEGER, region TEXT,
@@ -58,7 +58,7 @@ CREATE TABLE items (
     weapon_type TEXT, req_level INTEGER NOT NULL, req_str INTEGER NOT NULL, req_dex INTEGER NOT NULL,
     req_int INTEGER NOT NULL, req_luk INTEGER NOT NULL, req_fame INTEGER NOT NULL, attack_speed INTEGER,
     knockback INTEGER, upgrade_slots INTEGER, quest_item INTEGER NOT NULL, untradable INTEGER NOT NULL, stats TEXT NOT NULL,
-    price INTEGER, description TEXT, scroll TEXT);
+    price INTEGER, description TEXT, scroll TEXT, icon_url TEXT);
 CREATE TABLE recipes (
     id INTEGER PRIMARY KEY, discipline TEXT NOT NULL, skill_level INTEGER NOT NULL, craft_exp INTEGER NOT NULL,
     meso_cost INTEGER NOT NULL, output_item_id INTEGER NOT NULL, output_count INTEGER NOT NULL);
@@ -369,7 +369,7 @@ impl Store {
     fn load_items(&self) -> Result<Vec<ItemRecord>> {
         let mut stmt = self.conn.prepare(
             "SELECT id, name, kind, slot, gender, classes, weapon_type, req_level, req_str, req_dex, req_int, req_luk,
-                    req_fame, attack_speed, upgrade_slots, quest_item, untradable, stats, price, description, scroll, knockback
+                    req_fame, attack_speed, upgrade_slots, quest_item, untradable, stats, price, description, scroll, knockback, icon_url
              FROM items ORDER BY id",
         )?;
         let rows = stmt.query_map([], |row| {
@@ -400,6 +400,7 @@ impl Store {
                 description: row.get(19)?,
                 scroll: None,
                 knockback: row.get(21)?,
+                icon_url: row.get(22)?,
             };
             Ok((item, stats, scroll))
         })?;
@@ -441,7 +442,7 @@ impl Store {
         }
         let mut stmt = self
             .conn
-            .prepare("SELECT id, name, street, region, is_town, return_map_id, map_mark FROM maps ORDER BY id")?;
+            .prepare("SELECT id, name, street, region, is_town, return_map_id, map_mark, minimap_url, render_url, map_mark_url FROM maps ORDER BY id")?;
         let maps = stmt.query_map([], |row| {
             let id: u32 = row.get(0)?;
             Ok(MapRecord {
@@ -454,6 +455,9 @@ impl Store {
                 map_mark: row.get(6)?,
                 exits: exits.remove(&id).unwrap_or_default(),
                 portals: portals.remove(&id).unwrap_or_default(),
+                minimap_url: row.get(7)?,
+                render_url: row.get(8)?,
+                map_mark_url: row.get(9)?,
             })
         })?;
         Ok(maps.collect::<rusqlite::Result<_>>()?)
@@ -470,7 +474,7 @@ impl Store {
             spawns.entry(mob).or_default().push(spawn);
         }
         let mut stmt =
-            self.conn.prepare("SELECT id, name, level, hp, exp, is_boss, undead, details FROM monsters ORDER BY id")?;
+            self.conn.prepare("SELECT id, name, level, hp, exp, is_boss, undead, details, icon_url FROM monsters ORDER BY id")?;
         let rows = stmt.query_map([], |row| {
             let id: u32 = row.get(0)?;
             let details: String = row.get(7)?;
@@ -484,6 +488,7 @@ impl Store {
                 undead: row.get(6)?,
                 spawns: spawns.remove(&id).unwrap_or_default(),
                 details: MonsterDetails::default(),
+                icon_url: row.get(8)?,
             };
             Ok((monster, details))
         })?;
@@ -503,10 +508,10 @@ impl Store {
             let (npc, map) = row?;
             maps.entry(npc).or_default().push(map);
         }
-        let mut stmt = self.conn.prepare("SELECT id, name FROM npcs ORDER BY id")?;
+        let mut stmt = self.conn.prepare("SELECT id, name, icon_url FROM npcs ORDER BY id")?;
         let npcs = stmt.query_map([], |row| {
             let id: u32 = row.get(0)?;
-            Ok(NpcRecord { id, name: row.get(1)?, maps: maps.remove(&id).unwrap_or_default() })
+            Ok(NpcRecord { id, name: row.get(1)?, maps: maps.remove(&id).unwrap_or_default(), icon_url: row.get(2)? })
         })?;
         Ok(npcs.collect::<rusqlite::Result<_>>()?)
     }
@@ -822,8 +827,8 @@ impl Store {
 
 fn insert_maps(tx: &Transaction, maps: &[MapRecord]) -> Result<()> {
     let mut map = tx.prepare(
-        "INSERT OR REPLACE INTO maps (id, name, street, region, is_town, return_map_id, map_mark)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        "INSERT OR REPLACE INTO maps (id, name, street, region, is_town, return_map_id, map_mark, minimap_url, render_url, map_mark_url)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
     )?;
     let mut exit = tx.prepare("INSERT OR IGNORE INTO map_exits (map_id, dest_map_id) VALUES (?1, ?2)")?;
     let mut portal = tx.prepare(
@@ -831,7 +836,7 @@ fn insert_maps(tx: &Transaction, maps: &[MapRecord]) -> Result<()> {
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
     )?;
     for m in maps {
-        map.execute(params![m.id, m.name, m.street_name, m.region, m.is_town, m.return_map_id, m.map_mark])?;
+        map.execute(params![m.id, m.name, m.street_name, m.region, m.is_town, m.return_map_id, m.map_mark, m.minimap_url, m.render_url, m.map_mark_url])?;
         for dest in &m.exits {
             exit.execute(params![m.id, dest])?;
         }
@@ -846,8 +851,8 @@ fn insert_maps(tx: &Transaction, maps: &[MapRecord]) -> Result<()> {
 
 fn insert_monsters(tx: &Transaction, monsters: &[MonsterRecord]) -> Result<()> {
     let mut monster = tx.prepare(
-        "INSERT OR REPLACE INTO monsters (id, name, level, hp, exp, is_boss, undead, details)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        "INSERT OR REPLACE INTO monsters (id, name, level, hp, exp, is_boss, undead, details, icon_url)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
     )?;
     let mut spawn = tx.prepare(
         "INSERT INTO spawns (mob_id, map_id, count, respawn) VALUES (?1, ?2, ?3, ?4)
@@ -855,7 +860,7 @@ fn insert_monsters(tx: &Transaction, monsters: &[MonsterRecord]) -> Result<()> {
     )?;
     for m in monsters {
         let details = serde_json::to_string(&m.details).map_err(|err| Error::Invalid(err.to_string()))?;
-        monster.execute(params![m.id, m.name, m.level, m.hp, m.exp, m.is_boss, m.undead, details])?;
+        monster.execute(params![m.id, m.name, m.level, m.hp, m.exp, m.is_boss, m.undead, details, m.icon_url])?;
         for s in &m.spawns {
             spawn.execute(params![m.id, s.map_id, s.count, s.respawn])?;
         }
@@ -864,10 +869,10 @@ fn insert_monsters(tx: &Transaction, monsters: &[MonsterRecord]) -> Result<()> {
 }
 
 fn insert_npcs(tx: &Transaction, npcs: &[NpcRecord]) -> Result<()> {
-    let mut npc = tx.prepare("INSERT OR REPLACE INTO npcs (id, name) VALUES (?1, ?2)")?;
+    let mut npc = tx.prepare("INSERT OR REPLACE INTO npcs (id, name, icon_url) VALUES (?1, ?2, ?3)")?;
     let mut on_map = tx.prepare("INSERT OR IGNORE INTO npc_maps (npc_id, map_id) VALUES (?1, ?2)")?;
     for n in npcs {
-        npc.execute(params![n.id, n.name])?;
+        npc.execute(params![n.id, n.name, n.icon_url])?;
         for map in &n.maps {
             on_map.execute(params![n.id, map])?;
         }
@@ -962,8 +967,8 @@ fn insert_items(tx: &Transaction, items: &[ItemRecord]) -> Result<()> {
     let mut item = tx.prepare(
         "INSERT OR REPLACE INTO items (id, name, kind, slot, gender, classes, weapon_type, req_level, req_str, req_dex,
                                        req_int, req_luk, req_fame, attack_speed, upgrade_slots, quest_item, untradable,
-                                       stats, price, description, scroll, knockback)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22)",
+                                       stats, price, description, scroll, knockback, icon_url)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23)",
     )?;
     for i in items {
         let json = |err: serde_json::Error| Error::Invalid(err.to_string());
@@ -991,7 +996,8 @@ fn insert_items(tx: &Transaction, items: &[ItemRecord]) -> Result<()> {
             i.price,
             i.description,
             scroll,
-            i.knockback
+            i.knockback,
+            i.icon_url
         ])?;
     }
     Ok(())

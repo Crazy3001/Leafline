@@ -2,6 +2,7 @@
   // The build plan's part of the Character tab: what the plan says at the character's level. It
   // moves on with the level, and catches up with what was really spent whenever the stat and
   // skill windows are read. The level itself is shown once, in the character's header above.
+  import Ref from "$lib/components/Ref.svelte";
   import { Check, ExternalLink, Pencil, Plus, RefreshCw, Search, X } from "@lucide/svelte";
   import { untrack } from "svelte";
 
@@ -332,11 +333,8 @@
             <div class="line">
               <span class="label">Wearing</span>
               {#if piece}
-                <button
-                  class="ref ref-item"
-                  class:upgraded={!!piece.upgrades}
-                  onclick={() => backend.showItem(piece.item, piece.item == null ? piece.name : null)}
-                  >{piece.name}{#if piece.upgrades}{` (+${piece.upgrades})`}{/if}</button
+                <Ref kind="item" id={piece.item} name={piece.name} class={piece.upgrades ? "upgraded" : ""}
+                  >{piece.name}{#if piece.upgrades}{` (+${piece.upgrades})`}{/if}</Ref
                 >
                 <span class="end">
                   {#if piece.level != null}<span class="lv tabular" class:good={row.wearingFit?.ok} class:bad={row.wearingFit && !row.wearingFit.ok} title={fitTitle(row.wearingFit)}
@@ -574,7 +572,7 @@
                 <!-- What the level adds, then the total it makes: "Double Stab +3 (4)". -->
                 {#each s.sp as gain (gain.skillId)}<span>{gain.name} <span class="tabular">+{gain.to - gain.from}</span> <span class="total tabular">({gain.to})</span></span>{/each}
                 {#each s.ap as gain (gain.stat)}<span>{statLabel(gain.stat)} <span class="tabular">+{gain.amount}</span> <span class="total tabular">({gain.total})</span></span>{/each}
-                {#each s.gear as name (name)}<button class="ref ref-item" onclick={() => backend.showItem(null, name)}>{name}</button>{/each}
+                {#each s.gear as name (name)}<Ref kind="item" name={name} />{/each}
               </span>
             </li>
           {/each}
@@ -588,9 +586,7 @@
           <li>
             <span class="when tabular">Lv {nextGear.level}</span>
             <span class="what"
-              ><span>New gear:</span>{#each nextGear.gear as name (name)}<button class="ref ref-item" onclick={() => backend.showItem(null, name)}
-                  >{name}</button
-                >{/each}</span
+              ><span>New gear:</span>{#each nextGear.gear as name (name)}<Ref kind="item" {name} />{/each}</span
             >
           </li>
         {/if}
@@ -645,7 +641,7 @@
               {@const pick = row.suggested}
               <div class="line">
                 <span class="label">Suggested</span>
-                <button class="ref ref-item" onclick={() => backend.showItem(pick.id, null)}>{pick.name}</button>
+                <Ref kind="item" id={pick.id} name={pick.name} />
                 <span class="end">
                   <span class="lv tabular" class:good={row.suggestedFit?.ok} class:bad={row.suggestedFit && !row.suggestedFit.ok} title={fitTitle(row.suggestedFit)}
                     >{pick.reqLevel ? `Lv ${pick.reqLevel}` : "Any level"}</span
@@ -671,7 +667,7 @@
               <span class="label">Next</span>
               {#if row.next}
                 {@const next = row.next}
-                <button class="ref ref-item" onclick={() => backend.showItem(next.item.id, null)}>{next.item.name}</button>
+                <Ref kind="item" id={next.item.id} name={next.item.name} />
                 <span class="end">
                   <span
                     class="lv tabular"
@@ -763,7 +759,7 @@
 
   .head.strip {
     align-items: center;
-    margin: 0 -12px 10px;
+    margin: 0 0 10px;
   }
 
   .head.strip .title {
@@ -1036,7 +1032,7 @@
     font-size: var(--text-xs);
   }
 
-  .line .ref {
+  .line :global(.ref) {
     min-width: 0;
     padding: 0;
     border: 0;
@@ -1048,7 +1044,7 @@
   }
 
   /* Scrolled, in the game's amber, as the item check shows it. */
-  .line .ref.upgraded {
+  .line :global(.ref.upgraded) {
     color: var(--accent-strong);
   }
 

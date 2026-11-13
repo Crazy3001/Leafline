@@ -1,6 +1,7 @@
 <script lang="ts">
   // Where an item comes from, by how you get it: the NPC shops that sell it, the monsters that
   // drop it, each opening to the maps it lives on, and the quests that give it.
+  import Ref from "$lib/components/Ref.svelte";
   import { ChevronRight } from "@lucide/svelte";
 
   import GoButton from "$lib/components/GoButton.svelte";
@@ -68,13 +69,11 @@
         {#each shops as shop, i (i)}
           <li>
             <span class="shop-line">
-              {#if shop.npcId != null}<button class="ref ref-npc" onclick={() => backend.showPlace("npcs", shop.npcId!)}
-                  >{shop.npc}</button
-                >{:else}{shop.npc}{/if}
+              {#if shop.npcId != null}<Ref kind="npc" id={shop.npcId} name={shop.npc} />{:else}{shop.npc}{/if}
               <span class="price tabular" title="Seen {shortDate(shop.seen)}">{formatNumber(shop.price)} mesos</span>
             </span>
             <span class="who">
-              {#if shop.map}<button class="ref ref-map" onclick={() => backend.showPlace("maps", shop.map!.id)}>{shop.map.name}</button
+              {#if shop.map}<Ref kind="map" id={shop.map!.id}>{shop.map.name}</Ref
                 >{:else}{shop.mapName}{/if}{#if shop.hops != null && shop.hops > 0}{" · "}{shop.hops} portal{shop.hops === 1
                   ? ""
                   : "s"}{/if}{#if shop.needs}{" · "}<span class="needs">{shop.needs}</span>{/if}
@@ -101,7 +100,7 @@
               <button class="chevron-button" aria-expanded={open} aria-label="Maps for {hunt.monster.name}" onclick={() => toggle(hunt)}>
                 <span class="chevron" class:open><ChevronRight size={11} /></span>
               </button>
-              <button class="mob-name ref ref-mob" onclick={() => showMonsterNamed(hunt.monster.name)}>{hunt.monster.name}</button>
+              <Ref kind="mob" name={hunt.monster.name} class="mob-name" />
               <button class="row-rest" tabindex="-1" onclick={() => toggle(hunt)}>
                 <span class="muted tabular">Lv {hunt.monster.level}{hunt.monster.boss ? " · boss" : ""}</span>
                 <span class="maps-count faint tabular">{hunt.maps.length} map{hunt.maps.length === 1 ? "" : "s"}</span>
@@ -112,7 +111,7 @@
               <ul class="maps">
                 {#each hunt.maps as ground (ground.map.id)}
                   <li>
-                    <button class="ref ref-map" onclick={() => backend.showPlace("maps", ground.map.id)}>{ground.map.name}</button>
+                    <Ref kind="map" id={ground.map.id} name={ground.map.name} />
                     <span class="faint tabular">×{ground.count}</span>
                     <span class="dist tabular">{groundDistance(ground, found.from != null)}</span>
                     {#if ground.hops !== 0}<GoButton place={mapPlace(ground.map)} />{/if}
@@ -149,15 +148,9 @@
         {#each quests as quest (quest.quest.id)}
           {@const giverMap = quest.giverMaps[0]}
           <li>
-            <button class="quest" onclick={() => backend.showQuest(quest.quest.id)}>{quest.quest.name}</button>
+            <Ref kind="quest" id={quest.quest.id} name={quest.quest.name} class="quest" />
             <span class="who">
-              {#if quest.quest.levelMin}Lv {quest.quest.levelMin}{/if}{#if quest.giver}{quest.quest.levelMin ? " · " : ""}<button
-                  class="ref ref-npc"
-                  onclick={() => showNpcNamed(quest.giver!)}>{quest.giver}</button
-                >{/if}{#if giverMap}{quest.quest.levelMin || quest.giver ? " · " : ""}{#if giverMap.known}<button
-                    class="ref ref-map"
-                    onclick={() => backend.showPlace("maps", giverMap.id)}>{giverMap.name}</button
-                  >{:else}{giverMap.name}{/if}{/if}
+              {#if quest.quest.levelMin}Lv {quest.quest.levelMin}{/if}{#if quest.giver}{quest.quest.levelMin ? " · " : ""}<Ref kind="npc" name={quest.giver} />{/if}{#if giverMap}{quest.quest.levelMin || quest.giver ? " · " : ""}{#if giverMap.known}<Ref kind="map" id={giverMap.id} name={giverMap.name} />{:else}{giverMap.name}{/if}{/if}
             </span>
           </li>
         {/each}
@@ -327,22 +320,6 @@
   .quests li {
     display: grid;
     gap: 1px;
-  }
-
-  .quest {
-    padding: 0;
-    border: 0;
-    background: transparent;
-    font-size: var(--text-sm);
-    font-weight: 600;
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .quest:hover,
-  .quest:focus-visible {
-    color: var(--accent-strong);
-    outline: none;
   }
 
   .who {

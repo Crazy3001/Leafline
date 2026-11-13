@@ -1,5 +1,6 @@
 <script lang="ts">
   // Everything the cached data says about one map. No map images or coordinates are shown.
+  import Ref from "$lib/components/Ref.svelte";
   import { ExternalLink, Skull } from "@lucide/svelte";
 
   import { backend } from "$lib/api";
@@ -90,7 +91,7 @@
         {#each details.mobs as mob (mob.id)}
           <tr>
             <td class="mob">
-              <button class="ref ref-mob" onclick={() => backend.showMonster(mob.id, null)}>{monsterLabel(mob.name)}</button>
+              <Ref kind="mob" id={mob.id} name={monsterLabel(mob.name)} />
               {#if mob.boss}<span class="boss" title="Boss"><Skull size={11} /></span>{/if}
               {#if mob.undead}<span class="tag">undead</span>{/if}
             </td>
@@ -119,12 +120,12 @@
       {#each details.quests as need (need.quest.id)}
         <li>
           <div class="quest-head">
-            <button class="quest-name ref ref-quest" onclick={() => backend.showQuest(need.quest.id)}>{need.quest.name}</button>
+            <Ref kind="quest" id={need.quest.id} name={need.quest.name} class="quest-name" />
             {#if need.quest.levelMin}<span class="lv">Lv {need.quest.levelMin}+</span>{/if}
           </div>
           <div class="quest-sub">
             {need.targets.map((t) => `${t.count} ${t.name}`).join(", ")}
-            {#if need.giver}<span class="giver">· from <button class="ref ref-npc" onclick={() => showNpcNamed(need.giver!)}>{need.giver}</button></span>{/if}
+            {#if need.giver}<span class="giver">· from <Ref kind="npc" name={need.giver} /></span>{/if}
           </div>
         </li>
       {/each}
@@ -137,7 +138,7 @@
     <ul class="npcs">
       {#each details.npcs as npc (npc.id)}
         <li>
-          <button class="ref ref-npc" onclick={() => backend.showPlace("npcs", npc.id)}>{npc.name}</button>
+          <Ref kind="npc" id={npc.id} name={npc.name} />
           {#if npc.quests.length}
             <span class="gives" title={npc.quests.map((q) => q.name).join("\n")}>
               {npc.quests.length} quest{npc.quests.length === 1 ? "" : "s"}
@@ -165,7 +166,7 @@
               <span class="chev" class:open>›</span>
             </button>
             {#if shop.npcId != null}
-              <button class="ref ref-npc" onclick={() => backend.showPlace("npcs", shop.npcId!)}>{shop.npc}</button>
+              <Ref kind="npc" id={shop.npcId} name={shop.npc} />
             {:else}
               <span>{shop.npc}</span>
             {/if}
@@ -298,7 +299,7 @@
     font-size: var(--text-sm);
   }
 
-  .quest-name {
+  li :global(.ref.quest-name) {
     font-weight: 500;
   }
 

@@ -4,8 +4,9 @@
 //! The facts come from OSMS Data Explorer's public JSON (CC BY 4.0), which is extracted from the
 //! Classic client. Leafline downloads it only after the user asks, keeps it in a local SQLite
 //! cache and credits it wherever it is shown; none of it ships in the repo or the installer.
-//! Image fields and map coordinates are never read. Drops and who takes each quest in come
-//! separately from mapleclassic.wiki, where players log them.
+//! Picture addresses are kept for the picture cache (see `pictures`); map coordinates are not.
+//! Drops and who takes each quest in come separately from mapleclassic.wiki, where players log
+//! them.
 
 pub mod atlas;
 pub mod bestiary;
@@ -14,6 +15,7 @@ pub mod layout;
 pub mod fetch;
 pub mod guide;
 pub mod osms;
+pub mod pictures;
 pub mod places;
 pub mod questbook;
 pub mod shops;

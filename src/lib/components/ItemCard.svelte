@@ -9,6 +9,7 @@
   import DropLogger from "./DropLogger.svelte";
   import ItemDetails from "./ItemDetails.svelte";
   import ItemNotes from "./ItemNotes.svelte";
+  import PicFrame from "$lib/ui/PicFrame.svelte";
   import { backend } from "$lib/api";
   import { reportUrl } from "$lib/feedback";
   import { formatSigned, titleCase } from "$lib/format";
@@ -228,10 +229,15 @@
       {#if saveFailed}<p class="saved">Couldn't save the picture.</p>{/if}
     </div>
   {/if}
-  <h3 class="name" class:upgraded>{name || "Unreadable name"}</h3>
-  {#if summary.length}
-    <p class="summary">{summary.join(" · ")}</p>
-  {/if}
+  <div class="title-row">
+    <PicFrame kind="item" id={record?.id ?? matched?.id ?? null} size={40} />
+    <div class="title-text">
+      <h3 class="name" class:upgraded>{name || "Unreadable name"}</h3>
+      {#if summary.length}
+        <p class="summary">{summary.join(" · ")}</p>
+      {/if}
+    </div>
+  </div>
   {#if scrolling?.line}
     <p class="slots tabular">{scrolling.line}</p>
   {/if}
@@ -325,6 +331,21 @@
 </Card>
 
 <style>
+  .title-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+
+  .title-text {
+    min-width: 0;
+  }
+
+  .title-text .summary {
+    margin-bottom: 0;
+  }
+
   .name {
     margin: 0;
     font-family: var(--font-display);

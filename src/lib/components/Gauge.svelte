@@ -51,15 +51,17 @@
 
   .track {
     height: 8px;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-pill);
     background: rgba(255, 255, 255, 0.06);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
     overflow: hidden;
   }
 
   .fill {
     height: 100%;
     border-radius: inherit;
-    background: var(--color);
-    transition: width 0.4s ease;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--color) 80%, white), var(--color));
+    box-shadow: 0 0 10px color-mix(in srgb, var(--color) 35%, transparent);
+    transition: width 0.4s var(--ease);
   }
 </style>

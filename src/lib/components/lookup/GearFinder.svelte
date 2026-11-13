@@ -127,7 +127,7 @@
       <ul class="rows">
         {#each group.picks as pick (pick.item.id)}
           <li>
-            <LookupRow name={pick.item.name} line={line(pick.item)} small={pick.item.gender?.[0].toUpperCase()} goal={pick.goal} onclick={() => (itemView.id = pick.item.id)} />
+            <LookupRow name={pick.item.name} picture={{ kind: "item", id: pick.item.id }} line={line(pick.item)} small={pick.item.gender?.[0].toUpperCase()} goal={pick.goal} onclick={() => (itemView.id = pick.item.id)} />
           </li>
         {/each}
       </ul>
@@ -136,7 +136,7 @@
         <ul class="rows">
           {#each group.picks.slice(0, SHOWN) as pick (pick.item.id)}
             <li>
-              <LookupRow name={pick.item.name} line={line(pick.item)} small={pick.item.gender?.[0].toUpperCase()} goal={pick.goal} onclick={() => (itemView.id = pick.item.id)} />
+              <LookupRow name={pick.item.name} picture={{ kind: "item", id: pick.item.id }} line={line(pick.item)} small={pick.item.gender?.[0].toUpperCase()} goal={pick.goal} onclick={() => (itemView.id = pick.item.id)} />
             </li>
           {/each}
         </ul>

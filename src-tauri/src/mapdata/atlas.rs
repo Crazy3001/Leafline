@@ -876,6 +876,9 @@ pub(crate) mod tests {
             map_mark: None,
             exits: portals.iter().filter_map(|p| p.dest_map_id).collect(),
             portals,
+            minimap_url: None,
+            render_url: None,
+            map_mark_url: None,
         }
     }
 
@@ -890,6 +893,7 @@ pub(crate) mod tests {
             undead: false,
             spawns: spawns.iter().map(|&(map_id, count)| Spawn { map_id, count, respawn: None }).collect(),
             details: MonsterDetails::default(),
+            icon_url: None,
         }
     }
 
@@ -920,8 +924,8 @@ pub(crate) mod tests {
                 mob(12, "Burrow Rat", 8, 15, &[(4, 5)]),
             ],
             npcs: vec![
-                NpcRecord { id: 50, name: "Warden Ilse".into(), maps: vec![1] },
-                NpcRecord { id: 51, name: "Innkeeper Bo".into(), maps: vec![5] },
+                NpcRecord { id: 50, name: "Warden Ilse".into(), maps: vec![1], icon_url: None },
+                NpcRecord { id: 51, name: "Innkeeper Bo".into(), maps: vec![5], icon_url: None },
             ],
             quests: vec![
                 QuestRecord {
@@ -995,8 +999,8 @@ pub(crate) mod tests {
             maps: vec![town(10), town(20), map(30, "Harbor", "Main Road", vec![])],
             monsters: vec![],
             npcs: vec![
-                NpcRecord { id: 1, name: "Roger".into(), maps: vec![10] },
-                NpcRecord { id: 2, name: "Nina".into(), maps: vec![20] },
+                NpcRecord { id: 1, name: "Roger".into(), maps: vec![10], icon_url: None },
+                NpcRecord { id: 2, name: "Nina".into(), maps: vec![20], icon_url: None },
             ],
             quests: vec![],
             ..Dataset::default()

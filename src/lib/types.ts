@@ -937,6 +937,8 @@ export interface DisplaySettings {
   setupDone: boolean;
   /** Ask GitHub for the latest version number at startup. Off until the player turns it on. */
   updateCheck: boolean;
+  /** Item, monster, NPC and map pictures, downloaded from OSMS the first time each is shown. */
+  showPictures: boolean;
 }
 
 /** The optional update check (src-tauri/src/app/update.rs). */
@@ -1404,6 +1406,8 @@ export interface MonsterSheet {
   splits: { id: number; name: string; count: number }[];
   /** Null when the drop table isn't downloaded. */
   drops: MonsterDrops | null;
+  /** Where its HP per EXP places it among field monsters that spawn, least first; null for bosses. */
+  expRank: { place: number; of: number } | null;
 }
 
 export interface MonsterWhere {

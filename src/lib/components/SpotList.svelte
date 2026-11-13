@@ -10,6 +10,7 @@
   // monster, held to what the map can respawn at an assumed respawn time (see training.rs). No
   // damage formulas are modelled. "Played" lists every map the player has data for, whatever its
   // level, by their own rate. "Saved" lists the maps the player bookmarked, whatever their level.
+  import Ref from "$lib/components/Ref.svelte";
   import GoButton from "$lib/components/GoButton.svelte";
   import { mapPlace } from "$lib/destination.svelte";
   import { Bookmark, ChevronRight, CircleHelp, ExternalLink, Minus, Plus } from "@lucide/svelte";
@@ -383,24 +384,10 @@
               <span class="rank tabular">{i + 1}</span>
               <span class="names">
                 <span class="name"
-                  ><button
-                    class="ref ref-map"
-                    title="Open {spot.map.name} in Lookup"
-                    onclick={(e) => {
-                      e.stopPropagation();
-                      void backend.showPlace("maps", spot.map.id);
-                    }}>{spot.map.name}</button
-                  ></span
+                  ><Ref kind="map" id={spot.map.id} name={spot.map.name} /></span
                 >
                 <span class="meta" title={summaryText(spot)}>
-                  {#if steps(spot) === 0}<span class="here">You're here</span>{" · "}{/if}{#if sort === "played" && spot.measured}{formatDuration(spot.measured.activeSeconds)} played · {/if}{line.levels}{#each line.mobs as mob, n (mob.id)}{n === 0 ? " · " : ", "}<button
-                      class="ref ref-mob"
-                      title="Open {monsterLabel(mob.name)} in Lookup"
-                      onclick={(e) => {
-                        e.stopPropagation();
-                        void backend.showMonster(mob.id, null);
-                      }}>{monsterLabel(mob.name)}</button
-                    >{/each}
+                  {#if steps(spot) === 0}<span class="here">You're here</span>{" · "}{/if}{#if sort === "played" && spot.measured}{formatDuration(spot.measured.activeSeconds)} played · {/if}{line.levels}{#each line.mobs as mob, n (mob.id)}{n === 0 ? " · " : ", "}<Ref kind="mob" id={mob.id} name={monsterLabel(mob.name)} icon={false} />{/each}
                 </span>
               </span>
               <span class="metric">
@@ -436,8 +423,7 @@
                   {#each distinctMobs(spot.mobs) as mob (mob.id)}
                     <tr>
                       <td>
-                        <button class="ref ref-mob" onclick={() => backend.showMonster(mob.id, null)}>{monsterLabel(mob.name)}</button
-                        >{mob.boss ? " (boss)" : ""}
+                        <Ref kind="mob" id={mob.id} name={monsterLabel(mob.name)} />{mob.boss ? " (boss)" : ""}
                       </td>
                       <td class="tabular">{mob.level}</td>
                       <td class="tabular">{mob.count}</td>
@@ -708,7 +694,7 @@
   }
 
   /* The names inside the row are links; the line still trims to one row. */
-  .meta .ref {
+  .meta :global(.ref) {
     font-size: inherit;
   }
 
@@ -817,7 +803,7 @@
   .sure i {
     width: 4px;
     height: 4px;
-    border-radius: 1px;
+    border-radius: 50%;
     background: var(--border-strong);
   }
 

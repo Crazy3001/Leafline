@@ -1,6 +1,7 @@
 <script lang="ts">
   // How a quest goes, step by step with directions, and what it pays and leads to. For a quest
   // being tracked, the steps start with its objectives, since it has already been taken.
+  import Ref from "$lib/components/Ref.svelte";
   import ObjectiveHint from "./ObjectiveHint.svelte";
   import PlaceRoute from "./PlaceRoute.svelte";
   import { backend } from "$lib/api";
@@ -38,7 +39,7 @@
 <ol class="steps">
   {#if !tracked && info.giver}
     <li>
-      <p class="step">Talk to <button class="ref ref-npc" onclick={() => showNpcNamed(info.giver!)}>{info.giver}</button></p>
+      <p class="step">Talk to <Ref kind="npc" name={info.giver} /></p>
       <PlaceRoute maps={info.giverMaps} {from} npc={info.giver} />
     </li>
   {/if}
@@ -49,9 +50,9 @@
         {objective.guide.kind === "monster" ? "Defeat" : "Bring"}
         {objective.count}
         {#if objective.guide.kind === "monster"}
-          <button class="ref ref-mob" onclick={() => showMonsterNamed(objective.guide.target)}>{objective.guide.target}</button>
+          <Ref kind="mob" name={objective.guide.target} />
         {:else}
-          <button class="ref ref-item" onclick={() => showItemNamed(objective.guide.item ?? objective.guide.target)}>{objective.guide.target}</button>
+          <Ref kind="item" name={objective.guide.item ?? objective.guide.target}>{objective.guide.target}</Ref>
         {/if}
       </p>
       {#if !finishedStep}<ObjectiveHint guide={objective.guide} {from} />{/if}
@@ -59,11 +60,11 @@
   {/each}
   <li class:next={finished}>
     {#if info.turnIn}
-      <p class="step">Turn in to <button class="ref ref-npc" onclick={() => showNpcNamed(info.turnIn!)}>{info.turnIn}</button></p>
+      <p class="step">Turn in to <Ref kind="npc" name={info.turnIn} /></p>
       <PlaceRoute maps={info.turnInMaps} {from} npc={info.turnIn} />
     {:else if info.giver}
       <p class="step">Turn it in</p>
-      <p class="unsure">Nothing says to whom yet. It came from <button class="ref ref-npc" onclick={() => showNpcNamed(info.giver!)}>{info.giver}</button>.</p>
+      <p class="unsure">Nothing says to whom yet. It came from <Ref kind="npc" name={info.giver} />.</p>
       <PlaceRoute maps={info.giverMaps} {from} npc={info.giver} />
     {:else}
       <p class="step">Turn it in</p>
@@ -81,7 +82,7 @@
     <ul class="links">
       {#each sheet.rewards as item (item.id)}
         <li>
-          <button class="ref ref-item" onclick={() => backend.showItem(item.id, null)}>{item.name}</button>
+          <Ref kind="item" id={item.id} name={item.name} />
           {#if item.count > 1}<span class="tabular">×{item.count}</span>{/if}
           {#if !item.sure}<span class="maybe">possible</span>{/if}
         </li>
@@ -94,14 +95,14 @@
   <h4>Comes after</h4>
   <ul class="links">
     {#each sheet.after as quest (quest.id)}
-      <li><button class="ref ref-quest" onclick={() => backend.showQuest(quest.id)}>{quest.name}</button></li>
+      <li><Ref kind="quest" id={quest.id} name={quest.name} /></li>
     {/each}
   </ul>
 {/if}
 {#if sheet.next}
   <h4>Leads to</h4>
   <ul class="links">
-    <li><button class="ref ref-quest" onclick={() => backend.showQuest(sheet.next!.id)}>{sheet.next.name}</button></li>
+    <li><Ref kind="quest" id={sheet.next!.id} name={sheet.next.name} /></li>
   </ul>
 {/if}
 
@@ -151,7 +152,7 @@
   }
 
   .done .step,
-  .done .step .ref {
+  .done .step :global(.ref) {
     color: var(--faint);
     font-weight: 500;
     text-decoration: line-through;
@@ -206,7 +207,7 @@
     font-size: var(--text-sm);
   }
 
-  .links .ref {
+  .links :global(.ref) {
     padding: 2px 0;
     font-weight: 600;
   }

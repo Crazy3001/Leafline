@@ -1,5 +1,6 @@
 <script lang="ts">
   // The map a quest step happens on, with the way there from where the character is.
+  import Ref from "$lib/components/Ref.svelte";
   import GoButton from "$lib/components/GoButton.svelte";
   import { mapPlace, npcPlace } from "$lib/destination.svelte";
   import { Route } from "@lucide/svelte";
@@ -48,7 +49,7 @@
 {#if maps.length}
   <p class="place">
     <span>
-      {#each maps as m, k (m.id)}{#if k}{", "}{/if}{#if m.known}<button class="ref ref-map" onclick={() => backend.showPlace("maps", m.id)}>{m.name}</button>{:else}{m.name}{/if}{/each}
+      {#each maps as m, k (m.id)}{#if k}{", "}{/if}{#if m.known}<Ref kind="map" id={m.id} name={m.name} />{:else}{m.name}{/if}{/each}
     </span>
     {#if !here}<GoButton {place} />{/if}
     {#if here}

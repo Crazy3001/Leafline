@@ -141,7 +141,7 @@
         <p class="heading">On this map</p>
         <ul class="rows">
           {#each here.card.npcs as npc (npc.id)}
-            <li><LookupRow name={npc.name} aside={quests(npc.quests.length)} onclick={() => (npcView.id = npc.id)} /></li>
+            <li><LookupRow name={npc.name} picture={{ kind: "npc", id: npc.id }} aside={quests(npc.quests.length)} onclick={() => (npcView.id = npc.id)} /></li>
           {/each}
         </ul>
         <p class="heading">Everyone</p>
@@ -152,7 +152,7 @@
           {#if !page.closest}<p class="count tabular">{page.total.toLocaleString()} {page.total === 1 ? "NPC" : "NPCs"}</p>{/if}
           <ul class="rows">
             {#each page.npcs as row (row.id)}
-              <li><LookupRow name={row.name} line={line(row)} aside={quests(row.quests)} onclick={() => (npcView.id = row.id)} /></li>
+              <li><LookupRow name={row.name} picture={{ kind: "npc", id: row.id }} line={line(row)} aside={quests(row.quests)} onclick={() => (npcView.id = row.id)} /></li>
             {/each}
           </ul>
           {#if page.npcs.length < page.total}<button class="back inline" onclick={more}>Show more</button>{/if}

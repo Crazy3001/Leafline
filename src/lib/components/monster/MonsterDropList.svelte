@@ -1,6 +1,7 @@
 <script lang="ts">
   // What a monster is known to drop, from Leafline's drop list: presence only, so rates show only
   // where a drop has one. An empty list says so plainly.
+  import Ref from "$lib/components/Ref.svelte";
   import { backend } from "$lib/api";
   import { showItemNamed } from "$lib/items.svelte";
   import { DROPS_CREDIT, DROPS_URL } from "$lib/mapdata.svelte";
@@ -45,7 +46,7 @@
         {#if drop.category === "meso"}
           <span class="mesos">{drop.item}</span>
         {:else}
-          <button class="ref ref-item" onclick={() => showItemNamed(drop.item)}>{drop.item}</button>
+          <Ref kind="item" name={drop.item} />
         {/if}
         {#if drop.quest}<span class="tag">quest</span>{/if}
         <span class="rate tabular">{percent(drop.rate)}{quantity(drop)}</span>
@@ -85,7 +86,7 @@
     border-top: 1px solid var(--border);
   }
 
-  li .ref {
+  li :global(.ref) {
     min-width: 0;
     font-weight: 500;
   }

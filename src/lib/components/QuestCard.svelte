@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Ref from "$lib/components/Ref.svelte";
   import GoButton from "$lib/components/GoButton.svelte";
   import { npcPlace } from "$lib/destination.svelte";
   import { Check, ChevronRight, Gift, Hourglass, LoaderCircle, Search, UserRound, X } from "@lucide/svelte";
@@ -164,7 +165,7 @@
 </script>
 
 {#snippet who(person: string, maps: MapRef[])}
-  <button class="ref ref-npc" onclick={() => showNpcNamed(person)}>{person}</button>{#if maps.length}<span class="faint">{" · "}</span>{#each maps as m, k (m.id)}{#if k}<span class="faint">, </span>{/if}{#if m.known}<button class="ref ref-map" onclick={() => backend.showPlace("maps", m.id)}>{m.name}</button>{:else}<span class="faint">{m.name}</span>{/if}{/each}{/if}{" "}<GoButton place={npcPlace(person, maps)} />
+  <Ref kind="npc" name={person} />{#if maps.length}<span class="faint">{" · "}</span>{#each maps as m, k (m.id)}{#if k}<span class="faint">, </span>{/if}{#if m.known}<Ref kind="map" id={m.id} name={m.name} />{:else}<span class="faint">{m.name}</span>{/if}{/each}{/if}{" "}<GoButton place={npcPlace(person, maps)} />
 {/snippet}
 
 <Card title={followed ? "Followed quests" : "Quests"} {plain}>
@@ -214,10 +215,10 @@
                 <span class="step">
                   {#if hint?.kind === "monster"}
                     <span class="verb">Hunt</span>
-                    <button class="ref ref-mob" onclick={() => showMonsterNamed(objective.target)}>{objective.target}</button>
+                    <Ref kind="mob" name={objective.target} />
                   {:else if hint?.kind === "item"}
                     <span class="verb">Collect</span>
-                    <button class="ref ref-item" onclick={() => showItemNamed(hint.item ?? objective.target)}>{objective.target}</button>
+                    <Ref kind="item" name={hint.item ?? objective.target}>{objective.target}</Ref>
                   {:else}
                     <span>{objective.target}</span>
                   {/if}
@@ -261,7 +262,7 @@
           <span>
             <!-- Kept on few lines: the separators carry their own spaces. -->
             {#each payout(sheet.sheet) as part, k}{#if k}<span class="sep">{" · "}</span>{/if}{#if part.kind === "item"}
-                <span class="nowrap"><button class="ref ref-item" onclick={() => backend.showItem(part.id, null)}>{part.name}</button>{#if part.count > 1}<span class="tabular">{" "}×{part.count}</span>{/if}</span
+                <span class="nowrap"><Ref kind="item" id={part.id} name={part.name} />{#if part.count > 1}<span class="tabular">{" "}×{part.count}</span>{/if}</span
               >{:else if part.kind === "more" && id != null}<button class="more" onclick={() => toggleExpanded(id)}
                   >{expanded ? part.text : `${part.text} ›`}</button
                 >{:else}<span class="{part.kind} nowrap tabular">{part.text}</span>{/if}{/each}

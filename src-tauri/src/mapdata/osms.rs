@@ -1,9 +1,10 @@
 //! The parts of OSMS Data Explorer's v1 JSON that the map card and build planner use.
 //!
-//! Only the fields listed here are read. Every `*_url` image field is left out on purpose, so
-//! none can reach the cache or the screen. Coordinates are read only to tell which third of its
-//! map a portal stands in, and are dropped as the file is parsed: only that coarse place is
-//! kept, and nothing is ever drawn at a map's real positions.
+//! Only the fields listed here are read. Picture addresses (`icon_url`, `minimap_url`,
+//! `render_url`) are kept so the picture cache can download a picture the first time one is
+//! shown (allowed since 2026-11-13); the pictures themselves never pass through here.
+//! Coordinates are read only to tell which third of its map a portal stands in, and are dropped
+//! as the file is parsed.
 
 use std::collections::HashMap;
 
@@ -88,6 +89,9 @@ struct RawMap {
     mobs: Vec<Point>,
     #[serde(default)]
     npcs: Vec<Point>,
+    minimap_url: Option<String>,
+    render_url: Option<String>,
+    map_mark_url: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -147,6 +151,9 @@ impl From<RawMap> for MapRecord {
             map_mark: raw.map_mark,
             exits: raw.exits,
             portals,
+            minimap_url: raw.minimap_url,
+            render_url: raw.render_url,
+            map_mark_url: raw.map_mark_url,
         }
     }
 }
@@ -164,6 +171,11 @@ pub struct MapRecord {
     /// Maps reachable from this one.
     pub exits: Vec<u32>,
     pub portals: Vec<Portal>,
+    /// Where OSMS publishes the map's minimap and its whole-map picture.
+    pub minimap_url: Option<String>,
+    pub render_url: Option<String>,
+    /// Where OSMS publishes the emblem of the area it is in.
+    pub map_mark_url: Option<String>,
 }
 
 /// A portal's name, where it leads, and roughly where it stands: which third of the map across
@@ -210,6 +222,7 @@ struct RawMonster {
     revives_into: Vec<Split>,
     #[serde(default)]
     spawns: Vec<Spawn>,
+    icon_url: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -272,6 +285,7 @@ impl From<RawMonster> for MonsterRecord {
             undead: raw.undead,
             spawns: raw.spawns,
             details,
+            icon_url: raw.icon_url,
         }
     }
 }
@@ -288,10 +302,12 @@ pub struct MonsterRecord {
     pub undead: bool,
     pub spawns: Vec<Spawn>,
     pub details: MonsterDetails,
+    /// Where OSMS publishes its picture.
+    pub icon_url: Option<String>,
 }
 
-/// What the file says of a monster beyond the few numbers maps and routes use. Icon and animation
-/// URLs are left out, like every other image. A stat the file leaves out stays `None`.
+/// What the file says of a monster beyond the few numbers maps and routes use. A stat the file
+/// leaves out stays `None`.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MonsterDetails {
@@ -361,6 +377,9 @@ pub struct NpcRecord {
     pub name: String,
     #[serde(default)]
     pub maps: Vec<u32>,
+    /// Where OSMS publishes their picture.
+    #[serde(default)]
+    pub icon_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Deserialize)]
@@ -562,6 +581,7 @@ struct RawItem {
     stats: HashMap<String, serde_json::Value>,
     weapon: Option<RawWeapon>,
     scroll: Option<RawScroll>,
+    icon_url: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -631,6 +651,7 @@ impl From<RawItem> for ItemRecord {
             scroll,
             classes: raw.req_classes,
             name: raw.name,
+            icon_url: raw.icon_url,
         }
     }
 }
@@ -741,6 +762,9 @@ pub struct ItemRecord {
     pub price: Option<i64>,
     pub description: Option<String>,
     pub scroll: Option<ScrollInfo>,
+    /// Where OSMS publishes its icon. The webview asks for pictures by item id, not by address.
+    #[serde(skip_serializing)]
+    pub icon_url: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -822,6 +846,8 @@ mod tests {
         assert_eq!(maps[0].portals[0].dest_map_id, Some(8));
         assert_eq!(maps[0].portals[1].dest_map_id, None);
         assert_eq!(maps[0].street_name.as_deref(), Some("Mossy Road"));
+        assert_eq!(maps[0].minimap_url.as_deref(), Some("https://example.invalid/m.png"));
+        assert_eq!(maps[0].render_url, None);
     }
 
     fn portals_of(json: &[u8]) -> Vec<Portal> {
@@ -916,6 +942,9 @@ mod tests {
         assert!(items[1].classes.is_empty() && items[1].req_level == 0);
         assert_eq!((items[2].description.as_deref(), items[2].untradable), (Some("Restores 5 HP."), true));
         assert!(items[3].quest_item);
+        assert_eq!(wand.icon_url.as_deref(), Some("https://example.invalid/w.png"));
+        assert_eq!(items[1].icon_url, None);
+        assert!(!serde_json::to_string(wand).unwrap().contains("http"), "the webview asks by id, not by address");
     }
 
     #[test]
@@ -937,7 +966,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_what_a_monster_can_do_but_not_its_images() {
+    fn reads_what_a_monster_can_do_and_where_its_picture_is() {
         // A made-up monster in OSMS's shape.
         let json = br#"[
             {"id": 7, "name": "Moss Golem", "level": 30, "hp": 900, "mp": 40, "exp": 50, "is_boss": true, "aggro": true,
@@ -964,6 +993,8 @@ mod tests {
         let times: Vec<_> = golem.spawns.iter().map(|s| s.respawn).collect();
         assert_eq!(times, [Some(3600), None, None, None]);
         assert_eq!(monsters[1].details, MonsterDetails::default());
+        assert_eq!(golem.icon_url.as_deref(), Some("https://example.invalid/i.png"));
+        assert_eq!(monsters[1].icon_url, None);
 
         let stored = serde_json::to_string(details).unwrap();
         assert!(!stored.contains("http"));

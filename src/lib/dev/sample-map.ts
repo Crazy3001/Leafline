@@ -462,6 +462,7 @@ export function sampleMonsterSheet(id: number, from: number | null, hasDrops: bo
     undead,
     details,
     respawn: boss ? 3600 : null,
+    expRank: boss || !exp ? null : { place: 1 + bestiary.filter((m) => !m.boss && m.exp && m.hp / m.exp < hp / exp).length, of: bestiary.filter((m) => !m.boss && m.exp).length },
     maps,
     quests:
       id === 11

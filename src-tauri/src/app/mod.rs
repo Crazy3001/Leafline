@@ -9,6 +9,7 @@ mod live;
 mod mapdata;
 mod nav;
 mod overlay;
+mod pictures;
 mod pins;
 mod readings;
 mod recovery;
@@ -59,8 +60,10 @@ pub fn run() {
         .manage(Readings::default())
         .manage(Bindings::default())
         .manage(UpdateState::default())
+        .register_asynchronous_uri_scheme_protocol(pictures::SCHEME, pictures::handle)
         .setup(|app| {
             app.manage(MapDataState::load(app.handle())?);
+            app.manage(pictures::PictureState::load(app.handle())?);
             app.manage(UserDataState::load(app.handle())?);
             app.manage(damage::DamageState::load(app.handle())?);
             mapdata::check_for_updates(app.handle());

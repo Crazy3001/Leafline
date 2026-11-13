@@ -618,6 +618,7 @@ pub(crate) mod tests {
             price: None,
             description: None,
             scroll: None,
+            icon_url: None,
         }
     }
 

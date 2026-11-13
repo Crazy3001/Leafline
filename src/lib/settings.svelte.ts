@@ -26,6 +26,7 @@ export const display = $state<DisplaySettings>({
   framesFolder: null,
   setupDone: false,
   updateCheck: false,
+  showPictures: true,
 });
 
 const NUMPAD: Record<string, string> = { Add: "+", Subtract: "-", Multiply: "*", Divide: "/", Decimal: ".", Enter: "Enter" };

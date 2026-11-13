@@ -1,6 +1,7 @@
 <script lang="ts">
   // Where to go for one quest objective: a one-line hint that opens into the monsters to hunt,
   // their best maps, and the route to the chosen map.
+  import Ref from "$lib/components/Ref.svelte";
   import { ChevronRight, Crosshair } from "@lucide/svelte";
 
   import { backend } from "$lib/api";
@@ -85,7 +86,7 @@
       {#each hunts as hunt (hunt.monster.name)}
         <div class="hunt">
           <div class="mob">
-            <button class="ref ref-mob" onclick={() => showMonsterNamed(hunt.monster.name)}>{hunt.monster.name}</button>
+            <Ref kind="mob" name={hunt.monster.name} />
             <span class="muted">Lv {hunt.monster.level}{hunt.monster.boss ? " · boss" : ""}</span>
             {#if hunt.drop?.rate != null}
               <span class="rate" title={rateTitle(hunt.drop)}>{rate(hunt.drop.rate)} drop</span>
@@ -257,7 +258,7 @@
     font-size: var(--text-sm);
   }
 
-  .mob .ref {
+  .mob :global(.ref) {
     font-weight: 600;
   }
 

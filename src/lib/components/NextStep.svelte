@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Ref from "$lib/components/Ref.svelte";
   // The slim "next step" bar for "Go here", under the overlay's header, in the compact HUD and
   // in the Route pin (which shows the trip the overlay follows, see followTrip):
   // the step to take from the map the player is on, how many follow, and a way to cancel. It
@@ -61,17 +62,13 @@
   /** The map the route ends on, which says where an NPC stands. */
   const end = $derived(trip.route?.to ?? null);
 
-  function open(place: Destination) {
-    if (place.kind === "npc") void showNpcNamed(place.name);
-    else void backend.showPlace("maps", place.maps[0].id);
-  }
 </script>
 
 {#snippet name(place: Destination)}
   {#if hud}
     <span class="who" class:npc={place.kind === "npc"}>{place.name}</span>
   {:else}
-    <button class="ref {place.kind === 'npc' ? 'ref-npc' : 'ref-map'}" onclick={() => open(place)}>{place.name}</button>
+    <Ref kind={place.kind === "npc" ? "npc" : "map"} id={place.kind === "npc" ? null : place.maps[0].id} name={place.name} />
   {/if}
 {/snippet}
 
@@ -354,7 +351,7 @@
     font-size: var(--text-xs);
   }
 
-  .rest .ref {
+  .rest :global(.ref) {
     font-weight: 600;
   }
 

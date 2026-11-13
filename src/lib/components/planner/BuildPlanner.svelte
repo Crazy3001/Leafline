@@ -4,6 +4,7 @@
   // Skills, Stats, Gear and Settings, with the levels beside every tab. Changes save themselves.
   // It is its own window, and a column of the desk view (embedded), where a menu stands in for
   // the list of builds.
+  import Ref from "$lib/components/Ref.svelte";
   import { ArrowDown, ArrowUp, ClipboardCopy, ClipboardPaste, ExternalLink, Milestone, Plus, RotateCcw, Search, Trash2, X } from "@lucide/svelte";
   import { onMount, untrack } from "svelte";
 
@@ -773,8 +774,8 @@
                   {#if worn}
                     <span class="chip worn">
                       <b>now</b>
-                      <button class="ref ref-item" class:upgraded={!!worn.upgrades} onclick={() => backend.showItem(worn.item, worn.item == null ? worn.name : null)}
-                        >{worn.name}{#if worn.upgrades}{` (+${worn.upgrades})`}{/if}</button
+                      <Ref kind="item" id={worn.item} name={worn.name} class={worn.upgrades ? "upgraded" : ""}
+                        >{worn.name}{#if worn.upgrades}{` (+${worn.upgrades})`}{/if}</Ref
                       >
                     </span>
                   {:else}
@@ -785,7 +786,7 @@
                       <b class:warn={!check.usable || check.level == null}
                         >{#if !check.usable}wrong job{:else if check.level != null}{check.level}{:else}out of reach{/if}</b
                       >
-                      <button class="ref ref-item" onclick={() => backend.showItem(check.item.id, null)}>{check.item.name}</button>
+                      <Ref kind="item" id={check.item.id} name={check.item.name} />
                       <button class="icon small" aria-label="Stop aiming for {check.item.name}" onclick={() => dropGoal(check.item.id)}><X size={11} /></button>
                     </span>
                   {/each}
@@ -1565,7 +1566,7 @@
     color: var(--warn);
   }
 
-  .chip .ref {
+  .chip :global(.ref) {
     padding: 0;
     border: 0;
     background: transparent;
@@ -1573,11 +1574,11 @@
     cursor: pointer;
   }
 
-  .chip.worn .ref {
+  .chip.worn :global(.ref) {
     color: var(--text);
   }
 
-  .chip .ref.upgraded {
+  .chip :global(.ref.upgraded) {
     color: var(--accent-strong);
   }
 

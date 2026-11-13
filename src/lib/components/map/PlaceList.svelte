@@ -1,5 +1,6 @@
 <script lang="ts">
   // The maps something can be found on, the best first, and the route to the one picked.
+  import Ref from "$lib/components/Ref.svelte";
   import { backend } from "$lib/api";
   import RouteSteps from "./RouteSteps.svelte";
   import { formatCompact, groundDistance } from "$lib/format";
@@ -98,7 +99,7 @@
     <p class="note">No route through portals is known from {from.name}.</p>
   {/if}
   {#if ground}
-    <button class="more" onclick={() => backend.showPlace("maps", ground.map.id)}>Open {ground.map.name}</button>
+    <Ref kind="map" id={ground.map.id} class="more">Open {ground.map.name}</Ref>
   {/if}
 {/if}
 

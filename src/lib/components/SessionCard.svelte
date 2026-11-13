@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Ref from "$lib/components/Ref.svelte";
   import Card from "./Card.svelte";
   import { showMapNamed } from "$lib/places.svelte";
   import SessionControls from "./SessionControls.svelte";
@@ -73,7 +74,7 @@
           <tr class:current={row.map != null && row.map === session.map}>
             <th scope="row">
               {#if label}
-                <span class="map-name"><button class="ref ref-map" onclick={() => showMapNamed(row.map!)}>{label.name}</button></span>
+                <span class="map-name"><Ref kind="map" name={row.map}>{label.name}</Ref></span>
                 {#if label.street && !compact}<span class="map-street">{label.street}</span>{/if}
               {:else}
                 <span class="map-name unplaced" title="Gains between two readings on different maps, or before any map was read">

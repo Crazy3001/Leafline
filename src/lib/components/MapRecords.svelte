@@ -2,6 +2,7 @@
   // The training log's Records view: every map the player trained on, and under each the ways
   // they trained there (level, party size and job), with EXP and mesos per hour. Built from the
   // saved sessions' lines; everything stays on this PC.
+  import Ref from "$lib/components/Ref.svelte";
   import { ChevronDown, ChevronRight } from "@lucide/svelte";
 
   import { formatCompact, formatDuration, partyLabel } from "$lib/format";
@@ -120,7 +121,7 @@
           <tbody>
             <tr class="map" class:short={m.activeSeconds < SHORT_SECONDS}>
               <td>
-                <button class="ref ref-map name" onclick={() => showMapNamed(m.map)}>{m.name}</button>
+                <Ref kind="map" name={m.map} class="name">{m.name}</Ref>
                 <button class="fold" aria-expanded={open} aria-label="{open ? 'Fold' : 'Unfold'} {m.name}" onclick={() => toggle(m.map)}>
                   {#if m.street}<span class="street">{m.street}</span>{/if}
                   {#if open}<ChevronDown size={12} />{:else}<ChevronRight size={12} />{/if}
@@ -292,7 +293,7 @@
     color: var(--text);
   }
 
-  .name {
+  td :global(.ref.name) {
     font-weight: 600;
   }
 

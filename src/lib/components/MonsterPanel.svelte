@@ -13,6 +13,7 @@
   import MonsterCard from "./MonsterCard.svelte";
   import Section from "./map/Section.svelte";
   import { backend } from "$lib/api";
+  import Pic from "$lib/ui/Pic.svelte";
   import { formatCompact, formatNumber, monsterLabel } from "$lib/format";
   import { OSMS_CREDIT, OSMS_URL, mapData, watchMapData } from "$lib/mapdata.svelte";
   import { backFromMonster, blankMonsterQuery, monsterView, openMonster } from "$lib/monsters.svelte";
@@ -135,8 +136,9 @@
   const number = (value: string) => (value === "" ? null : Math.max(0, Math.floor(Number(value) || 0)));
 </script>
 
-{#snippet name(mob: { name: string; boss: boolean; undead: boolean })}
+{#snippet name(mob: { id: number; name: string; boss: boolean; undead: boolean })}
   <span class="name">
+    <Pic kind="mob" id={mob.id} size={20} />
     <span class="label">{monsterLabel(mob.name)}</span>
     {#if mob.boss}<span class="boss" title="Boss"><Skull size={11} /></span>{/if}
     {#if mob.undead}<span class="tag">undead</span>{/if}
@@ -389,8 +391,8 @@
 
   .name {
     display: flex;
-    align-items: baseline;
-    gap: 3px;
+    align-items: center;
+    gap: 6px;
     min-width: 0;
     color: var(--text);
     font-size: var(--text-sm);

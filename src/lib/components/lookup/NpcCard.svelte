@@ -9,13 +9,26 @@
   import ShopStock from "../item/ShopStock.svelte";
   import PlaceList from "../map/PlaceList.svelte";
   import Section from "../map/Section.svelte";
+  import Ref from "../Ref.svelte";
+  import PicFrame from "$lib/ui/PicFrame.svelte";
   import { backend } from "$lib/api";
   import { formatCompact } from "$lib/format";
   import { OSMS_CREDIT, OSMS_URL } from "$lib/mapdata.svelte";
   import { travelKey } from "$lib/settings.svelte";
   import type { MapReading, NpcWhere, QuestRow } from "$lib/types";
 
-  let { id, map = null, plain = false }: { id: number; map?: MapReading | null; plain?: boolean } = $props();
+  let {
+    id,
+    map = null,
+    plain = false,
+    compact = false,
+  }: {
+    id: number;
+    map?: MapReading | null;
+    plain?: boolean;
+    /** A link card's short form: the quests handed in here stay folded. */
+    compact?: boolean;
+  } = $props();
 
   let found = $state<NpcWhere | null>(null);
   let error = $state<string | null>(null);
@@ -35,6 +48,17 @@
 
   const sheet = $derived(found?.sheet.id === id ? found.sheet : null);
 
+  /** What they do, for the line under their name. */
+  const roles = $derived(
+    sheet
+      ? [
+          sheet.shop ? "Shop" : null,
+          sheet.quests.length ? `Gives ${sheet.quests.length} ${sheet.quests.length === 1 ? "quest" : "quests"}` : null,
+          sheet.takes.length ? `Takes ${sheet.takes.length} in` : null,
+        ].filter((r): r is string => !!r)
+      : [],
+  );
+
   function line(quest: QuestRow) {
     const repeat = quest.repeat ? quest.repeat[0].toUpperCase() + quest.repeat.slice(1) : null;
     return [quest.levelMin ? `Lv ${quest.levelMin}` : null, repeat, quest.exp ? `${formatCompact(quest.exp)} EXP` : null].filter(Boolean).join(" · ");
@@ -43,7 +67,13 @@
 
 <Card title="NPC" {plain}>
   {#if sheet}
-    <h3 class="name">{sheet.name} <GoButton place={npcPlace(sheet.name, sheet.maps.map((m) => m.map))} /></h3>
+    <div class="title-row">
+      <PicFrame kind="npc" id={sheet.id} size={compact ? 52 : 60} />
+      <div class="title-text">
+        <h3 class="name">{sheet.name} <GoButton place={npcPlace(sheet.name, sheet.maps.map((m) => m.map))} /></h3>
+        {#if roles.length}<p class="roles">{roles.join(" · ")}</p>{/if}
+      </div>
+    </div>
 
     <Section title="Where to find them" count={sheet.maps.length}>
       {#if sheet.maps.length}
@@ -64,7 +94,7 @@
         <ul class="quests">
           {#each sheet.quests as quest (quest.id)}
             <li>
-              <button class="ref ref-quest" onclick={() => backend.showQuest(quest.id)}>{quest.name}</button>
+              <Ref kind="quest" id={quest.id} name={quest.name} />
               <span class="who">{line(quest)}</span>
             </li>
           {/each}
@@ -77,7 +107,7 @@
         <ul class="quests">
           {#each sheet.takes as quest (quest.id)}
             <li>
-              <button class="ref ref-quest" onclick={() => backend.showQuest(quest.id)}>{quest.name}</button>
+              <Ref kind="quest" id={quest.id} name={quest.name} />
               {#if quest.levelMin}<span class="who">Lv {quest.levelMin}</span>{/if}
             </li>
           {/each}
@@ -94,6 +124,23 @@
 </Card>
 
 <style>
+  .title-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+
+  .title-text {
+    min-width: 0;
+  }
+
+  .roles {
+    margin: 2px 0 0;
+    color: var(--muted);
+    font-size: var(--text-sm);
+  }
+
   .name {
     margin: 0;
     font-family: var(--font-display);
@@ -116,7 +163,7 @@
     border-top: 1px solid var(--border);
   }
 
-  .quests .ref {
+  .quests :global(.ref) {
     display: block;
     font-size: var(--text-sm);
     font-weight: 600;

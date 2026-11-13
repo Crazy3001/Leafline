@@ -3,6 +3,7 @@
   // how this map compares with your bests on it, the maps played), then where to train next, with
   // a jump to it from the top. Before a session starts: the goal, where to train, your best maps
   // and the last sessions.
+  import Ref from "$lib/components/Ref.svelte";
   import SessionControls from "./SessionControls.svelte";
   import { ArrowDown } from "@lucide/svelte";
 
@@ -388,7 +389,7 @@
             <tr class:town>
               <td>
                 {#if row.map === session.map}<span class="here" title="You are here"></span>{/if}
-                {#if row.map}<button class="ref ref-map" onclick={() => showMapNamed(row.map!)}>{splitMapLabel(row.map).name}</button
+                {#if row.map}<Ref kind="map" name={row.map}>{splitMapLabel(row.map).name}</Ref
                   >{#if !town} <SaveSpot label={row.map} name={splitMapLabel(row.map).name} />{/if}{:else}<span
                     class="unplaced"
                     >Not placed on a map</span
@@ -437,7 +438,7 @@
         <tbody>
           {#each bests as m (m.map)}
             <tr>
-              <td><button class="ref ref-map" onclick={() => showMapNamed(m.map)}>{m.name}</button> <SaveSpot label={m.map} name={m.name} /></td>
+              <td><Ref kind="map" name={m.map}>{m.name}</Ref> <SaveSpot label={m.map} name={m.name} /></td>
               <td class="tabular">{formatCompact(m.best!.expPerHour)}</td>
               <td class="tabular">{m.bestMesos ? formatCompact(m.bestMesos.mesosPerHour) : "—"}</td>
               <td class="tabular muted">{m.best!.level != null ? `Lv ${m.best!.level} · ` : ""}{shortDay(m.best!.at)}</td>
@@ -464,7 +465,7 @@
         <li>
           <span class="tabular muted day">{shortDay(s.startedAt ?? s.savedAt)}</span>
           <span class="what"
-            >{#if !s.label && s.maps.length}<button class="ref ref-map" onclick={() => showMapNamed(s.maps[0].map)}>{mainMap(s.maps)}</button
+            >{#if !s.label && s.maps.length}<Ref kind="map" name={s.maps[0].map}>{mainMap(s.maps)}</Ref
               >{:else}{s.label || mainMap(s.maps)}{/if}</span
           >
           <span class="tabular">{formatCompact(s.expPerHour)}</span>

@@ -2,6 +2,7 @@
   // Every known drop of this map's monsters: by item, with who drops it, or by monster, each
   // opening to its own drops. The first open downloads Leafline's drop list if it isn't here yet;
   // lookups stay on this PC.
+  import Ref from "$lib/components/Ref.svelte";
   import { ChevronRight, LoaderCircle, RefreshCw } from "@lucide/svelte";
   import { untrack } from "svelte";
 
@@ -160,7 +161,7 @@
               <button class="chevron-button" aria-expanded={open} aria-label="Drops of {entry.monster}" onclick={() => toggle(entry.monster)}>
                 <span class="chevron" class:open><ChevronRight size={12} /></span>
               </button>
-              <button class="mob-name ref ref-mob" onclick={() => showMonsterNamed(entry.monster)}>{entry.monster}</button>
+              <Ref kind="mob" name={entry.monster} class="mob-name" />
               <button class="row-rest" tabindex="-1" onclick={() => toggle(entry.monster)}>
                 <span class="summary tabular">{entry.summary}</span>
               </button>
@@ -172,7 +173,7 @@
                     {#if drop.category === "meso"}
                       <span class="name mesos">{drop.item}</span>
                     {:else}
-                      <button class="name ref ref-item" onclick={() => showItemNamed(drop.item)}>{drop.item}</button>
+                      <Ref kind="item" name={drop.item} class="name" />
                     {/if}
                     {#if drop.quest}<span class="tag">quest</span>{/if}
                     <span class="rate tabular">{percent(drop.rate)}{quantity(drop)}</span>
@@ -201,7 +202,7 @@
             {#if item.category === "meso"}
               <span class="name mesos">{item.name}</span>
             {:else}
-              <button class="name ref ref-item" onclick={() => showItemNamed(item.name)}>{item.name}</button>
+              <Ref kind="item" name={item.name} class="name" />
             {/if}
             {#if item.quest}<span class="tag">quest</span>{/if}
             {#if item.category}<span class="cat">{item.category}</span>{/if}
@@ -209,7 +210,7 @@
           <div class="sources">
             {#each item.sources as source (source.monster)}
               <span class="source" class:unmeasured={source.rate == null} title={evidence(source)}>
-                <button class="monster ref ref-mob" onclick={() => showMonsterNamed(source.monster)}>{source.monster}</button>
+                <Ref kind="mob" name={source.monster} class="monster" />
                 <span class="rate tabular">{percent(source.rate)}{quantity(source)}</span>
               </span>
             {/each}
@@ -287,7 +288,7 @@
     color: var(--mesos);
   }
 
-  .monster {
+  .sources :global(.ref.monster) {
     font-size: var(--text-xs);
   }
 

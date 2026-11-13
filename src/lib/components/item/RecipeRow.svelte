@@ -1,6 +1,7 @@
 <script lang="ts">
   // One crafting recipe: what it makes, the discipline and skill level it needs, and what goes
   // into it. Every item opens its own page.
+  import Ref from "$lib/components/Ref.svelte";
   import { backend } from "$lib/api";
   import { formatNumber } from "$lib/format";
   import type { Recipe } from "$lib/types";
@@ -17,19 +18,13 @@
 <div class="recipe">
   <div class="top">
     <span class="makes">
-      {amount(recipe.output.count)}{#if recipe.output.id === current}<strong>{recipe.output.name}</strong>{:else}<button
-          class="ref ref-item"
-          onclick={() => backend.showItem(recipe.output.id, null)}>{recipe.output.name}</button
-        >{/if}
+      {amount(recipe.output.count)}{#if recipe.output.id === current}<strong>{recipe.output.name}</strong>{:else}<Ref kind="item" id={recipe.output.id} name={recipe.output.name} />{/if}
     </span>
     <span class="how">{recipe.discipline} {recipe.skillLevel}</span>
   </div>
   <div class="from">
     {#each recipe.ingredients as g, i (g.id)}
-      {i ? ", " : ""}{amount(g.count) || "1 × "}{#if g.id === current}<strong>{g.name}</strong>{:else}<button
-          class="ref ref-item"
-          onclick={() => backend.showItem(g.id, null)}>{g.name}</button
-        >{/if}
+      {i ? ", " : ""}{amount(g.count) || "1 × "}{#if g.id === current}<strong>{g.name}</strong>{:else}<Ref kind="item" id={g.id} name={g.name} />{/if}
     {/each}
     {#if recipe.mesoCost > 0}<span class="cost">{" · "}{formatNumber(recipe.mesoCost)} mesos</span>{/if}
   </div>

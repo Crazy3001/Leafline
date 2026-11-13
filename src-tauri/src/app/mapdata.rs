@@ -15,6 +15,7 @@ use crate::build::Catalog;
 use crate::error::{Error, Result};
 use crate::mapdata::fetch::{self, Http};
 use crate::mapdata::osms::Dataset;
+use crate::mapdata::pictures::PictureIndex;
 use crate::mapdata::layout::{self, Layouts};
 use crate::mapdata::store::{DROPS_FAILED, LAYOUTS_FAILED, TURN_INS_FAILED};
 use crate::mapdata::{
@@ -69,6 +70,8 @@ pub struct MapDataState {
     path: PathBuf,
     atlas: RwLock<Option<Arc<Atlas>>>,
     catalog: RwLock<Option<Arc<Catalog>>>,
+    /// Where each picture the data names is published, for the picture protocol.
+    pictures: RwLock<Arc<PictureIndex>>,
     /// Every map's layout, from Leafline's data repository. Empty until downloaded.
     layouts: RwLock<Arc<Layouts>>,
     downloading: AtomicBool,
@@ -84,8 +87,14 @@ impl MapDataState {
     pub fn load(app: &AppHandle) -> Result<Self> {
         let path = app.path().app_data_dir()?.join(FILE_NAME);
         // A damaged cache must not stop the app; downloading again rebuilds it.
+        let mut pictures = PictureIndex::default();
         let (atlas, catalog) = match Store::open(&path).and_then(|store| store.load()) {
-            Ok(data) => data.map(split).unzip(),
+            Ok(data) => {
+                if let Some(data) = &data {
+                    pictures = PictureIndex::new(data);
+                }
+                data.map(split).unzip()
+            }
             Err(err) => {
                 eprintln!("map data cache unreadable: {err}");
                 (None, None)
@@ -96,6 +105,7 @@ impl MapDataState {
             path,
             atlas: RwLock::new(atlas),
             catalog: RwLock::new(catalog),
+            pictures: RwLock::new(Arc::new(pictures)),
             layouts: RwLock::new(Arc::new(layouts)),
             downloading: AtomicBool::new(false),
             osms: Http::new(Duration::from_millis(250)),
@@ -122,6 +132,10 @@ impl MapDataState {
         self.atlas.read().expect("atlas lock").clone()
     }
 
+    pub(super) fn pictures(&self) -> Arc<PictureIndex> {
+        self.pictures.read().expect("pictures lock").clone()
+    }
+
     pub(super) fn catalog(&self) -> Option<Arc<Catalog>> {
         self.catalog.read().expect("catalog lock").clone()
     }
@@ -134,7 +148,11 @@ impl MapDataState {
             let mut store = Store::open(&self.path)?;
             let report = fetch::refresh(&mut store, &self.osms, force, now())?;
             if !report.downloaded.is_empty() || self.atlas().is_none() {
-                let (atlas, catalog) = store.load()?.map(split).unzip();
+                let data = store.load()?;
+                if let Some(data) = &data {
+                    *self.pictures.write().expect("pictures lock") = Arc::new(PictureIndex::new(data));
+                }
+                let (atlas, catalog) = data.map(split).unzip();
                 *self.atlas.write().expect("atlas lock") = atlas;
                 *self.catalog.write().expect("catalog lock") = catalog;
             }

@@ -1,5 +1,6 @@
 <script lang="ts">
   // What one NPC shop sells, with prices, from Leafline's shop file. Items open their own page.
+  import Ref from "$lib/components/Ref.svelte";
   import { backend } from "$lib/api";
   import { formatNumber } from "$lib/format";
   import { seenLine, shortDate } from "$lib/shops";
@@ -14,7 +15,7 @@
   {#each shop.items as item, i (i)}
     <li>
       {#if item.itemId != null}
-        <button class="ref ref-item" onclick={() => backend.showItem(item.itemId, null)}>{item.item}</button>
+        <Ref kind="item" id={item.itemId} name={item.item} />
       {:else}
         <span>{item.item}</span>
       {/if}

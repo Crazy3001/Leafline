@@ -25,10 +25,14 @@
 <style>
   .meter {
     width: 100%;
-    background: var(--surface-3);
+    overflow: hidden;
+    border-radius: var(--radius-pill);
+    background: rgba(255, 255, 255, 0.06);
   }
 
   .fill {
     height: 100%;
+    border-radius: inherit;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
   }
 </style>

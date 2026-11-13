@@ -27,18 +27,17 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
-    padding: 0 var(--space-3) 14px;
+    padding: 10px 10px 14px;
   }
 
   /* A block with no heading still keeps its space from the one above. */
   .block:not(:has(> header)) {
     padding-top: var(--space-3);
-    border-top: 1px solid var(--border-strong);
   }
 
   header {
     justify-content: space-between;
-    margin: 0 calc(-1 * var(--space-3));
+    margin: 0;
   }
 
   h2 {

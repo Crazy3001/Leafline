@@ -49,6 +49,9 @@ pub struct Settings {
     /// Ask GitHub for the latest version number at startup. Off until the player turns it on, in
     /// setup or Settings; sends nothing about the game or the player (see `update.rs`).
     pub update_check: bool,
+    /// Show item, monster, NPC and map pictures, downloaded from OSMS the first time each is
+    /// shown. Off, nothing is downloaded and names stand alone.
+    pub show_pictures: bool,
 }
 
 impl Default for Settings {
@@ -66,6 +69,7 @@ impl Default for Settings {
             frames_folder: None,
             setup_done: false,
             update_check: false,
+            show_pictures: true,
         }
     }
 }

@@ -412,9 +412,8 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--space-2) var(--space-4);
-    padding: var(--space-2) var(--space-4);
-    border-bottom: 1px solid var(--border-strong);
-    background: var(--surface);
+    padding: 10px var(--space-4);
+    background: transparent;
   }
 
   .who,
@@ -468,8 +467,9 @@
   .status .dot {
     width: 7px;
     height: 7px;
-    border-radius: 1px;
+    border-radius: 50%;
     background: currentColor;
+    box-shadow: 0 0 6px currentColor;
   }
 
   .status.good {
@@ -499,7 +499,8 @@
     padding: 0 10px;
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
-    background: var(--surface-2);
+    background: linear-gradient(180deg, var(--surface-3), var(--surface-2));
+    box-shadow: inset 0 1px 0 var(--highlight);
     color: var(--text);
     font-size: var(--text-sm);
     white-space: nowrap;
@@ -530,12 +531,10 @@
 
   .tabs {
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     justify-content: space-between;
     gap: var(--space-3);
-    padding: var(--space-2) var(--space-4) 0;
-    background: var(--surface);
-    border-bottom: 1px solid var(--border-strong);
+    padding: 0 var(--space-4) 10px;
   }
 
   .tablist {
@@ -543,42 +542,47 @@
     flex-wrap: wrap;
     gap: 2px;
     min-width: 0;
+    padding: 3px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: rgba(0, 0, 0, 0.28);
   }
 
   .tab,
   .rename {
-    height: 34px;
+    height: 32px;
     padding: 0 var(--space-4);
     border: 1px solid transparent;
-    border-bottom: 0;
-    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    border-radius: 7px;
     font-size: var(--text-md);
     white-space: nowrap;
   }
 
   .tab {
-    margin-bottom: -1px;
     background: transparent;
     color: var(--muted);
     cursor: pointer;
+    transition:
+      background 0.16s ease,
+      color 0.12s ease;
   }
 
   .tab:hover {
-    background: var(--surface-2);
+    background: rgba(255, 255, 255, 0.04);
     color: var(--text);
   }
 
   .tab[aria-selected="true"] {
-    background: var(--bg);
-    border-color: var(--border-strong);
-    border-bottom: 1px solid var(--bg);
+    background: linear-gradient(180deg, var(--surface-3), var(--surface-2));
+    box-shadow:
+      inset 0 1px 0 var(--highlight),
+      0 1px 4px rgba(0, 0, 0, 0.4);
     color: var(--accent-strong);
     font-weight: 600;
   }
 
   .rename {
     width: 150px;
-    margin-bottom: -1px;
     background: var(--surface-2);
     border-color: var(--accent);
     color: var(--text);
@@ -587,7 +591,6 @@
   .tab-actions {
     display: inline-flex;
     gap: var(--space-2);
-    padding-bottom: var(--space-2);
   }
 
   /* The Go here bar runs the window's width, under the header. */
@@ -600,14 +603,14 @@
     flex: 1;
     min-height: 0;
     display: grid;
-    gap: 1px;
-    background: var(--border);
+    gap: 10px;
+    padding: 0 10px 10px;
   }
 
   .column {
     display: flex;
     flex-direction: column;
-    gap: 1px;
+    gap: 10px;
     min-width: 0;
     min-height: 0;
   }
@@ -617,7 +620,13 @@
     display: flex;
     flex-direction: column;
     min-height: 0;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
     background: var(--surface);
+    box-shadow:
+      inset 0 1px 0 var(--highlight),
+      var(--shadow);
   }
 
   .panel-head {
@@ -626,10 +635,11 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--space-2);
-    height: 40px;
+    height: 44px;
     flex: none;
     padding: 0 var(--space-3) 0 var(--space-4);
     border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent);
   }
 
   h2 {
@@ -653,11 +663,11 @@
     right: var(--space-3);
     z-index: 10;
     width: 260px;
-    padding: 6px 0;
-    background: var(--surface-3);
+    padding: 6px;
+    background: var(--surface-raised);
     border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
-    box-shadow: var(--shadow);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
   }
 
   .menu-label {
@@ -678,8 +688,9 @@
     justify-content: space-between;
     width: 100%;
     height: 32px;
-    padding: 0 12px;
+    padding: 0 10px;
     border: 0;
+    border-radius: var(--radius-sm);
     background: transparent;
     color: var(--text);
     font-size: var(--text-md);
@@ -715,6 +726,6 @@
     flex: 1;
     min-height: 0;
     overflow-y: auto;
-    padding: var(--space-3) var(--space-4) var(--space-4);
+    padding: var(--space-2) var(--space-2) var(--space-4);
   }
 </style>

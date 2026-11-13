@@ -34,17 +34,12 @@
   .card {
     background: transparent;
     border-radius: 0;
-    padding: 0 12px 14px;
+    padding: 10px 10px 14px;
   }
 
   header {
     justify-content: space-between;
-    margin: 0 -12px 10px;
-  }
-
-  /* The first section sits right under the tabs, which already rule it off. */
-  .card:first-child header {
-    border-top: 0;
+    margin: 0 0 12px;
   }
 
   .plain-aside {

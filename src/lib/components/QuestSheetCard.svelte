@@ -8,9 +8,23 @@
   import { backend } from "$lib/api";
   import { DROPS_CREDIT, DROPS_URL, OSMS_CREDIT, OSMS_URL } from "$lib/mapdata.svelte";
   import { follow, isFollowed, unfollow } from "$lib/quests.svelte";
-  import type { MapReading, QuestWhere } from "$lib/types";
+  import type { MapReading, QuestReading, QuestWhere } from "$lib/types";
 
-  let { id, map = null, plain = false }: { id: number; map?: MapReading | null; plain?: boolean } = $props();
+  let {
+    id,
+    map = null,
+    quest = null,
+    plain = false,
+    compact = false,
+  }: {
+    id: number;
+    map?: MapReading | null;
+    /** What the Quest Helper shows, for this quest's counts while it is tracked. */
+    quest?: QuestReading | null;
+    plain?: boolean;
+    /** A link card: the credits stay in the full view. */
+    compact?: boolean;
+  } = $props();
 
   let found = $state<QuestWhere | null>(null);
   let error = $state<string | null>(null);
@@ -29,6 +43,8 @@
   });
 
   const sheet = $derived(found?.sheet.row.id === id ? found.sheet : null);
+  /** The Quest Helper's counts for it, while it shows this quest. */
+  const progress = $derived(sheet ? (quest?.quests.find((q) => q.title === sheet.row.name)?.objectives ?? []) : []);
   const meta = $derived(
     sheet
       ? [
@@ -54,12 +70,26 @@
       <button class="follow" onclick={() => follow(sheet.row.id, sheet.row.name)}><Plus size={12} />Follow</button>
     {/if}
 
+    {#if progress.length}
+      <ul class="progress">
+        {#each progress as objective (objective.target)}
+          {@const done = !objective.unread && objective.current >= objective.required}
+          <li class:done>
+            <span>{objective.target}</span>
+            <span class="tabular">{objective.unread ? "–" : objective.current} / {objective.required}</span>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+
     <QuestSteps {sheet} from={found?.from ?? null} />
 
+    {#if !compact}
     <p class="credit">
       <button onclick={() => backend.openLink(OSMS_URL)}>{OSMS_CREDIT}</button>
       <button onclick={() => backend.openLink(DROPS_URL)}>{DROPS_CREDIT}</button>
     </p>
+    {/if}
   {:else if error}
     <p class="note">{error}</p>
   {:else}
@@ -68,6 +98,30 @@
 </Card>
 
 <style>
+  .progress {
+    margin: 0 0 10px;
+    padding: 0;
+    list-style: none;
+  }
+
+  .progress li {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 5px 10px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    font-size: var(--text-sm);
+  }
+
+  .progress li + li {
+    margin-top: 3px;
+  }
+
+  .progress li.done span:last-child {
+    color: var(--good);
+  }
+
   .name {
     margin: 0;
     font-family: var(--font-display);

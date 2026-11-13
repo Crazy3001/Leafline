@@ -2,6 +2,7 @@
   // The training log: every saved session with its graph, rates per map by level and party, the
   // player's records per map by level, party size and job, and progress over days. Its own window opens from the Train tab, and the desk view can show it
   // in a column (embedded). Everything here stays on this PC.
+  import Ref from "$lib/components/Ref.svelte";
   import { Download, PenLine, Share2 } from "@lucide/svelte";
   import { onMount, untrack } from "svelte";
 
@@ -485,7 +486,7 @@
                             {:else}
                               {#if l.map}
                                 {@const map = l.map}
-                                <button class="ref ref-map" onclick={() => showMapNamed(map)}>{splitMapLabel(map).name}</button>
+                                <Ref kind="map" name={map}>{splitMapLabel(map).name}</Ref>
                               {:else}Not placed on a map{/if}
                               {#if l.map}
                                 {@const map = l.map}
@@ -511,8 +512,8 @@
                     <ul class="drops">
                       {#each sessionDropRows as d (d.item + d.monster)}
                         <li>
-                          <span><button class="ref ref-item" onclick={() => showItemNamed(d.item)}>{d.item}</button></span>
-                          <span class="muted"><button class="ref ref-mob" onclick={() => showMonsterNamed(d.monster)}>{d.monster}</button>{d.count > 1 ? ` ×${d.count}` : ""}</span>
+                          <span><Ref kind="item" name={d.item} /></span>
+                          <span class="muted"><Ref kind="mob" name={d.monster} />{d.count > 1 ? ` ×${d.count}` : ""}</span>
                         </li>
                       {/each}
                     </ul>
@@ -633,7 +634,7 @@
                 <tbody>
                   {#each stats as m (m.map)}
                     <tr>
-                      <td><button class="ref ref-map" onclick={() => showMapNamed(m.map)}>{m.name}</button></td>
+                      <td><Ref kind="map" name={m.map}>{m.name}</Ref></td>
                       <td>{m.sessions}</td>
                       <td>{dur(m.activeSeconds)}</td>
                       <td>{formatCompact(m.expPerHour)}</td>

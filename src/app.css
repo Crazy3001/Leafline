@@ -4,53 +4,64 @@
   color-scheme: dark;
 
   --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
-  --font-display: Bahnschrift, "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Segoe UI Variable Display", Bahnschrift, "Segoe UI", system-ui, sans-serif;
   --font-mono: "Cascadia Mono", "Cascadia Code", Consolas, ui-monospace, monospace;
 
-  --bg: #141412;
-  --surface: #1a1917;
-  --surface-2: #201f1c;
-  --surface-3: #2a2824;
-  --glass: rgba(20, 20, 18, 0.95);
+  /*
+   * Surfaces, darkest first: the window, a panel, a band or field inside it, a control on that.
+   * A cool graphite with a trace of warmth, so the amber accent and the game's colours stand out.
+   */
+  --bg: #0f1013;
+  --surface: #15171b;
+  --surface-2: #1c1f24;
+  --surface-3: #262a31;
+  /* A card that floats over the rest: link cards, menus. */
+  --surface-raised: #181b20;
+  --glass: rgba(15, 16, 19, 0.94);
   /* Rules between rows: strong enough to show over a bright game scene behind a see-through overlay. */
-  --border: rgba(236, 230, 216, 0.14);
-  --border-strong: rgba(236, 230, 216, 0.24);
+  --border: rgba(214, 222, 240, 0.08);
+  --border-strong: rgba(214, 222, 240, 0.15);
+  /* A soft top light on raised things. */
+  --highlight: rgba(255, 255, 255, 0.04);
 
-  --text: #ece6d8;
-  --muted: #a8a193;
+  --text: #eceef2;
+  --muted: #a3a8b3;
   /* 5.3:1 on the surface, the dimmest text that stays readable at 11 px. */
-  --faint: #938c7e;
+  --faint: #8a909b;
 
-  --accent: #e0a030;
-  --accent-strong: #f0b848;
-  --accent-soft: rgba(224, 160, 48, 0.14);
+  --accent: #f0a83a;
+  --accent-strong: #ffc062;
+  --accent-soft: rgba(240, 168, 58, 0.14);
+  --accent-ink: #1a1206;
 
-  --hp: #d9534f;
-  --mp: #4a90d9;
-  --exp: #d9c036;
-  --map: #e0a030;
+  --hp: #e0524d;
+  --mp: #4f98e8;
+  --exp: #e2c53c;
+  --map: #f0a83a;
   /* Rides and return scrolls in routes, apart from portal steps. */
-  --travel: #4fb3a3;
-  --good: #6fbf73;
-  --good-soft: rgba(111, 191, 115, 0.14);
-  --warn: #e8893a;
-  --warn-soft: rgba(232, 137, 58, 0.14);
+  --travel: #4fc0ae;
+  --good: #6cc77a;
+  --good-soft: rgba(108, 199, 122, 0.14);
+  --warn: #ee9244;
+  --warn-soft: rgba(238, 146, 68, 0.14);
   /* Lighter than the HP red, so it reads as text on the dark surface (5.4:1). */
-  --bad: #e06a66;
-  --bad-soft: rgba(224, 106, 102, 0.12);
+  --bad: #ec6f6a;
+  --bad-soft: rgba(236, 111, 106, 0.13);
   /* Mesos match the coin. */
-  --mesos: #e0a030;
+  --mesos: #f0a83a;
 
-  /* Names that open in another tab, coloured by what they name. All read 6:1 or better on the surface. */
-  --ref-item: #86b4e3;
-  --ref-mob: #e5897c;
-  --ref-npc: #6fc2b2;
-  --ref-map: #d9a94e;
+  /* Names that open a card, coloured by what they name. All read 6:1 or better on the surface. */
+  --ref-item: #8cbcf0;
+  --ref-mob: #f0907f;
+  --ref-npc: #6fd0bd;
+  --ref-map: #e7b45a;
 
-  --radius-sm: 2px;
-  --radius: 2px;
-  --radius-lg: 3px;
-  --shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --radius-pill: 999px;
+  --shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 18px 48px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.35);
 
   /* Type scale: seven sizes and no others. */
   --text-xs: 11px;
@@ -69,8 +80,10 @@
   --space-5: 20px;
 
   /* Controls. */
-  --control-h: 28px;
+  --control-h: 30px;
   --control-h-sm: 24px;
+
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 
   font-family: var(--font-sans);
   font-size: var(--text-md);
@@ -97,70 +110,94 @@ button {
   color: inherit;
 }
 
+::selection {
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
 .tabular {
   font-variant-numeric: tabular-nums;
 }
 
 .eyebrow {
   font-family: var(--font-display);
-  font-size: var(--text-md);
-  font-weight: 400;
-  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
 }
 
 .num {
   font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
 }
 
 /*
  * The band that opens each section of a panel (Card, Block, the map card's parts, the build):
- * a flat fill ruled above and below, its title in full text colour, so one section reads as
- * ending before the next begins even over a busy game scene. The section bleeds it to its own
- * edges with negative margins. Items inside a section (a quest, a spot) are framed blocks.
+ * a soft rounded band set in from the panel's edges, its title in full text colour, so one
+ * section reads as ending before the next begins even over a busy game scene.
  */
 .strip {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 30px;
+  min-height: 32px;
   padding: 4px 12px;
-  border-top: 1px solid var(--border-strong);
-  border-bottom: 1px solid var(--border);
-  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, var(--surface-3), var(--surface-2));
+  box-shadow: inset 0 1px 0 var(--highlight);
 }
 
 .strip-title {
   font-family: var(--font-display);
   font-size: var(--text-md);
   font-weight: 600;
+  letter-spacing: 0.01em;
   color: var(--text);
 }
 
 /*
- * A name that opens its own page: an item, monster, NPC, map or quest. The colour says which,
- * so the link needs no tooltip. Size and weight come from the text around it.
+ * A name that opens its card: an item, monster, NPC, map or quest. The colour says which, so the
+ * link needs no tooltip; a small picture sits before it when there is one. Size and weight come
+ * from the text around it.
  */
 .ref {
   display: inline;
   padding: 0;
   border: 0;
+  border-radius: 4px;
   background: transparent;
   color: var(--ref, var(--text));
   font: inherit;
   text-align: left;
   cursor: pointer;
+  transition: color 0.12s ease;
+}
+
+.ref.with-pic {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  vertical-align: bottom;
+}
+
+.ref .ref-pic {
+  flex: none;
 }
 
 .ref:hover,
 .ref:focus-visible {
   text-decoration: underline;
-  text-underline-offset: 2px;
+  text-decoration-color: color-mix(in srgb, currentColor 55%, transparent);
+  text-underline-offset: 3px;
   outline: none;
 }
 
 .ref:focus-visible {
-  outline: 1px solid var(--accent);
-  outline-offset: 1px;
+  outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent);
+  outline-offset: 2px;
 }
 
 .ref-item {
@@ -184,22 +221,61 @@ button {
   color: var(--accent-strong);
 }
 
+/* Emphasis a list asks of the names in it. */
+.ref.strong,
+.ref.link,
+.ref.quest,
+.ref.mob-name {
+  font-weight: 600;
+}
+
+.ref.upgraded,
+.ref.goal {
+  color: var(--accent-strong);
+}
+
+.ref.more {
+  margin-top: 3px;
+  padding: 0 6px;
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.ref.more:hover {
+  color: var(--text);
+}
+
+.missing .ref.mob-name,
+.empty .ref.mob-name {
+  color: var(--faint);
+  font-weight: 400;
+}
+
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.09);
   border: 3px solid transparent;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-pill);
   background-clip: padding-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(255, 255, 255, 0.16);
+  background-color: rgba(255, 255, 255, 0.18);
 }
 
 ::-webkit-scrollbar-corner {
   background: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

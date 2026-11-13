@@ -1180,7 +1180,7 @@ mod tests {
         use crate::mapdata::atlas::tests::map;
         use crate::mapdata::osms::{Dataset, NpcRecord, QuestRecord};
         use crate::mapdata::turnins::TurnIn;
-        let npc = |id: u32, name: &str, maps: Vec<u32>| NpcRecord { id, name: name.into(), maps };
+        let npc = |id: u32, name: &str, maps: Vec<u32>| NpcRecord { id, name: name.into(), maps, icon_url: None };
         let quest = |id: u32, name: &str, giver: u32, next: Option<u32>| QuestRecord {
             id,
             name: name.into(),

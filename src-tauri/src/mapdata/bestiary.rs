@@ -119,8 +119,18 @@ pub struct MonsterSheet {
     pub quests: Vec<MonsterQuest>,
     pub versions: Vec<MonsterVersion>,
     pub splits: Vec<MonsterSplit>,
+    /// Where its HP per EXP places it among the field monsters that spawn: first is the least HP
+    /// for each point of EXP. `None` for bosses and monsters that give no EXP or spawn nowhere.
+    pub exp_rank: Option<Rank>,
     /// What players logged. `None` when the drop table is empty or not downloaded.
     pub drops: Option<MonsterDrops>,
+}
+
+/// A place in a list: `place` of `of`, from 1.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct Rank {
+    pub place: u32,
+    pub of: u32,
 }
 
 /// Whether `kind` takes in this monster.
@@ -333,6 +343,26 @@ impl Atlas {
         versions
     }
 
+    /// Where a monster's HP per EXP places it among the field monsters that spawn on a known map,
+    /// one entry per name (its easiest version), the least HP per EXP first. Ties share a place.
+    fn exp_rank(&self, monster: &MonsterRecord) -> Option<Rank> {
+        let ranked = |m: &MonsterRecord| {
+            !m.is_boss && m.exp > 0 && m.spawns.iter().any(|s| s.count > 0 && self.maps.contains_key(&s.map_id))
+        };
+        if !ranked(monster) {
+            return None;
+        }
+        let cost = |m: &MonsterRecord| f64::from(m.hp) / f64::from(m.exp);
+        let mut best: HashMap<&str, f64> = HashMap::new();
+        for m in self.monsters.values().filter(|m| ranked(m)) {
+            let entry = best.entry(m.name.as_str()).or_insert(f64::INFINITY);
+            *entry = entry.min(cost(m));
+        }
+        let mine = cost(monster);
+        let ahead = best.iter().filter(|(name, c)| **name != monster.name && **c < mine).count();
+        Some(Rank { place: ahead as u32 + 1, of: best.len() as u32 })
+    }
+
     /// All the data says about a monster. `from` is the map the player is on, for portal counts;
     /// `measured` the EXP rates the player recorded; `travel` the rides and scrolls turned on.
     pub fn monster_sheet(
@@ -364,6 +394,7 @@ impl Atlas {
             quests: self.quests_wanting(&family),
             versions: self.other_versions(monster, &family),
             splits: splits.collect(),
+            exp_rank: self.exp_rank(monster),
             drops,
         })
     }
@@ -448,6 +479,16 @@ mod tests {
         let rows: Vec<(u32, &str)> = page.monsters.iter().map(|m| (m.id, m.name.as_str())).collect();
         assert_eq!(rows, [(10, "Moss Slime"), (30, "Bog Ghoul"), (20, "Ember Golem")]);
         assert_eq!((page.total, page.closest), (3, false));
+    }
+
+    #[test]
+    fn ranks_field_monsters_by_hp_for_each_point_of_exp() {
+        // Made-up world: HP is ten times the level, so 20/4, 50/9 and 80/15 HP per EXP.
+        let atlas = world();
+        let rank = |id| atlas.monster_sheet(id, None, None, &[], &Travel::none()).unwrap().exp_rank;
+        assert_eq!(rank(10), Some(Rank { place: 1, of: 3 }));
+        assert_eq!(rank(12), Some(Rank { place: 2, of: 3 }));
+        assert_eq!(rank(11), Some(Rank { place: 3, of: 3 }));
     }
 
     #[test]

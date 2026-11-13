@@ -13,6 +13,7 @@
   import Chips from "./lookup/Chips.svelte";
   import MapDataPanel from "./map/MapDataPanel.svelte";
   import { backend } from "$lib/api";
+  import Pic from "$lib/ui/Pic.svelte";
   import { JOBS, blankQuery, gearView, gives, itemSlot, itemView, lastLine, watchItems } from "$lib/items.svelte";
   import { OSMS_CREDIT, OSMS_URL, mapData, watchMapData } from "$lib/mapdata.svelte";
   import { live } from "$lib/readings.svelte";
@@ -273,7 +274,9 @@
           {#each page.items as item (item.id)}
             <li>
               <button onclick={() => (itemView.id = item.id)}>
-                <span class="row-name">{item.name}{#if gender(item)}<small>{gender(item)}</small>{/if}</span>
+                <span class="row-name"
+                  ><Pic kind="item" id={item.id} size={18} class="row-pic" />{item.name}{#if gender(item)}<small>{gender(item)}</small>{/if}</span
+                >
                 <span class="row-line">{line(item)}</span>
               </button>
             </li>
@@ -374,6 +377,10 @@
   .results button:focus-visible {
     background: var(--surface-3);
     outline: none;
+  }
+
+  .row-name :global(.row-pic) {
+    margin-right: 6px;
   }
 
   .row-name {

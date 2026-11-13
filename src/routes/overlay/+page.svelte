@@ -357,9 +357,12 @@
     display: flex;
     flex-direction: column;
     height: 100vh;
-    background: var(--glass);
+    background:
+      radial-gradient(120% 60% at 0% 0%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 60%),
+      var(--glass);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-lg);
+    box-shadow: inset 0 1px 0 var(--highlight);
     overflow: hidden;
     transition: opacity 0.2s ease;
   }
@@ -374,8 +377,8 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    height: 36px;
-    padding: 0 6px 0 12px;
+    height: 40px;
+    padding: 0 8px 0 14px;
     user-select: none;
     cursor: grab;
   }
@@ -393,10 +396,10 @@
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    height: 20px;
-    padding: 0 7px;
+    height: 22px;
+    padding: 0 9px;
     border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-pill);
     font-family: var(--font-sans);
     font-size: var(--text-xs);
     font-weight: 600;
@@ -416,20 +419,23 @@
   }
 
   .mode.on {
-    border-color: color-mix(in srgb, var(--good) 45%, transparent);
+    border-color: color-mix(in srgb, var(--good) 40%, transparent);
+    background: var(--good-soft);
     color: var(--good);
   }
 
   .mode.waiting {
-    border-color: color-mix(in srgb, var(--warn) 45%, transparent);
+    border-color: color-mix(in srgb, var(--warn) 40%, transparent);
+    background: var(--warn-soft);
     color: var(--warn);
   }
 
   .live-dot {
     width: 6px;
     height: 6px;
-    border-radius: var(--radius-sm);
+    border-radius: 50%;
     background: currentColor;
+    box-shadow: 0 0 6px currentColor;
   }
 
   .mode.on .live-dot {
@@ -513,18 +519,21 @@
   .pin {
     display: grid;
     place-items: center;
-    width: 26px;
-    height: 26px;
+    width: 28px;
+    height: 28px;
     border: 0;
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--muted);
     cursor: pointer;
+    transition:
+      background 0.12s ease,
+      color 0.12s ease;
   }
 
   .actions button:hover,
   .pin:hover {
-    background: rgba(255, 255, 255, 0.07);
+    background: rgba(255, 255, 255, 0.08);
     color: var(--text);
   }
 
@@ -537,14 +546,19 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    padding: 0 6px 0 8px;
+    padding: 0 8px 8px;
     border-bottom: 1px solid var(--border);
   }
 
   .tablist {
     display: flex;
     flex: 1;
+    gap: 2px;
     min-width: 0;
+    padding: 3px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: rgba(0, 0, 0, 0.28);
     outline: none;
   }
 
@@ -556,10 +570,10 @@
     justify-content: center;
     gap: 2px;
     min-width: 0;
-    height: 34px;
-    padding: 0 1px;
+    height: 30px;
+    padding: 0 4px;
     border: 0;
-    border-bottom: 2px solid transparent;
+    border-radius: 7px;
     background: transparent;
     color: var(--muted);
     font-size: var(--text-sm);
@@ -568,7 +582,8 @@
     cursor: pointer;
     transition:
       color 0.12s ease,
-      border-color 0.12s ease;
+      background 0.16s ease,
+      box-shadow 0.16s ease;
   }
 
   /* Five titles don't fit a window dragged narrow, so only the open tab keeps its title. */
@@ -579,12 +594,21 @@
   }
 
   [role="tab"]:hover {
+    background: rgba(255, 255, 255, 0.04);
     color: var(--text);
   }
 
   [role="tab"][aria-selected="true"] {
-    border-bottom-color: var(--accent);
+    background: linear-gradient(180deg, var(--surface-3), var(--surface-2));
+    box-shadow:
+      inset 0 1px 0 var(--highlight),
+      0 1px 4px rgba(0, 0, 0, 0.4);
     color: var(--text);
+    font-weight: 600;
+  }
+
+  [role="tab"][aria-selected="true"] .icon {
+    color: var(--accent);
   }
 
   [role="tab"].empty:not([aria-selected="true"]) {
@@ -610,10 +634,10 @@
     position: absolute;
     top: -2px;
     right: -3px;
-    width: 6px;
-    height: 6px;
-    border: 1px solid var(--surface);
-    border-radius: var(--radius-sm);
+    width: 7px;
+    height: 7px;
+    border: 1.5px solid var(--surface);
+    border-radius: 50%;
     background: var(--accent);
   }
 
@@ -684,7 +708,7 @@
     place-items: center;
     width: 18px;
     height: 18px;
-    border-radius: var(--radius-sm);
+    border-radius: 50%;
     background: var(--accent-soft);
     color: var(--accent);
     font-size: var(--text-xs);

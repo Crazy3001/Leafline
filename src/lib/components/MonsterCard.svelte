@@ -12,8 +12,8 @@
   import { formatCompact, formatDuration, formatNumber, monsterLabel } from "$lib/format";
   import { measuredRates, watchHistory } from "$lib/history.svelte";
   import { OSMS_CREDIT, OSMS_URL, WIKI_URL } from "$lib/mapdata.svelte";
-  import { openMonster } from "$lib/monsters.svelte";
-  import { showNpcNamed } from "$lib/places.svelte";
+  import Ref from "./Ref.svelte";
+  import PicFrame from "$lib/ui/PicFrame.svelte";
   import { travelKey } from "$lib/settings.svelte";
   import type { MapReading, MonsterSheet, MonsterWhere, QuestReading, SessionSummary } from "$lib/types";
 
@@ -24,6 +24,7 @@
     quest = null,
     session = null,
     plain = false,
+    compact = false,
   }: {
     id: number;
     map?: MapReading | null;
@@ -31,6 +32,8 @@
     quest?: QuestReading | null;
     session?: SessionSummary | null;
     plain?: boolean;
+    /** A link card's short form: the numbers, where to find it and what it drops. */
+    compact?: boolean;
   } = $props();
 
   watchHistory();
@@ -140,8 +143,18 @@
   {/snippet}
 
   {#if sheet}
-    <h3 class="name">{monsterLabel(sheet.name)}</h3>
-    <p class="meta tabular">{[`Lv ${sheet.level}`, yours?.gap].filter(Boolean).join(" · ")}</p>
+    <div class="title-row">
+      <PicFrame kind="mob" id={sheet.id} size={compact ? 52 : 60} />
+      <div class="title-text">
+        <h3 class="name">{monsterLabel(sheet.name)}</h3>
+        <p class="meta tabular">{[`Lv ${sheet.level}`, yours?.gap].filter(Boolean).join(" · ")}</p>
+        {#if sheet.expRank}
+          <p class="rank tabular" title="Its HP for each point of EXP, against every field monster that spawns: first takes the least HP">
+            <b>#{sheet.expRank.place}</b> of {sheet.expRank.of} for HP per EXP
+          </p>
+        {/if}
+      </div>
+    </div>
 
     <dl class="facts">
       {#each facts as fact (fact.label)}
@@ -155,7 +168,7 @@
       </p>
     {/if}
 
-    {#if sheet.details.elements.length}
+    {#if sheet.details.elements.length && !compact}
       <div class="elements">
         {#each EFFECTS as { effect, label, tone } (effect)}
           {@const named = sheet.details.elements.filter((e) => e.effect === effect).map((e) => e.element)}
@@ -166,6 +179,7 @@
       </div>
     {/if}
 
+    {#if !compact}
     <dl class="stats">
       {#each stats as stat (stat.label)}
         <div title={stat.title}><dt>{stat.label}</dt><dd class="tabular">{formatNumber(stat.value)}</dd></div>
@@ -173,12 +187,13 @@
     </dl>
 
     {#if traits.length}<p class="traits">{traits.join(" · ")}</p>{/if}
+    {/if}
 
     {#if sheet.splits.length}
       <p class="traits">
         Turns into
         {#each sheet.splits as split, i (split.id)}
-          {i ? ", " : ""}<button class="link" onclick={() => openMonster(split.id)}>{split.count} {monsterLabel(split.name)}</button>
+          {i ? ", " : ""}<Ref kind="mob" id={split.id} name={split.name}>{split.count} {monsterLabel(split.name)}</Ref>
         {/each}
         when defeated
       </p>
@@ -202,19 +217,16 @@
       <MonsterDropList drops={sheet.drops} name={sheet.name} />
     </Section>
 
-    {#if sheet.quests.length}
+    {#if sheet.quests.length && !compact}
       <Section title="Quests hunting it" count={sheet.quests.length}>
         <ul class="quests">
           {#each sheet.quests as need (need.quest.id)}
             {@const counted = tracked(need.quest.name, sheet.name)}
             <li>
-              <button class="link strong" onclick={() => backend.showQuest(need.quest.id)}>{need.quest.name}</button>
+              <Ref kind="quest" id={need.quest.id} name={need.quest.name} class="strong" />
               <span class="tabular" class:yours-now={counted}>{counted ?? `×${need.count}`}</span>
               <span class="who"
-                >{#if need.quest.levelMin}Lv {need.quest.levelMin}{/if}{#if need.giver}{need.quest.levelMin ? " · " : ""}<button
-                    class="ref ref-npc"
-                    onclick={() => showNpcNamed(need.giver!)}>{need.giver}</button
-                  >{/if}</span
+                >{#if need.quest.levelMin}Lv {need.quest.levelMin}{/if}{#if need.giver}{need.quest.levelMin ? " · " : ""}<Ref kind="npc" name={need.giver} />{/if}</span
               >
             </li>
           {/each}
@@ -222,19 +234,16 @@
       </Section>
     {/if}
 
-    {#if sheet.versions.length}
+    {#if sheet.versions.length && !compact}
       <Section title="Other versions" count={sheet.versions.length} open={false}>
         <ul class="versions">
           {#each sheet.versions as version (version.id)}
             <li>
-              <button class="link strong tabular" onclick={() => openMonster(version.id)}>
-                Lv {version.level} · {formatCompact(version.hp)} HP · {formatNumber(version.exp)} EXP
-              </button>
+              <Ref kind="mob" id={version.id} name={sheet.name} icon={false} class="strong tabular"
+                >Lv {version.level} · {formatCompact(version.hp)} HP · {formatNumber(version.exp)} EXP</Ref
+              >
               <span class="who"
-                >{#each version.maps.slice(0, 2) as m, k (m.id)}{k ? ", " : ""}{#if m.known}<button
-                      class="ref ref-map"
-                      onclick={() => backend.showPlace("maps", m.id)}>{m.name}</button
-                    >{:else}{m.name}{/if}{:else}Not on any map{/each}</span
+                >{#each version.maps.slice(0, 2) as m, k (m.id)}{k ? ", " : ""}{#if m.known}<Ref kind="map" id={m.id} name={m.name} />{:else}{m.name}{/if}{:else}Not on any map{/each}</span
               >
             </li>
           {/each}
@@ -242,11 +251,13 @@
       </Section>
     {/if}
 
+    {#if !compact}
     <div class="links">
       <button class="out" onclick={() => backend.openLink(wikiPage(sheet.name))}>
         mapleclassic.wiki<ExternalLink size={11} />
       </button>
     </div>
+    {/if}
     <button class="credit" onclick={() => backend.openLink(OSMS_URL)}>{OSMS_CREDIT}</button>
   {:else if error}
     <p class="soft note">{error}</p>
@@ -256,6 +267,32 @@
 </Card>
 
 <style>
+  .title-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+
+  .title-text {
+    min-width: 0;
+  }
+
+  .title-text .meta {
+    margin-bottom: 0;
+  }
+
+  .rank {
+    margin: 2px 0 0;
+    color: var(--muted);
+    font-size: var(--text-xs);
+  }
+
+  .rank b {
+    color: var(--exp);
+    font-weight: 600;
+  }
+
   .name {
     margin: 0;
     font-family: var(--font-display);

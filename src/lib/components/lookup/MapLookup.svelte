@@ -180,7 +180,7 @@
         <p class="heading">You're here</p>
         <ul class="rows">
           <li>
-            <LookupRow name={here.card.map.name} line={here.card.map.street} aside={levels(here.card.levelRange)} onclick={() => open(here!.card.map.id)} />
+            <LookupRow name={here.card.map.name} picture={{ kind: "mark", id: here.card.map.id }} line={here.card.map.street} aside={levels(here.card.levelRange)} onclick={() => open(here!.card.map.id)} />
           </li>
         </ul>
         <p class="heading">Every map</p>
@@ -191,7 +191,7 @@
           {#if !page.closest}<p class="count tabular">{page.total.toLocaleString()} {page.total === 1 ? "map" : "maps"}</p>{/if}
           <ul class="rows">
             {#each page.maps as row (row.map.id)}
-              <li><LookupRow name={row.map.name} line={line(row)} aside={levels(row.levelRange)} onclick={() => open(row.map.id)} /></li>
+              <li><LookupRow name={row.map.name} picture={{ kind: "mark", id: row.map.id }} line={line(row)} aside={levels(row.levelRange)} onclick={() => open(row.map.id)} /></li>
             {/each}
           </ul>
           {#if page.maps.length < page.total}<button class="back inline" onclick={more}>Show more</button>{/if}
