@@ -3,142 +3,132 @@
 What changed in each release of Leafline. Leafline is a work in progress: if something reads
 wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?template=bug_report.yml).
 
-## Unreleased
+## 0.3.0 (2026-11-14)
 
 ### Added
-- **More from the route bar.** Under the next step, a strip of the map you are on with the
-  portal to take lit up. **All N steps** opens every step of the trip, with the ones you have
-  taken ticked off, how many portals and about how long on foot. **Travel** turns taxis and
-  return scrolls on or off right there (the same switches as in Settings), and offers to download
-  them when they are not on this PC yet. A long trip shows one bar filling up.
-- **Zoom on the map picture.** Scroll over it to zoom in where the pointer is, drag to move
-  around, double-click to zoom in or fit the whole map again, or use the small buttons in the
-  corner. Marks keep their size, so a crowded town spreads out. Zoomed all the way out, scrolling
-  moves the panel as before. The portal your trip takes next shows in amber with a **Next** flag.
-- **Portals, placed and linked.** Each portal card has a small locator showing where it really
-  stands on the map, and portals on the same side follow their real order. Pointing at a portal
-  card lights it on the map picture, and pointing at a portal on the picture lights its card. The
-  trip's next portal is flagged and never folds away behind "+N more". **List** shows every
-  portal in a row, left to right across the map.
-- **Character → Stats.** Every number your Character Stat window shows, read from the game:
-  STR, DEX, INT and LUK with what gear adds, Max HP and MP, Fame, AP left, and with **Detail**
-  open, Attack, Weapon and Magic Def., Magic, Accuracy, Evasion, Crit. rate and damage, Speed and
-  Jump. It says when it was last read, and **Read** reads it again.
+
+**Training**
+- **Where to train, worked out for your character.** Maps are now ranked by a forecast built from
+  your own stats, gear, buffs and skill (how many blows each monster takes, how often you'd miss,
+  how fast you attack), blended with how you actually play on maps you've trained on. Each map
+  shows a likely range and plain reasons. A long trip and deaths count against a map, maps where
+  most of your blows would miss wait under **Every level**, and an untried map that may beat your
+  best is marked **Worth a try**.
+- **How close are the estimates?** Under **Assumptions**, a check hides each map you've played in
+  turn and estimates it from the rest, so you can see how far to trust the numbers.
+- **Kills and quest EXP told apart.** The session counts kills by matching each EXP gain to the
+  map's monsters. A quest reward shows on its own and stays out of EXP per hour, and the Train tab
+  shows kills per hour.
+- **Time to level with a range,** and a second figure with your usual breaks counted, plus the
+  clock time you'll get there at this pace (in the Train tab and the compact HUD's tooltip).
+- **A session survives a crash or a restart.** If the app closes or crashes and you are back within
+  30 minutes, the session carries on where it was: the same log entry, the same rates, with the
+  time away left out. **New session** starts fresh as before.
+- **Each character keeps its own numbers.** The Train tab follows the name on your HUD, and with two
+  or more characters it shows a **Character** picker, with **All characters** too. Where to train,
+  your best maps, the last sessions, the training log and Records use only that character's play,
+  so a Lv 120 hunter no longer shifts the estimates of a Lv 30 mage. Potion slots, prices, a level
+  goal and tracked items are kept per character. Sessions that never read a name count for
+  everyone while you have one character, and for nobody once you have two.
+
+**Your character**
+- **Character → Stats.** Every number your Character Stat window shows: STR, DEX, INT and LUK with
+  what gear adds, Max HP and MP, Fame, AP left, and with **Detail** open, Attack, Weapon and Magic
+  Def., Magic, Accuracy, Evasion, Crit. rate and damage, Speed and Jump. It says when it was last
+  read, and **Read** reads it again. Character → Level up shows each stat's total with what you put
+  in and what your gear adds, such as STR 30 (28+2).
 - **Buffs.** Your job's buffs, each at the level your Skill window last showed, with a switch to
   say which are running. When the Character Stat window shows a buff in red, such as
-  Accuracy 90 (+14), the switches follow it. With any on, the stats show what they come to, the
-  number without buffs beside each, and the training estimates count a buff's Attack in your
-  attack range.
-- **Game pictures.** Items, monsters and NPCs show their icons beside their names, in lists and on
-  their cards, and maps show their area's emblem and a picture of the whole map. Each picture is
-  downloaded from OSMS Data Explorer the first time it is shown and kept on this PC. Turn them off
-  with **Show game pictures** in **Settings → Data**; names then stand alone, and nothing is
-  downloaded.
-- **Cards for coloured names.** Clicking an item, monster, NPC, map or quest name now opens a
-  small card beside it instead of jumping to another tab: an item's stats, needs, price, where to
-  get it and your notes; a monster's numbers, where it ranks for HP per EXP, its best maps and
-  drops; a map's monsters, exits and Go here; an NPC's maps, shop and quests; a quest's steps and
-  your counts. Names inside a card open the next card, with a back arrow. Esc or a click outside
-  closes it, and **Full view** opens the tab as before.
-- **A new look.** Rounded corners, softer surfaces, pill tabs, and the desk view's panels as
-  cards of their own. Routes read as a line of stops, the last one where you end up.
-- **One rule for links.** Coloured text opens a card; a row or box moves you within the tab
-  you're in, and shows a chevron. A card's **Full view** is the way into a tab. Places you headed
-  for lately are Go buttons under the search.
-- **Tooltips.** Resting the mouse on a mark on the map picture says what it is: a portal's
-  destination (and whether it is hidden or a teleport within the map), an NPC with its picture,
-  or a monster with its level and how many spawn points it has there. A drop in **Drops → By
-  item** shows the item's picture, type, level and which monsters drop it. Small pictures,
-  icon buttons, short numbers and names cut short in a narrow window explain themselves the
-  same way, all in one style.
-- **Skill pictures.** Skills show their icons in Character → Skills and the Build Planner.
-- **Gear that climbs every tier.** Each gear slot now has one path: the best piece you can wear
-  now, then one piece for every level tier the data has for your job up to the plan's end, each
-  better than the last. A goal you added wins its tier; goals you've outgrown show as such.
-  The Build Planner's Gear tab, its Level by level list and Character → Gear's Next all follow it.
-- **Gear by level.** Gear paths no longer wait for your stats: each piece shows at the level it
-  asks for. The Gear tab has a Male / Female switch; with neither set, the gear you wear decides.
-  The Level by level list shows new gear as a row of pictures and skills with their icons.
+  Accuracy 90 (+14), the switches follow it. With any on, the stats show what they come to with
+  the number without buffs beside each, and the training estimates count them.
+- **Gear that climbs every tier.** Each gear slot has one path: the best piece you can wear now,
+  then one piece for every level tier up to the plan's end, each better than the last, shown at
+  the level it asks for. Overalls carry on where a job's tops and bottoms end, and a helmet for any
+  job no longer ends the job's own hats early. A goal you added wins its tier. The Gear tab has a
+  Male / Female switch; with neither set, the gear you wear decides. The Build Planner's Gear tab,
+  its Level by level list and Character → Gear's Next all follow it.
 - **Skills.** Lookup has a Skills half: every skill by job, searchable by name or what it does.
-  Skill names in Character → Skills and the Build Planner open a skill card with its picture,
-  what it does, what it needs first and what each level gives.
-- **Cards in windows of their own.** In the app, a coloured name opens its card in a small window
-  beside the link, which you can drag anywhere on the screen, outside the overlay too. Links in a
-  card open the next card in the same window, with a back arrow. Pin keeps a card in a window
-  that stays, so the next link opens a new one beside it. Cards always open with their sections
-  folded. Skill names link everywhere, the Level by level list included.
-- **Gear past Lv 40 and 50.** Where a job's tops and bottoms end, overalls carry on (a Bowman's
-  Kismet, Tai and Linnex). A helmet for any job no longer ends the job's own hats early.
-- **More in the map picture's tooltips:** a monster's picture, level, HP and EXP; an NPC's
-  quests; a portal's area emblem. Character → Level up shows each stat's total with what you
-  put in and what your gear adds, such as STR 30 (28+2).
-- **A new Crafting tab.** Disciplines as tiles with a picture of what they make, a skill level
-  row, recipes grouped by level, and ingredients as pictures with their counts.
-- **Cards open folded**, as a short list of headings; what you open is remembered for cards.
-- **Sort NPCs** by name, most quests or map. During a session, Where to train sits under your
-  live numbers.
-- **Quieter views.** Drop rates, "seen" dates, credit lines and outside links are gone from the
-  tabs and cards; Settings → Data keeps where the data comes from.
-- **All levels** in Lookup → Items → Equip, a sort for every kind of item, and "any" in empty
-  level boxes. Filter boxes stay open once opened, through Clear; Monsters starts with them open.
-- **See the map.** Map details (the Map tab, Lookup → Maps and a map's card) have a **Map**
-  section with the map's picture, its portals (hidden ones marked), NPCs and spawn points drawn
-  where they stand. Click a mark for its card; point at a monster in the list to light up where
-  it spawns. It starts folded over the game and open in the desk view, and is downloaded the
-  first time you open it.
-- **Tidier drop lists.** By item, each drop is one line under Equip, Use and Etc headings, with
-  the monsters that drop it as small pictures. By monster, each monster's items sit in one wrap.
-- **More hidden portals marked in routes.** Portals named like `h001` and `hide01`, which the game
-  uses for hidden ones, are now marked hidden too, not only `h_east` style names.
-- **Florina Beach in routes.** The map data has no way into Florina Beach, because it is reached
-  by an NPC's flight from Lith Harbor. Routes now include that flight and the one back, without
-  needing the taxi setting. The ride comes from a player's report and its fare isn't recorded
-  yet; check it in game.
-- **A session survives a crash or a restart.** Leafline keeps what the tracker has worked out
-  beside the saved session. If the app closes or crashes and you are back within 30 minutes, the
-  session carries on where it was: the same log entry, the same rates, with the time away left
-  out. **New session** starts fresh as before.
-- **Each character keeps its own numbers.** The Train tab follows the name on your HUD, and with
-  two or more characters it shows a **Character** picker (with the game closed, or to look at
-  another one). Where to train, your best maps and the last sessions use only that character's
-  play, so a Lv 120 hunter no longer shifts the estimates of a Lv 30 mage. Potion slots and
-  prices are kept per character too; a character with none of its own shows the ones you had set
-  before, until you change them. Sessions that never read a name count for everyone while you
-  have one character, and for nobody once you have two. Nothing is hidden: the picker also has
-  **All characters**, and any other character you have played, for the Train tab and the training
-  log (Records and best maps follow it). Potions and a level goal always belong to one character:
-  the one you pick, or on screen, or played last. A past session's potions use its own
-  character's slots.
+  Skill names open a skill card with its picture, what it does, what it needs first and what each
+  level gives.
+
+**Maps and getting around**
+- **See the map.** Map details (the Map tab, Lookup → Maps and a map's card) have a **Map** section
+  with the map's picture, its portals (hidden ones marked), NPCs and spawn points drawn where they
+  stand. Point at a mark to see what it is, click it for its card, and point at a monster in the
+  list to light up where it spawns. Scroll to zoom where the pointer is, drag to move around, and
+  double-click to zoom in or fit the whole map again. The portal your trip takes next shows in
+  amber with a **Next** flag.
+- **Portals, placed and linked.** Each portal card has a small locator showing where it stands on
+  the map, and portals on the same side follow their real order. Pointing at a portal card lights
+  it on the picture, and the other way round. The trip's next portal is flagged and never folds
+  away behind "+N more". **List** shows every portal in a row, left to right across the map.
+- **More from the route bar.** Under the next step, a strip of the map you are on with the portal
+  to take lit up. **All N steps** opens every step of the trip, with the ones you have taken
+  ticked off, how many portals and about how long on foot. **Travel** turns taxis and return
+  scrolls on or off right there, and offers to download them when they are not on this PC yet.
+- **Florina Beach in routes.** Routes now include the NPC flight from Lith Harbor to Florina Beach
+  and back, without needing the taxi setting. Its fare isn't recorded yet.
+
+**Items, quests and lookups**
 - **Closest or Most.** A quest objective's list of maps has a **Closest / Most** switch: the
   nearest map with a fair number of the monster, or the one with the most of it, however far.
-  Your choice holds for every quest.
-- **Buy it instead.** When an NPC shop sells an item a quest wants, the objective says so under
-  where to hunt it: the cheapest shop, its price and what the rest you need would cost, with Go.
+- **Buy it instead.** When an NPC shop sells an item a quest wants, the objective says so: the
+  cheapest shop, its price and what the rest you need would cost, with Go.
 - **Rest of the chain.** A quest's page says how many quests follow it in its chain, the highest
   level they ask for, and the EXP and mesos they pay in all.
-- **Quests to take now.** The Quests tab lists quests your level can start that need no other
-  quest first, the nearest to your level first. The search has the same filter. Leafline can't see
-  which quests you've done, so some may be done already.
+- **Quests to take now.** The Quests tab lists quests your level can start that need no other quest
+  first, nearest to your level first. Leafline can't see which quests you've done, so some may be
+  done already.
 - **Tracked items.** **Track it** on any item's page stars it. Starred items are listed in
-  **Lookup → Items**, each with the monster that drops it and the best map to hunt it, a route,
-  and a shop when one sells it. Each character keeps its own list.
-- **Download and install updates.** With the update check on, Settings → About offers
-  **Download and install** when a new version is out. Leafline downloads the installer from the
-  release, checks its SHA-256 against the release's checksum list, and runs it only if they
-  match, then closes so it can install. Nothing is downloaded until you press it.
-- **When you'll level.** Time to level now also says the clock time you'll get there at this pace,
-  in the Train tab and in the compact HUD's tooltip.
+  **Lookup → Items**, each with the monster that drops it, the best map to hunt it, a route, and a
+  shop when one sells it.
+- **A new Crafting tab.** Disciplines as tiles, a skill level row, recipes grouped by level, and
+  ingredients as pictures with their counts.
+- **Lookup filters.** All levels in Lookup → Items → Equip, a sort for every kind of item, "any" in
+  empty level boxes, and NPCs sorted by name, most quests or map. Filter boxes stay open once
+  opened.
+- **Tidier drop lists.** By item, each drop is one line under Equip, Use and Etc headings, with the
+  monsters that drop it as small pictures. By monster, each monster's items sit in one wrap.
+
+**Cards and pictures**
+- **Game pictures.** Items, monsters, NPCs and skills show their icons beside their names, and maps
+  show their area's emblem. Each picture is downloaded from OSMS Data Explorer the first time it is
+  shown and kept on this PC. Turn them off with **Show game pictures** in **Settings → Data**;
+  names then stand alone, and nothing is downloaded.
+- **Cards for coloured names.** Clicking an item, monster, NPC, map, quest or skill name opens a
+  small card beside it instead of jumping to another tab, in a window of its own that you can drag
+  anywhere on the screen. Names inside a card open the next card, with a back arrow, and **Pin**
+  keeps a card open so the next link opens a new one beside it. Cards open folded, and remember
+  which sections you open. **Full view** opens the tab as before.
+- **Tooltips** on map marks, drops, small pictures, icon buttons and names cut short in a narrow
+  window, all in one style.
+
+**Around the app**
+- **Download and install updates.** With the update check on, Settings → About offers **Download
+  and install** when a new version is out. Leafline downloads the installer from the release,
+  checks its SHA-256 against the release's checksum list, runs it only if they match, then closes
+  so it can install. Nothing is downloaded until you press it.
+- **A new look.** Rounded corners, softer surfaces, pill tabs, and the desk view's panels as cards
+  of their own. Routes read as a line of stops. Coloured text opens a card; a row or box moves you
+  within the tab you're in, and shows a chevron.
 
 ### Changed
-- **Routes take the quickest walk.** Routes are now worked out by how far you walk across each
-  map, from the portal you come out of to the one you take next, with climbing counted extra,
-  instead of the fewest portals. A taxi or scroll is taken when it beats the walk. "About N on
-  foot" comes from the same walk. Walking speed and ride times are rough guesses for a character
-  with no speed bonus.
-- **Hidden portals** in routes and the next-step bar say "stand on the spot and press ↑", since
-  the game draws nothing there.
-- **EXP per hour from the second kill.** The session's rate now shows from your second kill
-  instead of after half a minute, marked "still measuring" until about a minute of play.
+- **Routes take the quickest walk.** Routes are worked out by how far you walk across each map,
+  with climbing counted extra, instead of the fewest portals. A taxi or scroll is taken when it
+  beats the walk. Walking speed and ride times are rough guesses for a character with no speed
+  bonus.
+- **Hidden portals** in routes say "stand on the spot and press ↑", since the game draws nothing
+  there. Portals named like `h001` and `hide01` are now marked hidden too.
+- **EXP per hour from the second kill** instead of after half a minute, marked "still measuring"
+  until about a minute of play. A break now counts only a usual kill's time, and the last five
+  minutes are exactly five minutes.
+- **Quieter views.** Drop rates, "seen" dates, credit lines and outside links are gone from the tabs
+  and cards; Settings → Data keeps where the data comes from.
+
+### Upgrading
+- Your records are upgraded the first time 0.3 starts, and the map data downloads again once.
+  Leafline keeps a daily backup of your records, so take one aside first if you want to be able to
+  go back to 0.2.
 
 ## 0.2.0 (2026-11-12)
 

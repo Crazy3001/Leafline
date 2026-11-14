@@ -73,7 +73,8 @@ OCR is sometimes wrong, so the tracker checks readings against each other rather
 - At high levels the HUD shows only a percentage. EXP/hour then stays blank, and % per hour and time to level come from the percentage alone.
 - Another character is noticed by a lower level or a different name, three readings in a row. The old session is saved and a new one starts.
 - If the minimap's name is hidden for 45 seconds, gains stop going to the last map read.
-- The clock pauses after 15 seconds without EXP (changeable in Settings), and at once on a map change without EXP, so time in town doesn't dilute the rates.
+- The clock pauses after 15 seconds without EXP (changeable in Settings), and at once on a map change without EXP, so time in town doesn't dilute the rates. A longer wait counts only a usual kill's time, as the hunt that ended it.
+- Each gain is matched against the map's monster EXP to count kills. A gain far bigger than any kill there is quest EXP, shown apart and left out of the rates.
 - A missing reading is skipped, never guessed. No EXP table is built in: each level's requirement is measured from the HUD, since Classic's table may differ from old GMS.
 
 Live sessions save themselves every 30 seconds once they have a minute of active time. Records are copied to a `backups` folder once a day, and the last 7 copies are kept.
@@ -93,7 +94,7 @@ src-tauri/src/
   pipeline.rs              frame → readings, shared by live capture and the examples
   session.rs               readings over time → EXP and meso rates
   replay.rs                a folder of screenshots fed through both, in order (examples only)
-  mapdata/                 community data download, cache and lookups
+  mapdata/                 community data download, cache and lookups, routes, training forecasts
   userdata/                the player's records (SQLite)
   build/                   the build planner
 ```

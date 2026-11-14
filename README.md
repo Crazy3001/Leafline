@@ -18,38 +18,40 @@
 ## What it does
 
 ### Training
-- **EXP and meso rates as you play:** EXP gained, EXP/hour, % per hour, time to level, mesos/hour, overall, per map and over the last five minutes, with a trend graph.
-- **Readings are checked, not trusted:** EXP points and percent have to agree, a level-up has to show twice, and big meso jumps need several readings. Time in town, deaths and shop trades are kept out of the rates.
-- **Sessions save themselves** as you go, with a line for each map, level, party size and job. The **training log** compares sessions and maps, and lists the drops you logged. Export it all to CSV.
-- **Where to train:** the Train tab ranks maps near your level by EXP per kill, EXP per monster HP, the EXP/hour you measured there, or how close they are. Bookmark the spots you like.
+- **EXP and meso rates as you play:** EXP gained, EXP/hour from your second kill, kills per hour, time to level with a likely range, mesos/hour (after potions, if you set their cost), overall, per map and over the last five minutes, with a trend graph.
+- **Readings are checked, not trusted:** EXP points and percent have to agree, a level-up has to show twice, and big meso jumps need several readings. Time in town, deaths, quest rewards and shop trades are kept out of the rates.
+- **Sessions save themselves** as you go, with a line for each map, level, party size and job, and carry on after a crash or restart. The **training log** compares sessions and maps, keeps your records per map, and lists the drops you logged. Export it all to CSV. Each character keeps its own numbers.
+- **Where to train:** the Train tab ranks maps by a forecast worked out from your character's stats, gear and buffs and from how you really play, with a likely range and plain reasons for each. A check shows how close the estimates have been. Bookmark the spots you like, and set a level goal.
 - **Share card:** turn a session into a picture to post anywhere. Leafline draws it from scratch (no game art), leaves your character's name off unless you add it, and never posts anything itself.
 
 ![The desk view with the Train panel and the training log: a session's EXP and mesos per hour, its rate over time, each map, and the drops logged](.github/screenshots/desk-log.png)
 
 ### Items
 - **Item check:** hover an item in game and press your hotkey. Leafline reads the tooltip and shows its stats with the base and bonus, its requirements, whether it's clean or scrolled (and how many scrolls failed), and whether your build can wear it.
-- **Where to get it:** every monster players have seen drop it, each with the maps it lives on and a route there, plus the quests that give it.
+- **Where to get it:** every monster players have seen drop it, each with the maps it lives on and a route there, the NPC shops that sell it, the quests that give it, and the recipe that crafts it.
+- **Tracked items:** star an item to keep it listed with who drops it, the best map to hunt it and a shop when one sells it.
 - **Drop log:** log an item as a drop from a monster on your map, and send it on to MeowDB's community drop lists with one click if you like.
 - **Your own notes** on any item, kept on your PC.
 
 ![Item check: an item hovered in game and Leafline's reading of it, with its stats, requirements, upgrade slots and whether the build can use it](https://github.com/user-attachments/assets/42d09ee0-da2e-4b64-9b6a-22e009952e03)
 
 ### Getting around
-- **The map you're on:** its monsters, exits, NPCs, quests and drops, plus your rates there and your own notes.
-- **Go here:** pick a map, NPC, monster or quest target, and a small bar shows the next step (which portal, taxi or return scroll) and moves on as you travel.
-- **Lookup:** search every item, monster, map and NPC, with filters, and open any name you see in Leafline.
+- **The map you're on:** its monsters, exits, NPCs, quests, shops and drops, plus your rates there and your own notes, with a picture of the map you can zoom that shows where each portal, NPC and spawn point is.
+- **Go here:** pick a map, NPC, monster or quest target, and a small bar shows the next step (which portal, taxi or return scroll) and moves on as you travel. Routes take the quickest walk, and the bar can list every step.
+- **Lookup:** search every item, monster, map, NPC, skill and crafting recipe, with filters. Any coloured name in Leafline opens a small card about it.
 
 ### Quests
 - **Quest Helper, read live:** your tracked quests with their counters and rewards. Open one for its steps, directions to each monster, and who takes it in.
-- **Quest search** across every quest by name, NPC, monster or region.
+- **Quest search** across every quest by name, NPC, monster or region, the quests your level can take now, and the rest of each quest's chain.
 
 ![The desk view with Quests, Map and Lookup: each quest's steps with directions, the map's exits and NPCs, and where a monster lives and what it drops](.github/screenshots/desk-questing.png)
 
 ### Your character
 - **Character tab:** level, job, HP, MP, EXP and mesos at a glance, with what your build plan says to do at this level.
+- **Stats and buffs:** every number your Character Stat window shows, read from the game, and switches for the buffs you have running, counted in the stats and the training estimates.
 - **Build planner:** a job and a list of goals in order ("this skill to 20, DEX to 25, the rest into LUK"), laid out level by level. It warns when a goal comes too late or SP would be lost at a job advancement. Ready-made plans for each 2nd job, each following one credited guide.
 - **Follows your real character:** open your Stat or Skill window in game and the plan picks up from where you really are.
-- **Gear:** what you're wearing, the best you can wear now, and the next step up, ranked by the stats your plan raises.
+- **Gear:** what you're wearing, the best you can wear now, and a piece for every level tier after it, ranked by the stats your plan raises.
 - **Job advancement checklist:** who to see and where, with a route, when an advancement comes up.
 
 ![The desk view with the build planner and the Character panel: skill goals in order, the plan level by level, and gear to wear now and next](.github/screenshots/desk-planner.png)
@@ -172,6 +174,8 @@ This is an early release, and these are the rough edges known so far. Please [re
 - **The party count** hasn't been checked on a real party yet.
 - **Ready-made build plans** follow one written guide each and credit it in the app. Nobody has played them through yet, so treat them as a starting point.
 - **The planner counts points.** It doesn't work out damage, accuracy or HP, because those are unsettled for Classic.
+- **Training forecasts** use community formulas for hit chance and damage and assume a respawn time, so treat them as a guide until you have played a few maps: they lean on your own play more as you go. Buffs are switched on by you, not read from the screen.
+- **Walking times** in routes are rough guesses for a character with no speed bonus.
 - **A jump of several levels** between two readings adds no EXP, since the levels in between were never measured.
 - **Windows HDR** has to be off for reliable readings.
 - **Windows only**, English client only.
@@ -180,7 +184,7 @@ This is an early release, and these are the rough edges known so far. Please [re
 
 Leafline ships no game data. It downloads community data on your PC when you ask, keeps it in a local cache, and credits it in the app:
 
-- Map, monster, NPC, quest, skill and equipment data: [OSMS Data Explorer](https://osmsdataexplorer.com), CC BY 4.0.
+- Map, monster, NPC, quest, skill, crafting and equipment data, and the game pictures: [OSMS Data Explorer](https://osmsdataexplorer.com), CC BY 4.0.
 - Monster drops: built for Leafline from the game's item text, [StrategyWiki](https://strategywiki.org/wiki/MapleStory/Drops_(Victoria_Island)) contributors (CC BY-SA 4.0) and players' reports.
 - Taxi routes and return scrolls: [mapleclassic.wiki](https://mapleclassic.wiki) contributors, CC BY-NC-SA 4.0.
 

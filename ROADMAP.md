@@ -37,12 +37,12 @@ sends input, and stays free.
 - NPC shops beyond Maple Island and Victoria Island
 - A before-and-after look at a gear change: stats, damage and EXP per hour
 - Is this upgrade worth it: what a piece of gear gains you for what it costs
-- Training spots that show their monsters and a map preview
+- NPC shop prices kept up to date as they change
 
 **Maps and getting around**
-- Hidden portals and where each one leads, on every map
-- Spawn points for each monster on a map
-- Routes that count travel time when ranking where to train
+- Hidden portals checked in game on every map, with ones the data misses added
+- Routes to maps no portal leads into, such as party quest stages and saunas
+- More NPC rides in routes, with their fares
 
 **Timers and alerts**
 - Timers you start yourself, for bosses and buffs
@@ -53,7 +53,8 @@ sends input, and stays free.
 - A choice of averaging window for EXP per hour
 - A mode that keeps one session going across maps
 - Party quest mode: completion times and rewards
-- Kills per hour and a count of kills per monster
+- A count of kills per monster
+- Training estimates that look ahead: how many levels a map stays good for
 
 **Party and social**
 - Comparing party setups: which size and class mix trains best
