@@ -8,7 +8,7 @@
 
 use std::collections::HashMap;
 
-use rusqlite::{OptionalExtension, params};
+use rusqlite::params;
 use serde::{Deserialize, Serialize};
 
 use super::UserData;
@@ -52,23 +52,40 @@ fn used(start: Option<i64>, now: Option<i64>) -> i64 {
     }
 }
 
+/// Who a set of slots belongs to: a character's name, or empty for the shared set.
+fn owner(character: Option<&str>) -> String {
+    character.map(str::trim).unwrap_or_default().to_string()
+}
+
 /// A session's start time as a key: the same bits the tracker gave it.
 fn key(started_at: f64) -> i64 {
     started_at.to_bits() as i64
 }
 
 impl UserData {
-    /// The player's potion slots, in slot order.
-    pub fn potion_slots(&self) -> Result<Vec<PotionSlot>> {
-        let mut stmt = self.conn.prepare("SELECT slot, name, price FROM potion_slots ORDER BY slot")?;
-        let rows = stmt.query_map([], |row| Ok(PotionSlot { slot: row.get(0)?, name: row.get(1)?, price: row.get(2)? }))?;
+    /// The potion slots for a character, in slot order. A character with none of its own uses the
+    /// shared ones (from before slots were kept per character, or set with no character known)
+    /// until it sets its own.
+    pub fn potion_slots(&self, character: Option<&str>) -> Result<Vec<PotionSlot>> {
+        let own = self.slots_of(&owner(character))?;
+        if own.is_empty() && !owner(character).is_empty() {
+            return self.slots_of("");
+        }
+        Ok(own)
+    }
+
+    fn slots_of(&self, owner: &str) -> Result<Vec<PotionSlot>> {
+        let mut stmt =
+            self.conn.prepare("SELECT slot, name, price FROM potion_slots WHERE character = ?1 ORDER BY slot")?;
+        let rows = stmt.query_map([owner], |row| Ok(PotionSlot { slot: row.get(0)?, name: row.get(1)?, price: row.get(2)? }))?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
     /// Replaces the potion slots. A slot keeps its number, so a session's counts stay with it;
     /// a new slot (number 0) takes the next free one. Counts already typed for sessions keep the
     /// name and price they were typed with.
-    pub fn set_potion_slots(&mut self, slots: &[PotionSlot]) -> Result<()> {
+    pub fn set_potion_slots(&mut self, character: Option<&str>, slots: &[PotionSlot]) -> Result<()> {
+        let owner = owner(character);
         if slots.len() > MAX_SLOTS {
             return Err(Error::Invalid(format!("Up to {MAX_SLOTS} potion slots can be set.")));
         }
@@ -85,7 +102,7 @@ impl UserData {
             return Err(Error::Invalid("Two potion slots share a number.".into()));
         }
         let tx = self.conn.transaction()?;
-        tx.execute("DELETE FROM potion_slots", [])?;
+        tx.execute("DELETE FROM potion_slots WHERE character = ?1", [&owner])?;
         for slot in slots {
             let number = if slot.slot > 0 {
                 slot.slot
@@ -95,8 +112,8 @@ impl UserData {
                 next
             };
             tx.execute(
-                "INSERT INTO potion_slots (slot, name, price) VALUES (?1, ?2, ?3)",
-                params![number, slot.name.trim(), slot.price],
+                "INSERT INTO potion_slots (character, slot, name, price) VALUES (?1, ?2, ?3, ?4)",
+                params![owner, number, slot.name.trim(), slot.price],
             )?;
         }
         tx.commit()?;
@@ -137,7 +154,14 @@ impl UserData {
 
     /// Records a slot's counts for a session, taking the slot's current name and price. With
     /// neither count, the slot's entry is removed.
-    pub fn set_session_potion(&mut self, started_at: f64, slot: u32, start: Option<i64>, now: Option<i64>) -> Result<()> {
+    pub fn set_session_potion(
+        &mut self,
+        character: Option<&str>,
+        started_at: f64,
+        slot: u32,
+        start: Option<i64>,
+        now: Option<i64>,
+    ) -> Result<()> {
         if start.is_some_and(|n| n < 0) || now.is_some_and(|n| n < 0) {
             return Err(Error::Invalid("A potion count can't be below zero.".into()));
         }
@@ -146,10 +170,7 @@ impl UserData {
                 .execute("DELETE FROM session_potions WHERE started_at = ?1 AND slot = ?2", params![key(started_at), slot])?;
             return Ok(());
         }
-        let found: Option<(String, i64)> = self
-            .conn
-            .query_row("SELECT name, price FROM potion_slots WHERE slot = ?1", [slot], |r| Ok((r.get(0)?, r.get(1)?)))
-            .optional()?;
+        let found = self.potion_slots(character)?.into_iter().find(|s| s.slot == slot).map(|s| (s.name, s.price));
         let Some((name, price)) = found else {
             return Err(Error::Invalid("That potion slot isn't set up any more.".into()));
         };
@@ -193,48 +214,76 @@ mod tests {
     #[test]
     fn slots_are_numbered_in_the_order_given() {
         let mut db = UserData::open_in_memory().unwrap();
-        db.set_potion_slots(&[slot(" White Potion ", 320), slot("Blue Potion", 200)]).unwrap();
-        let slots = db.potion_slots().unwrap();
+        db.set_potion_slots(None, &[slot(" White Potion ", 320), slot("Blue Potion", 200)]).unwrap();
+        let slots = db.potion_slots(None).unwrap();
         assert_eq!(slots, [
             PotionSlot { slot: 1, name: "White Potion".into(), price: 320 },
             PotionSlot { slot: 2, name: "Blue Potion".into(), price: 200 },
         ]);
-        assert!(db.set_potion_slots(&[slot("", 1)]).is_err());
-        assert!(db.set_potion_slots(&[slot("Elixir", -1)]).is_err());
-        assert!(db.set_potion_slots(&vec![slot("Red Potion", 50); MAX_SLOTS + 1]).is_err());
-        assert_eq!(db.potion_slots().unwrap().len(), 2, "a refused change leaves the slots alone");
+        assert!(db.set_potion_slots(None, &[slot("", 1)]).is_err());
+        assert!(db.set_potion_slots(None, &[slot("Elixir", -1)]).is_err());
+        assert!(db.set_potion_slots(None, &vec![slot("Red Potion", 50); MAX_SLOTS + 1]).is_err());
+        assert_eq!(db.potion_slots(None).unwrap().len(), 2, "a refused change leaves the slots alone");
 
         // Taking the first away leaves the second at its number; a new one fills the gap.
-        let mut kept = db.potion_slots().unwrap();
+        let mut kept = db.potion_slots(None).unwrap();
         kept.remove(0);
         kept.push(slot("Mana Elixir", 620));
-        db.set_potion_slots(&kept).unwrap();
-        let numbers: Vec<_> = db.potion_slots().unwrap().into_iter().map(|s| (s.slot, s.name)).collect();
+        db.set_potion_slots(None, &kept).unwrap();
+        let numbers: Vec<_> = db.potion_slots(None).unwrap().into_iter().map(|s| (s.slot, s.name)).collect();
         assert_eq!(numbers, [(1, "Mana Elixir".to_string()), (2, "Blue Potion".to_string())]);
     }
 
     #[test]
     fn a_session_uses_what_it_started_with_minus_what_is_left() {
         let mut db = UserData::open_in_memory().unwrap();
-        db.set_potion_slots(&[slot("White Potion", 320), slot("Blue Potion", 200)]).unwrap();
+        db.set_potion_slots(None, &[slot("White Potion", 320), slot("Blue Potion", 200)]).unwrap();
         let at = 1_794_000_000.25;
-        db.set_session_potion(at, 1, Some(300), None).unwrap();
+        db.set_session_potion(None, at, 1, Some(300), None).unwrap();
         assert_eq!(db.session_potions(at).unwrap()[0].used, 0, "nothing used until the count now is typed");
-        db.set_session_potion(at, 1, Some(300), Some(212)).unwrap();
-        db.set_session_potion(at, 2, Some(100), Some(140)).unwrap();
+        db.set_session_potion(None, at, 1, Some(300), Some(212)).unwrap();
+        db.set_session_potion(None, at, 2, Some(100), Some(140)).unwrap();
         let potions = db.session_potions(at).unwrap();
         assert_eq!(potions.iter().map(|p| p.used).collect::<Vec<_>>(), [88, 0], "more than at the start counts as none used");
         assert_eq!(cost_of(&potions), 88 * 320);
 
         // A new price applies to counts typed afterwards, not to the ones already kept.
-        db.set_potion_slots(&[PotionSlot { slot: 1, name: "White Potion".into(), price: 400 }]).unwrap();
+        db.set_potion_slots(None, &[PotionSlot { slot: 1, name: "White Potion".into(), price: 400 }]).unwrap();
         assert_eq!(db.session_potions(at).unwrap()[0].price, 320);
-        db.set_session_potion(at, 1, Some(300), Some(200)).unwrap();
+        db.set_session_potion(None, at, 1, Some(300), Some(200)).unwrap();
         assert_eq!(db.session_potions(at).unwrap()[0].price, 400);
-        assert!(db.set_session_potion(at, 2, Some(1), Some(0)).is_err(), "slot 2 is gone");
-        db.set_session_potion(at, 2, None, None).unwrap();
+        assert!(db.set_session_potion(None, at, 2, Some(1), Some(0)).is_err(), "slot 2 is gone");
+        db.set_session_potion(None, at, 2, None, None).unwrap();
         assert_eq!(db.session_potions(at).unwrap().len(), 1);
         assert!(db.session_potions(at + 1.0).unwrap().is_empty());
-        assert!(db.set_session_potion(at, 1, Some(-1), None).is_err());
+        assert!(db.set_session_potion(None, at, 1, Some(-1), None).is_err());
+    }
+
+    #[test]
+    fn each_character_has_its_own_slots_and_falls_back_to_the_shared_ones() {
+        let mut db = UserData::open_in_memory().unwrap();
+        db.set_potion_slots(None, &[slot("White Potion", 320)]).unwrap();
+        // Nothing of its own yet: the shared slots show.
+        assert_eq!(db.potion_slots(Some("Swiftleaf")).unwrap()[0].name, "White Potion");
+
+        db.set_potion_slots(Some("Swiftleaf"), &[slot("Elixir", 900), slot("Blue Potion", 200)]).unwrap();
+        let own: Vec<_> = db.potion_slots(Some("swiftleaf")).unwrap().into_iter().map(|s| s.name).collect();
+        assert_eq!(own, ["Elixir", "Blue Potion"], "names match whatever their case");
+        assert_eq!(db.potion_slots(Some("Mapleduck")).unwrap()[0].name, "White Potion");
+        assert_eq!(db.potion_slots(None).unwrap().len(), 1, "the shared set is left alone");
+
+        // A session's counts take the price of its own character's slot.
+        db.set_session_potion(Some("Swiftleaf"), 5.0, 1, Some(10), Some(5)).unwrap();
+        assert_eq!(db.session_potions(5.0).unwrap()[0].price, 900);
+    }
+
+    #[test]
+    fn slots_from_before_characters_move_to_the_shared_set() {
+        let db = UserData::open_in_memory().unwrap();
+        db.conn.execute("DELETE FROM potion_slots", []).unwrap();
+        // The migration copies old rows over as the shared set: the column default does the same.
+        db.conn.execute("INSERT INTO potion_slots (slot, name, price) VALUES (1, 'Red Potion', 50)", []).unwrap();
+        assert_eq!(db.potion_slots(None).unwrap()[0].name, "Red Potion");
+        assert_eq!(db.potion_slots(Some("Anyone")).unwrap()[0].name, "Red Potion");
     }
 }

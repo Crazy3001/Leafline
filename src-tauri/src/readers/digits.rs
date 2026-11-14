@@ -29,6 +29,8 @@ const WINDOW: Font = Font { rows: 9, upper: 2, lower: 6 };
 /// The same round numbers a row shorter, in the Quest Helper.
 const QUEST: Font = Font { rows: 8, upper: 2, lower: 5 };
 
+/// The window font's digits are no wider than this.
+const WINDOW_DIGIT_WIDTH: u32 = 5;
 /// A digit no wider than this is a 1, which is narrow in every font.
 const ONE_WIDTH: u32 = 3;
 /// The value font's digits are narrower than this, and its `%` isn't.
@@ -176,6 +178,13 @@ fn round_digit(mask: &Mask, font: Font) -> Option<char> {
     let shape = Shape::new(mask, font)?;
     let straight = shape.width > ONE_WIDTH || (0..font.rows).all(|y| shape.right(y));
     shape.digit().filter(|_| straight)
+}
+
+/// One digit of a window number, or `None` for anything else. The window font's digits are no
+/// wider than [`WINDOW_DIGIT_WIDTH`]; a `%` has two closed holes like an 8 but is wider.
+pub fn window_digit(mask: &Mask) -> Option<char> {
+    let shape = Shape::new(mask, WINDOW)?;
+    (shape.width <= WINDOW_DIGIT_WIDTH).then(|| round_digit(mask, WINDOW)).flatten()
 }
 
 /// Reads the digits a window number starts with, up to the first mark that isn't one, such as the

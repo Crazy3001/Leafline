@@ -263,6 +263,16 @@ export interface SessionLine {
   percentGained: number;
   mesosGained: number;
   mesosSeconds: number;
+  /** Kills counted from gains; null where none could be (a party, a map the data lacks). */
+  kills?: number | null;
+  /** Quest EXP and the like, left out of expGained. */
+  otherExp?: number;
+  deaths?: number;
+  expLost?: number;
+  /** Hunting gains that matched no sum of the map's monsters' EXP. */
+  gainsMissed?: number;
+  /** The character as the estimates saw them when the stretch began. */
+  fighter?: Fighter | null;
 }
 
 export interface MapSummary {
@@ -295,9 +305,33 @@ export interface SessionSummary {
   /** The EXP the current level needs, as measured from the HUD. */
   expNeeded: number | null;
   expGained: number;
+  /** EXP that was no kill (quests handed in), left out of every rate. */
+  expOther: number;
+  /** Kills counted from gains that match the map's monsters, solo only. */
+  kills: number;
+  gainsMatched: number;
+  gainsUnmatched: number;
   expPerHour: number | null;
   percentPerHour: number | null;
+  /** The rates are a first estimate from the first kills, under a minute of play. */
+  measuring?: boolean;
+  /** Active seconds to the next level at paceExpPerHour. */
   secondsToLevel: number | null;
+  /** The same at the range's fast and slow ends. */
+  secondsToLevelLow: number | null;
+  secondsToLevelHigh: number | null;
+  /** The same with breaks counted as this session has had them. */
+  secondsToLevelWithBreaks: number | null;
+  /** This map's EXP an hour less deaths, eased in from an estimate: what the time to level goes by. */
+  paceExpPerHour: number | null;
+  /** How far the pace could be out, as a share of it. */
+  paceError: number | null;
+  /** An estimate still counts for more than a tenth of the pace. */
+  paceFromEstimate: boolean;
+  killsPerHour: number | null;
+  /** Seconds of play, breaks included. */
+  realSeconds: number;
+  expPerHourWithBreaks: number | null;
   /** Rates over the last five minutes of active time. */
   recentExpPerHour: number | null;
   recentPercentPerHour: number | null;
@@ -450,6 +484,31 @@ export interface MapExit {
   hidden: boolean;
 }
 
+/** A marker on a map's picture, placed from 0 to 1 across and down it. */
+export interface ViewPoint {
+  kind: "portal" | "npc" | "mob";
+  /** The map a portal leads to, or the NPC or monster. */
+  id: number;
+  name: string;
+  hidden: boolean;
+  /** A portal to another spot on the same map. */
+  teleport: boolean;
+  /** A portal's own name and the one it comes out at, to pair teleports. */
+  portal: string | null;
+  toPortal: string | null;
+  /** In the data, so its card can open. */
+  known: boolean;
+  x: number;
+  y: number;
+}
+
+/** A map's picture cut to what is drawn, at the size it is drawn, with its markers. */
+export interface MapPicture {
+  width: number;
+  height: number;
+  points: ViewPoint[];
+}
+
 export interface MapDetails {
   map: MapRef;
   region: string | null;
@@ -569,11 +628,14 @@ export interface Trip {
   offer: { title: string; quest: string; destination: Destination; giver: boolean } | null;
 }
 
-/** A Route pin's word to the overlay: send the trip as it stands, or drop the turn-in offer. */
-export type TripMessage = "ask" | "dismiss-offer";
+/**
+ * A Route pin's word to the overlay: send the trip as it stands, drop the turn-in offer, or work
+ * the route out again (once the taxis and scrolls are downloaded).
+ */
+export type TripMessage = "ask" | "dismiss-offer" | "reroute";
 
 /** Taxis and return scrolls (see src-tauri/src/mapdata/travel.rs). */
-export type TravelKind = "cab" | "vipCab" | "scroll";
+export type TravelKind = "cab" | "vipCab" | "scroll" | "npc";
 
 export interface TravelStep {
   kind: TravelKind;
@@ -644,6 +706,10 @@ export interface MonsterDrops {
     sampleDrops: number | null;
     gameVersion: string | null;
     quest: boolean;
+    /** From the item data: its id, what it is (a slot, weapon type or group) and its level. */
+    itemId: number | null;
+    itemType: string | null;
+    reqLevel: number | null;
   }[];
 }
 
@@ -702,6 +768,8 @@ export interface ObjectiveGuide {
   /** Whether the drop list has been searched for who drops this item. */
   lookedUp: boolean;
   hunts: Hunt[];
+  /** For an item: NPC shops that sell it, the cheapest first, so it can be bought instead. */
+  shops: ShopOffer[];
 }
 
 export interface QuestGuide {
@@ -734,6 +802,42 @@ export interface MeasuredRate {
   level?: number | null;
   /** Party size then; none or one is solo. */
   party?: number | null;
+  /** Kills counted in that play, when nearly every gain matched. */
+  kills?: number | null;
+  /** The character as they were then, when known. */
+  fighter?: Fighter | null;
+  /** Deaths in that play, when counted. */
+  deaths?: number | null;
+}
+
+/** The character as the combat model sees them (src-tauri/src/mapdata/combat.rs). */
+export interface Fighter {
+  level: number;
+  /** One damage line, skill share included, before the monster's defence. */
+  low: number;
+  high: number;
+  lines: number;
+  targets: number;
+  accuracy: number | null;
+  magic: boolean;
+  critRate: number;
+  critBonus: number;
+  attackSeconds: number;
+}
+
+/** What the rules leave open, as fitted to the player's play. */
+export interface Tuning {
+  efficiency: number;
+  overhead: number;
+  defence: number;
+}
+
+export interface ModelFit {
+  tuning: Tuning;
+  /** Typical miss on the player's own maps, as a log standard deviation. */
+  spread: number;
+  stretches: number;
+  seconds: number;
 }
 
 /**
@@ -763,13 +867,103 @@ export interface PlayerDamage {
   attackMax: number | null;
   /** The damaging skills last seen in the skill window. */
   skills: DamageSkill[];
+  /** Everything the stat window and its detail pane showed, and when, in Unix seconds. */
+  sheet: StatSheet | null;
+  readAt: number | null;
+  /** The buffs marked as on, by skill id. */
+  buffsOn: number[];
+  /** The buffs marked as on when the stat window was last read. */
+  readWith: number[];
+}
+
+/** The Character Stat window and its detail pane, as last read. */
+export interface StatSheet {
+  level: number | null;
+  /** Points put in: the 28 of "30 (28+2)". */
+  str: number | null;
+  dex: number | null;
+  int: number | null;
+  luk: number | null;
+  /** What gear adds: the 2 of "30 (28+2)". */
+  gearStr: number;
+  gearDex: number;
+  gearInt: number;
+  gearLuk: number;
+  abilityPoints: number | null;
+  maxHp: number | null;
+  maxMp: number | null;
+  fame: number | null;
+  attackMin: number | null;
+  attackMax: number | null;
+  weaponDef: number | null;
+  magic: number | null;
+  magicDef: number | null;
+  accuracy: number | null;
+  evasion: number | null;
+  /** Percentages: 26 is 26%. */
+  critRate: number | null;
+  critDamage: number | null;
+  speed: number | null;
+  jump: number | null;
+  /** What buffs added to each detail line, as the window showed it in red: the 14 of "90 (+14)". */
+  buffBonus: Record<"weaponDef" | "magic" | "magicDef" | "accuracy" | "evasion" | "critRate" | "critDamage" | "speed" | "jump", number>;
+  /** The Attack line was red: a buff was in the range. */
+  attackBuffed: boolean;
+}
+
+/** What a buff changes at one of its levels. All add, except weaponDefPercent, a share. */
+export interface SkillEffects {
+  attack: number;
+  magic: number;
+  weaponDef: number;
+  weaponDefPercent: number;
+  magicDef: number;
+  accuracy: number;
+  evasion: number;
+  speed: number;
+  jump: number;
+  /** How long it lasts; 0 when the data gives no time. */
+  seconds: number;
+}
+
+/** One of the character's buffs, at its level. */
+export interface BuffRow {
+  id: number;
+  name: string;
+  /** Null until the Skill window has shown it or the build gives it. */
+  level: number | null;
+  maxLevel: number;
+  /** The level came from the Skill window, not the build. */
+  levelRead: boolean;
+  on: boolean;
+  /** Was on when the stat window was last read, so already in its numbers. */
+  onAtRead: boolean;
+  effects: SkillEffects;
+  description: string | null;
+}
+
+export interface StatsView {
+  /** As the window showed it, buffs and all. */
+  sheet: StatSheet | null;
+  readAt: number | null;
+  buffs: BuffRow[];
+  /** Without any buff: what the window showed less what it said buffs added. */
+  base: StatSheet | null;
+  /** With the buffs on now; null when none on changes a number. */
+  buffed: StatSheet | null;
+  /** The worn gear's Attack, which a buff's Attack is counted against. */
+  weaponAttack: number | null;
+  /** A buff changes Attack but no worn gear gives the Attack, so the range is left as read. */
+  attackUnscaled: boolean;
 }
 
 export interface DamageSkill {
   name: string;
   level: number;
-  /** Its damage at that level: 240 is 240%. */
+  /** Its damage at that level: 240 is 240%. A spell's is 100; its damage comes from basicAttack. */
   percent: number;
+  /** A spell's Basic Attack at that level. */
+  basicAttack?: number | null;
 }
 
 /** How fast the player gets through monster HP, from their own solo play. */
@@ -811,6 +1005,31 @@ export interface Estimate {
   weaponDef?: number;
   /** Whether the player's attack range was counted, so defence is too. */
   damageKnown?: boolean;
+  /** How the fight goes, when the combat model made the estimate. */
+  fight?: FightDetail | null;
+}
+
+export interface FightDetail {
+  /** Chance a blow lands, averaged over the monsters. */
+  hitChance: number;
+  attacksPerKill: number;
+  /** Seconds a kill takes, everything counted, before the spawn limit. */
+  killSeconds: number;
+  levelGap: number | null;
+}
+
+/** The best guess at what the player gets on a map now: their play there and the model together. */
+export interface Forecast {
+  expPerHour: number;
+  /** Four times in five the real rate lands between these. */
+  low: number;
+  high: number;
+  sureness: 1 | 2 | 3;
+  /** Solo seconds played there that count, near the current level. */
+  playedSeconds: number;
+  modelExpPerHour: number | null;
+  /** Deaths an hour in the player's play there, once ten minutes counted them. */
+  deathsPerHour?: number | null;
 }
 
 /** A map's size and how its monsters spread, in the game's pixels, from the client. */
@@ -846,16 +1065,43 @@ export interface TrainingSpot {
   /** Portals lead here from some town; party quest stages and other instances are not. */
   reachable: boolean;
   measured: { expPerHour: number; activeSeconds: number } | null;
-  /** From the player's kill speed, once enough solo play is saved. */
+  /** From the combat model, or from the player's kill speed when their damage isn't known. */
   estimate: Estimate | null;
+  /** The best guess now, with a range; null without the combat model. */
+  forecast?: Forecast | null;
   /** The map's size, floors and how its monsters spread, when known. */
   layout?: MapLayout | null;
 }
 
+/** One of the player's maps, hidden and estimated from the rest. */
+export interface MapCheck {
+  map: MapRef;
+  seconds: number;
+  /** What the player really got there, EXP an hour. */
+  measured: number;
+  /** The combat model's estimate, tuned on the other maps. */
+  modelled: number | null;
+  /** The older estimate from kill speed. */
+  older: number | null;
+}
+
+/** How close the estimates come on the player's own maps. */
+export interface EstimateCheck {
+  maps: MapCheck[];
+  /** The middle miss, as a share: 0.15 is 15% out either way. */
+  modelTypicalMiss: number | null;
+  modelWithin20: number | null;
+  olderTypicalMiss: number | null;
+  olderWithin20: number | null;
+}
+
 export interface TrainingSpots {
   from: MapRef | null;
-  /** Behind every estimate; null until enough solo play is saved. */
+  /** Behind the older estimates; null until enough solo play is saved. */
   speed: KillSpeed | null;
+  /** The character as the combat model sees them, and how its tuning fits their play. */
+  fighter?: Fighter | null;
+  fit?: ModelFit | null;
   spots: TrainingSpot[];
 }
 
@@ -937,6 +1183,8 @@ export interface DisplaySettings {
   setupDone: boolean;
   /** Ask GitHub for the latest version number at startup. Off until the player turns it on. */
   updateCheck: boolean;
+  /** Item, monster, NPC and map pictures, downloaded from OSMS the first time each is shown. */
+  showPictures: boolean;
 }
 
 /** The optional update check (src-tauri/src/app/update.rs). */
@@ -944,7 +1192,18 @@ export type UpdateStatus =
   | { state: "off" }
   | { state: "checking" }
   | { state: "upToDate"; current: string; latest: string }
-  | { state: "available"; current: string; latest: string; url: string }
+  | {
+      state: "available";
+      current: string;
+      latest: string;
+      url: string;
+      /** The release has a setup program and checksums, so it can be downloaded and installed. */
+      installable: boolean;
+      /** Why the last download and install didn't go through. */
+      problem: string | null;
+    }
+  | { state: "downloading"; current: string; latest: string; received: number; total: number | null }
+  | { state: "installing"; latest: string }
   | { state: "unavailable"; current: string; reason: string }
   | { state: "failed"; current: string; message: string };
 
@@ -1404,6 +1663,8 @@ export interface MonsterSheet {
   splits: { id: number; name: string; count: number }[];
   /** Null when the drop table isn't downloaded. */
   drops: MonsterDrops | null;
+  /** Where its HP per EXP places it among field monsters that spawn, least first; null for bosses. */
+  expRank: { place: number; of: number } | null;
 }
 
 export interface MonsterWhere {
@@ -1460,6 +1721,8 @@ export interface NpcQuery {
   region: string | null;
   /** One of `mapAreas`. */
   area: string | null;
+  /** `name`, `quests` (most first) or `map`; the best match first otherwise. */
+  sort: string | null;
   offset: number;
 }
 
@@ -1514,6 +1777,8 @@ export interface QuestSearch {
   repeat: string | null;
   /** Only quests a character of this level can start. */
   atLevel: number | null;
+  /** Only quests that need no other quest finished first. */
+  noPrior?: boolean;
   offset: number;
 }
 
@@ -1550,6 +1815,17 @@ export interface QuestSheet {
     /** Always given. Otherwise it is one of a choice, or down to chance. */
     sure: boolean;
   }[];
+  /** What the quests after this one in its chain pay together, when it leads on. */
+  chainRest: ChainRest | null;
+}
+
+/** The quests left in a chain after one of them, and their EXP and mesos added up. */
+export interface ChainRest {
+  quests: QuestRef[];
+  exp: number;
+  mesos: number;
+  /** The highest level any of them asks for. */
+  levelMax: number | null;
 }
 
 export interface QuestWhere {
@@ -1631,6 +1907,27 @@ export interface Outfit {
   level: number;
   /** In the equip window's order. An overall or a shield only when worn or planned. */
   slots: SlotGear[];
+  /** Each slot's way up from this level, which `slots` takes its suggestion and next step from. */
+  paths: GearPath[];
+  /** Who the gear worn was made for, when a piece of it says. */
+  wornGender: string | null;
+}
+
+/** One piece on a slot's way up, at the first level the plan can wear it. */
+export interface GearStep {
+  item: ItemRecord;
+  level: number;
+  /** One of the plan's own goals, not the data's pick. */
+  planned: boolean;
+}
+
+/** A slot's gear to the end of the plan: one piece now at most, then one for each tier up. */
+export interface GearPath {
+  slot: string;
+  now: GearStep | null;
+  steps: GearStep[];
+  /** The plan's goals the path passes over: outgrown, or beaten by a piece of the same tier or higher. */
+  passed: ItemRecord[];
 }
 
 export interface Expansion {
@@ -1669,6 +1966,10 @@ export interface SkillInfo {
   requiredSkills: SkillLevel[];
   /** What the skill does at each level, from level 1. */
   levelDescriptions: string[];
+  /** What it changes at each level, from level 1; empty when it changes no stat. */
+  effects: SkillEffects[];
+  /** Cast on yourself or the party for a while, such as Rage or Haste. */
+  buff: boolean;
 }
 
 export interface BuildCatalog {

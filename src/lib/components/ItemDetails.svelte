@@ -1,7 +1,7 @@
 <script lang="ts">
   // What the data says about an item, under its card: what it does, where to get it, and the
   // links to the build and to scrolls. An item read from a tooltip is matched by name first.
-  import { Check, LoaderCircle, Plus, ScrollText } from "@lucide/svelte";
+  import { Check, LoaderCircle, Plus, ScrollText, Star } from "@lucide/svelte";
   import { untrack } from "svelte";
 
   import ItemCraftingView from "./item/ItemCrafting.svelte";
@@ -11,9 +11,9 @@
   import { buildState, watchBuilds } from "$lib/builds.svelte";
   import { attackSpeedText, formatMesos } from "$lib/format";
   import { blankQuery, itemView, statRows, type CheckedStat } from "$lib/items.svelte";
-  import { DROPS_CREDIT, DROPS_URL, OSMS_CREDIT, OSMS_URL, mapData } from "$lib/mapdata.svelte";
-  import { showNpcNamed } from "$lib/places.svelte";
+  import { mapData } from "$lib/mapdata.svelte";
   import { live } from "$lib/readings.svelte";
+  import { isTracked, track, untrack as stopTracking, watchTracked } from "$lib/tracked.svelte";
   import type { GearPiece, ItemRecord, ItemTooltip, ItemWhere, MapReading } from "$lib/types";
 
   let {
@@ -33,6 +33,7 @@
   } = $props();
 
   watchBuilds();
+  watchTracked();
 
   let matched = $state<ItemRecord | null>(null);
   let found = $state<ItemWhere | null>(null);
@@ -181,8 +182,14 @@
     {#if tags.length}<p class="tags">{tags.join(" · ")}</p>{/if}
   {/if}
 
-  {#if shown.kind === "equip"}
-    <div class="actions">
+  <div class="actions">
+    <button
+      class:on={isTracked(shown.id)}
+      onclick={() => (isTracked(shown.id) ? stopTracking(shown.id) : track(shown.id, shown.name))}
+    >
+      <Star size={12} />{isTracked(shown.id) ? "Tracking" : "Track it"}
+    </button>
+    {#if shown.kind === "equip"}
       {#if piece && pieces != null}
         <!-- A copy read from the game may be the player's own: put it in its slot as it is, scrolls and all. -->
         <button
@@ -198,17 +205,13 @@
         </button>
       {/if}
       <button onclick={() => scrollsFor(shown)}><ScrollText size={12} />Scrolls for it</button>
-    </div>
-    {#if pieceError}<p class="piece-error">{pieceError}</p>{/if}
-  {/if}
+    {/if}
+  </div>
+  {#if pieceError}<p class="piece-error">{pieceError}</p>{/if}
 
   <Section title="Where to get it">
     {#if found}
       <ItemSources {found} />
-      <p class="credit">
-        <button onclick={() => backend.openLink(DROPS_URL)}>{DROPS_CREDIT}</button>
-        <button onclick={() => backend.openLink(OSMS_URL)}>{OSMS_CREDIT}</button>
-      </p>
     {:else if error}
       <p class="note">{error}</p>
     {:else if loading}
@@ -311,25 +314,4 @@
     }
   }
 
-  .credit {
-    display: grid;
-    gap: 2px;
-    margin: 8px 0 0;
-  }
-
-  .credit button {
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--faint);
-    font-size: var(--text-xs);
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .credit button:hover,
-  .credit button:focus-visible {
-    color: var(--muted);
-    outline: none;
-  }
 </style>

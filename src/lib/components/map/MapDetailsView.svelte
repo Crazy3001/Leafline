@@ -1,18 +1,23 @@
 <script lang="ts">
-  // Everything the cached data says about one map. No map images or coordinates are shown.
-  import { ExternalLink, Skull } from "@lucide/svelte";
+  // Everything the cached data says about one map: its picture with the marks on it, where its
+  // portals lead, its monsters, drops, quests, NPCs and shops.
+  import { tip } from "$lib/tip.svelte";
+  import Ref from "$lib/components/Ref.svelte";
+  import { Skull } from "@lucide/svelte";
 
   import { backend } from "$lib/api";
   import { formatCompact, formatNumber, monsterLabel } from "$lib/format";
-  import { OSMS_CREDIT, OSMS_URL } from "$lib/mapdata.svelte";
-  import { showNpcNamed } from "$lib/places.svelte";
-  import type { MapDetails, MapRef } from "$lib/types";
+  import type { MapDetails, MapPicture as Picture, MapRef } from "$lib/types";
+  import { trip } from "$lib/wayfinder.svelte";
   import ConnectionCompass from "./ConnectionCompass.svelte";
+  import MapPicture from "./MapPicture.svelte";
+  import { display } from "$lib/settings.svelte";
   import MapDrops from "./MapDrops.svelte";
   import ShopStock from "../item/ShopStock.svelte";
   import RouteFromHere from "./RouteFromHere.svelte";
   import RoutePlanner from "./RoutePlanner.svelte";
   import Section from "./Section.svelte";
+  import Segmented from "$lib/ui/Segmented.svelte";
 
   let {
     details,
@@ -48,6 +53,66 @@
     ].filter((f): f is string => !!f),
   );
   const monsterNames = $derived([...new Set(details.mobs.map((m) => m.name))]);
+  /** The desk view has room for the map's picture; over the game it waits to be opened. */
+  const desk = typeof location !== "undefined" && location.pathname.startsWith("/desk");
+  /** The monster under the pointer in the list, whose spawn points stand out on the picture. */
+  let hovered = $state<string | null>(null);
+
+  // The picture's size and marks, for the picture and for placing the portals where they stand.
+  let picture = $state<Picture | null>(null);
+  let pictureDone = $state(false);
+  $effect(() => {
+    const id = details.map.id;
+    picture = null;
+    pictureDone = false;
+    if (!display.showPictures) return;
+    backend
+      .mapPicture(id)
+      .then((result) => {
+        if (id === details.map.id) picture = result;
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (id === details.map.id) pictureDone = true;
+      });
+  });
+
+  /** A map whose portal is pointed at, in the Portals section or on the picture: lit in both. */
+  let litExit = $state<number | null>(null);
+
+  // The Portals section as a compass or a plain list, remembered as a convenience.
+  type Layout = "compass" | "list";
+  const LAYOUT_KEY = "leafline.portals.layout";
+  let layout = $state<Layout>(
+    (() => {
+      try {
+        return localStorage.getItem(LAYOUT_KEY) === "list" ? "list" : "compass";
+      } catch {
+        return "compass";
+      }
+    })(),
+  );
+  function setLayout(value: Layout) {
+    layout = value;
+    try {
+      localStorage.setItem(LAYOUT_KEY, value);
+    } catch {
+      // A convenience only.
+    }
+  }
+  /** Placed from the picture: the portals' real spots, rather than only the data's thirds. */
+  const located = $derived(picture?.points.some((p) => p.kind === "portal" && !p.teleport) ?? false);
+
+  /** The portal the trip being followed takes next, when it leaves from this map. */
+  const nextKey = $derived.by(() => {
+    const step = trip.route?.steps[trip.next];
+    return step && !step.travel && step.from.id === details.map.id ? JSON.stringify([step.portal, step.to.id]) : null;
+  });
+  const nextStep = $derived.by(() => {
+    if (!nextKey) return null;
+    const [portal, to] = JSON.parse(nextKey) as [string | null, number];
+    return { portal, to };
+  });
 </script>
 
 {#if facts.length || details.returnMap}
@@ -56,42 +121,82 @@
     {#if details.returnMap}
       <span class="return">
         Returns to
-        <button class="inline ref ref-map" onclick={() => onnavigate(details.returnMap!.id)}>{details.returnMap.name}</button>
+        <Ref kind="map" id={details.returnMap.id} name={details.returnMap.name} />
       </span>
     {/if}
   </div>
 {/if}
 
+{#if display.showPictures}
+  <Section title="Map" memory="map-picture-{desk ? 'desk' : 'overlay'}" open={desk}>
+    <MapPicture
+      mapId={details.map.id}
+      {picture}
+      done={pictureDone}
+      highlight={hovered}
+      mobs={details.mobs}
+      npcs={details.npcs}
+      next={nextStep}
+      lit={litExit}
+      onhoverportal={(id) => (litExit = id)}
+    />
+  </Section>
+{/if}
+
 {#if away}
   <Section title="Route from your map">
-    <RouteFromHere from={away} to={details.map} {onnavigate} />
+    <RouteFromHere from={away} to={details.map} />
   </Section>
 {/if}
 
 {#if !glance}
-  <Section title="Exits" count={details.exits.length}>
+  <Section title="Portals" count={details.exits.length}>
     {#snippet aside()}
-      {#if placed}<span>rough positions</span>{/if}
+      {#if placed && !located}<span>rough positions</span>{/if}
     {/snippet}
-    <ConnectionCompass exits={details.exits} map={details.map} {current} {onnavigate} />
+    {#if details.exits.length > 2}
+      <div class="portal-layout">
+        <Segmented
+          size="sm"
+          label="Show the portals as"
+          value={layout}
+          options={[
+            { id: "compass", label: "Compass", title: "Around the map, on the side each portal stands" },
+            { id: "list", label: "List", title: "Every portal in a row, left to right across the map" },
+          ]}
+          onchange={setLayout}
+        />
+      </div>
+    {/if}
+    <ConnectionCompass
+      exits={details.exits}
+      map={details.map}
+      {current}
+      {layout}
+      points={picture?.points ?? null}
+      next={nextStep}
+      lit={litExit}
+      onhover={(id) => (litExit = id)}
+      {onnavigate}
+    />
   </Section>
 {/if}
 
 {#if details.mobs.length}
   <Section title="Monsters" count={details.mobTotal}>
-    {#snippet aside()}<span title="Base EXP for killing every monster once, before any modifiers"
+    {#snippet aside()}<span use:tip={"Base EXP for killing every monster once, before any modifiers"}
         >{formatCompact(details.expPerClear)} EXP / clear</span
       >{/snippet}
     <table class="mobs">
       <thead>
-        <tr><th>Monster</th><th>Lv</th><th>HP</th><th>EXP</th><th title="How many spawn">#</th></tr>
+        <tr><th>Monster</th><th>Lv</th><th>HP</th><th>EXP</th><th use:tip={"How many spawn"}>#</th></tr>
       </thead>
       <tbody>
         {#each details.mobs as mob (mob.id)}
-          <tr>
+          <tr onmouseenter={() => (hovered = mob.name)} onmouseleave={() => (hovered = null)}>
             <td class="mob">
-              <button class="ref ref-mob" onclick={() => backend.showMonster(mob.id, null)}>{monsterLabel(mob.name)}</button>
-              {#if mob.boss}<span class="boss" title="Boss"><Skull size={11} /></span>{/if}
+              <Ref kind="mob" id={mob.id} name={monsterLabel(mob.name)} />
+              {#if mob.boss}<span class="boss" use:tip={"Boss"}><Skull size={11} /></span>{/if}
               {#if mob.undead}<span class="tag">undead</span>{/if}
             </td>
             <td class="tabular">{mob.level}</td>
@@ -105,7 +210,7 @@
   </Section>
 {/if}
 
-<!-- A pinned window stops at the monsters; exits, drops, quests, NPCs and routes are in the tab. -->
+<!-- A pinned window stops at the monsters; portals, drops, quests, NPCs and routes are in the tab. -->
 {#if !glance}
 {#if monsterNames.length}
   <Section title="Drops">
@@ -119,12 +224,12 @@
       {#each details.quests as need (need.quest.id)}
         <li>
           <div class="quest-head">
-            <button class="quest-name ref ref-quest" onclick={() => backend.showQuest(need.quest.id)}>{need.quest.name}</button>
+            <Ref kind="quest" id={need.quest.id} name={need.quest.name} class="quest-name" />
             {#if need.quest.levelMin}<span class="lv">Lv {need.quest.levelMin}+</span>{/if}
           </div>
           <div class="quest-sub">
             {need.targets.map((t) => `${t.count} ${t.name}`).join(", ")}
-            {#if need.giver}<span class="giver">· from <button class="ref ref-npc" onclick={() => showNpcNamed(need.giver!)}>{need.giver}</button></span>{/if}
+            {#if need.giver}<span class="giver">· from <Ref kind="npc" name={need.giver} /></span>{/if}
           </div>
         </li>
       {/each}
@@ -137,9 +242,9 @@
     <ul class="npcs">
       {#each details.npcs as npc (npc.id)}
         <li>
-          <button class="ref ref-npc" onclick={() => backend.showPlace("npcs", npc.id)}>{npc.name}</button>
+          <Ref kind="npc" id={npc.id} name={npc.name} />
           {#if npc.quests.length}
-            <span class="gives" title={npc.quests.map((q) => q.name).join("\n")}>
+            <span class="gives" use:tip={npc.quests.map((q) => q.name).join("\n")}>
               {npc.quests.length} quest{npc.quests.length === 1 ? "" : "s"}
             </span>
           {/if}
@@ -165,7 +270,7 @@
               <span class="chev" class:open>›</span>
             </button>
             {#if shop.npcId != null}
-              <button class="ref ref-npc" onclick={() => backend.showPlace("npcs", shop.npcId!)}>{shop.npc}</button>
+              <Ref kind="npc" id={shop.npcId} name={shop.npc} />
             {:else}
               <span>{shop.npc}</span>
             {/if}
@@ -178,23 +283,22 @@
   </Section>
 {/if}
 
-{#if !away}
-  <Section title="Route" open={!compact}>
-    <RoutePlanner from={details.map} region={details.region} {onnavigate} />
+<!-- The route planner lives in the Map tab; a looked-up map or a card shows the route from yours. -->
+{#if !away && !compact}
+  <Section title="Route">
+    <RoutePlanner from={details.map} region={details.region} />
   </Section>
 {/if}
 
-<div class="links">
-  {#each details.links as link}
-    <button class="out" onclick={() => backend.openLink(link.url)}>
-      {link.label}<ExternalLink size={11} />
-    </button>
-  {/each}
-</div>
 {/if}
-<button class="credit" onclick={() => backend.openLink(OSMS_URL)}>{OSMS_CREDIT}</button>
 
 <style>
+  .portal-layout {
+    display: flex;
+    justify-content: flex-end;
+    margin: -2px 0 6px;
+  }
+
   .facts {
     display: flex;
     flex-wrap: wrap;
@@ -223,7 +327,7 @@
     color: var(--faint);
   }
 
-  .inline {
+  .return :global(.ref) {
     font-size: var(--text-xs);
   }
 
@@ -298,7 +402,7 @@
     font-size: var(--text-sm);
   }
 
-  .quest-name {
+  li :global(.ref.quest-name) {
     font-weight: 500;
   }
 
@@ -380,47 +484,4 @@
     }
   }
 
-  .links {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-    margin-top: 12px;
-  }
-
-  .out {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    height: 24px;
-    padding: 0 8px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--muted);
-    font-size: var(--text-xs);
-    cursor: pointer;
-  }
-
-  .out:hover {
-    border-color: var(--border-strong);
-    color: var(--text);
-  }
-
-  .credit {
-    display: block;
-    margin-top: 8px;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--faint);
-    font-size: var(--text-xs);
-    line-height: 1.4;
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .credit:hover {
-    color: var(--muted);
-    text-decoration: underline;
-  }
 </style>

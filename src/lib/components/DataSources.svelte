@@ -7,9 +7,10 @@
 
   import { backend } from "$lib/api";
   import { DROPS_URL, OSMS_URL, ago, downloadMapData, mapData, watchMapData } from "$lib/mapdata.svelte";
-  import { display } from "$lib/settings.svelte";
+  import { changeSettings, display } from "$lib/settings.svelte";
   import type { TravelInfo } from "$lib/types";
   import Button from "$lib/ui/Button.svelte";
+  import Switch from "$lib/ui/Switch.svelte";
 
   let { travel = $bindable(null) }: { travel?: TravelInfo | null } = $props();
 
@@ -108,6 +109,19 @@
     </Button>
   </div>
 
+  <div class="source">
+    <div class="about">
+      <span class="name">Game pictures</span>
+      <span class="help">
+        Item, monster and NPC icons and map pictures, from
+        <button class="link" onclick={() => backend.openLink(OSMS_URL)}>OSMS Data Explorer</button>. Each is downloaded the
+        first time it is shown and kept on this PC. Game art © Nexon.
+      </span>
+      <span class="state">{display.showPictures ? "Shown beside names and on cards" : "Off: names only, nothing downloaded"}</span>
+    </div>
+    <Switch label="Show game pictures" checked={display.showPictures} onchange={(on) => changeSettings({ showPictures: on })} />
+  </div>
+
   {#if travelOn}
     <div class="source">
       <div class="about">
@@ -141,7 +155,9 @@
   .sources {
     display: flex;
     flex-direction: column;
+    overflow: hidden;
     border: 1px solid var(--border);
+    border-radius: var(--radius);
     background: var(--surface);
   }
 

@@ -1,6 +1,7 @@
 <script lang="ts">
   // Settings: how the overlay looks, travel in routes, the hotkeys, downloaded data, and what
   // Leafline is.
+  import { tip } from "$lib/tip.svelte";
   import {
     CarTaxiFront,
     Check,
@@ -193,6 +194,17 @@
       stopUpdate.then((stop) => stop());
     };
   });
+
+  async function installNow() {
+    updateError = null;
+    try {
+      await backend.installUpdate();
+    } catch (e) {
+      updateError = String(e);
+    }
+  }
+
+  const megabytes = (bytes: number) => (bytes / 1_000_000).toFixed(1);
 
   async function checkNow() {
     updateError = null;
@@ -398,7 +410,7 @@
             </select>
             <button
               class="button icon-only"
-              title="Look for windows again"
+              use:tip={"Look for windows again"}
               aria-label="Look for windows again"
               onclick={loadWindows}
             >
@@ -788,7 +800,7 @@
           {#if display.framesFolder}
             <button
               class="button icon-only"
-              title="Back to the local folder"
+              use:tip={"Back to the local folder"}
               aria-label="Back to the local folder"
               onclick={() => changeSettings({ framesFolder: null })}><RotateCcw size={13} /></button
             >
@@ -866,11 +878,35 @@
       </p>
 
       {#if update.state === "available"}
+        {@const notes = update.url}
         <div class="update" role="status">
           <span>Leafline {update.latest} is out. You have {update.current}.</span>
-          <button class="link" onclick={() => backend.openLink(update.state === "available" ? update.url : "")}>
-            Release notes and download<ExternalLink size={11} />
-          </button>
+          {#if update.installable}
+            <button class="button" onclick={installNow}><Download size={12} />Download and install</button>
+          {/if}
+          <button class="link" onclick={() => backend.openLink(notes)}>Release notes<ExternalLink size={11} /></button>
+          <span class="update-note">
+            {#if update.installable}
+              Downloads the installer from GitHub, checks it against the release's SHA-256 and runs it only if they match.
+              Leafline closes while it installs; your records and settings stay.
+            {:else}
+              This release has no installer Leafline can check, so download it from the release page.
+            {/if}
+          </span>
+          {#if update.problem}<span class="update-note warn">{update.problem}</span>{/if}
+        </div>
+      {:else if update.state === "downloading"}
+        <div class="update" role="status">
+          <span>
+            Downloading Leafline {update.latest}…
+            <span class="tabular"
+              >{megabytes(update.received)}{#if update.total}&nbsp;of {megabytes(update.total)}{/if} MB</span
+            >
+          </span>
+        </div>
+      {:else if update.state === "installing"}
+        <div class="update" role="status">
+          <span>The installer for Leafline {update.latest} checked out and is starting. Leafline is closing.</span>
         </div>
       {/if}
 
@@ -902,7 +938,7 @@
           <span class="name">Check for updates</span>
           <span class="help">
             At startup, asks GitHub for the number of the latest release and says here if it's newer. Nothing about the
-            game or you is sent, and nothing is downloaded or installed.
+            game or you is sent. An update is downloaded and installed only when you press Download and install.
           </span>
           {#if display.updateCheck && updateLine}<span class="help status">{updateLine}</span>{/if}
           {#if updateError}<span class="help warn">{updateError}</span>{/if}
@@ -1128,7 +1164,7 @@
     outline-offset: 1px;
   }
 
-  /* The same square switch as src/lib/ui/Switch.svelte, on a checkbox so labels still work. */
+  /* The same switch as src/lib/ui/Switch.svelte, on a checkbox so labels still work. */
   .switch {
     appearance: none;
     position: relative;
@@ -1137,8 +1173,9 @@
     height: 20px;
     margin: 0;
     border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-pill);
     background: var(--surface-3);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
     cursor: pointer;
     transition: background 0.12s ease;
   }
@@ -1150,8 +1187,9 @@
     left: 2px;
     width: 14px;
     height: 14px;
-    border-radius: 1px;
+    border-radius: 50%;
     background: var(--muted);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
     transition: transform 0.12s ease;
   }
 
@@ -1162,7 +1200,7 @@
 
   .switch:checked::after {
     transform: translateX(16px);
-    background: var(--bg);
+    background: #fff;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -1603,6 +1641,16 @@
     border-left: 2px solid var(--accent);
     background: var(--accent-soft);
     font-size: var(--text-md);
+  }
+
+  .update-note {
+    flex-basis: 100%;
+    color: var(--muted);
+    font-size: var(--text-sm);
+  }
+
+  .update-note.warn {
+    color: var(--warn);
   }
 
   .help.status {

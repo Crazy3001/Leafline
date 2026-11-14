@@ -61,6 +61,9 @@ pub struct Sample {
     pub party: Option<u32>,
     /// The Quest Helper's counters.
     pub counters: Vec<Counter>,
+    /// The base EXP of each monster on the map, when the map data knows it. Gains are matched
+    /// against these to count kills and to tell quest EXP from hunting.
+    pub kill_exp: Vec<u32>,
 }
 
 /// A quest counter as read: what it counts and how far along it is.
@@ -96,6 +99,7 @@ impl Sample {
                 .filter(|o| !o.unread)
                 .map(|o| Counter { target: o.target.clone(), current: o.current, required: o.required })
                 .collect(),
+            kill_exp: Vec::new(),
         }
     }
 }
@@ -120,6 +124,10 @@ impl Default for TrackerConfig {
 
 /// Active seconds behind the "last 5 minutes" rates.
 const RECENT_SECONDS: f64 = 300.0;
+/// Gains of EXP before a first rate shows, ahead of `min_rate_seconds`: two kills say something.
+const FIRST_RATE_GAINS: u32 = 2;
+/// Until this much active time, the session's rate is a first estimate and says so.
+const MEASURING_SECONDS: f64 = 60.0;
 /// Active seconds between points on the trend line, and how many it keeps.
 const TREND_STEP: f64 = 15.0;
 const TREND_POINTS: usize = 60;
@@ -141,9 +149,32 @@ const MAP_HIDDEN_SECONDS: f64 = 6.0;
 const STEADY_READS: usize = 2;
 /// Readings in a row of a lower level or another name that mean another character.
 const OTHER_CHARACTER_READS: usize = 3;
+/// A reading a second can catch a few kills at once; more than this in one gain is not taken as
+/// kills.
+const MAX_KILLS_PER_GAIN: u32 = 4;
+/// A gain that is no sum of kills and over this many of the map's biggest kill is quest EXP (or
+/// the like), not hunting.
+const QUEST_GAIN_KILLS: f64 = 4.0;
+/// Seconds of play an estimate counts for in the pace: the measured pace takes over as play
+/// goes on, outweighing it four to one after a quarter of an hour.
+const PRIOR_SECONDS: f64 = 180.0;
+/// Active seconds on the current map before its own pace is used for the time to level.
+const MAP_PACE_SECONDS: f64 = 120.0;
+/// Gains behind a pace before a range is given for it, and how wide the range is: 1.28 standard
+/// errors either side holds the true pace four times in five.
+const RANGE_GAINS: u32 = 10;
+const RANGE_Z: f64 = 1.28;
+/// A wait between two frames longer than this is time away (the app closed or the game hidden),
+/// not a break in play.
+const REAL_GAP: f64 = 120.0;
+/// Seconds of play, breaks included, before the time to level with breaks is given.
+const BREAKS_AFTER: f64 = 1200.0;
+/// The gaps between gains kept to tell how long a kill usually takes, and the guess before any.
+const GAPS_KEPT: usize = 20;
+const USUAL_GAP: f64 = 5.0;
 
 /// A value that changes only once several readings in a row agree on the new one.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct Steady<T> {
     value: Option<T>,
     candidate: Option<(T, usize)>,
@@ -199,9 +230,38 @@ pub struct SessionSummary {
     pub exp_needed: Option<u64>,
     /// EXP gained; EXP lost to deaths is counted apart.
     pub exp_gained: i64,
+    /// EXP that was no kill: quests handed in and the like. Left out of every rate.
+    pub exp_other: i64,
+    /// Kills counted from gains that match the map's monsters, solo only.
+    pub kills: u64,
+    /// Solo gains on maps the data knows that did and didn't match a sum of its monsters' EXP.
+    /// Many misses would mean kills give other than the data's base EXP.
+    pub gains_matched: u32,
+    pub gains_unmatched: u32,
     pub exp_per_hour: Option<f64>,
     pub percent_per_hour: Option<f64>,
+    /// The rates are a first estimate from the first kills, under a minute of play.
+    pub measuring: bool,
+    /// Seconds to the next level at [`Self::pace_exp_per_hour`], in active time.
     pub seconds_to_level: Option<f64>,
+    /// The same at the range's slow and fast ends, once enough gains are behind the pace.
+    pub seconds_to_level_low: Option<f64>,
+    pub seconds_to_level_high: Option<f64>,
+    /// The same with breaks counted at this session's share of them.
+    pub seconds_to_level_with_breaks: Option<f64>,
+    /// The pace behind the time to level: this map's EXP an hour less deaths, eased in from an
+    /// estimate when there is one, or the session's while this map has too little.
+    pub pace_exp_per_hour: Option<f64>,
+    /// How far the pace could be out, as a share of it, for a range of ±1.28 times this.
+    pub pace_error: Option<f64>,
+    /// An estimate still counts for more than a tenth of the pace.
+    pub pace_from_estimate: bool,
+    /// Kills an hour on this map, when kills were counted.
+    pub kills_per_hour: Option<f64>,
+    /// Seconds from the first reading to the latest, breaks in play included, time away not.
+    pub real_seconds: f64,
+    /// EXP an hour less deaths over that time.
+    pub exp_per_hour_with_breaks: Option<f64>,
     /// Rates over the last five minutes of active time.
     pub recent_exp_per_hour: Option<f64>,
     pub recent_percent_per_hour: Option<f64>,
@@ -266,8 +326,8 @@ pub struct MapSummary {
 }
 
 /// A stretch of play on one map at one level, party size and job.
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
 pub struct SessionLine {
     pub map: Option<String>,
     pub town: bool,
@@ -279,10 +339,22 @@ pub struct SessionLine {
     pub percent_gained: f64,
     pub mesos_gained: i64,
     pub mesos_seconds: f64,
+    /// Kills counted from gains, `None` where none could be (a party, a map the data lacks).
+    pub kills: Option<u32>,
+    /// Quest EXP and the like, left out of `exp_gained`.
+    pub other_exp: i64,
+    pub deaths: u32,
+    pub exp_lost: u64,
+    /// Hunting gains on a map the data knows that matched no sum of its monsters' EXP, so the
+    /// kills are short by about that many.
+    pub gains_missed: u32,
+    /// The character's damage and stats when the stretch began, as the estimates read them, so
+    /// play can be compared with what the character could do then.
+    pub fighter: Option<serde_json::Value>,
 }
 
 /// How fast one quest counter went up on one map.
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CounterRate {
     pub target: String,
@@ -326,7 +398,7 @@ pub struct SessionEvent {
     pub level: Option<u32>,
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
 pub struct Rejected {
     pub exp: usize,
     pub mesos: usize,
@@ -334,7 +406,7 @@ pub struct Rejected {
 
 /// The EXP a level needs, as a range: the HUD's percent has two decimals, and whether it rounds
 /// or truncates is not known, so the true percent is anywhere from 0.005 below to 0.01 above.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 struct Requirement {
     low: f64,
     high: f64,
@@ -377,7 +449,7 @@ fn narrow(a: Option<Requirement>, b: Option<Requirement>) -> Option<Requirement>
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct ExpPoint {
     at: f64,
     level: u32,
@@ -386,7 +458,7 @@ struct ExpPoint {
 }
 
 /// Progress when the HUD shows only a percentage.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct PercentPoint {
     at: f64,
     level: u32,
@@ -395,14 +467,14 @@ struct PercentPoint {
 }
 
 /// Running totals at one moment of active time, for the recent rates.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 struct Mark {
     clock: f64,
     exp: i64,
     percent: f64,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct MesoPoint {
     mesos: u64,
     /// The active clock when this amount first appeared.
@@ -411,7 +483,7 @@ struct MesoPoint {
 }
 
 /// A shop, storage or trade window that is open now.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct OpenWindow {
     opened_at: f64,
     /// An amount has been read in it.
@@ -420,17 +492,114 @@ struct OpenWindow {
     last: Option<u64>,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
 struct MapTotals {
     map: Option<String>,
     active_seconds: f64,
     exp_gained: i64,
     mesos_gained: i64,
     meso_seconds: f64,
+    kills: u64,
+    exp_lost: u64,
+    /// Hunting gains, and their sum and sum of squares, for how steady the pace is.
+    gains: Gains,
+}
+
+/// How many gains there were and how much they varied: the spread of a pace comes from both.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+struct Gains {
+    count: u32,
+    sum: f64,
+    squares: f64,
+}
+
+impl Gains {
+    fn add(&mut self, gain: f64) {
+        self.count += 1;
+        self.sum += gain;
+        self.squares += gain * gain;
+    }
+
+    /// The pace's likely error as a share of it: with n gains whose sizes vary by v (standard
+    /// deviation over mean), about √((1 + v²) / n). `None` with too few gains to say.
+    fn error(&self) -> Option<f64> {
+        if self.count < RANGE_GAINS || self.sum <= 0.0 {
+            return None;
+        }
+        let n = f64::from(self.count);
+        let mean = self.sum / n;
+        let variance = (self.squares / n - mean * mean).max(0.0);
+        let v2 = variance / (mean * mean);
+        Some(((1.0 + v2) / n).sqrt())
+    }
+}
+
+/// The pace the time to level goes by, with how sure it is.
+#[derive(Debug, Clone, Copy)]
+struct Pace {
+    exp_per_hour: Option<f64>,
+    error: Option<f64>,
+    from_estimate: bool,
+    kills_per_hour: Option<f64>,
+}
+
+/// How a gain of EXP is counted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum GainKind {
+    /// This many kills of the map's monsters.
+    Kills(u32),
+    /// Hunting that matched no sum of kills, or couldn't be checked.
+    Hunting { checked: bool },
+    /// Too big to be hunting: a quest handed in, or the like.
+    Other,
+}
+
+/// The fewest kills of monsters worth `values` EXP that add up to `gain`, up to
+/// [`MAX_KILLS_PER_GAIN`]. Each kill may be one EXP out either way, for rounding.
+fn kills_in(gain: u64, values: &[u32]) -> Option<u32> {
+    /// Whether `kills` monsters from `values[from..]` can add up to between `low` and `high`.
+    fn reach(low: i64, high: i64, values: &[u32], kills: u32, from: usize) -> bool {
+        if kills == 0 {
+            return low <= 0 && 0 <= high;
+        }
+        high >= 0
+            && (from..values.len()).any(|i| {
+                let v = i64::from(values[i]);
+                reach(low - v, high - v, values, kills - 1, i)
+            })
+    }
+    if gain == 0 {
+        return None;
+    }
+    let mut values: Vec<u32> = values.iter().copied().filter(|&v| v > 0).collect();
+    values.sort_unstable();
+    values.dedup();
+    let gain = gain as i64;
+    (1..=MAX_KILLS_PER_GAIN).find(|&kills| {
+        let slack = i64::from(kills);
+        reach(gain - slack, gain + slack, &values, kills, 0)
+    })
+}
+
+/// Sorts a gain made solo on a map whose monsters are worth `values`.
+fn classify(gain: u64, values: &[u32]) -> GainKind {
+    if values.is_empty() {
+        return GainKind::Hunting { checked: false };
+    }
+    if let Some(kills) = kills_in(gain, values) {
+        return GainKind::Kills(kills);
+    }
+    let biggest = values.iter().copied().max().unwrap_or(0);
+    if gain as f64 > QUEST_GAIN_KILLS * f64::from(biggest) {
+        GainKind::Other
+    } else {
+        GainKind::Hunting { checked: true }
+    }
 }
 
 /// One quest counter as tracked: the value being read, and the last confirmed one.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct CounterTrack {
     target: String,
     required: u32,
@@ -442,9 +611,30 @@ struct CounterTrack {
     seen: bool,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
 pub struct SessionTracker {
+    #[serde(skip)]
     config: TrackerConfig,
+    /// The base EXP of the current map's monsters, from the last reading that had them.
+    kill_exp: Vec<u32>,
+    kills: u64,
+    exp_other: i64,
+    gains_matched: u32,
+    gains_unmatched: u32,
+    /// Hunting gains over the whole session, for the pace's range when a map has too few.
+    gains: Gains,
+    /// Recent gaps between hunting gains, for how long a kill usually takes.
+    gaps: VecDeque<f64>,
+    /// The map changed since the last gain.
+    new_map: bool,
+    /// Seconds of play, breaks included, and when the last frame that read anything came.
+    real_clock: f64,
+    last_read_at: Option<f64>,
+    /// An estimate of the pace on a map, from earlier play or the training estimates.
+    prior: Option<(String, f64)>,
+    /// The character's damage and stats as the estimates read them, copied into new lines.
+    fighter: Option<serde_json::Value>,
     frames: usize,
     started_at: Option<f64>,
     updated_at: Option<f64>,
@@ -463,6 +653,10 @@ pub struct SessionTracker {
     clock: f64,
     /// Seconds since EXP last went up.
     idle_for: f64,
+    /// Readings that showed hunting EXP going up: kills, roughly, since one reading can hold
+    /// several.
+    #[serde(default)]
+    rising: u32,
     exp_gained: i64,
     level_ups: u32,
     deaths: u32,
@@ -539,14 +733,24 @@ impl SessionTracker {
         if read_any {
             self.started_at = Some(self.started_at.map_or(sample.at, |s| s.min(sample.at)));
             self.updated_at = Some(self.updated_at.map_or(sample.at, |u| u.max(sample.at)));
+            // Breaks in play count; time away (the app closed, tracking held) doesn't.
+            if let Some(last) = self.last_read_at {
+                let gap = sample.at - last;
+                if !self.skip_gap && (0.0..=REAL_GAP).contains(&gap) {
+                    self.real_clock += gap;
+                }
+            }
+            self.last_read_at = Some(sample.at);
         }
         if sample.map.is_some() {
             self.map.clone_from(&sample.map);
             self.map_seen_at = Some(sample.at);
             self.town = sample.town;
+            self.kill_exp.clone_from(&sample.kill_exp);
         } else if self.map_seen_at.is_some_and(|seen| sample.at - seen >= MAP_BLIND_SECONDS) {
             // The player may have moved on: gains stop going to the old map.
             self.map = None;
+            self.kill_exp.clear();
         }
         if let Some(party) = sample.party {
             self.party.see(party, STEADY_READS);
@@ -601,8 +805,35 @@ impl SessionTracker {
         self.config.idle_after = seconds;
     }
 
+    /// Gives an estimate of the EXP an hour on `map` (a minimap label), which the pace behind the
+    /// time to level starts from until enough play there is measured. `None` forgets it.
+    pub fn set_prior(&mut self, map: &str, exp_per_hour: Option<f64>) {
+        self.prior = exp_per_hour.filter(|r| r.is_finite() && *r > 0.0).map(|r| (map.to_string(), r));
+    }
+
+    /// The map the tracker counts gains to now, if any.
+    pub fn current_map(&self) -> Option<&str> {
+        self.map.as_deref()
+    }
+
+    /// Takes what the estimates know of the character's damage and stats, to copy into the
+    /// stretches of play from now on.
+    pub fn set_fighter(&mut self, fighter: Option<serde_json::Value>) {
+        self.fighter = fighter;
+    }
+
     /// Stops or restarts tracking by hand. Readings are not pushed while held, and the time
     /// held doesn't count once they come back.
+    /// Takes a saved tracker back (it serialises as a whole, see `serde_json::to_value`). The
+    /// time the app was away is not counted: the next reading starts a new stretch, and the
+    /// rates carry on from where they were.
+    pub fn restore(config: TrackerConfig, saved: serde_json::Value) -> Option<Self> {
+        let mut tracker: Self = serde_json::from_value(saved).ok()?;
+        tracker.config = config;
+        tracker.skip_gap = true;
+        Some(tracker)
+    }
+
     pub fn set_held(&mut self, held: bool) {
         self.held = held;
         self.skip_gap = true;
@@ -766,8 +997,36 @@ impl SessionTracker {
 
         let dt = (next.at - last.at).max(0.0);
         let moved = matches!((&last.map, &next.map), (Some(a), Some(b)) if a != b);
-        let counted = self.run_clock(gain.map(|g| g > 0), dt, moved);
-        self.exp_gained += gain.unwrap_or(0);
+        let solo = self.party.value.is_none_or(|p| p <= 1);
+        // Only a gain within one level is exact enough to match against kills.
+        let kind = match gain {
+            Some(g) if g > 0 && next.level == last.level && solo && !moved => {
+                let kind = classify(g as u64, &self.kill_exp);
+                match kind {
+                    GainKind::Kills(_) => self.gains_matched += 1,
+                    GainKind::Hunting { checked: true } => self.gains_unmatched += 1,
+                    _ => {}
+                }
+                kind
+            }
+            _ => GainKind::Hunting { checked: false },
+        };
+        let other = kind == GainKind::Other;
+        // Quest EXP is no sign of hunting: the clock runs as if nothing came in.
+        let counted = self.run_clock(gain.map(|g| g > 0 && !other), dt, moved);
+        let (hunted, other_exp) = if other { (0, gain.unwrap_or(0)) } else { (gain.unwrap_or(0), 0) };
+        let percent = if other { 0.0 } else { percent };
+        let kills = match kind {
+            GainKind::Kills(k) => Some(k),
+            _ => None,
+        };
+        self.exp_gained += hunted;
+        self.exp_other += other_exp;
+        self.kills += u64::from(kills.unwrap_or(0));
+        if hunted > 0 {
+            self.gains.add(hunted as f64);
+            self.rising += 1;
+        }
         self.percent_gained += percent;
         self.level_ups += next.level - last.level;
         if next.level > last.level && self.level_known {
@@ -778,12 +1037,22 @@ impl SessionTracker {
             let map = if moved { None } else { last.map.clone().or_else(|| next.map.clone()) };
             let totals = self.totals(map.clone());
             totals.active_seconds += counted;
-            totals.exp_gained += gain.unwrap_or(0);
+            totals.exp_gained += hunted;
+            totals.kills += u64::from(kills.unwrap_or(0));
+            if hunted > 0 {
+                totals.gains.add(hunted as f64);
+            }
             let level = self.level_known.then_some(next.level);
             let line = self.line(map, level);
             line.active_seconds += counted;
-            line.exp_gained += gain.unwrap_or(0);
+            line.exp_gained += hunted;
+            line.other_exp += other_exp;
             line.percent_gained += percent;
+            match kind {
+                GainKind::Kills(k) => *line.kills.get_or_insert(0) += k,
+                GainKind::Hunting { checked: true } => line.gains_missed += 1,
+                _ => {}
+            }
         }
 
         let implied = Requirement::implied(next.exp);
@@ -798,33 +1067,81 @@ impl SessionTracker {
         self.run_clock(Some(false), dt, false);
         self.deaths += 1;
         self.event(EventKind::Death, None);
-        self.exp_lost += last.exp.points.saturating_sub(next.exp.points);
+        let lost = last.exp.points.saturating_sub(next.exp.points);
+        self.exp_lost += lost;
         self.percent_lost += f64::from(last.exp.percent - next.exp.percent).max(0.0);
+        let map = last.map.clone();
+        self.totals(map.clone()).exp_lost += lost;
+        let level = self.level_known.then_some(last.level);
+        let line = self.line(map, level);
+        line.deaths += 1;
+        line.exp_lost += lost;
         self.exp = Some(next);
     }
 
-    /// Moves the active clock on by `dt` seconds. `gained` says whether EXP went up, or is `None`
-    /// when that can't be told. Returns the seconds counted.
+    /// How long a kill usually takes here: the middle of the recent gaps between gains.
+    fn usual_gap(&self) -> f64 {
+        if self.gaps.is_empty() {
+            return USUAL_GAP.min(self.config.idle_after);
+        }
+        let mut gaps: Vec<f64> = self.gaps.iter().copied().collect();
+        gaps.sort_by(f64::total_cmp);
+        gaps[gaps.len() / 2].clamp(1.0, self.config.idle_after.max(1.0))
+    }
+
+    /// Moves the active clock on. `dt` is the time since the last reading; `gained` says whether
+    /// EXP went up, or is `None` when that can't be told. Returns the seconds counted.
+    ///
+    /// Time seen to pass without EXP is held back until the next gain, since the wait before a
+    /// kill is part of it. A wait up to `idle_after` counts in full. A longer one was a break: only
+    /// a usual kill's time of it counts, as the hunt that ended it. Counting the first
+    /// `idle_after` of every break, as before, made a session with many breaks look slower than
+    /// its play was. The time since the reading before a gain always counts: with readings far
+    /// apart (a folder of screenshots) nothing says it was idle.
     fn run_clock(&mut self, gained: Option<bool>, dt: f64, moved: bool) -> f64 {
         let dt = if std::mem::take(&mut self.skip_gap) { 0.0 } else { dt };
         let counted = match gained {
             None => 0.0,
             Some(true) => {
-                self.idle_for = 0.0;
-                dt
+                let waited = std::mem::take(&mut self.idle_for);
+                let gap = waited + dt;
+                if std::mem::take(&mut self.new_map) {
+                    dt
+                } else if gap <= self.config.idle_after {
+                    self.gaps.push_back(gap);
+                    if self.gaps.len() > GAPS_KEPT {
+                        self.gaps.pop_front();
+                    }
+                    gap
+                } else if waited > 0.0 {
+                    dt + self.usual_gap().min(waited)
+                } else {
+                    dt
+                }
             }
             Some(false) if moved => {
+                // A new map with no EXP yet: whatever led up to it was no hunting here, and the
+                // first gain there counts only the time since the reading before it.
                 self.idle_for = self.config.idle_after;
+                self.new_map = true;
                 0.0
             }
             Some(false) => {
-                let counted = (self.config.idle_after - self.idle_for).clamp(0.0, dt);
                 self.idle_for += dt;
-                counted
+                0.0
             }
         };
         self.clock += counted;
         counted
+    }
+
+    /// Active seconds to show: the clock, plus the wait since the last gain as far as a usual
+    /// kill's time, which the next gain will count.
+    fn shown_clock(&self) -> f64 {
+        if self.held || self.clock == 0.0 {
+            return self.clock;
+        }
+        self.clock + self.idle_for.min(self.usual_gap())
     }
 
     /// Follows a HUD that shows only a percentage. Each level is 100, so nothing else is needed.
@@ -896,6 +1213,9 @@ impl SessionTracker {
         let dt = (next.at - last.at).max(0.0);
         let moved = matches!((&last.map, &next.map), (Some(a), Some(b)) if a != b);
         let counted = self.run_clock(Some(gain > 0.0), dt, moved);
+        if gain > 0.0 {
+            self.rising += 1;
+        }
         self.percent_gained += gain;
         self.level_ups += next.level.saturating_sub(last.level);
         if next.level > last.level && self.level_known {
@@ -918,7 +1238,8 @@ impl SessionTracker {
         let mark =
             Mark { clock: self.clock, exp: self.exp_gained, percent: self.percent_gained };
         self.marks.push_back(mark);
-        while self.marks.front().is_some_and(|m| m.clock < self.clock - RECENT_SECONDS - TREND_STEP) {
+        // One mark at or before the window's start is kept: the totals then are the window's base.
+        while self.marks.get(1).is_some_and(|m| m.clock <= self.clock - RECENT_SECONDS) {
             self.marks.pop_front();
         }
         if self.clock - self.trend_clock >= TREND_STEP {
@@ -975,12 +1296,24 @@ impl SessionTracker {
         self.events.push(SessionEvent { at: self.clock, kind, level });
     }
 
-    /// The rate of a running total over the last five minutes of active time.
+    /// The rate of a running total over the last five minutes of active time, exactly: the totals
+    /// only change at a mark, so at the window's start they are those of the last mark before it.
+    /// Measuring from the first mark inside the window instead dropped the gain there but kept
+    /// its time, which read low. Before five minutes, the whole session from its start at 0.
     fn recent_rate(&self, total: impl Fn(&Mark) -> f64) -> Option<f64> {
         let last = self.marks.back()?;
-        let first = self.marks.iter().find(|m| m.clock >= last.clock - RECENT_SECONDS)?;
-        let seconds = last.clock - first.clock;
-        (seconds >= self.config.min_rate_seconds).then(|| (total(last) - total(first)) * 3600.0 / seconds)
+        let from = last.clock - RECENT_SECONDS;
+        let seconds = last.clock.min(RECENT_SECONDS);
+        if seconds < self.config.min_rate_seconds {
+            return None;
+        }
+        let base = if from <= 0.0 {
+            0.0
+        } else {
+            // Marks are dropped only once a later one is at or before the start, so one is here.
+            self.marks.iter().rev().find(|m| m.clock <= from).map_or(0.0, &total)
+        };
+        Some((total(last) - base) * 3600.0 / seconds)
     }
 
     /// Notes a look at the mesos, then redraws the graph's points since the look before, which
@@ -1216,7 +1549,46 @@ impl SessionTracker {
             self.lines.push(SessionLine { map, town, level, party, job, ..SessionLine::default() });
             self.lines.len() - 1
         });
-        &mut self.lines[index]
+        let line = &mut self.lines[index];
+        // The character as the stretch began, or as soon as it was known.
+        if line.fighter.is_none() {
+            line.fighter.clone_from(&self.fighter);
+        }
+        line
+    }
+
+    /// The pace behind the time to level. It is this map's, since a session that moved maps
+    /// says little about the one the player is on now, less EXP lost to deaths here, which set
+    /// the level back for real. An estimate for the map, when given, counts for
+    /// [`PRIOR_SECONDS`] of play, so the pace is steady from the first kill and the player's own
+    /// play takes over as it goes on. Without one, the session's pace stands in until the map has
+    /// [`MAP_PACE_SECONDS`] of play.
+    fn pace(&self) -> Pace {
+        let here = self.map.as_ref().and_then(|map| self.maps.iter().find(|t| t.map.as_ref() == Some(map)));
+        let prior = self.prior.as_ref().filter(|(map, _)| self.map.as_ref() == Some(map)).map(|(_, rate)| *rate);
+        let map_ready = here.is_some_and(|t| t.active_seconds >= MAP_PACE_SECONDS);
+        let (exp, seconds, gains, kills) = match here {
+            Some(t) if map_ready || prior.is_some() => {
+                (t.exp_gained - t.exp_lost as i64, t.active_seconds, t.gains, Some(t.kills))
+            }
+            _ => (self.exp_gained - self.exp_lost as i64, self.clock, self.gains, None),
+        };
+        let exp_per_hour = match prior {
+            Some(rate) => Some((exp as f64 + rate * PRIOR_SECONDS / 3600.0) * 3600.0 / (seconds + PRIOR_SECONDS)),
+            // Like the session's rate, a first figure from the second kill.
+            None => (seconds >= self.config.min_rate_seconds || (gains.count >= FIRST_RATE_GAINS && seconds > 0.0))
+                .then(|| exp as f64 * 3600.0 / seconds),
+        };
+        let kills_per_hour = kills
+            .filter(|&k| k > 0 && seconds >= self.config.min_rate_seconds)
+            .map(|k| k as f64 * 3600.0 / seconds);
+        Pace {
+            exp_per_hour,
+            // The estimate's own error isn't known; its weight only shrinks the measured one.
+            error: gains.error().map(|e| prior.map_or(e, |_| e * seconds / (seconds + PRIOR_SECONDS))),
+            from_estimate: prior.is_some() && PRIOR_SECONDS > 0.1 * (seconds + PRIOR_SECONDS),
+            kills_per_hour,
+        }
     }
 
     pub fn summary(&self) -> SessionSummary {
@@ -1224,21 +1596,38 @@ impl SessionTracker {
             (seconds >= self.config.min_rate_seconds).then(|| amount as f64 * 3600.0 / seconds)
         };
         let percent_only = self.percent_point.is_some();
-        let exp_per_hour = rate(self.exp_gained, self.clock).filter(|_| !percent_only);
+        // The session's own rate starts at the second gain, as a first estimate, rather than
+        // waiting for `min_rate_seconds`; per-map rates still wait.
+        let started = self.clock >= self.config.min_rate_seconds || (self.rising >= FIRST_RATE_GAINS && self.clock > 0.0);
+        let exp_per_hour =
+            started.then(|| self.exp_gained as f64 * 3600.0 / self.clock).filter(|_| !percent_only);
         let exp_needed = self.exp.as_ref().and_then(|e| self.requirement(e.level)).and_then(Requirement::estimate);
         let percent = self.percent_point.as_ref().map(|p| p.percent).or(self.exp.as_ref().map(|e| e.exp.percent));
         let percent_per_hour =
             exp_per_hour.zip(exp_needed).map(|(per_hour, needed)| per_hour * 100.0 / needed as f64).or_else(|| {
-                (self.clock >= self.config.min_rate_seconds).then(|| self.percent_gained * 3600.0 / self.clock)
+                started.then(|| self.percent_gained * 3600.0 / self.clock)
             });
-        let seconds_to_level = match (exp_per_hour, exp_needed, &self.exp) {
-            (Some(per_hour), Some(needed), Some(last)) if per_hour > 0.0 && !percent_only => {
-                Some(needed.saturating_sub(last.exp.points) as f64 / per_hour * 3600.0)
-            }
-            _ => percent
+        let pace = self.pace();
+        let remaining = match (&self.exp, exp_needed) {
+            (Some(last), Some(needed)) if !percent_only => Some(needed.saturating_sub(last.exp.points) as f64),
+            _ => None,
+        };
+        let eta = |per_hour: f64| remaining.filter(|_| per_hour > 0.0).map(|left| left / per_hour * 3600.0);
+        let seconds_to_level = match pace.exp_per_hour.and_then(eta) {
+            Some(seconds) => Some(seconds),
+            None => percent
                 .zip(percent_per_hour.filter(|&p| p > 0.0 && percent_only))
                 .map(|(percent, per_hour)| (100.0 - f64::from(percent)) / per_hour * 3600.0),
         };
+        let spread = |sign: f64| {
+            let (per_hour, error) = (pace.exp_per_hour?, pace.error?);
+            eta(per_hour * (1.0 + sign * RANGE_Z * error).max(0.2))
+        };
+        // Breaks as this session has had them, once it has run long enough to say.
+        let breaks = (self.real_clock >= BREAKS_AFTER && self.clock > 0.0)
+            .then(|| (self.real_clock / self.clock).clamp(1.0, 5.0));
+        let exp_per_hour_with_breaks = (self.real_clock >= BREAKS_AFTER && !percent_only)
+            .then(|| (self.exp_gained - self.exp_lost as i64) as f64 * 3600.0 / self.real_clock);
         let mut maps: Vec<MapSummary> = self
             .maps
             .iter()
@@ -1269,7 +1658,7 @@ impl SessionTracker {
             started_at: self.started_at,
             updated_at: self.updated_at,
             elapsed_seconds: self.started_at.zip(self.updated_at).map_or(0.0, |(s, u)| u - s),
-            active_seconds: self.clock,
+            active_seconds: self.shown_clock(),
             paused: self.held || (self.level().is_some() && self.idle_for >= self.config.idle_after),
             held: self.held,
             level: self.level().filter(|_| self.level_known),
@@ -1278,9 +1667,23 @@ impl SessionTracker {
             percent_only,
             exp_needed: exp_needed.filter(|_| !percent_only),
             exp_gained: self.exp_gained,
+            exp_other: self.exp_other,
+            kills: self.kills,
+            gains_matched: self.gains_matched,
+            gains_unmatched: self.gains_unmatched,
             exp_per_hour,
             percent_per_hour,
+            measuring: (exp_per_hour.is_some() || percent_per_hour.is_some()) && self.clock < MEASURING_SECONDS,
             seconds_to_level,
+            seconds_to_level_low: spread(1.0),
+            seconds_to_level_high: spread(-1.0),
+            seconds_to_level_with_breaks: seconds_to_level.zip(breaks).map(|(s, b)| s * b),
+            pace_exp_per_hour: pace.exp_per_hour.filter(|_| !percent_only),
+            pace_error: pace.error,
+            pace_from_estimate: pace.from_estimate,
+            kills_per_hour: pace.kills_per_hour,
+            real_seconds: self.real_clock,
+            exp_per_hour_with_breaks,
             recent_exp_per_hour: self.recent_rate(|m| m.exp as f64).filter(|_| !percent_only),
             recent_percent_per_hour: self.recent_rate(|m| m.percent),
             recent_mesos_per_hour: self.meso_looks.back().and_then(|&(clock, _)| self.meso_rate_at(clock)),
@@ -1343,6 +1746,40 @@ mod tests {
     }
 
     #[test]
+    fn a_restored_tracker_carries_on_without_counting_the_time_away() {
+        let config = TrackerConfig { confirmations: 1, ..TrackerConfig::default() };
+        let mut tracker = SessionTracker::new(config);
+        let mut points = 100;
+        for second in 0..=120 {
+            points += 20;
+            tracker.push(&with_mesos(sample(f64::from(second), 30, points, points as f32 / 10_000.0), 1_000 + 50 * points));
+        }
+        let before = tracker.summary();
+        assert!(before.active_seconds > 100.0 && before.exp_gained > 0);
+
+        let saved = serde_json::to_value(&tracker).unwrap();
+        let mut back = SessionTracker::restore(config, saved).expect("restores");
+        assert_eq!(back.summary().exp_gained, before.exp_gained);
+        assert_eq!(back.summary().maps, before.maps);
+
+        // Back an hour later: the hour is not play time, and the next gain counts in full.
+        points += 20;
+        back.push(&sample(4_000.0, 30, points, points as f32 / 10_000.0));
+        points += 20;
+        back.push(&sample(4_001.0, 30, points, points as f32 / 10_000.0));
+        let after = back.summary();
+        assert!(after.active_seconds - before.active_seconds < 5.0, "{}", after.active_seconds);
+        assert_eq!(after.exp_gained, before.exp_gained + 40);
+        assert_eq!(after.started_at, before.started_at);
+    }
+
+    #[test]
+    fn a_snapshot_that_cannot_be_read_is_refused() {
+        let config = TrackerConfig::default();
+        assert!(SessionTracker::restore(config, serde_json::json!({ "frames": "many" })).is_none());
+    }
+
+    #[test]
     fn keeps_a_timeline_with_level_ups_and_deaths() {
         let mut samples = vec![sample(0.0, 30, 100, 0.01)];
         let mut points = 100;
@@ -1401,6 +1838,24 @@ mod tests {
         assert_eq!(summary.deaths, 1);
         assert_eq!(summary.exp_lost, 5_000);
         assert_eq!(summary.exp_gained, 20_000);
+    }
+
+    #[test]
+    fn a_first_rate_shows_at_the_second_kill_and_says_it_is_still_measuring() {
+        let one = track(&[sample(0.0, 30, 10_000, 10.0), sample(2.0, 30, 10_000, 10.0), sample(6.0, 30, 10_100, 10.1)]);
+        assert_eq!(one.exp_per_hour, None, "one kill says too little");
+        let two = track(&[
+            sample(0.0, 30, 10_000, 10.0),
+            sample(2.0, 30, 10_000, 10.0),
+            sample(6.0, 30, 10_100, 10.1),
+            sample(10.0, 30, 10_200, 10.2),
+        ]);
+        assert!(two.active_seconds > 0.0 && two.active_seconds < 30.0);
+        assert!(close(two.exp_per_hour, 200.0 * 3600.0 / two.active_seconds, 1.0), "{:?}", two.exp_per_hour);
+        assert!(two.measuring && two.seconds_to_level.is_some());
+        let mut samples = vec![sample(0.0, 30, 10_000, 10.0)];
+        samples.extend((1..=40u32).map(|i| sample(f64::from(i) * 2.0, 30, 10_000 + u64::from(i) * 50, 10.0 + i as f32 * 0.05)));
+        assert!(!track(&samples).measuring, "past a minute it is the session's rate");
     }
 
     #[test]
@@ -1719,8 +2174,9 @@ mod tests {
         samples.extend((2..=61).map(|t| sample(f64::from(t), 30, 24_400, 25.49)));
         samples.push(sample(62.0, 30, 24_500, 25.60));
         let summary = track(&samples);
-        // 1 s to the first gain, 15 s of the idle minute, 1 s to the last gain.
-        assert_eq!(summary.active_seconds, 17.0);
+        // 1 s to the first gain; of the idle minute only a usual kill's time (1 s, from the first
+        // gain); 1 s from the reading before the last gain.
+        assert_eq!(summary.active_seconds, 3.0);
         assert!(!summary.paused);
         assert_eq!(summary.exp_gained, 169);
     }
@@ -1912,10 +2368,11 @@ mod tests {
             with_counter(sample(90.0, 30, 24_631, 25.74), 1),
             with_counter(sample(91.0, 30, 24_631, 25.74), 1),
         ]);
-        // 4 to 5 over 31 s, and 0 to 1 over 30 s.
+        // 4 to 5 over 30 s, and 0 to 1 over 30 s: the idle second after the last gain waits for
+        // the next one.
         let rate = &summary.counters[0];
-        assert_eq!((rate.gained, rate.active_seconds), (2, 61.0));
-        assert!(close(rate.per_hour, 118.0, 0.1), "{:?}", rate.per_hour);
+        assert_eq!((rate.gained, rate.active_seconds), (2, 60.0));
+        assert!(close(rate.per_hour, 120.0, 0.1), "{:?}", rate.per_hour);
     }
 
     /// A look at the mesos at the start, six minutes with the inventory shut, then another look.
@@ -1971,5 +2428,138 @@ mod tests {
         let summary = tracker.summary();
         assert_eq!(summary.mesos_gained, 9_904);
         assert!(close(summary.mesos_per_hour, 9_904.0 * 30.0, 0.5), "{:?}", summary.mesos_per_hour);
+    }
+
+    /// The EXP level 30 needs in these tests, which `sample`'s numbers agree with.
+    const NEED: f64 = 95_717.0;
+
+    /// A reading at `points` of level 30 on Kerning, whose monsters give `kill_exp`.
+    fn hunting(at: f64, points: u64, kill_exp: &[u32]) -> Sample {
+        let percent = ((points as f64 * 100.0 / NEED) * 100.0).floor() as f32 / 100.0;
+        Sample { kill_exp: kill_exp.to_vec(), ..sample(at, 30, points, percent) }
+    }
+
+    /// A reading a second for `seconds`, with a kill worth `exp` every `every` seconds.
+    fn grind(from: f64, seconds: u32, every: u32, exp: u32, points: &mut u64, kill_exp: &[u32]) -> Vec<Sample> {
+        (1..=seconds)
+            .map(|s| {
+                if s % every == 0 {
+                    *points += u64::from(exp);
+                }
+                hunting(from + f64::from(s), *points, kill_exp)
+            })
+            .collect()
+    }
+
+    #[test]
+    fn gains_are_matched_to_kills() {
+        assert_eq!(kills_in(43, &[43, 52]), Some(1));
+        assert_eq!(kills_in(95, &[52, 43]), Some(2));
+        assert_eq!(kills_in(44, &[43, 52]), Some(1), "a kill may be one EXP out");
+        assert_eq!(kills_in(150, &[43, 52]), Some(3));
+        assert_eq!(kills_in(120, &[100]), None);
+        assert_eq!(kills_in(300, &[43, 52]), None, "more than four kills in one reading");
+        assert_eq!(classify(120, &[100]), GainKind::Hunting { checked: true });
+        assert_eq!(classify(5_000, &[43, 52]), GainKind::Other);
+        assert_eq!(classify(5_000, &[]), GainKind::Hunting { checked: false });
+    }
+
+    #[test]
+    fn quest_exp_is_left_out_of_the_rates() {
+        let mut points = 24_000;
+        let mut samples = vec![hunting(0.0, points, &[50]), hunting(1.0, points, &[50])];
+        samples.extend(grind(1.0, 300, 5, 50, &mut points, &[50]));
+        // A quest handed in on the map.
+        points += 5_000;
+        samples.push(hunting(302.0, points, &[50]));
+        samples.push(hunting(303.0, points, &[50]));
+        let summary = track(&samples);
+        assert_eq!(summary.exp_other, 5_000);
+        assert_eq!(summary.exp_gained, 60 * 50);
+        assert_eq!(summary.kills, 60);
+        assert_eq!((summary.gains_matched, summary.gains_unmatched), (60, 0));
+        let line = &summary.lines[0];
+        assert_eq!((line.kills, line.other_exp, line.exp_gained), (Some(60), 5_000, 3_000));
+        assert!(close(summary.kills_per_hour, 720.0, 15.0), "{:?}", summary.kills_per_hour);
+    }
+
+    #[test]
+    fn the_last_five_minutes_are_measured_exactly() {
+        let mut points = 24_000;
+        let mut samples = vec![hunting(0.0, points, &[]), hunting(1.0, points, &[])];
+        samples.extend(grind(1.0, 600, 10, 100, &mut points, &[]));
+        let summary = track(&samples);
+        // 100 EXP every 10 s is 36,000 an hour, however the window falls between gains.
+        assert!(close(summary.recent_exp_per_hour, 36_000.0, 1.0), "{:?}", summary.recent_exp_per_hour);
+        assert!(close(summary.exp_per_hour, 36_000.0, 100.0), "{:?}", summary.exp_per_hour);
+    }
+
+    #[test]
+    fn an_estimate_steadies_the_pace_until_play_takes_over() {
+        let mut tracker = SessionTracker::new(TrackerConfig::default());
+        tracker.set_prior(KERNING, Some(30_000.0));
+        let mut points = 24_000;
+        let mut samples = vec![hunting(0.0, points, &[]), hunting(1.0, points, &[])];
+        samples.extend(grind(1.0, 20, 10, 100, &mut points, &[]));
+        samples.iter().for_each(|s| tracker.push(s));
+        let early = tracker.summary();
+        // 200 EXP in about 20 s, plus 180 s of the estimate's 30,000 an hour.
+        let here = &early.maps[0];
+        assert_eq!(here.exp_gained, 200);
+        let expected = (200.0 + 30_000.0 * 0.05) * 3600.0 / (here.active_seconds + 180.0);
+        assert!(close(early.pace_exp_per_hour, expected, 1.0), "{:?}", early.pace_exp_per_hour);
+        assert!(early.pace_from_estimate);
+        assert!(early.seconds_to_level.is_some());
+
+        // Half an hour later the measured 36,000 an hour has all but taken over.
+        let mut later = Vec::new();
+        later.extend(grind(21.0, 1800, 10, 100, &mut points, &[]));
+        later.iter().for_each(|s| tracker.push(s));
+        let late = tracker.summary();
+        assert!(!late.pace_from_estimate);
+        assert!(close(late.pace_exp_per_hour, 35_450.0, 200.0), "{:?}", late.pace_exp_per_hour);
+        // Steady kills of one size: the range is tight.
+        assert!(late.pace_error.is_some_and(|e| e < 0.1), "{:?}", late.pace_error);
+        let (low, high) = (late.seconds_to_level_low.unwrap(), late.seconds_to_level_high.unwrap());
+        let eta = late.seconds_to_level.unwrap();
+        assert!(low < eta && eta < high, "{low} {eta} {high}");
+    }
+
+    #[test]
+    fn breaks_count_once_the_session_has_run_a_while() {
+        let mut points = 24_000;
+        let mut samples = vec![hunting(0.0, points, &[]), hunting(1.0, points, &[])];
+        samples.extend(grind(1.0, 900, 10, 100, &mut points, &[]));
+        // Ten minutes standing in town, a frame a second.
+        samples.extend((902..1502).map(|t| hunting(f64::from(t), points, &[])));
+        samples.extend(grind(1502.0, 300, 10, 100, &mut points, &[]));
+        let summary = track(&samples);
+        // The ten minutes count only as a usual kill's 10 s.
+        let active = summary.active_seconds;
+        assert!((1195.0..1215.0).contains(&active), "{active}");
+        assert!((summary.real_seconds - 1802.0).abs() < 1.0, "{}", summary.real_seconds);
+        let (eta, with_breaks) = (summary.seconds_to_level.unwrap(), summary.seconds_to_level_with_breaks.unwrap());
+        assert!((with_breaks / eta - summary.real_seconds / summary.active_seconds).abs() < 0.02);
+        assert!(close(summary.exp_per_hour_with_breaks, 120.0 * 100.0 * 3600.0 / 1802.0, 50.0));
+    }
+
+    #[test]
+    fn deaths_set_the_pace_back_on_their_map() {
+        let mut points = 30_000;
+        let mut samples = vec![hunting(0.0, points, &[]), hunting(1.0, points, &[])];
+        samples.extend(grind(1.0, 300, 10, 300, &mut points, &[]));
+        // Died: 10% of the level gone, read twice.
+        points -= 9_571;
+        samples.push(hunting(302.0, points, &[]));
+        samples.push(hunting(303.0, points, &[]));
+        samples.extend(grind(303.0, 300, 10, 300, &mut points, &[]));
+        let summary = track(&samples);
+        assert_eq!(summary.deaths, 1);
+        assert!(close(summary.exp_per_hour, 108_000.0, 2_000.0), "deaths stay out of the pace shown");
+        // The time to level goes by what is left after the loss.
+        let net = (18_000.0 - 9_571.0) * 3600.0 / summary.active_seconds;
+        assert!(close(summary.pace_exp_per_hour, net, 600.0), "{:?} {net}", summary.pace_exp_per_hour);
+        assert_eq!(summary.lines[0].deaths, 1);
+        assert_eq!(summary.lines[0].exp_lost, 9_571);
     }
 }

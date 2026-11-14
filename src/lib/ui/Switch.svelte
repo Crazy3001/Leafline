@@ -1,5 +1,5 @@
 <script lang="ts">
-  // An on/off setting. Square-edged, amber when on.
+  // An on/off setting: a rounded track, amber when on.
   let {
     checked,
     label,
@@ -28,8 +28,9 @@
     height: 20px;
     padding: 0;
     border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-pill);
     background: var(--surface-3);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
     cursor: pointer;
     transition: background 0.12s ease;
   }
@@ -50,9 +51,10 @@
     left: 2px;
     width: 14px;
     height: 14px;
-    border-radius: 1px;
+    border-radius: 50%;
     background: var(--muted);
-    transition: left 0.12s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    transition: left 0.16s var(--ease);
   }
 
   .on {
@@ -62,7 +64,7 @@
 
   .on .knob {
     left: 18px;
-    background: var(--bg);
+    background: #fff;
   }
 
   @media (prefers-reduced-motion: reduce) {

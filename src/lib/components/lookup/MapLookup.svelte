@@ -2,6 +2,7 @@
   // The Maps half of the Lookup tab: the map the player is on, and a search of every map in the
   // data by name, area, monster or NPC, down to a map's full card.
   import GoButton from "$lib/components/GoButton.svelte";
+  import { FilterBoxState } from "$lib/filterbox.svelte";
   import SaveSpot from "$lib/components/SaveSpot.svelte";
   import { mapPlace } from "$lib/destination.svelte";
   import { ArrowLeft, LoaderCircle } from "@lucide/svelte";
@@ -16,7 +17,7 @@
   import MapDataPanel from "../map/MapDataPanel.svelte";
   import MapDetailsView from "../map/MapDetailsView.svelte";
   import { backend } from "$lib/api";
-  import { OSMS_CREDIT, OSMS_URL, mapData, watchMapData } from "$lib/mapdata.svelte";
+  import { mapData, watchMapData } from "$lib/mapdata.svelte";
   import { blankMapQuery, mapView } from "$lib/places.svelte";
   import type { MapDetails, MapMatch, MapPage, MapQuery, MapRow } from "$lib/types";
 
@@ -37,7 +38,7 @@
 
   let regions = $state<string[]>([]);
   let areas = $state<string[]>([]);
-  let showFilters = $state(false);
+  const filterBox = new FilterBoxState("maps");
   let page = $state<MapPage | null>(null);
   let searching = $state(false);
   let details = $state<MapDetails | null>(null);
@@ -98,7 +99,6 @@
 
   function clear() {
     setQuery(blankMapQuery());
-    showFilters = false;
   }
 
   function open(id: number) {
@@ -127,7 +127,7 @@
       placeholder="Map, area, monster or NPC"
       label="Search maps"
       {narrowed}
-      bind:filters={showFilters}
+      bind:filters={filterBox.open}
       clearable={browsing || mapView.id != null}
       oninput={(text) => setQuery({ text })}
       onclear={clear}
@@ -136,7 +136,7 @@
       <KindTabs label="Kind of map" options={KINDS} value={query.kind} onselect={(kind) => setQuery({ kind })} />
       <Chips label="Area" options={areas} value={query.area} onselect={(area) => setQuery({ area })} />
     {/if}
-    {#if showFilters}
+    {#if filterBox.open}
       <FilterBox>
         <label>
           <span>Region</span>
@@ -147,9 +147,9 @@
         </label>
         <div class="levels">
           <span>Monsters</span>
-          <input class="tabular" type="number" min="0" aria-label="Lowest monster level" value={query.levelMin ?? ""} oninput={(e) => setQuery({ levelMin: number(e.currentTarget.value) })} />
+          <input class="tabular" type="number" min="0" placeholder="any" aria-label="Lowest monster level" value={query.levelMin ?? ""} oninput={(e) => setQuery({ levelMin: number(e.currentTarget.value) })} />
           <span class="to">to</span>
-          <input class="tabular" type="number" min="0" aria-label="Highest monster level" value={query.levelMax ?? ""} oninput={(e) => setQuery({ levelMax: number(e.currentTarget.value) })} />
+          <input class="tabular" type="number" min="0" placeholder="any" aria-label="Highest monster level" value={query.levelMax ?? ""} oninput={(e) => setQuery({ levelMax: number(e.currentTarget.value) })} />
         </div>
         <label>
           <span>Sort</span>
@@ -180,7 +180,7 @@
         <p class="heading">You're here</p>
         <ul class="rows">
           <li>
-            <LookupRow name={here.card.map.name} line={here.card.map.street} aside={levels(here.card.levelRange)} onclick={() => open(here!.card.map.id)} />
+            <LookupRow name={here.card.map.name} picture={{ kind: "mark", id: here.card.map.id }} line={here.card.map.street} aside={levels(here.card.levelRange)} onclick={() => open(here!.card.map.id)} />
           </li>
         </ul>
         <p class="heading">Every map</p>
@@ -191,14 +191,13 @@
           {#if !page.closest}<p class="count tabular">{page.total.toLocaleString()} {page.total === 1 ? "map" : "maps"}</p>{/if}
           <ul class="rows">
             {#each page.maps as row (row.map.id)}
-              <li><LookupRow name={row.map.name} line={line(row)} aside={levels(row.levelRange)} onclick={() => open(row.map.id)} /></li>
+              <li><LookupRow name={row.map.name} picture={{ kind: "mark", id: row.map.id }} line={line(row)} aside={levels(row.levelRange)} onclick={() => open(row.map.id)} /></li>
             {/each}
           </ul>
           {#if page.maps.length < page.total}<button class="back inline" onclick={more}>Show more</button>{/if}
         {:else}
           <p class="quiet">No maps match.</p>
         {/if}
-        <button class="credit" onclick={() => backend.openLink(OSMS_URL)}>{OSMS_CREDIT}</button>
       {:else if searching}
         <p class="quiet"><span class="spin"><LoaderCircle size={13} /></span> Searching…</p>
       {/if}
@@ -313,21 +312,4 @@
     }
   }
 
-  .credit {
-    display: block;
-    margin-top: 8px;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--faint);
-    font-size: var(--text-xs);
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .credit:hover,
-  .credit:focus-visible {
-    color: var(--muted);
-    outline: none;
-  }
 </style>

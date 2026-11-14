@@ -101,6 +101,9 @@ pub struct NpcQuery {
     pub region: Option<String>,
     /// Those standing on a map in one of [`Atlas::map_areas`].
     pub area: Option<String>,
+    /// `name` for A to Z, `quests` for the most quests first, `map` by the map they stand on.
+    /// The best match first otherwise.
+    pub sort: Option<String>,
     pub offset: usize,
 }
 
@@ -331,6 +334,12 @@ impl Atlas {
             found = near.into_iter().map(|(_, row)| (0, row)).collect();
         } else {
             found.sort_by_key(|(rank, row)| (*rank, fold(&row.name), row.id));
+            match query.sort.as_deref() {
+                Some("name") => found.sort_by_key(|(_, row)| (fold(&row.name), row.id)),
+                Some("quests") => found.sort_by_key(|(_, row)| (std::cmp::Reverse(row.quests), fold(&row.name))),
+                Some("map") => found.sort_by_key(|(_, row)| (row.map.is_none(), row.map.as_deref().map(fold), fold(&row.name))),
+                _ => {}
+            }
         }
         NpcPage {
             total: found.len(),

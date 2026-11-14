@@ -1,6 +1,8 @@
 <script lang="ts">
   // The Monsters half of the Lookup tab: what is on this map and near the character's level, and
   // a search of every monster in the map data by name, drop or map.
+  import { clipped, tip } from "$lib/tip.svelte";
+  import { FilterBoxState } from "$lib/filterbox.svelte";
   import { ArrowLeft, LoaderCircle, Skull } from "@lucide/svelte";
   import { untrack } from "svelte";
 
@@ -13,8 +15,9 @@
   import MonsterCard from "./MonsterCard.svelte";
   import Section from "./map/Section.svelte";
   import { backend } from "$lib/api";
+  import Pic from "$lib/ui/Pic.svelte";
   import { formatCompact, formatNumber, monsterLabel } from "$lib/format";
-  import { OSMS_CREDIT, OSMS_URL, mapData, watchMapData } from "$lib/mapdata.svelte";
+  import { mapData, watchMapData } from "$lib/mapdata.svelte";
   import { backFromMonster, blankMonsterQuery, monsterView, openMonster } from "$lib/monsters.svelte";
   import type { MapMatch, MapReading, MonsterFilters, MonsterPage, MonsterQuery, MonsterRow, MobRow, QuestReading, SessionSummary } from "$lib/types";
 
@@ -61,7 +64,7 @@
 
   let filters = $state<MonsterFilters | null>(null);
   let areas = $state<string[]>([]);
-  let showFilters = $state(false);
+  const filterBox = new FilterBoxState("monsters", true);
   let page = $state<MonsterPage | null>(null);
   let searching = $state(false);
   let near = $state<MonsterRow[]>([]);
@@ -124,7 +127,6 @@
 
   function clear() {
     setQuery(blankMonsterQuery());
-    showFilters = false;
   }
 
   /** The column it sorts by, with Level as the way back. */
@@ -135,10 +137,11 @@
   const number = (value: string) => (value === "" ? null : Math.max(0, Math.floor(Number(value) || 0)));
 </script>
 
-{#snippet name(mob: { name: string; boss: boolean; undead: boolean })}
+{#snippet name(mob: { id: number; name: string; boss: boolean; undead: boolean })}
   <span class="name">
-    <span class="label">{monsterLabel(mob.name)}</span>
-    {#if mob.boss}<span class="boss" title="Boss"><Skull size={11} /></span>{/if}
+    <Pic kind="mob" id={mob.id} size={20} />
+    <span use:clipped class="label">{monsterLabel(mob.name)}</span>
+    {#if mob.boss}<span class="boss" use:tip={"Boss"}><Skull size={11} /></span>{/if}
     {#if mob.undead}<span class="tag">undead</span>{/if}
   </span>
 {/snippet}
@@ -167,7 +170,7 @@
   <ul class="rows">
     {#each list as mob (mob.id)}
       <li>
-        <button class="row" onclick={() => openMonster(mob.id)}>
+        <button class="row nav-row" onclick={() => openMonster(mob.id)}>
           {@render name(mob)}
           {@render numbers(mob)}
           {#if mob.note}<span class="note">{mob.note}</span>{/if}
@@ -182,7 +185,7 @@
   <ul class="rows">
     {#each list as mob (mob.id)}
       <li>
-        <button class="row" onclick={() => openMonster(mob.id)}>
+        <button class="row nav-row" onclick={() => openMonster(mob.id)}>
           {@render name(mob)}
           {@render numbers(mob)}
         </button>
@@ -203,7 +206,7 @@
       placeholder="Monster, what it drops, or a map"
       label="Search monsters"
       {narrowed}
-      bind:filters={showFilters}
+      bind:filters={filterBox.open}
       clearable={browsing || monsterView.id != null}
       oninput={(text) => setQuery({ text })}
       onclear={clear}
@@ -214,7 +217,7 @@
       <Chips label="Area" options={areas} value={query.area} onselect={(area) => setQuery({ area })} />
     {/if}
 
-    {#if showFilters}
+    {#if filterBox.open}
       <FilterBox>
         <label>
           <span>Weak to</span>
@@ -232,9 +235,9 @@
         </label>
         <div class="levels">
           <span>Level</span>
-          <input class="tabular" type="number" min="0" aria-label="Lowest level" value={query.levelMin ?? ""} oninput={(e) => setQuery({ levelMin: number(e.currentTarget.value) })} />
+          <input class="tabular" type="number" min="0" placeholder="any" aria-label="Lowest level" value={query.levelMin ?? ""} oninput={(e) => setQuery({ levelMin: number(e.currentTarget.value) })} />
           <span class="to">to</span>
-          <input class="tabular" type="number" min="0" aria-label="Highest level" value={query.levelMax ?? ""} oninput={(e) => setQuery({ levelMax: number(e.currentTarget.value) })} />
+          <input class="tabular" type="number" min="0" placeholder="any" aria-label="Highest level" value={query.levelMax ?? ""} oninput={(e) => setQuery({ levelMax: number(e.currentTarget.value) })} />
         </div>
         <label>
           <span>Sort</span>
@@ -278,7 +281,6 @@
         {:else}
           <p class="quiet">No monsters match.</p>
         {/if}
-        <button class="credit" onclick={() => backend.openLink(OSMS_URL)}>{OSMS_CREDIT}</button>
       {:else if searching}
         <p class="quiet"><span class="spin"><LoaderCircle size={13} /></span> Searching…</p>
       {/if}
@@ -334,8 +336,9 @@
     column-gap: 6px;
     align-items: baseline;
     width: 100%;
-    padding: 4px;
+    padding: 4px 24px 4px 4px;
     border: 0;
+    border-radius: var(--radius-sm);
     background: transparent;
     color: var(--muted);
     font-size: var(--text-sm);
@@ -389,8 +392,8 @@
 
   .name {
     display: flex;
-    align-items: baseline;
-    gap: 3px;
+    align-items: center;
+    gap: 6px;
     min-width: 0;
     color: var(--text);
     font-size: var(--text-sm);
@@ -476,21 +479,4 @@
     }
   }
 
-  .credit {
-    display: block;
-    margin-top: 8px;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--faint);
-    font-size: var(--text-xs);
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .credit:hover,
-  .credit:focus-visible {
-    color: var(--muted);
-    outline: none;
-  }
 </style>

@@ -3,18 +3,21 @@
   // how this map compares with your bests on it, the maps played), then where to train next, with
   // a jump to it from the top. Before a session starts: the goal, where to train, your best maps
   // and the last sessions.
+  import { tip } from "$lib/tip.svelte";
+  import Ref from "$lib/components/Ref.svelte";
   import SessionControls from "./SessionControls.svelte";
   import { ArrowDown } from "@lucide/svelte";
 
+  import CharacterPicker from "./CharacterPicker.svelte";
   import LevelGoal from "./LevelGoal.svelte";
   import PotionCosts from "./PotionCosts.svelte";
   import SaveSpot from "./SaveSpot.svelte";
   import SpotList, { SPOTS_ID } from "./SpotList.svelte";
   import TimersCard from "./TimersCard.svelte";
   import { openTrainingLog } from "$lib/nav.svelte";
-  import { formatCompact, formatDuration, formatNumber, splitMapLabel } from "$lib/format";
+  import { formatClockIn, formatCompact, formatDuration, formatNumber, splitMapLabel } from "$lib/format";
+  import { characters } from "$lib/characters.svelte";
   import { history, watchHistory } from "$lib/history.svelte";
-  import { showMapNamed } from "$lib/places.svelte";
   import { live } from "$lib/readings.svelte";
   import {
     chartPoints,
@@ -74,6 +77,26 @@
       return { label: "Level % per hour, this session", value: session.percentPerHour != null ? `${session.percentPerHour.toFixed(1)}%` : "—" };
     return { label: "EXP per hour, this session", value: formatCompact(session.expPerHour) };
   });
+  /** The clock time the level comes at this pace. Worked out again with each reading. */
+  const levelAt = $derived(session?.secondsToLevel != null && !session.paused ? formatClockIn(session.secondsToLevel) : "");
+  /** The time to level, with its range and breaks, as one line and a fuller tooltip. */
+  const toLevel = $derived.by(() => {
+    const s = session;
+    if (s?.secondsToLevel == null) return null;
+    const range =
+      s.secondsToLevelLow != null && s.secondsToLevelHigh != null
+        ? `${formatDuration(s.secondsToLevelLow)}–${formatDuration(s.secondsToLevelHigh)}`
+        : null;
+    const breaks = s.secondsToLevelWithBreaks != null ? `about ${formatDuration(s.secondsToLevelWithBreaks)} with breaks` : null;
+    const why = [
+      "At this map's pace, less EXP lost to deaths.",
+      s.paceFromEstimate ? "Early on it leans on an estimate for this map, from your past play and your stats; your own pace takes over as you play." : null,
+      range ? `Four times in five it should take ${range} of play.` : null,
+      breaks ? `Counting breaks the way this session has had them, ${breaks}.` : null,
+    ];
+    const line = [`${formatDuration(s.secondsToLevel)} to level here`, range ? `(${range})` : null].filter(Boolean).join(" ");
+    return { line: levelAt ? `${line}, about ${levelAt}` : line, breaks, tip: why.filter(Boolean).join(" ") };
+  });
   /** Share of a level an hour, said in words next to the time to level. */
   const levelPace = $derived(
     !percentOnly && session?.percentPerHour != null ? `${session.percentPerHour.toFixed(1)}% of a level an hour` : null,
@@ -106,7 +129,7 @@
   const towns = $derived(new Set((session?.lines ?? []).filter((l) => l.town).map((l) => l.map)));
 
   // This map against your best on it, over the saved sessions.
-  const stats = $derived(mapStats(history.value?.sessions ?? []));
+  const stats = $derived(mapStats(characters.sessions(history.value?.sessions ?? [])));
   const here = $derived.by(() => {
     if (!session?.map || towns.has(session.map)) return null;
     const now = session.maps.find((m) => m.map === session.map);
@@ -151,7 +174,7 @@
   );
 
   // Before a session: the last few saved ones.
-  const lastSessions = $derived((history.value?.sessions ?? []).slice(0, 3));
+  const lastSessions = $derived(characters.sessions(history.value?.sessions ?? []).slice(0, 3));
   const lastOne = $derived(lastSessions[0] ?? null);
 
   const liveState = $derived(live.liveStatus.state);
@@ -189,6 +212,7 @@
   </Button>
 {/snippet}
 
+{#if !glance}<CharacterPicker />{/if}
 <Block title="Session">
   {#snippet aside()}
     {#if session?.held}
@@ -227,8 +251,15 @@
   <Block>
     <div class="headline">
       <div class="big">
-        <span class="label">{headline.label}</span>
-        <span class="num hero">{headline.value}</span>
+        <span class="label"
+          >{headline.label}{#if session.measuring}<span
+              class="measuring"
+              use:tip={"A first estimate from your first kills. It settles after about a minute of play."}
+            >
+              · still measuring</span
+            >{/if}</span
+        >
+        <span class="num hero" class:early={session.measuring}>{headline.value}</span>
       </div>
       {#if recent}
         <div class="recent">
@@ -247,10 +278,11 @@
       <div class="level">
         <div class="level-line"><span class="muted">Lv {lv} to {lv + 1}</span><span class="tabular">{percent.toFixed(2)}%</span></div>
         <Meter value={percent / 100} label="EXP towards the next level" />
-        {#if session.secondsToLevel != null || levelPace}
-          <span class="muted tabular">
-            {#if session.secondsToLevel != null}{formatDuration(session.secondsToLevel)} to level at this rate{/if}{#if session.secondsToLevel != null && levelPace}{" · "}{/if}{#if levelPace}{levelPace}{/if}
+        {#if toLevel || levelPace}
+          <span class="muted tabular" use:tip={toLevel?.tip ?? ""}>
+            {#if toLevel}{toLevel.line}{/if}{#if toLevel && levelPace}{" · "}{/if}{#if levelPace}{levelPace}{/if}
           </span>
+          {#if toLevel?.breaks}<span class="muted tabular">{toLevel.breaks}</span>{/if}
         {/if}
       </div>
     {/if}
@@ -259,7 +291,7 @@
       <LevelGoal
         level={lv}
         {percent}
-        character={session.name}
+        character={session.name ?? characters.active}
         rate={{ expPerHour: session.expPerHour, percentPerHour: session.percentPerHour }}
       />
     {/if}
@@ -271,12 +303,24 @@
         sub={coverage?.partial ? coverage.label : null}
         faint={coverage?.partial && coverage.thin}
       />
-      <Stat label="EXP gained" value={signed(session.expGained)} />
+      <Stat
+        label="EXP gained"
+        value={signed(session.expGained)}
+        sub={session.expOther > 0 ? `+${formatCompact(session.expOther)} from quests` : null}
+      />
+      {#if session.killsPerHour != null}
+        <Stat label="Kills / hr" value={formatCompact(session.killsPerHour)} sub="on this map" />
+      {/if}
       <Stat label="Mesos gained" value={signed(session.mesosGained)} />
     </div>
 
     {#if !glance}
-      <PotionCosts startedAt={session.startedAt} activeSeconds={session.activeSeconds} mesosPerHour={session.mesosPerHour} />
+      <PotionCosts
+        startedAt={session.startedAt}
+        activeSeconds={session.activeSeconds}
+        mesosPerHour={session.mesosPerHour}
+        character={session.name ?? characters.active}
+      />
     {/if}
 
     {#if reminder}
@@ -297,40 +341,6 @@
   </Block>
 
   {#if !glance}
-  <Block title="This session">
-    {#snippet aside()}
-      <Segmented
-        size="sm"
-        label="Graph shows"
-        value={metric}
-        options={[
-          { id: "exp", label: percentOnly ? "% / hr" : "EXP / hr" },
-          { id: "mesos", label: "Mesos / hr" },
-        ]}
-        onchange={pickMetric}
-      />
-    {/snippet}
-    {#if session.activeSeconds >= GRAPH_AFTER && points.filter((p) => p.y != null).length > 1}
-      <LineChart
-        {points}
-        xMax={Math.max(session.activeSeconds, points[points.length - 1]?.x ?? 0)}
-        color={chartColor}
-        format={rateFormat(metric, percentOnly)}
-        bands={mapBands(session.timeline)}
-        markers={eventMarkers(session.events ?? [])}
-        detail={(i) => pointDetail(session.timeline[i])}
-        label="{metric === 'exp' ? 'EXP' : 'Mesos'} per hour over this session"
-      />
-      <p class="caption">
-        Each point is the rate over the 5 minutes before it; the first 2½ minutes are left out.
-        {#if metric === "mesos"}Mesos are spread evenly between your looks at them, so the line reaches only your last look.{/if}
-        {#if session.events?.length}Green dots are level-ups, red ones deaths.{/if}
-      </p>
-    {:else}
-      <p class="caption">The graph starts after 5 minutes of play.</p>
-    {/if}
-  </Block>
-
   {#if here}
     <Block title="This map">
       {#snippet aside()}<span class="map-name">{here.name}</span>{/snippet}
@@ -379,8 +389,8 @@
             {@const town = row.map != null && towns.has(row.map)}
             <tr class:town>
               <td>
-                {#if row.map === session.map}<span class="here" title="You are here"></span>{/if}
-                {#if row.map}<button class="ref ref-map" onclick={() => showMapNamed(row.map!)}>{splitMapLabel(row.map).name}</button
+                {#if row.map === session.map}<span class="here" use:tip={"You are here"}></span>{/if}
+                {#if row.map}<Ref kind="map" name={row.map}>{splitMapLabel(row.map).name}</Ref
                   >{#if !town} <SaveSpot label={row.map} name={splitMapLabel(row.map).name} />{/if}{:else}<span
                     class="unplaced"
                     >Not placed on a map</span
@@ -414,11 +424,46 @@
       {/if}
     </Block>
   {/if}
+  <!-- Where to go next sits under the live numbers; the rate graph is detail, last. -->
+  <SpotList {level} {map} {session} />
+  <Block title="This session">
+    {#snippet aside()}
+      <Segmented
+        size="sm"
+        label="Graph shows"
+        value={metric}
+        options={[
+          { id: "exp", label: percentOnly ? "% / hr" : "EXP / hr" },
+          { id: "mesos", label: "Mesos / hr" },
+        ]}
+        onchange={pickMetric}
+      />
+    {/snippet}
+    {#if session.activeSeconds >= GRAPH_AFTER && points.filter((p) => p.y != null).length > 1}
+      <LineChart
+        {points}
+        xMax={Math.max(session.activeSeconds, points[points.length - 1]?.x ?? 0)}
+        color={chartColor}
+        format={rateFormat(metric, percentOnly)}
+        bands={mapBands(session.timeline)}
+        markers={eventMarkers(session.events ?? [])}
+        detail={(i) => pointDetail(session.timeline[i])}
+        label="{metric === 'exp' ? 'EXP' : 'Mesos'} per hour over this session"
+      />
+      <p class="caption">
+        Each point is the rate over the 5 minutes before it; the first 2½ minutes are left out.
+        {#if metric === "mesos"}Mesos are spread evenly between your looks at them, so the line reaches only your last look.{/if}
+        {#if session.events?.length}Green dots are level-ups, red ones deaths.{/if}
+      </p>
+    {:else}
+      <p class="caption">The graph starts after 5 minutes of play.</p>
+    {/if}
+  </Block>
   {/if}
 {:else if !glance}
   <!-- No session yet: the goal and where to train come first, your bests and the last sessions after. -->
   <Block title="Level goal">
-    <LevelGoal {level} percent={session?.percent ?? null} character={session?.name ?? lastOne?.character ?? null} />
+    <LevelGoal {level} percent={session?.percent ?? null} character={session?.name ?? characters.active} />
   </Block>
   <SpotList {level} {map} {session} last={!lastOne && !bests.length} />
   {#if bests.length}
@@ -429,7 +474,7 @@
         <tbody>
           {#each bests as m (m.map)}
             <tr>
-              <td><button class="ref ref-map" onclick={() => showMapNamed(m.map)}>{m.name}</button> <SaveSpot label={m.map} name={m.name} /></td>
+              <td><Ref kind="map" name={m.map}>{m.name}</Ref> <SaveSpot label={m.map} name={m.name} /></td>
               <td class="tabular">{formatCompact(m.best!.expPerHour)}</td>
               <td class="tabular">{m.bestMesos ? formatCompact(m.bestMesos.mesosPerHour) : "—"}</td>
               <td class="tabular muted">{m.best!.level != null ? `Lv ${m.best!.level} · ` : ""}{shortDay(m.best!.at)}</td>
@@ -456,7 +501,7 @@
         <li>
           <span class="tabular muted day">{shortDay(s.startedAt ?? s.savedAt)}</span>
           <span class="what"
-            >{#if !s.label && s.maps.length}<button class="ref ref-map" onclick={() => showMapNamed(s.maps[0].map)}>{mainMap(s.maps)}</button
+            >{#if !s.label && s.maps.length}<Ref kind="map" name={s.maps[0].map}>{mainMap(s.maps)}</Ref
               >{:else}{s.label || mainMap(s.maps)}{/if}</span
           >
           <span class="tabular">{formatCompact(s.expPerHour)}</span>
@@ -465,10 +510,6 @@
     </ul>
     <div><Button onclick={openTrainingLog}>All sessions</Button></div>
   </Block>
-{/if}
-
-{#if tracking && session && headline && !glance}
-  <SpotList {level} {map} {session} />
 {/if}
 
 <TimersCard />
@@ -531,6 +572,14 @@
 
   .recent {
     align-items: flex-end;
+  }
+
+  .measuring {
+    color: var(--warn);
+  }
+
+  .hero.early {
+    opacity: 0.7;
   }
 
   .label {

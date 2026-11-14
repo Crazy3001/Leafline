@@ -1,5 +1,6 @@
 <script lang="ts" generics="T extends string | number">
   // A row of choices where exactly one is picked: the one control for modes and sorts.
+  import { tip } from "$lib/tip.svelte";
   let {
     options,
     value,
@@ -21,7 +22,7 @@
 
 <div class="seg {size}" class:stretch role="group" aria-label={label}>
   {#each options as option (option.id)}
-    <button aria-pressed={option.id === value} title={option.title} onclick={() => onchange(option.id)}>
+    <button aria-pressed={option.id === value} use:tip={option.title} onclick={() => onchange(option.id)}>
       {option.label}
     </button>
   {/each}
@@ -31,9 +32,11 @@
   .seg {
     display: inline-flex;
     flex: none;
-    border: 1px solid var(--border-strong);
+    gap: 2px;
+    padding: 2px;
+    border: 1px solid var(--border);
     border-radius: var(--radius-sm);
-    overflow: hidden;
+    background: var(--bg);
   }
 
   .stretch {
@@ -46,9 +49,10 @@
   }
 
   button {
-    height: calc(var(--control-h) - 2px);
+    height: calc(var(--control-h) - 6px);
     padding: 0 10px;
     border: 0;
+    border-radius: 4px;
     background: transparent;
     color: var(--muted);
     font-size: var(--text-sm);
@@ -57,13 +61,9 @@
   }
 
   .sm button {
-    height: calc(var(--control-h-sm) - 2px);
+    height: calc(var(--control-h-sm) - 6px);
     padding: 0 8px;
     font-size: var(--text-xs);
-  }
-
-  button + button {
-    border-left: 1px solid var(--border-strong);
   }
 
   button:hover {
@@ -77,6 +77,9 @@
 
   button[aria-pressed="true"] {
     background: var(--surface-3);
+    box-shadow:
+      inset 0 1px 0 var(--highlight),
+      0 1px 3px rgba(0, 0, 0, 0.35);
     color: var(--text);
     font-weight: 600;
   }

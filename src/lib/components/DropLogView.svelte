@@ -1,6 +1,8 @@
 <script lang="ts">
   // The training log's Drops view: every drop the player logged, by monster and as a list. Each
   // can be reported on MeowDB, which opens its page in the player's browser.
+  import { tip } from "$lib/tip.svelte";
+  import Ref from "$lib/components/Ref.svelte";
   import { Check, ExternalLink, Trash2 } from "@lucide/svelte";
 
   import { backend } from "$lib/api";
@@ -63,15 +65,15 @@
       {#each tallies as t (t.monster)}
         <div class="monster">
           <div class="mrow">
-            <span class="mname"><button class="ref ref-mob" onclick={() => showMonsterNamed(t.monster)}>{t.monster}</button></span>
+            <span class="mname"><Ref kind="mob" name={t.monster} /></span>
             <span class="tabular quiet">{t.total}</span>
-            <button class="icon" title="Open {t.monster} on MeowDB" aria-label="Open {t.monster} on MeowDB" onclick={() => backend.openLink(meowdbMonster(t.monster))}
+            <button class="icon" use:tip={`${t.monster} on MeowDB`} aria-label="Open {t.monster} on MeowDB" onclick={() => backend.openLink(meowdbMonster(t.monster))}
               ><ExternalLink size={12} /></button
             >
           </div>
           <ul>
             {#each t.items as i (i.item)}
-              <li><span><button class="ref ref-item" onclick={() => showItemNamed(i.item)}>{i.item}</button></span><span class="tabular muted">×{i.count}</span></li>
+              <li><span><Ref kind="item" name={i.item} /></span><span class="tabular muted">×{i.count}</span></li>
             {/each}
           </ul>
         </div>
@@ -93,14 +95,14 @@
           {#each shown as d (d.id)}
             <tr>
               <td class="tabular muted nowrap">{formatDay(d.seenAt)} {clock(d.seenAt)}</td>
-              <td><button class="ref ref-item" onclick={() => showItemNamed(d.item)}>{d.item}</button></td>
-              <td><button class="ref ref-mob" onclick={() => showMonsterNamed(d.monster)}>{d.monster}</button></td>
-              <td>{#if d.map}<button class="ref ref-map" onclick={() => showMapNamed(d.map!)}>{d.map}</button>{:else}<span class="muted">—</span>{/if}</td>
+              <td><Ref kind="item" name={d.item} /></td>
+              <td><Ref kind="mob" name={d.monster} /></td>
+              <td>{#if d.map}<Ref kind="map" name={d.map} />{:else}<span class="muted">—</span>{/if}</td>
               <td class="nowrap r">
-                <button class="report" title="Opens MeowDB and copies the item's name" onclick={() => report(d)}>
+                <button class="report" use:tip={"Copies the item's name too, to paste into MeowDB's search"} onclick={() => report(d)}>
                   {#if copiedId === d.id}<Check size={12} />Name copied{:else}<ExternalLink size={12} />Report on MeowDB{/if}
                 </button>
-                <button class="icon" title="Delete this drop" aria-label="Delete this drop" onclick={() => remove(d.id)}><Trash2 size={12} /></button>
+                <button class="icon" use:tip={"Delete this drop"} aria-label="Delete this drop" onclick={() => remove(d.id)}><Trash2 size={12} /></button>
               </td>
             </tr>
           {/each}

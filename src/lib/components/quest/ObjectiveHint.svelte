@@ -1,18 +1,30 @@
 <script lang="ts">
   // Where to go for one quest objective: a one-line hint that opens into the monsters to hunt,
-  // their best maps, and the route to the chosen map.
-  import { ChevronRight, Crosshair } from "@lucide/svelte";
+  // their best maps, and the route to the chosen map. An item an NPC sells says so, with the
+  // cheapest shop, so it can be bought instead of farmed.
+  import { tip } from "$lib/tip.svelte";
+  import Ref from "$lib/components/Ref.svelte";
+  import { ChevronRight, Crosshair, ShoppingBag } from "@lucide/svelte";
 
   import { backend } from "$lib/api";
-  import { groundDistance } from "$lib/format";
-  import { showMonsterNamed } from "$lib/monsters.svelte";
+  import { formatMesos, groundDistance } from "$lib/format";
+  import { huntOrder, orderGrounds, setHuntOrder } from "$lib/quests.svelte";
   import { travelKey } from "$lib/settings.svelte";
   import RouteSteps from "$lib/components/map/RouteSteps.svelte";
   import GoButton from "$lib/components/GoButton.svelte";
   import { mapPlace } from "$lib/destination.svelte";
   import type { HuntingGround, MapRef, MapRoute, ObjectiveGuide } from "$lib/types";
 
-  let { guide, from }: { guide: ObjectiveGuide; from: MapRef | null } = $props();
+  let {
+    guide,
+    from,
+    left = null,
+  }: {
+    guide: ObjectiveGuide;
+    from: MapRef | null;
+    /** How many are still wanted, to price buying them all. */
+    left?: number | null;
+  } = $props();
 
   let open = $state(false);
   /** The map whose route is shown: the best one until another is picked. */
@@ -20,7 +32,17 @@
   let route = $state<MapRoute | null>(null);
   let routing = $state(false);
 
-  const hunts = $derived(guide.hunts.filter((h) => h.monster.known && h.maps.length));
+  const hunts = $derived(
+    guide.hunts
+      .filter((h) => h.monster.known && h.maps.length)
+      .map((h) => ({ ...h, maps: orderGrounds(h.maps, huntOrder.value) })),
+  );
+  /** Whether the choice says anything: some monster has a map that is closer but not fuller. */
+  const choosing = $derived(
+    hunts.some((h) => h.maps.length > 1 && orderGrounds(h.maps, "most")[0].map.id !== h.maps[0].map.id) ||
+      (huntOrder.value === "most" && hunts.some((h) => h.maps.length > 1)),
+  );
+  const shop = $derived(guide.shops?.[0] ?? null);
   const top = $derived(hunts[0] ?? null);
   const best = $derived(top?.maps[0] ?? null);
   const target = $derived(picked ?? best?.map.id ?? null);
@@ -42,21 +64,28 @@
       .finally(() => (routing = false));
   });
 
-  function rate(value: number | null) {
-    if (value == null) return "";
-    return `${value >= 10 ? value.toFixed(0) : value.toFixed(1)}%`;
-  }
-
-  function rateTitle(drop: NonNullable<ObjectiveGuide["hunts"][number]["drop"]>) {
-    const parts = ["Drop rate players measured"];
-    if (drop.sampleKills) parts.push(`over ${drop.sampleKills.toLocaleString()} kills`);
-    if (drop.gameVersion) parts.push(`(v${drop.gameVersion})`);
-    if (drop.rateLow != null && drop.rateHigh != null) parts.push(`· likely ${drop.rateLow.toFixed(1)}–${drop.rateHigh.toFixed(1)}%`);
-    return parts.join(" ");
-  }
-
   const distance = (ground: HuntingGround) => groundDistance(ground, from != null);
 </script>
+
+{#snippet buy()}
+  {#if shop}
+    <div class="hint-row">
+      <p class="hint quiet buy">
+        <span class="icon shop"><ShoppingBag size={11} /></span>
+        <span class="line">
+          Or buy it from <Ref kind="npc" name={shop.npc} />
+          <span class="sep">·</span>
+          <span class="tabular mesos">{formatMesos(shop.price)} mesos</span>{#if left && left > 1}<span class="muted tabular"
+              >&nbsp;each, {formatMesos(shop.price * left)} for {left}</span
+            >{/if}
+          {#if shop.needs}<span class="muted"> · {shop.needs}</span>{/if}
+        </span>
+        {#if shop.map && shop.hops != null}<span class="far tabular">{shop.hops === 0 ? "here" : `${shop.hops} portal${shop.hops === 1 ? "" : "s"}`}</span>{/if}
+      </p>
+      {#if shop.map && shop.hops !== 0}<GoButton place={mapPlace(shop.map)} />{/if}
+    </div>
+  {/if}
+{/snippet}
 
 {#if top && best}
   <div class="hint-row">
@@ -65,13 +94,13 @@
       <span class="line">
         {#if guide.kind === "item"}
           <span class="who">{top.monster.name}</span>
-          {#if top.drop?.rate != null}<span class="muted" title={rateTitle(top.drop)}>{rate(top.drop.rate)}</span>{/if}
+
           <span class="sep">·</span>
         {/if}
         <span class="where">{best.map.name}</span>
       </span>
       {#if best.travel}
-        <span class="far tabular shortcut" title="{distance(best)}, via {best.travel.via.name}">{best.travel.hops} with travel</span>
+        <span class="far tabular shortcut" use:tip={`${distance(best)}, via ${best.travel.via.name}`}>{best.travel.hops} with travel</span>
       {:else if best.hops != null}
         <span class="far tabular">{distance(best)}</span>
       {/if}
@@ -80,16 +109,21 @@
     {#if best.hops !== 0}<GoButton place={mapPlace(best.map)} />{/if}
   </div>
 
+  {@render buy()}
+
   {#if open}
     <div class="detail">
+      {#if choosing}
+        <div class="order" role="group" aria-label="Which map first">
+          <button aria-pressed={huntOrder.value === "closest"} onclick={() => { picked = null; setHuntOrder("closest"); }} use:tip={"The nearest map with a fair number of them"}>Closest</button>
+          <button aria-pressed={huntOrder.value === "most"} onclick={() => { picked = null; setHuntOrder("most"); }} use:tip={"The map with the most of them, however far"}>Most</button>
+        </div>
+      {/if}
       {#each hunts as hunt (hunt.monster.name)}
         <div class="hunt">
           <div class="mob">
-            <button class="ref ref-mob" onclick={() => showMonsterNamed(hunt.monster.name)}>{hunt.monster.name}</button>
+            <Ref kind="mob" name={hunt.monster.name} />
             <span class="muted">Lv {hunt.monster.level}{hunt.monster.boss ? " · boss" : ""}</span>
-            {#if hunt.drop?.rate != null}
-              <span class="rate" title={rateTitle(hunt.drop)}>{rate(hunt.drop.rate)} drop</span>
-            {/if}
           </div>
           <ul class="maps">
             {#each hunt.maps as ground (ground.map.id)}
@@ -105,7 +139,7 @@
                   <span
                     class="dist tabular"
                     class:shortcut={ground.travel}
-                    title={ground.travel ? `With the travel you turned on in Settings, via ${ground.travel.via.name}` : undefined}
+                    use:tip={ground.travel ? `With the travel you turned on in Settings, via ${ground.travel.via.name}` : undefined}
                     >{distance(ground)}</span
                   >
                 </button>
@@ -117,7 +151,7 @@
       {/each}
       {#each guide.hunts.filter((h) => !h.monster.known) as hunt (hunt.monster.name)}
         <p class="note">
-          {hunt.monster.name}{#if hunt.drop?.rate != null}<span title={rateTitle(hunt.drop)}> ({rate(hunt.drop.rate)})</span>{/if} also drops
+          {hunt.monster.name} also drops
           it, but isn't in the map data.
         </p>
       {/each}
@@ -135,6 +169,9 @@
   <p class="hint quiet">
     Dropped by {guide.hunts.map((h) => h.monster.name).join(", ")}, not found in the map data.
   </p>
+  {@render buy()}
+{:else if guide.kind === "item" && shop}
+  {@render buy()}
 {:else if guide.kind === "item" && guide.lookedUp}
   <p class="hint quiet">No known monster drops for this item.</p>
 {:else if guide.kind === "monster"}
@@ -257,14 +294,8 @@
     font-size: var(--text-sm);
   }
 
-  .mob .ref {
+  .mob :global(.ref) {
     font-weight: 600;
-  }
-
-  .rate {
-    margin-left: auto;
-    color: var(--muted);
-    font-size: var(--text-xs);
   }
 
   .maps {
@@ -326,6 +357,47 @@
 
   .route {
     margin-top: 2px;
+  }
+
+  .buy {
+    margin: 0;
+  }
+
+  .icon.shop {
+    color: var(--mesos);
+  }
+
+  .mesos {
+    color: var(--mesos);
+  }
+
+  .order {
+    display: inline-flex;
+    gap: 2px;
+    margin: 0 0 6px;
+    padding: 2px;
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .order button {
+    padding: 2px 8px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--muted);
+    font-size: var(--text-xs);
+    cursor: pointer;
+  }
+
+  .order button[aria-pressed="true"] {
+    background: color-mix(in srgb, var(--map) 18%, transparent);
+    color: var(--text);
+  }
+
+  .order button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -1px;
   }
 
   .note {

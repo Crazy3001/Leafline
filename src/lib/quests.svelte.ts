@@ -106,6 +106,30 @@ export function noteCharacter(name: string | null) {
   store(CHARACTER_KEY, name);
 }
 
+/**
+ * Which hunting ground a quest objective suggests first: the closest map, or the one with the
+ * most of the monster. One choice for every objective, kept on this PC.
+ */
+export type HuntOrder = "closest" | "most";
+const HUNT_ORDER_KEY = "leafline.quests.huntOrder";
+
+export const huntOrder = $state<{ value: HuntOrder }>({ value: stored<HuntOrder>(HUNT_ORDER_KEY, "closest") });
+
+export function setHuntOrder(value: HuntOrder) {
+  huntOrder.value = value;
+  store(HUNT_ORDER_KEY, value);
+}
+
+/** Hunting grounds in the order chosen: as the guide sent them (closest), or the fullest first. */
+export function orderGrounds<T extends { count: number; hops: number | null; travel: { hops: number } | null }>(
+  maps: T[],
+  order: HuntOrder,
+): T[] {
+  if (order === "closest") return maps;
+  const steps = (m: T) => m.travel?.hops ?? m.hops ?? Number.MAX_SAFE_INTEGER;
+  return [...maps].sort((a, b) => b.count - a.count || steps(a) - steps(b));
+}
+
 let watching = false;
 
 export function watchQuests() {
@@ -119,5 +143,6 @@ export function watchQuests() {
   window.addEventListener("storage", (e) => {
     if (e.key === FOLLOW_KEY) following.list = stored<FollowedQuest[]>(FOLLOW_KEY, []);
     if (e.key === CHARACTER_KEY) following.character = stored<string | null>(CHARACTER_KEY, null);
+    if (e.key === HUNT_ORDER_KEY) huntOrder.value = stored<HuntOrder>(HUNT_ORDER_KEY, "closest");
   });
 }

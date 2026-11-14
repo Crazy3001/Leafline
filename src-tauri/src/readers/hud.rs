@@ -40,7 +40,7 @@ pub struct Gauge {
     pub max: u32,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, serde::Deserialize)]
 pub struct Exp {
     pub points: u64,
     pub percent: f32,

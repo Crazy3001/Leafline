@@ -1,6 +1,7 @@
 <script lang="ts">
   // A bookmark for a map: saves it to "your spots" (the Saved list in Where to train). It takes
   // the map's ID, or a session's `Street : Name` label to find it by.
+  import { tip } from "$lib/tip.svelte";
   import { Bookmark } from "@lucide/svelte";
   import { onMount } from "svelte";
 
@@ -45,7 +46,7 @@
     class:on={saved}
     class:text
     aria-pressed={saved}
-    title={saved ? "Remove from your spots" : "Save to your spots"}
+    use:tip={saved ? "Remove from your spots" : "Save to your spots"}
     aria-label={saved ? `Remove ${name} from your spots` : `Save ${name} to your spots`}
     onclick={(e) => {
       e.stopPropagation();
@@ -78,6 +79,7 @@
   .save.text {
     padding: 0 8px;
     border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
     background: var(--surface-2);
   }
 

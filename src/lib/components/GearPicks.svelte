@@ -1,6 +1,8 @@
 <script lang="ts">
   // Gear to look for at a level, on this build. Each name opens the item in the Lookup tab. The
   // Character tab shows the top pick of each slot; the editor shows more, and can add them as goals.
+  import { tip } from "$lib/tip.svelte";
+  import Ref from "$lib/components/Ref.svelte";
   import { Plus } from "@lucide/svelte";
 
   import { backend } from "$lib/api";
@@ -52,14 +54,14 @@
         <div class="picks">
           {#each full ? slot.picks : slot.picks.slice(0, 1) as pick (pick.item.id)}
             <div class="pick">
-              <button class="name ref ref-item" class:goal={pick.goal} onclick={() => backend.showItem(pick.item.id, null)}>
+              <Ref kind="item" id={pick.item.id} class={["name", pick.goal ? "goal" : ""].join(" ")}>
                 {pick.item.name}{#if pick.item.gender}<small>{pick.item.gender[0].toUpperCase()}</small>{/if}
-              </button>
+              </Ref>
               <span class="gives">
                 {#if full && pick.item.reqLevel}Lv {pick.item.reqLevel} · {/if}{gives(pick.item, full ? 3 : 2)}
               </span>
               {#if onAdd}
-                <button class="add" disabled={pick.goal} title={pick.goal ? "Already a goal" : "Add as a gear goal"} aria-label="Add as a gear goal" onclick={() => onAdd?.(pick.item)}><Plus size={12} /></button>
+                <button class="add" disabled={pick.goal} use:tip={pick.goal ? "Already a goal" : "Add as a gear goal"} aria-label="Add as a gear goal" onclick={() => onAdd?.(pick.item)}><Plus size={12} /></button>
               {/if}
             </div>
           {/each}
@@ -114,16 +116,16 @@
     min-width: 0;
   }
 
-  .name {
+  li :global(.ref.name) {
     font-size: var(--text-sm);
     font-weight: 600;
   }
 
-  .name.goal {
+  li :global(.ref.name.goal) {
     color: var(--accent-strong);
   }
 
-  .name small {
+  li :global(.ref.name small) {
     margin-left: 4px;
     color: var(--faint);
     font-size: var(--text-xs);

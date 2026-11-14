@@ -1,11 +1,13 @@
 <script lang="ts">
   // One panel pinned into a small window of its own. It stays on screen while the overlay is
   // hidden and sizes itself to what it shows, until the player resizes it by hand.
+  import { tip } from "$lib/tip.svelte";
   import { AppWindow, Minimize2, PinOff } from "@lucide/svelte";
   import { onMount, tick, untrack } from "svelte";
 
   import { page } from "$app/state";
   import { backend } from "$lib/api";
+  import { peek } from "$lib/peek.svelte";
   import NextStep from "$lib/components/NextStep.svelte";
   import PanelView from "$lib/components/PanelView.svelte";
   import { PIN_MAX_HEIGHT, PIN_WIDTH, pinId, pinInfo } from "$lib/panels";
@@ -82,7 +84,9 @@
     if (!frame || !body) return;
     const natural = Math.ceil(frame.offsetHeight - body.clientHeight + body.scrollHeight);
     capped = natural > maxHeight;
-    setWindow(PIN_WIDTH * display.scale, Math.min(maxHeight, natural) * display.scale);
+    // A link card needs room: the window grows to its cap while one is open.
+    const height = peek.stack.length ? maxHeight : Math.min(maxHeight, natural);
+    setWindow(PIN_WIDTH * display.scale, height * display.scale);
   }
 
   // Clicks leave the game focused; typing in a box takes focus while it lasts.
@@ -112,6 +116,12 @@
     void display.scale;
     untrack(fit);
   });
+
+  // Opening or closing a link card refits the window.
+  $effect(() => {
+    void peek.stack.length;
+    untrack(fit);
+  });
 </script>
 
 <svelte:head><title>Leafline · {info.title}</title></svelte:head>
@@ -127,15 +137,15 @@
     <span class="title" data-tauri-drag-region><Icon size={12} />{info.title}</span>
     <span class="actions">
       {#if sized}
-        <button class="action" title="Fit to contents" onclick={fitToContent}><Minimize2 size={12} /></button>
+        <button class="action" use:tip={"Fit to contents"} onclick={fitToContent}><Minimize2 size={12} /></button>
       {/if}
       <button
         class="action"
-        title={panel === "route" ? "Open the Map tab" : `Open the ${info.title} tab`}
+        use:tip={panel === "route" ? "Open the Map tab" : `Open the ${info.title} tab`}
         onclick={() => backend.showPanel(panel)}
         ><AppWindow size={12} /></button
       >
-      <button class="action" title="Unpin" onclick={() => backend.unpinPanel(panel)}><PinOff size={12} /></button>
+      <button class="action" use:tip={"Unpin"} onclick={() => backend.unpinPanel(panel)}><PinOff size={12} /></button>
     </span>
   </header>
   <div class="body" class:scrolls={capped} bind:this={body}>
@@ -160,7 +170,9 @@
     display: flex;
     flex-direction: column;
     max-height: 100vh;
-    background: var(--glass);
+    background:
+      radial-gradient(120% 60% at 0% 0%, color-mix(in srgb, var(--accent) 6%, transparent), transparent 60%),
+      var(--glass);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius);
     overflow: hidden;

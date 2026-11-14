@@ -2,13 +2,15 @@
   // The compact HUD: the numbers worth a glance while playing, in a small window that fits what it
   // shows. One layout: EXP per hour, the last five minutes, mesos per hour, time to level, then
   // the quest counters. Everything else stays in the full overlay.
+  import { tip } from "$lib/tip.svelte";
   import { Check, Maximize2, Pause, Play } from "@lucide/svelte";
   import { onMount } from "svelte";
 
   import { backend } from "$lib/api";
+  import Pic from "$lib/ui/Pic.svelte";
   import Logo from "$lib/components/Logo.svelte";
   import NextStep from "$lib/components/NextStep.svelte";
-  import { formatCompact, formatDuration, objectiveProgress } from "$lib/format";
+  import { formatClockIn, formatCompact, formatDuration, objectiveProgress } from "$lib/format";
   import { live } from "$lib/readings.svelte";
   import { display, keyHint } from "$lib/settings.svelte";
   import { mesosCoverage } from "$lib/training";
@@ -27,6 +29,9 @@
   );
   const percentOnly = $derived(session?.percentOnly ?? false);
   const coverage = $derived(session ? mesosCoverage(session) : null);
+
+  /** The clock time the level comes at this pace, for the To level tile's tooltip. */
+  const levelAt = $derived(session?.secondsToLevel != null && !session.paused ? formatClockIn(session.secondsToLevel) : "");
 
   const rate = $derived.by(() => {
     if (!session) return null;
@@ -80,7 +85,7 @@
 </script>
 
 <div class="hud" bind:this={frame}>
-  <div class="level-track" title={percent != null ? `${percent.toFixed(2)}% toward the next level` : "Toward the next level"}>
+  <div class="level-track" use:tip={percent != null ? `${percent.toFixed(2)}% toward the next level` : "Toward the next level"}>
     <span class="level-fill" style:width="{Math.min(100, percent ?? 0)}%"></span>
   </div>
 
@@ -90,7 +95,10 @@
       {#if rate}
         <span class="value num" data-tauri-drag-region>{rate.value}</span>
         <span class="unit" data-tauri-drag-region>{rate.unit}</span>
-        {#if session?.held || session?.paused}<span class="paused" data-tauri-drag-region>Paused</span>{/if}
+        {#if session?.held || session?.paused}<span class="paused" data-tauri-drag-region>Paused</span>{:else if session?.measuring}<span
+            class="paused"
+            data-tauri-drag-region>Measuring</span
+          >{/if}
       {:else}
         <span class="unit" data-tauri-drag-region>{session && session.activeSeconds > 0 ? "Measuring…" : "Starts with your first EXP"}</span>
       {/if}
@@ -98,14 +106,14 @@
     {#if reading}
       <button
         class="icon"
-        title="{reading.held ? 'Resume' : 'Pause'} tracking{keyHint('PauseTracking')}"
+        use:tip={`${reading.held ? 'Resume' : 'Pause'} tracking${keyHint('PauseTracking')}`}
         aria-label={reading.held ? "Resume tracking" : "Pause tracking"}
         onclick={() => backend.setLiveHeld(!reading.held)}
       >
         {#if reading.held}<Play size={12} />{:else}<Pause size={12} />{/if}
       </button>
     {/if}
-    <button class="icon" title="Full overlay{keyHint('ToggleCompact')}" aria-label="Full overlay" onclick={() => backend.setCompact(false)}>
+    <button class="icon" use:tip={`Full overlay${keyHint('ToggleCompact')}`} aria-label="Full overlay" onclick={() => backend.setCompact(false)}>
       <Maximize2 size={12} />
     </button>
   </div>
@@ -130,7 +138,9 @@
     </span>
     <span class="tile" data-tauri-drag-region>
       <span class="label" data-tauri-drag-region>To level</span>
-      <span class="tile-value num" data-tauri-drag-region>{formatDuration(session?.secondsToLevel)}</span>
+      <span class="tile-value num" data-tauri-drag-region use:tip={levelAt ? `About ${levelAt} at this pace` : undefined}
+        >{formatDuration(session?.secondsToLevel)}</span
+      >
     </span>
   </div>
 
@@ -142,9 +152,11 @@
         <!-- A line the data says is there but no reading has counted shows no count, not a 0. -->
         {@const progress = objective.unread ? 0 : objectiveProgress(objective)}
         {@const done = progress >= 1}
-        <li class:done title={objective.quest}>
+        <li class:done use:tip={objective.quest}>
           <span class="target">
             {#if done}<Check size={10} />{/if}
+            <!-- The counter names an item or a monster; whichever has a picture shows it. -->
+            <Pic kind="item" name={objective.target} size={16} /><Pic kind="mob" name={objective.target} size={16} />
             {objective.target}
           </span>
           <span class="count tabular" class:faint={objective.unread}

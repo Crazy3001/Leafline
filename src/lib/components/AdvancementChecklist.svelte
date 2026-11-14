@@ -3,6 +3,8 @@
   // involved, found in the downloaded quest and NPC data by the job's name. Nothing here is a
   // game rule Leafline knows: it is what the data lists, and the game's own NPCs come first.
   // Ticks are a convenience kept in this window's storage, per character and advancement.
+  import { tip } from "$lib/tip.svelte";
+  import Ref from "$lib/components/Ref.svelte";
   import { Check } from "@lucide/svelte";
   import { untrack } from "svelte";
 
@@ -100,7 +102,7 @@
       const instructor = journey?.giver ? await place(journey.giver) : null;
       let tester: Place | null = null;
       if (tier === 2) {
-        const npcs = await backend.searchNpcs({ text: `${className} Job Instructor`, kind: null, region: null, area: null, offset: 0 });
+        const npcs = await backend.searchNpcs({ text: `${className} Job Instructor`, kind: null, region: null, area: null, sort: null, offset: 0 });
         const row = npcs.closest ? null : [...npcs.npcs].sort((a, b) => a.id - b.id)[0];
         if (row) tester = await place(row.name, row.id);
       }
@@ -135,7 +137,7 @@
 
 {#snippet where(map: MapRef, hops: number | null)}
   <span class="dim"
-    >in {#if map.known}<button class="ref ref-map" onclick={() => backend.showPlace("maps", map.id)}>{map.name}</button
+    >in {#if map.known}<Ref kind="map" id={map.id}>{map.name}</Ref
       >{:else}{map.name}{/if}{away(hops)}</span
   >
 {/snippet}
@@ -147,7 +149,7 @@
     role="checkbox"
     aria-checked={done}
     disabled={auto}
-    title={auto ? "Ticks itself when the HUD shows the level" : undefined}
+    use:tip={auto ? "Ticks itself when the HUD shows the level" : undefined}
     onclick={() => toggle(step)}
   >
     {#if done}<Check size={10} />{/if}
@@ -171,9 +173,7 @@
         {@render tick("instructor", !!ticks.instructor)}
         <span class="what">
           {tier === 1 ? "See" : "Talk to"}
-          <button class="link ref ref-npc" onclick={() => backend.showPlace("npcs", found!.instructor!.npcId)}
-            >{found.instructor.name}</button
-          >
+          <Ref kind="npc" id={found.instructor.npcId} name={found.instructor.name} class="link" />
           {#if found.instructor.map}{@render where(found.instructor.map, found.instructor.hops)}{/if}
         </span>
       </li>
@@ -184,7 +184,7 @@
         <li>
           {@render tick(`quest-${quest.id}`, !!ticks[`quest-${quest.id}`])}
           <span class="what">
-            <button class="link ref ref-quest" onclick={() => backend.showQuest(quest.id)}>{quest.name}</button>
+            <Ref kind="quest" id={quest.id} name={quest.name} class="link" />
             <span class="dim">quest{quest.levelMin ? `, Lv ${quest.levelMin}` : ""}</span>
           </span>
         </li>
@@ -193,9 +193,7 @@
         <li>
           {@render tick("tester", !!ticks.tester)}
           <span class="what">
-            <button class="link ref ref-npc" onclick={() => backend.showPlace("npcs", found!.tester!.npcId)}
-              >{found.tester.name}</button
-            >
+            <Ref kind="npc" id={found.tester.npcId} name={found.tester.name} class="link" />
             {#if found.tester.map}{@render where(found.tester.map, found.tester.hops)}{/if}
           </span>
         </li>
@@ -277,13 +275,6 @@
 
   .what {
     min-width: 0;
-  }
-
-  .link {
-    font-size: var(--text-sm);
-    font-weight: 600;
-    text-align: left;
-    cursor: pointer;
   }
 
   .dim,

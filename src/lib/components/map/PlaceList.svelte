@@ -1,5 +1,7 @@
 <script lang="ts">
   // The maps something can be found on, the best first, and the route to the one picked.
+  import { clipped, tip } from "$lib/tip.svelte";
+  import Ref from "$lib/components/Ref.svelte";
   import { backend } from "$lib/api";
   import RouteSteps from "./RouteSteps.svelte";
   import { formatCompact, groundDistance } from "$lib/format";
@@ -58,7 +60,7 @@
 {#if places.length}
   <div class="legend">
     <span>Map</span>
-    {#if counted}<span title="How many of it spawn, out of every monster on the map">It / all</span>{/if}
+    {#if counted}<span use:tip={"How many of it spawn, out of every monster on the map"}>It / all</span>{/if}
     {#if from && places.length > 1}
       <button class:on={nearest} aria-pressed={nearest} onclick={() => (nearest = !nearest)}>Nearest</button>
     {/if}
@@ -67,14 +69,14 @@
     {#each shown as map (map.map.id)}
       <li>
         <button class="ground" class:selected={map.map.id === target} aria-pressed={map.map.id === target} onclick={() => (picked = map.map.id)}>
-          <span class="name">{map.map.name}</span>
+          <span use:clipped class="name">{map.map.name}</span>
           {#if map.count != null}
             <span class="count tabular">{map.count}<small>/{map.mapTotal}</small></span>
           {/if}
           <span
             class="dist tabular"
             class:shortcut={map.travel}
-            title={map.travel ? `With the travel you turned on in Settings, via ${map.travel.via.name}` : undefined}>{groundDistance(map, from != null)}</span
+            use:tip={map.travel ? `With the travel you turned on in Settings, via ${map.travel.via.name}` : undefined}>{groundDistance(map, from != null)}</span
           >
         </button>
       </li>
@@ -98,7 +100,7 @@
     <p class="note">No route through portals is known from {from.name}.</p>
   {/if}
   {#if ground}
-    <button class="more" onclick={() => backend.showPlace("maps", ground.map.id)}>Open {ground.map.name}</button>
+    <p class="open">More on <Ref kind="map" id={ground.map.id} name={ground.map.name} /></p>
   {/if}
 {/if}
 
@@ -215,6 +217,12 @@
     color: var(--muted);
     font-size: var(--text-xs);
     cursor: pointer;
+  }
+
+  .open {
+    margin: 6px 0 0;
+    color: var(--faint);
+    font-size: var(--text-xs);
   }
 
   .more:hover,

@@ -1,29 +1,27 @@
 <script lang="ts">
   // What one NPC shop sells, with prices, from Leafline's shop file. Items open their own page.
-  import { backend } from "$lib/api";
+  import Ref from "$lib/components/Ref.svelte";
   import { formatNumber } from "$lib/format";
-  import { seenLine, shortDate } from "$lib/shops";
   import type { Shop } from "$lib/types";
 
   let { shop }: { shop: Shop } = $props();
 
-  const seen = $derived(seenLine(shop.items.map((i) => i.seen)));
 </script>
 
 <ul class="stock">
   {#each shop.items as item, i (i)}
     <li>
       {#if item.itemId != null}
-        <button class="ref ref-item" onclick={() => backend.showItem(item.itemId, null)}>{item.item}</button>
+        <Ref kind="item" id={item.itemId} name={item.item} />
       {:else}
         <span>{item.item}</span>
       {/if}
       {#if item.needs}<span class="needs">{item.needs}</span>{/if}
-      <span class="price tabular" title="Seen {shortDate(item.seen)}">{formatNumber(item.price)}</span>
+      <span class="price tabular">{formatNumber(item.price)}</span>
     </li>
   {/each}
 </ul>
-{#if seen}<p class="seen">{seen}</p>{/if}
+
 
 <style>
   .stock {
@@ -55,9 +53,4 @@
     flex: none;
   }
 
-  .seen {
-    margin: 4px 0 0;
-    font-size: var(--text-xs);
-    color: var(--faint);
-  }
 </style>

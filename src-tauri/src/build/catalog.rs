@@ -365,6 +365,11 @@ impl Catalog {
         self.skills.iter().find(|s| s.name == name && jobs.contains(&s.job_id))
     }
 
+    /// The item of any kind called `name` exactly, the first in the data.
+    pub fn item_called(&self, name: &str) -> Option<&ItemRecord> {
+        self.items.iter().find(|i| i.name == name)
+    }
+
     /// The piece of equipment called `name`.
     pub fn item_named(&self, name: &str) -> Option<&ItemRecord> {
         self.equipment().find(|i| i.name == name)
@@ -590,6 +595,9 @@ pub(crate) mod tests {
             description: None,
             required_skills: needs.iter().map(|&(skill_id, level)| SkillNeed { skill_id, level }).collect(),
             level_descriptions: Vec::new(),
+            icon_url: None,
+            effects: Vec::new(),
+            buff: false,
         }
     }
 
@@ -618,6 +626,7 @@ pub(crate) mod tests {
             price: None,
             description: None,
             scroll: None,
+            icon_url: None,
         }
     }
 

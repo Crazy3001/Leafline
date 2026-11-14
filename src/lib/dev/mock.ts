@@ -48,6 +48,7 @@ import type {
   QuestRow,
   SessionSummary,
 } from "../types";
+import type { BuffRow, PlayerDamage, SkillEffects, StatSheet, StatsView } from "../types";
 import sample from "./sample-analysis.json";
 import {
   sampleCard,
@@ -139,7 +140,12 @@ const dropHandlers: (() => void)[] = [];
 const historyHandlers: (() => void)[] = [];
 
 // Potion slots and per-session counts, as the backend keeps them.
-let potionSlots: PotionSlot[] = [];
+// Slots by lower-cased character name; the empty name is the shared set.
+const potionSlotSets = new Map<string, PotionSlot[]>();
+const slotsFor = (character: string | null) => {
+  const own = potionSlotSets.get((character ?? "").trim().toLowerCase()) ?? [];
+  return own.length || !character ? own : (potionSlotSets.get("") ?? []);
+};
 const sessionPotions = new Map<number, SessionPotion[]>();
 const potionHandlers: (() => void)[] = [];
 
@@ -214,6 +220,7 @@ let displaySettings: DisplaySettings = {
   framesFolder: null,
   setupDone: true,
   updateCheck: false,
+  showPictures: true,
   buildRules: { apPerLevel: 5, spPerLevel: 3, beginnerSpPerLevel: 1, advancementSp: 1, firstJobLevel: 10, secondJobLevel: 30 },
 };
 
@@ -229,6 +236,8 @@ const mockSkill = (id: number, name: string, jobId: number, maxLevel: number, re
   description: null,
   requiredSkills,
   levelDescriptions: Array.from({ length: maxLevel }, (_, i) => `Damage ${100 + i * 5}%`),
+  effects: [],
+  buff: false,
 });
 const mockCatalog: BuildCatalog = {
   jobs: [
@@ -563,6 +572,15 @@ export const mockBackend: Backend = {
     const card = sampleCard(2)!;
     return { score: 0.93, card, alternatives: [sampleSearch("Meadow II")[0]] };
   },
+  // A preview server set up for it can stand in a real map's layout; otherwise there is none.
+  async mapPicture(id) {
+    try {
+      const response = await fetch(`/__preview/map-picture/${id}`);
+      return response.ok ? await response.json() : null;
+    } catch {
+      return null;
+    }
+  },
   mapCard: async (id) =>
     preview?.map ? (preview.map.card.map.id === id ? preview.map.card : null) : mapStatus.ready ? sampleCard(id) : null,
   searchMaps: async (text) => (mapStatus.ready ? sampleSearch(text) : []),
@@ -602,6 +620,10 @@ export const mockBackend: Backend = {
     if (!mapStatus.ready) return null;
     return preview?.spots ?? sampleSpots(2, measured, level, assumptions);
   },
+  async checkEstimates() {
+    await delay(300);
+    return { maps: [], modelTypicalMiss: null, modelWithin20: null, olderTypicalMiss: null, olderWithin20: null };
+  },
   async openLink(url) {
     window.open(url, "_blank", "noopener");
   },
@@ -610,10 +632,10 @@ export const mockBackend: Backend = {
     return () => {};
   },
   savedSpots: async () => [...savedSpots],
-  potionSlots: async () => [...potionSlots],
-  async setPotionSlots(slots) {
+  potionSlots: async (character) => [...slotsFor(character)],
+  async setPotionSlots(character, slots) {
     const taken = new Set(slots.map((s) => s.slot).filter((n) => n > 0));
-    potionSlots = slots
+    const kept = slots
       .map((s) => {
         if (s.slot > 0) return { ...s, name: s.name.trim() };
         let next = 1;
@@ -622,13 +644,14 @@ export const mockBackend: Backend = {
         return { ...s, slot: next, name: s.name.trim() };
       })
       .sort((a, b) => a.slot - b.slot);
+    potionSlotSets.set((character ?? "").trim().toLowerCase(), kept);
     potionHandlers.forEach((h) => h());
-    return [...potionSlots];
+    return [...kept];
   },
   sessionPotions: async (startedAt) => [...(sessionPotions.get(startedAt) ?? [])],
-  async setSessionPotion(startedAt, slot, start, now) {
+  async setSessionPotion(character, startedAt, slot, start, now) {
     const rows = (sessionPotions.get(startedAt) ?? []).filter((p) => p.slot !== slot);
-    const def = potionSlots.find((p) => p.slot === slot);
+    const def = slotsFor(character).find((p) => p.slot === slot);
     if ((start != null || now != null) && def) {
       const used = start != null && now != null ? Math.max(0, start - now) : 0;
       rows.push({ slot, name: def.name, price: def.price, start, now, used });
@@ -649,8 +672,16 @@ export const mockBackend: Backend = {
     return [...savedSpots];
   },
   playerDamage: async () => null,
-  async onPlayerDamage() {
+  async onPlayerDamage(handler) {
+    damageHandlers.push(handler);
     return () => {};
+  },
+  characterStats: async () => mockStats(),
+  async setBuff(name, skill, on) {
+    mockBuffsOn = mockBuffsOn.filter((id) => id !== skill);
+    if (on) mockBuffsOn.push(skill);
+    const damage: PlayerDamage = { attackMin: 107, attackMax: 289, skills: [], sheet: null, readAt: null, buffsOn: mockBuffsOn, readWith: [] };
+    damageHandlers.forEach((h) => h({ name, damage }));
   },
   async onSavedSpots(handler) {
     spotHandlers.push(handler);
@@ -669,7 +700,32 @@ export const mockBackend: Backend = {
   },
   sessionHistory: async () => mockHistory(),
   itemCrafting: async () => ({ madeBy: [], usedIn: [] }),
-  craftingRecipes: async () => ({ disciplines: [], recipes: [] }),
+  cardIsLive: async () => true,
+  pinCard: async () => {},
+  async showCard(path) {
+    window.open(`/${path}`, "leafline-card", "width=380,height=540");
+  },
+  async popOutCard(path) {
+    window.open(`/${path}`, "_blank", "width=380,height=540");
+  },
+  async craftingRecipes(query) {
+    // A few made-up recipes, enough to lay the Crafting tab out.
+    const item = (id: number, name: string, count = 1) => ({ id, name, count });
+    const all = [
+      { id: 1, discipline: "Smelting", skillLevel: 1, craftExp: 3, mesoCost: 100, output: item(900001, "Fern Ingot"), ingredients: [item(900101, "Fern Ore", 5)] },
+      { id: 2, discipline: "Smelting", skillLevel: 2, craftExp: 5, mesoCost: 250, output: item(900002, "Ash Ingot"), ingredients: [item(900102, "Ash Ore", 5), item(900001, "Fern Ingot", 1)] },
+      { id: 3, discipline: "Stitching", skillLevel: 1, craftExp: 3, mesoCost: 0, output: item(900003, "Moss Cloth", 2), ingredients: [item(900103, "Moss Thread", 4)] },
+      { id: 4, discipline: "Stitching", skillLevel: 4, craftExp: 12, mesoCost: 1200, output: item(900004, "Bark Vest"), ingredients: [item(900003, "Moss Cloth", 6), item(900104, "Thorn Button", 2)] },
+    ];
+    const recipes = all.filter(
+      (r) =>
+        (!query.discipline || r.discipline === query.discipline) &&
+        (query.maxLevel == null || r.skillLevel <= query.maxLevel) &&
+        (!query.search || [r.output, ...r.ingredients].some((i) => i.name.toLowerCase().includes(query.search!.toLowerCase()))),
+    );
+    const disciplines: [string, number][] = [["Smelting", 2], ["Stitching", 2]];
+    return { disciplines, recipes };
+  },
   levelExp: async () => [
     { level: 20, needed: 6_000 },
     { level: 21, needed: 6_900 },
@@ -907,7 +963,7 @@ export const mockBackend: Backend = {
     };
     const beats = (a: number[], b: number[]) => a[0] > b[0] || (a[0] === b[0] && a[1] > b[1]);
     const overall = pieces.some((p) => mockSlotOf(p) === "Overall");
-    const outfit: Outfit = { level, slots: [] };
+    const outfit: Outfit = { level, slots: [], paths: [], wornGender: "male" };
     for (const slot of MOCK_SLOTS) {
       if (overall && (slot === "Top" || slot === "Bottom")) continue;
       const wearing = pieces.findLast((p) => mockSlotOf(p) === slot) ?? null;
@@ -951,11 +1007,29 @@ export const mockBackend: Backend = {
         suggestedFit: suggested ? fit(suggested.reqLevel) : null,
         nextFit: next ? fit(next.level ?? next.item.reqLevel) : null,
       });
+      // A tier at a time from here, each better than the last, as the app works it out.
+      const steps: Outfit["paths"][number]["steps"] = [];
+      let floor = suggested ? score(suggested.stats) : wearing ? score(wearing.stats) : null;
+      let tier = suggested?.reqLevel ?? level;
+      for (const i of mockItems
+        .filter((i) => i.kind === "equip" && i.slot === slot && i.reqLevel > level)
+        .sort((a, b) => a.reqLevel - b.reqLevel)) {
+        if (i.reqLevel <= tier || (floor && !beats(score(i.stats), floor))) continue;
+        steps.push({ item: i, level: i.reqLevel, planned: gear.some((g) => g.item.id === i.id) });
+        floor = score(i.stats);
+        tier = i.reqLevel;
+      }
+      outfit.paths.push({ slot, now: suggested ? { item: suggested, level, planned: suggestedPlanned } : null, steps, passed: [] });
     }
     return outfit;
   },
   async searchQuests(search) {
-    const quests = mockQuests.filter((q) => q.name.toLowerCase().includes(search.text.toLowerCase()) && (!search.region || q.region === search.region));
+    const quests = mockQuests.filter(
+      (q) =>
+        q.name.toLowerCase().includes(search.text.toLowerCase()) &&
+        (!search.region || q.region === search.region) &&
+        (search.atLevel == null || (q.levelMin ?? 0) <= search.atLevel),
+    );
     return { quests, total: quests.length };
   },
   questRegions: async () => ["Fern Isle", "Mossbank"],
@@ -974,6 +1048,15 @@ export const mockBackend: Backend = {
         next: null,
         objectives: [{ count: 5, guide: quest.objectives[0] }],
         rewards: [{ id: 504, name: "Berry Tonic", count: 5, sure: true }, { id: 502, name: "Bark Vest", count: 1, sure: false }, { id: 503, name: "Thorn Claw", count: 1, sure: false }],
+        chainRest: {
+          quests: [
+            { id: 72, name: "Slime Stew", levelMin: 4 },
+            { id: 73, name: "The Recipe Book", levelMin: 6 },
+          ],
+          exp: 1850,
+          mesos: 2400,
+          levelMax: 6,
+        },
       },
     };
   },
@@ -1003,7 +1086,7 @@ export const mockBackend: Backend = {
   mapRegions: async () => ["Ashlands", "Fern Isle"],
   mapAreas: async () => ["Fern Isle", "Ashlands"],
   searchNpcs: async (query) => sampleNpcs(query),
-  findNpc: async (name) => sampleNpcs({ text: name, kind: null, region: null, area: null, offset: 0 }).npcs[0]?.id ?? null,
+  findNpc: async (name) => sampleNpcs({ text: name, kind: null, region: null, area: null, sort: null, offset: 0 }).npcs[0]?.id ?? null,
   async npcSheet(id, mapName) {
     const sheet = sampleNpcSheet(id, mapName ? 2 : null);
     return sheet && { from: mapName ? sampleCard(2)!.map : null, sheet };
@@ -1176,6 +1259,22 @@ export const mockBackend: Backend = {
     mockUpdateCheck();
     return updateStatus;
   },
+  async installUpdate() {
+    // A made-up download that ends in a mismatch, so the preview shows both states and closes nothing.
+    const total = 8_400_000;
+    for (let received = 0; received <= total; received += 1_400_000) {
+      setUpdate({ state: "downloading", current: "0.1.0", latest: "0.2.0", received, total });
+      await delay(250);
+    }
+    setUpdate({
+      state: "available",
+      current: "0.1.0",
+      latest: "0.2.0",
+      url: "https://github.com/OWNER/leafline/releases",
+      installable: true,
+      problem: "The download didn't match the release's SHA-256, so it was deleted and not run.",
+    });
+  },
   async onUpdateStatus(handler) {
     updateHandlers.push(handler);
     return () => {};
@@ -1196,6 +1295,71 @@ function mockUpdateCheck() {
   setUpdate({ state: "checking" });
   setTimeout(() => {
     if (displaySettings.updateCheck)
-      setUpdate({ state: "available", current: "0.1.0", latest: "0.2.0", url: "https://github.com/OWNER/leafline/releases" });
+      setUpdate({
+        state: "available",
+        current: "0.1.0",
+        latest: "0.2.0",
+        url: "https://github.com/OWNER/leafline/releases",
+        installable: true,
+        problem: null,
+      });
   }, 700);
+}
+
+// Made-up stats for the dev preview's Stats view.
+const damageHandlers: ((change: { name: string; damage: PlayerDamage }) => void)[] = [];
+let mockBuffsOn: number[] = [];
+
+function mockStats(): StatsView {
+  const sheet: StatSheet = {
+    level: 33,
+    str: 28,
+    dex: 149,
+    int: 4,
+    luk: 4,
+    gearStr: 2,
+    gearDex: 6,
+    gearInt: 0,
+    gearLuk: 0,
+    abilityPoints: 0,
+    maxHp: 1220,
+    maxMp: 1004,
+    fame: 3,
+    attackMin: 107,
+    attackMax: 289,
+    weaponDef: 117,
+    magic: 2,
+    magicDef: 28,
+    accuracy: 76,
+    evasion: 33,
+    critRate: 26,
+    critDamage: 141,
+    speed: 101,
+    jump: 100,
+    buffBonus: { weaponDef: 0, magic: 0, magicDef: 0, accuracy: 0, evasion: 0, critRate: 0, critDamage: 0, speed: 0, jump: 0 },
+    attackBuffed: false,
+  };
+  const none: SkillEffects = { attack: 0, magic: 0, weaponDef: 0, weaponDefPercent: 0, magicDef: 0, accuracy: 0, evasion: 0, speed: 0, jump: 0, seconds: 300 };
+  const row = (id: number, name: string, level: number | null, maxLevel: number, effects: Partial<SkillEffects>, description: string | null): BuffRow => ({
+    id,
+    name,
+    level,
+    maxLevel,
+    levelRead: level != null,
+    on: level != null && mockBuffsOn.includes(id),
+    onAtRead: false,
+    effects: { ...none, ...effects },
+    description,
+  });
+  const buffs = [
+    row(12, "Soft Landing", 10, 10, { accuracy: 15, evasion: 15 }, "MP -12; Accuracy +15, Evasion +15 for 300 sec"),
+    row(21, "Bramble Guard", 4, 20, {}, "HP -20, MP -20; Attack speed up 2 stages for 120 sec"),
+    row(30, "Thin Mist", null, 30, {}, null),
+  ];
+  const on = buffs.filter((b) => b.on);
+  const add = (key: keyof SkillEffects) => on.reduce((n, b) => n + b.effects[key], 0);
+  const buffed = on.length
+    ? { ...sheet, accuracy: sheet.accuracy! + add("accuracy"), evasion: sheet.evasion! + add("evasion") }
+    : null;
+  return { sheet, readAt: Date.now() / 1000 - 260, buffs, base: sheet, buffed, weaponAttack: 49, attackUnscaled: false };
 }

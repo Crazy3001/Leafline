@@ -7,6 +7,7 @@
   import ItemPanel from "./ItemPanel.svelte";
   import MapLookup from "./lookup/MapLookup.svelte";
   import NpcLookup from "./lookup/NpcLookup.svelte";
+  import SkillLookup from "./lookup/SkillLookup.svelte";
   import MonsterPanel from "./MonsterPanel.svelte";
   import Segmented from "$lib/ui/Segmented.svelte";
   import { backend } from "$lib/api";
@@ -42,6 +43,7 @@
     { id: "monsters", label: "Monsters" },
     { id: "maps", label: "Maps" },
     { id: "npcs", label: "NPCs" },
+    { id: "skills", label: "Skills" },
     { id: "crafting", label: "Crafting" },
   ] as const;
 
@@ -78,6 +80,8 @@
   <MapLookup {here} {pinned} />
 {:else if lookup.mode === "npcs"}
   <NpcLookup {here} {map} {pinned} />
+{:else if lookup.mode === "skills"}
+  <SkillLookup {pinned} />
 {:else if lookup.mode === "crafting"}
   <CraftingPanel {pinned} />
 {:else}

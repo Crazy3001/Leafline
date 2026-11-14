@@ -165,7 +165,12 @@ pub fn restore(app: &AppHandle) -> Result<()> {
     Ok(())
 }
 
-/// The windows of every pinned panel.
+/// Whether pinned panels are hidden for now.
+pub fn hidden(app: &AppHandle) -> bool {
+    app.state::<PinState>().hidden.load(Ordering::Relaxed)
+}
+
+/// The windows of every pinned panel, and of cards popped out of a window.
 pub fn windows(app: &AppHandle) -> impl Iterator<Item = WebviewWindow> {
     app.webview_windows().into_iter().filter(|(label, _)| label.starts_with(PREFIX)).map(|(_, window)| window)
 }

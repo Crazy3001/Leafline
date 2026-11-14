@@ -7,10 +7,12 @@ use std::collections::{BTreeMap, HashMap, VecDeque};
 use serde::{Deserialize, Serialize};
 use strsim::normalized_levenshtein;
 
-use super::osms::{Dataset, Height, MapRecord, MonsterRecord, NO_MAP, QuestRecord, Side};
+use super::osms::{Dataset, Height, MapPoint, MapRecord, MonsterRecord, NO_MAP, PointKind, QuestRecord, Side};
+use super::pictures::MapView;
 use super::shops::{PlacedShop, Shop, ShopRecord};
 use super::travel::{Travel, TravelKind, TravelLink};
 use super::turnins;
+use super::walking;
 
 /// Below this similarity an OCR'd name is not taken for any map.
 const MIN_SCORE: f64 = 0.72;
@@ -37,7 +39,10 @@ impl Direction {
     /// The direction a portal name suggests, and whether the name marks it as hidden.
     pub fn of_portal(name: &str) -> (Self, bool) {
         let name = name.to_ascii_lowercase();
-        let hidden = name.starts_with("h_") || name.starts_with("hide");
+        // The client names hidden portals `h_east`, `hide01` and `h001`; no other name starts that way.
+        let hidden = name.starts_with("h_")
+            || name.starts_with("hide")
+            || name.strip_prefix('h').is_some_and(|rest| rest.starts_with(|c: char| c.is_ascii_digit()));
         let base = name.trim_start_matches("h_");
         let direction = if base.starts_with("west") {
             Self::West
@@ -79,6 +84,28 @@ pub struct MapMatch {
     pub alternatives: Vec<MapRef>,
 }
 
+/// A marker on a map's picture: a portal (`id` the map it leads to), an NPC or a spawn point,
+/// placed from 0 to 1 across and down the picture as the windows draw it.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ViewPoint {
+    pub kind: PointKind,
+    pub id: u32,
+    /// Where a portal leads, or who stands or spawns there.
+    pub name: String,
+    /// A portal the game hides.
+    pub hidden: bool,
+    /// A portal to another spot on the same map.
+    pub teleport: bool,
+    /// A portal's own name, and the one it comes out at, to pair teleports.
+    pub portal: Option<String>,
+    pub to_portal: Option<String>,
+    /// The map, NPC or monster is in the data, so its card can open.
+    pub known: bool,
+    pub x: f64,
+    pub y: f64,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MapCard {
@@ -115,6 +142,10 @@ pub struct MobRow {
     pub undead: bool,
     /// How much of a weapon blow it shrugs off, when the data says.
     pub weapon_def: Option<u32>,
+    /// The same for spells.
+    pub magic_def: Option<u32>,
+    /// Avoidability: how hard it is to hit with a weapon.
+    pub evasion: Option<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -182,6 +213,10 @@ pub struct Route {
     /// For a route that takes a ride or scroll: the portals the walk alone takes, or `None`
     /// when no portals lead there.
     pub walking: Option<u32>,
+    /// About how many seconds the route takes on foot, rides left out, when every portal on the
+    /// way has a place in the data. Sent with the route by the command that times it.
+    #[serde(skip)]
+    pub walk_seconds: Option<f64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -216,18 +251,10 @@ pub struct Shortcut {
     pub via: MapRef,
 }
 
-/// A way from one map to the next: a portal, or travel the player turned on.
-#[derive(Clone, Copy)]
-enum Edge<'a> {
-    Portal(&'a Exit),
-    Travel(&'a TravelLink),
-}
-
-/// A map reached in a breadth-first search: in how many steps, from where, and where the
-/// first ride or scroll on the way went.
-struct Visit<'a> {
+/// A map reached in a breadth-first search: in how many steps, and where the first ride or
+/// scroll on the way went.
+struct Visit {
     hops: u32,
-    prev: Option<(u32, Edge<'a>)>,
     via: Option<u32>,
 }
 
@@ -258,6 +285,8 @@ pub struct Atlas {
     pub(super) turn_ins: HashMap<u32, u32>,
     /// Map → its exits, in display order.
     pub(super) exits: HashMap<u32, Vec<Exit>>,
+    /// Map → its portals at their places, for timing routes.
+    pub(super) spots: HashMap<u32, Vec<walking::Spot>>,
     /// Each map's name, street and town folded for fuzzy matching.
     pub(super) keys: Vec<(u32, String, Option<String>)>,
 }
@@ -291,8 +320,9 @@ impl Atlas {
 
     pub fn new(data: Dataset) -> Self {
         // A few names in the data carry stray spaces.
-        let maps: BTreeMap<u32, MapRecord> =
+        let mut maps: BTreeMap<u32, MapRecord> =
             data.maps.into_iter().map(|m| (m.id, MapRecord { name: m.name.trim().to_string(), ..m })).collect();
+        let spots = walking::take_spots(&mut maps);
         let mut spawns: HashMap<u32, Vec<(u32, u32)>> = HashMap::new();
         for mob in &data.monsters {
             for spawn in mob.spawns.iter().filter(|s| s.count > 0) {
@@ -339,6 +369,7 @@ impl Atlas {
             quests_rewarding,
             turn_ins: HashMap::new(),
             exits: HashMap::new(),
+            spots,
             keys,
         };
         atlas.exits = atlas.maps.values().map(|m| (m.id, atlas.exits_of(m))).collect();
@@ -498,6 +529,8 @@ impl Atlas {
                     boss: m.is_boss,
                     undead: m.undead,
                     weapon_def: m.details.weapon_def.map(|d| d.max(0) as u32),
+                    magic_def: m.details.magic_def.map(|d| d.max(0) as u32),
+                    evasion: m.details.evasion.map(|d| d.max(0) as u32),
                 })
             })
             .collect();
@@ -543,53 +576,22 @@ impl Atlas {
         })
     }
 
-    /// The fewest portals from one map to another, by breadth-first search over the portals'
-    /// destinations. `None` when no path is known.
+    /// The quickest way from one map to another through portals, timed by the walk across each
+    /// map (see [`walking`]). `None` when no path is known.
     pub fn route(&self, from: u32, to: u32) -> Option<Route> {
         self.route_with(from, to, &Travel::none())
     }
 
-    /// The fewest steps from one map to another, where a ride or scroll in `travel` is one
-    /// step like a portal. Between routes of the same length, walking wins. A route that
-    /// takes travel also says how many portals the walk alone takes.
+    /// The quickest way from one map to another, through portals and the rides and scrolls in
+    /// `travel`, which are taken when they beat the walk. A route that takes travel also says
+    /// how many portals the walk alone takes.
     pub fn route_with(&self, from: u32, to: u32, travel: &Travel) -> Option<Route> {
-        if !self.maps.contains_key(&from) || !self.maps.contains_key(&to) {
-            return None;
-        }
-        let visits = self.explore(from, travel, Some(to));
-        visits.get(&to)?;
-        let mut steps = Vec::new();
-        let mut at = to;
-        while let Some((prev, edge)) = visits.get(&at).and_then(|v| v.prev) {
-            steps.push(match edge {
-                Edge::Portal(exit) => RouteStep {
-                    from: self.map_ref(prev),
-                    to: exit.to.clone(),
-                    direction: exit.direction,
-                    side: exit.side,
-                    portal: exit.portals.first().cloned(),
-                    hidden: exit.hidden,
-                    travel: None,
-                },
-                Edge::Travel(link) => RouteStep {
-                    from: self.map_ref(prev),
-                    to: self.map_ref(link.to),
-                    direction: Direction::Other,
-                    side: None,
-                    portal: None,
-                    hidden: false,
-                    travel: Some(TravelStep { kind: link.kind, service: link.service.clone(), fare: link.fare }),
-                },
-            });
-            at = prev;
-        }
-        steps.reverse();
-        let walking = if steps.iter().any(|s| s.travel.is_some()) {
-            self.explore(from, &Travel::none(), Some(to)).get(&to).map(|v| v.hops)
-        } else {
-            None
-        };
-        Some(Route { from: self.map_ref(from), to: self.map_ref(to), steps, walking })
+        self.quickest(from, to, travel)
+    }
+
+    /// The fewest portals from one map to another on foot.
+    pub(super) fn portals_on_foot(&self, from: u32, to: u32) -> Option<u32> {
+        self.explore(from, &Travel::none(), Some(to)).get(&to).map(|v| v.hops)
     }
 
     /// Portals from `from` to every map reachable through them.
@@ -623,16 +625,15 @@ impl Atlas {
 
     /// Breadth-first search from `from` over portals and travel, stopping once `stop` is
     /// reached. Portals are tried first, so a walk wins over a ride of the same length.
-    fn explore<'a>(&'a self, from: u32, travel: &'a Travel, stop: Option<u32>) -> HashMap<u32, Visit<'a>> {
-        let mut visits = HashMap::from([(from, Visit { hops: 0, prev: None, via: None })]);
+    fn explore(&self, from: u32, travel: &Travel, stop: Option<u32>) -> HashMap<u32, Visit> {
+        let mut visits = HashMap::from([(from, Visit { hops: 0, via: None })]);
         let mut queue = VecDeque::from([from]);
         while let Some(at) = queue.pop_front() {
             if stop == Some(at) {
                 break;
             }
             let (hops, via) = (visits[&at].hops + 1, visits[&at].via);
-            let portals =
-                self.exits.get(&at).into_iter().flatten().filter(|e| e.to.known).map(|e| (e.to.id, Edge::Portal(e)));
+            let portals = self.exits.get(&at).into_iter().flatten().filter(|e| e.to.known).map(|e| (e.to.id, false));
             // Leaving the island can't be undone, so a scroll is never suggested as a shortcut off it.
             let stays =
                 |l: &&TravelLink| l.from.is_some() || !self.on_starting_island(at) || self.on_starting_island(l.to);
@@ -640,16 +641,53 @@ impl Atlas {
                 .leaving(at)
                 .filter(|l| self.maps.contains_key(&l.to))
                 .filter(stays)
-                .map(|l| (l.to, Edge::Travel(l)));
-            for (next, edge) in portals.chain(rides) {
+                .map(|l| (l.to, true));
+            for (next, ride) in portals.chain(rides) {
                 if let Entry::Vacant(entry) = visits.entry(next) {
-                    let via = via.or(matches!(edge, Edge::Travel(_)).then_some(next));
-                    entry.insert(Visit { hops, prev: Some((at, edge)), via });
+                    let via = via.or(ride.then_some(next));
+                    entry.insert(Visit { hops, via });
                     queue.push_back(next);
                 }
             }
         }
         visits
+    }
+
+    /// A map's points as markers on its cut picture, named; ones the cut left out are dropped.
+    pub fn view_points(&self, map: u32, points: &[MapPoint], view: &MapView) -> Vec<ViewPoint> {
+        points
+            .iter()
+            .filter_map(|p| {
+                let (x, y) = view.place(p.x, p.y)?;
+                let (name, known, hidden) = match p.kind {
+                    PointKind::Portal => {
+                        let to = self.map_ref(p.id);
+                        (to.name, to.known, p.name.as_deref().is_some_and(|n| Direction::of_portal(n).1))
+                    }
+                    PointKind::Npc => match self.npc_names.get(&p.id) {
+                        Some(name) => (name.clone(), true, false),
+                        None => ("NPC".into(), false, false),
+                    },
+                    PointKind::Mob => match self.monsters.get(&p.id) {
+                        Some(mob) => (mob.name.clone(), true, false),
+                        None => ("Monster".into(), false, false),
+                    },
+                };
+                let teleport = p.kind == PointKind::Portal && p.id == map;
+                Some(ViewPoint {
+                    kind: p.kind,
+                    id: p.id,
+                    name,
+                    hidden,
+                    teleport,
+                    portal: p.name.clone(),
+                    to_portal: p.to_portal.clone(),
+                    known,
+                    x,
+                    y,
+                })
+            })
+            .collect()
     }
 
     pub(super) fn map_ref(&self, id: u32) -> MapRef {
@@ -793,6 +831,42 @@ fn lookalike(s: &str) -> String {
 
 #[cfg(test)]
 pub(crate) mod tests {
+    #[test]
+    fn names_and_places_the_points_on_a_maps_picture() {
+        let atlas = world();
+        let view = MapView { left: 100, top: 0, width: 200, height: 100, out_width: 200, out_height: 100 };
+        let point = |kind, id, name: Option<&str>, x| MapPoint { kind, id, name: name.map(str::to_string), to_portal: None, x, y: 50 };
+        let points = [
+            point(PointKind::Portal, 3, Some("h_east00"), 300),
+            point(PointKind::Npc, 50, None, 200),
+            point(PointKind::Mob, 10, None, 100),
+            point(PointKind::Mob, 10, None, 50),
+        ];
+        let marks: Vec<_> = atlas.view_points(2, &points, &view).into_iter().map(|p| (p.name, p.hidden, p.known, p.x)).collect();
+        assert_eq!(
+            marks,
+            [
+                ("Mossbank Meadow II".to_string(), true, true, 1.0),
+                ("Warden Ilse".to_string(), false, true, 0.5),
+                ("Pebble Snail".to_string(), false, true, 0.0),
+            ],
+            "the last spawn point was cut off"
+        );
+        let teleport = [point(PointKind::Portal, 2, Some("t001"), 200)];
+        assert!(atlas.view_points(2, &teleport, &view)[0].teleport, "leads back into the same map");
+        assert!(!atlas.view_points(2, &points[..1], &view)[0].teleport);
+    }
+
+    #[test]
+    fn portal_names_that_mark_hidden_portals() {
+        for name in ["h_east00", "hide01", "h001", "h000", "H004"] {
+            assert!(Direction::of_portal(name).1, "{name}");
+        }
+        for name in ["east00", "in00", "hp01", "home", "h", "horn"] {
+            assert!(!Direction::of_portal(name).1, "{name}");
+        }
+    }
+
     use super::*;
     use crate::mapdata::osms::{
         MobRequirement, MonsterDetails, MonsterRecord, NpcRecord, Portal, QuestRecord, RewardItem, Spawn,
@@ -863,6 +937,10 @@ pub(crate) mod tests {
             map_mark: None,
             exits: portals.iter().filter_map(|p| p.dest_map_id).collect(),
             portals,
+            minimap_url: None,
+            render_url: None,
+            map_mark_url: None,
+            points: vec![],
         }
     }
 
@@ -877,6 +955,7 @@ pub(crate) mod tests {
             undead: false,
             spawns: spawns.iter().map(|&(map_id, count)| Spawn { map_id, count, respawn: None }).collect(),
             details: MonsterDetails::default(),
+            icon_url: None,
         }
     }
 
@@ -907,8 +986,8 @@ pub(crate) mod tests {
                 mob(12, "Burrow Rat", 8, 15, &[(4, 5)]),
             ],
             npcs: vec![
-                NpcRecord { id: 50, name: "Warden Ilse".into(), maps: vec![1] },
-                NpcRecord { id: 51, name: "Innkeeper Bo".into(), maps: vec![5] },
+                NpcRecord { id: 50, name: "Warden Ilse".into(), maps: vec![1], icon_url: None },
+                NpcRecord { id: 51, name: "Innkeeper Bo".into(), maps: vec![5], icon_url: None },
             ],
             quests: vec![
                 QuestRecord {
@@ -982,8 +1061,8 @@ pub(crate) mod tests {
             maps: vec![town(10), town(20), map(30, "Harbor", "Main Road", vec![])],
             monsters: vec![],
             npcs: vec![
-                NpcRecord { id: 1, name: "Roger".into(), maps: vec![10] },
-                NpcRecord { id: 2, name: "Nina".into(), maps: vec![20] },
+                NpcRecord { id: 1, name: "Roger".into(), maps: vec![10], icon_url: None },
+                NpcRecord { id: 2, name: "Nina".into(), maps: vec![20], icon_url: None },
             ],
             quests: vec![],
             ..Dataset::default()
@@ -1092,7 +1171,7 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn routes_take_the_fewest_portals() {
+    fn routes_without_placed_portals_take_the_fewest() {
         let atlas = world();
         let route = atlas.route(5, 4).unwrap();
         let steps: Vec<(&str, Direction, Option<&str>, &str)> = route

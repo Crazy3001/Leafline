@@ -2,6 +2,8 @@
   // The training log's Records view: every map the player trained on, and under each the ways
   // they trained there (level, party size and job), with EXP and mesos per hour. Built from the
   // saved sessions' lines; everything stays on this PC.
+  import { tip } from "$lib/tip.svelte";
+  import Ref from "$lib/components/Ref.svelte";
   import { ChevronDown, ChevronRight } from "@lucide/svelte";
 
   import { formatCompact, formatDuration, partyLabel } from "$lib/format";
@@ -120,7 +122,7 @@
           <tbody>
             <tr class="map" class:short={m.activeSeconds < SHORT_SECONDS}>
               <td>
-                <button class="ref ref-map name" onclick={() => showMapNamed(m.map)}>{m.name}</button>
+                <Ref kind="map" name={m.map} class="name">{m.name}</Ref>
                 <button class="fold" aria-expanded={open} aria-label="{open ? 'Fold' : 'Unfold'} {m.name}" onclick={() => toggle(m.map)}>
                   {#if m.street}<span class="street">{m.street}</span>{/if}
                   {#if open}<ChevronDown size={12} />{:else}<ChevronRight size={12} />{/if}
@@ -129,12 +131,12 @@
               <td>{m.sessions}</td>
               <td>{formatDuration(m.activeSeconds)}</td>
               <td class="strong">{exp(m)}</td>
-              <td class="strong" title={mesosTitle(m)}>{mesos(m)}{m.mesosPerHour != null && m.mesosShare < 0.9 ? "*" : ""}</td>
+              <td class="strong" use:tip={mesosTitle(m)}>{mesos(m)}{m.mesosPerHour != null && m.mesosShare < 0.9 ? "*" : ""}</td>
               {#if withPotions}<td class="strong">{net(m)}</td>{/if}
               <td>
                 {#if bests.get(m.map)?.best}
                   {@const best = bests.get(m.map)!.best!}
-                  <span title="{shortDay(best.at)}{best.level != null ? `, Lv ${best.level}` : ''}">{formatCompact(best.expPerHour)}</span>
+                  <span use:tip={`${shortDay(best.at)}${best.level != null ? `, Lv ${best.level}` : ''}`}>{formatCompact(best.expPerHour)}</span>
                 {:else}—{/if}
               </td>
             </tr>
@@ -147,7 +149,7 @@
                   <td>{row.sessions}</td>
                   <td>{formatDuration(row.activeSeconds)}</td>
                   <td>{exp(row)}</td>
-                  <td title={mesosTitle(row)}>{mesos(row)}{row.mesosPerHour != null && row.mesosShare < 0.9 ? "*" : ""}</td>
+                  <td use:tip={mesosTitle(row)}>{mesos(row)}{row.mesosPerHour != null && row.mesosShare < 0.9 ? "*" : ""}</td>
                   {#if withPotions}<td>{net(row)}</td>{/if}
                   <td></td>
                 </tr>
@@ -210,6 +212,7 @@
     gap: 10px;
     padding: var(--space-3);
     border: 1px solid var(--border);
+    border-radius: var(--radius);
     background: var(--surface);
   }
 
@@ -292,7 +295,7 @@
     color: var(--text);
   }
 
-  .name {
+  td :global(.ref.name) {
     font-weight: 600;
   }
 

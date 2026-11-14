@@ -5,7 +5,7 @@
   import type { MapRef, MapRoute } from "$lib/types";
   import RouteSteps from "./RouteSteps.svelte";
 
-  let { from, to, onnavigate }: { from: MapRef; to: MapRef; onnavigate: (id: number) => void } = $props();
+  let { from, to }: { from: MapRef; to: MapRef } = $props();
 
   let route = $state<MapRoute | null>(null);
   let loading = $state(true);
@@ -24,7 +24,7 @@
 </script>
 
 {#if route}
-  <RouteSteps {route} {onnavigate} />
+  <RouteSteps {route} />
 {:else if !loading}
   <p class="note">
     {#if display.travel.enabled}

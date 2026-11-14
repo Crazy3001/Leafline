@@ -1,19 +1,24 @@
 //! Tauri wiring: windows, tray, hotkeys and commands.
 
 mod builds;
+mod cards;
 mod commands;
 mod damage;
 mod desk;
+mod fighter;
 mod layout;
 mod live;
 mod mapdata;
 mod nav;
 mod overlay;
+mod pictures;
 mod pins;
 mod readings;
+mod recovery;
 mod records;
 mod report;
 mod settings;
+mod sheet;
 mod shortcuts;
 mod snap;
 mod tray;
@@ -54,12 +59,15 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(shortcuts::plugin())
         .manage(OverlayState::default())
+        .manage(cards::CardState::default())
         .manage(LiveState::default())
         .manage(Readings::default())
         .manage(Bindings::default())
         .manage(UpdateState::default())
+        .register_asynchronous_uri_scheme_protocol(pictures::SCHEME, pictures::handle)
         .setup(|app| {
             app.manage(MapDataState::load(app.handle())?);
+            app.manage(pictures::PictureState::load(app.handle())?);
             app.manage(UserDataState::load(app.handle())?);
             app.manage(damage::DamageState::load(app.handle())?);
             mapdata::check_for_updates(app.handle());
@@ -127,10 +135,17 @@ pub fn run() {
             readings::current_readings,
             pins::pin_status,
             pins::pin_panel,
+            cards::pop_out_card,
+            cards::show_card,
+            cards::close_live_card,
+            cards::card_is_live,
+            cards::pin_card,
             pins::unpin_panel,
             pins::toggle_pins,
             pins::show_panel,
             damage::player_damage,
+            sheet::character_stats,
+            sheet::set_buff,
             desk::desk_status,
             desk::desk_take_tab,
             desk::show_desk,
@@ -149,6 +164,7 @@ pub fn run() {
             mapdata::download_drops,
             mapdata::drops_fetched_at,
             mapdata::training_spots,
+            mapdata::check_estimates,
             records::known_mesos,
             records::item_note,
             records::saved_spots,
@@ -159,6 +175,7 @@ pub fn run() {
             records::set_session_potion,
             update::update_status,
             update::check_for_update,
+            update::install_update,
             records::set_item_note,
             records::map_note,
             records::set_map_note,
@@ -229,6 +246,7 @@ pub fn run() {
             mapdata::find_npc,
             mapdata::npc_sheet,
             mapdata::show_place,
+            pictures::map_picture,
             nav::destination,
             nav::set_destination,
             nav::arrive_at,

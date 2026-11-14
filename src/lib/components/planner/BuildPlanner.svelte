@@ -4,6 +4,9 @@
   // Skills, Stats, Gear and Settings, with the levels beside every tab. Changes save themselves.
   // It is its own window, and a column of the desk view (embedded), where a menu stands in for
   // the list of builds.
+  import { tip } from "$lib/tip.svelte";
+  import Pic from "$lib/ui/Pic.svelte";
+  import Ref from "$lib/components/Ref.svelte";
   import { ArrowDown, ArrowUp, ClipboardCopy, ClipboardPaste, ExternalLink, Milestone, Plus, RotateCcw, Search, Trash2, X } from "@lucide/svelte";
   import { onMount, untrack } from "svelte";
 
@@ -13,9 +16,10 @@
   import MapDataPanel from "$lib/components/map/MapDataPanel.svelte";
   import NewBuild from "$lib/components/planner/NewBuild.svelte";
   import Timeline from "$lib/components/planner/Timeline.svelte";
+  import Segmented from "$lib/ui/Segmented.svelte";
   import { guideLinks } from "$lib/guides";
   import { gives } from "$lib/items.svelte";
-  import { OSMS_CREDIT, OSMS_URL, mapData, watchMapData } from "$lib/mapdata.svelte";
+  import { mapData, watchMapData } from "$lib/mapdata.svelte";
   import { apSplit, skillReached, statReached, stepAt, type Reached } from "$lib/planner";
   import { live, watchLive } from "$lib/readings.svelte";
   import { DEFAULT_RULES, changeSettings, display, keyHint, watchSettings } from "$lib/settings.svelte";
@@ -145,7 +149,6 @@
     copied = false;
     adding = null;
     gearText = "";
-    filled = null;
   }
 
   async function save(snapshot: string) {
@@ -418,19 +421,25 @@
     });
   });
 
-  const goalsBySlot = $derived.by(() => {
+  /** Goals the plan can't use: for another job, or out of reach by its end. Shown after the path. */
+  const stuckBySlot = $derived.by(() => {
     const by = new Map<string, GearCheck[]>();
-    for (const check of expansion?.gear ?? []) by.set(check.item.slot, [...(by.get(check.item.slot) ?? []), check]);
-    for (const list of by.values()) list.sort((a, b) => (a.level ?? 999) - (b.level ?? 999) || a.item.reqLevel - b.item.reqLevel);
+    for (const check of expansion?.gear ?? []) {
+      if (check.usable && check.level != null) continue;
+      by.set(check.item.slot, [...(by.get(check.item.slot) ?? []), check]);
+    }
     return by;
   });
   /** The outfit's slots, then any slot with goals it left out. */
   const gearSlots = $derived.by(() => {
     const slots = (outfit?.slots ?? []).map((s) => s.slot);
-    for (const slot of goalsBySlot.keys()) if (!slots.includes(slot)) slots.push(slot);
+    for (const slot of stuckBySlot.keys()) if (!slots.includes(slot)) slots.push(slot);
     return slots;
   });
   const wearing = (slot: string) => outfit?.slots.find((s) => s.slot === slot)?.wearing ?? null;
+  const pathOf = (slot: string) => outfit?.paths.find((p) => p.slot === slot) ?? null;
+  /** The level the gear paths start from. */
+  const gearFrom = $derived(outfit?.level ?? level ?? draft?.start.level ?? 1);
 
   /** The slot whose finder is open. */
   let adding = $state<string | null>(null);
@@ -462,30 +471,6 @@
     if (draft && !draft.plan.gear.includes(id)) draft.plan.gear.push(id);
   }
 
-  /** Slots with no goals, which the data can fill with an upgrade path. */
-  const emptySlots = $derived(gearSlots.filter((s) => s !== "Overall" && s !== "Shield" && !goalsBySlot.get(s)?.length));
-  let filling = $state(false);
-  let filled = $state<string | null>(null);
-
-  async function fillEmpty() {
-    if (!draft) return;
-    // Unsaved typing first, so the fill builds on it.
-    clearTimeout(saveTimer);
-    const snapshot = JSON.stringify(draft);
-    if (snapshot !== saved) await save(snapshot);
-    filling = true;
-    try {
-      const added = await backend.fillGear(draft.id, level ?? draft.start.level);
-      filled = added
-        ? `Added ${added} ${added === 1 ? "goal" : "goals"}, picked by stats alone: not by price or how easy they are to find. Drop any you don't want.`
-        : "Nothing in the data beats what you wear in those slots.";
-      error = null;
-    } catch (e) {
-      error = String(e);
-    } finally {
-      filling = false;
-    }
-  }
 
   function dropGoal(id: number) {
     if (draft) draft.plan.gear = draft.plan.gear.filter((g) => g !== id);
@@ -520,18 +505,26 @@
     rulesTimer = setTimeout(() => changeSettings({ buildRules: next }), SAVE_DELAY);
   }
 
+  const GENDERS = [
+    { id: "", label: "Either" },
+    { id: "male", label: "Male" },
+    { id: "female", label: "Female" },
+  ];
+  /** The character's gender as the plan has it, or as the gear worn tells. */
+  const gender = $derived(draft?.start.gender ?? outfit?.wornGender ?? null);
+  const genderWord = $derived(gender === "male" ? "Male" : gender === "female" ? "Female" : null);
   const rulesChanged = $derived(JSON.stringify(display.buildRules) !== JSON.stringify(DEFAULT_RULES));
   const pathSummary = $derived(
     draft
-      ? `${jobPath} · ${draft.character ? `${draft.character}, ` : ""}Lv ${draft.start.level} · planned to Lv ${draft.plan.planTo}`
+      ? `${jobPath} · ${draft.character ? `${draft.character}, ` : ""}Lv ${draft.start.level}${genderWord ? ` · ${genderWord}` : ""} · planned to Lv ${draft.plan.planTo}`
       : "",
   );
 </script>
 
 {#snippet moveButtons(onmove: (by: number) => void, first: boolean, last: boolean)}
   <span class="moves">
-    <button class="icon" title="Move up" aria-label="Move up" disabled={first} onclick={() => onmove(-1)}><ArrowUp size={12} /></button>
-    <button class="icon" title="Move down" aria-label="Move down" disabled={last} onclick={() => onmove(1)}><ArrowDown size={12} /></button>
+    <button class="icon" use:tip={"Move up"} aria-label="Move up" disabled={first} onclick={() => onmove(-1)}><ArrowUp size={12} /></button>
+    <button class="icon" use:tip={"Move down"} aria-label="Move down" disabled={last} onclick={() => onmove(1)}><ArrowDown size={12} /></button>
   </span>
 {/snippet}
 
@@ -632,7 +625,9 @@
                 <li>
                   {@render moveButtons((by) => moveSkill(index, by), k === 0, k === group.goals.length - 1)}
                   <span class="goal-name">
-                    <span>{skill?.name ?? `Unknown skill ${goal.skillId}`}</span>
+                    <span class="with-icon"
+                      >{#if skill}<Ref kind="skill" id={goal.skillId} name={skill.name} />{:else}Unknown skill {goal.skillId}{/if}</span
+                    >
                     {#if skill?.levelDescriptions[goal.level - 1]}
                       <small>Level {goal.level}: {skill.levelDescriptions[goal.level - 1]}</small>
                     {/if}
@@ -644,7 +639,7 @@
                   </label>
                   <span class="max tabular">of {skill?.maxLevel ?? "?"}</span>
                   {@render reachedBadge(skillReached(goal, draft.start.skills, steps))}
-                  <button class="icon" title="Remove" aria-label="Remove {skill?.name ?? 'skill'}" onclick={() => draft?.plan.skills.splice(index, 1)}
+                  <button class="icon" use:tip={"Remove"} aria-label="Remove {skill?.name ?? 'skill'}" onclick={() => draft?.plan.skills.splice(index, 1)}
                     ><X size={12} /></button
                   >
                 </li>
@@ -709,7 +704,7 @@
                   {:else}
                     <span class="reached tabular normal">{stepAt(steps, endLevel)?.stats[goal.stat] ?? "?"} by Lv {endLevel}</span>
                   {/if}
-                  <button class="icon" title="Remove" aria-label="Remove {statLabel(goal.stat)} goal" onclick={() => draft?.plan.stats.splice(i, 1)}
+                  <button class="icon" use:tip={"Remove"} aria-label="Remove {statLabel(goal.stat)} goal" onclick={() => draft?.plan.stats.splice(i, 1)}
                     ><X size={12} /></button
                   >
                 </li>
@@ -751,41 +746,67 @@
           {/if}
         {:else if tab === "gear"}
           <p class="help">
-            What you aim for in each slot, in the order this plan can wear it. The first one ahead shows as Next in Character →
-            Gear; a slot with none gets the data's next better piece there.
+            Each slot from what you wear to Lv {draft.plan.planTo}: the best piece you can wear now, then one piece for each
+            level tier the data has for this plan, each better than the last. Add a piece to pick it over the data's choice
+            for its tier. The first one ahead shows as Next in Character → Gear.
           </p>
-          {#if emptySlots.length}
-            <div class="fill">
-              <button class="plain" disabled={filling} onclick={fillEmpty}><Plus size={13} />Fill empty slots</button>
-              <span class="faint">
-                {emptySlots.map(slotName).join(", ")}: an upgrade from the data every 10 levels, each one better than the last.
-              </span>
-            </div>
-          {/if}
-          {#if filled}<p class="help">{filled}</p>{/if}
+          <div class="gender">
+            <span class="faint">Gear made for</span>
+            <Segmented
+              label="Gear made for"
+              size="sm"
+              options={GENDERS}
+              value={draft.start.gender ?? ""}
+              onchange={(g) => draft && (draft.start.gender = g || null)}
+            />
+            {#if !draft.start.gender && outfit?.wornGender}
+              <span class="faint">Your worn gear is {outfit.wornGender}-only, so the path keeps to {outfit.wornGender} gear.</span>
+            {/if}
+          </div>
           <ul class="slots">
             {#each gearSlots as slot (slot)}
               {@const worn = wearing(slot)}
-              {@const goals = goalsBySlot.get(slot) ?? []}
+              {@const path = pathOf(slot)}
               <li>
                 <span class="slot-name">{slotName(slot)}</span>
                 <div class="path">
                   {#if worn}
-                    <span class="chip worn">
-                      <b>now</b>
-                      <button class="ref ref-item" class:upgraded={!!worn.upgrades} onclick={() => backend.showItem(worn.item, worn.item == null ? worn.name : null)}
-                        >{worn.name}{#if worn.upgrades}{` (+${worn.upgrades})`}{/if}</button
+                    <span class="chip worn" use:tip={"What you wear"}>
+                      <b>worn</b>
+                      <Ref kind="item" id={worn.item} name={worn.name} class={worn.upgrades ? "upgraded" : ""}
+                        >{worn.name}{#if worn.upgrades}{` (+${worn.upgrades})`}{/if}</Ref
                       >
                     </span>
                   {:else}
                     <span class="faint">Nothing worn</span>
                   {/if}
-                  {#each goals as check (check.item.id)}
-                    <span class="chip">
-                      <b class:warn={!check.usable || check.level == null}
-                        >{#if !check.usable}wrong job{:else if check.level != null}{check.level}{:else}out of reach{/if}</b
-                      >
-                      <button class="ref ref-item" onclick={() => backend.showItem(check.item.id, null)}>{check.item.name}</button>
+                  {#each [...(path?.now ? [path.now] : []), ...(path?.steps ?? [])] as step, i (step.item.id)}
+                    {@const now = i === 0 && path?.now != null}
+                    <span
+                      class="chip"
+                      class:data={!step.planned}
+                      class:now
+                      use:tip={step.planned ? "One of your goals" : "The data's pick for this tier. Add another piece of the tier to pick it instead."}
+                    >
+                      <b>{now ? "now" : step.level}</b>
+                      <Ref kind="item" id={step.item.id} name={step.item.name} />
+                      {#if step.planned}
+                        <button class="icon small" aria-label="Stop aiming for {step.item.name}" onclick={() => dropGoal(step.item.id)}><X size={11} /></button>
+                      {/if}
+                    </span>
+                  {/each}
+                  {#each path?.passed ?? [] as item (item.id)}
+                    {@const below = item.reqLevel <= gearFrom}
+                    <span class="chip passed" use:tip={below ? `Needs Lv ${item.reqLevel}: you're past it, and the path has a better piece` : "A better piece of this tier or a higher one comes as soon"}>
+                      <b class="warn">{below ? `below Lv ${gearFrom}` : "passed over"}</b>
+                      <Ref kind="item" id={item.id} name={item.name} />
+                      <button class="icon small" aria-label="Stop aiming for {item.name}" onclick={() => dropGoal(item.id)}><X size={11} /></button>
+                    </span>
+                  {/each}
+                  {#each stuckBySlot.get(slot) ?? [] as check (check.item.id)}
+                    <span class="chip passed">
+                      <b class="warn">{check.usable ? "out of reach" : "wrong job"}</b>
+                      <Ref kind="item" id={check.item.id} name={check.item.name} />
                       <button class="icon small" aria-label="Stop aiming for {check.item.name}" onclick={() => dropGoal(check.item.id)}><X size={11} /></button>
                     </span>
                   {/each}
@@ -861,7 +882,7 @@
                 <div class="have">
                   {#each pathSkills as skill (skill.id)}
                     <label>
-                      <span>{skill.name}</span>
+                      <span class="with-icon"><Pic kind="skill" id={skill.id} size={18} />{skill.name}</span>
                       <input
                         class="number"
                         type="number"
@@ -992,7 +1013,6 @@
           </section>
         {/if}
 
-        <button class="credit" onclick={() => backend.openLink(OSMS_URL)}>{OSMS_CREDIT}</button>
       </div>
     </main>
 
@@ -1389,6 +1409,13 @@
     min-width: 0;
   }
 
+  .with-icon {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+
   small {
     color: var(--faint);
     font-size: var(--text-xs);
@@ -1549,9 +1576,33 @@
     background: var(--surface);
   }
 
+  .gender {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+    margin: 0 0 8px;
+    font-size: var(--text-sm);
+  }
+
   .chip.worn {
     padding-right: 8px;
+    border-color: var(--border-strong);
+    background: var(--surface-2);
+  }
+
+  .chip.now {
     border-color: var(--accent);
+  }
+
+  /* The data's pick for a tier, not one of the plan's goals: no remove button, a dashed edge. */
+  .chip.data {
+    padding-right: 8px;
+    border-style: dashed;
+  }
+
+  .chip.passed {
+    opacity: 0.75;
   }
 
   .chip b {
@@ -1565,7 +1616,7 @@
     color: var(--warn);
   }
 
-  .chip .ref {
+  .chip :global(.ref) {
     padding: 0;
     border: 0;
     background: transparent;
@@ -1573,11 +1624,11 @@
     cursor: pointer;
   }
 
-  .chip.worn .ref {
+  .chip.worn :global(.ref) {
     color: var(--text);
   }
 
-  .chip .ref.upgraded {
+  .chip :global(.ref.upgraded) {
     color: var(--accent-strong);
   }
 
@@ -1600,14 +1651,6 @@
     color: var(--accent-strong);
   }
 
-  .fill {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 6px 10px;
-    margin: 4px 0 10px;
-    font-size: var(--text-sm);
-  }
 
   .finder {
     grid-column: 2;

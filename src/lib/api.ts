@@ -11,6 +11,7 @@ import { open, save } from "@tauri-apps/plugin-dialog";
 
 import type {
   Analysis,
+  EstimateCheck,
   Build,
   BuildCatalog,
   BuildPlan,
@@ -42,6 +43,7 @@ import type {
   MapDataDownload,
   MapDataStatus,
   MapDetails,
+  MapPicture,
   MapMatch,
   MapPage,
   MapQuery,
@@ -52,6 +54,7 @@ import type {
   MeasuredRate,
   Assumptions,
   PlayerDamage,
+  StatsView,
   SavedSpot,
   PotionSlot,
   SessionPotion,
@@ -135,6 +138,8 @@ export interface Backend {
   /** The card for an OCR'd minimap header, or null without a close enough match or any data. */
   findMap(name: string, street: string | null, twin: number | null): Promise<MapMatch | null>;
   mapCard(id: number): Promise<MapDetails | null>;
+  /** A map's picture cut down with its portals, NPCs and spawns placed on it; null when pictures are off or missing. */
+  mapPicture(id: number): Promise<MapPicture | null>;
   searchMaps(text: string): Promise<MapRef[]>;
   mapRoute(from: number, to: number): Promise<MapRoute | null>;
   /** Where "Go here" is heading, and the places headed for lately. */
@@ -168,7 +173,18 @@ export interface Backend {
     measured: MeasuredRate[],
     level: number | null,
     assumptions: Assumptions,
+    /** Whose read stats the combat model uses, and the skill picked (empty for the best read). */
+    character: string | null,
+    skill: string | null,
   ): Promise<TrainingSpots | null>;
+  /** How close the estimates come on the player's own maps, each hidden in turn. */
+  checkEstimates(
+    measured: MeasuredRate[],
+    level: number | null,
+    assumptions: Assumptions,
+    character: string | null,
+    skill: string | null,
+  ): Promise<EstimateCheck | null>;
   /** One page of the quest search. */
   searchQuests(search: QuestSearch): Promise<QuestPage>;
   questRegions(): Promise<string[]>;
@@ -220,14 +236,24 @@ export interface Backend {
   /** What was last read of a character's attack range and damaging skills. */
   playerDamage(name: string): Promise<PlayerDamage | null>;
   onPlayerDamage(handler: (change: { name: string; damage: PlayerDamage }) => void): Promise<UnlistenFn>;
-  /** The potion slots the player set up, in slot order. */
-  potionSlots(): Promise<PotionSlot[]>;
-  /** Replaces the potion slots; a new slot has number 0. Returns them numbered. */
-  setPotionSlots(slots: PotionSlot[]): Promise<PotionSlot[]>;
+  /** The character's stats as last read, their buffs, and the stats with buffs on. */
+  characterStats(name: string): Promise<StatsView>;
+  /** Marks one of the character's buffs as on or off. */
+  setBuff(name: string, skill: number, on: boolean): Promise<void>;
+  /** A character's potion slots, in slot order; the shared ones until it sets its own. */
+  potionSlots(character: string | null): Promise<PotionSlot[]>;
+  /** Replaces a character's potion slots; a new slot has number 0. Returns them numbered. */
+  setPotionSlots(character: string | null, slots: PotionSlot[]): Promise<PotionSlot[]>;
   /** The potion counts typed for the session that started at `startedAt`. */
   sessionPotions(startedAt: number): Promise<SessionPotion[]>;
   /** How many of a slot's potion the player had at a session's start and has now. */
-  setSessionPotion(startedAt: number, slot: number, start: number | null, now: number | null): Promise<SessionPotion[]>;
+  setSessionPotion(
+    character: string | null,
+    startedAt: number,
+    slot: number,
+    start: number | null,
+    now: number | null,
+  ): Promise<SessionPotion[]>;
   /** Fires when the slots or any session's counts change. */
   onPotions(handler: () => void): Promise<UnlistenFn>;
   /** The player's note on an item, matched like the price log. */
@@ -356,6 +382,14 @@ export interface Backend {
   pinStatus(): Promise<PinStatus>;
   /** Opens a panel in its own window that stays up while the overlay is hidden. */
   pinPanel(panel: PinId): Promise<PinStatus>;
+  /** Opens a link card in a small window of its own at a screen position (logical pixels). */
+  popOutCard(path: string, x: number, y: number): Promise<void>;
+  /** Shows a card in the live card window at a screen position (logical pixels), opening it if needed. */
+  showCard(path: string, x: number, y: number): Promise<void>;
+  /** Whether this card window is the one links open their cards in. */
+  cardIsLive(): Promise<boolean>;
+  /** Pins this card window where it is; the next link opens a new one. */
+  pinCard(): Promise<void>;
   unpinPanel(panel: PinId): Promise<PinStatus>;
   onPins(handler: (status: PinStatus) => void): Promise<UnlistenFn>;
   /** The player resized the calling pinned panel, with its new width and height in screen units. */
@@ -383,6 +417,8 @@ export interface Backend {
   updateStatus(): Promise<UpdateStatus>;
   /** Checks now; refused while the check is turned off. */
   checkForUpdate(): Promise<UpdateStatus>;
+  /** Downloads the newer release's installer, checks its SHA-256, runs it and closes Leafline. */
+  installUpdate(): Promise<void>;
   onUpdateStatus(handler: (status: UpdateStatus) => void): Promise<UnlistenFn>;
   /** The travel connections routes can use, and which file they come from. */
   travelInfo(): Promise<TravelInfo>;
@@ -425,6 +461,7 @@ const tauriBackend: Backend = {
   downloadMapData: (force) => invoke("download_map_data", { force }),
   findMap: (name, street, twin) => invoke("find_map", { name, street, twin }),
   mapCard: (id) => invoke("map_card", { id }),
+  mapPicture: (id) => invoke("map_picture", { id }),
   searchMaps: (text) => invoke("search_maps", { text }),
   mapRoute: (from, to) => invoke("map_route", { from, to }),
   destination: () => invoke("destination"),
@@ -437,8 +474,10 @@ const tauriBackend: Backend = {
     invoke("quest_guide", { quests, mapName, mapStreet, mapTwin, measured }),
   downloadDrops: (retry) => invoke("download_drops", { retry: retry ?? false }),
   dropsFetchedAt: () => invoke("drops_fetched_at"),
-  trainingSpots: (mapName, mapStreet, mapTwin, measured, level, assumptions) =>
-    invoke("training_spots", { mapName, mapStreet, mapTwin, measured, level, assumptions }),
+  trainingSpots: (mapName, mapStreet, mapTwin, measured, level, assumptions, character, skill) =>
+    invoke("training_spots", { mapName, mapStreet, mapTwin, measured, level, assumptions, character, skill }),
+  checkEstimates: (measured, level, assumptions, character, skill) =>
+    invoke("check_estimates", { measured, level, assumptions, character, skill }),
   searchQuests: (search) => invoke("search_quests", { search }),
   questRegions: () => invoke("quest_regions"),
   questSheet: (id, mapName, mapStreet, mapTwin) => invoke("quest_sheet", { id, mapName, mapStreet, mapTwin }),
@@ -466,10 +505,13 @@ const tauriBackend: Backend = {
   onSavedSpots: (handler) => listen<SavedSpot[]>("saved-spots", (e) => handler(e.payload)),
   playerDamage: (name) => invoke("player_damage", { name }),
   onPlayerDamage: (handler) => listen<{ name: string; damage: PlayerDamage }>("player-damage", (e) => handler(e.payload)),
-  potionSlots: () => invoke("potion_slots"),
-  setPotionSlots: (slots) => invoke("set_potion_slots", { slots }),
+  characterStats: (name) => invoke("character_stats", { name }),
+  setBuff: (name, skill, on) => invoke("set_buff", { name, skill, on }),
+  potionSlots: (character) => invoke("potion_slots", { character }),
+  setPotionSlots: (character, slots) => invoke("set_potion_slots", { character, slots }),
   sessionPotions: (startedAt) => invoke("session_potions", { startedAt }),
-  setSessionPotion: (startedAt, slot, start, now) => invoke("set_session_potion", { startedAt, slot, start, now }),
+  setSessionPotion: (character, startedAt, slot, start, now) =>
+    invoke("set_session_potion", { character, startedAt, slot, start, now }),
   onPotions: (handler) => listen("potions", () => handler()),
   itemNote: (item) => invoke("item_note", { item }),
   setItemNote: (item, note) => invoke("set_item_note", { item, note }),
@@ -555,6 +597,10 @@ const tauriBackend: Backend = {
   currentReadings: () => invoke("current_readings"),
   pinStatus: () => invoke("pin_status"),
   pinPanel: (panel) => invoke("pin_panel", { panel }),
+  popOutCard: (path, x, y) => invoke("pop_out_card", { path, x, y }),
+  showCard: (path, x, y) => invoke("show_card", { path, x, y }),
+  cardIsLive: () => invoke("card_is_live"),
+  pinCard: () => invoke("pin_card"),
   unpinPanel: (panel) => invoke("unpin_panel", { panel }),
   onPins: (handler) => listen<PinStatus>("pins", (e) => handler(e.payload)),
   onPinResized: (handler) => getCurrentWindow().listen<[number, number]>("pin-resized", (e) => handler(e.payload)),
@@ -570,6 +616,7 @@ const tauriBackend: Backend = {
   onSettings: (handler) => listen<DisplaySettings>("settings", (e) => handler(e.payload)),
   updateStatus: () => invoke("update_status"),
   checkForUpdate: () => invoke("check_for_update"),
+  installUpdate: () => invoke("install_update"),
   onUpdateStatus: (handler) => listen<UpdateStatus>("update", (e) => handler(e.payload)),
   showSettings: () => invoke("show_settings"),
   showSetup: () => invoke("show_setup"),

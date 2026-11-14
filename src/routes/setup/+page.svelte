@@ -204,8 +204,9 @@
           <label for="update-check">
             <span class="name">Check for updates at startup</span>
             <span class="help">
-              Asks GitHub for the latest version number and says in Settings if there's a newer one. Nothing about the
-              game or you is sent. Change it any time in Settings → About.
+              Asks GitHub for the latest version number and says in Settings if there's a newer one, which you can then
+              download and install from there. Nothing about the game or you is sent. Change it any time in Settings →
+              About.
             </span>
           </label>
           <input
@@ -788,7 +789,7 @@
     cursor: pointer;
   }
 
-  /* The same square switch as src/lib/ui/Switch.svelte, on a checkbox so labels still work. */
+  /* The same switch as src/lib/ui/Switch.svelte, on a checkbox so labels still work. */
   .switch {
     appearance: none;
     position: relative;
@@ -797,8 +798,9 @@
     height: 20px;
     margin: 0;
     border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-pill);
     background: var(--surface-3);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
     cursor: pointer;
   }
 
@@ -809,8 +811,9 @@
     left: 2px;
     width: 14px;
     height: 14px;
-    border-radius: 1px;
+    border-radius: 50%;
     background: var(--muted);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
   }
 
   .switch:checked {
@@ -820,6 +823,6 @@
 
   .switch:checked::after {
     transform: translateX(16px);
-    background: var(--bg);
+    background: #fff;
   }
 </style>

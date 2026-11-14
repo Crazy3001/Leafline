@@ -1,6 +1,8 @@
 <script lang="ts">
   // The Quests tab: what the Quest Helper is tracking, and a book of every quest in the map data.
   // The book needs nothing from the game, so it works with live reading off.
+  import { clipped, tip } from "$lib/tip.svelte";
+  import { FilterBoxState } from "$lib/filterbox.svelte";
   import { ArrowLeft, LoaderCircle, Search, SlidersHorizontal, X } from "@lucide/svelte";
   import { untrack } from "svelte";
 
@@ -11,7 +13,7 @@
   import FollowedQuests from "./quest/FollowedQuests.svelte";
   import { backend } from "$lib/api";
   import { formatCompact } from "$lib/format";
-  import { OSMS_CREDIT, OSMS_URL, mapData, watchMapData } from "$lib/mapdata.svelte";
+  import { mapData, watchMapData } from "$lib/mapdata.svelte";
   import { blankSearch, followedQuests, noteCharacter, questView, watchQuests } from "$lib/quests.svelte";
   import type { MapReading, QuestPage, QuestReading, QuestRow, QuestSearch, SessionSummary } from "$lib/types";
 
@@ -48,11 +50,15 @@
   const search = $derived(questView.search);
 
   let regions = $state<string[]>([]);
-  let showFilters = $state(false);
+  const filterBox = new FilterBoxState("quests");
   let page = $state<QuestPage | null>(null);
   let searching = $state(false);
 
-  const narrowed = $derived([search.region, search.repeat, search.atLevel].filter((v) => v != null).length);
+  const narrowed = $derived(
+    [search.region, search.repeat, search.atLevel, search.noPrior || null].filter((v) => v != null).length,
+  );
+  /** How many quests to take now the tab names before "Show all". */
+  const TAKE_NOW = 6;
   const browsing = $derived(search.text.trim() !== "" || narrowed > 0);
   const asked = $derived(JSON.stringify(search));
 
@@ -80,6 +86,21 @@
     return () => clearTimeout(timer);
   });
 
+  // Quests the character can start at their level that need no other quest first, the nearest
+  // to their level first. Which ones they've done is the game's to know, so some may be done.
+  let takeNow = $state<QuestPage | null>(null);
+  $effect(() => {
+    void mapData.status?.dataUpdatedAt;
+    const at = level;
+    if (!ready || at == null || pinned) {
+      takeNow = null;
+      return;
+    }
+    untrack(() => backend.searchQuests({ ...blankSearch(), atLevel: at, noPrior: true })).then((found) => {
+      if (level === at) takeNow = found;
+    });
+  });
+
   async function more() {
     if (!page) return;
     const key = asked;
@@ -95,7 +116,6 @@
   function clear() {
     questView.search = blankSearch();
     questView.id = null;
-    showFilters = false;
   }
 
   /** What a row says under the name. */
@@ -116,7 +136,7 @@
       <li>
         <button onclick={() => (questView.id = row.id)}>
           <span class="row-name">{row.name}</span>
-          <span class="row-line">{line(row)}{#if row.exp}{line(row) ? " · " : ""}<span class="exp tabular">{formatCompact(row.exp)} EXP</span>{/if}</span>
+          <span use:clipped class="row-line">{line(row)}{#if row.exp}{line(row) ? " · " : ""}<span class="exp tabular">{formatCompact(row.exp)} EXP</span>{/if}</span>
         </button>
       </li>
     {/each}
@@ -139,20 +159,20 @@
       </label>
       <button
         class="tool"
-        class:active={showFilters || narrowed > 0}
-        title="Filters"
+        class:active={filterBox.open || narrowed > 0}
+        use:tip={"Filters"}
         aria-label="Filters"
-        aria-expanded={showFilters}
-        onclick={() => (showFilters = !showFilters)}
+        aria-expanded={filterBox.open}
+        onclick={() => (filterBox.open = !filterBox.open)}
       >
         <SlidersHorizontal size={13} />{#if narrowed}<span class="tabular">{narrowed}</span>{/if}
       </button>
       {#if browsing || questView.id != null}
-        <button class="tool" title="Clear the search" aria-label="Clear the search" onclick={clear}><X size={13} /></button>
+        <button class="tool" use:tip={"Clear the search"} aria-label="Clear the search" onclick={clear}><X size={13} /></button>
       {/if}
     </div>
 
-    {#if showFilters}
+    {#if filterBox.open}
       <div class="filters">
         <label>
           <span>Region</span>
@@ -174,6 +194,10 @@
             <span>Only what Lv {level} can start</span>
           </label>
         {/if}
+        <label class="check">
+          <input type="checkbox" checked={!!search.noPrior} onchange={(e) => setSearch({ noPrior: e.currentTarget.checked || undefined })} />
+          <span>Only quests that need no other first</span>
+        </label>
       </div>
     {/if}
   </div>
@@ -192,7 +216,6 @@
       {:else}
         <p class="quiet">No quests match.</p>
       {/if}
-      <button class="credit" onclick={() => backend.openLink(OSMS_URL)}>{OSMS_CREDIT}</button>
     {:else if searching}
       <p class="quiet"><span class="spin"><LoaderCircle size={13} /></span> Searching…</p>
     {/if}
@@ -206,6 +229,20 @@
     </p>
   {/if}
   {#if ready}<FollowedQuests tracked={quest} {map} {session} plain={pinned} />{/if}
+  {#if ready && !pinned && level != null && takeNow?.quests.length}
+    <Card title={`Quests to take at Lv ${level}`}>
+      <p class="lead">
+        Quests your level can start that need no other quest first, the nearest to your level first. Leafline can't see
+        which you've done.
+      </p>
+      {@render rows(takeNow.quests.slice(0, TAKE_NOW))}
+      {#if takeNow.total > TAKE_NOW}
+        <button class="back inline" onclick={() => setSearch({ atLevel: level, noPrior: true })}
+          >Show all {takeNow.total.toLocaleString()}</button
+        >
+      {/if}
+    </Card>
+  {/if}
   {#if !ready && !pinned}
     <Card title="Quest search" plain={pinned}>
       <p class="lead">Search every quest once the map data is downloaded.</p>
@@ -434,21 +471,4 @@
     text-align: center;
   }
 
-  .credit {
-    display: block;
-    margin-top: 8px;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--faint);
-    font-size: var(--text-xs);
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .credit:hover,
-  .credit:focus-visible {
-    color: var(--muted);
-    outline: none;
-  }
 </style>

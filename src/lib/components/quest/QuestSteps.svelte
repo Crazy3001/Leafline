@@ -1,6 +1,7 @@
 <script lang="ts">
   // How a quest goes, step by step with directions, and what it pays and leads to. For a quest
   // being tracked, the steps start with its objectives, since it has already been taken.
+  import Ref from "$lib/components/Ref.svelte";
   import ObjectiveHint from "./ObjectiveHint.svelte";
   import PlaceRoute from "./PlaceRoute.svelte";
   import { backend } from "$lib/api";
@@ -24,9 +25,19 @@
 
   const info = $derived(sheet.info);
 
+  function counted(target: string) {
+    return tracked?.find((o) => o.target.toLowerCase() === target.toLowerCase()) ?? null;
+  }
+
   function done(target: string) {
-    const counted = tracked?.find((o) => o.target.toLowerCase() === target.toLowerCase());
-    return counted != null && counted.current >= counted.required;
+    const read = counted(target);
+    return read != null && read.current >= read.required;
+  }
+
+  /** How many are still wanted: what the Quest Helper has left, or the whole count. */
+  function left(target: string, count: number) {
+    const read = counted(target);
+    return read ? Math.max(0, read.required - read.current) : count;
   }
 
   const finished = $derived(sheet.objectives.length > 0 && sheet.objectives.every((o) => done(o.guide.target)));
@@ -38,7 +49,7 @@
 <ol class="steps">
   {#if !tracked && info.giver}
     <li>
-      <p class="step">Talk to <button class="ref ref-npc" onclick={() => showNpcNamed(info.giver!)}>{info.giver}</button></p>
+      <p class="step">Talk to <Ref kind="npc" name={info.giver} /></p>
       <PlaceRoute maps={info.giverMaps} {from} npc={info.giver} />
     </li>
   {/if}
@@ -49,21 +60,21 @@
         {objective.guide.kind === "monster" ? "Defeat" : "Bring"}
         {objective.count}
         {#if objective.guide.kind === "monster"}
-          <button class="ref ref-mob" onclick={() => showMonsterNamed(objective.guide.target)}>{objective.guide.target}</button>
+          <Ref kind="mob" name={objective.guide.target} />
         {:else}
-          <button class="ref ref-item" onclick={() => showItemNamed(objective.guide.item ?? objective.guide.target)}>{objective.guide.target}</button>
+          <Ref kind="item" name={objective.guide.item ?? objective.guide.target}>{objective.guide.target}</Ref>
         {/if}
       </p>
-      {#if !finishedStep}<ObjectiveHint guide={objective.guide} {from} />{/if}
+      {#if !finishedStep}<ObjectiveHint guide={objective.guide} {from} left={left(objective.guide.target, objective.count)} />{/if}
     </li>
   {/each}
   <li class:next={finished}>
     {#if info.turnIn}
-      <p class="step">Turn in to <button class="ref ref-npc" onclick={() => showNpcNamed(info.turnIn!)}>{info.turnIn}</button></p>
+      <p class="step">Turn in to <Ref kind="npc" name={info.turnIn} /></p>
       <PlaceRoute maps={info.turnInMaps} {from} npc={info.turnIn} />
     {:else if info.giver}
       <p class="step">Turn it in</p>
-      <p class="unsure">Nothing says to whom yet. It came from <button class="ref ref-npc" onclick={() => showNpcNamed(info.giver!)}>{info.giver}</button>.</p>
+      <p class="unsure">Nothing says to whom yet. It came from <Ref kind="npc" name={info.giver} />.</p>
       <PlaceRoute maps={info.giverMaps} {from} npc={info.giver} />
     {:else}
       <p class="step">Turn it in</p>
@@ -81,7 +92,7 @@
     <ul class="links">
       {#each sheet.rewards as item (item.id)}
         <li>
-          <button class="ref ref-item" onclick={() => backend.showItem(item.id, null)}>{item.name}</button>
+          <Ref kind="item" id={item.id} name={item.name} />
           {#if item.count > 1}<span class="tabular">×{item.count}</span>{/if}
           {#if !item.sure}<span class="maybe">possible</span>{/if}
         </li>
@@ -94,15 +105,26 @@
   <h4>Comes after</h4>
   <ul class="links">
     {#each sheet.after as quest (quest.id)}
-      <li><button class="ref ref-quest" onclick={() => backend.showQuest(quest.id)}>{quest.name}</button></li>
+      <li><Ref kind="quest" id={quest.id} name={quest.name} /></li>
     {/each}
   </ul>
 {/if}
 {#if sheet.next}
   <h4>Leads to</h4>
   <ul class="links">
-    <li><button class="ref ref-quest" onclick={() => backend.showQuest(sheet.next!.id)}>{sheet.next.name}</button></li>
+    <li><Ref kind="quest" id={sheet.next!.id} name={sheet.next.name} /></li>
   </ul>
+{/if}
+{#if sheet.chainRest}
+  {@const rest = sheet.chainRest}
+  <h4>Rest of the chain</h4>
+  <p class="chain">
+    {rest.quests.length} more {rest.quests.length === 1 ? "quest" : "quests"}{#if rest.levelMax}, up to Lv {rest.levelMax}{/if}{#if rest.exp || rest.mesos},
+      paying
+      {#if rest.exp}<span class="tabular exp">{formatNumber(rest.exp)} EXP</span>{/if}{#if rest.exp && rest.mesos}&nbsp;and{/if}
+      {#if rest.mesos}<span class="tabular mesos">{formatMesos(rest.mesos)} mesos</span>{/if}
+      in all{/if}{#if rest.quests.length > 1}, ending with <Ref kind="quest" id={rest.quests[rest.quests.length - 1].id} name={rest.quests[rest.quests.length - 1].name} />{/if}.
+  </p>
 {/if}
 
 <style>
@@ -151,7 +173,7 @@
   }
 
   .done .step,
-  .done .step .ref {
+  .done .step :global(.ref) {
     color: var(--faint);
     font-weight: 500;
     text-decoration: line-through;
@@ -190,8 +212,19 @@
     font-weight: 600;
   }
 
-  dd.exp {
+  dd.exp,
+  .chain .exp {
     color: var(--exp);
+  }
+
+  .chain {
+    margin: 0;
+    color: var(--muted);
+    font-size: var(--text-sm);
+  }
+
+  .chain .mesos {
+    color: var(--mesos);
   }
 
   dd.mesos {
@@ -206,7 +239,7 @@
     font-size: var(--text-sm);
   }
 
-  .links .ref {
+  .links :global(.ref) {
     padding: 2px 0;
     font-weight: 600;
   }

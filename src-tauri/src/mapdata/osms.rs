@@ -1,9 +1,11 @@
 //! The parts of OSMS Data Explorer's v1 JSON that the map card and build planner use.
 //!
-//! Only the fields listed here are read. Every `*_url` image field is left out on purpose, so
-//! none can reach the cache or the screen. Coordinates are read only to tell which third of its
-//! map a portal stands in, and are dropped as the file is parsed: only that coarse place is
-//! kept, and nothing is ever drawn at a map's real positions.
+//! Only the fields listed here are read. Picture addresses (`icon_url`, `minimap_url`,
+//! `render_url`) are kept so the picture cache can download a picture the first time one is
+//! shown (allowed since 2026-11-13); the pictures themselves never pass through here.
+//! Coordinates tell which third of its map a portal stands in, and since 2026-11-13 are kept as
+//! [`MapPoint`]s too, to mark portals, NPCs and spawns on the map's picture. They are the
+//! picture's own pixels.
 
 use std::collections::HashMap;
 
@@ -88,6 +90,9 @@ struct RawMap {
     mobs: Vec<Point>,
     #[serde(default)]
     npcs: Vec<Point>,
+    minimap_url: Option<String>,
+    render_url: Option<String>,
+    map_mark_url: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -103,6 +108,34 @@ struct RawPortal {
 struct Point {
     x: Option<i32>,
     y: Option<i32>,
+    mob_id: Option<u32>,
+    npc_id: Option<u32>,
+}
+
+/// What stands at a point on a map.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum PointKind {
+    Portal,
+    Npc,
+    Mob,
+}
+
+impl PointKind {
+    pub const ALL: [Self; 3] = [Self::Portal, Self::Npc, Self::Mob];
+}
+
+/// A portal that leads somewhere, an NPC or a spawn point, at its place on the map's picture.
+/// `id` is the map a portal leads to, or the NPC or monster; `name` a portal's own name and
+/// `to_portal` the one it comes out at.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MapPoint {
+    pub kind: PointKind,
+    pub id: u32,
+    pub name: Option<String>,
+    pub to_portal: Option<String>,
+    pub x: i32,
+    pub y: i32,
 }
 
 /// The lowest and highest of `values`, if they spread far enough to mean anything.
@@ -137,6 +170,38 @@ impl From<RawMap> for MapRecord {
                 height: p.y.zip(down).map(|(y, range)| Height::ALL[third(y, range)]),
             })
             .collect();
+        let mut points: Vec<MapPoint> = raw
+            .portals
+            .iter()
+            .filter_map(|p| {
+                let dest = p.dest_map_id.filter(|d| *d != NO_MAP)?;
+                Some(MapPoint {
+                    kind: PointKind::Portal,
+                    id: dest,
+                    name: Some(p.name.clone()),
+                    to_portal: p.dest_portal.clone(),
+                    x: p.x?,
+                    y: p.y?,
+                })
+            })
+            .collect();
+        // Where teleports within the map come out: portals that lead nowhere themselves, named as
+        // the exit of one that leads back into this map. Marked as teleports too, to pair them.
+        let landings: Vec<&str> = raw
+            .portals
+            .iter()
+            .filter(|p| p.dest_map_id == Some(raw.id))
+            .filter_map(|p| p.dest_portal.as_deref())
+            .collect();
+        points.extend(raw.portals.iter().filter(|p| p.dest_map_id.is_none_or(|d| d == NO_MAP)).filter_map(|p| {
+            landings.contains(&p.name.as_str()).then_some(())?;
+            Some(MapPoint { kind: PointKind::Portal, id: raw.id, name: Some(p.name.clone()), to_portal: None, x: p.x?, y: p.y? })
+        }));
+        let placed = |kind: PointKind, id: Option<u32>, p: &Point| {
+            Some(MapPoint { kind, id: id?, name: None, to_portal: None, x: p.x?, y: p.y? })
+        };
+        points.extend(raw.npcs.iter().filter_map(|p| placed(PointKind::Npc, p.npc_id, p)));
+        points.extend(raw.mobs.iter().filter_map(|p| placed(PointKind::Mob, p.mob_id, p)));
         Self {
             id: raw.id,
             name: raw.name,
@@ -147,6 +212,10 @@ impl From<RawMap> for MapRecord {
             map_mark: raw.map_mark,
             exits: raw.exits,
             portals,
+            minimap_url: raw.minimap_url,
+            render_url: raw.render_url,
+            map_mark_url: raw.map_mark_url,
+            points,
         }
     }
 }
@@ -164,6 +233,14 @@ pub struct MapRecord {
     /// Maps reachable from this one.
     pub exits: Vec<u32>,
     pub portals: Vec<Portal>,
+    /// Where OSMS publishes the map's minimap and its whole-map picture.
+    pub minimap_url: Option<String>,
+    pub render_url: Option<String>,
+    /// Where OSMS publishes the emblem of the area it is in.
+    pub map_mark_url: Option<String>,
+    /// Portals, NPCs and spawn points at their places. Filled as the file is read and stored
+    /// apart; the cache loads maps without them (see `Store::map_points`).
+    pub points: Vec<MapPoint>,
 }
 
 /// A portal's name, where it leads, and roughly where it stands: which third of the map across
@@ -210,6 +287,7 @@ struct RawMonster {
     revives_into: Vec<Split>,
     #[serde(default)]
     spawns: Vec<Spawn>,
+    icon_url: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -272,6 +350,7 @@ impl From<RawMonster> for MonsterRecord {
             undead: raw.undead,
             spawns: raw.spawns,
             details,
+            icon_url: raw.icon_url,
         }
     }
 }
@@ -288,10 +367,12 @@ pub struct MonsterRecord {
     pub undead: bool,
     pub spawns: Vec<Spawn>,
     pub details: MonsterDetails,
+    /// Where OSMS publishes its picture.
+    pub icon_url: Option<String>,
 }
 
-/// What the file says of a monster beyond the few numbers maps and routes use. Icon and animation
-/// URLs are left out, like every other image. A stat the file leaves out stays `None`.
+/// What the file says of a monster beyond the few numbers maps and routes use. A stat the file
+/// leaves out stays `None`.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MonsterDetails {
@@ -361,6 +442,9 @@ pub struct NpcRecord {
     pub name: String,
     #[serde(default)]
     pub maps: Vec<u32>,
+    /// Where OSMS publishes their picture.
+    #[serde(default)]
+    pub icon_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Deserialize)]
@@ -517,6 +601,121 @@ pub struct SkillRecord {
     /// What the skill does at each level, from level 1.
     #[serde(default)]
     pub level_descriptions: Vec<String>,
+    /// Where OSMS publishes its icon. The webview asks for pictures by skill id, not by address.
+    #[serde(default, skip_serializing)]
+    pub icon_url: Option<String>,
+    /// What the skill changes about the character at each level, from level 1. Empty for skills
+    /// that change nothing a stat window shows.
+    #[serde(default, rename(deserialize = "levels"), deserialize_with = "level_effects")]
+    pub effects: Vec<Effects>,
+    /// A skill the player casts on themselves (or the party) for a while, such as Rage or Haste:
+    /// one that costs MP and hits nothing. Worked out from the file's levels when it is read.
+    #[serde(default, skip_deserializing)]
+    pub buff: bool,
+}
+
+/// What a buff changes at one of its levels, from the file's per-level numbers. All are added to
+/// what the stat window shows, except `weapon_def_percent`, which is a share of it.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Effects {
+    pub attack: i32,
+    pub magic: i32,
+    pub weapon_def: i32,
+    pub weapon_def_percent: i32,
+    pub magic_def: i32,
+    pub accuracy: i32,
+    pub evasion: i32,
+    pub speed: i32,
+    pub jump: i32,
+    /// How long it lasts, in seconds. Zero when the file gives no time.
+    pub seconds: u32,
+    /// For an attack: the damage lines one use deals, and how many monsters it can hit. Zero when
+    /// the file doesn't say.
+    pub lines: i32,
+    pub targets: i32,
+    /// The level costs MP, and whether it hits: what tells a buff. Only read from the file, never kept.
+    #[serde(skip)]
+    pub costs_mp: bool,
+    #[serde(skip)]
+    pub hits: bool,
+}
+
+impl Effects {
+    /// Whether it changes anything a stat window shows.
+    pub fn any(&self) -> bool {
+        [self.attack, self.magic, self.weapon_def, self.weapon_def_percent, self.magic_def, self.accuracy, self.evasion, self.speed, self.jump]
+            .iter()
+            .any(|&n| n != 0)
+    }
+}
+
+/// One level of a skill as the file has it; only what [`Effects`] needs.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RawLevel {
+    indie_pad: Option<i32>,
+    indie_mad: Option<i32>,
+    indie_pdd: Option<i32>,
+    indie_pdd_r: Option<i32>,
+    indie_mdd: Option<i32>,
+    indie_acc: Option<i32>,
+    indie_eva: Option<i32>,
+    indie_speed: Option<i32>,
+    indie_jump: Option<i32>,
+    /// Nimble Feet's speed, which isn't an `indie` one.
+    speed: Option<i32>,
+    time: Option<u32>,
+    mp_con: Option<i32>,
+    damage: Option<i32>,
+    fixdamage: Option<i32>,
+    mob_count: Option<i32>,
+    attack_count: Option<i32>,
+}
+
+fn level_effects<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Vec<Effects>, D::Error> {
+    let raw: Option<Vec<RawLevel>> = Option::deserialize(deserializer)?;
+    Ok(raw
+        .unwrap_or_default()
+        .into_iter()
+        .map(|l| Effects {
+            attack: l.indie_pad.unwrap_or(0),
+            magic: l.indie_mad.unwrap_or(0),
+            weapon_def: l.indie_pdd.unwrap_or(0),
+            weapon_def_percent: l.indie_pdd_r.unwrap_or(0),
+            magic_def: l.indie_mdd.unwrap_or(0),
+            accuracy: l.indie_acc.unwrap_or(0),
+            evasion: l.indie_eva.unwrap_or(0),
+            speed: l.indie_speed.or(l.speed).unwrap_or(0),
+            jump: l.indie_jump.unwrap_or(0),
+            seconds: l.time.unwrap_or(0),
+            lines: l.attack_count.unwrap_or(0).max(0),
+            targets: l.mob_count.unwrap_or(0).max(0),
+            costs_mp: l.mp_con.is_some_and(|mp| mp > 0),
+            hits: [l.damage, l.fixdamage, l.mob_count, l.attack_count].iter().any(Option::is_some),
+        })
+        .collect())
+}
+
+/// Kinds of skill, as the file's `mechanics` names them, that are never buffs even when they cost MP.
+const NOT_BUFFS: [&str; 6] = ["attack", "action_hitbox", "weapon_projectile", "magic_projectile", "mobility", "passive"];
+
+impl SkillRecord {
+    /// Works out [`SkillRecord::buff`] from what the file gave: an active skill whose levels cost
+    /// MP and hit nothing, and that the file doesn't call an attack or a movement skill.
+    fn settle_buff(&mut self, mechanics: Option<&str>) {
+        self.buff = !self.passive
+            && !mechanics.is_some_and(|m| NOT_BUFFS.contains(&m))
+            && self.effects.iter().any(|e| e.costs_mp)
+            && !self.effects.iter().any(|e| e.hits);
+    }
+}
+
+/// The `mechanics` of each skill in the file, for [`SkillRecord::settle_buff`].
+#[derive(Deserialize)]
+struct Mechanics {
+    id: u32,
+    mechanics: Option<String>,
 }
 
 /// A skill that must reach `level` first.
@@ -562,6 +761,7 @@ struct RawItem {
     stats: HashMap<String, serde_json::Value>,
     weapon: Option<RawWeapon>,
     scroll: Option<RawScroll>,
+    icon_url: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -631,6 +831,7 @@ impl From<RawItem> for ItemRecord {
             scroll,
             classes: raw.req_classes,
             name: raw.name,
+            icon_url: raw.icon_url,
         }
     }
 }
@@ -741,6 +942,9 @@ pub struct ItemRecord {
     pub price: Option<i64>,
     pub description: Option<String>,
     pub scroll: Option<ScrollInfo>,
+    /// Where OSMS publishes its icon. The webview asks for pictures by item id, not by address.
+    #[serde(skip_serializing)]
+    pub icon_url: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -797,6 +1001,11 @@ impl Records {
             "skills.json" => {
                 let mut skills: Vec<SkillRecord> = serde_json::from_slice(body)?;
                 skills.retain(|s| s.job_tier != CRAFTING);
+                let kinds: HashMap<u32, Option<String>> =
+                    serde_json::from_slice::<Vec<Mechanics>>(body)?.into_iter().map(|m| (m.id, m.mechanics)).collect();
+                for skill in &mut skills {
+                    skill.settle_buff(kinds.get(&skill.id).and_then(Option::as_deref));
+                }
                 Self::Skills(skills)
             }
             "items.json" => Self::Items(serde_json::from_slice(body)?),
@@ -811,6 +1020,33 @@ mod tests {
     use super::*;
 
     #[test]
+    fn a_skill_that_costs_mp_and_hits_nothing_is_a_buff_with_its_effects_by_level() {
+        // Made-up skills in OSMS's shape.
+        let json = br#"[
+            {"id": 1, "name": "Fern Fury", "job_id": 110, "job_tier": "2nd Job", "max_level": 2, "mechanics": "party_support",
+             "levels": [{"level": 1, "mpCon": 10, "time": 60, "indiePad": 5, "indiePdd": -5},
+                        {"level": 2, "mpCon": 12, "time": 120, "indiePad": 10, "indiePdd": -10}]},
+            {"id": 2, "name": "Quick Feet", "job_id": 0, "job_tier": "Beginner", "max_level": 1, "mechanics": "self_buff",
+             "levels": [{"level": 1, "mpCon": 4, "time": 10, "speed": 10}]},
+            {"id": 3, "name": "Mending", "job_id": 230, "job_tier": "2nd Job", "max_level": 1, "mechanics": "party_support",
+             "levels": [{"level": 1, "mpCon": 20, "mobCount": 6, "x": 100}]},
+            {"id": 4, "name": "Blink", "job_id": 210, "job_tier": "2nd Job", "max_level": 1, "mechanics": "mobility",
+             "levels": [{"level": 1, "mpCon": 15, "range": 150}]},
+            {"id": 5, "name": "Shade Veil", "job_id": 400, "job_tier": "1st Job", "max_level": 1,
+             "levels": [{"level": 1, "mpCon": 30, "speed": null}]},
+            {"id": 6, "name": "Thick Hide", "job_id": 100, "job_tier": "1st Job", "max_level": 1, "passive": true,
+             "levels": [{"level": 1, "y": 20}]}
+        ]"#;
+        let Records::Skills(skills) = Records::parse("skills.json", json).unwrap() else { panic!() };
+        let buffs: Vec<_> = skills.iter().filter(|s| s.buff).map(|s| s.name.as_str()).collect();
+        // The heal hits and the teleport moves; a buff with no stats, like the veil, is still one.
+        assert_eq!(buffs, ["Fern Fury", "Quick Feet", "Shade Veil"]);
+        assert_eq!(skills[0].effects[1], Effects { attack: 10, weapon_def: -10, seconds: 120, costs_mp: true, ..Effects::default() });
+        assert_eq!(skills[1].effects[0].speed, 10, "a speed outside the indie fields counts");
+        assert!(!skills[4].effects[0].any());
+    }
+
+    #[test]
     fn reads_only_what_the_card_uses() {
         // Made-up records in OSMS's shape, image URLs and coordinates included.
         let json = br#"[{"id": 7, "name": "Fernway Path", "street_name": "Mossy Road", "is_town": false,
@@ -822,6 +1058,23 @@ mod tests {
         assert_eq!(maps[0].portals[0].dest_map_id, Some(8));
         assert_eq!(maps[0].portals[1].dest_map_id, None);
         assert_eq!(maps[0].street_name.as_deref(), Some("Mossy Road"));
+        assert_eq!(maps[0].minimap_url.as_deref(), Some("https://example.invalid/m.png"));
+        assert_eq!(maps[0].render_url, None);
+        // The portal that leads somewhere and the monster, at their places; the spawn point not.
+        let points: Vec<_> = maps[0].points.iter().map(|p| (p.kind, p.id, p.x, p.y)).collect();
+        assert_eq!(points, [(PointKind::Portal, 8, 10, 20), (PointKind::Mob, 1, 5, 6)]);
+    }
+
+    #[test]
+    fn keeps_where_a_teleport_within_the_map_comes_out() {
+        // A made-up map with one teleport into itself, its landing spot, and a spare spawn point.
+        let json = br#"[{"id": 7, "name": "Fernway Farm", "portals": [
+            {"name": "t001", "x": 10, "y": 20, "dest_map_id": 7, "dest_portal": "st00"},
+            {"name": "st00", "x": 300, "y": 40}, {"name": "sp", "x": 1, "y": 2}]}]"#;
+        let Records::Maps(maps) = Records::parse("maps.json", json).unwrap() else { panic!() };
+        let points: Vec<_> =
+            maps[0].points.iter().map(|p| (p.id, p.name.as_deref(), p.to_portal.as_deref(), p.x)).collect();
+        assert_eq!(points, [(7, Some("t001"), Some("st00"), 10), (7, Some("st00"), None, 300)]);
     }
 
     fn portals_of(json: &[u8]) -> Vec<Portal> {
@@ -877,17 +1130,19 @@ mod tests {
     }
 
     #[test]
-    fn reads_skills_but_not_crafting_or_icons() {
+    fn reads_skills_and_their_icons_but_not_crafting() {
         // Made-up skills in OSMS's shape. Crafting records carry no levels at all.
         let json = br#"[
             {"id": 7, "name": "Pebble Toss", "job_id": 400, "class_name": "Rogue", "job_tier": "1st Job",
-             "max_level": 2, "passive": false, "description": "Throws a pebble.", "icon_url": "https://example.invalid/i.png",
-             "required_skills": [{"skill_id": 6, "level": 3}], "level_descriptions": ["Damage 1", "Damage 2"]},
+             "max_level": 2, "passive": false, "description": "Throws a pebble.",
+             "required_skills": [{"skill_id": 6, "level": 3}], "level_descriptions": ["Damage 1", "Damage 2"],
+             "icon_url": "https://osmsdataexplorer.com/data/current/images/skills/0000007.png"},
             {"id": 92000000, "name": "Knitting", "job_id": 9200, "job_tier": "Crafting", "max_level": 10}]"#;
         let Records::Skills(skills) = Records::parse("skills.json", json).unwrap() else { panic!() };
         assert_eq!(skills.len(), 1);
         assert_eq!(skills[0].required_skills, vec![SkillNeed { skill_id: 6, level: 3 }]);
         assert_eq!(skills[0].level_descriptions.len(), 2);
+        assert_eq!(skills[0].icon_url.as_deref(), Some("https://osmsdataexplorer.com/data/current/images/skills/0000007.png"));
     }
 
     #[test]
@@ -916,6 +1171,9 @@ mod tests {
         assert!(items[1].classes.is_empty() && items[1].req_level == 0);
         assert_eq!((items[2].description.as_deref(), items[2].untradable), (Some("Restores 5 HP."), true));
         assert!(items[3].quest_item);
+        assert_eq!(wand.icon_url.as_deref(), Some("https://example.invalid/w.png"));
+        assert_eq!(items[1].icon_url, None);
+        assert!(!serde_json::to_string(wand).unwrap().contains("http"), "the webview asks by id, not by address");
     }
 
     #[test]
@@ -937,7 +1195,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_what_a_monster_can_do_but_not_its_images() {
+    fn reads_what_a_monster_can_do_and_where_its_picture_is() {
         // A made-up monster in OSMS's shape.
         let json = br#"[
             {"id": 7, "name": "Moss Golem", "level": 30, "hp": 900, "mp": 40, "exp": 50, "is_boss": true, "aggro": true,
@@ -964,6 +1222,8 @@ mod tests {
         let times: Vec<_> = golem.spawns.iter().map(|s| s.respawn).collect();
         assert_eq!(times, [Some(3600), None, None, None]);
         assert_eq!(monsters[1].details, MonsterDetails::default());
+        assert_eq!(golem.icon_url.as_deref(), Some("https://example.invalid/i.png"));
+        assert_eq!(monsters[1].icon_url, None);
 
         let stored = serde_json::to_string(details).unwrap();
         assert!(!stored.contains("http"));

@@ -95,6 +95,12 @@ impl<'a> Wearer<'a> {
         item.kind == ItemKind::Equip && self.right_gender(item) && self.right_job(item) && self.strong_enough(item)
     }
 
+    /// Whether the job can wear it from this level on, stats aside: the level, job and gender
+    /// the game asks for. Gear plans go by this, so each piece shows at the level it asks for.
+    pub fn old_enough(&self, item: &ItemRecord) -> bool {
+        item.kind == ItemKind::Equip && self.right_gender(item) && self.right_job(item) && self.level >= item.req_level
+    }
+
     fn right_gender(&self, item: &ItemRecord) -> bool {
         match (&item.gender, &self.build.start.gender) {
             (Some(made_for), Some(gender)) => made_for == gender,

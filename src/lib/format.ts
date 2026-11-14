@@ -48,6 +48,18 @@ export function formatDuration(seconds: number | null | undefined): string {
   return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m`;
 }
 
+/**
+ * The clock time `seconds` from now, as the PC shows times: `9:42 PM`, with the day in front
+ * when it isn't today (`Sat 1:05 AM`). Empty past a week, where a time of day means nothing.
+ */
+export function formatClockIn(seconds: number | null | undefined, now = Date.now()): string {
+  if (seconds == null || !Number.isFinite(seconds) || seconds < 0 || seconds > 7 * 86400) return "";
+  const at = new Date(now + seconds * 1000);
+  const time = at.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const today = new Date(now).toDateString() === at.toDateString();
+  return today ? time : `${at.toLocaleDateString([], { weekday: "short" })} ${time}`;
+}
+
 /** How long ago something was, roughly: `just now`, `12m ago`, `3h ago`, `2d ago`. */
 export function formatAgo(seconds: number): string {
   const total = Math.max(0, Math.round(seconds));

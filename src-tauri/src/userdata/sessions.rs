@@ -186,7 +186,8 @@ impl UserData {
              WHERE session_id = ?1 ORDER BY active_seconds DESC",
         )?;
         let mut lines = self.conn.prepare(
-            "SELECT map, level, party, job, active_seconds, exp_gained, percent_gained, mesos_gained, mesos_seconds
+            "SELECT map, level, party, job, active_seconds, exp_gained, percent_gained, mesos_gained, mesos_seconds,
+                    kills, other_exp, deaths, exp_lost, gains_missed, fighter
              FROM session_lines WHERE session_id = ?1 ORDER BY active_seconds DESC",
         )?;
         let mut potions = self.all_session_potions()?;
@@ -208,6 +209,14 @@ impl UserData {
                         percent_gained: row.get(6)?,
                         mesos_gained: row.get(7)?,
                         mesos_seconds: row.get(8)?,
+                        kills: row.get(9)?,
+                        other_exp: row.get(10)?,
+                        deaths: row.get(11)?,
+                        exp_lost: row.get::<_, i64>(12)?.max(0) as u64,
+                        gains_missed: row.get(13)?,
+                        fighter: row
+                            .get::<_, Option<String>>(14)?
+                            .and_then(|json| serde_json::from_str(&json).ok()),
                     })
                 })?
                 .collect::<rusqlite::Result<_>>()?;
@@ -355,8 +364,9 @@ fn write_session(tx: &rusqlite::Transaction, id: i64, session: &SessionSummary, 
         let map = line.map.as_deref().map(renamed).transpose()?;
         tx.execute(
             "INSERT INTO session_lines (session_id, map, level, party, job, active_seconds, exp_gained,
-                                        percent_gained, mesos_gained, mesos_seconds)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                                        percent_gained, mesos_gained, mesos_seconds,
+                                        kills, other_exp, deaths, exp_lost, gains_missed, fighter)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
             params![
                 id,
                 map,
@@ -367,7 +377,13 @@ fn write_session(tx: &rusqlite::Transaction, id: i64, session: &SessionSummary, 
                 line.exp_gained,
                 line.percent_gained,
                 line.mesos_gained,
-                line.mesos_seconds
+                line.mesos_seconds,
+                line.kills,
+                line.other_exp,
+                line.deaths,
+                line.exp_lost as i64,
+                line.gains_missed,
+                line.fighter.as_ref().map(serde_json::Value::to_string)
             ],
         )?;
     }
@@ -460,9 +476,9 @@ mod tests {
     fn potions_typed_before_the_save_reach_the_saved_session() {
         use crate::userdata::potions::PotionSlot;
         let mut db = UserData::open_in_memory().unwrap();
-        db.set_potion_slots(&[PotionSlot { slot: 0, name: "White Potion".into(), price: 320 }]).unwrap();
+        db.set_potion_slots(None, &[PotionSlot { slot: 0, name: "White Potion".into(), price: 320 }]).unwrap();
         // Typed in the first minutes, while the session wasn't saved yet.
-        db.set_session_potion(1000.0, 1, Some(300), Some(250)).unwrap();
+        db.set_session_potion(None, 1000.0, 1, Some(300), Some(250)).unwrap();
         let id = db.save_session(&session(30.0, 6000, &[]), "", 1).unwrap();
         let saved = &db.sessions().unwrap()[0];
         assert_eq!((saved.potions.len(), saved.potion_cost), (1, 50 * 320));

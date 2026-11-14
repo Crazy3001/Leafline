@@ -2,6 +2,7 @@
   // The NPCs half of the Lookup tab: who is on this map, and a search of every NPC in the data by
   // name, quest or map.
   import { ArrowLeft, LoaderCircle } from "@lucide/svelte";
+  import { FilterBoxState } from "$lib/filterbox.svelte";
   import { untrack } from "svelte";
 
   import Chips from "./Chips.svelte";
@@ -13,7 +14,7 @@
   import Card from "../Card.svelte";
   import MapDataPanel from "../map/MapDataPanel.svelte";
   import { backend } from "$lib/api";
-  import { OSMS_CREDIT, OSMS_URL, mapData, watchMapData } from "$lib/mapdata.svelte";
+  import { mapData, watchMapData } from "$lib/mapdata.svelte";
   import { blankNpcQuery, npcView } from "$lib/places.svelte";
   import type { MapMatch, MapReading, NpcPage, NpcQuery, NpcRow } from "$lib/types";
 
@@ -37,11 +38,11 @@
 
   let regions = $state<string[]>([]);
   let areas = $state<string[]>([]);
-  let showFilters = $state(false);
+  const filterBox = new FilterBoxState("npcs");
   let page = $state<NpcPage | null>(null);
   let searching = $state(false);
 
-  const narrowed = $derived(query.region != null ? 1 : 0);
+  const narrowed = $derived([query.region, query.sort].filter((v) => v != null).length);
   const browsing = $derived(query.text.trim() !== "" || query.kind != null || query.area != null || narrowed > 0);
   const asked = $derived(JSON.stringify(query));
 
@@ -86,7 +87,6 @@
 
   function clear() {
     setQuery(blankNpcQuery());
-    showFilters = false;
   }
 
   const quests = (count: number) => (count ? `${count} quest${count === 1 ? "" : "s"}` : null);
@@ -110,7 +110,7 @@
       placeholder="NPC, a quest they give, or a map"
       label="Search NPCs"
       {narrowed}
-      bind:filters={showFilters}
+      bind:filters={filterBox.open}
       clearable={browsing || npcView.id != null}
       oninput={(text) => setQuery({ text })}
       onclear={clear}
@@ -119,13 +119,22 @@
       <KindTabs label="Kind of NPC" options={KINDS} value={query.kind} onselect={(kind) => setQuery({ kind })} />
       <Chips label="Area" options={areas} value={query.area} onselect={(area) => setQuery({ area })} />
     {/if}
-    {#if showFilters}
+    {#if filterBox.open}
       <FilterBox>
         <label>
           <span>Region</span>
           <select value={query.region ?? ""} onchange={(e) => setQuery({ region: e.currentTarget.value || null })}>
             <option value="">Any</option>
             {#each regions as region (region)}<option value={region}>{region}</option>{/each}
+          </select>
+        </label>
+        <label>
+          <span>Sort</span>
+          <select value={query.sort ?? ""} onchange={(e) => setQuery({ sort: e.currentTarget.value || null })}>
+            <option value="">Best match</option>
+            <option value="name">Name</option>
+            <option value="quests">Most quests</option>
+            <option value="map">Map</option>
           </select>
         </label>
       </FilterBox>
@@ -141,7 +150,7 @@
         <p class="heading">On this map</p>
         <ul class="rows">
           {#each here.card.npcs as npc (npc.id)}
-            <li><LookupRow name={npc.name} aside={quests(npc.quests.length)} onclick={() => (npcView.id = npc.id)} /></li>
+            <li><LookupRow name={npc.name} picture={{ kind: "npc", id: npc.id }} aside={quests(npc.quests.length)} onclick={() => (npcView.id = npc.id)} /></li>
           {/each}
         </ul>
         <p class="heading">Everyone</p>
@@ -152,14 +161,13 @@
           {#if !page.closest}<p class="count tabular">{page.total.toLocaleString()} {page.total === 1 ? "NPC" : "NPCs"}</p>{/if}
           <ul class="rows">
             {#each page.npcs as row (row.id)}
-              <li><LookupRow name={row.name} line={line(row)} aside={quests(row.quests)} onclick={() => (npcView.id = row.id)} /></li>
+              <li><LookupRow name={row.name} picture={{ kind: "npc", id: row.id }} line={line(row)} aside={quests(row.quests)} onclick={() => (npcView.id = row.id)} /></li>
             {/each}
           </ul>
           {#if page.npcs.length < page.total}<button class="back inline" onclick={more}>Show more</button>{/if}
         {:else}
           <p class="quiet">No NPCs match.</p>
         {/if}
-        <button class="credit" onclick={() => backend.openLink(OSMS_URL)}>{OSMS_CREDIT}</button>
       {:else if searching}
         <p class="quiet"><span class="spin"><LoaderCircle size={13} /></span> Searching…</p>
       {/if}
@@ -256,21 +264,4 @@
     }
   }
 
-  .credit {
-    display: block;
-    margin-top: 8px;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--faint);
-    font-size: var(--text-xs);
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .credit:hover,
-  .credit:focus-visible {
-    color: var(--muted);
-    outline: none;
-  }
 </style>

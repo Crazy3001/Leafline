@@ -1,20 +1,36 @@
 <script lang="ts">
   // A collapsible part of the map card. Opening or closing one is remembered by its title;
-  // until then `open` decides.
+  // until then `open` decides. Inside a link card every section starts folded, so the card opens
+  // as a short list of headings, every time: nothing opened in a card is remembered.
   import { ChevronRight } from "@lucide/svelte";
-  import type { Snippet } from "svelte";
+  import { getContext, type Snippet } from "svelte";
+
+  import { SECTION_SCOPE } from "$lib/peek.svelte";
 
   let {
     title,
     count,
     open: startOpen = true,
+    memory,
     aside,
     children,
-  }: { title: string; count?: number | string; open?: boolean; aside?: Snippet; children: Snippet } = $props();
+  }: {
+    title: string;
+    count?: number | string;
+    open?: boolean;
+    /** What the open state is remembered by, when the title alone would share it too widely. */
+    memory?: string;
+    aside?: Snippet;
+    children: Snippet;
+  } = $props();
+
+  const inCard = getContext(SECTION_SCOPE) === "card";
+  // svelte-ignore state_referenced_locally
+  const key = `leafline.section.${memory ?? title}`;
 
   function remembered() {
     try {
-      const value = localStorage.getItem(`leafline.section.${title}`);
+      const value = localStorage.getItem(key);
       return value === null ? null : value === "true";
     } catch {
       return null;
@@ -22,12 +38,13 @@
   }
 
   // svelte-ignore state_referenced_locally
-  let open = $state(remembered() ?? startOpen);
+  let open = $state(inCard ? false : (remembered() ?? startOpen));
 
   function toggle() {
     open = !open;
+    if (inCard) return;
     try {
-      localStorage.setItem(`leafline.section.${title}`, String(open));
+      localStorage.setItem(key, String(open));
     } catch {
       // A convenience only.
     }
@@ -57,14 +74,18 @@
     align-items: center;
     gap: 5px;
     width: 100%;
-    min-height: 26px;
-    padding: 3px 8px 3px 5px;
-    border: 0;
-    border-bottom: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    min-height: 28px;
+    padding: 3px 10px 3px 6px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
     background: var(--surface-2);
     cursor: pointer;
     text-align: left;
+    transition: background 0.12s ease;
+  }
+
+  .head:hover {
+    background: var(--surface-3);
   }
 
   .chevron {
@@ -79,8 +100,9 @@
 
   .title {
     font-family: var(--font-display);
-    font-size: var(--text-md);
+    font-size: var(--text-sm);
     font-weight: 600;
+    letter-spacing: 0.01em;
     color: var(--text);
   }
 
@@ -95,9 +117,9 @@
   }
 
   .count {
-    padding: 0 5px;
-    border-radius: var(--radius-sm);
-    background: rgba(255, 255, 255, 0.06);
+    padding: 0 7px;
+    border-radius: var(--radius-pill);
+    background: rgba(255, 255, 255, 0.07);
     font-size: var(--text-xs);
     color: var(--faint);
   }

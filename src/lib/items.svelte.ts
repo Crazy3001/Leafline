@@ -23,7 +23,7 @@ export const blankQuery = (): ItemQuery => ({
 });
 
 /** Which part of the Lookup tab is showing. */
-export const lookup = $state<{ mode: "items" | "monsters" | "maps" | "npcs" | "crafting" }>({ mode: "items" });
+export const lookup = $state<{ mode: "items" | "monsters" | "maps" | "npcs" | "skills" | "crafting" }>({ mode: "items" });
 
 const GENDER_KEY = "leafline.gear.gender";
 
@@ -36,12 +36,12 @@ function storedGender() {
 }
 
 /** Who the Equip list is for. Nothing here is set until the player changes it. */
-export const gearView = $state<{ forMe: boolean; level: number | null; job: number | null; gender: string | null; ahead: number }>({
+export const gearView = $state<{ forMe: boolean; level: number | null; job: number | null; gender: string | null; ahead: number | "all" }>({
   forMe: true,
   level: null,
   job: null,
   gender: storedGender(),
-  /** Levels past the character's own to look at. */
+  /** Levels past the character's own to look at, or `all` for gear of any level. */
   ahead: 0,
 });
 

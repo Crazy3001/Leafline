@@ -1,7 +1,9 @@
 <script lang="ts">
   // The Items half of the Lookup tab: the last item check, and a search of every item in the map
   // data. Search needs nothing from the game, so it works with live reading off.
+  import { clipped } from "$lib/tip.svelte";
   import { ArrowLeft, LoaderCircle } from "@lucide/svelte";
+  import { FilterBoxState } from "$lib/filterbox.svelte";
   import { untrack } from "svelte";
 
   import Card from "./Card.svelte";
@@ -12,9 +14,11 @@
   import SearchBar from "./lookup/SearchBar.svelte";
   import Chips from "./lookup/Chips.svelte";
   import MapDataPanel from "./map/MapDataPanel.svelte";
+  import TrackedItems from "./item/TrackedItems.svelte";
   import { backend } from "$lib/api";
+  import Pic from "$lib/ui/Pic.svelte";
   import { JOBS, blankQuery, gearView, gives, itemSlot, itemView, lastLine, watchItems } from "$lib/items.svelte";
-  import { OSMS_CREDIT, OSMS_URL, mapData, watchMapData } from "$lib/mapdata.svelte";
+  import { mapData, watchMapData } from "$lib/mapdata.svelte";
   import { live } from "$lib/readings.svelte";
   import { hotkey } from "$lib/settings.svelte";
   import type { ItemFilters, ItemKind, ItemPage, ItemRecord, ItemTooltip, MapReading } from "$lib/types";
@@ -55,7 +59,7 @@
   const query = $derived(itemView.query);
 
   let filters = $state<ItemFilters | null>(null);
-  let showFilters = $state(false);
+  const filterBox = new FilterBoxState("items");
   let page = $state<ItemPage | null>(null);
   let searching = $state(false);
   let record = $state<ItemRecord | null>(null);
@@ -132,7 +136,6 @@
   function clear() {
     itemView.query = blankQuery();
     itemView.id = null;
-    showFilters = false;
   }
 
   const number = (value: string) => (value === "" ? null : Math.max(0, Math.floor(Number(value) || 0)));
@@ -172,7 +175,7 @@
     placeholder="Search items"
     label="Search items"
     {narrowed}
-    bind:filters={showFilters}
+    bind:filters={filterBox.open}
     filterable={!finding}
     clearable={browsing || itemView.id != null}
     oninput={(text) => setQuery({ text })}
@@ -207,7 +210,7 @@
     {/if}
   {/if}
 
-  {#if showFilters && !finding}
+  {#if filterBox.open && !finding}
     <FilterBox>
       {#if slotted}
         <label>
@@ -231,23 +234,25 @@
         </label>
         <div class="levels">
           <span>Level</span>
-          <input class="tabular" type="number" min="0" aria-label="Lowest level" value={query.levelMin ?? ""} oninput={(e) => setQuery({ levelMin: number(e.currentTarget.value) })} />
+          <input class="tabular" type="number" min="0" placeholder="any" aria-label="Lowest level" value={query.levelMin ?? ""} oninput={(e) => setQuery({ levelMin: number(e.currentTarget.value) })} />
           <span class="to">to</span>
-          <input class="tabular" type="number" min="0" aria-label="Highest level" value={query.levelMax ?? ""} oninput={(e) => setQuery({ levelMax: number(e.currentTarget.value) })} />
+          <input class="tabular" type="number" min="0" placeholder="any" aria-label="Highest level" value={query.levelMax ?? ""} oninput={(e) => setQuery({ levelMax: number(e.currentTarget.value) })} />
         </div>
-        <label>
-          <span>Sort</span>
-          <select value={query.sort ?? ""} onchange={(e) => setQuery({ sort: e.currentTarget.value || null })}>
-            <option value="">Level</option>
-            <option value="name">Name</option>
-            {#each SORTS as label (label)}<option value={label}>Highest {label}</option>{/each}
-          </select>
-        </label>
         <label class="check">
           <input type="checkbox" checked={query.mine} onchange={(e) => setQuery({ mine: e.currentTarget.checked })} />
           <span>Only what my build can wear now</span>
         </label>
       {/if}
+      <label>
+        <span>Sort</span>
+        <select value={query.sort ?? ""} onchange={(e) => setQuery({ sort: e.currentTarget.value || null })}>
+          <option value="">{equipment ? "Level" : "Best match"}</option>
+          <option value="name">Name</option>
+          {#if equipment}
+            {#each SORTS as label (label)}<option value={label}>Highest {label}</option>{/each}
+          {/if}
+        </select>
+      </label>
     </FilterBox>
   {/if}
   </div>
@@ -272,9 +277,11 @@
         <ul class="results">
           {#each page.items as item (item.id)}
             <li>
-              <button onclick={() => (itemView.id = item.id)}>
-                <span class="row-name">{item.name}{#if gender(item)}<small>{gender(item)}</small>{/if}</span>
-                <span class="row-line">{line(item)}</span>
+              <button class="nav-row" onclick={() => (itemView.id = item.id)}>
+                <span class="row-name"
+                  ><Pic kind="item" id={item.id} size={18} class="row-pic" />{item.name}{#if gender(item)}<small>{gender(item)}</small>{/if}</span
+                >
+                <span use:clipped class="row-line">{line(item)}</span>
               </button>
             </li>
           {/each}
@@ -285,7 +292,6 @@
       {:else}
         <p class="quiet">No items match.</p>
       {/if}
-      <button class="credit" onclick={() => backend.openLink(OSMS_URL)}>{OSMS_CREDIT}</button>
     {:else if searching}
       <p class="quiet"><span class="spin"><LoaderCircle size={13} /></span> Searching…</p>
     {/if}
@@ -301,8 +307,10 @@
     {:else}
       <p class="empty">
         Search above, or hover an item in game and {hotkey("ReadItem") ? `press ${hotkey("ReadItem")}` : "use the Read item hotkey"} to check that copy.
+        Star an item with <strong>Track it</strong> to keep it in a list here, with who drops it and where.
       </p>
     {/each}
+    {#if ready}<TrackedItems {map} plain={pinned} />{/if}
   {/if}
 {/if}
 
@@ -363,8 +371,9 @@
     display: grid;
     gap: 1px;
     width: 100%;
-    padding: 5px 4px;
+    padding: 6px 24px 6px 6px;
     border: 0;
+    border-radius: var(--radius-sm);
     background: transparent;
     text-align: left;
     cursor: pointer;
@@ -374,6 +383,10 @@
   .results button:focus-visible {
     background: var(--surface-3);
     outline: none;
+  }
+
+  .row-name :global(.row-pic) {
+    margin-right: 6px;
   }
 
   .row-name {
@@ -445,21 +458,4 @@
     text-align: center;
   }
 
-  .credit {
-    display: block;
-    margin-top: 8px;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--faint);
-    font-size: var(--text-xs);
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .credit:hover,
-  .credit:focus-visible {
-    color: var(--muted);
-    outline: none;
-  }
 </style>

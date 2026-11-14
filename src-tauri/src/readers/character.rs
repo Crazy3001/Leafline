@@ -9,7 +9,7 @@
 //! names go through OCR, which reads that font well.
 
 use image::Rgba;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use super::digits;
 use super::hud::HudLayout;
@@ -25,6 +25,13 @@ const STAT_PITCH: f32 = 36.0;
 const STAT_LABELS: usize = 4;
 /// From the top of the STR label up to the top of the LEVEL label.
 const LEVEL_ABOVE_STR: f32 = 192.0;
+/// The HP, MP and FAME lines, likewise. EXP sits between MP and FAME.
+const HP_ABOVE_STR: f32 = 156.0;
+const MP_ABOVE_STR: f32 = 120.0;
+const FAME_ABOVE_STR: f32 = 48.0;
+/// The detail pane's lines under ATTACK: WEAPON DEF., MAGIC, MAGIC DEF., ACCURACY, EVASION,
+/// CRIT. RATE, CRIT. DAMAGE, SPEED and JUMP.
+const DETAIL_LINES: usize = 10;
 /// From a label's left edge to where its value can start, and how far values run.
 const VALUE_LEFT: f32 = 96.0;
 const VALUE_WIDTH: f32 = 170.0;
@@ -67,13 +74,43 @@ pub struct CharacterReading {
     pub detail: Option<DetailWindow>,
 }
 
-/// What the detail pane shows that the plans use.
+/// What the detail pane shows. Its lines stand in this order under ATTACK, one label pitch apart;
+/// a line that doesn't read is `None` and the others still count.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DetailWindow {
     /// The Attack line, `107 - 289`.
     pub attack_min: u32,
     pub attack_max: u32,
+    pub weapon_def: Option<u32>,
+    pub magic: Option<u32>,
+    pub magic_def: Option<u32>,
+    pub accuracy: Option<u32>,
+    pub evasion: Option<u32>,
+    /// Percentages, as the pane shows them: `26%` is 26.
+    pub crit_rate: Option<u32>,
+    pub crit_damage: Option<u32>,
+    pub speed: Option<u32>,
+    pub jump: Option<u32>,
+    /// What buffs add, as the pane shows it in red after a line: the `+14` of `90 (+14)`.
+    pub bonus: DetailBonus,
+    /// The Attack line is red: a buff is in it. The pane gives no share for the range.
+    pub attack_buffed: bool,
+}
+
+/// What buffs add to each line of the detail pane, as it shows them. Zero where it shows none.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct DetailBonus {
+    pub weapon_def: i32,
+    pub magic: i32,
+    pub magic_def: i32,
+    pub accuracy: i32,
+    pub evasion: i32,
+    pub crit_rate: i32,
+    pub crit_damage: i32,
+    pub speed: i32,
+    pub jump: i32,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
@@ -89,6 +126,11 @@ pub struct StatWindow {
     pub bonus: Bonus,
     /// Unspent AP.
     pub ability_points: u32,
+    /// The second half of the HP and MP lines, `1220/1220`. The first half moves with every blow,
+    /// so it isn't kept: a change to it would read the windows again for nothing.
+    pub max_hp: Option<u32>,
+    pub max_mp: Option<u32>,
+    pub fame: Option<u32>,
 }
 
 /// What worn gear adds to each stat.
@@ -243,6 +285,25 @@ fn is_ink(px: &Rgba<u8>) -> bool {
     px.0[..3].iter().all(|&c| c < 120)
 }
 
+/// The red the detail pane writes a line in when a buff adds to it.
+fn is_red(px: &Rgba<u8>) -> bool {
+    near(px, [255, 0, 0], 40)
+}
+
+/// The detail pane's values, black or red.
+fn is_value_ink(px: &Rgba<u8>) -> bool {
+    is_ink(px) || is_red(px)
+}
+
+/// A line counts as red with this many red pixels: one digit has more.
+const RED_LINE: usize = 20;
+
+fn red_in(view: &Frame, area: Rect) -> bool {
+    let (x, y, w, h) = area.to_pixels(view.width(), view.height());
+    let red = (y..y + h).flat_map(|row| (x..x + w).map(move |col| (col, row))).filter(|&(col, row)| is_red(view.get_pixel(col, row)));
+    red.count() >= RED_LINE
+}
+
 /// The STR, DEX, INT and LUK labels, top to bottom: four of a size, stacked at the right pitch.
 fn stat_labels(view: &Frame) -> Option<[Rect; STAT_LABELS]> {
     stacked_labels(view, is_stat_label, false)
@@ -252,26 +313,111 @@ fn stat_labels(view: &Frame) -> Option<[Rect; STAT_LABELS]> {
 /// With `broken`, the labels under the first may show only a sliver, since text across them
 /// splits their fill (the detail pane's do); the first must still be whole.
 fn stacked_labels(view: &Frame, is_label: fn(&Rgba<u8>) -> bool, broken: bool) -> Option<[Rect; STAT_LABELS]> {
-    let mut blocks = color::find_blocks(view, whole(view), MIN_LABEL_RUN, is_label);
-    blocks.retain(|b| b.h <= 36.0 && (broken || b.h >= 20.0));
-    blocks.sort_by(|a, b| a.y.total_cmp(&b.y));
+    let blocks = label_blocks(view, is_label, broken);
     blocks.iter().filter(|b| b.h >= 20.0).find_map(|first| {
-        let at = |i: usize| {
-            let y = first.y + i as f32 * STAT_PITCH;
-            blocks.iter().find(|b| (b.x - first.x).abs() <= SLACK && (b.y - y).abs() <= SLACK).copied()
-        };
+        let at = |i: usize| label_at(&blocks, first, i);
         Some([at(0)?, at(1)?, at(2)?, at(3)?])
     })
 }
 
-/// The Attack line of the detail pane: its blue labels stand four or more in a stack, ATTACK on top.
+/// Blocks of a label colour, of a label's size, top to bottom.
+fn label_blocks(view: &Frame, is_label: fn(&Rgba<u8>) -> bool, broken: bool) -> Vec<Rect> {
+    let mut blocks = color::find_blocks(view, whole(view), MIN_LABEL_RUN, is_label);
+    blocks.retain(|b| b.h <= 36.0 && (broken || b.h >= 20.0));
+    blocks.sort_by(|a, b| a.y.total_cmp(&b.y));
+    blocks
+}
+
+/// The label `i` pitches under `first`, when one stands there.
+fn label_at(blocks: &[Rect], first: &Rect, i: usize) -> Option<Rect> {
+    let y = first.y + i as f32 * STAT_PITCH;
+    blocks.iter().find(|b| (b.x - first.x).abs() <= SLACK && (b.y - y).abs() <= SLACK).copied()
+}
+
+/// The detail pane: its blue labels stand four or more in a stack, ATTACK on top. The Attack line
+/// must read; each line under it is read where its label stands. A buff turns a line red and adds
+/// what it gives in brackets, `90 (+14)`: the 90 is the value, the 14 its bonus.
 fn read_detail(view: &Frame) -> Option<DetailWindow> {
     let attack = stacked_labels(view, is_detail_label, true)?[0];
-    let (attack_min, attack_max) = range_in(
-        view,
-        Rect::new(attack.x + DETAIL_VALUE_LEFT, attack.y - 2.0, DETAIL_VALUE_WIDTH, attack.h + 4.0),
-    )?;
-    (attack_min <= attack_max).then_some(DetailWindow { attack_min, attack_max })
+    let blocks = label_blocks(view, is_detail_label, true);
+    let value_area = |label: &Rect| Rect::new(attack.x + DETAIL_VALUE_LEFT, label.y - 2.0, DETAIL_VALUE_WIDTH, attack.h + 4.0);
+    let (attack_min, attack_max) = range_in(view, value_area(&attack), is_value_ink)?;
+    if attack_min > attack_max {
+        return None;
+    }
+    let mut lines = (1..DETAIL_LINES).map(|i| {
+        // A label under a long value can be split by the text across it, so its top is taken from
+        // where it should be rather than from the sliver that shows.
+        let label = label_at(&blocks, &attack, i)?;
+        let area = value_area(&Rect::new(label.x, attack.y + i as f32 * STAT_PITCH, label.w, attack.h));
+        let value = only(numbers_in(view, area, is_value_ink))?;
+        let bonus = if red_in(view, area) { bracket_in(view, area).unwrap_or(0) } else { 0 };
+        Some((value, bonus))
+    });
+    let mut bonus = DetailBonus::default();
+    let mut next = |into: &mut i32| {
+        let (value, add) = lines.next().flatten()?;
+        *into = add;
+        Some(value)
+    };
+    Some(DetailWindow {
+        attack_min,
+        attack_max,
+        weapon_def: next(&mut bonus.weapon_def),
+        magic: next(&mut bonus.magic),
+        magic_def: next(&mut bonus.magic_def),
+        accuracy: next(&mut bonus.accuracy),
+        evasion: next(&mut bonus.evasion),
+        crit_rate: next(&mut bonus.crit_rate),
+        crit_damage: next(&mut bonus.crit_damage),
+        speed: next(&mut bonus.speed),
+        jump: next(&mut bonus.jump),
+        bonus,
+        attack_buffed: red_in(view, value_area(&attack)),
+    })
+}
+
+/// Runs of columns or rows with ink, each as its first and last.
+type Spans = Vec<(u32, u32)>;
+
+/// The ink columns of `area`, and the rows its first mark stands in, which a digit's are.
+fn digit_grid(view: &Frame, area: Rect, ink: fn(&Rgba<u8>) -> bool) -> Option<(Spans, (u32, u32))> {
+    let columns = ink_columns(view, area, ink);
+    let first = *columns.first()?;
+    let rows = ink_rows(view, Rect::new(first.0 as f32, area.y, (first.1 - first.0) as f32, area.h), ink)?;
+    Some((columns, rows))
+}
+
+/// The bonus in brackets after a value, `(+14)` or `(-40)`: the digits after the first gap, signed
+/// by the mark before them. A `-` is a bar a row or two tall; a `+` stands taller.
+fn bracket_in(view: &Frame, area: Rect) -> Option<i32> {
+    let (columns, rows) = digit_grid(view, area, is_value_ink)?;
+    let end = number_end(&columns);
+    let masks: Vec<Mask> = columns[end..].iter().map(|&cols| Mask::new(view, cols, rows, is_value_ink)).collect();
+    let start = masks.iter().position(|m| digits::window_digit(m).is_some())?;
+    let amount: i32 = masks[start..].iter().map_while(digits::window_digit).collect::<String>().parse().ok()?;
+    let sign = &masks[start.checked_sub(1)?];
+    let tall = (0..sign.height()).filter(|&y| (0..sign.width()).any(|x| sign.get(x, y))).count() as u32;
+    Some(if tall * 3 <= sign.height() { -amount } else { amount })
+}
+
+/// The numbers in `area` up to the first wide gap, each run of digits apart: `1220/1220` is two,
+/// `26%` is one. The digits' height comes from the first one, since slashes, brackets and signs
+/// run taller or lower. Empty when the first mark isn't a digit.
+fn numbers_in(view: &Frame, area: Rect, ink: fn(&Rgba<u8>) -> bool) -> Vec<u32> {
+    let Some((columns, rows)) = digit_grid(view, area, ink) else { return Vec::new() };
+    let end = number_end(&columns);
+    let mut numbers = Vec::new();
+    let mut run = String::new();
+    for &cols in &columns[..end] {
+        match digits::window_digit(&Mask::new(view, cols, rows, ink)) {
+            Some(digit) => run.push(digit),
+            None if run.is_empty() && numbers.is_empty() => return Vec::new(),
+            None => numbers.extend(std::mem::take(&mut run).parse::<u32>().ok()),
+        }
+    }
+    numbers.extend(run.parse::<u32>().ok());
+    numbers
 }
 
 fn read_stats(view: &Frame, labels: &[Rect; STAT_LABELS]) -> Option<StatWindow> {
@@ -291,7 +437,26 @@ fn read_stats(view: &Frame, labels: &[Rect; STAT_LABELS]) -> Option<StatWindow> 
         luk,
         bonus: Bonus { str: str_gear, dex: dex_gear, int: int_gear, luk: luk_gear },
         ability_points: number_in(view, Rect::new(luk_label.x + x, luk_label.y + y, w, h))?,
+        max_hp: maximum(numbers_in(view, row(str_label, str_label.y - HP_ABOVE_STR), is_ink)),
+        max_mp: maximum(numbers_in(view, row(str_label, str_label.y - MP_ABOVE_STR), is_ink)),
+        fame: only(numbers_in(view, row(str_label, str_label.y - FAME_ABOVE_STR), is_ink)),
     })
+}
+
+/// The number on a line that shows one; a line that reads as more is a misread.
+fn only(numbers: Vec<u32>) -> Option<u32> {
+    match numbers[..] {
+        [one] => Some(one),
+        _ => None,
+    }
+}
+
+/// The second of `now/most`, which can't be under the first.
+fn maximum(numbers: Vec<u32>) -> Option<u32> {
+    match numbers[..] {
+        [now, most] if now <= most && most > 0 => Some(most),
+        _ => None,
+    }
 }
 
 /// How many of `columns` make up the first number: it ends at the first gap wider than the space
@@ -327,33 +492,38 @@ fn stat_in(view: &Frame, area: Rect) -> Option<(u32, u32)> {
 fn number_in(view: &Frame, area: Rect) -> Option<u32> {
     let columns = ink_columns(view, area, is_ink);
     let end = number_end(&columns);
-    number_of(view, area, &columns[..end])
+    number_of(view, area, &columns[..end], is_ink)
 }
 
 /// A range such as `107 - 289`: two numbers with a dash between. The widest gap in the line is the
 /// one after the dash; the dash itself is a low mark that is left out of the first number.
-fn range_in(view: &Frame, area: Rect) -> Option<(u32, u32)> {
-    let columns = ink_columns(view, area, is_ink);
+fn range_in(view: &Frame, area: Rect, ink: fn(&Rgba<u8>) -> bool) -> Option<(u32, u32)> {
+    let mut columns = ink_columns(view, area, ink);
+    // A buff's bracket after the range is left out: the range is at most its first three words.
+    let gaps: Vec<usize> = (1..columns.len()).filter(|&i| columns[i].0 - columns[i - 1].1 > NUMBER_GAP).collect();
+    if let Some(&cut) = gaps.get(2) {
+        columns.truncate(cut);
+    }
     let split = (1..columns.len()).max_by_key(|&i| columns[i].0 - columns[i - 1].1)?;
     let (first, second) = columns.split_at(split);
     let height = |c: &(u32, u32)| {
-        ink_rows(view, Rect::new(c.0 as f32, area.y, (c.1 - c.0) as f32, area.h), is_ink).map_or(0, |(top, bottom)| bottom - top)
+        ink_rows(view, Rect::new(c.0 as f32, area.y, (c.1 - c.0) as f32, area.h), ink).map_or(0, |(top, bottom)| bottom - top)
     };
     let tallest = first.iter().map(height).max()?;
     let first = match first.split_last() {
         Some((dash, digits)) if !digits.is_empty() && height(dash) * 2 < tallest => digits,
         _ => first,
     };
-    Some((number_of(view, area, first)?, number_of(view, area, second)?))
+    Some((number_of(view, area, first, ink)?, number_of(view, area, second, ink)?))
 }
 
 /// The number the ink columns `digits` make up.
-fn number_of(view: &Frame, area: Rect, digits: &[(u32, u32)]) -> Option<u32> {
+fn number_of(view: &Frame, area: Rect, digits: &[(u32, u32)], ink: fn(&Rgba<u8>) -> bool) -> Option<u32> {
     // The digits' height comes from the digits alone: a bonus bracket beside them, as in
     // `30 (28+2)`, runs taller and would make every digit read the wrong size.
     let (left, right) = (digits.first()?.0, digits.last()?.1);
-    let rows = ink_rows(view, Rect::new(left as f32, area.y, (right - left) as f32, area.h), is_ink)?;
-    let masks: Vec<Mask> = digits.iter().map(|&cols| Mask::new(view, cols, rows, is_ink)).collect();
+    let rows = ink_rows(view, Rect::new(left as f32, area.y, (right - left) as f32, area.h), ink)?;
+    let masks: Vec<Mask> = digits.iter().map(|&cols| Mask::new(view, cols, rows, ink)).collect();
     digits::window_number(&masks)?.parse().ok()
 }
 
@@ -409,12 +579,16 @@ mod tests {
     }
 
     /// Draws made-up digits on the window font's grid, each two pixels to a dot.
-    fn draw(frame: &mut Frame, mut x: u32, y: u32, glyphs: &[(&[&str], u32)]) {
+    fn draw(frame: &mut Frame, x: u32, y: u32, glyphs: &[(&[&str], u32)]) {
+        draw_in(frame, x, y, glyphs, Rgba([0, 0, 0, 255]));
+    }
+
+    fn draw_in(frame: &mut Frame, mut x: u32, y: u32, glyphs: &[(&[&str], u32)], colour: Rgba<u8>) {
         for (rows, gap) in glyphs {
             for (dy, row) in rows.iter().enumerate() {
                 for (dx, dot) in row.chars().enumerate() {
                     if dot == '#' {
-                        fill(frame, (x + dx as u32 * 2, y + dy as u32 * 2, 2, 2), Rgba([0, 0, 0, 255]));
+                        fill(frame, (x + dx as u32 * 2, y + dy as u32 * 2, 2, 2), colour);
                     }
                 }
             }
@@ -503,6 +677,29 @@ mod tests {
         // The bracket is taller than the digits, which used to make the total unreadable.
         assert_eq!(number_in(&with_a_bonus(), area), Some(7));
         assert_eq!(stat_in(&with_a_bonus(), area), Some((17, 7)), "the 17 put in, not the total 7, and the 7 gear adds");
+    }
+
+    #[test]
+    fn a_red_line_is_its_value_and_what_buffs_add_in_brackets() {
+        const RED: Rgba<u8> = Rgba([255, 0, 0, 255]);
+        const MINUS: &[&str] = &[".....", ".....", ".....", "#####", ".....", ".....", ".....", ".....", "....."];
+        let line = |sign: &'static [&'static str]| {
+            let mut frame = Frame::from_pixel(140, 40, PAPER);
+            draw_in(&mut frame, 10, 10, &[(ONE, 8), (SEVEN, 10)], RED);
+            draw_in(&mut frame, 46, 8, &[(OPEN, 2)], RED);
+            draw_in(&mut frame, 54, 10, &[(sign, 4), (SEVEN, 4)], RED);
+            draw_in(&mut frame, 80, 8, &[(CLOSE, 0)], RED);
+            frame
+        };
+        let area = Rect::new(4.0, 4.0, 130.0, 30.0);
+        let plus = line(PLUS);
+        assert_eq!(numbers_in(&plus, area, is_value_ink), [17]);
+        assert!(red_in(&plus, area));
+        assert_eq!(bracket_in(&plus, area), Some(7));
+        assert_eq!(bracket_in(&line(MINUS), area), Some(-7));
+        // In black it is no buff, and the plain reading doesn't see red text at all.
+        assert!(!red_in(&with_a_bonus(), area));
+        assert!(numbers_in(&plus, area, is_ink).is_empty());
     }
 
     #[test]

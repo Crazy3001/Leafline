@@ -17,9 +17,10 @@ use tauri::{AppHandle, Emitter, Manager};
 use super::mapdata::MapDataState;
 use super::records::{self, HISTORY_EVENT, MESOS_EVENT, UserDataState};
 use super::builds;
+use super::fighter;
 use super::report;
 use super::settings::{self, SettingsState};
-use super::{overlay, pins, readings};
+use super::{overlay, pins, readings, recovery};
 use crate::capture::{self, Capturer, GameWindow, Grab};
 use crate::error::{Error, Result};
 use crate::mapdata::QuestTitles;
@@ -294,6 +295,7 @@ pub fn reset(app: &AppHandle) {
     if running(app) {
         app.state::<LiveState>().reset.store(true, Ordering::SeqCst);
     } else {
+        recovery::clear(app);
         readings::publish_session(app, &SessionSummary::default());
     }
 }
@@ -313,9 +315,31 @@ fn show_controls(app: &AppHandle) {
 struct Keeper {
     id: Option<i64>,
     saved_at: Option<Instant>,
+    /// When the tracker's state was last written for recovery.
+    checkpoint_at: Option<Instant>,
 }
 
 impl Keeper {
+    /// The keeper for a session that has just ended or been put aside: its recovery snapshot
+    /// goes, so the next start doesn't pick it up.
+    fn fresh(app: &AppHandle) -> Self {
+        recovery::clear(app);
+        Self::default()
+    }
+
+    /// Writes the tracker's state so a crash or a restart can carry on with it. Every half
+    /// minute with the save, or at once when `force`d.
+    fn checkpoint(&mut self, app: &AppHandle, tracker: &SessionTracker, force: bool) {
+        if !force && self.checkpoint_at.is_some_and(|at| at.elapsed() < SAVE_EVERY) {
+            return;
+        }
+        self.checkpoint_at = Some(Instant::now());
+        if tracker.summary().frames == 0 {
+            return;
+        }
+        recovery::write(app, self.id, tracker);
+    }
+
     fn due(&self) -> bool {
         self.saved_at.is_none_or(|at| at.elapsed() >= SAVE_EVERY)
     }
@@ -385,6 +409,40 @@ impl NameSnap {
         };
         // The first known name that fits closest, so a recorded name wins over one read today.
         self.known.iter().filter_map(|k| wrong(k).map(|n| (n, k))).min_by_key(|(n, _)| *n).map(|(_, k)| k)
+    }
+}
+
+/// How often the character snapshot and the map's estimate are worked out again while on one map.
+const FIGHTER_EVERY: Duration = Duration::from_secs(60);
+const PRIOR_EVERY: Duration = Duration::from_secs(300);
+
+/// Keeps the tracker supplied with what the estimates know: the character as they are (copied
+/// into each stretch of play, so later estimates can compare like with like) and an estimate of
+/// the pace on the map they are on, which the time to level starts from.
+#[derive(Default)]
+struct Estimates {
+    fighter_at: Option<Instant>,
+    prior_for: Option<(String, String)>,
+    prior_at: Option<Instant>,
+}
+
+impl Estimates {
+    fn follow(&mut self, app: &AppHandle, tracker: &mut SessionTracker, session: &SessionSummary) {
+        let Some(name) = session.name.clone() else { return };
+        let due = |at: Option<Instant>, every: Duration| at.is_none_or(|t| t.elapsed() >= every);
+        if due(self.fighter_at, FIGHTER_EVERY) {
+            self.fighter_at = Some(Instant::now());
+            let fighter = fighter::fighter(app, &name, session.level, &fighter::Choice::default());
+            tracker.set_fighter(fighter.and_then(|f| serde_json::to_value(f).ok()));
+        }
+        let Some(map) = tracker.current_map().map(str::to_string).filter(|_| !session.town) else { return };
+        let here = (name.clone(), map.clone());
+        if self.prior_for.as_ref() != Some(&here) || due(self.prior_at, PRIOR_EVERY) {
+            self.prior_for = Some(here);
+            self.prior_at = Some(Instant::now());
+            let prior = fighter::prior(app, &name, session.level, &map, session.started_at);
+            tracker.set_prior(&map, prior);
+        }
     }
 }
 
@@ -467,10 +525,23 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
         |idle_after| SessionTracker::new(TrackerConfig { confirmations: 2, idle_after, ..TrackerConfig::default() });
     let mut tracker = fresh_tracker(app.state::<SettingsState>().get().live.pause_after);
     let mut keeper = Keeper::default();
+    // A crash, a closed app or a restart within the break that ends a session carries on with
+    // the session that was going, so the rates and the log entry continue.
+    let mut resumed = false;
+    if let Some((saved, id)) = recovery::load(
+        app,
+        TrackerConfig { confirmations: 2, idle_after: choice_pause_after(app), ..TrackerConfig::default() },
+        BREAK_ENDS_SESSION.as_secs_f64(),
+    ) {
+        tracker = saved;
+        keeper.id = id;
+        resumed = true;
+    }
     let mut memory = MesoMemory::default();
     let mut titles = QuestTitles::default();
     let mut names = NameSnap::new(app.state::<UserDataState>().with(|db| db.character_names()).unwrap_or_default());
     let mut windows = Watch::default();
+    let mut estimates = Estimates::default();
     let mut twin = None;
     let mut held = false;
     let mut game: Option<(Capturer, GameWindow, bool)> = None;
@@ -480,7 +551,10 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
     let mut was_minimized = false;
     let mut frames = 0u64;
     // The session's active time when it last grew, and when that was.
-    let mut last_active = (0.0f64, Instant::now());
+    let mut last_active = (if resumed { tracker.summary().active_seconds } else { 0.0 }, Instant::now());
+    if resumed {
+        readings::publish_session(app, &tracker.summary());
+    }
     state.held.store(false, Ordering::SeqCst);
 
     while !state.stop.load(Ordering::SeqCst) {
@@ -493,7 +567,7 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
 
         if state.reset.swap(false, Ordering::SeqCst) {
             keeper.save(app, &tracker.summary());
-            keeper = Keeper::default();
+            keeper = Keeper::fresh(app);
             tracker = fresh_tracker(choice.pause_after);
             last_active = (0.0, Instant::now());
             held = false;
@@ -505,7 +579,7 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
         // this afternoon's.
         if !held && last_active.0 > 0.0 && last_active.1.elapsed() >= BREAK_ENDS_SESSION {
             keeper.save(app, &tracker.summary());
-            keeper = Keeper::default();
+            keeper = Keeper::fresh(app);
             tracker = fresh_tracker(choice.pause_after);
             last_active = (0.0, Instant::now());
             readings::publish_session(app, &tracker.summary());
@@ -584,6 +658,7 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
                     report::note(format!("Couldn't read the {part}"));
                 }
                 let mut town = false;
+                let mut kill_exp = Vec::new();
                 if let Some(map) = analysis.map.as_mut()
                     && let Some(atlas) = app.state::<MapDataState>().atlas()
                 {
@@ -601,6 +676,8 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
                     map.twin = twin;
                     if let Some(known) = atlas.settled(&map.name, map.street.as_deref()) {
                         town = atlas.is_town(known.id);
+                        // What a kill here is worth, to count kills and tell quest EXP apart.
+                        kill_exp = atlas.card(known.id).map(|c| c.mobs.iter().map(|m| m.exp).collect()).unwrap_or_default();
                         map.name = known.name;
                         map.street = known.street;
                     }
@@ -614,16 +691,20 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
                 let read_ms = started.elapsed().as_secs_f32() * 1000.0;
                 let mut sample = Sample::from_analysis(unix_seconds(SystemTime::now()), &analysis);
                 sample.town = town;
+                sample.kill_exp = kill_exp;
                 if !held {
                     if tracker.is_other_character(&sample) {
                         keeper.save(app, &tracker.summary());
-                        keeper = Keeper::default();
+                        keeper = Keeper::fresh(app);
                         tracker = fresh_tracker(choice.pause_after);
                         last_active = (0.0, Instant::now());
                     }
                     tracker.push(&sample);
                 }
                 let session = tracker.summary();
+                if !held {
+                    estimates.follow(app, &mut tracker, &session);
+                }
                 if session.active_seconds > last_active.0 {
                     last_active = (session.active_seconds, Instant::now());
                 }
@@ -633,6 +714,7 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
                 if keeper.due() {
                     keeper.save(app, &session);
                 }
+                keeper.checkpoint(app, &tracker, false);
                 memory.note(app, &session);
 
                 frames += 1;
@@ -669,7 +751,12 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
         pause(&state, tick, choice.interval);
     }
     keeper.save(app, &tracker.summary());
+    keeper.checkpoint(app, &tracker, true);
     Ok(())
+}
+
+fn choice_pause_after(app: &AppHandle) -> f64 {
+    app.state::<SettingsState>().get().live.pause_after
 }
 
 /// Sleeps until `interval` seconds after `tick`, waking early to stop.

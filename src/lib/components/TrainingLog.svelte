@@ -2,6 +2,8 @@
   // The training log: every saved session with its graph, rates per map by level and party, the
   // player's records per map by level, party size and job, and progress over days. Its own window opens from the Train tab, and the desk view can show it
   // in a column (embedded). Everything here stays on this PC.
+  import { clipped, tip } from "$lib/tip.svelte";
+  import Ref from "$lib/components/Ref.svelte";
   import { Download, PenLine, Share2 } from "@lucide/svelte";
   import { onMount, untrack } from "svelte";
 
@@ -19,6 +21,7 @@
   import { showMonsterNamed } from "$lib/monsters.svelte";
   import { showMapNamed } from "$lib/places.svelte";
   import { formatCompact, formatDuration, formatNumber, partyLabel, splitMapLabel } from "$lib/format";
+  import { characters as activeCharacter } from "$lib/characters.svelte";
   import { history, watchHistory } from "$lib/history.svelte";
   import { live, watchLive } from "$lib/readings.svelte";
   import { watchSettings } from "$lib/settings.svelte";
@@ -114,7 +117,7 @@
   // With more than one character, open on the one played last: a blend of two characters' levels
   // and maps reads as nonsense, so All is there to ask for.
   $effect(() => {
-    if (!characterChosen && characters.length > 1 && all[0]?.character) character = all[0].character;
+    if (!characterChosen && characters.length > 1) character = activeCharacter.viewing ?? (activeCharacter.all ? "" : (all[0]?.character ?? ""));
   });
   const since = $derived(range === "all" ? null : Date.now() / 1000 - Number(range) * 86400);
   const sessions = $derived(
@@ -367,7 +370,7 @@
               <button class="srow" aria-pressed={s.id === selected?.id} onclick={() => (selectedId = s.id)}>
                 <span class="tabular muted">{shortDay(s.startedAt ?? s.savedAt)}</span>
                 <span class="what">
-                  <span class="ellipsis">{title(s)}</span>
+                  <span use:clipped class="ellipsis">{title(s)}</span>
                   {#if levelText(s)}<span class="small">{levelText(s)}</span>{/if}
                 </span>
                 <span class="tabular r">{dur(s.activeSeconds)}</span>
@@ -415,7 +418,7 @@
               </div>
 
               <div class="panel">
-                <PotionCosts startedAt={s.startedAt} activeSeconds={s.activeSeconds} mesosPerHour={s.mesosPerHour} />
+                <PotionCosts startedAt={s.startedAt} activeSeconds={s.activeSeconds} mesosPerHour={s.mesosPerHour} character={s.character} />
               </div>
 
               <div class="panel chart">
@@ -484,11 +487,11 @@
                             {:else}
                               {#if l.map}
                                 {@const map = l.map}
-                                <button class="ref ref-map" onclick={() => showMapNamed(map)}>{splitMapLabel(map).name}</button>
+                                <Ref kind="map" name={map}>{splitMapLabel(map).name}</Ref>
                               {:else}Not placed on a map{/if}
                               {#if l.map}
                                 {@const map = l.map}
-                                <button class="pen" title="Rename" aria-label="Rename map" onclick={() => startRename(map)}
+                                <button class="pen" use:tip={"Rename"} aria-label="Rename map" onclick={() => startRename(map)}
                                   ><PenLine size={11} /></button
                                 >
                               {/if}
@@ -510,8 +513,8 @@
                     <ul class="drops">
                       {#each sessionDropRows as d (d.item + d.monster)}
                         <li>
-                          <span><button class="ref ref-item" onclick={() => showItemNamed(d.item)}>{d.item}</button></span>
-                          <span class="muted"><button class="ref ref-mob" onclick={() => showMonsterNamed(d.monster)}>{d.monster}</button>{d.count > 1 ? ` ×${d.count}` : ""}</span>
+                          <span><Ref kind="item" name={d.item} /></span>
+                          <span class="muted"><Ref kind="mob" name={d.monster} />{d.count > 1 ? ` ×${d.count}` : ""}</span>
                         </li>
                       {/each}
                     </ul>
@@ -632,7 +635,7 @@
                 <tbody>
                   {#each stats as m (m.map)}
                     <tr>
-                      <td><button class="ref ref-map" onclick={() => showMapNamed(m.map)}>{m.name}</button></td>
+                      <td><Ref kind="map" name={m.map}>{m.name}</Ref></td>
                       <td>{m.sessions}</td>
                       <td>{dur(m.activeSeconds)}</td>
                       <td>{formatCompact(m.expPerHour)}</td>
@@ -887,6 +890,7 @@
     gap: 10px;
     padding: var(--space-3);
     border: 1px solid var(--border);
+    border-radius: var(--radius);
     background: var(--surface);
   }
 
@@ -1183,6 +1187,7 @@
     gap: 4px;
     padding: var(--space-5);
     border: 1px solid var(--border);
+    border-radius: var(--radius);
     background: var(--surface);
     color: var(--muted);
   }

@@ -2,14 +2,18 @@
   // The build plan's part of the Character tab: what the plan says at the character's level. It
   // moves on with the level, and catches up with what was really spent whenever the stat and
   // skill windows are read. The level itself is shown once, in the character's header above.
+  import { clipped, tip } from "$lib/tip.svelte";
+  import Pic from "$lib/ui/Pic.svelte";
+  import Ref from "$lib/components/Ref.svelte";
   import { Check, ExternalLink, Pencil, Plus, RefreshCw, Search, X } from "@lucide/svelte";
   import { untrack } from "svelte";
 
   import AdvancementChecklist from "./AdvancementChecklist.svelte";
+  import CharacterStats from "./CharacterStats.svelte";
   import MapDataPanel from "./map/MapDataPanel.svelte";
   import { backend } from "$lib/api";
   import { STATS, buildState, statLabel, watchBuilds } from "$lib/builds.svelte";
-  import { OSMS_CREDIT, OSMS_URL, mapData, watchMapData } from "$lib/mapdata.svelte";
+  import { mapData, watchMapData } from "$lib/mapdata.svelte";
   import { gives } from "$lib/items.svelte";
   import { openPlanner } from "$lib/nav.svelte";
   import { display, keyHint } from "$lib/settings.svelte";
@@ -81,12 +85,13 @@
 
   // What to spend, the next job advancement and gear each get a view of their own, so the tab
   // stays short. The one last picked is remembered.
-  type View = "plan" | "advance" | "gear" | "skills";
+  type View = "plan" | "stats" | "advance" | "gear" | "skills";
   const VIEW_KEY = "leafline.build.view";
   let view = $state<View>(storedView());
   const canAdvance = $derived(!!nextAdvance?.advance && !!plan?.build.plan.job);
   const views = $derived([
     { id: "plan" as View, label: "Level up" },
+    { id: "stats" as View, label: "Stats" },
     { id: "gear" as View, label: "Gear" },
     { id: "skills" as View, label: "Skills" },
     ...(canAdvance ? [{ id: "advance" as View, label: "Job advance" }] : []),
@@ -305,7 +310,7 @@
   function storedView(): View {
     try {
       const saved = localStorage.getItem(VIEW_KEY);
-      return saved === "advance" || saved === "skills" ? saved : saved === "gear" || saved === "worn" ? "gear" : "plan";
+      return saved === "advance" || saved === "skills" || saved === "stats" ? saved : saved === "gear" || saved === "worn" ? "gear" : "plan";
     } catch {
       return "plan";
     }
@@ -332,25 +337,22 @@
             <div class="line">
               <span class="label">Wearing</span>
               {#if piece}
-                <button
-                  class="ref ref-item"
-                  class:upgraded={!!piece.upgrades}
-                  onclick={() => backend.showItem(piece.item, piece.item == null ? piece.name : null)}
-                  >{piece.name}{#if piece.upgrades}{` (+${piece.upgrades})`}{/if}</button
+                <Ref kind="item" id={piece.item} name={piece.name} class={piece.upgrades ? "upgraded" : ""}
+                  >{piece.name}{#if piece.upgrades}{` (+${piece.upgrades})`}{/if}</Ref
                 >
                 <span class="end">
-                  {#if piece.level != null}<span class="lv tabular" class:good={row.wearingFit?.ok} class:bad={row.wearingFit && !row.wearingFit.ok} title={fitTitle(row.wearingFit)}
+                  {#if piece.level != null}<span class="lv tabular" class:good={row.wearingFit?.ok} class:bad={row.wearingFit && !row.wearingFit.ok} use:tip={fitTitle(row.wearingFit)}
                       >{piece.level ? `Lv ${piece.level}` : "Any level"}</span
                     >{/if}
-                  <button class="remove" title="Edit" aria-label="Edit {piece.name}" onclick={() => startEdit(piece)}
+                  <button class="remove" use:tip={"Edit"} aria-label="Edit {piece.name}" onclick={() => startEdit(piece)}
                     ><Pencil size={11} /></button
                   >
-                  <button class="remove" title="Take it off" aria-label="Take off {piece.name}" onclick={() => removePiece(piece.id)}
+                  <button class="remove" use:tip={"Take it off"} aria-label="Take off {piece.name}" onclick={() => removePiece(piece.id)}
                     ><X size={12} /></button
                   >
                 </span>
               {:else}
-                <span class="none">Nothing added</span>
+                <span class="none">Nothing worn</span>
               {/if}
             </div>
             {#if piece && editing?.id === piece.id}
@@ -435,8 +437,8 @@
       {#each group.rows as skill (skill.id)}
         {@const max = skill.max ?? Math.max(skill.goal, skill.level, 1)}
         {@const done = isMaxed(skill)}
-        <li class:done title={skill.description ?? undefined}>
-          <span class="skill-name">{skill.name}</span>
+        <li class:done use:tip={skill.description ?? undefined}>
+          <span class="skill-name"><Ref kind="skill" id={skill.id} name={skill.name} /></span>
           <span class="skill-level tabular">
             {#if done}<span class="max">MAX</span>{:else}<b>{skillsRead ? skill.level : "—"}</b><span class="faint"> / {max}</span>{/if}
           </span>
@@ -473,7 +475,7 @@
         {#if step.advance}<p class="advance">{step.advance}</p>{/if}
         {#each step.sp as gain (gain.skillId)}
           <p>
-            <span class="tag">{gain.to - gain.from} SP</span>{gain.name}
+            <span class="tag">{gain.to - gain.from} SP</span><Ref kind="skill" id={gain.skillId} name={gain.name} />
             <span class="tabular dim">{gain.from} → {gain.to}</span>
           </p>
         {/each}
@@ -491,7 +493,7 @@
     <section class="build" aria-label="Build plan">
       <header class="head">
         <span class="title">Build</span>
-        <span class="plan" title={plan.build.name}>{plan.build.name}</span>
+        <span class="plan" use:clipped>{plan.build.name}</span>
       </header>
       {@render todo(step)}
       {#if advance}
@@ -504,21 +506,18 @@
           {warnings.length === 1 ? "1 thing to fix" : `${warnings.length} things to fix`} in this plan
         </button>
       {/if}
-      <footer>
-        <button class="credit" onclick={() => backend.openLink(OSMS_URL)}>{OSMS_CREDIT}</button>
-      </footer>
     </section>
   {/if}
 {:else}
 <section class="build full" aria-label="Build plan">
   <header class="head strip">
     <span class="title strip-title">Build</span>
-    {#if plan && step}<span class="plan" title={plan.build.name}>{plan.build.name}</span>{/if}
+    {#if plan && step}<span class="plan" use:clipped>{plan.build.name}</span>{/if}
     {#if plan && step}
       <span class="tools">
         <button
           class="link"
-          title="Read your Character Stat and Skill windows{keyHint('ReadCharacter')}"
+          use:tip={`Read your Character Stat and Skill windows${keyHint('ReadCharacter')}`}
           onclick={() => backend.readCharacter()}><RefreshCw size={12} />Read stats</button
         >
         <button class="link" onclick={() => openPlanner()}><Pencil size={12} />Edit</button>
@@ -529,6 +528,8 @@
   {#if !ready}
     <p class="lead">Plan your AP and SP level by level. Builds use the skills and equipment in the map data.</p>
     <MapDataPanel compact />
+    <h4 class="sub">Stats</h4>
+    <CharacterStats {character} />
   {:else if error}
     <p class="lead">{error}</p>
   {:else if loaded && !plan}
@@ -537,6 +538,8 @@
       level by level.
     </p>
     <button class="action" onclick={() => openPlanner()}><Pencil size={13} />Plan a build</button>
+    <h4 class="sub">Stats</h4>
+    <CharacterStats {character} />
   {:else if plan && step}
     <div class="views"><Segmented label="Build view" options={views} value={shown} stretch size="sm" onchange={pickView} /></div>
     {#if shown === "plan"}
@@ -554,9 +557,14 @@
         <div>
           <dt>{stat.label}</dt>
           <dd class="tabular">
-            {statsKnown ? step.stats[stat.id] : "—"}
             {#if statsKnown && gearBonus?.[stat.id]}
-              <span class="gear" title="What your gear adds, as the Character Stat window last showed it">+{gearBonus[stat.id]}</span>
+              <!-- The total the game shows, then what you put in and what your gear adds. -->
+              {step.stats[stat.id] + gearBonus[stat.id]}
+              <span class="gear" use:tip={"Points you put in, plus what your gear adds as the Character Stat window last showed it"}
+                >({step.stats[stat.id]}+{gearBonus[stat.id]})</span
+              >
+            {:else}
+              {statsKnown ? step.stats[stat.id] : "—"}
             {/if}
           </dd>
         </div>
@@ -572,9 +580,9 @@
               <span class="what">
                 {#if s.advance}<span class="advance">{s.advance}</span>{/if}
                 <!-- What the level adds, then the total it makes: "Double Stab +3 (4)". -->
-                {#each s.sp as gain (gain.skillId)}<span>{gain.name} <span class="tabular">+{gain.to - gain.from}</span> <span class="total tabular">({gain.to})</span></span>{/each}
+                {#each s.sp as gain (gain.skillId)}<span><Ref kind="skill" id={gain.skillId} name={gain.name} /> <span class="tabular">+{gain.to - gain.from}</span> <span class="total tabular">({gain.to})</span></span>{/each}
                 {#each s.ap as gain (gain.stat)}<span>{statLabel(gain.stat)} <span class="tabular">+{gain.amount}</span> <span class="total tabular">({gain.total})</span></span>{/each}
-                {#each s.gear as name (name)}<button class="ref ref-item" onclick={() => backend.showItem(null, name)}>{name}</button>{/each}
+                {#each s.gear as name (name)}<Ref kind="item" name={name} />{/each}
               </span>
             </li>
           {/each}
@@ -588,9 +596,7 @@
           <li>
             <span class="when tabular">Lv {nextGear.level}</span>
             <span class="what"
-              ><span>New gear:</span>{#each nextGear.gear as name (name)}<button class="ref ref-item" onclick={() => backend.showItem(null, name)}
-                  >{name}</button
-                >{/each}</span
+              ><span>New gear:</span>{#each nextGear.gear as name (name)}<Ref kind="item" {name} />{/each}</span
             >
           </li>
         {/if}
@@ -623,6 +629,8 @@
       />
     {:else if shown === "skills"}
     {@render skillsView()}
+    {:else if shown === "stats"}
+    <CharacterStats character={character ?? plan.build.character ?? null} showRead={false} />
     {:else}
     <!--
       Gear slot by slot, as the equip window has it: what you wear (its own stats, scrolls and all,
@@ -645,20 +653,20 @@
               {@const pick = row.suggested}
               <div class="line">
                 <span class="label">Suggested</span>
-                <button class="ref ref-item" onclick={() => backend.showItem(pick.id, null)}>{pick.name}</button>
+                <Ref kind="item" id={pick.id} name={pick.name} />
                 <span class="end">
-                  <span class="lv tabular" class:good={row.suggestedFit?.ok} class:bad={row.suggestedFit && !row.suggestedFit.ok} title={fitTitle(row.suggestedFit)}
+                  <span class="lv tabular" class:good={row.suggestedFit?.ok} class:bad={row.suggestedFit && !row.suggestedFit.ok} use:tip={fitTitle(row.suggestedFit)}
                     >{pick.reqLevel ? `Lv ${pick.reqLevel}` : "Any level"}</span
                   >
                   {#if row.suggestedPlanned}
                     <button
                       class="remove"
-                      title="Remove goal"
+                      use:tip={"Remove goal"}
                       aria-label="Stop aiming for {pick.name}"
                       onclick={() => setGoal(pick.id, false)}><X size={12} /></button
                     >
                   {:else}
-                    <button class="remove" title="Aim for this" aria-label="Aim for {pick.name}" onclick={() => setGoal(pick.id, true)}
+                    <button class="remove" use:tip={"Aim for this"} aria-label="Aim for {pick.name}" onclick={() => setGoal(pick.id, true)}
                       ><Plus size={12} /></button
                     >
                   {/if}
@@ -667,42 +675,40 @@
               <p class="piece-line">{gives(pick, 3)}</p>
             {/if}
 
+            {#if row.next}
+            {@const next = row.next}
             <div class="line">
               <span class="label">Next</span>
-              {#if row.next}
-                {@const next = row.next}
-                <button class="ref ref-item" onclick={() => backend.showItem(next.item.id, null)}>{next.item.name}</button>
+                <Ref kind="item" id={next.item.id} name={next.item.name} />
                 <span class="end">
                   <span
                     class="lv tabular"
                     class:warn={next.level == null}
                     class:good={next.level != null && row.nextFit?.ok}
                     class:bad={next.level != null && row.nextFit && !row.nextFit.ok}
-                    title={fitTitle(row.nextFit)}
+                    use:tip={fitTitle(row.nextFit)}
                   >
                     {#if next.level == null}Out of reach{:else}Lv {next.level}{/if}
                   </span>
                   {#if row.planned}
                     <button
                       class="remove"
-                      title="Remove goal"
+                      use:tip={"Remove goal"}
                       aria-label="Stop aiming for {next.item.name}"
                       onclick={() => setGoal(next.item.id, false)}><X size={12} /></button
                     >
                   {:else}
-                    <button class="remove" title="Aim for this" aria-label="Aim for {next.item.name}" onclick={() => setGoal(next.item.id, true)}
+                    <button class="remove" use:tip={"Aim for this"} aria-label="Aim for {next.item.name}" onclick={() => setGoal(next.item.id, true)}
                       ><Plus size={12} /></button
                     >
                   {/if}
                 </span>
-              {:else}
-                <span class="none">Nothing better later in this plan</span>
-              {/if}
             </div>
+            {/if}
             {#if row.next}
               <p class="piece-line">
                 {gives(row.next.item as ItemRecord, 3)}{#if row.later}<span class="sep">{" · "}</span><button class="link later" onclick={() => openPlanner()}
-                    >{row.later} more planned after it</button
+                    >{row.later} more {row.later === 1 ? "step" : "steps"} after it</button
                   >{/if}
               </p>
             {/if}
@@ -723,7 +729,6 @@
       {#if plan.build.guide}
         <button class="credit" onclick={() => backend.openGuide(plan!.build.guide)}><ExternalLink size={11} />Open guide</button>
       {/if}
-      <button class="credit" onclick={() => backend.openLink(OSMS_URL)}>{OSMS_CREDIT}</button>
     </footer>
   {/if}
 </section>
@@ -763,7 +768,7 @@
 
   .head.strip {
     align-items: center;
-    margin: 0 -12px 10px;
+    margin: 0 0 10px;
   }
 
   .head.strip .title {
@@ -923,7 +928,7 @@
   /* What gear adds, beside the stat: shown, never part of the plan's count. */
   dd .gear {
     margin-left: 4px;
-    color: var(--good);
+    color: var(--muted);
     font-size: var(--text-xs);
     font-weight: 500;
   }
@@ -1036,7 +1041,7 @@
     font-size: var(--text-xs);
   }
 
-  .line .ref {
+  .line :global(.ref) {
     min-width: 0;
     padding: 0;
     border: 0;
@@ -1048,7 +1053,7 @@
   }
 
   /* Scrolled, in the game's amber, as the item check shows it. */
-  .line .ref.upgraded {
+  .line :global(.ref.upgraded) {
     color: var(--accent-strong);
   }
 
@@ -1285,6 +1290,10 @@
   }
 
   .skill-name {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1391,5 +1400,10 @@
   .credit:focus-visible {
     color: var(--muted);
     outline: none;
+  }
+
+  /* The picture of a skill, in line with its name. */
+  :global(.skill-pic) {
+    margin-right: 4px;
   }
 </style>

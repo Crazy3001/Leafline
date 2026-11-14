@@ -228,6 +228,7 @@ export function sampleDrops(monsters: string[]): MonsterDrops[] {
               sampleDrops: 82,
               gameVersion: "0.1.0",
               quest: false,
+              itemId: null, itemType: null, reqLevel: null,
             },
             {
               item: `${monster.split(" ").pop()} Fragment`,
@@ -241,6 +242,7 @@ export function sampleDrops(monsters: string[]): MonsterDrops[] {
               sampleDrops: 53,
               gameVersion: "0.1.0",
               quest: false,
+              itemId: null, itemType: "Monster loot", reqLevel: null,
             },
             {
               item: "Green Tonic",
@@ -254,6 +256,7 @@ export function sampleDrops(monsters: string[]): MonsterDrops[] {
               sampleDrops: 3,
               gameVersion: "0.1.0",
               quest: false,
+              itemId: 2000001, itemType: "Potions", reqLevel: null,
             },
             {
               item: "Fern Ribbon",
@@ -267,6 +270,7 @@ export function sampleDrops(monsters: string[]): MonsterDrops[] {
               sampleDrops: null,
               gameVersion: null,
               quest: false,
+              itemId: 1002001, itemType: "Hat", reqLevel: 15,
             },
           ],
   }));
@@ -320,7 +324,8 @@ export function sampleGuide(quests: QuestQuery[], from: number | null, hasDrops:
             }
           : null,
       objectives: q.objectives.map((target): ObjectiveGuide => {
-        if (!ITEMISH.test(target)) return { target, kind: "monster", item: null, lookedUp: false, hunts: [hunt(11, from, null)] };
+        if (!ITEMISH.test(target))
+          return { target, kind: "monster", item: null, lookedUp: false, hunts: [hunt(11, from, null)], shops: [] };
         const logged = hasDrops && !UNLOGGED.test(target);
         return {
           target,
@@ -328,6 +333,10 @@ export function sampleGuide(quests: QuestQuery[], from: number | null, hasDrops:
           item: logged ? target : null,
           lookedUp: hasDrops,
           hunts: logged ? [hunt(12, from, 47.5), hunt(11, from, 6.2)] : [],
+          // A made-up shop, so the "buy it instead" line shows in the browser preview.
+          shops: logged
+            ? [{ npc: "Innkeeper Bo", npcId: 51, role: "Grocer", map: ref(5), mapName: "Mossbank Inn", hops: from == null ? null : 2, price: 12, needs: null, seen: "2026-11-10" }]
+            : [],
         };
       }),
     })),
@@ -462,6 +471,7 @@ export function sampleMonsterSheet(id: number, from: number | null, hasDrops: bo
     undead,
     details,
     respawn: boss ? 3600 : null,
+    expRank: boss || !exp ? null : { place: 1 + bestiary.filter((m) => !m.boss && m.exp && m.hp / m.exp < hp / exp).length, of: bestiary.filter((m) => !m.boss && m.exp).length },
     maps,
     quests:
       id === 11

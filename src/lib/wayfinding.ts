@@ -13,9 +13,18 @@ const verbs: Record<Direction, string> = {
 };
 const sides: Record<Side, string> = { left: "Left portal", centre: "Middle portal", right: "Right portal" };
 
+/** What to do at a hidden portal: the game draws nothing there, so the spot has to be found. */
+export const HIDDEN_PORTAL_HINT = "hidden portal: stand on the spot and press ↑";
+
 /** What to take for a portal step: its side when the data places it, otherwise its direction. */
 export function stepVerb(step: RouteStep): string {
   return step.side ? sides[step.side] : verbs[step.direction];
+}
+
+/** Rough walking time: under a minute in tens of seconds, then whole minutes. */
+export function walkTime(seconds: number): string {
+  if (seconds < 60) return `${Math.max(10, Math.round(seconds / 10) * 10)} s`;
+  return `${Math.round(seconds / 60)} min`;
 }
 
 /**

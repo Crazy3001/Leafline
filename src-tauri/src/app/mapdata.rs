@@ -9,12 +9,18 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State, Url};
 use tauri_plugin_opener::OpenerExt;
 
+use super::fighter::{self, Choice};
 use super::settings::SettingsState;
 use super::{overlay, pins};
+use crate::mapdata::combat::{Fighter, Fit};
+use crate::mapdata::training::EstimateCheck;
 use crate::build::Catalog;
+use crate::build::catalog::item_group;
+use crate::mapdata::osms::ItemKind;
 use crate::error::{Error, Result};
 use crate::mapdata::fetch::{self, Http};
 use crate::mapdata::osms::Dataset;
+use crate::mapdata::pictures::PictureIndex;
 use crate::mapdata::layout::{self, Layouts};
 use crate::mapdata::store::{DROPS_FAILED, LAYOUTS_FAILED, TURN_INS_FAILED};
 use crate::mapdata::{
@@ -69,6 +75,8 @@ pub struct MapDataState {
     path: PathBuf,
     atlas: RwLock<Option<Arc<Atlas>>>,
     catalog: RwLock<Option<Arc<Catalog>>>,
+    /// Where each picture the data names is published, for the picture protocol.
+    pictures: RwLock<Arc<PictureIndex>>,
     /// Every map's layout, from Leafline's data repository. Empty until downloaded.
     layouts: RwLock<Arc<Layouts>>,
     downloading: AtomicBool,
@@ -84,8 +92,14 @@ impl MapDataState {
     pub fn load(app: &AppHandle) -> Result<Self> {
         let path = app.path().app_data_dir()?.join(FILE_NAME);
         // A damaged cache must not stop the app; downloading again rebuilds it.
+        let mut pictures = PictureIndex::default();
         let (atlas, catalog) = match Store::open(&path).and_then(|store| store.load()) {
-            Ok(data) => data.map(split).unzip(),
+            Ok(data) => {
+                if let Some(data) = &data {
+                    pictures = PictureIndex::new(data);
+                }
+                data.map(split).unzip()
+            }
             Err(err) => {
                 eprintln!("map data cache unreadable: {err}");
                 (None, None)
@@ -96,6 +110,7 @@ impl MapDataState {
             path,
             atlas: RwLock::new(atlas),
             catalog: RwLock::new(catalog),
+            pictures: RwLock::new(Arc::new(pictures)),
             layouts: RwLock::new(Arc::new(layouts)),
             downloading: AtomicBool::new(false),
             osms: Http::new(Duration::from_millis(250)),
@@ -122,6 +137,15 @@ impl MapDataState {
         self.atlas.read().expect("atlas lock").clone()
     }
 
+    /// A map's portals, NPCs and spawn points, read from the cache when asked.
+    pub(super) fn map_points(&self, id: u32) -> Result<Vec<crate::mapdata::osms::MapPoint>> {
+        Store::open(&self.path)?.map_points(id)
+    }
+
+    pub(super) fn pictures(&self) -> Arc<PictureIndex> {
+        self.pictures.read().expect("pictures lock").clone()
+    }
+
     pub(super) fn catalog(&self) -> Option<Arc<Catalog>> {
         self.catalog.read().expect("catalog lock").clone()
     }
@@ -134,7 +158,11 @@ impl MapDataState {
             let mut store = Store::open(&self.path)?;
             let report = fetch::refresh(&mut store, &self.osms, force, now())?;
             if !report.downloaded.is_empty() || self.atlas().is_none() {
-                let (atlas, catalog) = store.load()?.map(split).unzip();
+                let data = store.load()?;
+                if let Some(data) = &data {
+                    *self.pictures.write().expect("pictures lock") = Arc::new(PictureIndex::new(data));
+                }
+                let (atlas, catalog) = data.map(split).unzip();
                 *self.atlas.write().expect("atlas lock") = atlas;
                 *self.catalog.write().expect("catalog lock") = catalog;
             }
@@ -292,12 +320,14 @@ pub struct RouteInfo {
     walk_seconds: Option<f64>,
 }
 
-/// The fewest steps between two maps, through portals and any travel the player turned on.
+/// The quickest way between two maps, through portals and any travel the player turned on,
+/// timed by the walk between portals. Where the data doesn't place every portal on the way, the
+/// map layouts give a rougher time.
 #[tauri::command]
 pub fn map_route(app: AppHandle, state: State<MapDataState>, from: u32, to: u32) -> Option<RouteInfo> {
     let atlas = state.atlas()?;
     let route = atlas.route_with(from, to, &travel(&app, &atlas))?;
-    let walk_seconds = layout::route_walk_seconds(&route, &state.layouts());
+    let walk_seconds = route.walk_seconds.or_else(|| layout::route_walk_seconds(&route, &state.layouts()));
     Some(RouteInfo { route, walk_seconds })
 }
 
@@ -333,10 +363,10 @@ fn travel_file(app: &AppHandle) -> (Option<TravelFile>, TravelOrigin, Option<Str
 /// The rides and scrolls the player turned on in Settings, found in the map data.
 fn travel(app: &AppHandle, atlas: &Atlas) -> Travel {
     let choice = app.state::<SettingsState>().get().travel;
-    match travel_file(app).0 {
-        Some(file) if choice.enabled => atlas.travel(&file, choice).0,
-        _ => Travel::none(),
-    }
+    // NPC rides are always in: some maps can't be reached without one. Taxis and scrolls wait
+    // for the player's switch, which `choice` checks for each ride.
+    let file = travel_file(app).0.unwrap_or_else(TravelFile::empty).with_known_rides();
+    atlas.travel(&file, choice).0
 }
 
 #[derive(Serialize)]
@@ -405,7 +435,23 @@ pub async fn monster_drops(app: AppHandle, monsters: Vec<String>) -> Result<Vec<
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<MapDataState>();
         state.refresh_drops()?;
-        Store::open(&state.path)?.drops(&monsters)
+        let mut drops = Store::open(&state.path)?.drops(&monsters)?;
+        // The drop list files everything as `etc`; the item data knows each item's kind, so the
+        // lists can group equips, use items and the rest.
+        if let Some(catalog) = state.catalog() {
+            for drop in drops.iter_mut().flat_map(|m| m.drops.iter_mut()) {
+                if let Some(item) = catalog.item_called(&drop.item) {
+                    drop.category = Some(item.kind.name().to_string());
+                    drop.item_id = Some(item.id);
+                    drop.item_type = item_group(item).map(str::to_string).or_else(|| match item.kind {
+                        ItemKind::Scroll => Some("Scroll".into()),
+                        _ => Some(item.weapon_type.clone().unwrap_or_else(|| item.slot.clone())),
+                    });
+                    drop.req_level = Some(item.req_level).filter(|&l| l > 0);
+                }
+            }
+        }
+        Ok(drops)
     })
     .await
     .map_err(|err| Error::Invalid(err.to_string()))?
@@ -706,13 +752,18 @@ pub struct Spots {
     /// How fast the player gets through monster HP, behind every estimate. None until enough
     /// solo play is saved.
     speed: Option<KillSpeed>,
+    /// The character as the combat model sees them, and how its tuning fits their play. None
+    /// until their attack range (or a spell) has been read or typed.
+    fighter: Option<Fighter>,
+    fit: Option<Fit>,
     spots: Vec<TrainingSpot>,
 }
 
 /// Every map with monsters to hunt, for the training spot finder, with the EXP per hour the
-/// player measured on each and an estimate from their kill speed for the rest. `level` is the
-/// character's; `assumptions` what the player set for respawn time and EXP rate. `None` until
-/// map data has been downloaded.
+/// player measured on each and an estimate for the rest: from the combat model when the
+/// character's damage is known, else from their kill speed. `level` is the character's;
+/// `assumptions` what the player set for respawn time and EXP rate; `character` whose read
+/// stats to use and `skill` the skill picked. `None` until map data has been downloaded.
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
 pub fn training_spots(
@@ -724,19 +775,46 @@ pub fn training_spots(
     measured: Vec<MeasuredRate>,
     level: Option<u32>,
     assumptions: Option<Assumptions>,
+    character: Option<String>,
+    skill: Option<String>,
 ) -> Option<Spots> {
     let atlas = state.atlas()?;
     let from = map_name.and_then(|name| atlas.find_twin(&name, map_street.as_deref(), map_twin)).map(|m| m.card.map);
     let layouts = state.layouts();
-    let estimator = atlas.estimator(&measured, level, assumptions.unwrap_or_default(), &layouts);
+    let assumptions = assumptions.unwrap_or_default();
+    let estimator = atlas.estimator(&measured, level, assumptions, &layouts);
+    let choice = Choice { assumptions: Some(&assumptions), skill: skill.as_deref() };
+    let fighter = character.as_deref().filter(|n| !n.trim().is_empty()).and_then(|name| fighter::fighter(&app, name, level, &choice));
+    let model = atlas.model(&measured, fighter, assumptions, &layouts);
     let spots = atlas.training_spots(
         from.as_ref().map(|m| m.id),
         &measured,
         &travel(&app, &atlas),
         estimator.as_ref(),
+        model.as_ref(),
         &layouts,
     );
-    Some(Spots { from, speed: estimator.map(|e| e.speed), spots })
+    Some(Spots { from, speed: estimator.map(|e| e.speed), fighter, fit: model.map(|m| m.fit), spots })
+}
+
+/// How close the estimates come on the player's own maps, each hidden in turn and estimated from
+/// the rest. `None` until map data has been downloaded.
+#[tauri::command]
+pub fn check_estimates(
+    app: AppHandle,
+    state: State<MapDataState>,
+    measured: Vec<MeasuredRate>,
+    level: Option<u32>,
+    assumptions: Option<Assumptions>,
+    character: Option<String>,
+    skill: Option<String>,
+) -> Option<EstimateCheck> {
+    let atlas = state.atlas()?;
+    let layouts = state.layouts();
+    let assumptions = assumptions.unwrap_or_default();
+    let choice = Choice { assumptions: Some(&assumptions), skill: skill.as_deref() };
+    let fighter = character.as_deref().filter(|n| !n.trim().is_empty()).and_then(|name| fighter::fighter(&app, name, level, &choice));
+    Some(atlas.check_estimates(&measured, fighter, assumptions, &layouts))
 }
 
 /// Opens one of the card's links in the default browser. Only the sites it links to are allowed.

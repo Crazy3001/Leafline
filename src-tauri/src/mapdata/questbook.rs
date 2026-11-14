@@ -23,6 +23,8 @@ pub struct QuestSearch {
     pub repeat: Option<String>,
     /// Only quests a character of this level can start.
     pub at_level: Option<u32>,
+    /// Only quests that need no other quest finished first.
+    pub no_prior: bool,
     pub offset: usize,
 }
 
@@ -76,7 +78,24 @@ pub struct QuestSheet {
     pub next: Option<QuestRef>,
     pub objectives: Vec<SheetObjective>,
     pub rewards: Vec<SheetItem>,
+    /// What the quests after this one in its chain pay, when it leads on.
+    pub chain_rest: Option<ChainRest>,
 }
+
+/// The quests a chain still has after one of them, each leading to the next, and what they pay
+/// together. Only EXP and mesos add up; item rewards stay on each quest's own page.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChainRest {
+    pub quests: Vec<QuestRef>,
+    pub exp: u64,
+    pub mesos: u64,
+    /// The highest level any of them asks for.
+    pub level_max: Option<u32>,
+}
+
+/// A chain longer than this is cut short: no real one is, so a loop in the data stops here.
+const CHAIN_LIMIT: usize = 40;
 
 /// Whether every word starts a word of `text`, which is already folded by [`item_key`].
 pub(super) fn has_words(text: &str, words: &[String]) -> bool {
@@ -123,6 +142,7 @@ impl Atlas {
             search.region.as_ref().is_none_or(|r| q.region.as_ref() == Some(r))
                 && search.repeat.as_ref().is_none_or(|r| q.repeat.as_ref() == Some(r))
                 && search.at_level.is_none_or(|level| q.level_min.unwrap_or(0) <= level)
+                && (!search.no_prior || q.follows.is_empty())
         };
         let mut found: Vec<(u8, &QuestRecord)> =
             self.quests.values().filter(fits).filter_map(|q| Some((self.quest_rank(q, &words)?, q))).collect();
@@ -179,7 +199,25 @@ impl Atlas {
                 .iter()
                 .filter_map(|r| Some(SheetItem { id: r.item_id, name: item_name(r.item_id)?, count: r.count, sure: r.sure }))
                 .collect(),
+            chain_rest: self.chain_rest(id),
         })
+    }
+
+    /// The quests after `id` in its chain, following each one's next quest, and what they pay.
+    pub fn chain_rest(&self, id: u32) -> Option<ChainRest> {
+        let mut seen = vec![id];
+        let mut rest = ChainRest { quests: Vec::new(), exp: 0, mesos: 0, level_max: None };
+        let mut at = self.quests.get(&id)?.next_quest_id;
+        while let Some(next) = at.filter(|n| !seen.contains(n) && seen.len() <= CHAIN_LIMIT) {
+            let Some(quest) = self.quests.get(&next) else { break };
+            seen.push(next);
+            rest.exp += u64::from(quest.reward_exp);
+            rest.mesos += u64::from(quest.reward_mesos);
+            rest.level_max = rest.level_max.max(quest.level_min);
+            rest.quests.extend(self.quest_ref(next));
+            at = quest.next_quest_id;
+        }
+        (!rest.quests.is_empty()).then_some(rest)
     }
 }
 
@@ -210,6 +248,31 @@ mod tests {
         };
         assert_eq!(at(5), ["Shell Sorting", "Slime Samples"]);
         assert_eq!(at(2), ["Slime Samples"], "not yet the Lv 3 one");
+    }
+
+    #[test]
+    fn the_rest_of_a_chain_adds_up_what_it_pays() {
+        use crate::mapdata::osms::{Dataset, QuestRecord};
+        let quest = |id: u32, next: Option<u32>, exp: u32, level: u32| QuestRecord {
+            id,
+            name: format!("Part {id}"),
+            level_min: Some(level),
+            next_quest_id: next,
+            reward_exp: exp,
+            reward_mesos: 10,
+            follows: if id > 1 { vec![id - 1] } else { vec![] },
+            ..QuestRecord::default()
+        };
+        let quests = vec![quest(1, Some(2), 100, 5), quest(2, Some(3), 200, 8), quest(3, Some(2), 300, 12), quest(4, None, 9, 1)];
+        let atlas = Atlas::new(Dataset { quests, ..Dataset::default() });
+        let rest = atlas.chain_rest(1).unwrap();
+        assert_eq!(rest.quests.iter().map(|q| q.id).collect::<Vec<_>>(), [2, 3], "a loop back to 2 stops there");
+        assert_eq!((rest.exp, rest.mesos, rest.level_max), (500, 20, Some(12)));
+        assert!(atlas.chain_rest(4).is_none(), "a quest that leads nowhere has no rest");
+
+        let starts = QuestSearch { no_prior: true, ..QuestSearch::default() };
+        let names: Vec<String> = atlas.search_quests(&starts).quests.into_iter().map(|q| q.name).collect();
+        assert_eq!(names, ["Part 1"], "the others need the one before them");
     }
 
     #[test]
