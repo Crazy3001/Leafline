@@ -104,9 +104,14 @@
   const located = $derived(picture?.points.some((p) => p.kind === "portal" && !p.teleport) ?? false);
 
   /** The portal the trip being followed takes next, when it leaves from this map. */
-  const nextStep = $derived.by(() => {
+  const nextKey = $derived.by(() => {
     const step = trip.route?.steps[trip.next];
-    return step && !step.travel && step.from.id === details.map.id ? { portal: step.portal, to: step.to.id } : null;
+    return step && !step.travel && step.from.id === details.map.id ? JSON.stringify([step.portal, step.to.id]) : null;
+  });
+  const nextStep = $derived.by(() => {
+    if (!nextKey) return null;
+    const [portal, to] = JSON.parse(nextKey) as [string | null, number];
+    return { portal, to };
   });
 </script>
 

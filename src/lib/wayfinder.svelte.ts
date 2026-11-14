@@ -122,7 +122,7 @@ async function onReading(map: MapReading | null, data: string) {
   if (!destination) {
     // Nowhere to go: still keep track, so a destination set later starts from here.
     if (match.score >= TRUSTED_SCORE) {
-      trip.here = match.card.map;
+      if (trip.here?.id !== match.card.map.id) trip.here = match.card.map;
       trip.unsure = false;
     } else trip.unsure = true;
     return;
@@ -139,7 +139,8 @@ async function onReading(map: MapReading | null, data: string) {
     return;
   }
   trip.unsure = false;
-  trip.here = at.at;
+  // The same map read again changes nothing: a new object each reading would resend the trip.
+  if (trip.here?.id !== at.at.id) trip.here = at.at;
   if (at.kind === "arrived") {
     straying = null;
     return arrive(destination, at.at);

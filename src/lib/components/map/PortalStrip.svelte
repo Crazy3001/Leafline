@@ -1,3 +1,10 @@
+<script lang="ts" module>
+  import type { MapPicture as Picture } from "$lib/types";
+
+  /** Pictures already fetched, by map, so a strip shown again (or a trip resent) never blanks. */
+  const fetched = new Map<number, Picture | null>();
+</script>
+
 <script lang="ts">
   // The map the player is on, as a strip under the route bar's next step, with the portal to take
   // lit up where it stands. Wide maps show whole; tall ones are cut to a band around the portal.
@@ -32,20 +39,27 @@
   let failed = $state(false);
   let width = $state(0);
 
+  // Only a different map fetches again: the trip arrives as a new copy often, same map or not.
+  const fromId = $derived(from.id);
   $effect(() => {
-    const id = from.id;
+    const id = fromId;
+    failed = false;
+    if (fetched.has(id)) {
+      picture = fetched.get(id) ?? null;
+      return;
+    }
     picture = null;
     loaded = false;
-    failed = false;
     backend
       .mapPicture(id)
       .then((result) => {
-        if (id === from.id) picture = result;
+        fetched.set(id, result);
+        if (id === fromId) picture = result;
       })
       .catch(() => (picture = null));
   });
 
-  const src = $derived(picture ? pictureUrl("mapview", from.id) : null);
+  const src = $derived(picture ? pictureUrl("mapview", fromId) : null);
   const portals = $derived(picture?.points.filter((p) => p.kind === "portal" && !p.teleport) ?? []);
   /** The portal to take: by its own name, or else any portal to the next map. */
   const targets = $derived.by(() => {
@@ -160,27 +174,8 @@
   .mark.lit::after {
     content: "";
     position: absolute;
-    inset: -8px;
-    border: 2px solid var(--accent);
+    inset: -7px;
+    border: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
     border-radius: 50%;
-    animation: ping 1.6s ease-out infinite;
-  }
-
-  @keyframes ping {
-    from {
-      opacity: 0.9;
-      transform: scale(0.5);
-    }
-    to {
-      opacity: 0;
-      transform: scale(1.5);
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .mark.lit::after {
-      animation: none;
-      opacity: 0.5;
-    }
   }
 </style>
