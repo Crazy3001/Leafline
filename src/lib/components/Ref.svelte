@@ -32,7 +32,7 @@
     children?: Snippet;
   } = $props();
 
-  const PICTURE: Record<PeekKind, PictureKind | null> = { item: "item", mob: "mob", npc: "npc", map: "mark", quest: null };
+  const PICTURE: Record<PeekKind, PictureKind | null> = { item: "item", mob: "mob", npc: "npc", map: "mark", quest: null, skill: "skill" };
   const picture = $derived(icon ? PICTURE[kind] : null);
   /** A map's label names the map after its street. */
   const pictureName = $derived(kind === "map" && name ? splitMapLabel(name).name : name);

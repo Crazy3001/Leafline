@@ -55,6 +55,7 @@
   --ref-mob: #f0907f;
   --ref-npc: #6fd0bd;
   --ref-map: #e7b45a;
+  --ref-skill: #c3a6f5;
 
   /*
    * Marks on a map's picture: their own vivid set, apart from the link colours, so they stand out
@@ -188,6 +189,38 @@ button {
   gap: 8px;
 }
 
+/* A row of small numbers under a tooltip's title: Lv, HP, EXP. */
+.tip-stats {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+  padding-top: 5px;
+  border-top: 1px solid var(--border);
+  color: var(--text);
+}
+
+.tip-stats b {
+  color: var(--faint);
+  font-weight: 500;
+}
+
+/* The map picture's marks, drawn small beside a tooltip that has no picture of its own. */
+.tip-key {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border: 3px solid var(--marker-portal);
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
+.tip-key.teleport {
+  width: 10px;
+  height: 10px;
+  border-width: 2px;
+  border-style: dashed;
+}
+
 .tip-list {
   display: grid;
   gap: 2px;
@@ -228,7 +261,7 @@ button {
   align-items: center;
   gap: 5px;
   max-width: 100%;
-  vertical-align: bottom;
+  vertical-align: middle;
 }
 
 .ref .ref-pic {
@@ -262,6 +295,10 @@ button {
 
 .ref-map {
   --ref: var(--ref-map);
+}
+
+.ref-skill {
+  --ref: var(--ref-skill);
 }
 
 .ref-quest:hover,

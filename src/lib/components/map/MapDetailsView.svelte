@@ -69,7 +69,7 @@
 
 {#if display.showPictures}
   <Section title="Map" memory="map-picture-{desk ? 'desk' : 'overlay'}" open={desk}>
-    <MapPicture mapId={details.map.id} highlight={hovered} mobs={details.mobs} />
+    <MapPicture mapId={details.map.id} highlight={hovered} mobs={details.mobs} npcs={details.npcs} />
   </Section>
 {/if}
 

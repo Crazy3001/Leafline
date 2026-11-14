@@ -625,7 +625,9 @@
                 <li>
                   {@render moveButtons((by) => moveSkill(index, by), k === 0, k === group.goals.length - 1)}
                   <span class="goal-name">
-                    <span class="with-icon"><Pic kind="skill" id={goal.skillId} size={22} />{skill?.name ?? `Unknown skill ${goal.skillId}`}</span>
+                    <span class="with-icon"
+                      >{#if skill}<Ref kind="skill" id={goal.skillId} name={skill.name} />{:else}Unknown skill {goal.skillId}{/if}</span
+                    >
                     {#if skill?.levelDescriptions[goal.level - 1]}
                       <small>Level {goal.level}: {skill.levelDescriptions[goal.level - 1]}</small>
                     {/if}

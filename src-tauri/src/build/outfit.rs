@@ -9,7 +9,7 @@ use super::catalog::{Catalog, novelty};
 use super::fit::ARMOUR;
 use super::plan::{Build, Expansion, GearCheck, MAX_LEVEL, Piece, Start, Stats, piece_bonus};
 use super::rules::Rules;
-use super::suggest::{Scorer, Wearer};
+use super::suggest::{Score, Scorer, Wearer};
 use crate::mapdata::osms::ItemRecord;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -196,14 +196,35 @@ pub fn gear_paths(build: &Build, expansion: &Expansion, rules: &Rules, catalog: 
     let trained = catalog.weapons_of_branch(build.plan.job);
     let overall = worn_in(build, catalog, "Overall").is_some();
 
-    let mut paths = Vec::new();
+    let mut paths: Vec<GearPath> = Vec::new();
+    // What the top and the bottom score together at a level, by the path up to it, so an overall
+    // joins once it beats the pair: where a job's tops and bottoms run out, overalls go on.
+    let pair_at = |paths: &[GearPath], at: u32| -> Option<Score> {
+        let piece = |slot: &str| -> Option<Score> {
+            let path = paths.iter().find(|p| p.slot == slot);
+            let step = path.and_then(|p| p.now.iter().chain(&p.steps).rfind(|s| s.level <= at));
+            match step {
+                Some(step) => Some(scorer.of(&step.item)),
+                None => worn_in(build, catalog, slot).map(|p| scorer.score(&p.data_stats(catalog))),
+            }
+        };
+        match (piece("Top"), piece("Bottom")) {
+            (None, None) => None,
+            (top, bottom) => {
+                let (t, b) = (top.unwrap_or_default(), bottom.unwrap_or_default());
+                Some((t.0 + b.0, t.1 + b.1, t.2 + b.2))
+            }
+        }
+    };
     for slot in slot_order() {
         if overall && (slot == "Top" || slot == "Bottom") {
             continue;
         }
         let goals: Vec<&ItemRecord> = expansion.gear.iter().filter(|g| g.usable && g.item.slot == slot).map(|g| &g.item).collect();
         let worn = worn_in(build, catalog, slot);
-        let optional = slot == "Overall" || slot == "Shield";
+        // A shield only when worn or planned; an overall too, unless the data has one that beats
+        // the top and bottom.
+        let optional = slot == "Shield";
         if optional && worn.is_none() && goals.is_empty() {
             continue;
         }
@@ -227,15 +248,22 @@ pub fn gear_paths(build: &Build, expansion: &Expansion, rules: &Rules, catalog: 
         let mut first = true;
         let mut chosen: Vec<GearStep> = Vec::new();
         for (at, wearer) in &wearers {
+            let pair = if slot == "Overall" && !overall { pair_at(&paths, *at) } else { None };
             let fitting: Vec<&ItemRecord> = candidates
                 .iter()
                 .copied()
                 .filter(|i| {
                     wearer.old_enough(i)
                         && floor.is_none_or(|f| scorer.of(i) > f)
+                        && pair.is_none_or(|p| scorer.of(i) > p)
                         && tier.is_none_or(|t| if first { i.req_level >= t } else { i.req_level > t })
                 })
                 .collect();
+            // The job's own gear goes before gear for anyone, which is mostly rare boss drops (a
+            // Zakum Helmet would otherwise end a Bowman's hats at Lv 50). Goals always count.
+            let own = |i: &&ItemRecord| !i.classes.is_empty() || is_goal(i);
+            let fitting: Vec<&ItemRecord> =
+                if fitting.iter().any(|i| !i.classes.is_empty()) { fitting.into_iter().filter(own).collect() } else { fitting };
             let rank = |i: &&ItemRecord| (scorer.of(i), std::cmp::Reverse(i.req_level));
             let Some(&best) = fitting.iter().max_by_key(|i| rank(i)) else { continue };
             let pick = fitting
@@ -258,6 +286,10 @@ pub fn gear_paths(build: &Build, expansion: &Expansion, rules: &Rules, catalog: 
             .filter(|g| reached(g) && !chosen.iter().any(|s| s.item.id == g.id))
             .map(|g| (*g).clone())
             .collect();
+        // An overall nobody wears, plans or would get is no row.
+        if slot == "Overall" && worn.is_none() && goals.is_empty() && chosen.is_empty() {
+            continue;
+        }
         paths.push(GearPath { slot: slot.to_string(), now, steps, passed });
     }
     paths
@@ -584,6 +616,46 @@ mod tests {
             crossbow(60, "Golden Crow", 60, 125, 82),
             crossbow(70, "Gross Jaeger", 70, 145, 92),
         ]
+    }
+
+    #[test]
+    fn hats_go_past_a_boss_helmet_and_overalls_take_over_where_tops_end() {
+        // Made-up gear in the shape of the Bowman data: the job's hats every tier, a helmet for
+        // anyone at Lv 50 with more stats than any of them, tops and bottoms only to Lv 40, then
+        // overalls.
+        let piece = |id, name: &str, level, slot: &str, dex: i64, def: i64| {
+            with(item(id, name, level, &["Bowman"]), slot, &[("DEX", dex), ("Weapon Def.", def)])
+        };
+        let mut boss_helm = with(item(9, "Ember Crown", 50, &[]), "Hat", &[("STR", 5), ("DEX", 5), ("Weapon Def.", 55)]);
+        boss_helm.classes.clear();
+        let catalog = Catalog::new(
+            vec![skill(1, "Iron Arrow", 320, 20, &[])],
+            vec![
+                piece(40, "Reed Hat", 40, "Hat", 4, 33),
+                piece(50, "Rush Hat", 50, "Hat", 5, 39),
+                piece(60, "Plume Hat", 60, "Hat", 6, 45),
+                piece(70, "Crest Hat", 70, "Hat", 7, 51),
+                boss_helm,
+                piece(41, "Reed Vest", 40, "Top", 4, 48),
+                piece(42, "Reed Pants", 40, "Bottom", 4, 35),
+                piece(51, "Rush Robe", 50, "Overall", 10, 106),
+                piece(61, "Plume Robe", 60, "Overall", 12, 122),
+                piece(71, "Crest Robe", 70, "Overall", 14, 137),
+            ],
+        );
+        let build = Build {
+            start: Start { level: 35, stats: Some(Stats { str: 30, dex: 120, int: 4, luk: 4 }), ..Start::default() },
+            plan: Plan { job: 320, stats: vec![StatGoal { stat: Stat::Dex, target: None, from_level: None }], plan_to: 70, ..Plan::default() },
+            ..Build::default()
+        };
+        let outfit = at(&build, &catalog, 35);
+        let steps = |slot: &str| -> Vec<(String, u32)> {
+            outfit.paths.iter().find(|p| p.slot == slot).map_or(Vec::new(), |p| p.steps.iter().map(|s| (s.item.name.clone(), s.level)).collect())
+        };
+        let names = |list: Vec<(String, u32)>| list.into_iter().map(|(n, l)| format!("{n} {l}")).collect::<Vec<_>>();
+        assert_eq!(names(steps("Hat")), ["Reed Hat 40", "Rush Hat 50", "Plume Hat 60", "Crest Hat 70"]);
+        assert_eq!(names(steps("Top")), ["Reed Vest 40"]);
+        assert_eq!(names(steps("Overall")), ["Rush Robe 50", "Plume Robe 60", "Crest Robe 70"], "the overall beats the pair");
     }
 
     #[test]

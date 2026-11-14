@@ -1,13 +1,15 @@
 // Link cards: a coloured name opens a small card beside it instead of jumping to another tab.
 // One card shows at a time. A link inside the card opens the next card over it, with a way back;
-// Esc or a click outside closes it. Each card has a button to the full view in its tab.
+// Esc or a click outside closes it. Each card has a button to the full view in its tab. A card
+// can be dragged by its header, and pinned: a pinned card stays where it is, beside the next ones,
+// until its own close button, so several can sit side by side to compare.
 
 import { backend } from "./api";
 import { showItemNamed } from "./items.svelte";
 import { showMonsterNamed } from "./monsters.svelte";
 import { showMapNamed, showNpcNamed } from "./places.svelte";
 
-export type PeekKind = "item" | "mob" | "npc" | "map" | "quest";
+export type PeekKind = "item" | "mob" | "npc" | "map" | "quest" | "skill";
 
 export interface PeekTarget {
   kind: PeekKind;
@@ -24,7 +26,35 @@ export interface PeekAnchor {
   width: number;
 }
 
-export const peek = $state<{ stack: PeekTarget[]; anchor: PeekAnchor | null }>({ stack: [], anchor: null });
+/** A card pinned in place, by where it sits in the window. */
+export interface PinnedCard {
+  key: number;
+  target: PeekTarget;
+  left: number;
+  top: number;
+}
+
+export const peek = $state<{
+  stack: PeekTarget[];
+  anchor: PeekAnchor | null;
+  /** How far the open card has been dragged from where it opened. */
+  drag: { x: number; y: number };
+  pinned: PinnedCard[];
+}>({ stack: [], anchor: null, drag: { x: 0, y: 0 }, pinned: [] });
+
+let pinKey = 0;
+
+/** Pins the open card where it is, and closes it as the open card. */
+export function pinPeek(left: number, top: number) {
+  const target = peek.stack.at(-1);
+  if (!target) return;
+  peek.pinned.push({ key: ++pinKey, target, left, top });
+  closePeek();
+}
+
+export function unpinCard(key: number) {
+  peek.pinned = peek.pinned.filter((p) => p.key !== key);
+}
 
 /** Whether a link sits inside the open card, where it opens the next card instead of a new one. */
 function inCard(from: Element | null): boolean {
@@ -47,6 +77,7 @@ export function openPeek(target: PeekTarget, from: Element | null) {
   }
   peek.stack = [target];
   peek.anchor = anchorOf(from);
+  peek.drag = { x: 0, y: 0 };
 }
 
 /** Opens the next card over the open one, from a link in it that isn't a coloured name. */
@@ -63,6 +94,7 @@ export function peekBack() {
 export function closePeek() {
   peek.stack = [];
   peek.anchor = null;
+  peek.drag = { x: 0, y: 0 };
 }
 
 /** Opens the full view in its tab, as links did before cards, and closes the card. */
@@ -80,6 +112,16 @@ export async function openFull(target: PeekTarget) {
       return id != null ? backend.showPlace("maps", id) : name ? showMapNamed(name) : undefined;
     case "quest":
       return id != null ? backend.showQuest(id) : undefined;
+    case "skill": {
+      // Skills have no tab of their own in the overlay: Lookup → Skills shows them.
+      const { lookup } = await import("./items.svelte");
+      const { loadSkills, skillNamed, skillView } = await import("./skills.svelte");
+      await loadSkills();
+      skillView.id = id ?? skillNamed(name)?.id ?? null;
+      lookup.mode = "skills";
+      const { openPanel } = await import("./nav.svelte");
+      return openPanel("item");
+    }
   }
 }
 

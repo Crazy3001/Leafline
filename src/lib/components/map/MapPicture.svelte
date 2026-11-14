@@ -8,6 +8,7 @@
   import { backend } from "$lib/api";
   import { openPeek } from "$lib/peek.svelte";
   import { pictureUrl } from "$lib/pictures";
+  import { formatNumber } from "$lib/format";
   import { tip } from "$lib/tip.svelte";
   import type { MapPicture, MobRow, ViewPoint } from "$lib/types";
   import Pic from "$lib/ui/Pic.svelte";
@@ -16,10 +17,13 @@
     mapId,
     highlight = null,
     mobs = [],
+    npcs = [],
   }: {
     mapId: number;
     /** The map's monsters, for their levels in a spawn point's tooltip. */
-    mobs?: Pick<MobRow, "id" | "name" | "level">[];
+    mobs?: Pick<MobRow, "id" | "name" | "level" | "hp" | "exp" | "boss">[];
+    /** The map's NPCs, for how many quests each gives. */
+    npcs?: { id: number; quests: unknown[] }[];
     /** A monster whose spawn points stand out, such as the one under the pointer in the list. */
     highlight?: string | null;
   } = $props();
@@ -55,7 +59,8 @@
   const spawnsOf = $derived(
     marks.reduce((n, p) => (p.kind === "mob" ? n.set(p.id, (n.get(p.id) ?? 0) + 1) : n), new Map<number, number>()),
   );
-  const levelOf = (id: number) => mobs.find((m) => m.id === id)?.level ?? null;
+  const mobOf = (id: number) => mobs.find((m) => m.id === id) ?? null;
+  const questsOf = (id: number) => npcs.find((n) => n.id === id)?.quests.length ?? 0;
   const counts = $derived({
     portals: marks.filter((p) => p.kind === "portal" && !p.teleport && !p.hidden).length,
     hidden: marks.filter((p) => p.kind === "portal" && !p.teleport && p.hidden).length,
@@ -125,23 +130,49 @@
         </button>
         {#snippet markTip()}
           {#if point.teleport}
-            <span class="tip-title">Teleport within this map</span>
-            <span class="tip-sub">{point.toPortal ? "Click to see where it comes out" : "Where a teleport comes out"}</span>
+            <span class="tip-head">
+              <span class="tip-key teleport" aria-hidden="true"></span>
+              <span>
+                <span class="tip-title">Teleport within this map</span>
+                <span class="tip-sub">{point.toPortal ? "Click to see where it comes out" : "Where a teleport comes out"}</span>
+              </span>
+            </span>
           {:else if point.kind === "portal"}
-            <span class="tip-title">{point.name}</span>
-            <span class="tip-sub">{point.hidden ? "Hidden portal" : "Portal"}{point.known ? "" : " · not in the map data"}</span>
+            <span class="tip-head">
+              <Pic kind="mark" id={point.id} name={point.name} size={26}>
+                {#snippet fallback()}<span class="tip-key portal" aria-hidden="true"></span>{/snippet}
+              </Pic>
+              <span>
+                <span class="tip-title">{point.name}</span>
+                <span class="tip-sub"
+                  >{point.hidden ? "Hidden portal" : "Portal"}{point.known ? " · click for the map's card" : " · not in the map data"}</span
+                >
+              </span>
+            </span>
           {:else if point.kind === "npc"}
-            <span class="tip-head"
-              ><Pic kind="npc" id={point.id} name={point.name} size={28} /><span class="tip-title">{point.name}</span></span
-            >
-            <span class="tip-sub">NPC</span>
+            {@const quests = questsOf(point.id)}
+            <span class="tip-head">
+              <Pic kind="npc" id={point.id} name={point.name} size={34} />
+              <span>
+                <span class="tip-title">{point.name}</span>
+                <span class="tip-sub">NPC{quests ? ` · ${quests} quest${quests === 1 ? "" : "s"}` : ""}</span>
+              </span>
+            </span>
           {:else}
-            {@const level = levelOf(point.id)}
+            {@const mob = mobOf(point.id)}
             {@const spots = spawnsOf.get(point.id) ?? 1}
-            <span class="tip-title">{point.name}</span>
-            <span class="tip-sub tabular"
-              >{level != null ? `Lv ${level} · ` : ""}{spots} spawn point{spots === 1 ? "" : "s"} on this map</span
-            >
+            <span class="tip-head">
+              <Pic kind="mob" id={point.id} name={point.name} size={34} />
+              <span>
+                <span class="tip-title">{point.name}{mob?.boss ? " · boss" : ""}</span>
+                <span class="tip-sub tabular">{spots} spawn point{spots === 1 ? "" : "s"} on this map</span>
+              </span>
+            </span>
+            {#if mob}
+              <span class="tip-stats tabular">
+                <span><b>Lv</b> {mob.level}</span><span><b>HP</b> {formatNumber(mob.hp)}</span><span><b>EXP</b> {formatNumber(mob.exp)}</span>
+              </span>
+            {/if}
           {/if}
         {/snippet}
       {/each}

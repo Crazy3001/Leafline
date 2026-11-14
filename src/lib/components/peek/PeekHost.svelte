@@ -2,16 +2,28 @@
   // The one link card a window shows, beside the link that opened it. Every window's layout
   // holds one; it stays empty until a coloured name is clicked.
   import { tip } from "$lib/tip.svelte";
-  import { ArrowLeft, Maximize2, X } from "@lucide/svelte";
+  import { ArrowLeft, Maximize2, Pin, X } from "@lucide/svelte";
 
   import ItemPeek from "./ItemPeek.svelte";
   import MapPeek from "./MapPeek.svelte";
   import MobPeek from "./MobPeek.svelte";
   import NpcPeek from "./NpcPeek.svelte";
   import QuestPeek from "./QuestPeek.svelte";
+  import SkillPeek from "./SkillPeek.svelte";
   import { setContext } from "svelte";
 
-  import { SECTION_SCOPE, closePeek, openFull, peek, peekBack, type PeekKind } from "$lib/peek.svelte";
+  import {
+    SECTION_SCOPE,
+    closePeek,
+    openFull,
+    peek,
+    peekBack,
+    pinPeek,
+    unpinCard,
+    type PeekKind,
+    type PeekTarget,
+    type PinnedCard,
+  } from "$lib/peek.svelte";
 
   // Sections inside a card start folded.
   setContext(SECTION_SCOPE, "card");
@@ -22,6 +34,7 @@
     npc: { label: "NPC", tab: "Lookup" },
     map: { label: "Map", tab: "Lookup" },
     quest: { label: "Quest", tab: "Quests" },
+    skill: { label: "Skill", tab: "Lookup" },
   };
 
   const MARGIN = 8;
@@ -52,12 +65,66 @@
     return { left, width, top: null, bottom: vh - a.top + GAP, maxHeight: above };
   });
 
+  /**
+   * Drags a card by its header: `move` gets how far the pointer has gone since it went down.
+   * Buttons in the header still click.
+   */
+  function dragFrom(e: PointerEvent, move: (dx: number, dy: number) => void) {
+    if (e.button !== 0 || (e.target as Element).closest("button")) return;
+    const header = e.currentTarget as HTMLElement;
+    const start = { x: e.clientX, y: e.clientY };
+    header.setPointerCapture(e.pointerId);
+    const onMove = (m: PointerEvent) => move(m.clientX - start.x, m.clientY - start.y);
+    const onUp = () => {
+      header.removeEventListener("pointermove", onMove);
+      header.removeEventListener("pointerup", onUp);
+      header.removeEventListener("pointercancel", onUp);
+    };
+    header.addEventListener("pointermove", onMove);
+    header.addEventListener("pointerup", onUp);
+    header.addEventListener("pointercancel", onUp);
+  }
+
+  /** Keeps a dragged card's header inside the window, so it can always be grabbed again. */
+  function clampLeft(left: number, width: number) {
+    return Math.min(Math.max(left, MARGIN - width + 80), viewport.width - 80);
+  }
+  function clampTop(top: number) {
+    return Math.min(Math.max(top, MARGIN), viewport.height - 40);
+  }
+
+  function dragOpen(e: PointerEvent) {
+    const from = { ...peek.drag };
+    dragFrom(e, (dx, dy) => (peek.drag = { x: from.x + dx, y: from.y + dy }));
+  }
+
+  function dragPinned(e: PointerEvent, card: PinnedCard) {
+    const from = { left: card.left, top: card.top };
+    dragFrom(e, (dx, dy) => {
+      card.left = clampLeft(from.left + dx, WIDTH);
+      card.top = clampTop(from.top + dy);
+    });
+  }
+
+  function pin() {
+    const box = openCard?.getBoundingClientRect();
+    if (box) pinPeek(box.left, box.top);
+  }
+
+  let openCard = $state<HTMLElement | null>(null);
+
+  $effect(() => {
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  });
+
   $effect(() => {
     if (!top) return;
     measure();
     const outside = (e: PointerEvent) => {
       const target = e.target as Element | null;
-      if (!target?.closest?.("[data-peek]") && !target?.closest?.(".ref")) closePeek();
+      if (!target?.closest?.("[data-peek]") && !target?.closest?.("[data-pinned-card]") && !target?.closest?.(".ref")) closePeek();
     };
     const key = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -82,19 +149,61 @@
   });
 </script>
 
+{#snippet content(target: PeekTarget)}
+  {#if target.kind === "item"}
+    <ItemPeek {target} />
+  {:else if target.kind === "mob"}
+    <MobPeek {target} />
+  {:else if target.kind === "npc"}
+    <NpcPeek {target} />
+  {:else if target.kind === "map"}
+    <MapPeek {target} />
+  {:else if target.kind === "skill"}
+    <SkillPeek {target} />
+  {:else}
+    <QuestPeek {target} />
+  {/if}
+{/snippet}
+
+<!-- Pinned cards: each stays put until its own close, and can be dragged by its header. -->
+{#each peek.pinned as card (card.key)}
+  <div
+    class="peek pinned"
+    data-pinned-card
+    role="dialog"
+    aria-label="Pinned {KIND[card.target.kind].label.toLowerCase()} card"
+    style:left="{card.left}px"
+    style:top="{card.top}px"
+    style:width="{Math.min(WIDTH, viewport.width - MARGIN * 2)}px"
+    style:max-height="{Math.max(viewport.height - card.top - MARGIN, 160)}px"
+  >
+    <header class="grab" role="toolbar" aria-label="Card header: drag to move" tabindex="-1" onpointerdown={(e) => dragPinned(e, card)}>
+      <span class="kind ref-{card.target.kind}">{KIND[card.target.kind].label}</span>
+      <span class="pinned-name">{card.target.name ?? ""}</span>
+      <span class="spacer"></span>
+      <button class="full" use:tip={`In the ${KIND[card.target.kind].tab} tab`} onclick={() => openFull(card.target)}>
+        <Maximize2 size={12} />Full view
+      </button>
+      <button class="icon" aria-label="Close" use:tip={"Close"} onclick={() => unpinCard(card.key)}><X size={14} /></button>
+    </header>
+    <div class="body">{@render content(card.target)}</div>
+  </div>
+{/each}
+
 {#if top && place}
   <div
     class="peek"
     data-peek
     role="dialog"
     aria-label={KIND[top.kind].label}
-    style:left="{place.left}px"
+    bind:this={openCard}
+    style:left="{place.left + peek.drag.x}px"
     style:width="{place.width}px"
-    style:top={place.top == null ? null : `${place.top}px`}
-    style:bottom={place.bottom == null ? null : `${place.bottom}px`}
+    style:top={place.top == null ? null : `${place.top + peek.drag.y}px`}
+    style:bottom={place.bottom == null ? null : `${place.bottom - peek.drag.y}px`}
     style:max-height="{place.maxHeight}px"
   >
-    <header>
+    <header class="grab" role="toolbar" aria-label="Card header: drag to move" tabindex="-1" onpointerdown={dragOpen}>
       {#if peek.stack.length > 1}
         <button class="icon" aria-label="Back" use:tip={"Back"} onclick={peekBack}><ArrowLeft size={14} /></button>
       {/if}
@@ -103,21 +212,14 @@
       <button class="full" use:tip={`In the ${KIND[top.kind].tab} tab`} onclick={() => openFull(top)}>
         <Maximize2 size={12} />Full view
       </button>
+      <button class="icon" aria-label="Pin this card" use:tip={"Pin: keep it here and open more beside it"} onclick={pin}
+        ><Pin size={13} /></button
+      >
       <button class="icon" aria-label="Close" use:tip={"Close (Esc)"} onclick={closePeek}><X size={14} /></button>
     </header>
     <div class="body" bind:this={card}>
       {#key peek.stack.length + ":" + top.kind + ":" + (top.id ?? top.name)}
-        {#if top.kind === "item"}
-          <ItemPeek target={top} />
-        {:else if top.kind === "mob"}
-          <MobPeek target={top} />
-        {:else if top.kind === "npc"}
-          <NpcPeek target={top} />
-        {:else if top.kind === "map"}
-          <MapPeek target={top} />
-        {:else}
-          <QuestPeek target={top} />
-        {/if}
+        {@render content(top)}
       {/key}
     </div>
   </div>
@@ -143,6 +245,33 @@
       opacity: 0;
       transform: translateY(4px) scale(0.985);
     }
+  }
+
+  /* The header is the handle a card is dragged by. */
+  .grab {
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+  }
+
+  .grab:active {
+    cursor: grabbing;
+  }
+
+  .peek.pinned {
+    z-index: 990;
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--border-strong));
+    animation: none;
+  }
+
+  .pinned-name {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--text);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   header {

@@ -436,7 +436,7 @@
         {@const max = skill.max ?? Math.max(skill.goal, skill.level, 1)}
         {@const done = isMaxed(skill)}
         <li class:done use:tip={skill.description ?? undefined}>
-          <span class="skill-name"><Pic kind="skill" id={skill.id} size={20} class="skill-pic" />{skill.name}</span>
+          <span class="skill-name"><Ref kind="skill" id={skill.id} name={skill.name} /></span>
           <span class="skill-level tabular">
             {#if done}<span class="max">MAX</span>{:else}<b>{skillsRead ? skill.level : "—"}</b><span class="faint"> / {max}</span>{/if}
           </span>
@@ -551,9 +551,14 @@
         <div>
           <dt>{stat.label}</dt>
           <dd class="tabular">
-            {statsKnown ? step.stats[stat.id] : "—"}
             {#if statsKnown && gearBonus?.[stat.id]}
-              <span class="gear" use:tip={"What your gear adds, as the Character Stat window last showed it"}>+{gearBonus[stat.id]}</span>
+              <!-- The total the game shows, then what you put in and what your gear adds. -->
+              {step.stats[stat.id] + gearBonus[stat.id]}
+              <span class="gear" use:tip={"Points you put in, plus what your gear adds as the Character Stat window last showed it"}
+                >({step.stats[stat.id]}+{gearBonus[stat.id]})</span
+              >
+            {:else}
+              {statsKnown ? step.stats[stat.id] : "—"}
             {/if}
           </dd>
         </div>
@@ -915,7 +920,7 @@
   /* What gear adds, beside the stat: shown, never part of the plan's count. */
   dd .gear {
     margin-left: 4px;
-    color: var(--good);
+    color: var(--muted);
     font-size: var(--text-xs);
     font-weight: 500;
   }

@@ -36,6 +36,16 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
 - **Gear by level.** Gear paths no longer wait for your stats: each piece shows at the level it
   asks for. The Gear tab has a Male / Female switch; with neither set, the gear you wear decides.
   The Level by level list shows new gear as a row of pictures and skills with their icons.
+- **Skills.** Lookup has a Skills half: every skill by job, searchable by name or what it does.
+  Skill names in Character → Skills and the Build Planner open a skill card with its picture,
+  what it does, what it needs first and what each level gives.
+- **Cards you can move and pin.** Drag a card by its header. The pin button keeps it where it is,
+  so you can open more beside it and compare. Cards always open with their sections folded.
+- **Gear past Lv 40 and 50.** Where a job's tops and bottoms end, overalls carry on (a Bowman's
+  Kismet, Tai and Linnex). A helmet for any job no longer ends the job's own hats early.
+- **More in the map picture's tooltips:** a monster's picture, level, HP and EXP; an NPC's
+  quests; a portal's area emblem. Character → Level up shows each stat's total with what you
+  put in and what your gear adds, such as STR 30 (28+2).
 - **A new Crafting tab.** Disciplines as tiles with a picture of what they make, a skill level
   row, recipes grouped by level, and ingredients as pictures with their counts.
 - **Cards open folded**, as a short list of headings; what you open is remembered for cards.
