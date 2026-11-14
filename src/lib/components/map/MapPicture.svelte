@@ -3,9 +3,13 @@
   // marked where they stand, at the same size however wide the panel. Each mark opens its card;
   // a teleport within the map points out where it comes out instead. The picture is downloaded
   // the first time it is shown.
-  import { LoaderCircle } from "@lucide/svelte";
+  //
+  // The wheel zooms in on the pointer and dragging moves around; the marks stay the same size,
+  // so a crowded town spreads out. Zoomed all the way out, the wheel scrolls the panel as usual,
+  // so the picture never traps it. The portal the trip takes next, and portals pointed at in the
+  // Portals section, stand out.
+  import { LoaderCircle, Minus, Plus, Scan } from "@lucide/svelte";
 
-  import { backend } from "$lib/api";
   import { openPeek } from "$lib/peek.svelte";
   import { pictureUrl } from "$lib/pictures";
   import { formatNumber } from "$lib/format";
@@ -15,43 +19,147 @@
 
   let {
     mapId,
+    picture,
+    done,
     highlight = null,
     mobs = [],
     npcs = [],
+    next = null,
+    lit = null,
+    onhoverportal,
   }: {
     mapId: number;
+    /** The picture's size and marks, fetched by the map's card; null while loading or missing. */
+    picture: MapPicture | null;
+    /** The fetch has finished, found or not. */
+    done: boolean;
     /** The map's monsters, for their levels in a spawn point's tooltip. */
     mobs?: Pick<MobRow, "id" | "name" | "level" | "hp" | "exp" | "boss">[];
     /** The map's NPCs, for how many quests each gives. */
     npcs?: { id: number; quests: unknown[] }[];
     /** A monster whose spawn points stand out, such as the one under the pointer in the list. */
     highlight?: string | null;
+    /** The portal the trip being followed takes next from this map. */
+    next?: { portal: string | null; to: number } | null;
+    /** A map whose portals stand out, as when its card in the Portals section is pointed at. */
+    lit?: number | null;
+    /** Pointing at a portal out, or leaving it. */
+    onhoverportal?: (to: number | null) => void;
   } = $props();
 
-  let picture = $state<MapPicture | null>(null);
-  let done = $state(false);
   let failed = $state(false);
   let loaded = $state(false);
   /** The teleport whose exit is pointed out, by the clicked one's index. */
   let paired = $state<number | null>(null);
 
+  // Zoom: how many times bigger, and the picture's point (0 to 1 across and down) at the middle.
+  const MAX_ZOOM = 6;
+  let zoom = $state(1);
+  let cx = $state(0.5);
+  let cy = $state(0.5);
+  let width = $state(0);
+
   $effect(() => {
-    const id = mapId;
-    picture = null;
-    done = false;
+    void mapId;
     failed = false;
     loaded = false;
     paired = null;
-    backend
-      .mapPicture(id)
-      .then((result) => {
-        if (id === mapId) picture = result;
-      })
-      .catch(() => (picture = null))
-      .finally(() => (done = true));
+    zoom = 1;
+    cx = 0.5;
+    cy = 0.5;
   });
 
   const src = $derived(picture ? pictureUrl("mapview", mapId) : null);
+  const height = $derived(picture && width ? (width * picture.height) / picture.width : 0);
+  /** Keeps the middle where the picture still fills the frame. */
+  function settle() {
+    const half = 1 / (2 * zoom);
+    cx = Math.min(Math.max(cx, half), 1 - half);
+    cy = Math.min(Math.max(cy, half), 1 - half);
+  }
+  const left = $derived(width / 2 - cx * width * zoom);
+  const top = $derived(height / 2 - cy * height * zoom);
+
+  /** Zooms to `to`, keeping the picture's point under (x, y) in the frame where it is. */
+  function zoomTo(to: number, x = width / 2, y = height / 2) {
+    const next = Math.min(Math.max(to, 1), MAX_ZOOM);
+    if (!width || !height || next === zoom) return;
+    const u = (x - left) / (width * zoom);
+    const v = (y - top) / (height * zoom);
+    cx = u - (x - width / 2) / (width * next);
+    cy = v - (y - height / 2) / (height * next);
+    zoom = next;
+    settle();
+  }
+
+  function reset() {
+    zoom = 1;
+    cx = 0.5;
+    cy = 0.5;
+  }
+
+  /** The wheel zooms; at either end it lets the panel scroll instead. Needs a listener that can cancel. */
+  function wheel(node: HTMLElement) {
+    const on = (e: WheelEvent) => {
+      if (e.ctrlKey && e.deltaMode === 0 && Math.abs(e.deltaY) < 10) return; // a pinch: the window zooms
+      const step = e.deltaMode === 1 ? 0.06 : 0.0018;
+      const to = Math.min(Math.max(zoom * Math.exp(-e.deltaY * step), 1), MAX_ZOOM);
+      if (to === zoom) return;
+      e.preventDefault();
+      const box = node.getBoundingClientRect();
+      zoomTo(to, e.clientX - box.left, e.clientY - box.top);
+    };
+    node.addEventListener("wheel", on, { passive: false });
+    return { destroy: () => node.removeEventListener("wheel", on) };
+  }
+
+  // Dragging moves around a zoomed picture. A press only becomes a drag once it moves a little,
+  // so clicking a mark still opens its card; the click that ends a drag opens nothing.
+  let press: { id: number; x: number; y: number; cx: number; cy: number } | null = null;
+  let dragging = $state(false);
+  let dragged = false;
+
+  function down(e: PointerEvent) {
+    if (e.button !== 0 || zoom === 1) return;
+    press = { id: e.pointerId, x: e.clientX, y: e.clientY, cx, cy };
+  }
+
+  function move(e: PointerEvent) {
+    if (!press || e.pointerId !== press.id) return;
+    const dx = e.clientX - press.x;
+    const dy = e.clientY - press.y;
+    if (!dragging) {
+      if (Math.hypot(dx, dy) < 4) return;
+      dragging = true;
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    }
+    cx = press.cx - dx / (width * zoom);
+    cy = press.cy - dy / (height * zoom);
+    settle();
+  }
+
+  function up(e: PointerEvent) {
+    if (!press || e.pointerId !== press.id) return;
+    dragged = dragging;
+    press = null;
+    dragging = false;
+  }
+
+  function swallowDragClick(e: MouseEvent) {
+    if (!dragged) return;
+    dragged = false;
+    e.stopPropagation();
+    e.preventDefault();
+  }
+
+  /** Double-click: zoom in on the spot, or back out when already in. Not on a mark. */
+  function doubleClick(e: MouseEvent) {
+    if ((e.target as Element).closest(".mark, .zoom")) return;
+    if (zoom > 1) return reset();
+    const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    zoomTo(2.5, e.clientX - box.left, e.clientY - box.top);
+  }
+
   /** Drawn bottom to top: teleports, spawns, NPCs, then portals out on top. */
   const ORDER = (p: ViewPoint) => (p.teleport ? 0 : p.kind === "mob" ? 1 : p.kind === "npc" ? 2 : 3);
   const marks = $derived(picture ? [...picture.points].sort((a, b) => ORDER(a) - ORDER(b)) : []);
@@ -67,6 +175,14 @@
     teleports: marks.filter((p) => p.teleport).length,
     npcs: marks.filter((p) => p.kind === "npc").length,
     spawns: marks.filter((p) => p.kind === "mob").length,
+  });
+
+  /** The portals out that the trip takes next: by the portal's own name, or else any to that map. */
+  const nextMarks = $derived.by(() => {
+    if (!next) return new Set<ViewPoint>();
+    const out = marks.filter((p) => p.kind === "portal" && !p.teleport);
+    const named = next.portal ? out.filter((p) => p.portal === next.portal) : [];
+    return new Set(named.length ? named : out.filter((p) => p.id === next.to));
   });
 
   /** The other end of a teleport: where it comes out, or the teleports that come out here. */
@@ -101,81 +217,122 @@
 </script>
 
 {#if picture && src && !failed}
-  <div class="stage" style:aspect-ratio="{picture.width} / {picture.height}">
-    <img
-      {src}
-      alt=""
-      class:ready={loaded}
-      draggable="false"
-      onload={() => (loaded = true)}
-      onerror={() => (failed = true)}
-    />
-    {#if loaded}
-      {#each marks as point, i (i)}
-        <button
-          class="mark {point.kind}"
-          class:teleport={point.teleport}
-          class:hidden={point.hidden && !point.teleport}
-          class:lit={point.kind === "mob" && highlight != null && point.name === highlight}
-          class:dim={point.kind === "mob" && highlight != null && point.name !== highlight}
-          class:paired={pairedEnds.has(i)}
-          class:unknown={!point.known && !point.teleport}
-          style:left="{point.x * 100}%"
-          style:top="{point.y * 100}%"
-          aria-label={label(point)}
-          use:tip={markTip}
-          onclick={(e) => open(i, e.currentTarget)}
-        >
-          <span class="shape"></span>
-        </button>
-        {#snippet markTip()}
-          {#if point.teleport}
-            <span class="tip-head">
-              <span class="tip-key teleport" aria-hidden="true"></span>
-              <span>
-                <span class="tip-title">Teleport within this map</span>
-                <span class="tip-sub">{point.toPortal ? "Click to see where it comes out" : "Where a teleport comes out"}</span>
+  <div
+    class="stage"
+    class:zoomed={zoom > 1}
+    class:dragging
+    style:aspect-ratio="{picture.width} / {picture.height}"
+    bind:clientWidth={width}
+    use:wheel
+    onpointerdown={down}
+    onpointermove={move}
+    onpointerup={up}
+    onpointercancel={up}
+    onclickcapture={swallowDragClick}
+    ondblclick={doubleClick}
+    role="group"
+    aria-label="Map picture"
+  >
+    <div class="layer" style:width="{zoom * 100}%" style:height="{zoom * 100}%" style:left="{left}px" style:top="{top}px">
+      <img
+        {src}
+        alt=""
+        class:ready={loaded}
+        draggable="false"
+        onload={() => (loaded = true)}
+        onerror={() => (failed = true)}
+      />
+      {#if loaded}
+        {#each marks as point, i (i)}
+          {@const out = point.kind === "portal" && !point.teleport}
+          <button
+            class="mark {point.kind}"
+            class:teleport={point.teleport}
+            class:hidden={point.hidden && !point.teleport}
+            class:lit={(point.kind === "mob" && highlight != null && point.name === highlight) || (out && lit === point.id)}
+            class:dim={point.kind === "mob" && highlight != null && point.name !== highlight}
+            class:next={nextMarks.has(point)}
+            class:paired={pairedEnds.has(i)}
+            class:unknown={!point.known && !point.teleport}
+            style:left="{point.x * 100}%"
+            style:top="{point.y * 100}%"
+            aria-label={label(point)}
+            use:tip={markTip}
+            onclick={(e) => open(i, e.currentTarget)}
+            onmouseenter={out ? () => onhoverportal?.(point.id) : undefined}
+            onmouseleave={out ? () => onhoverportal?.(null) : undefined}
+          >
+            <span class="shape"></span>
+            {#if nextMarks.has(point)}<span class="flag">Next</span>{/if}
+          </button>
+          {#snippet markTip()}
+            {#if point.teleport}
+              <span class="tip-head">
+                <span class="tip-key teleport" aria-hidden="true"></span>
+                <span>
+                  <span class="tip-title">Teleport within this map</span>
+                  <span class="tip-sub">{point.toPortal ? "Click to see where it comes out" : "Where a teleport comes out"}</span>
+                </span>
               </span>
-            </span>
-          {:else if point.kind === "portal"}
-            <span class="tip-head">
-              <Pic kind="mark" id={point.id} name={point.name} size={26}>
-                {#snippet fallback()}<span class="tip-key portal" aria-hidden="true"></span>{/snippet}
-              </Pic>
-              <span>
-                <span class="tip-title">{point.name}</span>
-                <span class="tip-sub"
-                  >{point.hidden ? "Hidden portal" : "Portal"}{point.known ? " · click for the map's card" : " · not in the map data"}</span
-                >
+            {:else if point.kind === "portal"}
+              <span class="tip-head">
+                <Pic kind="mark" id={point.id} name={point.name} size={26}>
+                  {#snippet fallback()}<span class="tip-key portal" aria-hidden="true"></span>{/snippet}
+                </Pic>
+                <span>
+                  <span class="tip-title">{point.name}</span>
+                  <span class="tip-sub"
+                    >{nextMarks.has(point) ? "Your next step · " : ""}{point.hidden ? "Hidden portal" : "Portal"}{point.known
+                      ? " · click for the map's card"
+                      : " · not in the map data"}</span
+                  >
+                </span>
               </span>
-            </span>
-          {:else if point.kind === "npc"}
-            {@const quests = questsOf(point.id)}
-            <span class="tip-head">
-              <Pic kind="npc" id={point.id} name={point.name} size={34} />
-              <span>
-                <span class="tip-title">{point.name}</span>
-                <span class="tip-sub">NPC{quests ? ` · ${quests} quest${quests === 1 ? "" : "s"}` : ""}</span>
+            {:else if point.kind === "npc"}
+              {@const quests = questsOf(point.id)}
+              <span class="tip-head">
+                <Pic kind="npc" id={point.id} name={point.name} size={34} />
+                <span>
+                  <span class="tip-title">{point.name}</span>
+                  <span class="tip-sub">NPC{quests ? ` · ${quests} quest${quests === 1 ? "" : "s"}` : ""}</span>
+                </span>
               </span>
-            </span>
-          {:else}
-            {@const mob = mobOf(point.id)}
-            {@const spots = spawnsOf.get(point.id) ?? 1}
-            <span class="tip-head">
-              <Pic kind="mob" id={point.id} name={point.name} size={34} />
-              <span>
-                <span class="tip-title">{point.name}{mob?.boss ? " · boss" : ""}</span>
-                <span class="tip-sub tabular">{spots} spawn point{spots === 1 ? "" : "s"} on this map</span>
+            {:else}
+              {@const mob = mobOf(point.id)}
+              {@const spots = spawnsOf.get(point.id) ?? 1}
+              <span class="tip-head">
+                <Pic kind="mob" id={point.id} name={point.name} size={34} />
+                <span>
+                  <span class="tip-title">{point.name}{mob?.boss ? " · boss" : ""}</span>
+                  <span class="tip-sub tabular">{spots} spawn point{spots === 1 ? "" : "s"} on this map</span>
+                </span>
               </span>
-            </span>
-            {#if mob}
-              <span class="tip-stats tabular">
-                <span><b>Lv</b> {mob.level}</span><span><b>HP</b> {formatNumber(mob.hp)}</span><span><b>EXP</b> {formatNumber(mob.exp)}</span>
-              </span>
+              {#if mob}
+                <span class="tip-stats tabular">
+                  <span><b>Lv</b> {mob.level}</span><span><b>HP</b> {formatNumber(mob.hp)}</span><span
+                    ><b>EXP</b> {formatNumber(mob.exp)}</span
+                  >
+                </span>
+              {/if}
             {/if}
-          {/if}
-        {/snippet}
-      {/each}
+          {/snippet}
+        {/each}
+      {/if}
+    </div>
+
+    {#if loaded}
+      <div class="zoom" role="toolbar" aria-label="Zoom">
+        <button use:tip={"Zoom out"} aria-label="Zoom out" disabled={zoom <= 1} onclick={() => zoomTo(zoom / 1.6)}
+          ><Minus size={12} /></button
+        >
+        <span class="level tabular" aria-live="polite">{zoom < 1.05 ? "1" : zoom.toFixed(1)}×</span>
+        <button use:tip={"Zoom in"} aria-label="Zoom in" disabled={zoom >= MAX_ZOOM} onclick={() => zoomTo(zoom * 1.6)}
+          ><Plus size={12} /></button
+        >
+        {#if zoom > 1}
+          <button use:tip={"Fit the whole map"} aria-label="Fit the whole map" onclick={reset}><Scan size={12} /></button>
+        {/if}
+      </div>
     {/if}
   </div>
   <p class="legend">
@@ -184,7 +341,7 @@
     {#if counts.teleports}<span><i class="key teleport"></i>Teleports</span>{/if}
     {#if counts.npcs}<span><i class="key npc"></i>NPCs</span>{/if}
     {#if counts.spawns}<span><i class="key mob"></i>Spawns</span>{/if}
-    <span class="hint">Click a mark for its card</span>
+    <span class="hint">{zoom > 1 ? "Drag to move · double-click to fit" : "Scroll to zoom · click a mark for its card"}</span>
   </p>
 {:else if !done}
   <p class="note"><span class="spin"><LoaderCircle size={13} /></span> Getting the map picture…</p>
@@ -206,6 +363,23 @@
     background: var(--bg);
   }
 
+  .stage.zoomed {
+    cursor: grab;
+    touch-action: none;
+  }
+
+  .stage.dragging {
+    cursor: grabbing;
+  }
+
+  .stage.dragging .mark {
+    pointer-events: none;
+  }
+
+  .layer {
+    position: absolute;
+  }
+
   img {
     display: block;
     width: 100%;
@@ -214,15 +388,73 @@
     filter: saturate(0.8) brightness(0.72);
     transition: opacity 0.2s ease;
     user-select: none;
+    pointer-events: none;
   }
 
   img.ready {
     opacity: 1;
   }
 
+  /* Zoom buttons in the top corner: quiet until the pointer is on the picture or it is zoomed. */
+  .zoom {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    z-index: 6;
+    display: flex;
+    align-items: center;
+    gap: 1px;
+    padding: 2px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--bg) 82%, transparent);
+    opacity: 0;
+    transition: opacity 0.14s ease;
+    cursor: default;
+  }
+
+  .stage:hover .zoom,
+  .stage.zoomed .zoom,
+  .zoom:focus-within {
+    opacity: 1;
+  }
+
+  .zoom button {
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+  }
+
+  .zoom button:hover:not(:disabled),
+  .zoom button:focus-visible {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text);
+    outline: none;
+  }
+
+  .zoom button:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+
+  .level {
+    min-width: 28px;
+    color: var(--muted);
+    font-size: var(--text-xs);
+    text-align: center;
+  }
+
   /*
-   * Each mark is a 24 px target centred on its point, the same size however wide the panel, with
-   * its shape drawn inside. A dark outline keeps every shape clear of the picture under it.
+   * Each mark is a 24 px target centred on its point, the same size however wide the panel or
+   * far in the zoom, with its shape drawn inside. A dark outline keeps every shape clear of the
+   * picture under it.
    */
   .mark {
     position: absolute;
@@ -322,6 +554,47 @@
 
   .portal:hover .shape {
     transform: scale(1.15);
+  }
+
+  /* A portal pointed at in the Portals section. */
+  .portal.lit {
+    z-index: 5;
+  }
+
+  .portal.lit .shape {
+    transform: scale(1.25);
+    box-shadow:
+      0 0 0 2px var(--bg),
+      0 0 0 7px color-mix(in srgb, var(--marker-portal) 40%, transparent);
+  }
+
+  /* The trip's next portal: amber, with a small "Next" flag above it. */
+  .portal.next {
+    z-index: 4;
+  }
+
+  .portal.next .shape {
+    border-color: var(--accent-strong);
+    background: radial-gradient(circle, var(--accent-strong) 0 4px, var(--bg) 4.5px);
+    box-shadow:
+      0 0 0 2px var(--bg),
+      0 0 12px color-mix(in srgb, var(--accent) 70%, transparent);
+  }
+
+  .flag {
+    position: absolute;
+    bottom: calc(100% - 1px);
+    left: 50%;
+    padding: 0 4px;
+    border-radius: var(--radius-sm);
+    background: var(--accent-strong);
+    color: var(--accent-ink);
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 14px;
+    white-space: nowrap;
+    transform: translateX(-50%);
+    pointer-events: none;
   }
 
   /* Teleports within the map: small and quiet, a dashed ring and no dot. */

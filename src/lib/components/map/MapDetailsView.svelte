@@ -1,11 +1,14 @@
 <script lang="ts">
-  // Everything the cached data says about one map. No map images or coordinates are shown.
+  // Everything the cached data says about one map: its picture with the marks on it, where its
+  // portals lead, its monsters, drops, quests, NPCs and shops.
   import { tip } from "$lib/tip.svelte";
   import Ref from "$lib/components/Ref.svelte";
   import { Skull } from "@lucide/svelte";
 
+  import { backend } from "$lib/api";
   import { formatCompact, formatNumber, monsterLabel } from "$lib/format";
-  import type { MapDetails, MapRef } from "$lib/types";
+  import type { MapDetails, MapPicture as Picture, MapRef } from "$lib/types";
+  import { trip } from "$lib/wayfinder.svelte";
   import ConnectionCompass from "./ConnectionCompass.svelte";
   import MapPicture from "./MapPicture.svelte";
   import { display } from "$lib/settings.svelte";
@@ -53,6 +56,31 @@
   const desk = typeof location !== "undefined" && location.pathname.startsWith("/desk");
   /** The monster under the pointer in the list, whose spawn points stand out on the picture. */
   let hovered = $state<string | null>(null);
+
+  // The picture's size and marks, for the picture and for placing the portals where they stand.
+  let picture = $state<Picture | null>(null);
+  let pictureDone = $state(false);
+  $effect(() => {
+    const id = details.map.id;
+    picture = null;
+    pictureDone = false;
+    if (!display.showPictures) return;
+    backend
+      .mapPicture(id)
+      .then((result) => {
+        if (id === details.map.id) picture = result;
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (id === details.map.id) pictureDone = true;
+      });
+  });
+
+  /** The portal the trip being followed takes next, when it leaves from this map. */
+  const nextStep = $derived.by(() => {
+    const step = trip.route?.steps[trip.next];
+    return step && !step.travel && step.from.id === details.map.id ? { portal: step.portal, to: step.to.id } : null;
+  });
 </script>
 
 {#if facts.length || details.returnMap}
@@ -69,7 +97,15 @@
 
 {#if display.showPictures}
   <Section title="Map" memory="map-picture-{desk ? 'desk' : 'overlay'}" open={desk}>
-    <MapPicture mapId={details.map.id} highlight={hovered} mobs={details.mobs} npcs={details.npcs} />
+    <MapPicture
+      mapId={details.map.id}
+      {picture}
+      done={pictureDone}
+      highlight={hovered}
+      mobs={details.mobs}
+      npcs={details.npcs}
+      next={nextStep}
+    />
   </Section>
 {/if}
 
