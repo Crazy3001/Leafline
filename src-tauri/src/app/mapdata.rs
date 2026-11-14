@@ -9,8 +9,10 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State, Url};
 use tauri_plugin_opener::OpenerExt;
 
+use super::fighter::{self, Choice};
 use super::settings::SettingsState;
 use super::{overlay, pins};
+use crate::mapdata::combat::{Fighter, Fit};
 use crate::build::Catalog;
 use crate::build::catalog::item_group;
 use crate::mapdata::osms::ItemKind;
@@ -747,13 +749,18 @@ pub struct Spots {
     /// How fast the player gets through monster HP, behind every estimate. None until enough
     /// solo play is saved.
     speed: Option<KillSpeed>,
+    /// The character as the combat model sees them, and how its tuning fits their play. None
+    /// until their attack range (or a spell) has been read or typed.
+    fighter: Option<Fighter>,
+    fit: Option<Fit>,
     spots: Vec<TrainingSpot>,
 }
 
 /// Every map with monsters to hunt, for the training spot finder, with the EXP per hour the
-/// player measured on each and an estimate from their kill speed for the rest. `level` is the
-/// character's; `assumptions` what the player set for respawn time and EXP rate. `None` until
-/// map data has been downloaded.
+/// player measured on each and an estimate for the rest: from the combat model when the
+/// character's damage is known, else from their kill speed. `level` is the character's;
+/// `assumptions` what the player set for respawn time and EXP rate; `character` whose read
+/// stats to use and `skill` the skill picked. `None` until map data has been downloaded.
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
 pub fn training_spots(
@@ -765,19 +772,26 @@ pub fn training_spots(
     measured: Vec<MeasuredRate>,
     level: Option<u32>,
     assumptions: Option<Assumptions>,
+    character: Option<String>,
+    skill: Option<String>,
 ) -> Option<Spots> {
     let atlas = state.atlas()?;
     let from = map_name.and_then(|name| atlas.find_twin(&name, map_street.as_deref(), map_twin)).map(|m| m.card.map);
     let layouts = state.layouts();
-    let estimator = atlas.estimator(&measured, level, assumptions.unwrap_or_default(), &layouts);
+    let assumptions = assumptions.unwrap_or_default();
+    let estimator = atlas.estimator(&measured, level, assumptions, &layouts);
+    let choice = Choice { assumptions: Some(&assumptions), skill: skill.as_deref() };
+    let fighter = character.as_deref().filter(|n| !n.trim().is_empty()).and_then(|name| fighter::fighter(&app, name, level, &choice));
+    let model = atlas.model(&measured, fighter, assumptions, &layouts);
     let spots = atlas.training_spots(
         from.as_ref().map(|m| m.id),
         &measured,
         &travel(&app, &atlas),
         estimator.as_ref(),
+        model.as_ref(),
         &layouts,
     );
-    Some(Spots { from, speed: estimator.map(|e| e.speed), spots })
+    Some(Spots { from, speed: estimator.map(|e| e.speed), fighter, fit: model.map(|m| m.fit), spots })
 }
 
 /// Opens one of the card's links in the default browser. Only the sites it links to are allowed.

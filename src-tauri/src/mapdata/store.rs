@@ -21,7 +21,7 @@ use super::turnins::TurnIn;
 use crate::error::{Error, Result};
 
 /// Bump when the tables change; an older cache is then dropped and downloaded again.
-const CACHE_VERSION: i32 = 15;
+const CACHE_VERSION: i32 = 16;
 
 const SCHEMA: &str = "
 CREATE TABLE source_files (
@@ -973,8 +973,10 @@ fn insert_skills(tx: &Transaction, skills: &[SkillRecord]) -> Result<()> {
     let mut need = tx.prepare("INSERT INTO skill_needs (skill_id, needs_id, level) VALUES (?1, ?2, ?3)")?;
     let mut level = tx.prepare("INSERT OR REPLACE INTO skill_levels (skill_id, level, description) VALUES (?1, ?2, ?3)")?;
     for s in skills {
-        // Only what a buff changes is worth keeping; other skills' levels are all zeros.
-        let effects = if s.effects.iter().any(Effects::any) { serde_json::to_string(&s.effects).unwrap_or_default() } else { "[]".into() };
+        // Only what a buff changes, or how an attack hits, is worth keeping; other skills' levels
+        // are all zeros.
+        let worth = |e: &Effects| e.any() || e.lines > 0 || e.targets > 0;
+        let effects = if s.effects.iter().any(worth) { serde_json::to_string(&s.effects).unwrap_or_default() } else { "[]".into() };
         skill.execute(params![
             s.id,
             s.name,

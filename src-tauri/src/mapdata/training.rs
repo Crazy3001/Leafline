@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use super::layout::{Layouts, MapLayout};
 use super::atlas::{Atlas, MapMatch, MapRef, MobRow, Shortcut};
+use super::combat::{self, Battle, Fighter, Fit, Observation};
 use super::travel::Travel;
 
 /// EXP per hour the session tracker measured on a map, keyed by the minimap label it read.
@@ -26,6 +27,12 @@ pub struct MeasuredRate {
     /// Party size then; none or one is solo.
     #[serde(default)]
     pub party: Option<u32>,
+    /// Kills counted in that play, when they were.
+    #[serde(default)]
+    pub kills: Option<f64>,
+    /// The character as they were then, when it was known.
+    #[serde(default)]
+    pub fighter: Option<Fighter>,
 }
 
 /// What the estimates take as given because the map data doesn't say. The player can change
@@ -151,6 +158,39 @@ pub struct Estimate {
     pub weapon_def: f64,
     /// Whether the player's attack was taken into account, so defence is counted.
     pub damage_known: bool,
+    /// How the fight goes, when the estimate came from the combat model.
+    pub fight: Option<FightDetail>,
+}
+
+/// What the combat model says of fighting a map's monsters.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FightDetail {
+    /// Chance a blow lands, on average over the monsters.
+    pub hit_chance: f64,
+    /// Attacks a kill takes.
+    pub attacks_per_kill: f64,
+    /// Seconds a kill takes, everything counted, before the spawn limit.
+    pub kill_seconds: f64,
+    /// Monsters here on average above the player's level, when it is known.
+    pub level_gap: Option<f64>,
+}
+
+/// What the player can expect on a map: their own measured play there, carried to their level
+/// now, together with the model's estimate, each counting by how much there is behind it.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Forecast {
+    pub exp_per_hour: f64,
+    /// Four times in five the real rate should land between these.
+    pub low: f64,
+    pub high: f64,
+    /// 3 fairly sure, 2 rough, 1 a guess.
+    pub sureness: u8,
+    /// Solo seconds played here that count, near the current level.
+    pub played_seconds: f64,
+    /// The model's own estimate, before measured play is folded in.
+    pub model_exp_per_hour: Option<f64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -178,6 +218,8 @@ pub struct TrainingSpot {
     pub measured: Option<Measured>,
     /// What the player's kill speed gives here, once there is enough solo play to go on.
     pub estimate: Option<Estimate>,
+    /// The best guess at what the player gets here now, with a range.
+    pub forecast: Option<Forecast>,
     /// The map's size, floors and how its monsters spread, when known.
     pub layout: Option<MapLayout>,
 }
@@ -257,8 +299,10 @@ impl Atlas {
         measured: &[MeasuredRate],
         travel: &Travel,
         estimator: Option<&Estimator>,
+        model: Option<&Model>,
         layouts: &Layouts,
     ) -> Vec<TrainingSpot> {
+        let carried = model.map(|m| self.carried_play(measured, m, layouts)).unwrap_or_default();
         let hops = from.map(|id| self.hops_from(id)).unwrap_or_default();
         let shortcuts = from.map(|id| self.shortcuts_from(id, travel, &hops)).unwrap_or_default();
         let mut reachable = HashSet::new();
@@ -284,9 +328,17 @@ impl Atlas {
                 let total = card.mob_total.max(1) as f64;
                 let average_level =
                     card.mobs.iter().map(|mob| mob.level as f64 * mob.count as f64).sum::<f64>() / total;
+                let layout = layouts.get(&m.id);
+                let modelled = model.and_then(|model| model.estimate(&card.mobs, layout));
+                let estimate = modelled.as_ref().map(|(e, _)| e.clone()).or_else(|| estimator.and_then(|e| e.estimate(&card.mobs, layout)));
+                let forecast = match (model, &modelled) {
+                    (Some(model), Some((estimate, spread))) => Some(model.forecast(estimate, *spread, carried.get(&m.id))),
+                    _ => None,
+                };
                 Some(TrainingSpot {
                     hp_per_clear: card.mobs.iter().map(|mob| mob.hp as u64 * mob.count as u64).sum(),
-                    estimate: estimator.and_then(|e| e.estimate(&card.mobs, layouts.get(&m.id))),
+                    estimate,
+                    forecast,
                     layout: layouts.get(&m.id).copied(),
                     map: card.map,
                     region: card.region,
@@ -482,7 +534,222 @@ impl Estimator {
             hits_per_kill: kill.hits,
             weapon_def: kill.defence,
             damage_known: self.damage.is_some(),
+            fight: None,
         })
+    }
+}
+
+/// Stretches of play shorter than this don't tune the model: a map passed through says little.
+const TUNE_SECONDS: f64 = 300.0;
+/// Seconds of play a model estimate counts for against the player's own play on a map.
+const FORECAST_SECONDS: f64 = 1200.0;
+/// Play without a record of the character then is taken as from the character now only this
+/// many levels either side.
+const SAME_LEVELS: u32 = 3;
+/// When a map's layout isn't known: seconds of walking a kill, and monsters on a platform.
+const DEFAULT_WALK: f64 = 2.0;
+const DEFAULT_CROWD: f64 = 3.0;
+/// 1.28 standard deviations either side holds four in five.
+const RANGE_Z: f64 = 1.28;
+
+/// How many monsters stand together on a platform, for attacks that reach several.
+fn crowd(layout: Option<&MapLayout>) -> f64 {
+    layout
+        .filter(|l| l.spawn_platforms > 0 && l.spawn_points > 0)
+        .map_or(DEFAULT_CROWD, |l| f64::from(l.spawn_points) / f64::from(l.spawn_platforms))
+}
+
+fn walk(layout: Option<&MapLayout>) -> f64 {
+    layout.and_then(MapLayout::walk_seconds_per_kill).unwrap_or(DEFAULT_WALK)
+}
+
+/// The combat model for the character now, tuned to their play.
+#[derive(Debug, Clone)]
+pub struct Model {
+    pub fighter: Fighter,
+    pub fit: Fit,
+    pub assumptions: Assumptions,
+}
+
+/// The player's own solo play on one map, carried to their level now.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Carried {
+    /// EXP an hour as it would be now, weighted by seconds.
+    pub exp_per_hour: f64,
+    pub seconds: f64,
+}
+
+impl Model {
+    fn exp_rate(&self) -> f64 {
+        if self.assumptions.exp_rate > 0.0 { self.assumptions.exp_rate } else { 1.0 }
+    }
+
+    /// EXP an hour for `fighter` on a map, with what the fight takes.
+    fn rate(&self, fighter: &Fighter, mobs: &[MobRow], layout: Option<&MapLayout>) -> Option<(Battle, f64, f64, f64)> {
+        let battle = combat::battle(fighter, mobs, self.fit.tuning.defence, crowd(layout))?;
+        let limit = combat::spawn_limit(battle.count, self.assumptions.respawn_seconds);
+        let seconds = combat::kill_seconds(&battle, &self.fit.tuning, walk(layout));
+        let kills = combat::kills_per_hour(3600.0 / seconds, limit);
+        Some((battle, kills, limit, seconds))
+    }
+
+    /// The model's estimate for a map, and how far off it may be (the standard deviation of its
+    /// logarithm).
+    pub fn estimate(&self, mobs: &[MobRow], layout: Option<&MapLayout>) -> Option<(Estimate, f64)> {
+        let (battle, kills, limit, seconds) = self.rate(&self.fighter, mobs, layout)?;
+        let free = 3600.0 / seconds;
+        let capped = free >= limit;
+        let level_gap = Some(battle.level - f64::from(self.fighter.level));
+        let mut spread = self.fit.spread;
+        // Each of these is a place the rules are least sure of.
+        if battle.hit < 0.9 {
+            spread += 0.1;
+        }
+        if free > 0.8 * limit {
+            spread += 0.1;
+        }
+        if level_gap.is_some_and(|g| g > 5.0) {
+            spread += 0.1;
+        }
+        let estimate = Estimate {
+            exp_per_hour: kills * battle.exp_per_kill * self.exp_rate(),
+            kills_per_hour: kills,
+            ceiling: limit,
+            capped,
+            hp_ratio: 1.0,
+            level_gap,
+            sureness: sureness(spread),
+            walk_seconds_per_kill: layout.and_then(MapLayout::walk_seconds_per_kill),
+            hits_per_kill: Some(battle.attacks * battle.hit * f64::from(self.fighter.lines.max(1))),
+            weapon_def: mobs
+                .iter()
+                .filter(|m| !m.boss && m.count > 0)
+                .map(|m| f64::from(m.weapon_def.unwrap_or(0)) * f64::from(m.count))
+                .sum::<f64>()
+                / f64::from(battle.count),
+            damage_known: true,
+            fight: Some(FightDetail {
+                hit_chance: battle.hit,
+                attacks_per_kill: battle.attacks,
+                kill_seconds: seconds,
+                level_gap,
+            }),
+        };
+        Some((estimate, spread))
+    }
+
+    /// The estimate with the player's own play on the map folded in: each counts by the time
+    /// behind it, the model for [`FORECAST_SECONDS`].
+    pub fn forecast(&self, estimate: &Estimate, spread: f64, played: Option<&Carried>) -> Forecast {
+        let model = estimate.exp_per_hour;
+        let (rate, seconds) = played.filter(|p| p.seconds > 0.0).map_or((0.0, 0.0), |p| (p.exp_per_hour, p.seconds));
+        let exp_per_hour = (rate * seconds + model * FORECAST_SECONDS) / (seconds + FORECAST_SECONDS);
+        // Measured play narrows the range as it outweighs the model, down to the spread of play
+        // itself.
+        let spread = (spread * FORECAST_SECONDS / (seconds + FORECAST_SECONDS)).max(0.08);
+        Forecast {
+            exp_per_hour,
+            low: exp_per_hour * (-RANGE_Z * spread).exp(),
+            high: exp_per_hour * (RANGE_Z * spread).exp(),
+            sureness: sureness(spread),
+            played_seconds: seconds,
+            model_exp_per_hour: Some(model),
+        }
+    }
+}
+
+fn sureness(spread: f64) -> u8 {
+    if spread < 0.2 {
+        3
+    } else if spread < 0.35 {
+        2
+    } else {
+        1
+    }
+}
+
+impl Atlas {
+    /// The combat model for `fighter`, the character now, tuned to their solo play: each stretch
+    /// of five minutes or more on a map the data knows, with the character as they were then.
+    /// Play recorded before that was kept counts only near the current level, as the character
+    /// now. `None` without the character's damage.
+    pub fn model(
+        &self,
+        measured: &[MeasuredRate],
+        fighter: Option<Fighter>,
+        assumptions: Assumptions,
+        layouts: &Layouts,
+    ) -> Option<Model> {
+        let fighter = fighter?;
+        let exp_rate = if assumptions.exp_rate > 0.0 { assumptions.exp_rate } else { 1.0 };
+        let places = self.places(measured);
+        let stretches: Vec<(Vec<MobRow>, Option<&MapLayout>, &MeasuredRate, Fighter)> = measured
+            .iter()
+            .filter(|r| r.active_seconds >= TUNE_SECONDS && r.exp_per_hour > 0.0 && r.party.unwrap_or(1) <= 1)
+            .filter_map(|r| {
+                let found = places.get(r.label.as_str())?.as_ref()?;
+                let then = r.fighter.or_else(|| {
+                    let near = r.level.is_some_and(|l| l.abs_diff(fighter.level) <= SAME_LEVELS);
+                    near.then_some(fighter)
+                })?;
+                Some((found.card.mobs.clone(), layouts.get(&found.card.map.id), r, then))
+            })
+            .collect();
+        let observations: Vec<Observation> = stretches
+            .iter()
+            .filter_map(|(mobs, layout, r, then)| {
+                let exp_per_kill = {
+                    let common: Vec<&MobRow> = mobs.iter().filter(|m| !m.boss && m.count > 0).collect();
+                    let count: u32 = common.iter().map(|m| m.count).sum();
+                    (count > 0).then(|| common.iter().map(|m| f64::from(m.exp * m.count)).sum::<f64>() / f64::from(count))?
+                };
+                let kills_per_hour = match r.kills.filter(|&k| k > 0.0) {
+                    Some(kills) => kills * 3600.0 / r.active_seconds,
+                    None => r.exp_per_hour / (exp_per_kill * exp_rate),
+                };
+                let count: u32 = mobs.iter().filter(|m| !m.boss).map(|m| m.count).sum();
+                Some(Observation {
+                    fighter: *then,
+                    mobs,
+                    crowd: crowd(*layout),
+                    walk_seconds: walk(*layout),
+                    limit: combat::spawn_limit(count, assumptions.respawn_seconds),
+                    kills_per_hour,
+                    seconds: r.active_seconds,
+                })
+            })
+            .collect();
+        let fit = combat::fit(&observations);
+        Some(Model { fighter, fit, assumptions: Assumptions { exp_rate, ..assumptions } })
+    }
+
+    /// The player's solo play on each map, carried to the character now: a stretch with a record
+    /// of the character then is scaled by how much faster the model says they are now; one
+    /// without counts only near the current level.
+    pub fn carried_play(&self, measured: &[MeasuredRate], model: &Model, layouts: &Layouts) -> HashMap<u32, Carried> {
+        let places = self.places(measured);
+        let mut out: HashMap<u32, Carried> = HashMap::new();
+        for r in measured.iter().filter(|r| r.active_seconds >= MIN_STRETCH_SECONDS && r.exp_per_hour > 0.0 && r.party.unwrap_or(1) <= 1) {
+            let Some(Some(found)) = places.get(r.label.as_str()) else { continue };
+            let layout = layouts.get(&found.card.map.id);
+            let scale = match r.fighter {
+                Some(then) => {
+                    let now = model.rate(&model.fighter, &found.card.mobs, layout).map(|x| x.1);
+                    let before = model.rate(&then, &found.card.mobs, layout).map(|x| x.1);
+                    match (now, before) {
+                        (Some(now), Some(before)) if before > 0.0 => now / before,
+                        _ => continue,
+                    }
+                }
+                None if r.level.is_some_and(|l| l.abs_diff(model.fighter.level) <= SAME_LEVELS) => 1.0,
+                None => continue,
+            };
+            let entry = out.entry(found.card.map.id).or_default();
+            let total = entry.seconds + r.active_seconds;
+            entry.exp_per_hour = (entry.exp_per_hour * entry.seconds + r.exp_per_hour * scale * r.active_seconds) / total;
+            entry.seconds = total;
+        }
+        out
     }
 }
 
@@ -492,14 +759,14 @@ mod tests {
     use crate::mapdata::atlas::tests::{island_world, world};
 
     fn reachable(atlas: &Atlas, from: Option<u32>) -> Vec<String> {
-        let spots = atlas.training_spots(from, &[], &Travel::none(), None, &Layouts::new());
+        let spots = atlas.training_spots(from, &[], &Travel::none(), None, None, &Layouts::new());
         let mut names: Vec<String> = spots.into_iter().filter(|s| s.reachable).map(|s| s.map.name).collect();
         names.sort();
         names
     }
 
     fn rate(label: &str, exp_per_hour: f64, minutes: f64, level: Option<u32>) -> MeasuredRate {
-        MeasuredRate { label: label.into(), exp_per_hour, active_seconds: minutes * 60.0, level, party: None }
+        MeasuredRate { label: label.into(), exp_per_hour, active_seconds: minutes * 60.0, level, party: None, kills: None, fighter: None }
     }
 
     #[test]
@@ -513,7 +780,7 @@ mod tests {
     #[test]
     fn lists_hunting_maps_with_base_numbers() {
         let atlas = world();
-        let spots = atlas.training_spots(Some(1), &[], &Travel::none(), None, &Layouts::new());
+        let spots = atlas.training_spots(Some(1), &[], &Travel::none(), None, None, &Layouts::new());
         let names: Vec<&str> = spots.iter().map(|s| s.map.name.as_str()).collect();
         assert_eq!(names, ["Mossbank Meadow I", "Mossbank Meadow II", "Burrow Den"]);
 
@@ -537,7 +804,7 @@ mod tests {
             rate("Fern Road : Mossbank Meadovv I", 2000.0, 30.0, None),
             rate("Nowhere", 9.0, 1.0, None),
         ];
-        let spots = atlas.training_spots(None, &measured, &Travel::none(), None, &Layouts::new());
+        let spots = atlas.training_spots(None, &measured, &Travel::none(), None, None, &Layouts::new());
         let meadow = spots.iter().find(|s| s.map.id == 2).unwrap();
         let rate = meadow.measured.as_ref().unwrap();
         assert_eq!(rate.active_seconds, 2400.0);
@@ -558,7 +825,7 @@ mod tests {
         assert_eq!((speed.maps, speed.levels, speed.widened), (1, Some((5, 5)), false));
 
         // Burrow Den: rats of 80 HP and 15 EXP. 3,200 HP is 40 rats, 600 EXP.
-        let spots = atlas.training_spots(None, &measured, &Travel::none(), Some(&estimator), &Layouts::new());
+        let spots = atlas.training_spots(None, &measured, &Travel::none(), Some(&estimator), None, &Layouts::new());
         let den = spots.iter().find(|s| s.map.id == 4).unwrap().estimate.as_ref().unwrap();
         assert!((den.kills_per_hour - 40.0).abs() < 1e-9);
         assert!((den.exp_per_hour - 600.0).abs() < 1e-9);
@@ -575,7 +842,7 @@ mod tests {
         let slow = Assumptions { respawn_seconds: 60.0, ..Assumptions::default() };
         let estimator = atlas.estimator(&measured, Some(5), slow, &Layouts::new()).unwrap();
         // Meadow II holds 2 snails: back once a minute, 120 kills an hour at most.
-        let spots = atlas.training_spots(None, &measured, &Travel::none(), Some(&estimator), &Layouts::new());
+        let spots = atlas.training_spots(None, &measured, &Travel::none(), Some(&estimator), None, &Layouts::new());
         let small = spots.iter().find(|s| s.map.id == 3).unwrap().estimate.as_ref().unwrap();
         assert!(small.capped);
         assert!((small.ceiling - 120.0).abs() < 1e-9);
@@ -589,7 +856,7 @@ mod tests {
         let base = atlas.estimator(&measured, None, Assumptions::default(), &Layouts::new()).unwrap();
         let doubled = atlas.estimator(&measured, None, Assumptions { exp_rate: 2.0, ..Assumptions::default() }, &Layouts::new()).unwrap();
         let den = |e: &Estimator| {
-            let spots = atlas.training_spots(None, &measured, &Travel::none(), Some(e), &Layouts::new());
+            let spots = atlas.training_spots(None, &measured, &Travel::none(), Some(e), None, &Layouts::new());
             spots.into_iter().find(|s| s.map.id == 4).unwrap().estimate.unwrap()
         };
         let (a, b) = (den(&base), den(&doubled));
@@ -608,7 +875,7 @@ mod tests {
     }
 
     fn armoured(defence: u32) -> Vec<MobRow> {
-        vec![MobRow { id: 1, name: "Iron Hog".into(), level: 28, hp: 572, exp: 52, count: 20, boss: false, undead: false, weapon_def: Some(defence) }]
+        vec![MobRow { id: 1, name: "Iron Hog".into(), level: 28, hp: 572, exp: 52, count: 20, boss: false, undead: false, weapon_def: Some(defence), magic_def: Some(100), evasion: Some(17) }]
     }
 
     fn estimator_with(attack: Option<(f64, f64)>) -> Estimator {
@@ -688,7 +955,7 @@ mod tests {
         // Nothing near Lv 30: every solo session counts, and the estimates say so.
         let far = atlas.estimator(&measured, Some(30), Assumptions::default(), &Layouts::new()).unwrap();
         assert_eq!((far.speed.levels, far.speed.widened), (Some((2, 9)), true));
-        let spots = atlas.training_spots(None, &measured, &Travel::none(), Some(&far), &Layouts::new());
+        let spots = atlas.training_spots(None, &measured, &Travel::none(), Some(&far), None, &Layouts::new());
         let meadow = spots.iter().find(|s| s.map.id == 2).unwrap().estimate.as_ref().unwrap();
         assert_eq!(meadow.sureness, 2);
     }
@@ -703,7 +970,7 @@ mod tests {
         };
         let den = |layouts: &Layouts| {
             let estimator = atlas.estimator(&measured, Some(5), Assumptions::default(), layouts).unwrap();
-            let spots = atlas.training_spots(None, &measured, &Travel::none(), Some(&estimator), layouts);
+            let spots = atlas.training_spots(None, &measured, &Travel::none(), Some(&estimator), None, layouts);
             spots.into_iter().find(|s| s.map.id == 4).unwrap().estimate.unwrap()
         };
         // Meadow I: 100 kills an hour, 36 s each, 0.8 s of it walking (200 px of floor a monster).
@@ -721,5 +988,61 @@ mod tests {
         let none = den(&Layouts::new());
         assert!((none.kills_per_hour - 40.0).abs() < 1e-9);
         assert_eq!(none.walk_seconds_per_kill, None);
+    }
+
+    fn hero(level: u32) -> Fighter {
+        Fighter {
+            level,
+            low: 100.0,
+            high: 200.0,
+            lines: 1,
+            targets: 1,
+            accuracy: None,
+            magic: false,
+            crit_rate: 0.0,
+            crit_bonus: 0.0,
+            attack_seconds: 0.8,
+        }
+    }
+
+    const MEADOW: &str = "Fern Road : Mossbank Meadow I";
+
+    fn forecast(atlas: &Atlas, measured: &[MeasuredRate], model: &Model) -> Forecast {
+        let spots = atlas.training_spots(None, measured, &Travel::none(), None, Some(model), &Layouts::new());
+        spots.into_iter().find(|s| s.map.name == "Mossbank Meadow I").and_then(|s| s.forecast).unwrap()
+    }
+
+    #[test]
+    fn the_model_estimates_maps_never_played_and_play_pulls_its_map_towards_it() {
+        let atlas = world();
+        let model = atlas.model(&[], Some(hero(5)), Assumptions::default(), &Layouts::new()).unwrap();
+        assert_eq!(model.fit.stretches, 0);
+        let fresh = forecast(&atlas, &[], &model);
+        assert_eq!((fresh.sureness, fresh.played_seconds), (1, 0.0));
+        assert!(fresh.low < fresh.exp_per_hour && fresh.exp_per_hour < fresh.high);
+
+        // An hour played there at this level, at twice the model's rate: the hour counts three
+        // times as much as the model's twenty minutes.
+        let r = fresh.exp_per_hour;
+        let played = [rate(MEADOW, 2.0 * r, 60.0, Some(5))];
+        let blended = forecast(&atlas, &played, &model);
+        assert!((blended.exp_per_hour - 1.75 * r).abs() < 1e-6 * r, "{blended:?}");
+        assert!(blended.high / blended.low < fresh.high / fresh.low, "play narrows the range");
+
+        // Play long ago, with no record of the character then, says nothing about now.
+        let old = [rate(MEADOW, 2.0 * r, 60.0, Some(1))];
+        let model_later = atlas.model(&[], Some(hero(9)), Assumptions::default(), &Layouts::new()).unwrap();
+        assert_eq!(forecast(&atlas, &old, &model_later).played_seconds, 0.0);
+    }
+
+    #[test]
+    fn play_with_a_record_of_the_character_then_is_carried_to_now() {
+        let atlas = world();
+        let weak = Fighter { low: 20.0, high: 40.0, ..hero(3) };
+        let model = atlas.model(&[], Some(hero(5)), Assumptions::default(), &Layouts::new()).unwrap();
+        let then = MeasuredRate { fighter: Some(weak), ..rate(MEADOW, 1_000.0, 60.0, Some(3)) };
+        let carried = atlas.carried_play(&[then], &model, &Layouts::new());
+        let meadow = carried.values().next().unwrap();
+        assert!(meadow.exp_per_hour > 1_000.0, "stronger now, so faster now: {meadow:?}");
     }
 }

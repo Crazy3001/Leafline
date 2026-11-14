@@ -51,8 +51,23 @@ pub struct PlayerDamage {
 pub struct DamageSkill {
     pub name: String,
     pub level: u32,
-    /// Its damage as the skill data gives it at that level: 240 is 240%.
+    /// Its damage as the skill data gives it at that level: 240 is 240%. A spell's is 100, since
+    /// its damage comes from its own Basic Attack instead.
     pub percent: u32,
+    /// A spell's Basic Attack at that level, which its damage is worked out from.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub basic_attack: Option<u32>,
+}
+
+/// A spell level's Basic Attack and Mastery level: `MP -20, Basic Attack 65, Mastery level 10`
+/// gives (65, 10).
+pub fn spell(description: &str) -> Option<(u32, u32)> {
+    let number_after = |label: &str| -> Option<u32> {
+        let rest = &description[description.find(label)? + label.len()..];
+        let digits: String = rest.trim_start().chars().take_while(char::is_ascii_digit).collect();
+        digits.parse().ok()
+    };
+    Some((number_after("Basic Attack")?, number_after("Mastery level").unwrap_or(1)))
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -136,9 +151,14 @@ fn damaging_skills(window: &SkillWindow, catalog: &Catalog) -> Vec<DamageSkill> 
     for row in window.rows.iter().filter(|r| r.level > 0) {
         let Some(skill) = skill_named(catalog, &row.name, |s| !s.passive) else { continue };
         let level = row.level.min(skill.level_descriptions.len() as u32).max(1) as usize;
-        let Some(percent) = skill.level_descriptions.get(level - 1).and_then(|d| percent(d)) else { continue };
+        let Some(description) = skill.level_descriptions.get(level - 1) else { continue };
+        let (percent, basic_attack) = match (percent(description), spell(description)) {
+            (Some(percent), _) => (percent, None),
+            (None, Some((base, _))) => (100, Some(base)),
+            _ => continue,
+        };
         if !found.iter().any(|f| f.name == skill.name) {
-            found.push(DamageSkill { name: skill.name.clone(), level: row.level, percent });
+            found.push(DamageSkill { name: skill.name.clone(), level: row.level, percent, basic_attack });
         }
     }
     found
@@ -239,6 +259,13 @@ mod tests {
         assert_eq!(percent("Fires an arrow"), None);
     }
 
+    #[test]
+    fn a_spell_level_gives_its_basic_attack() {
+        assert_eq!(spell("MP -20, Basic Attack 65, Mastery level 10"), Some((65, 10)));
+        assert_eq!(spell("MP -8, Basic Attack 90"), Some((90, 1)));
+        assert_eq!(spell("MP -14; Damage 240%"), None);
+    }
+
     fn catalog() -> Catalog {
         use crate::build::catalog::tests::skill;
         let levelled = |id, name: &str, passive: bool, descriptions: &[&str]| {
@@ -260,7 +287,7 @@ mod tests {
 
     #[test]
     fn a_read_of_another_page_of_skills_adds_to_what_is_known() {
-        let skill = |name: &str, level, percent| DamageSkill { name: name.into(), level, percent };
+        let skill = |name: &str, level, percent| DamageSkill { name: name.into(), level, percent, basic_attack: None };
         let mut known = vec![skill("Arrow Blow", 20, 240)];
         merge(&mut known, vec![skill("Iron Arrow", 1, 120)]);
         assert_eq!(known, vec![skill("Arrow Blow", 20, 240), skill("Iron Arrow", 1, 120)]);
@@ -280,6 +307,6 @@ mod tests {
         let found = damaging_skills(&window, &catalog());
         // Passive, not-damaging and unlearned skills are left out; a misread name still matches
         // its skill once, and the first reading of it stands.
-        assert_eq!(found, vec![DamageSkill { name: "Arrow Blow".into(), level: 3, percent: 170 }]);
+        assert_eq!(found, vec![DamageSkill { name: "Arrow Blow".into(), level: 3, percent: 170, basic_attack: None }]);
     }
 }

@@ -17,6 +17,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use super::mapdata::MapDataState;
 use super::records::{self, HISTORY_EVENT, MESOS_EVENT, UserDataState};
 use super::builds;
+use super::fighter;
 use super::report;
 use super::settings::{self, SettingsState};
 use super::{overlay, pins, readings, recovery};
@@ -411,6 +412,40 @@ impl NameSnap {
     }
 }
 
+/// How often the character snapshot and the map's estimate are worked out again while on one map.
+const FIGHTER_EVERY: Duration = Duration::from_secs(60);
+const PRIOR_EVERY: Duration = Duration::from_secs(300);
+
+/// Keeps the tracker supplied with what the estimates know: the character as they are (copied
+/// into each stretch of play, so later estimates can compare like with like) and an estimate of
+/// the pace on the map they are on, which the time to level starts from.
+#[derive(Default)]
+struct Estimates {
+    fighter_at: Option<Instant>,
+    prior_for: Option<(String, String)>,
+    prior_at: Option<Instant>,
+}
+
+impl Estimates {
+    fn follow(&mut self, app: &AppHandle, tracker: &mut SessionTracker, session: &SessionSummary) {
+        let Some(name) = session.name.clone() else { return };
+        let due = |at: Option<Instant>, every: Duration| at.is_none_or(|t| t.elapsed() >= every);
+        if due(self.fighter_at, FIGHTER_EVERY) {
+            self.fighter_at = Some(Instant::now());
+            let fighter = fighter::fighter(app, &name, session.level, &fighter::Choice::default());
+            tracker.set_fighter(fighter.and_then(|f| serde_json::to_value(f).ok()));
+        }
+        let Some(map) = tracker.current_map().map(str::to_string).filter(|_| !session.town) else { return };
+        let here = (name.clone(), map.clone());
+        if self.prior_for.as_ref() != Some(&here) || due(self.prior_at, PRIOR_EVERY) {
+            self.prior_for = Some(here);
+            self.prior_at = Some(Instant::now());
+            let prior = fighter::prior(app, &name, session.level, &map, session.started_at);
+            tracker.set_prior(&map, prior);
+        }
+    }
+}
+
 /// Remembers each character's mesos between runs, once the tracker has confirmed both the name
 /// and the amount.
 #[derive(Default)]
@@ -506,6 +541,7 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
     let mut titles = QuestTitles::default();
     let mut names = NameSnap::new(app.state::<UserDataState>().with(|db| db.character_names()).unwrap_or_default());
     let mut windows = Watch::default();
+    let mut estimates = Estimates::default();
     let mut twin = None;
     let mut held = false;
     let mut game: Option<(Capturer, GameWindow, bool)> = None;
@@ -666,6 +702,9 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
                     tracker.push(&sample);
                 }
                 let session = tracker.summary();
+                if !held {
+                    estimates.follow(app, &mut tracker, &session);
+                }
                 if session.active_seconds > last_active.0 {
                     last_active = (session.active_seconds, Instant::now());
                 }

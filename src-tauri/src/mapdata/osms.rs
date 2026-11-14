@@ -630,6 +630,10 @@ pub struct Effects {
     pub jump: i32,
     /// How long it lasts, in seconds. Zero when the file gives no time.
     pub seconds: u32,
+    /// For an attack: the damage lines one use deals, and how many monsters it can hit. Zero when
+    /// the file doesn't say.
+    pub lines: i32,
+    pub targets: i32,
     /// The level costs MP, and whether it hits: what tells a buff. Only read from the file, never kept.
     #[serde(skip)]
     pub costs_mp: bool,
@@ -685,6 +689,8 @@ fn level_effects<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Vec<Effec
             speed: l.indie_speed.or(l.speed).unwrap_or(0),
             jump: l.indie_jump.unwrap_or(0),
             seconds: l.time.unwrap_or(0),
+            lines: l.attack_count.unwrap_or(0).max(0),
+            targets: l.mob_count.unwrap_or(0).max(0),
             costs_mp: l.mp_con.is_some_and(|mp| mp > 0),
             hits: [l.damage, l.fixdamage, l.mob_count, l.attack_count].iter().any(Option::is_some),
         })

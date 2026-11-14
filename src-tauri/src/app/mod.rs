@@ -5,6 +5,7 @@ mod cards;
 mod commands;
 mod damage;
 mod desk;
+mod fighter;
 mod layout;
 mod live;
 mod mapdata;

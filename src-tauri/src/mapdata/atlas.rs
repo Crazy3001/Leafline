@@ -141,6 +141,10 @@ pub struct MobRow {
     pub undead: bool,
     /// How much of a weapon blow it shrugs off, when the data says.
     pub weapon_def: Option<u32>,
+    /// The same for spells.
+    pub magic_def: Option<u32>,
+    /// Avoidability: how hard it is to hit with a weapon.
+    pub evasion: Option<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -524,6 +528,8 @@ impl Atlas {
                     boss: m.is_boss,
                     undead: m.undead,
                     weapon_def: m.details.weapon_def.map(|d| d.max(0) as u32),
+                    magic_def: m.details.magic_def.map(|d| d.max(0) as u32),
+                    evasion: m.details.evasion.map(|d| d.max(0) as u32),
                 })
             })
             .collect();
