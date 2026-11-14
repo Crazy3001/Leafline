@@ -37,13 +37,14 @@
           {:else}
             <span class="verb">{verb(step)}</span>
             {#if step.hidden}<span class="hidden" use:tip={"The portal's name marks it as hidden: the game draws nothing there"}
-                ><EyeOff size={11} /><span class="hidden-hint">{HIDDEN_PORTAL_HINT}</span></span
+                ><EyeOff size={11} /></span
               >{/if}
           {/if}
           <span class="arrow">→</span>
           {#if step.to.known}<Ref kind="map" id={step.to.id} name={step.to.name} class="step-map" />{:else}<span class="map"
               >{step.to.name}</span
             >{/if}
+          {#if step.hidden && !step.travel}<span class="hidden-hint">· {HIDDEN_PORTAL_HINT}</span>{/if}
           {#if step.travel?.fare}
             <span class="fare tabular" use:tip={"Fare at level 20 and up, as players recorded it on mapleclassic.wiki"}
               >{formatNumber(step.travel.fare)} mesos</span
@@ -174,12 +175,11 @@
   .hidden {
     color: var(--warn);
     align-self: center;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
+    display: inline-grid;
   }
 
   .hidden-hint {
+    color: var(--warn);
     font-size: var(--text-xs);
   }
 

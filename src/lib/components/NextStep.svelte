@@ -110,7 +110,7 @@
           <span class="arrow">→</span>
           {#if step.to.known}<Ref kind="map" id={step.to.id} name={step.to.name} icon={false} />{:else}<span class="map">{step.to.name}</span>{/if}
           {#if step.travel?.fare}<span class="faint tabular fare">{formatNumber(step.travel.fare)} mesos</span>{/if}
-          {#if step.hidden}<span class="hidden-hint">{HIDDEN_PORTAL_HINT}</span>{/if}
+          {#if step.hidden}<span class="hidden-hint">· {HIDDEN_PORTAL_HINT}</span>{/if}
         {:else if trip.lost}
           <span class="label">No known way</span>
           {#if trip.here}<span class="faint">from {trip.here.name}</span>{/if}

@@ -93,6 +93,32 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
   log (Records and best maps follow it). Potions and a level goal always belong to one character:
   the one you pick, or on screen, or played last. A past session's potions use its own
   character's slots.
+- **Closest or Most.** A quest objective's list of maps has a **Closest / Most** switch: the
+  nearest map with a fair number of the monster, or the one with the most of it, however far.
+  Your choice holds for every quest.
+- **Buy it instead.** When an NPC shop sells an item a quest wants, the objective says so under
+  where to hunt it: the cheapest shop, its price and what the rest you need would cost, with Go.
+- **Rest of the chain.** A quest's page says how many quests follow it in its chain, the highest
+  level they ask for, and the EXP and mesos they pay in all.
+- **Quests to take now.** The Quests tab lists quests your level can start that need no other
+  quest first, the nearest to your level first. The search has the same filter. Leafline can't see
+  which quests you've done, so some may be done already.
+- **Tracked items.** **Track it** on any item's page stars it. Starred items are listed in
+  **Lookup → Items**, each with the monster that drops it and the best map to hunt it, a route,
+  and a shop when one sells it. Each character keeps its own list.
+- **When you'll level.** Time to level now also says the clock time you'll get there at this pace,
+  in the Train tab and in the compact HUD's tooltip.
+
+### Changed
+- **Routes take the quickest walk.** Routes are now worked out by how far you walk across each
+  map, from the portal you come out of to the one you take next, with climbing counted extra,
+  instead of the fewest portals. A taxi or scroll is taken when it beats the walk. "About N on
+  foot" comes from the same walk. Walking speed and ride times are rough guesses for a character
+  with no speed bonus.
+- **Hidden portals** in routes and the next-step bar say "stand on the spot and press ↑", since
+  the game draws nothing there.
+- **EXP per hour from the second kill.** The session's rate now shows from your second kill
+  instead of after half a minute, marked "still measuring" until about a minute of play.
 
 ## 0.2.0 (2026-11-12)
 

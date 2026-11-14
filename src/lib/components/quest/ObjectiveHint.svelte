@@ -80,7 +80,7 @@
             >{/if}
           {#if shop.needs}<span class="muted"> · {shop.needs}</span>{/if}
         </span>
-        {#if shop.map && shop.hops != null}<span class="far tabular">{shop.hops === 0 ? "here" : `${shop.hops} away`}</span>{/if}
+        {#if shop.map && shop.hops != null}<span class="far tabular">{shop.hops === 0 ? "here" : `${shop.hops} portal${shop.hops === 1 ? "" : "s"}`}</span>{/if}
       </p>
       {#if shop.map && shop.hops !== 0}<GoButton place={mapPlace(shop.map)} />{/if}
     </div>
