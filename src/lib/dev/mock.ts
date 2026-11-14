@@ -48,6 +48,7 @@ import type {
   QuestRow,
   SessionSummary,
 } from "../types";
+import type { BuffRow, PlayerDamage, SkillEffects, StatSheet, StatsView } from "../types";
 import sample from "./sample-analysis.json";
 import {
   sampleCard,
@@ -235,6 +236,8 @@ const mockSkill = (id: number, name: string, jobId: number, maxLevel: number, re
   description: null,
   requiredSkills,
   levelDescriptions: Array.from({ length: maxLevel }, (_, i) => `Damage ${100 + i * 5}%`),
+  effects: [],
+  buff: false,
 });
 const mockCatalog: BuildCatalog = {
   jobs: [
@@ -665,8 +668,16 @@ export const mockBackend: Backend = {
     return [...savedSpots];
   },
   playerDamage: async () => null,
-  async onPlayerDamage() {
+  async onPlayerDamage(handler) {
+    damageHandlers.push(handler);
     return () => {};
+  },
+  characterStats: async () => mockStats(),
+  async setBuff(name, skill, on) {
+    mockBuffsOn = mockBuffsOn.filter((id) => id !== skill);
+    if (on) mockBuffsOn.push(skill);
+    const damage: PlayerDamage = { attackMin: 107, attackMax: 289, skills: [], sheet: null, readAt: null, buffsOn: mockBuffsOn, readWith: [] };
+    damageHandlers.forEach((h) => h({ name, damage }));
   },
   async onSavedSpots(handler) {
     spotHandlers.push(handler);
@@ -1252,4 +1263,60 @@ function mockUpdateCheck() {
     if (displaySettings.updateCheck)
       setUpdate({ state: "available", current: "0.1.0", latest: "0.2.0", url: "https://github.com/OWNER/leafline/releases" });
   }, 700);
+}
+
+// Made-up stats for the dev preview's Stats view.
+const damageHandlers: ((change: { name: string; damage: PlayerDamage }) => void)[] = [];
+let mockBuffsOn: number[] = [];
+
+function mockStats(): StatsView {
+  const sheet: StatSheet = {
+    level: 33,
+    str: 28,
+    dex: 149,
+    int: 4,
+    luk: 4,
+    gearStr: 2,
+    gearDex: 6,
+    gearInt: 0,
+    gearLuk: 0,
+    abilityPoints: 0,
+    maxHp: 1220,
+    maxMp: 1004,
+    fame: 3,
+    attackMin: 107,
+    attackMax: 289,
+    weaponDef: 117,
+    magic: 2,
+    magicDef: 28,
+    accuracy: 76,
+    evasion: 33,
+    critRate: 26,
+    critDamage: 141,
+    speed: 101,
+    jump: 100,
+  };
+  const none: SkillEffects = { attack: 0, magic: 0, weaponDef: 0, weaponDefPercent: 0, magicDef: 0, accuracy: 0, evasion: 0, speed: 0, jump: 0, seconds: 300 };
+  const row = (id: number, name: string, level: number | null, maxLevel: number, effects: Partial<SkillEffects>, description: string | null): BuffRow => ({
+    id,
+    name,
+    level,
+    maxLevel,
+    levelRead: level != null,
+    on: level != null && mockBuffsOn.includes(id),
+    onAtRead: false,
+    effects: { ...none, ...effects },
+    description,
+  });
+  const buffs = [
+    row(12, "Soft Landing", 10, 10, { accuracy: 15, evasion: 15 }, "MP -12; Accuracy +15, Evasion +15 for 300 sec"),
+    row(21, "Bramble Guard", 4, 20, {}, "HP -20, MP -20; Attack speed up 2 stages for 120 sec"),
+    row(30, "Thin Mist", null, 30, {}, null),
+  ];
+  const on = buffs.filter((b) => b.on);
+  const add = (key: keyof SkillEffects) => on.reduce((n, b) => n + b.effects[key], 0);
+  const buffed = on.length
+    ? { ...sheet, accuracy: sheet.accuracy! + add("accuracy"), evasion: sheet.evasion! + add("evasion") }
+    : null;
+  return { sheet, readAt: Date.now() / 1000 - 260, buffs, buffed, weaponAttack: 49, attackUnscaled: false };
 }

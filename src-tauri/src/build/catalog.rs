@@ -596,6 +596,8 @@ pub(crate) mod tests {
             required_skills: needs.iter().map(|&(skill_id, level)| SkillNeed { skill_id, level }).collect(),
             level_descriptions: Vec::new(),
             icon_url: None,
+            effects: Vec::new(),
+            buff: false,
         }
     }
 

@@ -25,6 +25,13 @@ const STAT_PITCH: f32 = 36.0;
 const STAT_LABELS: usize = 4;
 /// From the top of the STR label up to the top of the LEVEL label.
 const LEVEL_ABOVE_STR: f32 = 192.0;
+/// The HP, MP and FAME lines, likewise. EXP sits between MP and FAME.
+const HP_ABOVE_STR: f32 = 156.0;
+const MP_ABOVE_STR: f32 = 120.0;
+const FAME_ABOVE_STR: f32 = 48.0;
+/// The detail pane's lines under ATTACK: WEAPON DEF., MAGIC, MAGIC DEF., ACCURACY, EVASION,
+/// CRIT. RATE, CRIT. DAMAGE, SPEED and JUMP.
+const DETAIL_LINES: usize = 10;
 /// From a label's left edge to where its value can start, and how far values run.
 const VALUE_LEFT: f32 = 96.0;
 const VALUE_WIDTH: f32 = 170.0;
@@ -67,13 +74,24 @@ pub struct CharacterReading {
     pub detail: Option<DetailWindow>,
 }
 
-/// What the detail pane shows that the plans use.
+/// What the detail pane shows. Its lines stand in this order under ATTACK, one label pitch apart;
+/// a line that doesn't read is `None` and the others still count.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DetailWindow {
     /// The Attack line, `107 - 289`.
     pub attack_min: u32,
     pub attack_max: u32,
+    pub weapon_def: Option<u32>,
+    pub magic: Option<u32>,
+    pub magic_def: Option<u32>,
+    pub accuracy: Option<u32>,
+    pub evasion: Option<u32>,
+    /// Percentages, as the pane shows them: `26%` is 26.
+    pub crit_rate: Option<u32>,
+    pub crit_damage: Option<u32>,
+    pub speed: Option<u32>,
+    pub jump: Option<u32>,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
@@ -89,6 +107,11 @@ pub struct StatWindow {
     pub bonus: Bonus,
     /// Unspent AP.
     pub ability_points: u32,
+    /// The second half of the HP and MP lines, `1220/1220`. The first half moves with every blow,
+    /// so it isn't kept: a change to it would read the windows again for nothing.
+    pub max_hp: Option<u32>,
+    pub max_mp: Option<u32>,
+    pub fame: Option<u32>,
 }
 
 /// What worn gear adds to each stat.
@@ -252,26 +275,81 @@ fn stat_labels(view: &Frame) -> Option<[Rect; STAT_LABELS]> {
 /// With `broken`, the labels under the first may show only a sliver, since text across them
 /// splits their fill (the detail pane's do); the first must still be whole.
 fn stacked_labels(view: &Frame, is_label: fn(&Rgba<u8>) -> bool, broken: bool) -> Option<[Rect; STAT_LABELS]> {
-    let mut blocks = color::find_blocks(view, whole(view), MIN_LABEL_RUN, is_label);
-    blocks.retain(|b| b.h <= 36.0 && (broken || b.h >= 20.0));
-    blocks.sort_by(|a, b| a.y.total_cmp(&b.y));
+    let blocks = label_blocks(view, is_label, broken);
     blocks.iter().filter(|b| b.h >= 20.0).find_map(|first| {
-        let at = |i: usize| {
-            let y = first.y + i as f32 * STAT_PITCH;
-            blocks.iter().find(|b| (b.x - first.x).abs() <= SLACK && (b.y - y).abs() <= SLACK).copied()
-        };
+        let at = |i: usize| label_at(&blocks, first, i);
         Some([at(0)?, at(1)?, at(2)?, at(3)?])
     })
 }
 
-/// The Attack line of the detail pane: its blue labels stand four or more in a stack, ATTACK on top.
+/// Blocks of a label colour, of a label's size, top to bottom.
+fn label_blocks(view: &Frame, is_label: fn(&Rgba<u8>) -> bool, broken: bool) -> Vec<Rect> {
+    let mut blocks = color::find_blocks(view, whole(view), MIN_LABEL_RUN, is_label);
+    blocks.retain(|b| b.h <= 36.0 && (broken || b.h >= 20.0));
+    blocks.sort_by(|a, b| a.y.total_cmp(&b.y));
+    blocks
+}
+
+/// The label `i` pitches under `first`, when one stands there.
+fn label_at(blocks: &[Rect], first: &Rect, i: usize) -> Option<Rect> {
+    let y = first.y + i as f32 * STAT_PITCH;
+    blocks.iter().find(|b| (b.x - first.x).abs() <= SLACK && (b.y - y).abs() <= SLACK).copied()
+}
+
+/// The detail pane: its blue labels stand four or more in a stack, ATTACK on top. The Attack line
+/// must read; each line under it is read where its label stands, as the first number on it.
 fn read_detail(view: &Frame) -> Option<DetailWindow> {
     let attack = stacked_labels(view, is_detail_label, true)?[0];
-    let (attack_min, attack_max) = range_in(
-        view,
-        Rect::new(attack.x + DETAIL_VALUE_LEFT, attack.y - 2.0, DETAIL_VALUE_WIDTH, attack.h + 4.0),
-    )?;
-    (attack_min <= attack_max).then_some(DetailWindow { attack_min, attack_max })
+    let blocks = label_blocks(view, is_detail_label, true);
+    let value_area = |label: &Rect| Rect::new(attack.x + DETAIL_VALUE_LEFT, label.y - 2.0, DETAIL_VALUE_WIDTH, attack.h + 4.0);
+    let (attack_min, attack_max) = range_in(view, value_area(&attack))?;
+    if attack_min > attack_max {
+        return None;
+    }
+    let mut lines = (1..DETAIL_LINES).map(|i| {
+        // A label under a long value can be split by the text across it, so its top is taken from
+        // where it should be rather than from the sliver that shows.
+        let label = label_at(&blocks, &attack, i)?;
+        let at = Rect::new(label.x, attack.y + i as f32 * STAT_PITCH, label.w, attack.h);
+        only(numbers_in(view, value_area(&at)))
+    });
+    let mut next = || lines.next().flatten();
+    Some(DetailWindow {
+        attack_min,
+        attack_max,
+        weapon_def: next(),
+        magic: next(),
+        magic_def: next(),
+        accuracy: next(),
+        evasion: next(),
+        crit_rate: next(),
+        crit_damage: next(),
+        speed: next(),
+        jump: next(),
+    })
+}
+
+/// The numbers in `area` up to the first wide gap, each run of digits apart: `1220/1220` is two,
+/// `26%` is one. The digits' height comes from the first one, since slashes, brackets and signs
+/// run taller or lower. Empty when the first mark isn't a digit.
+fn numbers_in(view: &Frame, area: Rect) -> Vec<u32> {
+    let columns = ink_columns(view, area, is_ink);
+    let end = number_end(&columns);
+    let Some(first) = columns.first() else { return Vec::new() };
+    let Some(rows) = ink_rows(view, Rect::new(first.0 as f32, area.y, (first.1 - first.0) as f32, area.h), is_ink) else {
+        return Vec::new();
+    };
+    let mut numbers = Vec::new();
+    let mut run = String::new();
+    for &cols in &columns[..end] {
+        match digits::window_digit(&Mask::new(view, cols, rows, is_ink)) {
+            Some(digit) => run.push(digit),
+            None if run.is_empty() && numbers.is_empty() => return Vec::new(),
+            None => numbers.extend(std::mem::take(&mut run).parse::<u32>().ok()),
+        }
+    }
+    numbers.extend(run.parse::<u32>().ok());
+    numbers
 }
 
 fn read_stats(view: &Frame, labels: &[Rect; STAT_LABELS]) -> Option<StatWindow> {
@@ -291,7 +369,26 @@ fn read_stats(view: &Frame, labels: &[Rect; STAT_LABELS]) -> Option<StatWindow> 
         luk,
         bonus: Bonus { str: str_gear, dex: dex_gear, int: int_gear, luk: luk_gear },
         ability_points: number_in(view, Rect::new(luk_label.x + x, luk_label.y + y, w, h))?,
+        max_hp: maximum(numbers_in(view, row(str_label, str_label.y - HP_ABOVE_STR))),
+        max_mp: maximum(numbers_in(view, row(str_label, str_label.y - MP_ABOVE_STR))),
+        fame: only(numbers_in(view, row(str_label, str_label.y - FAME_ABOVE_STR))),
     })
+}
+
+/// The number on a line that shows one; a line that reads as more is a misread.
+fn only(numbers: Vec<u32>) -> Option<u32> {
+    match numbers[..] {
+        [one] => Some(one),
+        _ => None,
+    }
+}
+
+/// The second of `now/most`, which can't be under the first.
+fn maximum(numbers: Vec<u32>) -> Option<u32> {
+    match numbers[..] {
+        [now, most] if now <= most && most > 0 => Some(most),
+        _ => None,
+    }
 }
 
 /// How many of `columns` make up the first number: it ends at the first gap wider than the space

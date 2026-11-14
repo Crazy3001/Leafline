@@ -604,6 +604,112 @@ pub struct SkillRecord {
     /// Where OSMS publishes its icon. The webview asks for pictures by skill id, not by address.
     #[serde(default, skip_serializing)]
     pub icon_url: Option<String>,
+    /// What the skill changes about the character at each level, from level 1. Empty for skills
+    /// that change nothing a stat window shows.
+    #[serde(default, rename(deserialize = "levels"), deserialize_with = "level_effects")]
+    pub effects: Vec<Effects>,
+    /// A skill the player casts on themselves (or the party) for a while, such as Rage or Haste:
+    /// one that costs MP and hits nothing. Worked out from the file's levels when it is read.
+    #[serde(default, skip_deserializing)]
+    pub buff: bool,
+}
+
+/// What a buff changes at one of its levels, from the file's per-level numbers. All are added to
+/// what the stat window shows, except `weapon_def_percent`, which is a share of it.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Effects {
+    pub attack: i32,
+    pub magic: i32,
+    pub weapon_def: i32,
+    pub weapon_def_percent: i32,
+    pub magic_def: i32,
+    pub accuracy: i32,
+    pub evasion: i32,
+    pub speed: i32,
+    pub jump: i32,
+    /// How long it lasts, in seconds. Zero when the file gives no time.
+    pub seconds: u32,
+    /// The level costs MP, and whether it hits: what tells a buff. Only read from the file, never kept.
+    #[serde(skip)]
+    pub costs_mp: bool,
+    #[serde(skip)]
+    pub hits: bool,
+}
+
+impl Effects {
+    /// Whether it changes anything a stat window shows.
+    pub fn any(&self) -> bool {
+        [self.attack, self.magic, self.weapon_def, self.weapon_def_percent, self.magic_def, self.accuracy, self.evasion, self.speed, self.jump]
+            .iter()
+            .any(|&n| n != 0)
+    }
+}
+
+/// One level of a skill as the file has it; only what [`Effects`] needs.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RawLevel {
+    indie_pad: Option<i32>,
+    indie_mad: Option<i32>,
+    indie_pdd: Option<i32>,
+    indie_pdd_r: Option<i32>,
+    indie_mdd: Option<i32>,
+    indie_acc: Option<i32>,
+    indie_eva: Option<i32>,
+    indie_speed: Option<i32>,
+    indie_jump: Option<i32>,
+    /// Nimble Feet's speed, which isn't an `indie` one.
+    speed: Option<i32>,
+    time: Option<u32>,
+    mp_con: Option<i32>,
+    damage: Option<i32>,
+    fixdamage: Option<i32>,
+    mob_count: Option<i32>,
+    attack_count: Option<i32>,
+}
+
+fn level_effects<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Vec<Effects>, D::Error> {
+    let raw: Option<Vec<RawLevel>> = Option::deserialize(deserializer)?;
+    Ok(raw
+        .unwrap_or_default()
+        .into_iter()
+        .map(|l| Effects {
+            attack: l.indie_pad.unwrap_or(0),
+            magic: l.indie_mad.unwrap_or(0),
+            weapon_def: l.indie_pdd.unwrap_or(0),
+            weapon_def_percent: l.indie_pdd_r.unwrap_or(0),
+            magic_def: l.indie_mdd.unwrap_or(0),
+            accuracy: l.indie_acc.unwrap_or(0),
+            evasion: l.indie_eva.unwrap_or(0),
+            speed: l.indie_speed.or(l.speed).unwrap_or(0),
+            jump: l.indie_jump.unwrap_or(0),
+            seconds: l.time.unwrap_or(0),
+            costs_mp: l.mp_con.is_some_and(|mp| mp > 0),
+            hits: [l.damage, l.fixdamage, l.mob_count, l.attack_count].iter().any(Option::is_some),
+        })
+        .collect())
+}
+
+/// Kinds of skill, as the file's `mechanics` names them, that are never buffs even when they cost MP.
+const NOT_BUFFS: [&str; 6] = ["attack", "action_hitbox", "weapon_projectile", "magic_projectile", "mobility", "passive"];
+
+impl SkillRecord {
+    /// Works out [`SkillRecord::buff`] from what the file gave: an active skill whose levels cost
+    /// MP and hit nothing, and that the file doesn't call an attack or a movement skill.
+    fn settle_buff(&mut self, mechanics: Option<&str>) {
+        self.buff = !self.passive
+            && !mechanics.is_some_and(|m| NOT_BUFFS.contains(&m))
+            && self.effects.iter().any(|e| e.costs_mp)
+            && !self.effects.iter().any(|e| e.hits);
+    }
+}
+
+/// The `mechanics` of each skill in the file, for [`SkillRecord::settle_buff`].
+#[derive(Deserialize)]
+struct Mechanics {
+    id: u32,
+    mechanics: Option<String>,
 }
 
 /// A skill that must reach `level` first.
@@ -889,6 +995,11 @@ impl Records {
             "skills.json" => {
                 let mut skills: Vec<SkillRecord> = serde_json::from_slice(body)?;
                 skills.retain(|s| s.job_tier != CRAFTING);
+                let kinds: HashMap<u32, Option<String>> =
+                    serde_json::from_slice::<Vec<Mechanics>>(body)?.into_iter().map(|m| (m.id, m.mechanics)).collect();
+                for skill in &mut skills {
+                    skill.settle_buff(kinds.get(&skill.id).and_then(Option::as_deref));
+                }
                 Self::Skills(skills)
             }
             "items.json" => Self::Items(serde_json::from_slice(body)?),
@@ -901,6 +1012,33 @@ impl Records {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_skill_that_costs_mp_and_hits_nothing_is_a_buff_with_its_effects_by_level() {
+        // Made-up skills in OSMS's shape.
+        let json = br#"[
+            {"id": 1, "name": "Fern Fury", "job_id": 110, "job_tier": "2nd Job", "max_level": 2, "mechanics": "party_support",
+             "levels": [{"level": 1, "mpCon": 10, "time": 60, "indiePad": 5, "indiePdd": -5},
+                        {"level": 2, "mpCon": 12, "time": 120, "indiePad": 10, "indiePdd": -10}]},
+            {"id": 2, "name": "Quick Feet", "job_id": 0, "job_tier": "Beginner", "max_level": 1, "mechanics": "self_buff",
+             "levels": [{"level": 1, "mpCon": 4, "time": 10, "speed": 10}]},
+            {"id": 3, "name": "Mending", "job_id": 230, "job_tier": "2nd Job", "max_level": 1, "mechanics": "party_support",
+             "levels": [{"level": 1, "mpCon": 20, "mobCount": 6, "x": 100}]},
+            {"id": 4, "name": "Blink", "job_id": 210, "job_tier": "2nd Job", "max_level": 1, "mechanics": "mobility",
+             "levels": [{"level": 1, "mpCon": 15, "range": 150}]},
+            {"id": 5, "name": "Shade Veil", "job_id": 400, "job_tier": "1st Job", "max_level": 1,
+             "levels": [{"level": 1, "mpCon": 30, "speed": null}]},
+            {"id": 6, "name": "Thick Hide", "job_id": 100, "job_tier": "1st Job", "max_level": 1, "passive": true,
+             "levels": [{"level": 1, "y": 20}]}
+        ]"#;
+        let Records::Skills(skills) = Records::parse("skills.json", json).unwrap() else { panic!() };
+        let buffs: Vec<_> = skills.iter().filter(|s| s.buff).map(|s| s.name.as_str()).collect();
+        // The heal hits and the teleport moves; a buff with no stats, like the veil, is still one.
+        assert_eq!(buffs, ["Fern Fury", "Quick Feet", "Shade Veil"]);
+        assert_eq!(skills[0].effects[1], Effects { attack: 10, weapon_def: -10, seconds: 120, costs_mp: true, ..Effects::default() });
+        assert_eq!(skills[1].effects[0].speed, 10, "a speed outside the indie fields counts");
+        assert!(!skills[4].effects[0].any());
+    }
 
     #[test]
     fn reads_only_what_the_card_uses() {
