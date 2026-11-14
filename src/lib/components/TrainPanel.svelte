@@ -77,6 +77,23 @@
       return { label: "Level % per hour, this session", value: session.percentPerHour != null ? `${session.percentPerHour.toFixed(1)}%` : "—" };
     return { label: "EXP per hour, this session", value: formatCompact(session.expPerHour) };
   });
+  /** The time to level, with its range and breaks, as one line and a fuller tooltip. */
+  const toLevel = $derived.by(() => {
+    const s = session;
+    if (s?.secondsToLevel == null) return null;
+    const range =
+      s.secondsToLevelLow != null && s.secondsToLevelHigh != null
+        ? `${formatDuration(s.secondsToLevelLow)}–${formatDuration(s.secondsToLevelHigh)}`
+        : null;
+    const breaks = s.secondsToLevelWithBreaks != null ? `about ${formatDuration(s.secondsToLevelWithBreaks)} with breaks` : null;
+    const why = [
+      "At this map's pace, less EXP lost to deaths.",
+      s.paceFromEstimate ? "Early on it leans on an estimate for this map, from your past play and your stats; your own pace takes over as you play." : null,
+      range ? `Four times in five it should take ${range} of play.` : null,
+      breaks ? `Counting breaks the way this session has had them, ${breaks}.` : null,
+    ];
+    return { line: [`${formatDuration(s.secondsToLevel)} to level here`, range ? `(${range})` : null].filter(Boolean).join(" "), breaks, tip: why.filter(Boolean).join(" ") };
+  });
   /** Share of a level an hour, said in words next to the time to level. */
   const levelPace = $derived(
     !percentOnly && session?.percentPerHour != null ? `${session.percentPerHour.toFixed(1)}% of a level an hour` : null,
@@ -251,10 +268,11 @@
       <div class="level">
         <div class="level-line"><span class="muted">Lv {lv} to {lv + 1}</span><span class="tabular">{percent.toFixed(2)}%</span></div>
         <Meter value={percent / 100} label="EXP towards the next level" />
-        {#if session.secondsToLevel != null || levelPace}
-          <span class="muted tabular">
-            {#if session.secondsToLevel != null}{formatDuration(session.secondsToLevel)} to level at this rate{/if}{#if session.secondsToLevel != null && levelPace}{" · "}{/if}{#if levelPace}{levelPace}{/if}
+        {#if toLevel || levelPace}
+          <span class="muted tabular" use:tip={toLevel?.tip ?? ""}>
+            {#if toLevel}{toLevel.line}{/if}{#if toLevel && levelPace}{" · "}{/if}{#if levelPace}{levelPace}{/if}
           </span>
+          {#if toLevel?.breaks}<span class="muted tabular">{toLevel.breaks}</span>{/if}
         {/if}
       </div>
     {/if}
@@ -275,7 +293,14 @@
         sub={coverage?.partial ? coverage.label : null}
         faint={coverage?.partial && coverage.thin}
       />
-      <Stat label="EXP gained" value={signed(session.expGained)} />
+      <Stat
+        label="EXP gained"
+        value={signed(session.expGained)}
+        sub={session.expOther > 0 ? `+${formatCompact(session.expOther)} from quests` : null}
+      />
+      {#if session.killsPerHour != null}
+        <Stat label="Kills / hr" value={formatCompact(session.killsPerHour)} sub="on this map" />
+      {/if}
       <Stat label="Mesos gained" value={signed(session.mesosGained)} />
     </div>
 

@@ -4,12 +4,13 @@
 </script>
 
 <script lang="ts">
-  // Where to train: maps near the character's level, ranked for this player. "For you" uses the
-  // EXP per hour measured on each map, and for maps not tried yet an estimate from the player's
-  // kill speed: the monster HP they get through an hour solo, over the HP of the map's average
-  // monster, held to what the map can respawn at an assumed respawn time (see training.rs). No
-  // damage formulas are modelled. "Played" lists every map the player has data for, whatever its
-  // level, by their own rate. "Saved" lists the maps the player bookmarked, whatever their level.
+  // Where to train: maps near the character's level, ranked for this player. "For you" goes by
+  // each map's forecast: the combat model (combat.rs: hit chance, damage against defence, hits to
+  // kill, attack time, spawn limit), tuned to the player's own play and folded together with what
+  // they measured on the map (training.rs). Without the character's damage, by their own rate
+  // where they played and an estimate from their kill speed elsewhere. Travel counts against far
+  // maps over a session's length, and deaths against risky ones. "Played" lists every map the
+  // player has data for, whatever its level, by their own rate. "Saved" lists their bookmarks.
   import { clipped, tip } from "$lib/tip.svelte";
   import Ref from "$lib/components/Ref.svelte";
   import GoButton from "$lib/components/GoButton.svelte";
@@ -42,7 +43,7 @@
     setAssumptions,
     watchAssumptions,
   } from "$lib/assumptions.svelte";
-  import type { Estimate, MapReading, MapRoute, SessionSummary, TrainingSpot, TrainingSpots } from "$lib/types";
+  import type { Estimate, EstimateCheck, Forecast, MapReading, MapRoute, SessionSummary, TrainingSpot, TrainingSpots } from "$lib/types";
   import Block from "$lib/ui/Block.svelte";
   import Button from "$lib/ui/Button.svelte";
   import Segmented from "$lib/ui/Segmented.svelte";
@@ -84,6 +85,20 @@
   let open = $state<number | null>(null);
   let route = $state<MapRoute | null>(null);
   let editing = $state(false);
+  let check = $state<EstimateCheck | null>(null);
+  let checking = $state(false);
+
+  /** Hides each played map in turn and estimates it from the rest, to show how close it comes. */
+  function runCheck() {
+    checking = true;
+    backend
+      .checkEstimates(measured, level, used.assumptions, damage.name, assumptions.value.skillName || null)
+      .then((result) => (check = result))
+      .catch(() => (check = null))
+      .finally(() => (checking = false));
+  }
+  const missText = (miss: number | null, within: number | null) =>
+    miss == null ? "nothing to compare yet" : `typically ${Math.round(miss * 100)}% out, ${Math.round((within ?? 0) * 100)}% of maps within 20%`;
 
   onMount(() => {
     watchSpots();
@@ -100,7 +115,18 @@
   const used = $derived(effective(assumptions.value, damage.value, damage.stats));
   const measured = $derived(measuredRates(session));
   const queryKey = $derived(
-    JSON.stringify([map?.name, map?.street, map?.twin, measured, travelKey(), level, used.assumptions]),
+    JSON.stringify([
+      map?.name,
+      map?.street,
+      map?.twin,
+      measured,
+      travelKey(),
+      level,
+      used.assumptions,
+      damage.name,
+      damage.value,
+      damage.stats?.buffed,
+    ]),
   );
   const fromId = $derived(data?.from?.id);
 
@@ -113,7 +139,16 @@
       return;
     }
     untrack(() =>
-      backend.trainingSpots(map?.name ?? null, map?.street ?? null, map?.twin ?? null, measured, level, used.assumptions),
+      backend.trainingSpots(
+        map?.name ?? null,
+        map?.street ?? null,
+        map?.twin ?? null,
+        measured,
+        level,
+        used.assumptions,
+        damage.name,
+        assumptions.value.skillName || null,
+      ),
     )
       .then((result) => {
         if (key === queryKey) data = result;
@@ -142,7 +177,7 @@
   const near = (s: TrainingSpot) => level == null || (s.averageLevel >= level - BELOW && s.averageLevel <= level + ABOVE);
   const savedIds = $derived(new Set(saved.map((s) => s.mapId)));
   const sorts = $derived<{ id: Sort; label: string; title: string }[]>([
-    { id: "you", label: "For you", title: "Your EXP per hour where you have played, an estimate from your kill speed where you haven't" },
+    { id: "you", label: "For you", title: "What you can expect on each map: your own play there and an estimate from your stats, travel counted" },
     { id: "played", label: "Played", title: "Every map you have played, whatever its level, by your own EXP per hour" },
     { id: "near", label: "Nearest", title: "Fewest portals from where you are" },
     {
@@ -153,9 +188,27 @@
   ]);
 
   const speed = $derived(data?.speed ?? null);
-  /** The estimate for a map the player hasn't measured. */
-  const estimate = (s: TrainingSpot) => (s.measured ? null : s.estimate);
-  const forYou = (s: TrainingSpot) => s.measured?.expPerHour ?? estimate(s)?.expPerHour ?? -1;
+  const fit = $derived(data?.fit ?? null);
+  /** The older estimate, for a map the player hasn't measured, when there is no forecast. */
+  const estimate = (s: TrainingSpot) => (s.forecast || s.measured ? null : s.estimate);
+  const forecast = (s: TrainingSpot): Forecast | null => s.forecast ?? null;
+  /** Hours a training session runs, for weighing a long trip against a better map. */
+  const SESSION_HOURS = 1;
+  /** Seconds a portal on the way takes: a rough walk across half a map. */
+  const SECONDS_PER_HOP = 30;
+  /** A death costs this share of the level's EXP. */
+  const DEATH_COST = 0.1;
+  /** EXP an hour of a session spent here: the trip there takes from the hour, deaths take EXP. */
+  function forYou(s: TrainingSpot) {
+    const rate = forecast(s)?.expPerHour ?? s.measured?.expPerHour ?? estimate(s)?.expPerHour;
+    if (rate == null) return -1;
+    const trip = ((steps(s) ?? 0) * SECONDS_PER_HOP) / 3600;
+    const deaths = (forecast(s)?.deathsPerHour ?? 0) * DEATH_COST * (session?.expNeeded ?? 0);
+    return (rate * SESSION_HOURS) / (SESSION_HOURS + trip) - deaths;
+  }
+  /** Most blows would miss: listed only with Every level ticked. */
+  const MIN_HIT = 0.6;
+  const tooHard = (s: TrainingSpot) => (s.estimate?.fight?.hitChance ?? 1) < MIN_HIT;
 
   const ranked = $derived.by(() => {
     const spots = (data?.spots ?? []).filter((s) =>
@@ -163,10 +216,11 @@
         ? savedIds.has(s.map.id)
         : sort === "played"
           ? s.measured != null && s.measured.activeSeconds >= 60
-          : s.reachable && (allLevels || near(s) || savedIds.has(s.map.id) || playedWell(s)),
+          : s.reachable && (allLevels || (near(s) && !tooHard(s)) || savedIds.has(s.map.id) || playedWell(s)),
     );
-    // With no kill speed yet, maps not tried fall back to base EXP, below every measured one.
-    const you = (s: TrainingSpot) => (speed == null && !s.measured ? s.expPerClear / 1e6 - 1 : forYou(s));
+    // With no estimate at all, maps not tried fall back to base EXP, below every measured one.
+    const you = (s: TrainingSpot) =>
+      !s.forecast && speed == null && !s.measured ? s.expPerClear / 1e6 - 1 : forYou(s);
     const by: Record<Sort, (s: TrainingSpot) => number> = {
       you,
       played: (s) => s.measured?.expPerHour ?? -1,
@@ -179,6 +233,18 @@
     return sorted;
   });
   const shown = $derived(sort === "saved" ? ranked : ranked.slice(0, more ? 30 : SHOWN));
+  /**
+   * One map not played yet that could beat the best played one: its range's top end is above
+   * that map's forecast. Trying it is how the list learns, so one is marked at a time.
+   */
+  const worthTrying = $derived.by(() => {
+    if (sort !== "you") return null;
+    const played = ranked.filter((s) => (forecast(s)?.playedSeconds ?? 0) >= PLAYED_WELL);
+    if (!played.length) return null;
+    const best = Math.max(...played.map((s) => forecast(s)!.expPerHour));
+    const fresh = shown.find((s) => (forecast(s)?.playedSeconds ?? 0) === 0 && (forecast(s)?.high ?? 0) > best);
+    return fresh?.map.id ?? null;
+  });
   const missingSaved = $derived(saved.filter((s) => !(data?.spots ?? []).some((spot) => spot.map.id === s.mapId)));
 
   function stored(key: string, fallback: string) {
@@ -259,11 +325,28 @@
     return [levels, ...(mobs.length ? [mobs.map((m) => monsterLabel(m.name)).join(", ")] : [])].join(" · ");
   };
 
-  function metric(spot: TrainingSpot): { value: string; unit: string; quiet: boolean; sure?: Estimate["sureness"] } {
+  function metric(spot: TrainingSpot): {
+    value: string;
+    unit: string;
+    quiet: boolean;
+    sure?: Estimate["sureness"];
+    range?: string;
+  } {
     if (sort === "near") {
       const hops = steps(spot);
       if (hops == null) return { value: "—", unit: "no route", quiet: true };
       return { value: String(hops), unit: hops === 0 ? "you are here" : spot.travel ? "with travel" : hops === 1 ? "portal" : "portals", quiet: false };
+    }
+    const f = forecast(spot);
+    if (f) {
+      const mostlyPlayed = f.playedSeconds >= 20 * 60;
+      return {
+        value: `${mostlyPlayed ? "" : "≈"}${formatCompact(f.expPerHour)}`,
+        unit: mostlyPlayed ? "your EXP / hr" : "est. EXP / hr",
+        quiet: !mostlyPlayed,
+        sure: f.sureness,
+        range: `Likely ${formatCompact(f.low)}–${formatCompact(f.high)} EXP an hour`,
+      };
     }
     if (spot.measured) return { value: formatCompact(spot.measured.expPerHour), unit: "your EXP / hr", quiet: false };
     const guess = estimate(spot);
@@ -274,6 +357,52 @@
   const SURENESS = { 3: "Fairly sure", 2: "Rough", 1: "A guess" } as const;
 
   const times = (ratio: number) => (ratio >= 10 ? Math.round(ratio) : Math.round(ratio * 10) / 10);
+
+  const percent = (share: number) => `${Math.round(share * 100)}%`;
+
+  /** Where a forecast comes from, then what makes it less sure, one sentence each. */
+  function forecastReasons(spot: TrainingSpot, f: Forecast): string[] {
+    const guess = spot.estimate;
+    const fight = guess?.fight;
+    const out: string[] = [];
+    if (f.playedSeconds > 0 && f.modelExpPerHour != null)
+      out.push(
+        `From your ${formatDuration(f.playedSeconds)} of solo play here, carried to your stats now, ` +
+          `and an estimate from your stats of ${formatCompact(f.modelExpPerHour)}, which counts as 20 minutes of play.`,
+      );
+    else out.push("Not played near this level yet: an estimate from your stats and how you've played elsewhere.");
+    out.push(`Likely ${formatCompact(f.low)}–${formatCompact(f.high)} EXP an hour.`);
+    if (fight && guess) {
+      const blows = fight.attacksPerKill < 10 ? fight.attacksPerKill.toFixed(1) : String(Math.round(fight.attacksPerKill));
+      out.push(
+        `About ${blows} attacks and ${fight.killSeconds.toFixed(1)} s a kill, walking included: ` +
+          `about ${formatCompact(guess.killsPerHour)} kills an hour.`,
+      );
+      if (fight.hitChance < 0.95) out.push(`Your accuracy lands about ${percent(fight.hitChance)} of blows here.`);
+      if (fight.levelGap != null && fight.levelGap >= 1) {
+        const gap = Math.round(fight.levelGap);
+        out.push(`They average ${gap} level${gap === 1 ? "" : "s"} above you, which cuts your damage.`);
+      }
+      if (guess.killsPerHour > 0.8 * guess.ceiling)
+        out.push(
+          `Near what the map can respawn: ${formatCompact(guess.ceiling)} kills an hour if every monster is back ` +
+            `after ${assumptions.value.respawnSeconds} s. That respawn time is an assumption you can change below.`,
+        );
+    }
+    if (fit)
+      out.push(
+        fit.stretches
+          ? `Tuned to ${fit.stretches} stretch${fit.stretches === 1 ? "" : "es"} of your solo play: you attack about ` +
+              `${percent(fit.tuning.efficiency)} of your fighting time and lose about ${fit.tuning.overhead.toFixed(1)} s a kill ` +
+              "to looting and finding the next."
+          : "No solo play of five minutes or more saved yet, so it starts from typical values. Each session tunes it to you.",
+      );
+    if ((f.deathsPerHour ?? 0) > 0)
+      out.push(
+        `You died here about ${(f.deathsPerHour ?? 0).toFixed(1)} times an hour. Each costs a tenth of a level, counted against the map.`,
+      );
+    return out;
+  }
 
   /** Where an estimate comes from, then what makes it less sure, one sentence each. */
   function reasons(spot: TrainingSpot, guess: Estimate): string[] {
@@ -334,7 +463,7 @@
   {#snippet aside()}
     <span
       class="help"
-      use:tip={"Where you have played, your own rate. Elsewhere, an estimate from how fast you get through monster HP solo, held to an assumed respawn time. Party bonus and misses aren't modelled."}
+      use:tip={"From your stats once Leafline has read them: accuracy against each monster's avoid, damage against its defence and HP, your attack speed and the map's respawn. Tuned to your own play, and folded in with your rate where you've played. Travel counts against far maps. Party play isn't modelled."}
     >
       <CircleHelp size={13} />
     </span>
@@ -388,10 +517,14 @@
                   ><Ref kind="map" id={spot.map.id} name={spot.map.name} /></span
                 >
                 <span class="meta" use:tip={summaryText(spot)}>
-                  {#if steps(spot) === 0}<span class="here">You're here</span>{" · "}{/if}{#if sort === "played" && spot.measured}{formatDuration(spot.measured.activeSeconds)} played · {/if}{line.levels}{#each line.mobs as mob, n (mob.id)}{n === 0 ? " · " : ", "}<Ref kind="mob" id={mob.id} name={monsterLabel(mob.name)} icon={false} />{/each}
+                  {#if worthTrying === spot.map.id}<span
+                      class="try"
+                      use:tip={"Not played yet, and its range reaches past your best map. Trying it teaches Leafline more."}
+                      >Worth a try</span
+                    >{" · "}{/if}{#if steps(spot) === 0}<span class="here">You're here</span>{" · "}{/if}{#if sort === "played" && spot.measured}{formatDuration(spot.measured.activeSeconds)} played · {/if}{line.levels}{#each line.mobs as mob, n (mob.id)}{n === 0 ? " · " : ", "}<Ref kind="mob" id={mob.id} name={monsterLabel(mob.name)} icon={false} />{/each}
                 </span>
               </span>
-              <span class="metric">
+              <span class="metric" use:tip={m.range ?? ""}>
                 <span class="value num">{m.value}</span>
                 <span class="unit" class:quiet={m.quiet}>
                   {#if m.sure}
@@ -408,8 +541,16 @@
           </div>
           {#if expanded}
             {@const guess = estimate(spot)}
+            {@const f = forecast(spot)}
             <div class="detail">
-              {#if guess}
+              {#if f}
+                <div class="why">
+                  {#each forecastReasons(spot, f) as line, n (line)}<p>
+                      {#if n === 0}<strong>{SURENESS[f.sureness]}.</strong>{/if}
+                      {line}
+                    </p>{/each}
+                </div>
+              {:else if guess}
                 <div class="why">
                   <p><strong>{SURENESS[guess.sureness]}.</strong> {reasons(spot, guess)[0]}</p>
                   {#each reasons(spot, guess).slice(1) as line (line)}<p>{line}</p>{/each}
@@ -597,6 +738,35 @@
         {#if !isDefault(assumptions.value)}
           <Button variant="ghost" size="sm" onclick={() => setAssumptions(DEFAULT_ASSUMPTIONS)}>Back to defaults</Button>
         {/if}
+        <div class="check-est">
+          <Button variant="ghost" size="sm" disabled={checking} onclick={runCheck}>
+            {checking ? "Checking…" : "How close are the estimates?"}
+          </Button>
+          {#if check}
+            {#if !check.maps.length}
+              <p>Needs ten minutes or more of solo play on at least two maps. Each map is hidden in turn and estimated from the rest.</p>
+            {:else}
+              <p>
+                Each of your {check.maps.length} played map{check.maps.length === 1 ? "" : "s"} hidden in turn and estimated from
+                the rest. From your stats: {missText(check.modelTypicalMiss, check.modelWithin20)}. The older estimate from kill
+                speed: {missText(check.olderTypicalMiss, check.olderWithin20)}.
+              </p>
+              <table>
+                <thead><tr><th>Map</th><th>You got</th><th>Estimate</th><th>Older</th></tr></thead>
+                <tbody>
+                  {#each check.maps as row (row.map.id)}
+                    <tr>
+                      <td><Ref kind="map" id={row.map.id} name={row.map.name} /></td>
+                      <td class="tabular">{formatCompact(row.measured)}</td>
+                      <td class="tabular">{row.modelled != null ? formatCompact(row.modelled) : "—"}</td>
+                      <td class="tabular">{row.older != null ? formatCompact(row.older) : "—"}</td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
+            {/if}
+          {/if}
+        </div>
       </div>
     {/if}
   {/if}
@@ -737,6 +907,17 @@
 
   .meta .here {
     color: var(--accent-strong);
+  }
+
+  .check-est {
+    display: grid;
+    gap: 6px;
+    justify-items: start;
+    margin-top: 6px;
+  }
+
+  .meta .try {
+    color: var(--good, var(--accent-strong));
   }
 
   .metric {

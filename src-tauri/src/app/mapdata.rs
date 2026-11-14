@@ -13,6 +13,7 @@ use super::fighter::{self, Choice};
 use super::settings::SettingsState;
 use super::{overlay, pins};
 use crate::mapdata::combat::{Fighter, Fit};
+use crate::mapdata::training::EstimateCheck;
 use crate::build::Catalog;
 use crate::build::catalog::item_group;
 use crate::mapdata::osms::ItemKind;
@@ -792,6 +793,26 @@ pub fn training_spots(
         &layouts,
     );
     Some(Spots { from, speed: estimator.map(|e| e.speed), fighter, fit: model.map(|m| m.fit), spots })
+}
+
+/// How close the estimates come on the player's own maps, each hidden in turn and estimated from
+/// the rest. `None` until map data has been downloaded.
+#[tauri::command]
+pub fn check_estimates(
+    app: AppHandle,
+    state: State<MapDataState>,
+    measured: Vec<MeasuredRate>,
+    level: Option<u32>,
+    assumptions: Option<Assumptions>,
+    character: Option<String>,
+    skill: Option<String>,
+) -> Option<EstimateCheck> {
+    let atlas = state.atlas()?;
+    let layouts = state.layouts();
+    let assumptions = assumptions.unwrap_or_default();
+    let choice = Choice { assumptions: Some(&assumptions), skill: skill.as_deref() };
+    let fighter = character.as_deref().filter(|n| !n.trim().is_empty()).and_then(|name| fighter::fighter(&app, name, level, &choice));
+    Some(atlas.check_estimates(&measured, fighter, assumptions, &layouts))
 }
 
 /// Opens one of the card's links in the default browser. Only the sites it links to are allowed.

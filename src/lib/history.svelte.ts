@@ -47,5 +47,9 @@ export function measuredRates(session: SessionSummary | null): MeasuredRate[] {
       activeSeconds: l.activeSeconds,
       level: l.level,
       party: l.party,
+      // Kills count only when nearly every gain matched the map's monsters.
+      kills: l.kills != null && l.kills > 0 && (l.gainsMissed ?? 0) * 10 <= l.kills ? l.kills : null,
+      fighter: l.fighter ?? null,
+      deaths: l.deaths ?? null,
     }));
 }

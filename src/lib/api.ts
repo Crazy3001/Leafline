@@ -11,6 +11,7 @@ import { open, save } from "@tauri-apps/plugin-dialog";
 
 import type {
   Analysis,
+  EstimateCheck,
   Build,
   BuildCatalog,
   BuildPlan,
@@ -172,7 +173,18 @@ export interface Backend {
     measured: MeasuredRate[],
     level: number | null,
     assumptions: Assumptions,
+    /** Whose read stats the combat model uses, and the skill picked (empty for the best read). */
+    character: string | null,
+    skill: string | null,
   ): Promise<TrainingSpots | null>;
+  /** How close the estimates come on the player's own maps, each hidden in turn. */
+  checkEstimates(
+    measured: MeasuredRate[],
+    level: number | null,
+    assumptions: Assumptions,
+    character: string | null,
+    skill: string | null,
+  ): Promise<EstimateCheck | null>;
   /** One page of the quest search. */
   searchQuests(search: QuestSearch): Promise<QuestPage>;
   questRegions(): Promise<string[]>;
@@ -460,8 +472,10 @@ const tauriBackend: Backend = {
     invoke("quest_guide", { quests, mapName, mapStreet, mapTwin, measured }),
   downloadDrops: (retry) => invoke("download_drops", { retry: retry ?? false }),
   dropsFetchedAt: () => invoke("drops_fetched_at"),
-  trainingSpots: (mapName, mapStreet, mapTwin, measured, level, assumptions) =>
-    invoke("training_spots", { mapName, mapStreet, mapTwin, measured, level, assumptions }),
+  trainingSpots: (mapName, mapStreet, mapTwin, measured, level, assumptions, character, skill) =>
+    invoke("training_spots", { mapName, mapStreet, mapTwin, measured, level, assumptions, character, skill }),
+  checkEstimates: (measured, level, assumptions, character, skill) =>
+    invoke("check_estimates", { measured, level, assumptions, character, skill }),
   searchQuests: (search) => invoke("search_quests", { search }),
   questRegions: () => invoke("quest_regions"),
   questSheet: (id, mapName, mapStreet, mapTwin) => invoke("quest_sheet", { id, mapName, mapStreet, mapTwin }),

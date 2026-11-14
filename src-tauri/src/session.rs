@@ -1297,7 +1297,7 @@ impl SessionTracker {
             0.0
         } else {
             // Marks are dropped only once a later one is at or before the start, so one is here.
-            self.marks.iter().rev().find(|m| m.clock <= from).map_or(0.0, |m| total(m))
+            self.marks.iter().rev().find(|m| m.clock <= from).map_or(0.0, &total)
         };
         Some((total(last) - base) * 3600.0 / seconds)
     }

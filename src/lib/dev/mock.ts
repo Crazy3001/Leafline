@@ -620,6 +620,10 @@ export const mockBackend: Backend = {
     if (!mapStatus.ready) return null;
     return preview?.spots ?? sampleSpots(2, measured, level, assumptions);
   },
+  async checkEstimates() {
+    await delay(300);
+    return { maps: [], modelTypicalMiss: null, modelWithin20: null, olderTypicalMiss: null, olderWithin20: null };
+  },
   async openLink(url) {
     window.open(url, "_blank", "noopener");
   },

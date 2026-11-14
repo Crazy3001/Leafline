@@ -33,6 +33,9 @@ pub struct MeasuredRate {
     /// The character as they were then, when it was known.
     #[serde(default)]
     pub fighter: Option<Fighter>,
+    /// Deaths in that play, when counted.
+    #[serde(default)]
+    pub deaths: Option<f64>,
 }
 
 /// What the estimates take as given because the map data doesn't say. The player can change
@@ -191,6 +194,8 @@ pub struct Forecast {
     pub played_seconds: f64,
     /// The model's own estimate, before measured play is folded in.
     pub model_exp_per_hour: Option<f64>,
+    /// Deaths an hour in the player's play here, once ten minutes of it counted them.
+    pub deaths_per_hour: Option<f64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -551,6 +556,8 @@ const DEFAULT_WALK: f64 = 2.0;
 const DEFAULT_CROWD: f64 = 3.0;
 /// 1.28 standard deviations either side holds four in five.
 const RANGE_Z: f64 = 1.28;
+/// Seconds of play on a map before its deaths an hour are given.
+const DEATHS_SECONDS: f64 = 600.0;
 
 /// How many monsters stand together on a platform, for attacks that reach several.
 fn crowd(layout: Option<&MapLayout>) -> f64 {
@@ -577,6 +584,9 @@ pub struct Carried {
     /// EXP an hour as it would be now, weighted by seconds.
     pub exp_per_hour: f64,
     pub seconds: f64,
+    /// Deaths, and the seconds of play they were counted over.
+    pub deaths: f64,
+    pub death_seconds: f64,
 }
 
 impl Model {
@@ -654,6 +664,9 @@ impl Model {
             sureness: sureness(spread),
             played_seconds: seconds,
             model_exp_per_hour: Some(model),
+            deaths_per_hour: played
+                .filter(|p| p.death_seconds >= DEATHS_SECONDS)
+                .map(|p| p.deaths * 3600.0 / p.death_seconds),
         }
     }
 }
@@ -745,12 +758,122 @@ impl Atlas {
                 None => continue,
             };
             let entry = out.entry(found.card.map.id).or_default();
+            if let Some(deaths) = r.deaths {
+                entry.deaths += deaths;
+                entry.death_seconds += r.active_seconds;
+            }
             let total = entry.seconds + r.active_seconds;
             entry.exp_per_hour = (entry.exp_per_hour * entry.seconds + r.exp_per_hour * scale * r.active_seconds) / total;
             entry.seconds = total;
         }
         out
     }
+
+    /// How well the estimates would have done on the player's own maps: each map with ten
+    /// minutes or more of solo play is hidden in turn, the model is tuned on the rest, and its
+    /// estimate for the hidden map (with the character as they were there) is set against what
+    /// they really got. The older estimate from kill speed is checked the same way, so the two
+    /// can be compared. Nothing leaves the PC.
+    pub fn check_estimates(
+        &self,
+        measured: &[MeasuredRate],
+        fighter: Option<Fighter>,
+        assumptions: Assumptions,
+        layouts: &Layouts,
+    ) -> EstimateCheck {
+        let places = self.places(measured);
+        let solo = |r: &&MeasuredRate| r.active_seconds >= TUNE_SECONDS && r.exp_per_hour > 0.0 && r.party.unwrap_or(1) <= 1;
+        let mut by_map: HashMap<u32, Vec<&MeasuredRate>> = HashMap::new();
+        for r in measured.iter().filter(solo) {
+            if let Some(Some(found)) = places.get(r.label.as_str()) {
+                by_map.entry(found.card.map.id).or_default().push(r);
+            }
+        }
+        let mut maps: Vec<MapCheck> = Vec::new();
+        for (&id, here) in &by_map {
+            let seconds: f64 = here.iter().map(|r| r.active_seconds).sum();
+            if seconds < CHECK_SECONDS {
+                continue;
+            }
+            let Some(card) = self.card(id) else { continue };
+            let layout = layouts.get(&id);
+            let rest: Vec<MeasuredRate> = measured
+                .iter()
+                .filter(|r| places.get(r.label.as_str()).and_then(Option::as_ref).is_none_or(|f| f.card.map.id != id))
+                .cloned()
+                .collect();
+            let measured_rate = here.iter().map(|r| r.exp_per_hour * r.active_seconds).sum::<f64>() / seconds;
+            let level = here.iter().filter_map(|r| r.level).max();
+            // The model, for the character as they were on this map.
+            let model = self.model(&rest, fighter, assumptions, layouts);
+            let modelled = model.as_ref().and_then(|m| {
+                let mut total = 0.0;
+                let mut weight = 0.0;
+                for r in here {
+                    let then = r.fighter.or_else(|| r.level.zip(fighter).filter(|(l, f)| l.abs_diff(f.level) <= SAME_LEVELS).map(|(_, f)| f))?;
+                    let (battle, kills, _, _) = m.rate(&then, &card.mobs, layout)?;
+                    total += kills * battle.exp_per_kill * m.exp_rate() * r.active_seconds;
+                    weight += r.active_seconds;
+                }
+                (weight > 0.0).then(|| total / weight)
+            });
+            let older = self
+                .estimator(&rest, level, assumptions, layouts)
+                .and_then(|e| e.estimate(&card.mobs, layout))
+                .map(|e| e.exp_per_hour);
+            maps.push(MapCheck { map: card.map, seconds, measured: measured_rate, modelled, older });
+        }
+        maps.sort_by(|a, b| b.seconds.total_cmp(&a.seconds));
+        let typical = |pick: fn(&MapCheck) -> Option<f64>| -> Option<(f64, f64)> {
+            let mut misses: Vec<f64> = maps.iter().filter_map(|m| pick(m).map(|e| (e / m.measured).ln().abs())).collect();
+            if misses.is_empty() {
+                return None;
+            }
+            misses.sort_by(f64::total_cmp);
+            let median = misses[misses.len() / 2];
+            let close = misses.iter().filter(|&&m| m <= 1.2f64.ln()).count() as f64 / misses.len() as f64;
+            Some((median.exp() - 1.0, close))
+        };
+        let model = typical(|m| m.modelled);
+        let old = typical(|m| m.older);
+        EstimateCheck {
+            maps,
+            model_typical_miss: model.map(|m| m.0),
+            model_within_20: model.map(|m| m.1),
+            older_typical_miss: old.map(|m| m.0),
+            older_within_20: old.map(|m| m.1),
+        }
+    }
+}
+
+/// Seconds of solo play on a map before it is used to check the estimates.
+const CHECK_SECONDS: f64 = 600.0;
+
+/// One of the player's maps, hidden and estimated from the rest.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MapCheck {
+    pub map: MapRef,
+    pub seconds: f64,
+    /// What the player really got there, EXP an hour.
+    pub measured: f64,
+    /// What the combat model, tuned on the other maps, said.
+    pub modelled: Option<f64>,
+    /// What the older estimate from kill speed said.
+    pub older: Option<f64>,
+}
+
+/// How close the estimates come on the player's own maps.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EstimateCheck {
+    pub maps: Vec<MapCheck>,
+    /// The middle miss over the maps, as a share: 0.15 is 15% out either way.
+    pub model_typical_miss: Option<f64>,
+    /// The share of maps within 20%.
+    pub model_within_20: Option<f64>,
+    pub older_typical_miss: Option<f64>,
+    pub older_within_20: Option<f64>,
 }
 
 #[cfg(test)]
@@ -766,7 +889,7 @@ mod tests {
     }
 
     fn rate(label: &str, exp_per_hour: f64, minutes: f64, level: Option<u32>) -> MeasuredRate {
-        MeasuredRate { label: label.into(), exp_per_hour, active_seconds: minutes * 60.0, level, party: None, kills: None, fighter: None }
+        MeasuredRate { label: label.into(), exp_per_hour, active_seconds: minutes * 60.0, level, party: None, kills: None, fighter: None, deaths: None }
     }
 
     #[test]
@@ -1044,5 +1167,28 @@ mod tests {
         let carried = atlas.carried_play(&[then], &model, &Layouts::new());
         let meadow = carried.values().next().unwrap();
         assert!(meadow.exp_per_hour > 1_000.0, "stronger now, so faster now: {meadow:?}");
+    }
+
+    #[test]
+    fn the_check_hides_each_map_and_estimates_it_from_the_rest() {
+        let atlas = world();
+        let me = Fighter { low: 3.0, high: 6.0, ..hero(5) };
+        let truth = atlas.model(&[], Some(me), Assumptions::default(), &Layouts::new()).unwrap();
+        // Play on three maps, just as the starting values say it goes.
+        let played: Vec<MeasuredRate> = ["Mossbank Meadow I", "Mossbank Meadow II", "Burrow Den"]
+            .iter()
+            .map(|name| {
+                let card = atlas.find(name, Some("Fern Road")).unwrap().card;
+                let (estimate, _) = truth.estimate(&card.mobs, None).unwrap();
+                rate(&format!("Fern Road : {name}"), estimate.exp_per_hour, 20.0, Some(5))
+            })
+            .collect();
+        let check = atlas.check_estimates(&played, Some(me), Assumptions::default(), &Layouts::new());
+        assert_eq!(check.maps.len(), 3);
+        assert!(check.maps.iter().all(|m| m.modelled.is_some()));
+        assert!(check.model_typical_miss.is_some_and(|m| m < 0.05), "{check:?}");
+        assert_eq!(check.model_within_20, Some(1.0));
+        let none = atlas.check_estimates(&[], Some(me), Assumptions::default(), &Layouts::new());
+        assert!(none.maps.is_empty() && none.model_typical_miss.is_none());
     }
 }

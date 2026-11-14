@@ -263,6 +263,16 @@ export interface SessionLine {
   percentGained: number;
   mesosGained: number;
   mesosSeconds: number;
+  /** Kills counted from gains; null where none could be (a party, a map the data lacks). */
+  kills?: number | null;
+  /** Quest EXP and the like, left out of expGained. */
+  otherExp?: number;
+  deaths?: number;
+  expLost?: number;
+  /** Hunting gains that matched no sum of the map's monsters' EXP. */
+  gainsMissed?: number;
+  /** The character as the estimates saw them when the stretch began. */
+  fighter?: Fighter | null;
 }
 
 export interface MapSummary {
@@ -295,9 +305,31 @@ export interface SessionSummary {
   /** The EXP the current level needs, as measured from the HUD. */
   expNeeded: number | null;
   expGained: number;
+  /** EXP that was no kill (quests handed in), left out of every rate. */
+  expOther: number;
+  /** Kills counted from gains that match the map's monsters, solo only. */
+  kills: number;
+  gainsMatched: number;
+  gainsUnmatched: number;
   expPerHour: number | null;
   percentPerHour: number | null;
+  /** Active seconds to the next level at paceExpPerHour. */
   secondsToLevel: number | null;
+  /** The same at the range's fast and slow ends. */
+  secondsToLevelLow: number | null;
+  secondsToLevelHigh: number | null;
+  /** The same with breaks counted as this session has had them. */
+  secondsToLevelWithBreaks: number | null;
+  /** This map's EXP an hour less deaths, eased in from an estimate: what the time to level goes by. */
+  paceExpPerHour: number | null;
+  /** How far the pace could be out, as a share of it. */
+  paceError: number | null;
+  /** An estimate still counts for more than a tenth of the pace. */
+  paceFromEstimate: boolean;
+  killsPerHour: number | null;
+  /** Seconds of play, breaks included. */
+  realSeconds: number;
+  expPerHourWithBreaks: number | null;
   /** Rates over the last five minutes of active time. */
   recentExpPerHour: number | null;
   recentPercentPerHour: number | null;
@@ -763,6 +795,42 @@ export interface MeasuredRate {
   level?: number | null;
   /** Party size then; none or one is solo. */
   party?: number | null;
+  /** Kills counted in that play, when nearly every gain matched. */
+  kills?: number | null;
+  /** The character as they were then, when known. */
+  fighter?: Fighter | null;
+  /** Deaths in that play, when counted. */
+  deaths?: number | null;
+}
+
+/** The character as the combat model sees them (src-tauri/src/mapdata/combat.rs). */
+export interface Fighter {
+  level: number;
+  /** One damage line, skill share included, before the monster's defence. */
+  low: number;
+  high: number;
+  lines: number;
+  targets: number;
+  accuracy: number | null;
+  magic: boolean;
+  critRate: number;
+  critBonus: number;
+  attackSeconds: number;
+}
+
+/** What the rules leave open, as fitted to the player's play. */
+export interface Tuning {
+  efficiency: number;
+  overhead: number;
+  defence: number;
+}
+
+export interface ModelFit {
+  tuning: Tuning;
+  /** Typical miss on the player's own maps, as a log standard deviation. */
+  spread: number;
+  stretches: number;
+  seconds: number;
 }
 
 /**
@@ -878,8 +946,10 @@ export interface StatsView {
 export interface DamageSkill {
   name: string;
   level: number;
-  /** Its damage at that level: 240 is 240%. */
+  /** Its damage at that level: 240 is 240%. A spell's is 100; its damage comes from basicAttack. */
   percent: number;
+  /** A spell's Basic Attack at that level. */
+  basicAttack?: number | null;
 }
 
 /** How fast the player gets through monster HP, from their own solo play. */
@@ -921,6 +991,31 @@ export interface Estimate {
   weaponDef?: number;
   /** Whether the player's attack range was counted, so defence is too. */
   damageKnown?: boolean;
+  /** How the fight goes, when the combat model made the estimate. */
+  fight?: FightDetail | null;
+}
+
+export interface FightDetail {
+  /** Chance a blow lands, averaged over the monsters. */
+  hitChance: number;
+  attacksPerKill: number;
+  /** Seconds a kill takes, everything counted, before the spawn limit. */
+  killSeconds: number;
+  levelGap: number | null;
+}
+
+/** The best guess at what the player gets on a map now: their play there and the model together. */
+export interface Forecast {
+  expPerHour: number;
+  /** Four times in five the real rate lands between these. */
+  low: number;
+  high: number;
+  sureness: 1 | 2 | 3;
+  /** Solo seconds played there that count, near the current level. */
+  playedSeconds: number;
+  modelExpPerHour: number | null;
+  /** Deaths an hour in the player's play there, once ten minutes counted them. */
+  deathsPerHour?: number | null;
 }
 
 /** A map's size and how its monsters spread, in the game's pixels, from the client. */
@@ -956,16 +1051,43 @@ export interface TrainingSpot {
   /** Portals lead here from some town; party quest stages and other instances are not. */
   reachable: boolean;
   measured: { expPerHour: number; activeSeconds: number } | null;
-  /** From the player's kill speed, once enough solo play is saved. */
+  /** From the combat model, or from the player's kill speed when their damage isn't known. */
   estimate: Estimate | null;
+  /** The best guess now, with a range; null without the combat model. */
+  forecast?: Forecast | null;
   /** The map's size, floors and how its monsters spread, when known. */
   layout?: MapLayout | null;
 }
 
+/** One of the player's maps, hidden and estimated from the rest. */
+export interface MapCheck {
+  map: MapRef;
+  seconds: number;
+  /** What the player really got there, EXP an hour. */
+  measured: number;
+  /** The combat model's estimate, tuned on the other maps. */
+  modelled: number | null;
+  /** The older estimate from kill speed. */
+  older: number | null;
+}
+
+/** How close the estimates come on the player's own maps. */
+export interface EstimateCheck {
+  maps: MapCheck[];
+  /** The middle miss, as a share: 0.15 is 15% out either way. */
+  modelTypicalMiss: number | null;
+  modelWithin20: number | null;
+  olderTypicalMiss: number | null;
+  olderWithin20: number | null;
+}
+
 export interface TrainingSpots {
   from: MapRef | null;
-  /** Behind every estimate; null until enough solo play is saved. */
+  /** Behind the older estimates; null until enough solo play is saved. */
   speed: KillSpeed | null;
+  /** The character as the combat model sees them, and how its tuning fits their play. */
+  fighter?: Fighter | null;
+  fit?: ModelFit | null;
   spots: TrainingSpot[];
 }
 

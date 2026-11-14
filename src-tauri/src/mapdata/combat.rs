@@ -290,7 +290,9 @@ pub fn fit(observations: &[Observation]) -> Fit {
     }
     let a0 = 1.0 / start.efficiency;
     let (la, lo) = (1.0 / (EFFICIENCY_SPREAD * EFFICIENCY_SPREAD), 1.0 / (OVERHEAD_SPREAD * OVERHEAD_SPREAD));
-    let mut best: Option<(f64, Tuning, Vec<(f64, f64, f64)>)> = None;
+    // The loss, the tuning, and each stretch as (minutes, seconds a kill seen, modelled).
+    type Best = (f64, Tuning, Vec<(f64, f64, f64)>);
+    let mut best: Option<Best> = None;
     for &k in &DEFENCE_GRID {
         let mut points: Vec<(Point, f64)> = Vec::new();
         for (o, seconds) in &usable {

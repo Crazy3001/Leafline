@@ -63,7 +63,7 @@ pub fn measured(app: &AppHandle, name: &str, except: Option<f64>) -> Vec<Measure
         .filter(|s| except.is_none_or(|at| s.started_at != Some(at)))
         .flat_map(|s| &s.lines)
         .filter(|l| l.map.is_some() && !l.town && l.active_seconds > 0.0 && l.exp_gained > 0)
-        .map(|l| rate_of(l))
+        .map(rate_of)
         .collect()
 }
 
@@ -78,6 +78,7 @@ pub fn rate_of(line: &SessionLine) -> MeasuredRate {
         party: line.party,
         kills,
         fighter: line.fighter.as_ref().and_then(|f| serde_json::from_value(f.clone()).ok()),
+        deaths: Some(f64::from(line.deaths)),
     }
 }
 

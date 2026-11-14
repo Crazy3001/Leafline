@@ -164,6 +164,7 @@ pub fn run() {
             mapdata::download_drops,
             mapdata::drops_fetched_at,
             mapdata::training_spots,
+            mapdata::check_estimates,
             records::known_mesos,
             records::item_note,
             records::saved_spots,
