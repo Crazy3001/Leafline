@@ -28,9 +28,11 @@ fn card_path(path: &str) -> bool {
         && path.chars().all(|c| c.is_ascii_alphanumeric() || "/-_.~%".contains(c))
 }
 
-/// Opens a card in a window of its own at screen position `x`, `y` (logical pixels).
+/// Opens a card in a window of its own at screen position `x`, `y` (logical pixels). Async, as
+/// every command that makes a window is: a synchronous one would block the event loop the new
+/// window needs, and the app would hang.
 #[tauri::command]
-pub fn pop_out_card(app: AppHandle, path: String, x: f64, y: f64) -> Result<()> {
+pub async fn pop_out_card(app: AppHandle, path: String, x: f64, y: f64) -> Result<()> {
     if !card_path(&path) {
         return Err(Error::Invalid(format!("not a card: {path}")));
     }

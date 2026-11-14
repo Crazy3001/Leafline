@@ -2,7 +2,7 @@
   // The one link card a window shows, beside the link that opened it. Every window's layout
   // holds one; it stays empty until a coloured name is clicked.
   import { tip } from "$lib/tip.svelte";
-  import { ArrowLeft, Maximize2, PictureInPicture2, Pin, X } from "@lucide/svelte";
+  import { ArrowLeft, Maximize2, Pin, X } from "@lucide/svelte";
   import { isTauri } from "@tauri-apps/api/core";
 
   import { backend } from "$lib/api";
@@ -69,16 +69,17 @@
    * Drags a card by its header: `move` gets how far the pointer has gone since it went down.
    * Buttons in the header still click.
    */
-  function dragFrom(e: PointerEvent, move: (dx: number, dy: number) => void) {
+  function dragFrom(e: PointerEvent, move: (dx: number, dy: number) => void, drop?: (up: PointerEvent) => void) {
     if (e.button !== 0 || (e.target as Element).closest("button")) return;
     const header = e.currentTarget as HTMLElement;
     const start = { x: e.clientX, y: e.clientY };
     header.setPointerCapture(e.pointerId);
     const onMove = (m: PointerEvent) => move(m.clientX - start.x, m.clientY - start.y);
-    const onUp = () => {
+    const onUp = (up: PointerEvent) => {
       header.removeEventListener("pointermove", onMove);
       header.removeEventListener("pointerup", onUp);
       header.removeEventListener("pointercancel", onUp);
+      if (up.type === "pointerup") drop?.(up);
     };
     header.addEventListener("pointermove", onMove);
     header.addEventListener("pointerup", onUp);
@@ -93,9 +94,20 @@
     return Math.min(Math.max(top, MARGIN), viewport.height - 40);
   }
 
+  /** Let go outside this window, the card goes into a window of its own, where it was dropped. */
   function dragOpen(e: PointerEvent) {
     const from = { ...peek.drag };
-    dragFrom(e, (dx, dy) => (peek.drag = { x: from.x + dx, y: from.y + dy }));
+    const grip = { x: e.clientX - (openCard?.getBoundingClientRect().left ?? 0), y: e.clientY - (openCard?.getBoundingClientRect().top ?? 0) };
+    dragFrom(
+      e,
+      (dx, dy) => (peek.drag = { x: from.x + dx, y: from.y + dy }),
+      (up) => {
+        const outside = up.clientX < 0 || up.clientY < 0 || up.clientX > window.innerWidth || up.clientY > window.innerHeight;
+        const target = peek.stack.at(-1);
+        if (!outside || !canPopOut || !target) return;
+        popOutAt(target, up.clientX - grip.x, up.clientY - grip.y, closePeek);
+      },
+    );
   }
 
   function dragPinned(e: PointerEvent, card: PinnedCard) {
@@ -109,18 +121,29 @@
   /** Cards can leave the window only in the app, where each gets a window of its own. */
   const canPopOut = isTauri();
 
-  /** Opens the card in its own window where it sits now, then lets go of it here. */
-  async function popOut(target: PeekTarget, box: DOMRect | undefined, done: () => void) {
+  /** Opens the card in its own window at a spot in this one's page (CSS pixels), then lets go of it here. */
+  async function popOutAt(target: PeekTarget, left: number, top: number, done: () => void) {
     const path = cardPath(target);
-    if (!path || !box) return;
+    if (!path) return;
     const zoom = window.outerWidth / window.innerWidth || 1;
-    await backend.popOutCard(path, window.screenX + box.left * zoom, window.screenY + box.top * zoom);
-    done();
+    try {
+      await backend.popOutCard(path, window.screenX + left * zoom, window.screenY + top * zoom);
+      done();
+    } catch {
+      // The card stays here.
+    }
   }
 
+  /**
+   * Pinning keeps the card: in the app it goes into a window of its own, to move anywhere on the
+   * screen; in a plain browser it stays pinned in this page.
+   */
   function pin() {
     const box = openCard?.getBoundingClientRect();
-    if (box) pinPeek(box.left, box.top);
+    const target = peek.stack.at(-1);
+    if (!box || !target) return;
+    if (canPopOut) popOutAt(target, box.left, box.top, closePeek);
+    else pinPeek(box.left, box.top);
   }
 
   let openCard = $state<HTMLElement | null>(null);
@@ -184,16 +207,6 @@
       <button class="full" use:tip={`In the ${KIND[card.target.kind].tab} tab`} onclick={() => openFull(card.target)}>
         <Maximize2 size={12} />Full view
       </button>
-      {#if canPopOut}
-        <button
-          class="icon"
-          aria-label="Pop out"
-          use:tip={"Into a window of its own, to move anywhere on the screen"}
-          onclick={(e) =>
-            popOut(card.target, (e.currentTarget as HTMLElement).closest(".peek")?.getBoundingClientRect(), () => unpinCard(card.key))}
-          ><PictureInPicture2 size={13} /></button
-        >
-      {/if}
       <button class="icon" aria-label="Close" use:tip={"Close"} onclick={() => unpinCard(card.key)}><X size={14} /></button>
     </header>
     <div class="body">{@render content(card.target)}</div>
@@ -224,17 +237,9 @@
       <button class="full" use:tip={`In the ${KIND[top.kind].tab} tab`} onclick={() => openFull(top)}>
         <Maximize2 size={12} />Full view
       </button>
-      <button class="icon" aria-label="Pin this card" use:tip={"Pin: keep it here and open more beside it"} onclick={pin}
+      <button class="icon" aria-label="Pin this card" use:tip={canPopOut ? "Pin: its own window, to move anywhere and keep beside the game" : "Pin: keep it here and open more beside it"} onclick={pin}
         ><Pin size={13} /></button
       >
-      {#if canPopOut}
-        <button
-          class="icon"
-          aria-label="Pop out"
-          use:tip={"Into a window of its own, to move anywhere on the screen"}
-          onclick={() => popOut(top, openCard?.getBoundingClientRect(), closePeek)}><PictureInPicture2 size={13} /></button
-        >
-      {/if}
       <button class="icon" aria-label="Close" use:tip={"Close (Esc)"} onclick={closePeek}><X size={14} /></button>
     </header>
     <div class="body" bind:this={card}>
