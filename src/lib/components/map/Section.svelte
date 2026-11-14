@@ -1,8 +1,11 @@
 <script lang="ts">
   // A collapsible part of the map card. Opening or closing one is remembered by its title;
-  // until then `open` decides.
+  // until then `open` decides. Inside a link card every section starts folded, so the card opens
+  // as a short list of headings, and what is opened there is remembered apart from the tabs.
   import { ChevronRight } from "@lucide/svelte";
-  import type { Snippet } from "svelte";
+  import { getContext, type Snippet } from "svelte";
+
+  import { SECTION_SCOPE } from "$lib/peek.svelte";
 
   let {
     title,
@@ -21,8 +24,9 @@
     children: Snippet;
   } = $props();
 
+  const inCard = getContext(SECTION_SCOPE) === "card";
   // svelte-ignore state_referenced_locally
-  const key = `leafline.section.${memory ?? title}`;
+  const key = `leafline.section.${inCard ? "card." : ""}${memory ?? title}`;
 
   function remembered() {
     try {
@@ -34,7 +38,7 @@
   }
 
   // svelte-ignore state_referenced_locally
-  let open = $state(remembered() ?? startOpen);
+  let open = $state(remembered() ?? (inCard ? false : startOpen));
 
   function toggle() {
     open = !open;

@@ -685,7 +685,24 @@ export const mockBackend: Backend = {
   },
   sessionHistory: async () => mockHistory(),
   itemCrafting: async () => ({ madeBy: [], usedIn: [] }),
-  craftingRecipes: async () => ({ disciplines: [], recipes: [] }),
+  async craftingRecipes(query) {
+    // A few made-up recipes, enough to lay the Crafting tab out.
+    const item = (id: number, name: string, count = 1) => ({ id, name, count });
+    const all = [
+      { id: 1, discipline: "Smelting", skillLevel: 1, craftExp: 3, mesoCost: 100, output: item(900001, "Fern Ingot"), ingredients: [item(900101, "Fern Ore", 5)] },
+      { id: 2, discipline: "Smelting", skillLevel: 2, craftExp: 5, mesoCost: 250, output: item(900002, "Ash Ingot"), ingredients: [item(900102, "Ash Ore", 5), item(900001, "Fern Ingot", 1)] },
+      { id: 3, discipline: "Stitching", skillLevel: 1, craftExp: 3, mesoCost: 0, output: item(900003, "Moss Cloth", 2), ingredients: [item(900103, "Moss Thread", 4)] },
+      { id: 4, discipline: "Stitching", skillLevel: 4, craftExp: 12, mesoCost: 1200, output: item(900004, "Bark Vest"), ingredients: [item(900003, "Moss Cloth", 6), item(900104, "Thorn Button", 2)] },
+    ];
+    const recipes = all.filter(
+      (r) =>
+        (!query.discipline || r.discipline === query.discipline) &&
+        (query.maxLevel == null || r.skillLevel <= query.maxLevel) &&
+        (!query.search || [r.output, ...r.ingredients].some((i) => i.name.toLowerCase().includes(query.search!.toLowerCase()))),
+    );
+    const disciplines: [string, number][] = [["Smelting", 2], ["Stitching", 2]];
+    return { disciplines, recipes };
+  },
   levelExp: async () => [
     { level: 20, needed: 6_000 },
     { level: 21, needed: 6_900 },

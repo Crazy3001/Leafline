@@ -33,6 +33,16 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
   now, then one piece for every level tier the data has for your job up to the plan's end, each
   better than the last. A goal you added wins its tier; goals you've outgrown show as such.
   The Build Planner's Gear tab, its Level by level list and Character → Gear's Next all follow it.
+- **Gear by level.** Gear paths no longer wait for your stats: each piece shows at the level it
+  asks for. The Gear tab has a Male / Female switch; with neither set, the gear you wear decides.
+  The Level by level list shows new gear as a row of pictures and skills with their icons.
+- **A new Crafting tab.** Disciplines as tiles with a picture of what they make, a skill level
+  row, recipes grouped by level, and ingredients as pictures with their counts.
+- **Cards open folded**, as a short list of headings; what you open is remembered for cards.
+- **Sort NPCs** by name, most quests or map. During a session, Where to train sits under your
+  live numbers.
+- **Quieter views.** Drop rates, "seen" dates, credit lines and outside links are gone from the
+  tabs and cards; Settings → Data keeps where the data comes from.
 - **All levels** in Lookup → Items → Equip, a sort for every kind of item, and "any" in empty
   level boxes. Filter boxes stay open once opened, through Clear; Monsters starts with them open.
 - **See the map.** Map details (the Map tab, Lookup → Maps and a map's card) have a **Map**

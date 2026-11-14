@@ -82,6 +82,13 @@
     white-space: pre-line;
   }
 
+  /* A tooltip with a picture or a list reads as a small card. */
+  .tip:not(.words) {
+    min-width: 160px;
+    padding: 9px 11px;
+    border-radius: var(--radius);
+  }
+
   @keyframes appear {
     from {
       opacity: 0;

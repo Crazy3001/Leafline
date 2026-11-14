@@ -9,7 +9,12 @@
   import MobPeek from "./MobPeek.svelte";
   import NpcPeek from "./NpcPeek.svelte";
   import QuestPeek from "./QuestPeek.svelte";
-  import { closePeek, openFull, peek, peekBack, type PeekKind } from "$lib/peek.svelte";
+  import { setContext } from "svelte";
+
+  import { SECTION_SCOPE, closePeek, openFull, peek, peekBack, type PeekKind } from "$lib/peek.svelte";
+
+  // Sections inside a card start folded.
+  setContext(SECTION_SCOPE, "card");
 
   const KIND: Record<PeekKind, { label: string; tab: string }> = {
     item: { label: "Item", tab: "Lookup" },

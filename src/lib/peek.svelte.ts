@@ -82,3 +82,6 @@ export async function openFull(target: PeekTarget) {
       return id != null ? backend.showQuest(id) : undefined;
   }
 }
+
+/** The context key a link card sets, so the sections inside it start folded. */
+export const SECTION_SCOPE = Symbol("section scope");

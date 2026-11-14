@@ -189,8 +189,9 @@
   </Section>
 {/if}
 
-{#if !away}
-  <Section title="Route" open={!compact}>
+<!-- The route planner lives in the Map tab; a looked-up map or a card shows the route from yours. -->
+{#if !away && !compact}
+  <Section title="Route">
     <RoutePlanner from={details.map} region={details.region} />
   </Section>
 {/if}
