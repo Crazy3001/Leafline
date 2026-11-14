@@ -39,11 +39,11 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
 - **Skills.** Lookup has a Skills half: every skill by job, searchable by name or what it does.
   Skill names in Character → Skills and the Build Planner open a skill card with its picture,
   what it does, what it needs first and what each level gives.
-- **Cards you can move and pin.** Drag a card by its header. The pin button keeps it where it is,
-  so you can open more beside it and compare; the card you click comes to the top. In the app a
-  pinned card gets a small window of its own, to place anywhere on the screen, and dragging an
-  open card past the overlay’s edge does the same. Cards always open with their sections folded. Skill names link everywhere, the Level by
-  level list included.
+- **Cards in windows of their own.** In the app, a coloured name opens its card in a small window
+  beside the link, which you can drag anywhere on the screen, outside the overlay too. Links in a
+  card open the next card in the same window, with a back arrow. Pin keeps a card in a window
+  that stays, so the next link opens a new one beside it. Cards always open with their sections
+  folded. Skill names link everywhere, the Level by level list included.
 - **Gear past Lv 40 and 50.** Where a job's tops and bottoms end, overalls carry on (a Bowman's
   Kismet, Tai and Linnex). A helmet for any job no longer ends the job's own hats early.
 - **More in the map picture's tooltips:** a monster's picture, level, HP and EXP; an NPC's

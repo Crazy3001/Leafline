@@ -685,6 +685,9 @@ export const mockBackend: Backend = {
   },
   sessionHistory: async () => mockHistory(),
   itemCrafting: async () => ({ madeBy: [], usedIn: [] }),
+  async showCard(path) {
+    window.open(`/${path}`, "leafline-card", "width=380,height=540");
+  },
   async popOutCard(path) {
     window.open(`/${path}`, "_blank", "width=380,height=540");
   },

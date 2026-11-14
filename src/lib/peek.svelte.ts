@@ -4,6 +4,8 @@
 // can be dragged by its header, and pinned: a pinned card stays where it is, beside the next ones,
 // until its own close button, so several can sit side by side to compare.
 
+import { isTauri } from "@tauri-apps/api/core";
+
 import { backend } from "./api";
 import { showItemNamed } from "./items.svelte";
 import { showMonsterNamed } from "./monsters.svelte";
@@ -78,9 +80,42 @@ export function unpinCard(key: number) {
   peek.pinned = peek.pinned.filter((p) => p.key !== key);
 }
 
+/** Set by a card's own window: there, links page through the window's own stack. */
+export const cardWindow = $state({ active: false });
+
 /** Whether a link sits inside the open card, where it opens the next card instead of a new one. */
 function inCard(from: Element | null): boolean {
-  return !!from?.closest("[data-peek]");
+  return cardWindow.active || !!from?.closest("[data-peek]");
+}
+
+/** A card window's size in logical pixels, at the size setting of 100%. */
+const CARD_WINDOW = { width: 380, height: 540 };
+
+/**
+ * In the app a card opens in a window of its own, beside the link and on the screen, so it can be
+ * moved anywhere. Below the link when it fits, else above it.
+ */
+function showInWindow(target: PeekTarget, from: Element | null): boolean {
+  if (!isTauri() || cardWindow.active) return false;
+  const path = cardPath(target);
+  if (!path) return false;
+  const zoom = window.outerWidth / window.innerWidth || 1;
+  const r = from?.getBoundingClientRect();
+  const left = window.screenX + (r ? r.left - 12 : 40) * zoom;
+  const below = window.screenY + (r ? r.bottom + 6 : 40) * zoom;
+  const above = window.screenY + (r ? r.top - 6 : 40) * zoom - CARD_WINDOW.height * zoom;
+  const screenRight = (screen as Screen & { availLeft?: number }).availLeft ?? 0;
+  const screenBottom = (screen as Screen & { availTop?: number }).availTop ?? 0;
+  const maxX = screenRight + screen.availWidth - CARD_WINDOW.width * zoom - 8;
+  const maxY = screenBottom + screen.availHeight - CARD_WINDOW.height * zoom - 8;
+  const x = Math.max(screenRight + 8, Math.min(left, maxX));
+  const y = below <= maxY || above < screenBottom ? Math.min(below, maxY) : above;
+  backend.showCard(path, x, y).catch(() => {
+    // Shown here instead, as in a browser.
+    peek.stack = [target];
+    peek.anchor = anchorOf(from);
+  });
+  return true;
 }
 
 function anchorOf(from: Element | null): PeekAnchor | null {
@@ -91,6 +126,7 @@ function anchorOf(from: Element | null): PeekAnchor | null {
 
 /** Opens a card for `target` beside the link `from`, or over the open card when the link is in it. */
 export function openPeek(target: PeekTarget, from: Element | null) {
+  if (!inCard(from) && showInWindow(target, from)) return;
   if (inCard(from) && peek.stack.length) {
     const top = peek.stack.at(-1)!;
     if (top.kind === target.kind && top.id === target.id && top.name === target.name) return;

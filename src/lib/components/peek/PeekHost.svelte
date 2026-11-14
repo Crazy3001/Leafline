@@ -13,6 +13,7 @@
   import {
     SECTION_SCOPE,
     cardPath,
+    cardWindow,
     closePeek,
     openFull,
     peek,
@@ -155,7 +156,7 @@
   });
 
   $effect(() => {
-    if (!top) return;
+    if (!top || cardWindow.active) return;
     measure();
     const outside = (e: PointerEvent) => {
       const target = e.target as Element | null;
@@ -213,7 +214,7 @@
   </div>
 {/each}
 
-{#if top && place}
+{#if top && place && !cardWindow.active}
   <div
     class="peek"
     data-peek

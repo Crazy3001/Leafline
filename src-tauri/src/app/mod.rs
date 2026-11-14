@@ -133,6 +133,8 @@ pub fn run() {
             pins::pin_status,
             pins::pin_panel,
             cards::pop_out_card,
+            cards::show_card,
+            cards::close_live_card,
             pins::unpin_panel,
             pins::toggle_pins,
             pins::show_panel,
