@@ -792,6 +792,87 @@ export interface PlayerDamage {
   attackMax: number | null;
   /** The damaging skills last seen in the skill window. */
   skills: DamageSkill[];
+  /** Everything the stat window and its detail pane showed, and when, in Unix seconds. */
+  sheet: StatSheet | null;
+  readAt: number | null;
+  /** The buffs marked as on, by skill id. */
+  buffsOn: number[];
+  /** The buffs marked as on when the stat window was last read. */
+  readWith: number[];
+}
+
+/** The Character Stat window and its detail pane, as last read. */
+export interface StatSheet {
+  level: number | null;
+  /** Points put in: the 28 of "30 (28+2)". */
+  str: number | null;
+  dex: number | null;
+  int: number | null;
+  luk: number | null;
+  /** What gear adds: the 2 of "30 (28+2)". */
+  gearStr: number;
+  gearDex: number;
+  gearInt: number;
+  gearLuk: number;
+  abilityPoints: number | null;
+  maxHp: number | null;
+  maxMp: number | null;
+  fame: number | null;
+  attackMin: number | null;
+  attackMax: number | null;
+  weaponDef: number | null;
+  magic: number | null;
+  magicDef: number | null;
+  accuracy: number | null;
+  evasion: number | null;
+  /** Percentages: 26 is 26%. */
+  critRate: number | null;
+  critDamage: number | null;
+  speed: number | null;
+  jump: number | null;
+}
+
+/** What a buff changes at one of its levels. All add, except weaponDefPercent, a share. */
+export interface SkillEffects {
+  attack: number;
+  magic: number;
+  weaponDef: number;
+  weaponDefPercent: number;
+  magicDef: number;
+  accuracy: number;
+  evasion: number;
+  speed: number;
+  jump: number;
+  /** How long it lasts; 0 when the data gives no time. */
+  seconds: number;
+}
+
+/** One of the character's buffs, at its level. */
+export interface BuffRow {
+  id: number;
+  name: string;
+  /** Null until the Skill window has shown it or the build gives it. */
+  level: number | null;
+  maxLevel: number;
+  /** The level came from the Skill window, not the build. */
+  levelRead: boolean;
+  on: boolean;
+  /** Was on when the stat window was last read, so already in its numbers. */
+  onAtRead: boolean;
+  effects: SkillEffects;
+  description: string | null;
+}
+
+export interface StatsView {
+  sheet: StatSheet | null;
+  readAt: number | null;
+  buffs: BuffRow[];
+  /** The sheet with the buffs on now; null when it would be the same. */
+  buffed: StatSheet | null;
+  /** The worn gear's Attack, which a buff's Attack is counted against. */
+  weaponAttack: number | null;
+  /** A buff changes Attack but no worn gear gives the Attack, so the range is left as read. */
+  attackUnscaled: boolean;
 }
 
 export interface DamageSkill {
@@ -1725,6 +1806,10 @@ export interface SkillInfo {
   requiredSkills: SkillLevel[];
   /** What the skill does at each level, from level 1. */
   levelDescriptions: string[];
+  /** What it changes at each level, from level 1; empty when it changes no stat. */
+  effects: SkillEffects[];
+  /** Cast on yourself or the party for a while, such as Rage or Haste. */
+  buff: boolean;
 }
 
 export interface BuildCatalog {
