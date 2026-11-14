@@ -57,6 +57,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(shortcuts::plugin())
         .manage(OverlayState::default())
+        .manage(cards::CardState::default())
         .manage(LiveState::default())
         .manage(Readings::default())
         .manage(Bindings::default())
@@ -135,6 +136,8 @@ pub fn run() {
             cards::pop_out_card,
             cards::show_card,
             cards::close_live_card,
+            cards::card_is_live,
+            cards::pin_card,
             pins::unpin_panel,
             pins::toggle_pins,
             pins::show_panel,

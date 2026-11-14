@@ -1,11 +1,12 @@
 //! Link cards in windows of their own, so they can sit anywhere on the screen, outside the
 //! overlay, beside the game. A coloured name opens its card in the one live card window, moved
-//! beside the link; pinning a card gives it a window that stays, and the next link opens a new
-//! live one. Each is a small window like a pinned panel.
+//! beside the link. Pinning a card keeps that window where it is, as a pinned panel stays, and
+//! the next link opens a new live one. Each is a small window like a pinned panel.
 
+use std::sync::Mutex;
 use std::sync::atomic::{AtomicU32, Ordering};
 
-use tauri::{AppHandle, Emitter, LogicalPosition, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Emitter, LogicalPosition, Manager, WebviewUrl, WebviewWindowBuilder, Window};
 
 use super::overlay;
 use super::pins;
@@ -16,14 +17,28 @@ use crate::error::{Error, Result};
 const WIDTH: f64 = 380.0;
 const HEIGHT: f64 = 540.0;
 
-/// The window links open their cards in. Named like a pinned panel, so it hides, shows, sizes and
-/// lets clicks through with them.
-const LIVE: &str = "pin-card-live";
+/// Which card window links open their cards in, by label, until it is pinned.
+#[derive(Default)]
+pub struct CardState {
+    live: Mutex<Option<String>>,
+}
+
+impl CardState {
+    fn live(&self) -> Option<String> {
+        self.live.lock().expect("cards lock").clone()
+    }
+}
 
 /// Tells the live card window which card to show now, with its page path.
 const SHOW_EVENT: &str = "card-show";
 
 static NEXT: AtomicU32 = AtomicU32::new(1);
+
+/// A new card window's label, named like a pinned panel so it hides, shows, sizes and lets
+/// clicks through with them.
+fn next_label() -> String {
+    format!("{}card-{}", pins::PREFIX, NEXT.fetch_add(1, Ordering::Relaxed))
+}
 
 /// Whether a page path is one these commands open: `card/<kind>/<id or n-name>`, in the
 /// characters a link's path can carry. Nothing else can be loaded through them.
@@ -68,16 +83,37 @@ pub async fn show_card(app: AppHandle, path: String, x: f64, y: f64) -> Result<(
     if !card_path(&path) {
         return Err(Error::Invalid(format!("not a card: {path}")));
     }
-    match app.get_webview_window(LIVE) {
+    let state = app.state::<CardState>();
+    match state.live().and_then(|label| app.get_webview_window(&label)) {
         Some(window) => {
             window.set_position(LogicalPosition::new(x, y))?;
-            app.emit_to(LIVE, SHOW_EVENT, &path)?;
+            app.emit_to(window.label(), SHOW_EVENT, &path)?;
             if !pins::hidden(&app) {
                 window.show()?;
             }
             Ok(())
         }
-        None => open(&app, LIVE.to_string(), path, x, y),
+        None => {
+            let label = next_label();
+            *state.live.lock().expect("cards lock") = Some(label.clone());
+            open(&app, label, path, x, y)
+        }
+    }
+}
+
+/// Whether the asking window is the live card window, which links send their cards to.
+#[tauri::command]
+pub fn card_is_live(window: Window, state: tauri::State<CardState>) -> bool {
+    state.live().as_deref() == Some(window.label())
+}
+
+/// Pins the asking card window where it is: links stop using it, and the next one opens a new
+/// live window.
+#[tauri::command]
+pub fn pin_card(window: Window, state: tauri::State<CardState>) {
+    let mut live = state.live.lock().expect("cards lock");
+    if live.as_deref() == Some(window.label()) {
+        *live = None;
     }
 }
 
@@ -88,14 +124,13 @@ pub async fn pop_out_card(app: AppHandle, path: String, x: f64, y: f64) -> Resul
     if !card_path(&path) {
         return Err(Error::Invalid(format!("not a card: {path}")));
     }
-    let label = format!("{}card-{}", pins::PREFIX, NEXT.fetch_add(1, Ordering::Relaxed));
-    open(&app, label, path, x, y)
+    open(&app, next_label(), path, x, y)
 }
 
 /// Closes the live card window, as a click elsewhere in Leafline closes a card.
 #[tauri::command]
 pub async fn close_live_card(app: AppHandle) -> Result<()> {
-    if let Some(window) = app.get_webview_window(LIVE) {
+    if let Some(window) = app.state::<CardState>().live().and_then(|label| app.get_webview_window(&label)) {
         window.close()?;
     }
     Ok(())

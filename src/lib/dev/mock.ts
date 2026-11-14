@@ -685,6 +685,8 @@ export const mockBackend: Backend = {
   },
   sessionHistory: async () => mockHistory(),
   itemCrafting: async () => ({ madeBy: [], usedIn: [] }),
+  cardIsLive: async () => true,
+  pinCard: async () => {},
   async showCard(path) {
     window.open(`/${path}`, "leafline-card", "width=380,height=540");
   },

@@ -369,6 +369,10 @@ export interface Backend {
   popOutCard(path: string, x: number, y: number): Promise<void>;
   /** Shows a card in the live card window at a screen position (logical pixels), opening it if needed. */
   showCard(path: string, x: number, y: number): Promise<void>;
+  /** Whether this card window is the one links open their cards in. */
+  cardIsLive(): Promise<boolean>;
+  /** Pins this card window where it is; the next link opens a new one. */
+  pinCard(): Promise<void>;
   unpinPanel(panel: PinId): Promise<PinStatus>;
   onPins(handler: (status: PinStatus) => void): Promise<UnlistenFn>;
   /** The player resized the calling pinned panel, with its new width and height in screen units. */
@@ -572,6 +576,8 @@ const tauriBackend: Backend = {
   pinPanel: (panel) => invoke("pin_panel", { panel }),
   popOutCard: (path, x, y) => invoke("pop_out_card", { path, x, y }),
   showCard: (path, x, y) => invoke("show_card", { path, x, y }),
+  cardIsLive: () => invoke("card_is_live"),
+  pinCard: () => invoke("pin_card"),
   unpinPanel: (panel) => invoke("unpin_panel", { panel }),
   onPins: (handler) => listen<PinStatus>("pins", (e) => handler(e.payload)),
   onPinResized: (handler) => getCurrentWindow().listen<[number, number]>("pin-resized", (e) => handler(e.payload)),

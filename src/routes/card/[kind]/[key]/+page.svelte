@@ -9,13 +9,12 @@
   import { page } from "$app/state";
   import { backend } from "$lib/api";
   import CardContent from "$lib/components/peek/CardContent.svelte";
-  import { SECTION_SCOPE, cardPath, cardWindow, openFull, peek, peekBack, type PeekKind, type PeekTarget } from "$lib/peek.svelte";
+  import { SECTION_SCOPE, cardWindow, openFull, peek, peekBack, type PeekKind, type PeekTarget } from "$lib/peek.svelte";
   import { display, watchSettings } from "$lib/settings.svelte";
   import { tip } from "$lib/tip.svelte";
 
   const LABEL: Record<PeekKind, string> = { item: "Item", mob: "Monster", npc: "NPC", map: "Map", quest: "Quest", skill: "Skill" };
   const TAB: Record<PeekKind, string> = { item: "Lookup", mob: "Lookup", npc: "Lookup", map: "Lookup", quest: "Quests", skill: "Lookup" };
-  const LIVE = "pin-card-live";
 
   watchSettings();
   // Sections start folded, as in every card, and links page through this window.
@@ -40,7 +39,7 @@
 
   onMount(() => {
     const win = getCurrentWindow();
-    live = win.label === LIVE;
+    backend.cardIsLive().then((yes) => (live = yes));
     // The live window shows whichever card a link asks for next.
     const stop = win.listen<string>("card-show", (e) => {
       const next = parse(e.payload);
@@ -69,12 +68,10 @@
       .catch(() => window.close());
   }
 
-  /** Keeps this card in a window that stays where this one is; the next link opens a new one. */
+  /** Keeps this window where it is, like a pinned panel; the next link opens a new one. */
   async function pin() {
-    const path = top && cardPath(top);
-    if (!path) return;
-    await backend.popOutCard(path, window.screenX, window.screenY);
-    close();
+    await backend.pinCard();
+    live = false;
   }
 
   function full() {
