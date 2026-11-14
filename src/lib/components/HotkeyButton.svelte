@@ -3,6 +3,7 @@
   // and the first-launch setup. A key that is already a hotkey never reaches the page (Windows
   // gives it to Leafline), so while this waits, hotkeys are kept quiet and one that arrives is
   // taken as the key pressed.
+  import { tip } from "$lib/tip.svelte";
   import { backend } from "$lib/api";
   import { display, keyName, quietHotkeys } from "$lib/settings.svelte";
 
@@ -81,7 +82,7 @@
   class:listening
   class:taken={taken && !listening}
   {disabled}
-  title={taken ? "Another program on this PC uses this key, so Leafline can't. Pick another." : undefined}
+  use:tip={taken ? "Another program on this PC uses this key, so Leafline can't. Pick another." : undefined}
   aria-label="{label}: {listening ? 'press keys' : keys ? keyName(keys) : 'no hotkey'}{taken ? ', in use by another program' : ''}"
   onclick={() => (listening = !listening)}
   onblur={() => (listening = false)}

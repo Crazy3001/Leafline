@@ -2,6 +2,7 @@
   // The item check: one item, read from its tooltip or taken from the data. Its stats, whether
   // it has been scrolled, where it comes from, and the player's own notes. Leafline has no
   // market prices.
+  import { tip } from "$lib/tip.svelte";
   import { untrack } from "svelte";
 
   import BuildFit from "./BuildFit.svelte";
@@ -186,7 +187,7 @@
   {#snippet aside()}
     <!-- Upgrades are read from the name's (+N) suffix, so say nothing when the name is unreadable. -->
     {#if scrolling}
-      <span class="verdict" class:upgraded={scrolling.verdict.tone === "scrolled"} title={scrolling.verdict.title}>
+      <span class="verdict" class:upgraded={scrolling.verdict.tone === "scrolled"} use:tip={scrolling.verdict.title}>
         {scrolling.verdict.label}
       </span>
     {/if}
@@ -251,17 +252,17 @@
             <td class="value tabular">{formatSigned(stat.value)}</td>
             <td class="detail tabular">
               {#if stat.base != null && stat.bonus != null}
-                <span title="The item's own value, then what this copy has added or lost">
+                <span use:tip={"The item's own value, then what this copy has added or lost"}>
                   ({stat.base}
                   <span class="bonus" class:negative={stat.bonus < 0}>{formatSigned(stat.bonus)}</span>)
                 </span>
               {:else if stat.note}
-                <span class="unsure" title={stat.note}>base default · unsure</span>
+                <span class="unsure" use:tip={stat.note}>base default · unsure</span>
               {:else if stat.fromData}
-                <span title="Not read from the tooltip: this is the item's default base value">base default</span>
+                <span use:tip={"Not read from the tooltip: this is the item's default base value"}>base default</span>
               {:else if stat.standard != null}
                 {@const diff = stat.value - stat.standard}
-                <span title="The item's own value, then what this copy has added or lost. A scroll, a rolled copy or a misread makes it differ.">
+                <span use:tip={"The item's own value, then what this copy has added or lost. A scroll, a rolled copy or a misread makes it differ."}>
                   ({stat.standard}
                   <span class="bonus" class:negative={diff < 0}>{formatSigned(diff)}</span>)
                 </span>
@@ -295,7 +296,7 @@
           class="chip req"
           class:zero={!value}
           class:unread={value == null}
-          title={filled.has(key) && value != null ? "Not read from the tooltip: this is the data's value" : undefined}
+          use:tip={filled.has(key) && value != null ? "Not read from the tooltip: this is the data's value" : undefined}
         >
           {label}<b class="tabular">{value ?? "?"}</b>
         </span>

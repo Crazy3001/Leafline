@@ -2,6 +2,7 @@
   // The Items half of the Lookup tab: the last item check, and a search of every item in the map
   // data. Search needs nothing from the game, so it works with live reading off.
   import { ArrowLeft, LoaderCircle } from "@lucide/svelte";
+  import { FilterBoxState } from "$lib/filterbox.svelte";
   import { untrack } from "svelte";
 
   import Card from "./Card.svelte";
@@ -56,7 +57,7 @@
   const query = $derived(itemView.query);
 
   let filters = $state<ItemFilters | null>(null);
-  let showFilters = $state(false);
+  const filterBox = new FilterBoxState("items");
   let page = $state<ItemPage | null>(null);
   let searching = $state(false);
   let record = $state<ItemRecord | null>(null);
@@ -133,7 +134,6 @@
   function clear() {
     itemView.query = blankQuery();
     itemView.id = null;
-    showFilters = false;
   }
 
   const number = (value: string) => (value === "" ? null : Math.max(0, Math.floor(Number(value) || 0)));
@@ -173,7 +173,7 @@
     placeholder="Search items"
     label="Search items"
     {narrowed}
-    bind:filters={showFilters}
+    bind:filters={filterBox.open}
     filterable={!finding}
     clearable={browsing || itemView.id != null}
     oninput={(text) => setQuery({ text })}
@@ -208,7 +208,7 @@
     {/if}
   {/if}
 
-  {#if showFilters && !finding}
+  {#if filterBox.open && !finding}
     <FilterBox>
       {#if slotted}
         <label>

@@ -1,6 +1,7 @@
 <script lang="ts">
   // Where to go for one quest objective: a one-line hint that opens into the monsters to hunt,
   // their best maps, and the route to the chosen map.
+  import { tip } from "$lib/tip.svelte";
   import Ref from "$lib/components/Ref.svelte";
   import { ChevronRight, Crosshair } from "@lucide/svelte";
 
@@ -66,13 +67,13 @@
       <span class="line">
         {#if guide.kind === "item"}
           <span class="who">{top.monster.name}</span>
-          {#if top.drop?.rate != null}<span class="muted" title={rateTitle(top.drop)}>{rate(top.drop.rate)}</span>{/if}
+          {#if top.drop?.rate != null}<span class="muted" use:tip={rateTitle(top.drop)}>{rate(top.drop.rate)}</span>{/if}
           <span class="sep">·</span>
         {/if}
         <span class="where">{best.map.name}</span>
       </span>
       {#if best.travel}
-        <span class="far tabular shortcut" title="{distance(best)}, via {best.travel.via.name}">{best.travel.hops} with travel</span>
+        <span class="far tabular shortcut" use:tip={`${distance(best)}, via ${best.travel.via.name}`}>{best.travel.hops} with travel</span>
       {:else if best.hops != null}
         <span class="far tabular">{distance(best)}</span>
       {/if}
@@ -89,7 +90,7 @@
             <Ref kind="mob" name={hunt.monster.name} />
             <span class="muted">Lv {hunt.monster.level}{hunt.monster.boss ? " · boss" : ""}</span>
             {#if hunt.drop?.rate != null}
-              <span class="rate" title={rateTitle(hunt.drop)}>{rate(hunt.drop.rate)} drop</span>
+              <span class="rate" use:tip={rateTitle(hunt.drop)}>{rate(hunt.drop.rate)} drop</span>
             {/if}
           </div>
           <ul class="maps">
@@ -106,7 +107,7 @@
                   <span
                     class="dist tabular"
                     class:shortcut={ground.travel}
-                    title={ground.travel ? `With the travel you turned on in Settings, via ${ground.travel.via.name}` : undefined}
+                    use:tip={ground.travel ? `With the travel you turned on in Settings, via ${ground.travel.via.name}` : undefined}
                     >{distance(ground)}</span
                   >
                 </button>
@@ -118,7 +119,7 @@
       {/each}
       {#each guide.hunts.filter((h) => !h.monster.known) as hunt (hunt.monster.name)}
         <p class="note">
-          {hunt.monster.name}{#if hunt.drop?.rate != null}<span title={rateTitle(hunt.drop)}> ({rate(hunt.drop.rate)})</span>{/if} also drops
+          {hunt.monster.name}{#if hunt.drop?.rate != null}<span use:tip={rateTitle(hunt.drop)}> ({rate(hunt.drop.rate)})</span>{/if} also drops
           it, but isn't in the map data.
         </p>
       {/each}

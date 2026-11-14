@@ -458,7 +458,19 @@ pub fn expand(build: &Build, rules: &Rules, catalog: &Catalog) -> Expansion {
     problems.extend(end_notes(build, &goals, &skills, &stats, catalog, end, ap, sp.left()));
     let mut skills: Vec<SkillLevel> = skills.into_iter().map(|(skill_id, level)| SkillLevel { skill_id, level }).collect();
     skills.sort_by_key(|s| s.skill_id);
-    Expansion { steps, problems, gear, skills }
+    let mut expansion = Expansion { steps, problems, gear, skills };
+    // The pieces to get, level by level, follow the same path per slot as the gear views: one
+    // piece now at most, then one for each tier up, with goals passed over left out.
+    let mut gets: Vec<(u32, String)> = super::outfit::gear_paths(build, &expansion, rules, catalog, start)
+        .into_iter()
+        .flat_map(|path| path.now.into_iter().chain(path.steps))
+        .map(|step| (step.level, step.item.name))
+        .collect();
+    gets.sort_by_key(|(level, _)| *level);
+    for step in &mut expansion.steps {
+        step.gear = gets.iter().filter(|(level, _)| *level == step.level).map(|(_, name)| name.clone()).collect();
+    }
+    expansion
 }
 
 fn job_name(catalog: &Catalog, job: Option<u32>) -> String {
@@ -1021,7 +1033,7 @@ mod tests {
         let (plan, catalog) = hat_and_dagger(0);
         let e = expand(&plan, &Rules::default(), &catalog);
         assert_eq!((e.gear[0].level, e.gear[1].level), (Some(10), Some(10)), "the hat brings the dagger in reach");
-        assert_eq!(step(&e, 10).gear, ["Fern Hat", "Fern Dagger"]);
+        assert_eq!(step(&e, 10).gear, ["Fern Dagger", "Fern Hat"], "in the equip window's order");
 
         // Needing more than base stats, the hat can't lift itself.
         let (plan, catalog) = hat_and_dagger(30);

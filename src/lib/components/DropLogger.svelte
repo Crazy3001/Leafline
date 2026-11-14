@@ -2,6 +2,7 @@
   // "Got it as a drop?" on the item check: one click logs which monster dropped the item, from
   // the monsters on the map the player is on. The log stays on this PC. Reporting the drop to
   // MeowDB opens its monster page in the player's browser with the item's name copied.
+  import { tip } from "$lib/tip.svelte";
   import { Check, ExternalLink, Undo2 } from "@lucide/svelte";
   import { untrack } from "svelte";
 
@@ -107,7 +108,7 @@
     {#if logged}
       <p class="done"><Check size={13} /> Logged from <b>{logged.monster}</b>{card ? ` on ${card.map.name}` : ""}.</p>
       <div class="row">
-        <button class="act" onclick={report} title="Opens MeowDB and copies the item's name"
+        <button class="act" onclick={report} use:tip={"Opens MeowDB and copies the item's name"}
           ><ExternalLink size={12} />Report on MeowDB</button
         >
         <button class="act ghost" onclick={undo}><Undo2 size={12} />Undo</button>

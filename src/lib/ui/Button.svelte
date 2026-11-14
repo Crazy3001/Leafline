@@ -3,6 +3,8 @@
   // secondary, ghost (no frame) or danger.
   import type { Snippet } from "svelte";
 
+  import { tip } from "$lib/tip.svelte";
+
   let {
     variant = "secondary",
     size = "md",
@@ -22,7 +24,7 @@
   } = $props();
 </script>
 
-<button class="btn {variant} {size}" {title} {disabled} aria-pressed={pressed} {onclick}>{@render children()}</button>
+<button class="btn {variant} {size}" use:tip={title} {disabled} aria-pressed={pressed} {onclick}>{@render children()}</button>
 
 <style>
   .btn {

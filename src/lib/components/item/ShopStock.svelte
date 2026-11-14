@@ -1,5 +1,6 @@
 <script lang="ts">
   // What one NPC shop sells, with prices, from Leafline's shop file. Items open their own page.
+  import { tip } from "$lib/tip.svelte";
   import Ref from "$lib/components/Ref.svelte";
   import { backend } from "$lib/api";
   import { formatNumber } from "$lib/format";
@@ -20,7 +21,7 @@
         <span>{item.item}</span>
       {/if}
       {#if item.needs}<span class="needs">{item.needs}</span>{/if}
-      <span class="price tabular" title="Seen {shortDate(item.seen)}">{formatNumber(item.price)}</span>
+      <span class="price tabular" use:tip={`Seen ${shortDate(item.seen)}`}>{formatNumber(item.price)}</span>
     </li>
   {/each}
 </ul>

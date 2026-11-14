@@ -1,6 +1,7 @@
 <script lang="ts">
   // Gear to look for at a level, on this build. Each name opens the item in the Lookup tab. The
   // Character tab shows the top pick of each slot; the editor shows more, and can add them as goals.
+  import { tip } from "$lib/tip.svelte";
   import Ref from "$lib/components/Ref.svelte";
   import { Plus } from "@lucide/svelte";
 
@@ -60,7 +61,7 @@
                 {#if full && pick.item.reqLevel}Lv {pick.item.reqLevel} · {/if}{gives(pick.item, full ? 3 : 2)}
               </span>
               {#if onAdd}
-                <button class="add" disabled={pick.goal} title={pick.goal ? "Already a goal" : "Add as a gear goal"} aria-label="Add as a gear goal" onclick={() => onAdd?.(pick.item)}><Plus size={12} /></button>
+                <button class="add" disabled={pick.goal} use:tip={pick.goal ? "Already a goal" : "Add as a gear goal"} aria-label="Add as a gear goal" onclick={() => onAdd?.(pick.item)}><Plus size={12} /></button>
               {/if}
             </div>
           {/each}

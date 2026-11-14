@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tip } from "$lib/tip.svelte";
   import Ref from "$lib/components/Ref.svelte";
   import Card from "./Card.svelte";
   import { showMapNamed } from "$lib/places.svelte";
@@ -22,7 +23,7 @@
     {#if session.held}
       <span class="state paused">Paused</span>
     {:else if session.paused}
-      <span class="state paused" title="No EXP for a while, or the map changed: the clock waits for the next gain">
+      <span class="state paused" use:tip={"No EXP for a while, or the map changed: the clock waits for the next gain"}>
         Paused
       </span>
     {:else if session.activeSeconds > 0}
@@ -55,7 +56,7 @@
         <dd class="tabular">{session.levelUps}</dd>
         {#if session.expNeeded != null}<dd
             class="sub tabular"
-            title="EXP this level needs in all, measured from the HUD's points and percent"
+            use:tip={"EXP this level needs in all, measured from the HUD's points and percent"}
           >
             Level needs {formatCompact(session.expNeeded)}
           </dd>{/if}
@@ -77,7 +78,7 @@
                 <span class="map-name"><Ref kind="map" name={row.map}>{label.name}</Ref></span>
                 {#if label.street && !compact}<span class="map-street">{label.street}</span>{/if}
               {:else}
-                <span class="map-name unplaced" title="Gains between two readings on different maps, or before any map was read">
+                <span class="map-name unplaced" use:tip={"Gains between two readings on different maps, or before any map was read"}>
                   Between maps
                 </span>
               {/if}

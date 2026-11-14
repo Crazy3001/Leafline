@@ -1,6 +1,7 @@
 <script lang="ts">
   // "Go to…": a search over maps and NPCs that heads for the one picked, with the places headed
   // for lately beside it for a second trip.
+  import { tip } from "$lib/tip.svelte";
   import { MapPin, Navigation, UserRound, X } from "@lucide/svelte";
 
   import { backend } from "$lib/api";
@@ -108,7 +109,7 @@
     <ul class="recent" aria-label="Places headed for lately">
       {#each recent as place (place.kind + place.name + place.maps[0]?.id)}
         <li>
-          <button class="chip" title="Head for {place.name}{where(place) ? ` (${where(place)})` : ''}" onclick={() => goTo(place)}
+          <button class="chip" use:tip={where(place)} onclick={() => goTo(place)}
             ><Navigation size={10} />{place.name}</button
           >
           <button class="forget" aria-label="Forget {place.name}" onclick={() => forgetPlace(place)}><X size={10} /></button>

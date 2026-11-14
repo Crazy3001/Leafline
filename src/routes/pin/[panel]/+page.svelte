@@ -1,6 +1,7 @@
 <script lang="ts">
   // One panel pinned into a small window of its own. It stays on screen while the overlay is
   // hidden and sizes itself to what it shows, until the player resizes it by hand.
+  import { tip } from "$lib/tip.svelte";
   import { AppWindow, Minimize2, PinOff } from "@lucide/svelte";
   import { onMount, tick, untrack } from "svelte";
 
@@ -136,15 +137,15 @@
     <span class="title" data-tauri-drag-region><Icon size={12} />{info.title}</span>
     <span class="actions">
       {#if sized}
-        <button class="action" title="Fit to contents" onclick={fitToContent}><Minimize2 size={12} /></button>
+        <button class="action" use:tip={"Fit to contents"} onclick={fitToContent}><Minimize2 size={12} /></button>
       {/if}
       <button
         class="action"
-        title={panel === "route" ? "Open the Map tab" : `Open the ${info.title} tab`}
+        use:tip={panel === "route" ? "Open the Map tab" : `Open the ${info.title} tab`}
         onclick={() => backend.showPanel(panel)}
         ><AppWindow size={12} /></button
       >
-      <button class="action" title="Unpin" onclick={() => backend.unpinPanel(panel)}><PinOff size={12} /></button>
+      <button class="action" use:tip={"Unpin"} onclick={() => backend.unpinPanel(panel)}><PinOff size={12} /></button>
     </span>
   </header>
   <div class="body" class:scrolls={capped} bind:this={body}>

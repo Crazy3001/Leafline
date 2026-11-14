@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tip } from "$lib/tip.svelte";
   import { Map as MapIcon, MapPin } from "@lucide/svelte";
 
   import Card from "./Card.svelte";
@@ -131,7 +132,7 @@
       {#if found.alternatives.length}
         Not it?
         {#each found.alternatives as alt (alt.id)}
-          <button class="alt" onclick={() => navigate(alt.id)} title={alt.street ?? undefined}>{alt.name}</button>
+          <button class="alt" onclick={() => navigate(alt.id)} use:tip={alt.street ?? undefined}>{alt.name}</button>
         {/each}
       {/if}
     </div>

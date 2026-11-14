@@ -2,6 +2,8 @@
   // The build plan's part of the Character tab: what the plan says at the character's level. It
   // moves on with the level, and catches up with what was really spent whenever the stat and
   // skill windows are read. The level itself is shown once, in the character's header above.
+  import { tip } from "$lib/tip.svelte";
+  import Pic from "$lib/ui/Pic.svelte";
   import Ref from "$lib/components/Ref.svelte";
   import { Check, ExternalLink, Pencil, Plus, RefreshCw, Search, X } from "@lucide/svelte";
   import { untrack } from "svelte";
@@ -337,13 +339,13 @@
                   >{piece.name}{#if piece.upgrades}{` (+${piece.upgrades})`}{/if}</Ref
                 >
                 <span class="end">
-                  {#if piece.level != null}<span class="lv tabular" class:good={row.wearingFit?.ok} class:bad={row.wearingFit && !row.wearingFit.ok} title={fitTitle(row.wearingFit)}
+                  {#if piece.level != null}<span class="lv tabular" class:good={row.wearingFit?.ok} class:bad={row.wearingFit && !row.wearingFit.ok} use:tip={fitTitle(row.wearingFit)}
                       >{piece.level ? `Lv ${piece.level}` : "Any level"}</span
                     >{/if}
-                  <button class="remove" title="Edit" aria-label="Edit {piece.name}" onclick={() => startEdit(piece)}
+                  <button class="remove" use:tip={"Edit"} aria-label="Edit {piece.name}" onclick={() => startEdit(piece)}
                     ><Pencil size={11} /></button
                   >
-                  <button class="remove" title="Take it off" aria-label="Take off {piece.name}" onclick={() => removePiece(piece.id)}
+                  <button class="remove" use:tip={"Take it off"} aria-label="Take off {piece.name}" onclick={() => removePiece(piece.id)}
                     ><X size={12} /></button
                   >
                 </span>
@@ -433,8 +435,8 @@
       {#each group.rows as skill (skill.id)}
         {@const max = skill.max ?? Math.max(skill.goal, skill.level, 1)}
         {@const done = isMaxed(skill)}
-        <li class:done title={skill.description ?? undefined}>
-          <span class="skill-name">{skill.name}</span>
+        <li class:done use:tip={skill.description ?? undefined}>
+          <span class="skill-name"><Pic kind="skill" id={skill.id} size={20} class="skill-pic" />{skill.name}</span>
           <span class="skill-level tabular">
             {#if done}<span class="max">MAX</span>{:else}<b>{skillsRead ? skill.level : "—"}</b><span class="faint"> / {max}</span>{/if}
           </span>
@@ -489,7 +491,7 @@
     <section class="build" aria-label="Build plan">
       <header class="head">
         <span class="title">Build</span>
-        <span class="plan" title={plan.build.name}>{plan.build.name}</span>
+        <span class="plan" use:tip={plan.build.name}>{plan.build.name}</span>
       </header>
       {@render todo(step)}
       {#if advance}
@@ -511,12 +513,12 @@
 <section class="build full" aria-label="Build plan">
   <header class="head strip">
     <span class="title strip-title">Build</span>
-    {#if plan && step}<span class="plan" title={plan.build.name}>{plan.build.name}</span>{/if}
+    {#if plan && step}<span class="plan" use:tip={plan.build.name}>{plan.build.name}</span>{/if}
     {#if plan && step}
       <span class="tools">
         <button
           class="link"
-          title="Read your Character Stat and Skill windows{keyHint('ReadCharacter')}"
+          use:tip={`Read your Character Stat and Skill windows${keyHint('ReadCharacter')}`}
           onclick={() => backend.readCharacter()}><RefreshCw size={12} />Read stats</button
         >
         <button class="link" onclick={() => openPlanner()}><Pencil size={12} />Edit</button>
@@ -554,7 +556,7 @@
           <dd class="tabular">
             {statsKnown ? step.stats[stat.id] : "—"}
             {#if statsKnown && gearBonus?.[stat.id]}
-              <span class="gear" title="What your gear adds, as the Character Stat window last showed it">+{gearBonus[stat.id]}</span>
+              <span class="gear" use:tip={"What your gear adds, as the Character Stat window last showed it"}>+{gearBonus[stat.id]}</span>
             {/if}
           </dd>
         </div>
@@ -643,18 +645,18 @@
                 <span class="label">Suggested</span>
                 <Ref kind="item" id={pick.id} name={pick.name} />
                 <span class="end">
-                  <span class="lv tabular" class:good={row.suggestedFit?.ok} class:bad={row.suggestedFit && !row.suggestedFit.ok} title={fitTitle(row.suggestedFit)}
+                  <span class="lv tabular" class:good={row.suggestedFit?.ok} class:bad={row.suggestedFit && !row.suggestedFit.ok} use:tip={fitTitle(row.suggestedFit)}
                     >{pick.reqLevel ? `Lv ${pick.reqLevel}` : "Any level"}</span
                   >
                   {#if row.suggestedPlanned}
                     <button
                       class="remove"
-                      title="Remove goal"
+                      use:tip={"Remove goal"}
                       aria-label="Stop aiming for {pick.name}"
                       onclick={() => setGoal(pick.id, false)}><X size={12} /></button
                     >
                   {:else}
-                    <button class="remove" title="Aim for this" aria-label="Aim for {pick.name}" onclick={() => setGoal(pick.id, true)}
+                    <button class="remove" use:tip={"Aim for this"} aria-label="Aim for {pick.name}" onclick={() => setGoal(pick.id, true)}
                       ><Plus size={12} /></button
                     >
                   {/if}
@@ -674,19 +676,19 @@
                     class:warn={next.level == null}
                     class:good={next.level != null && row.nextFit?.ok}
                     class:bad={next.level != null && row.nextFit && !row.nextFit.ok}
-                    title={fitTitle(row.nextFit)}
+                    use:tip={fitTitle(row.nextFit)}
                   >
                     {#if next.level == null}Out of reach{:else}Lv {next.level}{/if}
                   </span>
                   {#if row.planned}
                     <button
                       class="remove"
-                      title="Remove goal"
+                      use:tip={"Remove goal"}
                       aria-label="Stop aiming for {next.item.name}"
                       onclick={() => setGoal(next.item.id, false)}><X size={12} /></button
                     >
                   {:else}
-                    <button class="remove" title="Aim for this" aria-label="Aim for {next.item.name}" onclick={() => setGoal(next.item.id, true)}
+                    <button class="remove" use:tip={"Aim for this"} aria-label="Aim for {next.item.name}" onclick={() => setGoal(next.item.id, true)}
                       ><Plus size={12} /></button
                     >
                   {/if}
@@ -1281,6 +1283,10 @@
   }
 
   .skill-name {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

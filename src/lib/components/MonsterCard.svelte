@@ -1,6 +1,7 @@
 <script lang="ts">
   // One monster from the search: its numbers, what it is weak to, where it lives, what players
   // saw it drop, and the quests that want it. The numbers are the data's base values.
+  import { tip } from "$lib/tip.svelte";
   import { ExternalLink, LoaderCircle, Skull } from "@lucide/svelte";
   import { untrack } from "svelte";
 
@@ -149,7 +150,7 @@
         <h3 class="name">{monsterLabel(sheet.name)}</h3>
         <p class="meta tabular">{[`Lv ${sheet.level}`, yours?.gap].filter(Boolean).join(" · ")}</p>
         {#if sheet.expRank}
-          <p class="rank tabular" title="Its HP for each point of EXP, against every field monster that spawns: first takes the least HP">
+          <p class="rank tabular" use:tip={"Its HP for each point of EXP, against every field monster that spawns: first takes the least HP"}>
             <b>#{sheet.expRank.place}</b> of {sheet.expRank.of} for HP per EXP
           </p>
         {/if}
@@ -158,7 +159,7 @@
 
     <dl class="facts">
       {#each facts as fact (fact.label)}
-        <div title={fact.title}><dt>{fact.label}</dt><dd class="tabular" style:color={TINT[fact.label]}>{fact.value}</dd></div>
+        <div use:tip={fact.title}><dt>{fact.label}</dt><dd class="tabular" style:color={TINT[fact.label]}>{fact.value}</dd></div>
       {/each}
     </dl>
 
@@ -182,7 +183,7 @@
     {#if !compact}
     <dl class="stats">
       {#each stats as stat (stat.label)}
-        <div title={stat.title}><dt>{stat.label}</dt><dd class="tabular">{formatNumber(stat.value)}</dd></div>
+        <div use:tip={stat.title}><dt>{stat.label}</dt><dd class="tabular">{formatNumber(stat.value)}</dd></div>
       {/each}
     </dl>
 

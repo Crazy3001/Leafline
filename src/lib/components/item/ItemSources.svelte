@@ -1,6 +1,7 @@
 <script lang="ts">
   // Where an item comes from, by how you get it: the NPC shops that sell it, the monsters that
   // drop it, each opening to the maps it lives on, and the quests that give it.
+  import { tip } from "$lib/tip.svelte";
   import Ref from "$lib/components/Ref.svelte";
   import { ChevronRight } from "@lucide/svelte";
 
@@ -70,7 +71,7 @@
           <li>
             <span class="shop-line">
               {#if shop.npcId != null}<Ref kind="npc" id={shop.npcId} name={shop.npc} />{:else}{shop.npc}{/if}
-              <span class="price tabular" title="Seen {shortDate(shop.seen)}">{formatNumber(shop.price)} mesos</span>
+              <span class="price tabular" use:tip={`Seen ${shortDate(shop.seen)}`}>{formatNumber(shop.price)} mesos</span>
             </span>
             <span class="who">
               {#if shop.map}<Ref kind="map" id={shop.map!.id}>{shop.map.name}</Ref
@@ -104,7 +105,7 @@
               <button class="row-rest" tabindex="-1" onclick={() => toggle(hunt)}>
                 <span class="muted tabular">Lv {hunt.monster.level}{hunt.monster.boss ? " · boss" : ""}</span>
                 <span class="maps-count faint tabular">{hunt.maps.length} map{hunt.maps.length === 1 ? "" : "s"}</span>
-                {#if rate(hunt)}<span class="rate tabular" title={evidence(hunt)}>{rate(hunt)}</span>{/if}
+                {#if rate(hunt)}<span class="rate tabular" use:tip={evidence(hunt)}>{rate(hunt)}</span>{/if}
               </button>
             </div>
             {#if open}
@@ -128,7 +129,7 @@
             <span class="chevron"></span>
             <span class="mob-name">{hunt.monster.name}</span>
             <span class="faint">not in the map data</span>
-            {#if rate(hunt)}<span class="rate tabular" title={evidence(hunt)}>{rate(hunt)}</span>{/if}
+            {#if rate(hunt)}<span class="rate tabular" use:tip={evidence(hunt)}>{rate(hunt)}</span>{/if}
           </li>
         {/each}
       </ul>

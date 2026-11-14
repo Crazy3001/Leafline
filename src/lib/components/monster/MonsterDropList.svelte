@@ -1,6 +1,7 @@
 <script lang="ts">
   // What a monster is known to drop, from Leafline's drop list: presence only, so rates show only
   // where a drop has one. An empty list says so plainly.
+  import { tip } from "$lib/tip.svelte";
   import Ref from "$lib/components/Ref.svelte";
   import { backend } from "$lib/api";
   import { showItemNamed } from "$lib/items.svelte";
@@ -42,7 +43,7 @@
 {#if list.length}
   <ul class="drops">
     {#each list as drop (drop.item)}
-      <li class:unmeasured={drop.rate == null} title={evidence(drop)}>
+      <li class:unmeasured={drop.rate == null} use:tip={evidence(drop)}>
         {#if drop.category === "meso"}
           <span class="mesos">{drop.item}</span>
         {:else}

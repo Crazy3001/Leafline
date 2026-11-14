@@ -3,6 +3,7 @@
   // screen but just as well beside a windowed game.
   // It reads what the overlay reads, follows the overlay's "Go here" trip, and opens links in a
   // column of its own so the overlay needn't come up over the game.
+  import { tip } from "$lib/tip.svelte";
   import { ArrowLeft, ChartLine, ChevronDown, Milestone, Pencil, Pin, PinOff, Plus, RotateCcw, X } from "@lucide/svelte";
   import { onMount, untrack } from "svelte";
 
@@ -274,7 +275,7 @@
       <button
         class="ontop"
         aria-pressed={onTop}
-        title={onTop ? "Stop keeping on top" : "Keep on top"}
+        use:tip={onTop ? "Stop keeping on top" : "Keep on top"}
         onclick={toggleOnTop}
         >{#if onTop}<PinOff size={13} />{:else}<Pin size={13} />{/if}Keep on top</button
       >
@@ -302,7 +303,7 @@
             role="tab"
             class="tab"
             aria-selected={t.id === tab.id}
-            title={t.id === tab.id ? "Double-click to rename" : undefined}
+            use:tip={t.id === tab.id ? "Double-click to rename" : undefined}
             onclick={() => activate(t.id)}
             ondblclick={() => startRename(t.id)}>{t.name}</button
           >
@@ -310,8 +311,8 @@
       {/each}
     </div>
     <span class="tab-actions">
-      <button class="small" title="Rename this tab" onclick={() => startRename(tab.id)}><Pencil size={12} />Rename</button>
-      <button class="small" title="Put this tab back to how it started" onclick={reset}
+      <button class="small" onclick={() => startRename(tab.id)}><Pencil size={12} />Rename</button>
+      <button class="small" use:tip={"Put this tab back to how it started"} onclick={reset}
         ><RotateCcw size={12} />Reset tab</button
       >
     </span>

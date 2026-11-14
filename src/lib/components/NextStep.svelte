@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tip } from "$lib/tip.svelte";
   import Ref from "$lib/components/Ref.svelte";
   // The slim "next step" bar for "Go here", under the overlay's header, in the compact HUD and
   // in the Route pin (which shows the trip the overlay follows, see followTrip):
@@ -146,7 +147,7 @@
       {/if}
     </div>
     {#if canPin}
-      <button class="close" title="Pin the route" aria-label="Pin the route" onclick={pinRoute}
+      <button class="close" use:tip={"Pin the route"} aria-label="Pin the route" onclick={pinRoute}
         ><Pin size={11} /></button
       >
     {/if}

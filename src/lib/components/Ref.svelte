@@ -3,6 +3,8 @@
   // which, and a small picture sits before it when there is one.
   import type { Snippet } from "svelte";
 
+  import { tip, type Tip } from "$lib/tip.svelte";
+
   import { openPeek, type PeekKind } from "$lib/peek.svelte";
   import { splitMapLabel } from "$lib/format";
   import Pic from "$lib/ui/Pic.svelte";
@@ -24,7 +26,8 @@
     /** Show its picture, when it has one. */
     icon?: boolean;
     class?: string;
-    title?: string;
+    /** More about it on hover, never that it opens a card. */
+    title?: Tip;
     /** The text shown, when it isn't the name. */
     children?: Snippet;
   } = $props();
@@ -38,7 +41,7 @@
 <button
   class="ref ref-{kind} {extra}"
   class:with-pic={!!picture}
-  {title}
+  use:tip={title}
   onclick={(e) => {
     e.stopPropagation();
     openPeek({ kind, id, name }, e.currentTarget);

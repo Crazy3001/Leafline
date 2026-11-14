@@ -228,6 +228,7 @@ export function sampleDrops(monsters: string[]): MonsterDrops[] {
               sampleDrops: 82,
               gameVersion: "0.1.0",
               quest: false,
+              itemId: null, itemType: null, reqLevel: null,
             },
             {
               item: `${monster.split(" ").pop()} Fragment`,
@@ -241,6 +242,7 @@ export function sampleDrops(monsters: string[]): MonsterDrops[] {
               sampleDrops: 53,
               gameVersion: "0.1.0",
               quest: false,
+              itemId: null, itemType: "Monster loot", reqLevel: null,
             },
             {
               item: "Green Tonic",
@@ -254,6 +256,7 @@ export function sampleDrops(monsters: string[]): MonsterDrops[] {
               sampleDrops: 3,
               gameVersion: "0.1.0",
               quest: false,
+              itemId: 2000001, itemType: "Potions", reqLevel: null,
             },
             {
               item: "Fern Ribbon",
@@ -267,6 +270,7 @@ export function sampleDrops(monsters: string[]): MonsterDrops[] {
               sampleDrops: null,
               gameVersion: null,
               quest: false,
+              itemId: 1002001, itemType: "Hat", reqLevel: 15,
             },
           ],
   }));

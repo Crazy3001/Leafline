@@ -44,6 +44,11 @@ pub struct Drop {
     pub game_version: Option<String>,
     /// Only drops while a quest wants it.
     pub quest: bool,
+    /// What the item data says of it, filled in as drops are looked up: its id, what it is (a
+    /// slot or weapon type, or a group such as Potions) and the level it asks for.
+    pub item_id: Option<u32>,
+    pub item_type: Option<String>,
+    pub req_level: Option<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -155,6 +160,9 @@ fn parse(body: &[u8], now: i64) -> Result<BTreeMap<String, MonsterDrops>> {
                 sample_drops: None,
                 game_version: None,
                 quest: listed.quest,
+                item_id: None,
+                item_type: None,
+                req_level: None,
             });
         }
     }

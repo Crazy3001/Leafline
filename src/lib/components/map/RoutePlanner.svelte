@@ -1,5 +1,6 @@
 <script lang="ts">
   // "Route to…": the fewest portals from this map to another, as steps the player walks.
+  import { tip } from "$lib/tip.svelte";
   import { Flag, X } from "@lucide/svelte";
 
   import GoButton from "$lib/components/GoButton.svelte";
@@ -41,7 +42,7 @@
     <Flag size={12} />
     <span class="to">To <strong>{target.name}</strong></span>
     <GoButton place={mapPlace(target)} />
-    <button class="clear" title="Clear the route" onclick={() => (target = null)}><X size={12} /></button>
+    <button class="clear" use:tip={"Clear the route"} onclick={() => (target = null)}><X size={12} /></button>
   </div>
   {#if route}
     <RouteSteps {route} />

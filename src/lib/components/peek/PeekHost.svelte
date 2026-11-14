@@ -1,6 +1,7 @@
 <script lang="ts">
   // The one link card a window shows, beside the link that opened it. Every window's layout
   // holds one; it stays empty until a coloured name is clicked.
+  import { tip } from "$lib/tip.svelte";
   import { ArrowLeft, Maximize2, X } from "@lucide/svelte";
 
   import ItemPeek from "./ItemPeek.svelte";
@@ -90,14 +91,14 @@
   >
     <header>
       {#if peek.stack.length > 1}
-        <button class="icon" aria-label="Back" title="Back" onclick={peekBack}><ArrowLeft size={14} /></button>
+        <button class="icon" aria-label="Back" use:tip={"Back"} onclick={peekBack}><ArrowLeft size={14} /></button>
       {/if}
       <span class="kind ref-{top.kind}">{KIND[top.kind].label}</span>
       <span class="spacer"></span>
-      <button class="full" title="Open the full view in the {KIND[top.kind].tab} tab" onclick={() => openFull(top)}>
+      <button class="full" use:tip={`In the ${KIND[top.kind].tab} tab`} onclick={() => openFull(top)}>
         <Maximize2 size={12} />Full view
       </button>
-      <button class="icon" aria-label="Close" title="Close (Esc)" onclick={closePeek}><X size={14} /></button>
+      <button class="icon" aria-label="Close" use:tip={"Close (Esc)"} onclick={closePeek}><X size={14} /></button>
     </header>
     <div class="body" bind:this={card}>
       {#key peek.stack.length + ":" + top.kind + ":" + (top.id ?? top.name)}

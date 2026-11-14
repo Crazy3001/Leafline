@@ -1,6 +1,7 @@
 <script lang="ts">
   // Countdown timers the player starts themselves, for anything they want to keep time on.
   // A finished timer just reads "Done": no sound, popup or flashing asks the player to act.
+  import { tip } from "$lib/tip.svelte";
   import { Plus, RotateCcw, Timer, X } from "@lucide/svelte";
   import { onMount } from "svelte";
 
@@ -87,7 +88,7 @@
   <Card title="Timers">
     {#snippet aside()}
       {#if !adding}
-        <button class="icon" title="Add a timer" aria-label="Add a timer" onclick={() => (adding = true)}
+        <button class="icon" use:tip={"Add a timer"} aria-label="Add a timer" onclick={() => (adding = true)}
           ><Plus size={13} /></button
         >
       {/if}
@@ -103,14 +104,14 @@
               <span class="time tabular">{remaining === 0 ? "Done" : clock(remaining)}</span>
               <button
                 class="icon"
-                title="Start again"
+                use:tip={"Start again"}
                 aria-label="Start {timer.name} again"
                 onclick={() => store(timers.map((t) => (t.id === timer.id ? { ...t, startedAt: Date.now() } : t)))}
                 ><RotateCcw size={11} /></button
               >
               <button
                 class="icon"
-                title="Remove"
+                use:tip={"Remove"}
                 aria-label="Remove {timer.name}"
                 onclick={() => store(timers.filter((t) => t.id !== timer.id))}><X size={12} /></button
               >

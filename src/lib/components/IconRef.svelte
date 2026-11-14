@@ -2,6 +2,7 @@
   // A picture that opens its card: a monster beside the item it drops, say. Without a picture it
   // falls back to the name, small and muted, so the row stays one line.
   import { openPeek, type PeekKind } from "$lib/peek.svelte";
+  import { tip, type Tip } from "$lib/tip.svelte";
   import Pic from "$lib/ui/Pic.svelte";
 
   let {
@@ -9,12 +10,21 @@
     id = null,
     name,
     size = 20,
-  }: { kind: Extract<PeekKind, "item" | "mob" | "npc">; id?: number | null; name: string; size?: number } = $props();
+    title,
+  }: {
+    kind: Extract<PeekKind, "item" | "mob" | "npc">;
+    id?: number | null;
+    name: string;
+    size?: number;
+    /** What the tooltip says; the name by default, since a picture alone doesn't. */
+    title?: Tip;
+  } = $props();
 </script>
 
 <button
   class="icon-ref"
   aria-label={name}
+  use:tip={title ?? name}
   onclick={(e) => {
     e.stopPropagation();
     openPeek({ kind, id, name }, e.currentTarget);

@@ -1,5 +1,6 @@
 <script lang="ts">
   // The search box each half of the Lookup tab opens with, and its filter and clear buttons.
+  import { tip } from "$lib/tip.svelte";
   import { Search, SlidersHorizontal, X } from "@lucide/svelte";
 
   let {
@@ -36,7 +37,7 @@
     <button
       class="tool"
       class:active={filters || narrowed > 0}
-      title="Filters"
+      use:tip={"Filters"}
       aria-label="Filters"
       aria-expanded={filters}
       onclick={() => (filters = !filters)}
@@ -45,7 +46,7 @@
     </button>
   {/if}
   {#if clearable}
-    <button class="tool" title="Clear the search" aria-label="Clear the search" onclick={onclear}><X size={13} /></button>
+    <button class="tool" use:tip={"Clear the search"} aria-label="Clear the search" onclick={onclear}><X size={13} /></button>
   {/if}
 </div>
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tip } from "$lib/tip.svelte";
   import Ref from "$lib/components/Ref.svelte";
   import GoButton from "$lib/components/GoButton.svelte";
   import { npcPlace } from "$lib/destination.svelte";
@@ -195,7 +196,7 @@
         {/if}
         {#if followed?.[i] != null}
           {@const followedId = followed[i]}
-          <button class="stop" aria-label="Stop following {title}" title="Stop following" onclick={() => unfollow(followedId)}>
+          <button class="stop" aria-label="Stop following {title}" use:tip={"Stop following"} onclick={() => unfollow(followedId)}>
             <X size={12} />
           </button>
         {/if}
@@ -227,7 +228,7 @@
               </div>
               {#if hint && !done && !expanded}<ObjectiveHint guide={hint} from={guide?.from ?? null} />{/if}
               {#if eta}
-                <p class="eta" title={eta.title}>
+                <p class="eta" use:tip={eta.title}>
                   <Hourglass size={10} />
                   <span>
                     About {formatDuration(Math.max(60, eta.seconds))} left{eta.where}

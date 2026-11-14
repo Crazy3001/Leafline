@@ -3,6 +3,7 @@
   // at the rate of this session or, between sessions, of recent play at this level. The EXP each
   // level takes is learned from the player's own HUD as they level; until enough is known, each
   // level is taken to need as much of an hour as this one.
+  import { tip } from "$lib/tip.svelte";
   import { Pencil, X } from "@lucide/svelte";
   import { onMount } from "svelte";
 
@@ -157,8 +158,8 @@
     <div class="row">
       <span class="target">Goal <span class="num">Lv {stored.target}</span></span>
       <span class="grow"></span>
-      <button class="icon" aria-label="Change the goal" title="Change the goal" onclick={startEditing}><Pencil size={12} /></button>
-      <button class="icon" aria-label="Clear the goal" title="Clear the goal" onclick={() => save(null)}><X size={12} /></button>
+      <button class="icon" aria-label="Change the goal" use:tip={"Change the goal"} onclick={startEditing}><Pencil size={12} /></button>
+      <button class="icon" aria-label="Clear the goal" use:tip={"Clear the goal"} onclick={() => save(null)}><X size={12} /></button>
     </div>
     {#if level == null}
       <p class="muted">Your level shows once the HUD is read.</p>

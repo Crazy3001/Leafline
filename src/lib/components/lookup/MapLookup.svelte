@@ -2,6 +2,7 @@
   // The Maps half of the Lookup tab: the map the player is on, and a search of every map in the
   // data by name, area, monster or NPC, down to a map's full card.
   import GoButton from "$lib/components/GoButton.svelte";
+  import { FilterBoxState } from "$lib/filterbox.svelte";
   import SaveSpot from "$lib/components/SaveSpot.svelte";
   import { mapPlace } from "$lib/destination.svelte";
   import { ArrowLeft, LoaderCircle } from "@lucide/svelte";
@@ -37,7 +38,7 @@
 
   let regions = $state<string[]>([]);
   let areas = $state<string[]>([]);
-  let showFilters = $state(false);
+  const filterBox = new FilterBoxState("maps");
   let page = $state<MapPage | null>(null);
   let searching = $state(false);
   let details = $state<MapDetails | null>(null);
@@ -98,7 +99,6 @@
 
   function clear() {
     setQuery(blankMapQuery());
-    showFilters = false;
   }
 
   function open(id: number) {
@@ -127,7 +127,7 @@
       placeholder="Map, area, monster or NPC"
       label="Search maps"
       {narrowed}
-      bind:filters={showFilters}
+      bind:filters={filterBox.open}
       clearable={browsing || mapView.id != null}
       oninput={(text) => setQuery({ text })}
       onclear={clear}
@@ -136,7 +136,7 @@
       <KindTabs label="Kind of map" options={KINDS} value={query.kind} onselect={(kind) => setQuery({ kind })} />
       <Chips label="Area" options={areas} value={query.area} onselect={(area) => setQuery({ area })} />
     {/if}
-    {#if showFilters}
+    {#if filterBox.open}
       <FilterBox>
         <label>
           <span>Region</span>

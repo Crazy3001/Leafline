@@ -601,6 +601,9 @@ pub struct SkillRecord {
     /// What the skill does at each level, from level 1.
     #[serde(default)]
     pub level_descriptions: Vec<String>,
+    /// Where OSMS publishes its icon. The webview asks for pictures by skill id, not by address.
+    #[serde(default, skip_serializing)]
+    pub icon_url: Option<String>,
 }
 
 /// A skill that must reach `level` first.
@@ -983,17 +986,19 @@ mod tests {
     }
 
     #[test]
-    fn reads_skills_but_not_crafting_or_icons() {
+    fn reads_skills_and_their_icons_but_not_crafting() {
         // Made-up skills in OSMS's shape. Crafting records carry no levels at all.
         let json = br#"[
             {"id": 7, "name": "Pebble Toss", "job_id": 400, "class_name": "Rogue", "job_tier": "1st Job",
-             "max_level": 2, "passive": false, "description": "Throws a pebble.", "icon_url": "https://example.invalid/i.png",
-             "required_skills": [{"skill_id": 6, "level": 3}], "level_descriptions": ["Damage 1", "Damage 2"]},
+             "max_level": 2, "passive": false, "description": "Throws a pebble.",
+             "required_skills": [{"skill_id": 6, "level": 3}], "level_descriptions": ["Damage 1", "Damage 2"],
+             "icon_url": "https://osmsdataexplorer.com/data/current/images/skills/0000007.png"},
             {"id": 92000000, "name": "Knitting", "job_id": 9200, "job_tier": "Crafting", "max_level": 10}]"#;
         let Records::Skills(skills) = Records::parse("skills.json", json).unwrap() else { panic!() };
         assert_eq!(skills.len(), 1);
         assert_eq!(skills[0].required_skills, vec![SkillNeed { skill_id: 6, level: 3 }]);
         assert_eq!(skills[0].level_descriptions.len(), 2);
+        assert_eq!(skills[0].icon_url.as_deref(), Some("https://osmsdataexplorer.com/data/current/images/skills/0000007.png"));
     }
 
     #[test]

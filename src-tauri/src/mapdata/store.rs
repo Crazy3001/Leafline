@@ -21,7 +21,7 @@ use super::turnins::TurnIn;
 use crate::error::{Error, Result};
 
 /// Bump when the tables change; an older cache is then dropped and downloaded again.
-const CACHE_VERSION: i32 = 13;
+const CACHE_VERSION: i32 = 14;
 
 const SCHEMA: &str = "
 CREATE TABLE source_files (
@@ -55,7 +55,7 @@ CREATE TABLE quest_mobs (quest_id INTEGER NOT NULL, mob_id INTEGER NOT NULL, cou
 CREATE TABLE quest_rewards (quest_id INTEGER NOT NULL, item_id INTEGER NOT NULL, count INTEGER NOT NULL, sure INTEGER NOT NULL);
 CREATE TABLE skills (
     id INTEGER PRIMARY KEY, name TEXT NOT NULL, job_id INTEGER NOT NULL, class_name TEXT NOT NULL,
-    job_tier TEXT NOT NULL, max_level INTEGER NOT NULL, passive INTEGER NOT NULL, description TEXT);
+    job_tier TEXT NOT NULL, max_level INTEGER NOT NULL, passive INTEGER NOT NULL, description TEXT, icon_url TEXT);
 CREATE TABLE skill_needs (skill_id INTEGER NOT NULL, needs_id INTEGER NOT NULL, level INTEGER NOT NULL);
 CREATE TABLE skill_levels (skill_id INTEGER NOT NULL, level INTEGER NOT NULL, description TEXT NOT NULL, PRIMARY KEY (skill_id, level));
 CREATE TABLE items (
@@ -351,7 +351,7 @@ impl Store {
             levels.entry(skill).or_default().push(description);
         }
         let mut stmt = self.conn.prepare(
-            "SELECT id, name, job_id, class_name, job_tier, max_level, passive, description FROM skills ORDER BY id",
+            "SELECT id, name, job_id, class_name, job_tier, max_level, passive, description, icon_url FROM skills ORDER BY id",
         )?;
         let skills = stmt.query_map([], |row| {
             let id: u32 = row.get(0)?;
@@ -366,6 +366,7 @@ impl Store {
                 description: row.get(7)?,
                 required_skills: needs.remove(&id).unwrap_or_default(),
                 level_descriptions: levels.remove(&id).unwrap_or_default(),
+                icon_url: row.get(8)?,
             })
         })?;
         Ok(skills.collect::<rusqlite::Result<_>>()?)
@@ -755,6 +756,9 @@ impl Store {
                 sample_drops: row.get(8)?,
                 game_version: row.get(9)?,
                 quest: row.get(10)?,
+                item_id: None,
+                item_type: None,
+                req_level: None,
             })
         })?;
         Ok(drops.collect::<rusqlite::Result<_>>()?)
@@ -959,13 +963,13 @@ fn insert_quests(tx: &Transaction, quests: &[QuestRecord]) -> Result<()> {
 
 fn insert_skills(tx: &Transaction, skills: &[SkillRecord]) -> Result<()> {
     let mut skill = tx.prepare(
-        "INSERT OR REPLACE INTO skills (id, name, job_id, class_name, job_tier, max_level, passive, description)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        "INSERT OR REPLACE INTO skills (id, name, job_id, class_name, job_tier, max_level, passive, description, icon_url)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
     )?;
     let mut need = tx.prepare("INSERT INTO skill_needs (skill_id, needs_id, level) VALUES (?1, ?2, ?3)")?;
     let mut level = tx.prepare("INSERT OR REPLACE INTO skill_levels (skill_id, level, description) VALUES (?1, ?2, ?3)")?;
     for s in skills {
-        skill.execute(params![s.id, s.name, s.job_id, s.class_name, s.job_tier, s.max_level, s.passive, s.description])?;
+        skill.execute(params![s.id, s.name, s.job_id, s.class_name, s.job_tier, s.max_level, s.passive, s.description, s.icon_url])?;
         for n in &s.required_skills {
             need.execute(params![s.id, n.skill_id, n.level])?;
         }

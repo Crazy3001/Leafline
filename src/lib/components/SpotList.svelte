@@ -10,6 +10,7 @@
   // monster, held to what the map can respawn at an assumed respawn time (see training.rs). No
   // damage formulas are modelled. "Played" lists every map the player has data for, whatever its
   // level, by their own rate. "Saved" lists the maps the player bookmarked, whatever their level.
+  import { tip } from "$lib/tip.svelte";
   import Ref from "$lib/components/Ref.svelte";
   import GoButton from "$lib/components/GoButton.svelte";
   import { mapPlace } from "$lib/destination.svelte";
@@ -333,7 +334,7 @@
   {#snippet aside()}
     <span
       class="help"
-      title="Where you have played, your own rate. Elsewhere, an estimate from how fast you get through monster HP solo, held to an assumed respawn time. Party bonus and misses aren't modelled."
+      use:tip={"Where you have played, your own rate. Elsewhere, an estimate from how fast you get through monster HP solo, held to an assumed respawn time. Party bonus and misses aren't modelled."}
     >
       <CircleHelp size={13} />
     </span>
@@ -386,7 +387,7 @@
                 <span class="name"
                   ><Ref kind="map" id={spot.map.id} name={spot.map.name} /></span
                 >
-                <span class="meta" title={summaryText(spot)}>
+                <span class="meta" use:tip={summaryText(spot)}>
                   {#if steps(spot) === 0}<span class="here">You're here</span>{" · "}{/if}{#if sort === "played" && spot.measured}{formatDuration(spot.measured.activeSeconds)} played · {/if}{line.levels}{#each line.mobs as mob, n (mob.id)}{n === 0 ? " · " : ", "}<Ref kind="mob" id={mob.id} name={monsterLabel(mob.name)} icon={false} />{/each}
                 </span>
               </span>
@@ -394,7 +395,7 @@
                 <span class="value num">{m.value}</span>
                 <span class="unit" class:quiet={m.quiet}>
                   {#if m.sure}
-                    <span class="sure" title={SURENESS[m.sure]} aria-label={SURENESS[m.sure]}>
+                    <span class="sure" use:tip={SURENESS[m.sure]} aria-label={SURENESS[m.sure]}>
                       {#each [1, 2, 3] as step (step)}<i class:on={step <= m.sure}></i>{/each}
                     </span>
                   {/if}{m.unit}

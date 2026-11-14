@@ -8,13 +8,18 @@
   import { backend } from "$lib/api";
   import { openPeek } from "$lib/peek.svelte";
   import { pictureUrl } from "$lib/pictures";
-  import type { MapPicture, ViewPoint } from "$lib/types";
+  import { tip } from "$lib/tip.svelte";
+  import type { MapPicture, MobRow, ViewPoint } from "$lib/types";
+  import Pic from "$lib/ui/Pic.svelte";
 
   let {
     mapId,
     highlight = null,
+    mobs = [],
   }: {
     mapId: number;
+    /** The map's monsters, for their levels in a spawn point's tooltip. */
+    mobs?: Pick<MobRow, "id" | "name" | "level">[];
     /** A monster whose spawn points stand out, such as the one under the pointer in the list. */
     highlight?: string | null;
   } = $props();
@@ -43,11 +48,16 @@
   });
 
   const src = $derived(picture ? pictureUrl("mapview", mapId) : null);
-  /** Drawn bottom to top: teleports, spawns, NPCs, then exits on top. */
+  /** Drawn bottom to top: teleports, spawns, NPCs, then portals out on top. */
   const ORDER = (p: ViewPoint) => (p.teleport ? 0 : p.kind === "mob" ? 1 : p.kind === "npc" ? 2 : 3);
   const marks = $derived(picture ? [...picture.points].sort((a, b) => ORDER(a) - ORDER(b)) : []);
+  /** How many spawn points each monster has here, by id. */
+  const spawnsOf = $derived(
+    marks.reduce((n, p) => (p.kind === "mob" ? n.set(p.id, (n.get(p.id) ?? 0) + 1) : n), new Map<number, number>()),
+  );
+  const levelOf = (id: number) => mobs.find((m) => m.id === id)?.level ?? null;
   const counts = $derived({
-    exits: marks.filter((p) => p.kind === "portal" && !p.teleport && !p.hidden).length,
+    portals: marks.filter((p) => p.kind === "portal" && !p.teleport && !p.hidden).length,
     hidden: marks.filter((p) => p.kind === "portal" && !p.teleport && p.hidden).length,
     teleports: marks.filter((p) => p.teleport).length,
     npcs: marks.filter((p) => p.kind === "npc").length,
@@ -108,15 +118,37 @@
           style:left="{point.x * 100}%"
           style:top="{point.y * 100}%"
           aria-label={label(point)}
+          use:tip={markTip}
           onclick={(e) => open(i, e.currentTarget)}
         >
           <span class="shape"></span>
         </button>
+        {#snippet markTip()}
+          {#if point.teleport}
+            <span class="tip-title">Teleport within this map</span>
+            <span class="tip-sub">{point.toPortal ? "Click to see where it comes out" : "Where a teleport comes out"}</span>
+          {:else if point.kind === "portal"}
+            <span class="tip-title">{point.name}</span>
+            <span class="tip-sub">{point.hidden ? "Hidden portal" : "Portal"}{point.known ? "" : " · not in the map data"}</span>
+          {:else if point.kind === "npc"}
+            <span class="tip-head"
+              ><Pic kind="npc" id={point.id} name={point.name} size={28} /><span class="tip-title">{point.name}</span></span
+            >
+            <span class="tip-sub">NPC</span>
+          {:else}
+            {@const level = levelOf(point.id)}
+            {@const spots = spawnsOf.get(point.id) ?? 1}
+            <span class="tip-title">{point.name}</span>
+            <span class="tip-sub tabular"
+              >{level != null ? `Lv ${level} · ` : ""}{spots} spawn point{spots === 1 ? "" : "s"} on this map</span
+            >
+          {/if}
+        {/snippet}
       {/each}
     {/if}
   </div>
   <p class="legend">
-    {#if counts.exits}<span><i class="key portal"></i>Portals</span>{/if}
+    {#if counts.portals}<span><i class="key portal"></i>Portals</span>{/if}
     {#if counts.hidden}<span><i class="key portal hidden"></i>Hidden</span>{/if}
     {#if counts.teleports}<span><i class="key teleport"></i>Teleports</span>{/if}
     {#if counts.npcs}<span><i class="key npc"></i>NPCs</span>{/if}
@@ -238,7 +270,7 @@
     transform: scale(1.15);
   }
 
-  /* Exits: a blue ring with a blue dot inside, on a dark disc; hidden ones have a dashed ring. */
+  /* Portals out: a blue ring with a blue dot inside, on a dark disc; hidden ones have a dashed ring. */
   .portal {
     z-index: 3;
   }

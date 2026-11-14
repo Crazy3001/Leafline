@@ -1,6 +1,8 @@
 <script lang="ts">
   // The Quests tab: what the Quest Helper is tracking, and a book of every quest in the map data.
   // The book needs nothing from the game, so it works with live reading off.
+  import { tip } from "$lib/tip.svelte";
+  import { FilterBoxState } from "$lib/filterbox.svelte";
   import { ArrowLeft, LoaderCircle, Search, SlidersHorizontal, X } from "@lucide/svelte";
   import { untrack } from "svelte";
 
@@ -48,7 +50,7 @@
   const search = $derived(questView.search);
 
   let regions = $state<string[]>([]);
-  let showFilters = $state(false);
+  const filterBox = new FilterBoxState("quests");
   let page = $state<QuestPage | null>(null);
   let searching = $state(false);
 
@@ -95,7 +97,6 @@
   function clear() {
     questView.search = blankSearch();
     questView.id = null;
-    showFilters = false;
   }
 
   /** What a row says under the name. */
@@ -139,20 +140,20 @@
       </label>
       <button
         class="tool"
-        class:active={showFilters || narrowed > 0}
-        title="Filters"
+        class:active={filterBox.open || narrowed > 0}
+        use:tip={"Filters"}
         aria-label="Filters"
-        aria-expanded={showFilters}
-        onclick={() => (showFilters = !showFilters)}
+        aria-expanded={filterBox.open}
+        onclick={() => (filterBox.open = !filterBox.open)}
       >
         <SlidersHorizontal size={13} />{#if narrowed}<span class="tabular">{narrowed}</span>{/if}
       </button>
       {#if browsing || questView.id != null}
-        <button class="tool" title="Clear the search" aria-label="Clear the search" onclick={clear}><X size={13} /></button>
+        <button class="tool" use:tip={"Clear the search"} aria-label="Clear the search" onclick={clear}><X size={13} /></button>
       {/if}
     </div>
 
-    {#if showFilters}
+    {#if filterBox.open}
       <div class="filters">
         <label>
           <span>Region</span>

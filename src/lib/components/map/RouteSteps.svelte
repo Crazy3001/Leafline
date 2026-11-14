@@ -1,6 +1,7 @@
 <script lang="ts">
   // A route's steps as the player takes them, and how many portals it takes. Rides and return
   // scrolls, when the player turned them on, stand apart from portal steps.
+  import { tip } from "$lib/tip.svelte";
   import { CarTaxiFront, EyeOff, Plane, ScrollText } from "@lucide/svelte";
 
   import Ref from "$lib/components/Ref.svelte";
@@ -35,14 +36,14 @@
             </span>
           {:else}
             <span class="verb">{verb(step)}</span>
-            {#if step.hidden}<span class="hidden" title="The portal's name marks it as hidden"><EyeOff size={11} /></span>{/if}
+            {#if step.hidden}<span class="hidden" use:tip={"The portal's name marks it as hidden"}><EyeOff size={11} /></span>{/if}
           {/if}
           <span class="arrow">→</span>
           {#if step.to.known}<Ref kind="map" id={step.to.id} name={step.to.name} class="step-map" />{:else}<span class="map"
               >{step.to.name}</span
             >{/if}
           {#if step.travel?.fare}
-            <span class="fare tabular" title="Fare at level 20 and up, as players recorded it on mapleclassic.wiki"
+            <span class="fare tabular" use:tip={"Fare at level 20 and up, as players recorded it on mapleclassic.wiki"}
               >{formatNumber(step.travel.fare)} mesos</span
             >
           {/if}

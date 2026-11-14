@@ -669,6 +669,10 @@ export interface MonsterDrops {
     sampleDrops: number | null;
     gameVersion: string | null;
     quest: boolean;
+    /** From the item data: its id, what it is (a slot, weapon type or group) and its level. */
+    itemId: number | null;
+    itemType: string | null;
+    reqLevel: number | null;
   }[];
 }
 
@@ -1660,6 +1664,25 @@ export interface Outfit {
   level: number;
   /** In the equip window's order. An overall or a shield only when worn or planned. */
   slots: SlotGear[];
+  /** Each slot's way up from this level, which `slots` takes its suggestion and next step from. */
+  paths: GearPath[];
+}
+
+/** One piece on a slot's way up, at the first level the plan can wear it. */
+export interface GearStep {
+  item: ItemRecord;
+  level: number;
+  /** One of the plan's own goals, not the data's pick. */
+  planned: boolean;
+}
+
+/** A slot's gear to the end of the plan: one piece now at most, then one for each tier up. */
+export interface GearPath {
+  slot: string;
+  now: GearStep | null;
+  steps: GearStep[];
+  /** The plan's goals the path passes over: outgrown, or beaten by a piece of the same tier or higher. */
+  passed: ItemRecord[];
 }
 
 export interface Expansion {

@@ -110,6 +110,7 @@ pub enum PictureKind {
     Item,
     Mob,
     Npc,
+    Skill,
     /// A whole map, drawn.
     Map,
     Minimap,
@@ -123,6 +124,7 @@ impl PictureKind {
             "item" => Self::Item,
             "mob" => Self::Mob,
             "npc" => Self::Npc,
+            "skill" => Self::Skill,
             "map" => Self::Map,
             "minimap" => Self::Minimap,
             "mark" => Self::Mark,
@@ -163,6 +165,9 @@ impl PictureIndex {
         }
         for npc in &data.npcs {
             add(PictureKind::Npc, npc.id, Some(&npc.name), &npc.icon_url);
+        }
+        for skill in &data.skills {
+            add(PictureKind::Skill, skill.id, Some(&skill.name), &skill.icon_url);
         }
         for map in &data.maps {
             let name = Some(map.name.as_str());
@@ -408,7 +413,7 @@ mod tests {
     use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
-    use super::super::osms::{ItemRecord, MapRecord, NpcRecord};
+    use super::super::osms::{ItemRecord, MapRecord, NpcRecord, SkillRecord};
     use super::*;
 
     /// Hand-made bytes that only start like a PNG: no real picture is used in tests.
@@ -579,9 +584,15 @@ mod tests {
                 render_url: Some("https://osmsdataexplorer.com/data/maps/abc.webp".into()),
                 ..crate::mapdata::atlas::tests::map(5, "Mossbank", "Fern Road", vec![])
             }],
+            skills: vec![SkillRecord {
+                icon_url: Some("https://osmsdataexplorer.com/data/current/images/skills/0001000.png".into()),
+                ..crate::build::catalog::tests::skill(1000, "Pebble Toss", 0, 3, &[])
+            }],
             ..Dataset::default()
         };
         let index = PictureIndex::new(&data);
+        assert_eq!(index.resolve("/skill/1000"), Some("https://osmsdataexplorer.com/data/current/images/skills/0001000.png"));
+        assert_eq!(index.resolve("/skill/name/pebble%20toss"), index.resolve("/skill/1000"));
         assert_eq!(index.resolve("/item/1"), Some(ICON));
         assert_eq!(index.resolve("/item/name/red%20snail%20shell"), Some(ICON));
         assert_eq!(index.resolve("/item/2"), None, "no picture in the data");

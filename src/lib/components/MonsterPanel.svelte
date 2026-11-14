@@ -1,6 +1,8 @@
 <script lang="ts">
   // The Monsters half of the Lookup tab: what is on this map and near the character's level, and
   // a search of every monster in the map data by name, drop or map.
+  import { tip } from "$lib/tip.svelte";
+  import { FilterBoxState } from "$lib/filterbox.svelte";
   import { ArrowLeft, LoaderCircle, Skull } from "@lucide/svelte";
   import { untrack } from "svelte";
 
@@ -62,7 +64,7 @@
 
   let filters = $state<MonsterFilters | null>(null);
   let areas = $state<string[]>([]);
-  let showFilters = $state(false);
+  const filterBox = new FilterBoxState("monsters", true);
   let page = $state<MonsterPage | null>(null);
   let searching = $state(false);
   let near = $state<MonsterRow[]>([]);
@@ -125,7 +127,6 @@
 
   function clear() {
     setQuery(blankMonsterQuery());
-    showFilters = false;
   }
 
   /** The column it sorts by, with Level as the way back. */
@@ -140,7 +141,7 @@
   <span class="name">
     <Pic kind="mob" id={mob.id} size={20} />
     <span class="label">{monsterLabel(mob.name)}</span>
-    {#if mob.boss}<span class="boss" title="Boss"><Skull size={11} /></span>{/if}
+    {#if mob.boss}<span class="boss" use:tip={"Boss"}><Skull size={11} /></span>{/if}
     {#if mob.undead}<span class="tag">undead</span>{/if}
   </span>
 {/snippet}
@@ -205,7 +206,7 @@
       placeholder="Monster, what it drops, or a map"
       label="Search monsters"
       {narrowed}
-      bind:filters={showFilters}
+      bind:filters={filterBox.open}
       clearable={browsing || monsterView.id != null}
       oninput={(text) => setQuery({ text })}
       onclear={clear}
@@ -216,7 +217,7 @@
       <Chips label="Area" options={areas} value={query.area} onselect={(area) => setQuery({ area })} />
     {/if}
 
-    {#if showFilters}
+    {#if filterBox.open}
       <FilterBox>
         <label>
           <span>Weak to</span>

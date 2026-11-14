@@ -923,7 +923,7 @@ export const mockBackend: Backend = {
     };
     const beats = (a: number[], b: number[]) => a[0] > b[0] || (a[0] === b[0] && a[1] > b[1]);
     const overall = pieces.some((p) => mockSlotOf(p) === "Overall");
-    const outfit: Outfit = { level, slots: [] };
+    const outfit: Outfit = { level, slots: [], paths: [] };
     for (const slot of MOCK_SLOTS) {
       if (overall && (slot === "Top" || slot === "Bottom")) continue;
       const wearing = pieces.findLast((p) => mockSlotOf(p) === slot) ?? null;
@@ -967,6 +967,19 @@ export const mockBackend: Backend = {
         suggestedFit: suggested ? fit(suggested.reqLevel) : null,
         nextFit: next ? fit(next.level ?? next.item.reqLevel) : null,
       });
+      // A tier at a time from here, each better than the last, as the app works it out.
+      const steps: Outfit["paths"][number]["steps"] = [];
+      let floor = suggested ? score(suggested.stats) : wearing ? score(wearing.stats) : null;
+      let tier = suggested?.reqLevel ?? level;
+      for (const i of mockItems
+        .filter((i) => i.kind === "equip" && i.slot === slot && i.reqLevel > level)
+        .sort((a, b) => a.reqLevel - b.reqLevel)) {
+        if (i.reqLevel <= tier || (floor && !beats(score(i.stats), floor))) continue;
+        steps.push({ item: i, level: i.reqLevel, planned: gear.some((g) => g.item.id === i.id) });
+        floor = score(i.stats);
+        tier = i.reqLevel;
+      }
+      outfit.paths.push({ slot, now: suggested ? { item: suggested, level, planned: suggestedPlanned } : null, steps, passed: [] });
     }
     return outfit;
   },

@@ -2,6 +2,7 @@
   // The training log's Records view: every map the player trained on, and under each the ways
   // they trained there (level, party size and job), with EXP and mesos per hour. Built from the
   // saved sessions' lines; everything stays on this PC.
+  import { tip } from "$lib/tip.svelte";
   import Ref from "$lib/components/Ref.svelte";
   import { ChevronDown, ChevronRight } from "@lucide/svelte";
 
@@ -130,12 +131,12 @@
               <td>{m.sessions}</td>
               <td>{formatDuration(m.activeSeconds)}</td>
               <td class="strong">{exp(m)}</td>
-              <td class="strong" title={mesosTitle(m)}>{mesos(m)}{m.mesosPerHour != null && m.mesosShare < 0.9 ? "*" : ""}</td>
+              <td class="strong" use:tip={mesosTitle(m)}>{mesos(m)}{m.mesosPerHour != null && m.mesosShare < 0.9 ? "*" : ""}</td>
               {#if withPotions}<td class="strong">{net(m)}</td>{/if}
               <td>
                 {#if bests.get(m.map)?.best}
                   {@const best = bests.get(m.map)!.best!}
-                  <span title="{shortDay(best.at)}{best.level != null ? `, Lv ${best.level}` : ''}">{formatCompact(best.expPerHour)}</span>
+                  <span use:tip={`${shortDay(best.at)}${best.level != null ? `, Lv ${best.level}` : ''}`}>{formatCompact(best.expPerHour)}</span>
                 {:else}—{/if}
               </td>
             </tr>
@@ -148,7 +149,7 @@
                   <td>{row.sessions}</td>
                   <td>{formatDuration(row.activeSeconds)}</td>
                   <td>{exp(row)}</td>
-                  <td title={mesosTitle(row)}>{mesos(row)}{row.mesosPerHour != null && row.mesosShare < 0.9 ? "*" : ""}</td>
+                  <td use:tip={mesosTitle(row)}>{mesos(row)}{row.mesosPerHour != null && row.mesosShare < 0.9 ? "*" : ""}</td>
                   {#if withPotions}<td>{net(row)}</td>{/if}
                   <td></td>
                 </tr>

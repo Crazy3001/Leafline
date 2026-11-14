@@ -1,5 +1,6 @@
 <script lang="ts" generics="T extends string | number">
   // A row of choices where exactly one is picked: the one control for modes and sorts.
+  import { tip } from "$lib/tip.svelte";
   let {
     options,
     value,
@@ -21,7 +22,7 @@
 
 <div class="seg {size}" class:stretch role="group" aria-label={label}>
   {#each options as option (option.id)}
-    <button aria-pressed={option.id === value} title={option.title} onclick={() => onchange(option.id)}>
+    <button aria-pressed={option.id === value} use:tip={option.title} onclick={() => onchange(option.id)}>
       {option.label}
     </button>
   {/each}

@@ -2,6 +2,7 @@
   // The NPCs half of the Lookup tab: who is on this map, and a search of every NPC in the data by
   // name, quest or map.
   import { ArrowLeft, LoaderCircle } from "@lucide/svelte";
+  import { FilterBoxState } from "$lib/filterbox.svelte";
   import { untrack } from "svelte";
 
   import Chips from "./Chips.svelte";
@@ -37,7 +38,7 @@
 
   let regions = $state<string[]>([]);
   let areas = $state<string[]>([]);
-  let showFilters = $state(false);
+  const filterBox = new FilterBoxState("npcs");
   let page = $state<NpcPage | null>(null);
   let searching = $state(false);
 
@@ -86,7 +87,6 @@
 
   function clear() {
     setQuery(blankNpcQuery());
-    showFilters = false;
   }
 
   const quests = (count: number) => (count ? `${count} quest${count === 1 ? "" : "s"}` : null);
@@ -110,7 +110,7 @@
       placeholder="NPC, a quest they give, or a map"
       label="Search NPCs"
       {narrowed}
-      bind:filters={showFilters}
+      bind:filters={filterBox.open}
       clearable={browsing || npcView.id != null}
       oninput={(text) => setQuery({ text })}
       onclear={clear}
@@ -119,7 +119,7 @@
       <KindTabs label="Kind of NPC" options={KINDS} value={query.kind} onselect={(kind) => setQuery({ kind })} />
       <Chips label="Area" options={areas} value={query.area} onselect={(area) => setQuery({ area })} />
     {/if}
-    {#if showFilters}
+    {#if filterBox.open}
       <FilterBox>
         <label>
           <span>Region</span>

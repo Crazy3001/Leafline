@@ -3,6 +3,7 @@
   // involved, found in the downloaded quest and NPC data by the job's name. Nothing here is a
   // game rule Leafline knows: it is what the data lists, and the game's own NPCs come first.
   // Ticks are a convenience kept in this window's storage, per character and advancement.
+  import { tip } from "$lib/tip.svelte";
   import Ref from "$lib/components/Ref.svelte";
   import { Check } from "@lucide/svelte";
   import { untrack } from "svelte";
@@ -148,7 +149,7 @@
     role="checkbox"
     aria-checked={done}
     disabled={auto}
-    title={auto ? "Ticks itself when the HUD shows the level" : undefined}
+    use:tip={auto ? "Ticks itself when the HUD shows the level" : undefined}
     onclick={() => toggle(step)}
   >
     {#if done}<Check size={10} />{/if}

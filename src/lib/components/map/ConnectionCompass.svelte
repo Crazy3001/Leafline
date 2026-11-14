@@ -4,6 +4,7 @@
   // place is the coarse side and height from the map data; a portal without one is placed by its
   // name. Never drawn at real positions, and no map images. The pin only ever marks the map the
   // player is on.
+  import { tip } from "$lib/tip.svelte";
   import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ArrowUpRight, EyeOff, MapPin } from "@lucide/svelte";
 
   import type { MapExit, MapRef, Side } from "$lib/types";
@@ -94,7 +95,7 @@
     class:yours
     class:unknown={!exit.to.known}
     disabled={!exit.to.known}
-    title={exit.to.known ? undefined : "Not in the map data"}
+    use:tip={exit.to.known ? undefined : "Not in the map data"}
     onclick={() => onnavigate(exit.to.id)}
   >
     <span class="dir"><Icon size={10} />{word(exit)}</span>

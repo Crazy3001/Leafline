@@ -3,6 +3,7 @@
   // how this map compares with your bests on it, the maps played), then where to train next, with
   // a jump to it from the top. Before a session starts: the goal, where to train, your best maps
   // and the last sessions.
+  import { tip } from "$lib/tip.svelte";
   import Ref from "$lib/components/Ref.svelte";
   import SessionControls from "./SessionControls.svelte";
   import { ArrowDown } from "@lucide/svelte";
@@ -388,7 +389,7 @@
             {@const town = row.map != null && towns.has(row.map)}
             <tr class:town>
               <td>
-                {#if row.map === session.map}<span class="here" title="You are here"></span>{/if}
+                {#if row.map === session.map}<span class="here" use:tip={"You are here"}></span>{/if}
                 {#if row.map}<Ref kind="map" name={row.map}>{splitMapLabel(row.map).name}</Ref
                   >{#if !town} <SaveSpot label={row.map} name={splitMapLabel(row.map).name} />{/if}{:else}<span
                     class="unplaced"

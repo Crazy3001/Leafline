@@ -1,5 +1,6 @@
 <script lang="ts">
   // Everything the cached data says about one map. No map images or coordinates are shown.
+  import { tip } from "$lib/tip.svelte";
   import Ref from "$lib/components/Ref.svelte";
   import { ExternalLink, Skull } from "@lucide/svelte";
 
@@ -71,7 +72,7 @@
 
 {#if display.showPictures}
   <Section title="Map" memory="map-picture-{desk ? 'desk' : 'overlay'}" open={desk}>
-    <MapPicture mapId={details.map.id} highlight={hovered} />
+    <MapPicture mapId={details.map.id} highlight={hovered} mobs={details.mobs} />
   </Section>
 {/if}
 
@@ -82,7 +83,7 @@
 {/if}
 
 {#if !glance}
-  <Section title="Exits" count={details.exits.length}>
+  <Section title="Portals" count={details.exits.length}>
     {#snippet aside()}
       {#if placed}<span>rough positions</span>{/if}
     {/snippet}
@@ -92,19 +93,19 @@
 
 {#if details.mobs.length}
   <Section title="Monsters" count={details.mobTotal}>
-    {#snippet aside()}<span title="Base EXP for killing every monster once, before any modifiers"
+    {#snippet aside()}<span use:tip={"Base EXP for killing every monster once, before any modifiers"}
         >{formatCompact(details.expPerClear)} EXP / clear</span
       >{/snippet}
     <table class="mobs">
       <thead>
-        <tr><th>Monster</th><th>Lv</th><th>HP</th><th>EXP</th><th title="How many spawn">#</th></tr>
+        <tr><th>Monster</th><th>Lv</th><th>HP</th><th>EXP</th><th use:tip={"How many spawn"}>#</th></tr>
       </thead>
       <tbody>
         {#each details.mobs as mob (mob.id)}
           <tr onmouseenter={() => (hovered = mob.name)} onmouseleave={() => (hovered = null)}>
             <td class="mob">
               <Ref kind="mob" id={mob.id} name={monsterLabel(mob.name)} />
-              {#if mob.boss}<span class="boss" title="Boss"><Skull size={11} /></span>{/if}
+              {#if mob.boss}<span class="boss" use:tip={"Boss"}><Skull size={11} /></span>{/if}
               {#if mob.undead}<span class="tag">undead</span>{/if}
             </td>
             <td class="tabular">{mob.level}</td>
@@ -118,7 +119,7 @@
   </Section>
 {/if}
 
-<!-- A pinned window stops at the monsters; exits, drops, quests, NPCs and routes are in the tab. -->
+<!-- A pinned window stops at the monsters; portals, drops, quests, NPCs and routes are in the tab. -->
 {#if !glance}
 {#if monsterNames.length}
   <Section title="Drops">
@@ -152,7 +153,7 @@
         <li>
           <Ref kind="npc" id={npc.id} name={npc.name} />
           {#if npc.quests.length}
-            <span class="gives" title={npc.quests.map((q) => q.name).join("\n")}>
+            <span class="gives" use:tip={npc.quests.map((q) => q.name).join("\n")}>
               {npc.quests.length} quest{npc.quests.length === 1 ? "" : "s"}
             </span>
           {/if}

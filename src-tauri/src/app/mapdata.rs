@@ -12,6 +12,8 @@ use tauri_plugin_opener::OpenerExt;
 use super::settings::SettingsState;
 use super::{overlay, pins};
 use crate::build::Catalog;
+use crate::build::catalog::item_group;
+use crate::mapdata::osms::ItemKind;
 use crate::error::{Error, Result};
 use crate::mapdata::fetch::{self, Http};
 use crate::mapdata::osms::Dataset;
@@ -435,6 +437,12 @@ pub async fn monster_drops(app: AppHandle, monsters: Vec<String>) -> Result<Vec<
             for drop in drops.iter_mut().flat_map(|m| m.drops.iter_mut()) {
                 if let Some(item) = catalog.item_called(&drop.item) {
                     drop.category = Some(item.kind.name().to_string());
+                    drop.item_id = Some(item.id);
+                    drop.item_type = item_group(item).map(str::to_string).or_else(|| match item.kind {
+                        ItemKind::Scroll => Some("Scroll".into()),
+                        _ => Some(item.weapon_type.clone().unwrap_or_else(|| item.slot.clone())),
+                    });
+                    drop.req_level = Some(item.req_level).filter(|&l| l > 0);
                 }
             }
         }

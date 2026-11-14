@@ -1,5 +1,6 @@
 <script lang="ts">
   // The maps something can be found on, the best first, and the route to the one picked.
+  import { tip } from "$lib/tip.svelte";
   import Ref from "$lib/components/Ref.svelte";
   import { backend } from "$lib/api";
   import RouteSteps from "./RouteSteps.svelte";
@@ -59,7 +60,7 @@
 {#if places.length}
   <div class="legend">
     <span>Map</span>
-    {#if counted}<span title="How many of it spawn, out of every monster on the map">It / all</span>{/if}
+    {#if counted}<span use:tip={"How many of it spawn, out of every monster on the map"}>It / all</span>{/if}
     {#if from && places.length > 1}
       <button class:on={nearest} aria-pressed={nearest} onclick={() => (nearest = !nearest)}>Nearest</button>
     {/if}
@@ -75,7 +76,7 @@
           <span
             class="dist tabular"
             class:shortcut={map.travel}
-            title={map.travel ? `With the travel you turned on in Settings, via ${map.travel.via.name}` : undefined}>{groundDistance(map, from != null)}</span
+            use:tip={map.travel ? `With the travel you turned on in Settings, via ${map.travel.via.name}` : undefined}>{groundDistance(map, from != null)}</span
           >
         </button>
       </li>

@@ -8,7 +8,7 @@ import { isTauri } from "@tauri-apps/api/core";
 import { display } from "./settings.svelte";
 
 /** `mapview` is a map's picture cut to what is drawn and made smaller, for the map section. */
-export type PictureKind = "item" | "mob" | "npc" | "map" | "minimap" | "mark" | "mapview";
+export type PictureKind = "item" | "mob" | "npc" | "skill" | "map" | "minimap" | "mark" | "mapview";
 
 /**
  * Where the `pic` scheme answers: WebView2 reaches custom schemes as `http://<scheme>.localhost`.

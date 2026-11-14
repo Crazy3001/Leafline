@@ -2,6 +2,7 @@
   // The training log: every saved session with its graph, rates per map by level and party, the
   // player's records per map by level, party size and job, and progress over days. Its own window opens from the Train tab, and the desk view can show it
   // in a column (embedded). Everything here stays on this PC.
+  import { tip } from "$lib/tip.svelte";
   import Ref from "$lib/components/Ref.svelte";
   import { Download, PenLine, Share2 } from "@lucide/svelte";
   import { onMount, untrack } from "svelte";
@@ -490,7 +491,7 @@
                               {:else}Not placed on a map{/if}
                               {#if l.map}
                                 {@const map = l.map}
-                                <button class="pen" title="Rename" aria-label="Rename map" onclick={() => startRename(map)}
+                                <button class="pen" use:tip={"Rename"} aria-label="Rename map" onclick={() => startRename(map)}
                                   ><PenLine size={11} /></button
                                 >
                               {/if}

@@ -5,6 +5,9 @@
   import IconRef from "$lib/components/IconRef.svelte";
   import Ref from "$lib/components/Ref.svelte";
   import { LoaderCircle, RefreshCw } from "@lucide/svelte";
+
+  import { tip } from "$lib/tip.svelte";
+  import Pic from "$lib/ui/Pic.svelte";
   import { untrack } from "svelte";
 
   import { backend } from "$lib/api";
@@ -17,6 +20,9 @@
   /** One item on this map, and each monster seen dropping it. */
   interface MapItem {
     name: string;
+    id: number | null;
+    type: string | null;
+    level: number | null;
     category: string | null;
     quest: boolean;
     sources: (Drop & { monster: string })[];
@@ -69,7 +75,7 @@
       for (const drop of entry.drops) {
         let item = byName.get(drop.item);
         if (!item) {
-          item = { name: drop.item, category: drop.category, quest: false, sources: [] };
+          item = { name: drop.item, id: drop.itemId, type: drop.itemType, level: drop.reqLevel, category: drop.category, quest: false, sources: [] };
           byName.set(drop.item, item);
         }
         item.quest ||= drop.quest;
@@ -134,6 +140,13 @@
     }
   }
 
+  /** A dropper's picture says nothing alone: its name and how often it drops this. */
+  function dropperTip(source: MapItem["sources"][number], meso = false) {
+    const amount = meso ? quantity(source).replace(" ×", "") : "";
+    const rate = source.rate != null ? `${percent(source.rate)}${source.sampleKills ? ` over ${source.sampleKills.toLocaleString()} kills` : ""}` : "rate not measured";
+    return `${source.monster}\n${meso && amount ? `${amount} mesos · ` : ""}${rate}`;
+  }
+
   function percent(value: number | null) {
     if (value == null) return "";
     return value >= 10 ? `${value.toFixed(0)}%` : `${value.toFixed(1)}%`;
@@ -179,7 +192,7 @@
       <p class="meso-line">
         <span class="mesos">Mesos</span>
         <span class="droppers">
-          {#each mesos.sources as source (source.monster)}<IconRef kind="mob" name={source.monster} />{/each}
+          {#each mesos.sources as source (source.monster)}<IconRef kind="mob" name={source.monster} title={dropperTip(source, true)} />{/each}
         </span>
       </p>
     {/if}
@@ -188,13 +201,27 @@
       <ul class="items">
         {#each group.items as item (item.name)}
           <li>
-            <span class="item"
-              ><Ref kind="item" name={item.name} />{#if item.quest}<span class="tag">quest</span>{/if}</span
+            <span class="item" use:tip={itemTip}
+              ><Ref kind="item" id={item.id} name={item.name} />{#if item.quest}<span class="tag">quest</span>{/if}</span
             >
             <span class="droppers">
-              {#each item.sources as source (source.monster)}<IconRef kind="mob" name={source.monster} />{/each}
+              {#each item.sources as source (source.monster)}<IconRef kind="mob" name={source.monster} title={dropperTip(source)} />{/each}
             </span>
           </li>
+          {#snippet itemTip()}
+            <span class="tip-head">
+              <Pic kind="item" id={item.id} name={item.name} size={32} />
+              <span>
+                <span class="tip-title">{item.name}</span>
+                <span class="tip-sub">{[item.type ?? group.label, item.level ? `REQ LEV ${item.level}` : null, item.quest ? "quest only" : null].filter(Boolean).join(" · ")}</span>
+              </span>
+            </span>
+            <ul class="tip-list">
+              {#each item.sources as source (source.monster)}
+                <li><Pic kind="mob" name={source.monster} size={16} />{source.monster}<span class="tip-num">{source.rate != null ? percent(source.rate) : "seen"}</span></li>
+              {/each}
+            </ul>
+          {/snippet}
         {/each}
       </ul>
     {/each}

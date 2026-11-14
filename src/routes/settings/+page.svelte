@@ -1,6 +1,7 @@
 <script lang="ts">
   // Settings: how the overlay looks, travel in routes, the hotkeys, downloaded data, and what
   // Leafline is.
+  import { tip } from "$lib/tip.svelte";
   import {
     CarTaxiFront,
     Check,
@@ -398,7 +399,7 @@
             </select>
             <button
               class="button icon-only"
-              title="Look for windows again"
+              use:tip={"Look for windows again"}
               aria-label="Look for windows again"
               onclick={loadWindows}
             >
@@ -788,7 +789,7 @@
           {#if display.framesFolder}
             <button
               class="button icon-only"
-              title="Back to the local folder"
+              use:tip={"Back to the local folder"}
               aria-label="Back to the local folder"
               onclick={() => changeSettings({ framesFolder: null })}><RotateCcw size={13} /></button
             >
