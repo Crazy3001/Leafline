@@ -9,6 +9,7 @@
   import { untrack } from "svelte";
 
   import AdvancementChecklist from "./AdvancementChecklist.svelte";
+  import CharacterStats from "./CharacterStats.svelte";
   import MapDataPanel from "./map/MapDataPanel.svelte";
   import { backend } from "$lib/api";
   import { STATS, buildState, statLabel, watchBuilds } from "$lib/builds.svelte";
@@ -84,12 +85,13 @@
 
   // What to spend, the next job advancement and gear each get a view of their own, so the tab
   // stays short. The one last picked is remembered.
-  type View = "plan" | "advance" | "gear" | "skills";
+  type View = "plan" | "stats" | "advance" | "gear" | "skills";
   const VIEW_KEY = "leafline.build.view";
   let view = $state<View>(storedView());
   const canAdvance = $derived(!!nextAdvance?.advance && !!plan?.build.plan.job);
   const views = $derived([
     { id: "plan" as View, label: "Level up" },
+    { id: "stats" as View, label: "Stats" },
     { id: "gear" as View, label: "Gear" },
     { id: "skills" as View, label: "Skills" },
     ...(canAdvance ? [{ id: "advance" as View, label: "Job advance" }] : []),
@@ -308,7 +310,7 @@
   function storedView(): View {
     try {
       const saved = localStorage.getItem(VIEW_KEY);
-      return saved === "advance" || saved === "skills" ? saved : saved === "gear" || saved === "worn" ? "gear" : "plan";
+      return saved === "advance" || saved === "skills" || saved === "stats" ? saved : saved === "gear" || saved === "worn" ? "gear" : "plan";
     } catch {
       return "plan";
     }
@@ -526,6 +528,8 @@
   {#if !ready}
     <p class="lead">Plan your AP and SP level by level. Builds use the skills and equipment in the map data.</p>
     <MapDataPanel compact />
+    <h4 class="sub">Stats</h4>
+    <CharacterStats {character} />
   {:else if error}
     <p class="lead">{error}</p>
   {:else if loaded && !plan}
@@ -534,6 +538,8 @@
       level by level.
     </p>
     <button class="action" onclick={() => openPlanner()}><Pencil size={13} />Plan a build</button>
+    <h4 class="sub">Stats</h4>
+    <CharacterStats {character} />
   {:else if plan && step}
     <div class="views"><Segmented label="Build view" options={views} value={shown} stretch size="sm" onchange={pickView} /></div>
     {#if shown === "plan"}
@@ -623,6 +629,8 @@
       />
     {:else if shown === "skills"}
     {@render skillsView()}
+    {:else if shown === "stats"}
+    <CharacterStats character={character ?? plan.build.character ?? null} showRead={false} />
     {:else}
     <!--
       Gear slot by slot, as the equip window has it: what you wear (its own stats, scrolls and all,

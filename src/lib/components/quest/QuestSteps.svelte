@@ -25,9 +25,19 @@
 
   const info = $derived(sheet.info);
 
+  function counted(target: string) {
+    return tracked?.find((o) => o.target.toLowerCase() === target.toLowerCase()) ?? null;
+  }
+
   function done(target: string) {
-    const counted = tracked?.find((o) => o.target.toLowerCase() === target.toLowerCase());
-    return counted != null && counted.current >= counted.required;
+    const read = counted(target);
+    return read != null && read.current >= read.required;
+  }
+
+  /** How many are still wanted: what the Quest Helper has left, or the whole count. */
+  function left(target: string, count: number) {
+    const read = counted(target);
+    return read ? Math.max(0, read.required - read.current) : count;
   }
 
   const finished = $derived(sheet.objectives.length > 0 && sheet.objectives.every((o) => done(o.guide.target)));
@@ -55,7 +65,7 @@
           <Ref kind="item" name={objective.guide.item ?? objective.guide.target}>{objective.guide.target}</Ref>
         {/if}
       </p>
-      {#if !finishedStep}<ObjectiveHint guide={objective.guide} {from} />{/if}
+      {#if !finishedStep}<ObjectiveHint guide={objective.guide} {from} left={left(objective.guide.target, objective.count)} />{/if}
     </li>
   {/each}
   <li class:next={finished}>
@@ -104,6 +114,17 @@
   <ul class="links">
     <li><Ref kind="quest" id={sheet.next!.id} name={sheet.next.name} /></li>
   </ul>
+{/if}
+{#if sheet.chainRest}
+  {@const rest = sheet.chainRest}
+  <h4>Rest of the chain</h4>
+  <p class="chain">
+    {rest.quests.length} more {rest.quests.length === 1 ? "quest" : "quests"}{#if rest.levelMax}, up to Lv {rest.levelMax}{/if}{#if rest.exp || rest.mesos},
+      paying
+      {#if rest.exp}<span class="tabular exp">{formatNumber(rest.exp)} EXP</span>{/if}{#if rest.exp && rest.mesos}&nbsp;and{/if}
+      {#if rest.mesos}<span class="tabular mesos">{formatMesos(rest.mesos)} mesos</span>{/if}
+      in all{/if}{#if rest.quests.length > 1}, ending with <Ref kind="quest" id={rest.quests[rest.quests.length - 1].id} name={rest.quests[rest.quests.length - 1].name} />{/if}.
+  </p>
 {/if}
 
 <style>
@@ -191,8 +212,19 @@
     font-weight: 600;
   }
 
-  dd.exp {
+  dd.exp,
+  .chain .exp {
     color: var(--exp);
+  }
+
+  .chain {
+    margin: 0;
+    color: var(--muted);
+    font-size: var(--text-sm);
+  }
+
+  .chain .mesos {
+    color: var(--mesos);
   }
 
   dd.mesos {

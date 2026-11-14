@@ -79,7 +79,7 @@ Nothing read from the game leaves your PC. Leafline only goes online to:
 
 - download the community map, monster, quest and drop data (when you ask, then weekly),
 - download a game picture from OSMS Data Explorer the first time it is shown, if game pictures are on (they start on), and
-- ask GitHub for the latest version number at startup, if you turn the update check on (it starts off). That request carries Leafline's name and version and nothing else. Nothing is downloaded or installed for you.
+- ask GitHub for the latest version number at startup, if you turn the update check on (it starts off). That request carries Leafline's name and version and nothing else. A new version is downloaded only when you press **Download and install**: Leafline fetches the release's installer and its `SHA256SUMS.txt` from this repository, runs the installer only if its SHA-256 matches, and closes so it can install.
 
 Your sessions, notes, drop log, builds and settings stay in `%APPDATA%\app.leafline.overlay`, with a daily backup of the last 7 days. **Settings → Data** opens the folder.
 
@@ -91,7 +91,7 @@ Your sessions, notes, drop log, builds and settings stay in `%APPDATA%\app.leafl
 
 You need Windows 10 or 11 (64-bit) and the **English** MapleStory Classic World client. WebView2 comes with Windows 11; the installer adds it on Windows 10 if it's missing.
 
-**Updating:** Settings → About says when a new version is out and links to it. Install it over the old one; your records stay.
+**Updating:** with the update check on, Settings → About says when a new version is out. **Download and install** downloads the installer, checks its SHA-256 against the release's checksum list, runs it and closes Leafline; or download it yourself from the release page and install it over the old one. Your records stay either way.
 **Uninstalling:** from Windows' *Installed apps*. Your records stay in the folder above, so delete that too if you want them gone.
 
 ## Getting started
@@ -195,7 +195,7 @@ Until then, a download is genuine if it comes from this repository's [Releases](
 - Committers and reviewers: [Crazy3001](https://github.com/Crazy3001)
 - Release approvers: [Crazy3001](https://github.com/Crazy3001)
 
-**Privacy policy:** this program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it. In detail: it downloads the community data from [OSMS Data Explorer](https://osmsdataexplorer.com) and [mapleclassic.wiki](https://mapleclassic.wiki), and Leafline's own data files from GitHub, when you ask (then checks them for changes once a day), and asks GitHub for the latest version number only if you turn the update check on. Nothing read from the game, and none of your records, is ever sent anywhere. See [Privacy](#privacy).
+**Privacy policy:** this program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it. In detail: it downloads the community data from [OSMS Data Explorer](https://osmsdataexplorer.com) and [mapleclassic.wiki](https://mapleclassic.wiki), and Leafline's own data files from GitHub, when you ask (then checks them for changes once a day), asks GitHub for the latest version number only if you turn the update check on, and downloads a new version's installer from this repository only when you press Download and install. Nothing read from the game, and none of your records, is ever sent anywhere. See [Privacy](#privacy).
 
 ## Building from source
 

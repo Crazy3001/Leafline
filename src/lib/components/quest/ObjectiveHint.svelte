@@ -1,19 +1,30 @@
 <script lang="ts">
   // Where to go for one quest objective: a one-line hint that opens into the monsters to hunt,
-  // their best maps, and the route to the chosen map.
+  // their best maps, and the route to the chosen map. An item an NPC sells says so, with the
+  // cheapest shop, so it can be bought instead of farmed.
   import { tip } from "$lib/tip.svelte";
   import Ref from "$lib/components/Ref.svelte";
-  import { ChevronRight, Crosshair } from "@lucide/svelte";
+  import { ChevronRight, Crosshair, ShoppingBag } from "@lucide/svelte";
 
   import { backend } from "$lib/api";
-  import { groundDistance } from "$lib/format";
+  import { formatMesos, groundDistance } from "$lib/format";
+  import { huntOrder, orderGrounds, setHuntOrder } from "$lib/quests.svelte";
   import { travelKey } from "$lib/settings.svelte";
   import RouteSteps from "$lib/components/map/RouteSteps.svelte";
   import GoButton from "$lib/components/GoButton.svelte";
   import { mapPlace } from "$lib/destination.svelte";
   import type { HuntingGround, MapRef, MapRoute, ObjectiveGuide } from "$lib/types";
 
-  let { guide, from }: { guide: ObjectiveGuide; from: MapRef | null } = $props();
+  let {
+    guide,
+    from,
+    left = null,
+  }: {
+    guide: ObjectiveGuide;
+    from: MapRef | null;
+    /** How many are still wanted, to price buying them all. */
+    left?: number | null;
+  } = $props();
 
   let open = $state(false);
   /** The map whose route is shown: the best one until another is picked. */
@@ -21,7 +32,17 @@
   let route = $state<MapRoute | null>(null);
   let routing = $state(false);
 
-  const hunts = $derived(guide.hunts.filter((h) => h.monster.known && h.maps.length));
+  const hunts = $derived(
+    guide.hunts
+      .filter((h) => h.monster.known && h.maps.length)
+      .map((h) => ({ ...h, maps: orderGrounds(h.maps, huntOrder.value) })),
+  );
+  /** Whether the choice says anything: some monster has a map that is closer but not fuller. */
+  const choosing = $derived(
+    hunts.some((h) => h.maps.length > 1 && orderGrounds(h.maps, "most")[0].map.id !== h.maps[0].map.id) ||
+      (huntOrder.value === "most" && hunts.some((h) => h.maps.length > 1)),
+  );
+  const shop = $derived(guide.shops?.[0] ?? null);
   const top = $derived(hunts[0] ?? null);
   const best = $derived(top?.maps[0] ?? null);
   const target = $derived(picked ?? best?.map.id ?? null);
@@ -46,6 +67,26 @@
   const distance = (ground: HuntingGround) => groundDistance(ground, from != null);
 </script>
 
+{#snippet buy()}
+  {#if shop}
+    <div class="hint-row">
+      <p class="hint quiet buy">
+        <span class="icon shop"><ShoppingBag size={11} /></span>
+        <span class="line">
+          Or buy it from <Ref kind="npc" name={shop.npc} />
+          <span class="sep">·</span>
+          <span class="tabular mesos">{formatMesos(shop.price)} mesos</span>{#if left && left > 1}<span class="muted tabular"
+              >&nbsp;each, {formatMesos(shop.price * left)} for {left}</span
+            >{/if}
+          {#if shop.needs}<span class="muted"> · {shop.needs}</span>{/if}
+        </span>
+        {#if shop.map && shop.hops != null}<span class="far tabular">{shop.hops === 0 ? "here" : `${shop.hops} portal${shop.hops === 1 ? "" : "s"}`}</span>{/if}
+      </p>
+      {#if shop.map && shop.hops !== 0}<GoButton place={mapPlace(shop.map)} />{/if}
+    </div>
+  {/if}
+{/snippet}
+
 {#if top && best}
   <div class="hint-row">
     <button class="hint" aria-expanded={open} onclick={() => (open = !open)}>
@@ -68,8 +109,16 @@
     {#if best.hops !== 0}<GoButton place={mapPlace(best.map)} />{/if}
   </div>
 
+  {@render buy()}
+
   {#if open}
     <div class="detail">
+      {#if choosing}
+        <div class="order" role="group" aria-label="Which map first">
+          <button aria-pressed={huntOrder.value === "closest"} onclick={() => { picked = null; setHuntOrder("closest"); }} use:tip={"The nearest map with a fair number of them"}>Closest</button>
+          <button aria-pressed={huntOrder.value === "most"} onclick={() => { picked = null; setHuntOrder("most"); }} use:tip={"The map with the most of them, however far"}>Most</button>
+        </div>
+      {/if}
       {#each hunts as hunt (hunt.monster.name)}
         <div class="hunt">
           <div class="mob">
@@ -120,6 +169,9 @@
   <p class="hint quiet">
     Dropped by {guide.hunts.map((h) => h.monster.name).join(", ")}, not found in the map data.
   </p>
+  {@render buy()}
+{:else if guide.kind === "item" && shop}
+  {@render buy()}
 {:else if guide.kind === "item" && guide.lookedUp}
   <p class="hint quiet">No known monster drops for this item.</p>
 {:else if guide.kind === "monster"}
@@ -305,6 +357,47 @@
 
   .route {
     margin-top: 2px;
+  }
+
+  .buy {
+    margin: 0;
+  }
+
+  .icon.shop {
+    color: var(--mesos);
+  }
+
+  .mesos {
+    color: var(--mesos);
+  }
+
+  .order {
+    display: inline-flex;
+    gap: 2px;
+    margin: 0 0 6px;
+    padding: 2px;
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .order button {
+    padding: 2px 8px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--muted);
+    font-size: var(--text-xs);
+    cursor: pointer;
+  }
+
+  .order button[aria-pressed="true"] {
+    background: color-mix(in srgb, var(--map) 18%, transparent);
+    color: var(--text);
+  }
+
+  .order button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -1px;
   }
 
   .note {

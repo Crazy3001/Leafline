@@ -17,6 +17,7 @@ mod recovery;
 mod records;
 mod report;
 mod settings;
+mod sheet;
 mod shortcuts;
 mod snap;
 mod tray;
@@ -142,6 +143,8 @@ pub fn run() {
             pins::toggle_pins,
             pins::show_panel,
             damage::player_damage,
+            sheet::character_stats,
+            sheet::set_buff,
             desk::desk_status,
             desk::desk_take_tab,
             desk::show_desk,
@@ -170,6 +173,7 @@ pub fn run() {
             records::set_session_potion,
             update::update_status,
             update::check_for_update,
+            update::install_update,
             records::set_item_note,
             records::map_note,
             records::set_map_note,

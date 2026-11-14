@@ -6,6 +6,13 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
 ## Unreleased
 
 ### Added
+- **Character → Stats.** Every number your Character Stat window shows, read from the game:
+  STR, DEX, INT and LUK with what gear adds, Max HP and MP, Fame, AP left, and with **Detail**
+  open, Attack, Weapon and Magic Def., Magic, Accuracy, Evasion, Crit. rate and damage, Speed and
+  Jump. It says when it was last read, and **Read** reads it again.
+- **Buffs.** Your job's buffs, each at the level your Skill window last showed, with a switch to
+  say which are running. With any on, the stats show what they come to with them, the number read
+  beside each, and the training estimates count a buff's Attack in your attack range.
 - **Game pictures.** Items, monsters and NPCs show their icons beside their names, in lists and on
   their cards, and maps show their area's emblem and a picture of the whole map. Each picture is
   downloaded from OSMS Data Explorer the first time it is shown and kept on this PC. Turn them off
@@ -86,6 +93,36 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
   log (Records and best maps follow it). Potions and a level goal always belong to one character:
   the one you pick, or on screen, or played last. A past session's potions use its own
   character's slots.
+- **Closest or Most.** A quest objective's list of maps has a **Closest / Most** switch: the
+  nearest map with a fair number of the monster, or the one with the most of it, however far.
+  Your choice holds for every quest.
+- **Buy it instead.** When an NPC shop sells an item a quest wants, the objective says so under
+  where to hunt it: the cheapest shop, its price and what the rest you need would cost, with Go.
+- **Rest of the chain.** A quest's page says how many quests follow it in its chain, the highest
+  level they ask for, and the EXP and mesos they pay in all.
+- **Quests to take now.** The Quests tab lists quests your level can start that need no other
+  quest first, the nearest to your level first. The search has the same filter. Leafline can't see
+  which quests you've done, so some may be done already.
+- **Tracked items.** **Track it** on any item's page stars it. Starred items are listed in
+  **Lookup → Items**, each with the monster that drops it and the best map to hunt it, a route,
+  and a shop when one sells it. Each character keeps its own list.
+- **Download and install updates.** With the update check on, Settings → About offers
+  **Download and install** when a new version is out. Leafline downloads the installer from the
+  release, checks its SHA-256 against the release's checksum list, and runs it only if they
+  match, then closes so it can install. Nothing is downloaded until you press it.
+- **When you'll level.** Time to level now also says the clock time you'll get there at this pace,
+  in the Train tab and in the compact HUD's tooltip.
+
+### Changed
+- **Routes take the quickest walk.** Routes are now worked out by how far you walk across each
+  map, from the portal you come out of to the one you take next, with climbing counted extra,
+  instead of the fewest portals. A taxi or scroll is taken when it beats the walk. "About N on
+  foot" comes from the same walk. Walking speed and ride times are rough guesses for a character
+  with no speed bonus.
+- **Hidden portals** in routes and the next-step bar say "stand on the spot and press ↑", since
+  the game draws nothing there.
+- **EXP per hour from the second kill.** The session's rate now shows from your second kill
+  instead of after half a minute, marked "still measuring" until about a minute of play.
 
 ## 0.2.0 (2026-11-12)
 

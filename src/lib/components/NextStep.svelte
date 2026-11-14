@@ -31,7 +31,7 @@
   import { display } from "$lib/settings.svelte";
   import type { Destination, RouteStep } from "$lib/types";
   import { dismissOffer, endTrip, trip } from "$lib/wayfinder.svelte";
-  import { stepVerb } from "$lib/wayfinding";
+  import { HIDDEN_PORTAL_HINT, stepVerb } from "$lib/wayfinding";
 
   let { variant = "overlay" }: { variant?: "overlay" | "hud" | "pin" } = $props();
 
@@ -110,6 +110,7 @@
           <span class="arrow">→</span>
           {#if step.to.known}<Ref kind="map" id={step.to.id} name={step.to.name} icon={false} />{:else}<span class="map">{step.to.name}</span>{/if}
           {#if step.travel?.fare}<span class="faint tabular fare">{formatNumber(step.travel.fare)} mesos</span>{/if}
+          {#if step.hidden}<span class="hidden-hint">· {HIDDEN_PORTAL_HINT}</span>{/if}
         {:else if trip.lost}
           <span class="label">No known way</span>
           {#if trip.here}<span class="faint">from {trip.here.name}</span>{/if}
@@ -338,6 +339,12 @@
   }
 
   .fare {
+    font-size: var(--text-xs);
+    font-weight: 400;
+  }
+
+  .hidden-hint {
+    color: var(--warn);
     font-size: var(--text-xs);
     font-weight: 400;
   }

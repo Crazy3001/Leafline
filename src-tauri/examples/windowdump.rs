@@ -14,7 +14,10 @@ fn main() {
     for path in std::env::args().skip(1) {
         let frame = vision::load(Path::new(&path)).expect("load image");
         let scan = pipeline::read_character(&frame, &ocr).expect("read");
-        println!("{path}\n  {:?} Lv {:?}\n  {:?}\n  {:?}", scan.name, scan.level, scan.windows.stats, scan.windows.skills);
+        println!(
+            "{path}\n  {:?} Lv {:?}\n  {:?}\n  {:?}\n  {:?}",
+            scan.name, scan.level, scan.windows.stats, scan.windows.detail, scan.windows.skills
+        );
         if let Some((layout, reading)) = hud::read(&frame, &ocr).expect("read HUD") {
             let started = Instant::now();
             let glance = character::glance(&frame, &layout, reading.level);

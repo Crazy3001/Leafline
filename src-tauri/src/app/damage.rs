@@ -11,7 +11,10 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State};
 
 use super::mapdata::MapDataState;
+use super::records::now;
+use super::sheet::{SkillSeen, StatSheet};
 use crate::build::Catalog;
+use crate::mapdata::osms::SkillRecord;
 use crate::error::{Error, Result};
 use crate::pipeline::CharacterScan;
 use crate::readers::character::SkillWindow;
@@ -32,6 +35,15 @@ pub struct PlayerDamage {
     pub attack_max: Option<u32>,
     /// The damaging skills last seen in the skill window.
     pub skills: Vec<DamageSkill>,
+    /// Everything the stat window and its detail pane showed, and when they were last read.
+    pub sheet: Option<StatSheet>,
+    pub read_at: Option<i64>,
+    /// Every skill the skill window has shown, at the level it showed.
+    pub skill_levels: Vec<SkillSeen>,
+    /// The buffs the player marked as on, by skill id.
+    pub buffs_on: Vec<u32>,
+    /// The buffs marked as on when the stat window was last read, already in its numbers.
+    pub read_with: Vec<u32>,
 }
 
 /// A skill that hits for a share of the player's attack, at the level it was read.
@@ -62,6 +74,11 @@ impl DamageState {
         Ok(Self { path, all: Mutex::new(all) })
     }
 
+    /// What is stored for `name`.
+    pub fn get(&self, name: &str) -> Option<PlayerDamage> {
+        self.all.lock().expect("damage lock").get(&name.to_lowercase()).cloned()
+    }
+
     fn save(&self, all: &HashMap<String, PlayerDamage>) -> Result<()> {
         if let Some(dir) = self.path.parent() {
             std::fs::create_dir_all(dir)?;
@@ -79,18 +96,45 @@ fn percent(description: &str) -> Option<u32> {
     (rest[digits.len()..].starts_with('%')).then(|| digits.parse().ok()).flatten()
 }
 
+/// The skill a name read from the window stands for, among those `wanted`.
+fn skill_named<'a>(catalog: &'a Catalog, read: &str, wanted: impl Fn(&SkillRecord) -> bool) -> Option<&'a SkillRecord> {
+    catalog
+        .skills()
+        .iter()
+        .filter(|s| wanted(s))
+        .map(|s| (strsim::normalized_levenshtein(&s.name.to_lowercase(), &read.to_lowercase()), s))
+        .filter(|(score, _)| *score >= MIN_SKILL_SCORE)
+        .max_by(|a, b| a.0.total_cmp(&b.0))
+        .map(|(_, skill)| skill)
+}
+
+/// Every skill in `window` the data knows, at the level read, unlearned ones too.
+fn seen_skills(window: &SkillWindow, catalog: &Catalog) -> Vec<SkillSeen> {
+    let mut found: Vec<SkillSeen> = Vec::new();
+    for row in &window.rows {
+        let Some(skill) = skill_named(catalog, &row.name, |_| true) else { continue };
+        if !found.iter().any(|f| f.name == skill.name) {
+            found.push(SkillSeen { name: skill.name.clone(), level: row.level });
+        }
+    }
+    found
+}
+
+/// Adds the skills of one page of the skill window to those already known.
+fn merge_seen(known: &mut Vec<SkillSeen>, read: Vec<SkillSeen>) {
+    for skill in read {
+        match known.iter_mut().find(|k| k.name == skill.name) {
+            Some(existing) => *existing = skill,
+            None => known.push(skill),
+        }
+    }
+}
+
 /// The skills in `window` that hit for a share of the attack, each at the level read.
 fn damaging_skills(window: &SkillWindow, catalog: &Catalog) -> Vec<DamageSkill> {
     let mut found: Vec<DamageSkill> = Vec::new();
     for row in window.rows.iter().filter(|r| r.level > 0) {
-        let best = catalog
-            .skills()
-            .iter()
-            .filter(|s| !s.passive)
-            .map(|s| (strsim::normalized_levenshtein(&s.name.to_lowercase(), &row.name.to_lowercase()), s))
-            .filter(|(score, _)| *score >= MIN_SKILL_SCORE)
-            .max_by(|a, b| a.0.total_cmp(&b.0));
-        let Some((_, skill)) = best else { continue };
+        let Some(skill) = skill_named(catalog, &row.name, |s| !s.passive) else { continue };
         let level = row.level.min(skill.level_descriptions.len() as u32).max(1) as usize;
         let Some(percent) = skill.level_descriptions.get(level - 1).and_then(|d| percent(d)) else { continue };
         if !found.iter().any(|f| f.name == skill.name) {
@@ -116,7 +160,7 @@ fn merge(known: &mut Vec<DamageSkill>, read: Vec<DamageSkill>) {
 pub fn note(app: &AppHandle, scan: &CharacterScan) {
     let Some(name) = scan.name.as_deref().filter(|n| !n.trim().is_empty()) else { return };
     let (detail, skills) = (scan.windows.detail, scan.windows.skills.as_ref());
-    if detail.is_none() && skills.is_none() {
+    if detail.is_none() && skills.is_none() && scan.windows.stats.is_none() {
         return;
     }
     let catalog = app.state::<MapDataState>().catalog();
@@ -128,8 +172,22 @@ pub fn note(app: &AppHandle, scan: &CharacterScan) {
         entry.attack_min = Some(detail.attack_min);
         entry.attack_max = Some(detail.attack_max);
     }
+    let stats = scan.windows.stats.as_ref();
+    if stats.is_some() || detail.is_some() {
+        let sheet = entry.sheet.get_or_insert_default();
+        if let Some(stats) = stats {
+            sheet.take_stats(stats);
+        }
+        if let Some(detail) = &detail {
+            sheet.take_detail(detail);
+        }
+        entry.read_at = Some(now());
+        // The window's numbers already count whatever was on as it was read.
+        entry.read_with.clone_from(&entry.buffs_on);
+    }
     if let (Some(window), Some(catalog)) = (skills, catalog) {
         merge(&mut entry.skills, damaging_skills(window, &catalog));
+        merge_seen(&mut entry.skill_levels, seen_skills(window, &catalog));
     }
     if *entry == before {
         return;
@@ -145,7 +203,27 @@ pub fn note(app: &AppHandle, scan: &CharacterScan) {
 /// What was last read of this character's damage.
 #[tauri::command]
 pub fn player_damage(state: State<DamageState>, name: String) -> Option<PlayerDamage> {
-    state.all.lock().expect("damage lock").get(&name.to_lowercase()).cloned()
+    state.get(&name)
+}
+
+/// Marks one of `name`'s buffs as on or off, and tells every window.
+pub fn set_buff(app: &AppHandle, name: &str, skill: u32, on: bool) -> Result<()> {
+    let name = name.trim();
+    if name.is_empty() {
+        return Err(Error::Invalid("The character's name isn't known yet.".into()));
+    }
+    let state = app.state::<DamageState>();
+    let mut all = state.all.lock().expect("damage lock");
+    let entry = all.entry(name.to_lowercase()).or_default();
+    entry.buffs_on.retain(|&id| id != skill);
+    if on {
+        entry.buffs_on.push(skill);
+    }
+    let damage = entry.clone();
+    state.save(&all)?;
+    drop(all);
+    let _ = app.emit(DAMAGE_EVENT, Changed { name, damage: &damage });
+    Ok(())
 }
 
 #[cfg(test)]

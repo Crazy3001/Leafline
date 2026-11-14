@@ -12,7 +12,7 @@ use serde::Serialize;
 
 use super::drops::{Drop, Dropper, MonsterDrops};
 use super::osms::{
-    Dataset, FILES, FileMeta, Height, Ingredient, ItemKind, ItemNeed, ItemRecord, MapPoint, MapRecord, Meta, MobRequirement,
+    Dataset, Effects, FILES, FileMeta, Height, Ingredient, ItemKind, ItemNeed, ItemRecord, MapPoint, MapRecord, Meta, MobRequirement,
     MonsterDetails, MonsterRecord, NpcRecord, PointKind, Portal, QuestRecord, Records, RecipeRecord, RewardItem, Side, SkillNeed,
     SkillRecord, Spawn,
 };
@@ -21,7 +21,7 @@ use super::turnins::TurnIn;
 use crate::error::{Error, Result};
 
 /// Bump when the tables change; an older cache is then dropped and downloaded again.
-const CACHE_VERSION: i32 = 14;
+const CACHE_VERSION: i32 = 15;
 
 const SCHEMA: &str = "
 CREATE TABLE source_files (
@@ -55,7 +55,8 @@ CREATE TABLE quest_mobs (quest_id INTEGER NOT NULL, mob_id INTEGER NOT NULL, cou
 CREATE TABLE quest_rewards (quest_id INTEGER NOT NULL, item_id INTEGER NOT NULL, count INTEGER NOT NULL, sure INTEGER NOT NULL);
 CREATE TABLE skills (
     id INTEGER PRIMARY KEY, name TEXT NOT NULL, job_id INTEGER NOT NULL, class_name TEXT NOT NULL,
-    job_tier TEXT NOT NULL, max_level INTEGER NOT NULL, passive INTEGER NOT NULL, description TEXT, icon_url TEXT);
+    job_tier TEXT NOT NULL, max_level INTEGER NOT NULL, passive INTEGER NOT NULL, description TEXT, icon_url TEXT,
+    buff INTEGER NOT NULL, effects TEXT NOT NULL);
 CREATE TABLE skill_needs (skill_id INTEGER NOT NULL, needs_id INTEGER NOT NULL, level INTEGER NOT NULL);
 CREATE TABLE skill_levels (skill_id INTEGER NOT NULL, level INTEGER NOT NULL, description TEXT NOT NULL, PRIMARY KEY (skill_id, level));
 CREATE TABLE items (
@@ -351,10 +352,11 @@ impl Store {
             levels.entry(skill).or_default().push(description);
         }
         let mut stmt = self.conn.prepare(
-            "SELECT id, name, job_id, class_name, job_tier, max_level, passive, description, icon_url FROM skills ORDER BY id",
+            "SELECT id, name, job_id, class_name, job_tier, max_level, passive, description, icon_url, buff, effects FROM skills ORDER BY id",
         )?;
         let skills = stmt.query_map([], |row| {
             let id: u32 = row.get(0)?;
+            let effects: String = row.get(10)?;
             Ok(SkillRecord {
                 id,
                 name: row.get(1)?,
@@ -367,6 +369,8 @@ impl Store {
                 required_skills: needs.remove(&id).unwrap_or_default(),
                 level_descriptions: levels.remove(&id).unwrap_or_default(),
                 icon_url: row.get(8)?,
+                buff: row.get(9)?,
+                effects: serde_json::from_str(&effects).unwrap_or_default(),
             })
         })?;
         Ok(skills.collect::<rusqlite::Result<_>>()?)
@@ -446,6 +450,26 @@ impl Store {
             let (map, portal) = row?;
             portals.entry(map).or_default().push(portal);
         }
+        // Portals at their places, for timing routes. NPCs and spawns are read only when a map's
+        // picture is shown (`map_points`).
+        let mut spots: HashMap<u32, Vec<MapPoint>> = HashMap::new();
+        let mut stmt = self.conn.prepare(
+            "SELECT map_id, ref_id, name, to_portal, x, y FROM map_points WHERE kind = ?1 ORDER BY rowid",
+        )?;
+        for row in stmt.query_map([PointKind::Portal as i64], |row| {
+            let point = MapPoint {
+                kind: PointKind::Portal,
+                id: row.get(1)?,
+                name: row.get(2)?,
+                to_portal: row.get(3)?,
+                x: row.get(4)?,
+                y: row.get(5)?,
+            };
+            Ok((row.get(0)?, point))
+        })? {
+            let (map, point) = row?;
+            spots.entry(map).or_default().push(point);
+        }
         let mut stmt = self
             .conn
             .prepare("SELECT id, name, street, region, is_town, return_map_id, map_mark, minimap_url, render_url, map_mark_url FROM maps ORDER BY id")?;
@@ -464,7 +488,7 @@ impl Store {
                 minimap_url: row.get(7)?,
                 render_url: row.get(8)?,
                 map_mark_url: row.get(9)?,
-                points: Vec::new(),
+                points: spots.remove(&id).unwrap_or_default(),
             })
         })?;
         Ok(maps.collect::<rusqlite::Result<_>>()?)
@@ -963,13 +987,27 @@ fn insert_quests(tx: &Transaction, quests: &[QuestRecord]) -> Result<()> {
 
 fn insert_skills(tx: &Transaction, skills: &[SkillRecord]) -> Result<()> {
     let mut skill = tx.prepare(
-        "INSERT OR REPLACE INTO skills (id, name, job_id, class_name, job_tier, max_level, passive, description, icon_url)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        "INSERT OR REPLACE INTO skills (id, name, job_id, class_name, job_tier, max_level, passive, description, icon_url, buff, effects)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
     )?;
     let mut need = tx.prepare("INSERT INTO skill_needs (skill_id, needs_id, level) VALUES (?1, ?2, ?3)")?;
     let mut level = tx.prepare("INSERT OR REPLACE INTO skill_levels (skill_id, level, description) VALUES (?1, ?2, ?3)")?;
     for s in skills {
-        skill.execute(params![s.id, s.name, s.job_id, s.class_name, s.job_tier, s.max_level, s.passive, s.description, s.icon_url])?;
+        // Only what a buff changes is worth keeping; other skills' levels are all zeros.
+        let effects = if s.effects.iter().any(Effects::any) { serde_json::to_string(&s.effects).unwrap_or_default() } else { "[]".into() };
+        skill.execute(params![
+            s.id,
+            s.name,
+            s.job_id,
+            s.class_name,
+            s.job_tier,
+            s.max_level,
+            s.passive,
+            s.description,
+            s.icon_url,
+            s.buff,
+            effects
+        ])?;
         for n in &s.required_skills {
             need.execute(params![s.id, n.skill_id, n.level])?;
         }
@@ -1097,6 +1135,9 @@ mod tests {
         );
         assert!(store.map_points(8).unwrap().is_empty());
         assert_eq!(store.map_points(7).unwrap()[0].to_portal.as_deref(), Some("west00"));
+        let loaded = store.load_maps().unwrap();
+        let kinds: Vec<_> = loaded[0].points.iter().map(|p| (p.kind, p.name.as_deref())).collect();
+        assert_eq!(kinds, [(PointKind::Portal, Some("h_east00"))], "maps load with their portals' places only");
     }
 
     #[test]

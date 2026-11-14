@@ -97,7 +97,7 @@
     const name = session?.name ?? live.analysis?.hud?.name ?? null;
     untrack(() => followDamage(name));
   });
-  const used = $derived(effective(assumptions.value, damage.value));
+  const used = $derived(effective(assumptions.value, damage.value, damage.stats));
   const measured = $derived(measuredRates(session));
   const queryKey = $derived(
     JSON.stringify([map?.name, map?.street, map?.twin, measured, travelKey(), level, used.assumptions]),
@@ -572,6 +572,12 @@
         </label>
         {#if used.skill}
           <p>Counting <Ref kind="skill" name={used.skill.name} /> at Lv {used.skill.level}: {used.skill.percent}% of your attack.</p>
+        {/if}
+        {#if used.buffed}
+          <p>
+            With your buffs on, your attack counts as {used.assumptions.attackMin}–{used.assumptions.attackMax}. Turn buffs on or
+            off in Character → Stats.
+          </p>
         {/if}
         {#if assumptions.value.skillName === "custom" || !damage.value?.skills.length}
           <label>

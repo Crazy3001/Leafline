@@ -13,7 +13,7 @@
     if (seconds < 60) return `${Math.max(10, Math.round(seconds / 10) * 10)} s`;
     return `${Math.round(seconds / 60)} min`;
   }
-  import { stepVerb as verb } from "$lib/wayfinding";
+  import { HIDDEN_PORTAL_HINT, stepVerb as verb } from "$lib/wayfinding";
 
   let { route }: { route: MapRoute } = $props();
 
@@ -36,12 +36,15 @@
             </span>
           {:else}
             <span class="verb">{verb(step)}</span>
-            {#if step.hidden}<span class="hidden" use:tip={"The portal's name marks it as hidden"}><EyeOff size={11} /></span>{/if}
+            {#if step.hidden}<span class="hidden" use:tip={"The portal's name marks it as hidden: the game draws nothing there"}
+                ><EyeOff size={11} /></span
+              >{/if}
           {/if}
           <span class="arrow">→</span>
           {#if step.to.known}<Ref kind="map" id={step.to.id} name={step.to.name} class="step-map" />{:else}<span class="map"
               >{step.to.name}</span
             >{/if}
+          {#if step.hidden && !step.travel}<span class="hidden-hint">· {HIDDEN_PORTAL_HINT}</span>{/if}
           {#if step.travel?.fare}
             <span class="fare tabular" use:tip={"Fare at level 20 and up, as players recorded it on mapleclassic.wiki"}
               >{formatNumber(step.travel.fare)} mesos</span
@@ -60,7 +63,7 @@
   {:else}
     <p class="note">
       {route.steps.length} portal{route.steps.length === 1 ? "" : "s"}{#if route.walkSeconds != null}, about {walkTime(route.walkSeconds)} on foot{/if}.
-      Portal level or quest requirements are not checked.
+      The quickest walk, counting the way across each map. Portal level or quest requirements are not checked.
     </p>
   {/if}
 {/if}
@@ -173,6 +176,11 @@
     color: var(--warn);
     align-self: center;
     display: inline-grid;
+  }
+
+  .hidden-hint {
+    color: var(--warn);
+    font-size: var(--text-xs);
   }
 
   .arrow {

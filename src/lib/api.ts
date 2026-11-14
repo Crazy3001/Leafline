@@ -53,6 +53,7 @@ import type {
   MeasuredRate,
   Assumptions,
   PlayerDamage,
+  StatsView,
   SavedSpot,
   PotionSlot,
   SessionPotion,
@@ -223,6 +224,10 @@ export interface Backend {
   /** What was last read of a character's attack range and damaging skills. */
   playerDamage(name: string): Promise<PlayerDamage | null>;
   onPlayerDamage(handler: (change: { name: string; damage: PlayerDamage }) => void): Promise<UnlistenFn>;
+  /** The character's stats as last read, their buffs, and the stats with buffs on. */
+  characterStats(name: string): Promise<StatsView>;
+  /** Marks one of the character's buffs as on or off. */
+  setBuff(name: string, skill: number, on: boolean): Promise<void>;
   /** A character's potion slots, in slot order; the shared ones until it sets its own. */
   potionSlots(character: string | null): Promise<PotionSlot[]>;
   /** Replaces a character's potion slots; a new slot has number 0. Returns them numbered. */
@@ -400,6 +405,8 @@ export interface Backend {
   updateStatus(): Promise<UpdateStatus>;
   /** Checks now; refused while the check is turned off. */
   checkForUpdate(): Promise<UpdateStatus>;
+  /** Downloads the newer release's installer, checks its SHA-256, runs it and closes Leafline. */
+  installUpdate(): Promise<void>;
   onUpdateStatus(handler: (status: UpdateStatus) => void): Promise<UnlistenFn>;
   /** The travel connections routes can use, and which file they come from. */
   travelInfo(): Promise<TravelInfo>;
@@ -484,6 +491,8 @@ const tauriBackend: Backend = {
   onSavedSpots: (handler) => listen<SavedSpot[]>("saved-spots", (e) => handler(e.payload)),
   playerDamage: (name) => invoke("player_damage", { name }),
   onPlayerDamage: (handler) => listen<{ name: string; damage: PlayerDamage }>("player-damage", (e) => handler(e.payload)),
+  characterStats: (name) => invoke("character_stats", { name }),
+  setBuff: (name, skill, on) => invoke("set_buff", { name, skill, on }),
   potionSlots: (character) => invoke("potion_slots", { character }),
   setPotionSlots: (character, slots) => invoke("set_potion_slots", { character, slots }),
   sessionPotions: (startedAt) => invoke("session_potions", { startedAt }),
@@ -593,6 +602,7 @@ const tauriBackend: Backend = {
   onSettings: (handler) => listen<DisplaySettings>("settings", (e) => handler(e.payload)),
   updateStatus: () => invoke("update_status"),
   checkForUpdate: () => invoke("check_for_update"),
+  installUpdate: () => invoke("install_update"),
   onUpdateStatus: (handler) => listen<UpdateStatus>("update", (e) => handler(e.payload)),
   showSettings: () => invoke("show_settings"),
   showSetup: () => invoke("show_setup"),
