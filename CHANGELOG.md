@@ -40,9 +40,9 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
   Skill names in Character → Skills and the Build Planner open a skill card with its picture,
   what it does, what it needs first and what each level gives.
 - **Cards you can move and pin.** Drag a card by its header. The pin button keeps it where it is,
-  so you can open more beside it and compare; the card you click comes to the top. **Pop out**
-  puts a card in a small window of its own, to place anywhere on the screen, outside the overlay
-  too. Cards always open with their sections folded. Skill names link everywhere, the Level by
+  so you can open more beside it and compare; the card you click comes to the top. In the app a
+  pinned card gets a small window of its own, to place anywhere on the screen, and dragging an
+  open card past the overlay’s edge does the same. Cards always open with their sections folded. Skill names link everywhere, the Level by
   level list included.
 - **Gear past Lv 40 and 50.** Where a job's tops and bottoms end, overalls carry on (a Bowman's
   Kismet, Tai and Linnex). A helmet for any job no longer ends the job's own hats early.
