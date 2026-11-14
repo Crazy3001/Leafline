@@ -2,7 +2,7 @@
   // The training log: every saved session with its graph, rates per map by level and party, the
   // player's records per map by level, party size and job, and progress over days. Its own window opens from the Train tab, and the desk view can show it
   // in a column (embedded). Everything here stays on this PC.
-  import { tip } from "$lib/tip.svelte";
+  import { clipped, tip } from "$lib/tip.svelte";
   import Ref from "$lib/components/Ref.svelte";
   import { Download, PenLine, Share2 } from "@lucide/svelte";
   import { onMount, untrack } from "svelte";
@@ -370,7 +370,7 @@
               <button class="srow" aria-pressed={s.id === selected?.id} onclick={() => (selectedId = s.id)}>
                 <span class="tabular muted">{shortDay(s.startedAt ?? s.savedAt)}</span>
                 <span class="what">
-                  <span class="ellipsis">{title(s)}</span>
+                  <span use:clipped class="ellipsis">{title(s)}</span>
                   {#if levelText(s)}<span class="small">{levelText(s)}</span>{/if}
                 </span>
                 <span class="tabular r">{dur(s.activeSeconds)}</span>

@@ -2,7 +2,7 @@
   // The build plan's part of the Character tab: what the plan says at the character's level. It
   // moves on with the level, and catches up with what was really spent whenever the stat and
   // skill windows are read. The level itself is shown once, in the character's header above.
-  import { tip } from "$lib/tip.svelte";
+  import { clipped, tip } from "$lib/tip.svelte";
   import Pic from "$lib/ui/Pic.svelte";
   import Ref from "$lib/components/Ref.svelte";
   import { Check, ExternalLink, Pencil, Plus, RefreshCw, Search, X } from "@lucide/svelte";
@@ -350,7 +350,7 @@
                   >
                 </span>
               {:else}
-                <span class="none">Nothing added</span>
+                <span class="none">Nothing worn</span>
               {/if}
             </div>
             {#if piece && editing?.id === piece.id}
@@ -491,7 +491,7 @@
     <section class="build" aria-label="Build plan">
       <header class="head">
         <span class="title">Build</span>
-        <span class="plan" use:tip={plan.build.name}>{plan.build.name}</span>
+        <span class="plan" use:clipped>{plan.build.name}</span>
       </header>
       {@render todo(step)}
       {#if advance}
@@ -513,7 +513,7 @@
 <section class="build full" aria-label="Build plan">
   <header class="head strip">
     <span class="title strip-title">Build</span>
-    {#if plan && step}<span class="plan" use:tip={plan.build.name}>{plan.build.name}</span>{/if}
+    {#if plan && step}<span class="plan" use:clipped>{plan.build.name}</span>{/if}
     {#if plan && step}
       <span class="tools">
         <button
@@ -665,10 +665,10 @@
               <p class="piece-line">{gives(pick, 3)}</p>
             {/if}
 
+            {#if row.next}
+            {@const next = row.next}
             <div class="line">
               <span class="label">Next</span>
-              {#if row.next}
-                {@const next = row.next}
                 <Ref kind="item" id={next.item.id} name={next.item.name} />
                 <span class="end">
                   <span
@@ -693,14 +693,12 @@
                     >
                   {/if}
                 </span>
-              {:else}
-                <span class="none">Nothing better later in this plan</span>
-              {/if}
             </div>
+            {/if}
             {#if row.next}
               <p class="piece-line">
                 {gives(row.next.item as ItemRecord, 3)}{#if row.later}<span class="sep">{" · "}</span><button class="link later" onclick={() => openPlanner()}
-                    >{row.later} more planned after it</button
+                    >{row.later} more {row.later === 1 ? "step" : "steps"} after it</button
                   >{/if}
               </p>
             {/if}

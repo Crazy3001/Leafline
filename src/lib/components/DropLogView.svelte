@@ -67,7 +67,7 @@
           <div class="mrow">
             <span class="mname"><Ref kind="mob" name={t.monster} /></span>
             <span class="tabular quiet">{t.total}</span>
-            <button class="icon" use:tip={`Open ${t.monster} on MeowDB`} aria-label="Open {t.monster} on MeowDB" onclick={() => backend.openLink(meowdbMonster(t.monster))}
+            <button class="icon" use:tip={`${t.monster} on MeowDB`} aria-label="Open {t.monster} on MeowDB" onclick={() => backend.openLink(meowdbMonster(t.monster))}
               ><ExternalLink size={12} /></button
             >
           </div>
@@ -99,7 +99,7 @@
               <td><Ref kind="mob" name={d.monster} /></td>
               <td>{#if d.map}<Ref kind="map" name={d.map} />{:else}<span class="muted">—</span>{/if}</td>
               <td class="nowrap r">
-                <button class="report" use:tip={"Opens MeowDB and copies the item's name"} onclick={() => report(d)}>
+                <button class="report" use:tip={"Copies the item's name too, to paste into MeowDB's search"} onclick={() => report(d)}>
                   {#if copiedId === d.id}<Check size={12} />Name copied{:else}<ExternalLink size={12} />Report on MeowDB{/if}
                 </button>
                 <button class="icon" use:tip={"Delete this drop"} aria-label="Delete this drop" onclick={() => remove(d.id)}><Trash2 size={12} /></button>

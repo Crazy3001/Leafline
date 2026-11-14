@@ -10,7 +10,7 @@
   // monster, held to what the map can respawn at an assumed respawn time (see training.rs). No
   // damage formulas are modelled. "Played" lists every map the player has data for, whatever its
   // level, by their own rate. "Saved" lists the maps the player bookmarked, whatever their level.
-  import { tip } from "$lib/tip.svelte";
+  import { clipped, tip } from "$lib/tip.svelte";
   import Ref from "$lib/components/Ref.svelte";
   import GoButton from "$lib/components/GoButton.svelte";
   import { mapPlace } from "$lib/destination.svelte";
@@ -460,7 +460,7 @@
           <div class="line">
             <span class="row static">
               <span class="rank"></span>
-              <span class="names"><span class="name">{spot.name}</span><span class="meta">Not in the map data any more</span></span>
+              <span use:clipped class="names"><span class="name">{spot.name}</span><span class="meta">Not in the map data any more</span></span>
             </span>
             <SaveSpot mapId={spot.mapId} name={spot.name} />
           </div>

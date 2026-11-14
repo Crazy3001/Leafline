@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { clipped } from "$lib/tip.svelte";
   import type { Bar } from "./types";
   // Horizontal bars from one baseline, value at each tip: maps by rate, levels by time. Rows can
   // be picked.
@@ -23,7 +24,7 @@
   {#each rows as row (row.id)}
     {#snippet body()}
       <span class="names">
-        <span class="name">{row.label}</span>
+        <span use:clipped class="name">{row.label}</span>
         {#if row.sub}<span class="sub tabular">{row.sub}</span>{/if}
       </span>
       <span class="track">

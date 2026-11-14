@@ -1,6 +1,6 @@
 <script lang="ts">
   // The maps something can be found on, the best first, and the route to the one picked.
-  import { tip } from "$lib/tip.svelte";
+  import { clipped, tip } from "$lib/tip.svelte";
   import Ref from "$lib/components/Ref.svelte";
   import { backend } from "$lib/api";
   import RouteSteps from "./RouteSteps.svelte";
@@ -69,7 +69,7 @@
     {#each shown as map (map.map.id)}
       <li>
         <button class="ground" class:selected={map.map.id === target} aria-pressed={map.map.id === target} onclick={() => (picked = map.map.id)}>
-          <span class="name">{map.map.name}</span>
+          <span use:clipped class="name">{map.map.name}</span>
           {#if map.count != null}
             <span class="count tabular">{map.count}<small>/{map.mapTotal}</small></span>
           {/if}

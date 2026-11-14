@@ -258,7 +258,7 @@
       <div class="notice {notice.tone}" role="status">
         <span>{notice.text}</span>
         {#if notice.report}
-          <button class="report" use:tip={"Opens the bug form on GitHub"} onclick={() => backend.openLink(reportUrl())}>
+          <button class="report" use:tip={"GitHub's bug form, in your browser"} onclick={() => backend.openLink(reportUrl())}>
             Report it
           </button>
         {/if}

@@ -1,7 +1,7 @@
 <script lang="ts">
   // Countdown timers the player starts themselves, for anything they want to keep time on.
   // A finished timer just reads "Done": no sound, popup or flashing asks the player to act.
-  import { tip } from "$lib/tip.svelte";
+  import { clipped, tip } from "$lib/tip.svelte";
   import { Plus, RotateCcw, Timer, X } from "@lucide/svelte";
   import { onMount } from "svelte";
 
@@ -100,7 +100,7 @@
           {@const remaining = left(timer)}
           <li class:done={remaining === 0}>
             <div class="row">
-              <span class="name">{timer.name}</span>
+              <span use:clipped class="name">{timer.name}</span>
               <span class="time tabular">{remaining === 0 ? "Done" : clock(remaining)}</span>
               <button
                 class="icon"

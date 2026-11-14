@@ -1,7 +1,7 @@
 <script lang="ts">
   // The Quests tab: what the Quest Helper is tracking, and a book of every quest in the map data.
   // The book needs nothing from the game, so it works with live reading off.
-  import { tip } from "$lib/tip.svelte";
+  import { clipped, tip } from "$lib/tip.svelte";
   import { FilterBoxState } from "$lib/filterbox.svelte";
   import { ArrowLeft, LoaderCircle, Search, SlidersHorizontal, X } from "@lucide/svelte";
   import { untrack } from "svelte";
@@ -117,7 +117,7 @@
       <li>
         <button onclick={() => (questView.id = row.id)}>
           <span class="row-name">{row.name}</span>
-          <span class="row-line">{line(row)}{#if row.exp}{line(row) ? " · " : ""}<span class="exp tabular">{formatCompact(row.exp)} EXP</span>{/if}</span>
+          <span use:clipped class="row-line">{line(row)}{#if row.exp}{line(row) ? " · " : ""}<span class="exp tabular">{formatCompact(row.exp)} EXP</span>{/if}</span>
         </button>
       </li>
     {/each}

@@ -1,6 +1,7 @@
 <script lang="ts">
   // The Items half of the Lookup tab: the last item check, and a search of every item in the map
   // data. Search needs nothing from the game, so it works with live reading off.
+  import { clipped } from "$lib/tip.svelte";
   import { ArrowLeft, LoaderCircle } from "@lucide/svelte";
   import { FilterBoxState } from "$lib/filterbox.svelte";
   import { untrack } from "svelte";
@@ -232,23 +233,25 @@
         </label>
         <div class="levels">
           <span>Level</span>
-          <input class="tabular" type="number" min="0" aria-label="Lowest level" value={query.levelMin ?? ""} oninput={(e) => setQuery({ levelMin: number(e.currentTarget.value) })} />
+          <input class="tabular" type="number" min="0" placeholder="any" aria-label="Lowest level" value={query.levelMin ?? ""} oninput={(e) => setQuery({ levelMin: number(e.currentTarget.value) })} />
           <span class="to">to</span>
-          <input class="tabular" type="number" min="0" aria-label="Highest level" value={query.levelMax ?? ""} oninput={(e) => setQuery({ levelMax: number(e.currentTarget.value) })} />
+          <input class="tabular" type="number" min="0" placeholder="any" aria-label="Highest level" value={query.levelMax ?? ""} oninput={(e) => setQuery({ levelMax: number(e.currentTarget.value) })} />
         </div>
-        <label>
-          <span>Sort</span>
-          <select value={query.sort ?? ""} onchange={(e) => setQuery({ sort: e.currentTarget.value || null })}>
-            <option value="">Level</option>
-            <option value="name">Name</option>
-            {#each SORTS as label (label)}<option value={label}>Highest {label}</option>{/each}
-          </select>
-        </label>
         <label class="check">
           <input type="checkbox" checked={query.mine} onchange={(e) => setQuery({ mine: e.currentTarget.checked })} />
           <span>Only what my build can wear now</span>
         </label>
       {/if}
+      <label>
+        <span>Sort</span>
+        <select value={query.sort ?? ""} onchange={(e) => setQuery({ sort: e.currentTarget.value || null })}>
+          <option value="">{equipment ? "Level" : "Best match"}</option>
+          <option value="name">Name</option>
+          {#if equipment}
+            {#each SORTS as label (label)}<option value={label}>Highest {label}</option>{/each}
+          {/if}
+        </select>
+      </label>
     </FilterBox>
   {/if}
   </div>
@@ -277,7 +280,7 @@
                 <span class="row-name"
                   ><Pic kind="item" id={item.id} size={18} class="row-pic" />{item.name}{#if gender(item)}<small>{gender(item)}</small>{/if}</span
                 >
-                <span class="row-line">{line(item)}</span>
+                <span use:clipped class="row-line">{line(item)}</span>
               </button>
             </li>
           {/each}

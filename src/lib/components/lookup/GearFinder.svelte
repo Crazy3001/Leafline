@@ -2,6 +2,7 @@
   // Equipment for one character, slot by slot, the best first: what their job can use at their
   // level, going by their build where they have one. Anything it assumes can be changed here.
   import LookupRow from "./LookupRow.svelte";
+  import { tip } from "$lib/tip.svelte";
   import Chips from "./Chips.svelte";
   import Section from "../map/Section.svelte";
   import { backend } from "$lib/api";
@@ -27,8 +28,10 @@
     onslot: (slot: string | null) => void;
   } = $props();
 
-  /** Levels ahead the player can look with one click. */
-  const AHEAD = [0, 5, 10, 20];
+  /** Levels ahead the player can look with one click, and every level at once. */
+  const AHEAD: (number | "all")[] = [0, 5, 10, 20, "all"];
+  /** "All levels" asks for what the job can wear at the top level, so nothing is held back by level. */
+  const TOP_LEVEL = 200;
   /** Items each slot lists before "Show all". */
   const SHOWN = 3;
 
@@ -39,7 +42,8 @@
 
   const jobs = $derived(catalog?.jobs ?? []);
   const baseLevel = $derived(gearView.level ?? level);
-  const asked = $derived(baseLevel == null ? null : baseLevel + gearView.ahead);
+  const allLevels = $derived(gearView.ahead === "all");
+  const asked = $derived(baseLevel == null ? null : gearView.ahead === "all" ? TOP_LEVEL : baseLevel + gearView.ahead);
   const key = $derived(JSON.stringify([asked, gearView.job, gearView.gender, character, job, buildState.version, display.buildRules]));
   const changed = $derived(gearView.level != null || gearView.job != null || gearView.ahead !== 0);
   const shownSlots = $derived((found?.gear.slots ?? []).filter((s) => !slot || s.slot === slot));
@@ -106,18 +110,20 @@
   {#if baseLevel != null}
     <div role="radiogroup" aria-label="Levels to look ahead">
       {#each AHEAD as levels (levels)}
-        <button role="radio" aria-checked={gearView.ahead === levels} onclick={() => (gearView.ahead = levels)}>{levels ? `+${levels}` : "Now"}</button>
+        <button role="radio" aria-checked={gearView.ahead === levels} onclick={() => (gearView.ahead = levels)}
+          >{levels === "all" ? "All levels" : levels ? `+${levels}` : "Now"}</button
+        >
       {/each}
     </div>
   {/if}
   {#if changed}<button class="plain" onclick={reset}>Reset</button>{/if}
-  <button class="plain everything" onclick={() => (gearView.forMe = false)}>Everything</button>
+  <button class="plain everything" use:tip={"Every piece of equipment, for any job, in the item search"} onclick={() => (gearView.forMe = false)}>Any job</button>
 </div>
 
 <Chips label="Slot" options={offered} value={slot} onselect={onslot} />
 
 {#if found}
-  {#if beginner && found.job && jobName}
+  {#if beginner && found.job && jobName && !allLevels}
     <p class="note">Until Lv {found.firstJobLevel} a character wears only gear for anyone. Look ahead to see {jobName} gear.</p>
   {/if}
 
@@ -146,10 +152,11 @@
       </Section>
     {/if}
   {:else}
-    <p class="note">Nothing here for Lv {found.level}{slot ? ` in this slot` : ""}.</p>
+    <p class="note">Nothing here{allLevels ? "" : ` for Lv ${found.level}`}{slot ? ` in this slot` : ""}.</p>
   {/each}
 
   <p class="how">
+    {#if allLevels}Every level this job can reach, so the strongest come first; each row says the level it needs.{/if}
     Best first by {ranked}. {#if found.build}Uses your stats from {found.build}.{:else}Goes by level and job only: stat requirements aren't checked without a build.{/if}
     Staff items are left out. Nobody has checked these in game, and it doesn't know prices.
   </p>

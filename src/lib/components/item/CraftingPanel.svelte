@@ -4,6 +4,7 @@
   import { untrack } from "svelte";
 
   import MapDataPanel from "../map/MapDataPanel.svelte";
+  import SearchBar from "../lookup/SearchBar.svelte";
   import RecipeRow from "./RecipeRow.svelte";
   import { backend } from "$lib/api";
   import { mapData, watchMapData } from "$lib/mapdata.svelte";
@@ -67,8 +68,21 @@
 {#if !ready}
   {#if mapData.status}<MapDataPanel compact />{/if}
 {:else}
-  <div class="filters" class:pinned>
-    <input class="search" type="search" placeholder="Item or ingredient" aria-label="Search recipes" bind:value={search} />
+  <div class="controls" class:pinned>
+  <SearchBar
+    value={search}
+    placeholder="Item or ingredient"
+    label="Search recipes"
+    filterable={false}
+    clearable={search !== "" || discipline !== "" || maxLevel != null}
+    oninput={(text) => (search = text)}
+    onclear={() => {
+      search = "";
+      maxLevel = null;
+      pick("");
+    }}
+  />
+  <div class="filters">
     <select aria-label="Discipline" value={discipline} onchange={(e) => pick(e.currentTarget.value)}>
       <option value="">Every discipline</option>
       {#each page?.disciplines ?? [] as [name, count] (name)}<option value={name}>{name} ({count})</option>{/each}
@@ -85,7 +99,9 @@
       </select>
     </label>
   </div>
+  </div>
 
+  <div class="list" class:pinned>
   {#if !page}
     <p class="quiet">Loading recipes…</p>
   {:else if !page.disciplines.length}
@@ -101,9 +117,24 @@
       </section>
     {/each}
   {/if}
+  </div>
 {/if}
 
 <style>
+  /* Padded like the other halves of the Lookup tab; a pinned window pads its body. */
+  .controls {
+    padding: 8px 12px 0;
+  }
+
+  .list {
+    padding: 0 12px 10px;
+  }
+
+  .controls.pinned,
+  .list.pinned {
+    padding: 0;
+  }
+
   .filters {
     display: flex;
     flex-wrap: wrap;
@@ -111,12 +142,11 @@
     margin-bottom: var(--space-2);
   }
 
-  .search {
+  .filters select:first-child {
     flex: 1 1 140px;
     min-width: 0;
   }
 
-  input,
   select {
     height: var(--control-h);
     padding: 0 6px;
@@ -131,7 +161,9 @@
   .level {
     display: inline-flex;
     align-items: center;
+    flex: none;
     gap: 4px;
+    white-space: nowrap;
     font-size: var(--text-sm);
     color: var(--muted);
   }

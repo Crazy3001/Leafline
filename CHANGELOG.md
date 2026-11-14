@@ -22,6 +22,19 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
 - **One rule for links.** Coloured text opens a card; a row or box moves you within the tab
   you're in, and shows a chevron. A card's **Full view** is the way into a tab. Places you headed
   for lately are Go buttons under the search.
+- **Tooltips.** Resting the mouse on a mark on the map picture says what it is: a portal's
+  destination (and whether it is hidden or a teleport within the map), an NPC with its picture,
+  or a monster with its level and how many spawn points it has there. A drop in **Drops → By
+  item** shows the item's picture, type, level and which monsters drop it. Small pictures,
+  icon buttons, short numbers and names cut short in a narrow window explain themselves the
+  same way, all in one style.
+- **Skill pictures.** Skills show their icons in Character → Skills and the Build Planner.
+- **Gear that climbs every tier.** Each gear slot now has one path: the best piece you can wear
+  now, then one piece for every level tier the data has for your job up to the plan's end, each
+  better than the last. A goal you added wins its tier; goals you've outgrown show as such.
+  The Build Planner's Gear tab, its Level by level list and Character → Gear's Next all follow it.
+- **All levels** in Lookup → Items → Equip, a sort for every kind of item, and "any" in empty
+  level boxes. Filter boxes stay open once opened, through Clear; Monsters starts with them open.
 - **See the map.** Map details (the Map tab, Lookup → Maps and a map's card) have a **Map**
   section with the map's picture, its portals (hidden ones marked), NPCs and spawn points drawn
   where they stand. Click a mark for its card; point at a monster in the list to light up where

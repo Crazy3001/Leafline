@@ -36,12 +36,12 @@ function storedGender() {
 }
 
 /** Who the Equip list is for. Nothing here is set until the player changes it. */
-export const gearView = $state<{ forMe: boolean; level: number | null; job: number | null; gender: string | null; ahead: number }>({
+export const gearView = $state<{ forMe: boolean; level: number | null; job: number | null; gender: string | null; ahead: number | "all" }>({
   forMe: true,
   level: null,
   job: null,
   gender: storedGender(),
-  /** Levels past the character's own to look at. */
+  /** Levels past the character's own to look at, or `all` for gear of any level. */
   ahead: 0,
 });
 

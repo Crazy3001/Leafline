@@ -91,6 +91,12 @@
 
   const hovered = $derived(hover == null ? null : points[hover]);
   const tipLeft = $derived(hovered ? Math.min(Math.max(0, px(hovered.x) + 8), width - 150) : 0);
+
+  /** A band's name cut to its width, so neighbouring names never run into each other. */
+  function fitLabel(text: string, room: number) {
+    const fits = Math.floor(room / 6);
+    return text.length <= fits ? text : `${text.slice(0, Math.max(fits - 1, 1)).trimEnd()}…`;
+  }
 </script>
 
 <div class="chart" bind:clientWidth={width} style:height="{height}px">
@@ -100,7 +106,7 @@
       {@const w = px(band.end) - x}
       {#if i % 2 === 1}<rect {x} y={TOP} width={w} height={plotH} class="band" />{/if}
       {#if i > 0}<line x1={x} x2={x} y1={TOP} y2={TOP + plotH} class="divider" />{/if}
-      {#if w > 56}<text x={x + 3} y={TOP - 5} class="band-label">{band.label}</text>{/if}
+      {#if w > 56}<text x={x + 3} y={TOP - 5} class="band-label">{fitLabel(band.label, w - 8)}</text>{/if}
     {/each}
     <line x1={LEFT} x2={LEFT + plotW} y1={TOP + plotH} y2={TOP + plotH} class="axis" />
     {#each yTicks as tick (tick)}

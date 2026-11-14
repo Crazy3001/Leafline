@@ -147,9 +147,9 @@
         </label>
         <div class="levels">
           <span>Monsters</span>
-          <input class="tabular" type="number" min="0" aria-label="Lowest monster level" value={query.levelMin ?? ""} oninput={(e) => setQuery({ levelMin: number(e.currentTarget.value) })} />
+          <input class="tabular" type="number" min="0" placeholder="any" aria-label="Lowest monster level" value={query.levelMin ?? ""} oninput={(e) => setQuery({ levelMin: number(e.currentTarget.value) })} />
           <span class="to">to</span>
-          <input class="tabular" type="number" min="0" aria-label="Highest monster level" value={query.levelMax ?? ""} oninput={(e) => setQuery({ levelMax: number(e.currentTarget.value) })} />
+          <input class="tabular" type="number" min="0" placeholder="any" aria-label="Highest monster level" value={query.levelMax ?? ""} oninput={(e) => setQuery({ levelMax: number(e.currentTarget.value) })} />
         </div>
         <label>
           <span>Sort</span>

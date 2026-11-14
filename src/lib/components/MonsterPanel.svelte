@@ -1,7 +1,7 @@
 <script lang="ts">
   // The Monsters half of the Lookup tab: what is on this map and near the character's level, and
   // a search of every monster in the map data by name, drop or map.
-  import { tip } from "$lib/tip.svelte";
+  import { clipped, tip } from "$lib/tip.svelte";
   import { FilterBoxState } from "$lib/filterbox.svelte";
   import { ArrowLeft, LoaderCircle, Skull } from "@lucide/svelte";
   import { untrack } from "svelte";
@@ -140,7 +140,7 @@
 {#snippet name(mob: { id: number; name: string; boss: boolean; undead: boolean })}
   <span class="name">
     <Pic kind="mob" id={mob.id} size={20} />
-    <span class="label">{monsterLabel(mob.name)}</span>
+    <span use:clipped class="label">{monsterLabel(mob.name)}</span>
     {#if mob.boss}<span class="boss" use:tip={"Boss"}><Skull size={11} /></span>{/if}
     {#if mob.undead}<span class="tag">undead</span>{/if}
   </span>
@@ -235,9 +235,9 @@
         </label>
         <div class="levels">
           <span>Level</span>
-          <input class="tabular" type="number" min="0" aria-label="Lowest level" value={query.levelMin ?? ""} oninput={(e) => setQuery({ levelMin: number(e.currentTarget.value) })} />
+          <input class="tabular" type="number" min="0" placeholder="any" aria-label="Lowest level" value={query.levelMin ?? ""} oninput={(e) => setQuery({ levelMin: number(e.currentTarget.value) })} />
           <span class="to">to</span>
-          <input class="tabular" type="number" min="0" aria-label="Highest level" value={query.levelMax ?? ""} oninput={(e) => setQuery({ levelMax: number(e.currentTarget.value) })} />
+          <input class="tabular" type="number" min="0" placeholder="any" aria-label="Highest level" value={query.levelMax ?? ""} oninput={(e) => setQuery({ levelMax: number(e.currentTarget.value) })} />
         </div>
         <label>
           <span>Sort</span>
