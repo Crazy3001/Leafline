@@ -120,6 +120,10 @@ impl Default for TrackerConfig {
 
 /// Active seconds behind the "last 5 minutes" rates.
 const RECENT_SECONDS: f64 = 300.0;
+/// Gains of EXP before a first rate shows, ahead of `min_rate_seconds`: two kills say something.
+const FIRST_RATE_GAINS: u32 = 2;
+/// Until this much active time, the session's rate is a first estimate and says so.
+const MEASURING_SECONDS: f64 = 60.0;
 /// Active seconds between points on the trend line, and how many it keeps.
 const TREND_STEP: f64 = 15.0;
 const TREND_POINTS: usize = 60;
@@ -201,6 +205,8 @@ pub struct SessionSummary {
     pub exp_gained: i64,
     pub exp_per_hour: Option<f64>,
     pub percent_per_hour: Option<f64>,
+    /// The rates are a first estimate from the first kills, under a minute of play.
+    pub measuring: bool,
     pub seconds_to_level: Option<f64>,
     /// Rates over the last five minutes of active time.
     pub recent_exp_per_hour: Option<f64>,
@@ -464,6 +470,9 @@ pub struct SessionTracker {
     clock: f64,
     /// Seconds since EXP last went up.
     idle_for: f64,
+    /// Readings that showed EXP going up: kills, roughly, since one reading can hold several.
+    #[serde(default)]
+    gains: u32,
     exp_gained: i64,
     level_ups: u32,
     deaths: u32,
@@ -778,6 +787,9 @@ impl SessionTracker {
         let dt = (next.at - last.at).max(0.0);
         let moved = matches!((&last.map, &next.map), (Some(a), Some(b)) if a != b);
         let counted = self.run_clock(gain.map(|g| g > 0), dt, moved);
+        if gain.is_some_and(|g| g > 0) {
+            self.gains += 1;
+        }
         self.exp_gained += gain.unwrap_or(0);
         self.percent_gained += percent;
         self.level_ups += next.level - last.level;
@@ -907,6 +919,9 @@ impl SessionTracker {
         let dt = (next.at - last.at).max(0.0);
         let moved = matches!((&last.map, &next.map), (Some(a), Some(b)) if a != b);
         let counted = self.run_clock(Some(gain > 0.0), dt, moved);
+        if gain > 0.0 {
+            self.gains += 1;
+        }
         self.percent_gained += gain;
         self.level_ups += next.level.saturating_sub(last.level);
         if next.level > last.level && self.level_known {
@@ -1235,12 +1250,16 @@ impl SessionTracker {
             (seconds >= self.config.min_rate_seconds).then(|| amount as f64 * 3600.0 / seconds)
         };
         let percent_only = self.percent_point.is_some();
-        let exp_per_hour = rate(self.exp_gained, self.clock).filter(|_| !percent_only);
+        // The session's own rate starts at the second gain, as a first estimate, rather than
+        // waiting for `min_rate_seconds`; per-map rates still wait.
+        let started = self.clock >= self.config.min_rate_seconds || (self.gains >= FIRST_RATE_GAINS && self.clock > 0.0);
+        let exp_per_hour =
+            started.then(|| self.exp_gained as f64 * 3600.0 / self.clock).filter(|_| !percent_only);
         let exp_needed = self.exp.as_ref().and_then(|e| self.requirement(e.level)).and_then(Requirement::estimate);
         let percent = self.percent_point.as_ref().map(|p| p.percent).or(self.exp.as_ref().map(|e| e.exp.percent));
         let percent_per_hour =
             exp_per_hour.zip(exp_needed).map(|(per_hour, needed)| per_hour * 100.0 / needed as f64).or_else(|| {
-                (self.clock >= self.config.min_rate_seconds).then(|| self.percent_gained * 3600.0 / self.clock)
+                started.then(|| self.percent_gained * 3600.0 / self.clock)
             });
         let seconds_to_level = match (exp_per_hour, exp_needed, &self.exp) {
             (Some(per_hour), Some(needed), Some(last)) if per_hour > 0.0 && !percent_only => {
@@ -1291,6 +1310,7 @@ impl SessionTracker {
             exp_gained: self.exp_gained,
             exp_per_hour,
             percent_per_hour,
+            measuring: (exp_per_hour.is_some() || percent_per_hour.is_some()) && self.clock < MEASURING_SECONDS,
             seconds_to_level,
             recent_exp_per_hour: self.recent_rate(|m| m.exp as f64).filter(|_| !percent_only),
             recent_percent_per_hour: self.recent_rate(|m| m.percent),
@@ -1446,6 +1466,24 @@ mod tests {
         assert_eq!(summary.deaths, 1);
         assert_eq!(summary.exp_lost, 5_000);
         assert_eq!(summary.exp_gained, 20_000);
+    }
+
+    #[test]
+    fn a_first_rate_shows_at_the_second_kill_and_says_it_is_still_measuring() {
+        let one = track(&[sample(0.0, 30, 10_000, 10.0), sample(2.0, 30, 10_000, 10.0), sample(6.0, 30, 10_100, 10.1)]);
+        assert_eq!(one.exp_per_hour, None, "one kill says too little");
+        let two = track(&[
+            sample(0.0, 30, 10_000, 10.0),
+            sample(2.0, 30, 10_000, 10.0),
+            sample(6.0, 30, 10_100, 10.1),
+            sample(10.0, 30, 10_200, 10.2),
+        ]);
+        assert!(two.active_seconds > 0.0 && two.active_seconds < 30.0);
+        assert!(close(two.exp_per_hour, 200.0 * 3600.0 / two.active_seconds, 1.0), "{:?}", two.exp_per_hour);
+        assert!(two.measuring && two.seconds_to_level.is_some());
+        let mut samples = vec![sample(0.0, 30, 10_000, 10.0)];
+        samples.extend((1..=40u32).map(|i| sample(f64::from(i) * 2.0, 30, 10_000 + u64::from(i) * 50, 10.0 + i as f32 * 0.05)));
+        assert!(!track(&samples).measuring, "past a minute it is the session's rate");
     }
 
     #[test]

@@ -10,7 +10,7 @@
   import Pic from "$lib/ui/Pic.svelte";
   import Logo from "$lib/components/Logo.svelte";
   import NextStep from "$lib/components/NextStep.svelte";
-  import { formatCompact, formatDuration, objectiveProgress } from "$lib/format";
+  import { formatClockIn, formatCompact, formatDuration, objectiveProgress } from "$lib/format";
   import { live } from "$lib/readings.svelte";
   import { display, keyHint } from "$lib/settings.svelte";
   import { mesosCoverage } from "$lib/training";
@@ -29,6 +29,9 @@
   );
   const percentOnly = $derived(session?.percentOnly ?? false);
   const coverage = $derived(session ? mesosCoverage(session) : null);
+
+  /** The clock time the level comes at this pace, for the To level tile's tooltip. */
+  const levelAt = $derived(session?.secondsToLevel != null && !session.paused ? formatClockIn(session.secondsToLevel) : "");
 
   const rate = $derived.by(() => {
     if (!session) return null;
@@ -92,7 +95,10 @@
       {#if rate}
         <span class="value num" data-tauri-drag-region>{rate.value}</span>
         <span class="unit" data-tauri-drag-region>{rate.unit}</span>
-        {#if session?.held || session?.paused}<span class="paused" data-tauri-drag-region>Paused</span>{/if}
+        {#if session?.held || session?.paused}<span class="paused" data-tauri-drag-region>Paused</span>{:else if session?.measuring}<span
+            class="paused"
+            data-tauri-drag-region>Measuring</span
+          >{/if}
       {:else}
         <span class="unit" data-tauri-drag-region>{session && session.activeSeconds > 0 ? "Measuring…" : "Starts with your first EXP"}</span>
       {/if}
@@ -132,7 +138,9 @@
     </span>
     <span class="tile" data-tauri-drag-region>
       <span class="label" data-tauri-drag-region>To level</span>
-      <span class="tile-value num" data-tauri-drag-region>{formatDuration(session?.secondsToLevel)}</span>
+      <span class="tile-value num" data-tauri-drag-region use:tip={levelAt ? `About ${levelAt} at this pace` : undefined}
+        >{formatDuration(session?.secondsToLevel)}</span
+      >
     </span>
   </div>
 
