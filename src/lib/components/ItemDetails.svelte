@@ -1,7 +1,7 @@
 <script lang="ts">
   // What the data says about an item, under its card: what it does, where to get it, and the
   // links to the build and to scrolls. An item read from a tooltip is matched by name first.
-  import { Check, LoaderCircle, Plus, ScrollText } from "@lucide/svelte";
+  import { Check, LoaderCircle, Plus, ScrollText, Star } from "@lucide/svelte";
   import { untrack } from "svelte";
 
   import ItemCraftingView from "./item/ItemCrafting.svelte";
@@ -13,6 +13,7 @@
   import { blankQuery, itemView, statRows, type CheckedStat } from "$lib/items.svelte";
   import { mapData } from "$lib/mapdata.svelte";
   import { live } from "$lib/readings.svelte";
+  import { isTracked, track, untrack as stopTracking, watchTracked } from "$lib/tracked.svelte";
   import type { GearPiece, ItemRecord, ItemTooltip, ItemWhere, MapReading } from "$lib/types";
 
   let {
@@ -32,6 +33,7 @@
   } = $props();
 
   watchBuilds();
+  watchTracked();
 
   let matched = $state<ItemRecord | null>(null);
   let found = $state<ItemWhere | null>(null);
@@ -180,8 +182,14 @@
     {#if tags.length}<p class="tags">{tags.join(" · ")}</p>{/if}
   {/if}
 
-  {#if shown.kind === "equip"}
-    <div class="actions">
+  <div class="actions">
+    <button
+      class:on={isTracked(shown.id)}
+      onclick={() => (isTracked(shown.id) ? stopTracking(shown.id) : track(shown.id, shown.name))}
+    >
+      <Star size={12} />{isTracked(shown.id) ? "Tracking" : "Track it"}
+    </button>
+    {#if shown.kind === "equip"}
       {#if piece && pieces != null}
         <!-- A copy read from the game may be the player's own: put it in its slot as it is, scrolls and all. -->
         <button
@@ -197,9 +205,9 @@
         </button>
       {/if}
       <button onclick={() => scrollsFor(shown)}><ScrollText size={12} />Scrolls for it</button>
-    </div>
-    {#if pieceError}<p class="piece-error">{pieceError}</p>{/if}
-  {/if}
+    {/if}
+  </div>
+  {#if pieceError}<p class="piece-error">{pieceError}</p>{/if}
 
   <Section title="Where to get it">
     {#if found}

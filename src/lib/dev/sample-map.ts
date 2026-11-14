@@ -324,7 +324,8 @@ export function sampleGuide(quests: QuestQuery[], from: number | null, hasDrops:
             }
           : null,
       objectives: q.objectives.map((target): ObjectiveGuide => {
-        if (!ITEMISH.test(target)) return { target, kind: "monster", item: null, lookedUp: false, hunts: [hunt(11, from, null)] };
+        if (!ITEMISH.test(target))
+          return { target, kind: "monster", item: null, lookedUp: false, hunts: [hunt(11, from, null)], shops: [] };
         const logged = hasDrops && !UNLOGGED.test(target);
         return {
           target,
@@ -332,6 +333,10 @@ export function sampleGuide(quests: QuestQuery[], from: number | null, hasDrops:
           item: logged ? target : null,
           lookedUp: hasDrops,
           hunts: logged ? [hunt(12, from, 47.5), hunt(11, from, 6.2)] : [],
+          // A made-up shop, so the "buy it instead" line shows in the browser preview.
+          shops: logged
+            ? [{ npc: "Innkeeper Bo", npcId: 51, role: "Grocer", map: ref(5), mapName: "Mossbank Inn", hops: from == null ? null : 2, price: 12, needs: null, seen: "2026-11-10" }]
+            : [],
         };
       }),
     })),

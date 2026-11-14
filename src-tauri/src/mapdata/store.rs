@@ -450,6 +450,26 @@ impl Store {
             let (map, portal) = row?;
             portals.entry(map).or_default().push(portal);
         }
+        // Portals at their places, for timing routes. NPCs and spawns are read only when a map's
+        // picture is shown (`map_points`).
+        let mut spots: HashMap<u32, Vec<MapPoint>> = HashMap::new();
+        let mut stmt = self.conn.prepare(
+            "SELECT map_id, ref_id, name, to_portal, x, y FROM map_points WHERE kind = ?1 ORDER BY rowid",
+        )?;
+        for row in stmt.query_map([PointKind::Portal as i64], |row| {
+            let point = MapPoint {
+                kind: PointKind::Portal,
+                id: row.get(1)?,
+                name: row.get(2)?,
+                to_portal: row.get(3)?,
+                x: row.get(4)?,
+                y: row.get(5)?,
+            };
+            Ok((row.get(0)?, point))
+        })? {
+            let (map, point) = row?;
+            spots.entry(map).or_default().push(point);
+        }
         let mut stmt = self
             .conn
             .prepare("SELECT id, name, street, region, is_town, return_map_id, map_mark, minimap_url, render_url, map_mark_url FROM maps ORDER BY id")?;
@@ -468,7 +488,7 @@ impl Store {
                 minimap_url: row.get(7)?,
                 render_url: row.get(8)?,
                 map_mark_url: row.get(9)?,
-                points: Vec::new(),
+                points: spots.remove(&id).unwrap_or_default(),
             })
         })?;
         Ok(maps.collect::<rusqlite::Result<_>>()?)
@@ -1117,6 +1137,9 @@ mod tests {
         );
         assert!(store.map_points(8).unwrap().is_empty());
         assert_eq!(store.map_points(7).unwrap()[0].to_portal.as_deref(), Some("west00"));
+        let loaded = store.load_maps().unwrap();
+        let kinds: Vec<_> = loaded[0].points.iter().map(|p| (p.kind, p.name.as_deref())).collect();
+        assert_eq!(kinds, [(PointKind::Portal, Some("h_east00"))], "maps load with their portals' places only");
     }
 
     #[test]

@@ -223,7 +223,7 @@
                 </span>
                 {#if done}<span class="count" aria-label="Done"><Check size={13} /></span>{/if}
               </div>
-              {#if hint && !done && !expanded}<ObjectiveHint guide={hint} from={guide?.from ?? null} />{/if}
+              {#if hint && !done && !expanded}<ObjectiveHint guide={hint} from={guide?.from ?? null} left={objective.required - objective.current} />{/if}
               {#if eta}
                 <p class="eta" use:tip={eta.title}>
                   <Hourglass size={10} />

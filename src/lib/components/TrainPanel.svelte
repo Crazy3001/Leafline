@@ -15,7 +15,7 @@
   import SpotList, { SPOTS_ID } from "./SpotList.svelte";
   import TimersCard from "./TimersCard.svelte";
   import { openTrainingLog } from "$lib/nav.svelte";
-  import { formatCompact, formatDuration, formatNumber, splitMapLabel } from "$lib/format";
+  import { formatClockIn, formatCompact, formatDuration, formatNumber, splitMapLabel } from "$lib/format";
   import { characters } from "$lib/characters.svelte";
   import { history, watchHistory } from "$lib/history.svelte";
   import { live } from "$lib/readings.svelte";
@@ -77,6 +77,8 @@
       return { label: "Level % per hour, this session", value: session.percentPerHour != null ? `${session.percentPerHour.toFixed(1)}%` : "—" };
     return { label: "EXP per hour, this session", value: formatCompact(session.expPerHour) };
   });
+  /** The clock time the level comes at this pace. Worked out again with each reading. */
+  const levelAt = $derived(session?.secondsToLevel != null && !session.paused ? formatClockIn(session.secondsToLevel) : "");
   /** The time to level, with its range and breaks, as one line and a fuller tooltip. */
   const toLevel = $derived.by(() => {
     const s = session;
@@ -92,7 +94,8 @@
       range ? `Four times in five it should take ${range} of play.` : null,
       breaks ? `Counting breaks the way this session has had them, ${breaks}.` : null,
     ];
-    return { line: [`${formatDuration(s.secondsToLevel)} to level here`, range ? `(${range})` : null].filter(Boolean).join(" "), breaks, tip: why.filter(Boolean).join(" ") };
+    const line = [`${formatDuration(s.secondsToLevel)} to level here`, range ? `(${range})` : null].filter(Boolean).join(" ");
+    return { line: levelAt ? `${line}, about ${levelAt}` : line, breaks, tip: why.filter(Boolean).join(" ") };
   });
   /** Share of a level an hour, said in words next to the time to level. */
   const levelPace = $derived(
@@ -248,8 +251,15 @@
   <Block>
     <div class="headline">
       <div class="big">
-        <span class="label">{headline.label}</span>
-        <span class="num hero">{headline.value}</span>
+        <span class="label"
+          >{headline.label}{#if session.measuring}<span
+              class="measuring"
+              use:tip={"A first estimate from your first kills. It settles after about a minute of play."}
+            >
+              · still measuring</span
+            >{/if}</span
+        >
+        <span class="num hero" class:early={session.measuring}>{headline.value}</span>
       </div>
       {#if recent}
         <div class="recent">
@@ -562,6 +572,14 @@
 
   .recent {
     align-items: flex-end;
+  }
+
+  .measuring {
+    color: var(--warn);
+  }
+
+  .hero.early {
+    opacity: 0.7;
   }
 
   .label {

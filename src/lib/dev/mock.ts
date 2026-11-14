@@ -1024,7 +1024,12 @@ export const mockBackend: Backend = {
     return outfit;
   },
   async searchQuests(search) {
-    const quests = mockQuests.filter((q) => q.name.toLowerCase().includes(search.text.toLowerCase()) && (!search.region || q.region === search.region));
+    const quests = mockQuests.filter(
+      (q) =>
+        q.name.toLowerCase().includes(search.text.toLowerCase()) &&
+        (!search.region || q.region === search.region) &&
+        (search.atLevel == null || (q.levelMin ?? 0) <= search.atLevel),
+    );
     return { quests, total: quests.length };
   },
   questRegions: async () => ["Fern Isle", "Mossbank"],
@@ -1043,6 +1048,15 @@ export const mockBackend: Backend = {
         next: null,
         objectives: [{ count: 5, guide: quest.objectives[0] }],
         rewards: [{ id: 504, name: "Berry Tonic", count: 5, sure: true }, { id: 502, name: "Bark Vest", count: 1, sure: false }, { id: 503, name: "Thorn Claw", count: 1, sure: false }],
+        chainRest: {
+          quests: [
+            { id: 72, name: "Slime Stew", levelMin: 4 },
+            { id: 73, name: "The Recipe Book", levelMin: 6 },
+          ],
+          exp: 1850,
+          mesos: 2400,
+          levelMax: 6,
+        },
       },
     };
   },

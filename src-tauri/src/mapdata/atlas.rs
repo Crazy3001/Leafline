@@ -12,6 +12,7 @@ use super::pictures::MapView;
 use super::shops::{PlacedShop, Shop, ShopRecord};
 use super::travel::{Travel, TravelKind, TravelLink};
 use super::turnins;
+use super::walking;
 
 /// Below this similarity an OCR'd name is not taken for any map.
 const MIN_SCORE: f64 = 0.72;
@@ -212,6 +213,10 @@ pub struct Route {
     /// For a route that takes a ride or scroll: the portals the walk alone takes, or `None`
     /// when no portals lead there.
     pub walking: Option<u32>,
+    /// About how many seconds the route takes on foot, rides left out, when every portal on the
+    /// way has a place in the data. Sent with the route by the command that times it.
+    #[serde(skip)]
+    pub walk_seconds: Option<f64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -246,18 +251,10 @@ pub struct Shortcut {
     pub via: MapRef,
 }
 
-/// A way from one map to the next: a portal, or travel the player turned on.
-#[derive(Clone, Copy)]
-enum Edge<'a> {
-    Portal(&'a Exit),
-    Travel(&'a TravelLink),
-}
-
-/// A map reached in a breadth-first search: in how many steps, from where, and where the
-/// first ride or scroll on the way went.
-struct Visit<'a> {
+/// A map reached in a breadth-first search: in how many steps, and where the first ride or
+/// scroll on the way went.
+struct Visit {
     hops: u32,
-    prev: Option<(u32, Edge<'a>)>,
     via: Option<u32>,
 }
 
@@ -288,6 +285,8 @@ pub struct Atlas {
     pub(super) turn_ins: HashMap<u32, u32>,
     /// Map → its exits, in display order.
     pub(super) exits: HashMap<u32, Vec<Exit>>,
+    /// Map → its portals at their places, for timing routes.
+    pub(super) spots: HashMap<u32, Vec<walking::Spot>>,
     /// Each map's name, street and town folded for fuzzy matching.
     pub(super) keys: Vec<(u32, String, Option<String>)>,
 }
@@ -321,8 +320,9 @@ impl Atlas {
 
     pub fn new(data: Dataset) -> Self {
         // A few names in the data carry stray spaces.
-        let maps: BTreeMap<u32, MapRecord> =
+        let mut maps: BTreeMap<u32, MapRecord> =
             data.maps.into_iter().map(|m| (m.id, MapRecord { name: m.name.trim().to_string(), ..m })).collect();
+        let spots = walking::take_spots(&mut maps);
         let mut spawns: HashMap<u32, Vec<(u32, u32)>> = HashMap::new();
         for mob in &data.monsters {
             for spawn in mob.spawns.iter().filter(|s| s.count > 0) {
@@ -369,6 +369,7 @@ impl Atlas {
             quests_rewarding,
             turn_ins: HashMap::new(),
             exits: HashMap::new(),
+            spots,
             keys,
         };
         atlas.exits = atlas.maps.values().map(|m| (m.id, atlas.exits_of(m))).collect();
@@ -575,53 +576,22 @@ impl Atlas {
         })
     }
 
-    /// The fewest portals from one map to another, by breadth-first search over the portals'
-    /// destinations. `None` when no path is known.
+    /// The quickest way from one map to another through portals, timed by the walk across each
+    /// map (see [`walking`]). `None` when no path is known.
     pub fn route(&self, from: u32, to: u32) -> Option<Route> {
         self.route_with(from, to, &Travel::none())
     }
 
-    /// The fewest steps from one map to another, where a ride or scroll in `travel` is one
-    /// step like a portal. Between routes of the same length, walking wins. A route that
-    /// takes travel also says how many portals the walk alone takes.
+    /// The quickest way from one map to another, through portals and the rides and scrolls in
+    /// `travel`, which are taken when they beat the walk. A route that takes travel also says
+    /// how many portals the walk alone takes.
     pub fn route_with(&self, from: u32, to: u32, travel: &Travel) -> Option<Route> {
-        if !self.maps.contains_key(&from) || !self.maps.contains_key(&to) {
-            return None;
-        }
-        let visits = self.explore(from, travel, Some(to));
-        visits.get(&to)?;
-        let mut steps = Vec::new();
-        let mut at = to;
-        while let Some((prev, edge)) = visits.get(&at).and_then(|v| v.prev) {
-            steps.push(match edge {
-                Edge::Portal(exit) => RouteStep {
-                    from: self.map_ref(prev),
-                    to: exit.to.clone(),
-                    direction: exit.direction,
-                    side: exit.side,
-                    portal: exit.portals.first().cloned(),
-                    hidden: exit.hidden,
-                    travel: None,
-                },
-                Edge::Travel(link) => RouteStep {
-                    from: self.map_ref(prev),
-                    to: self.map_ref(link.to),
-                    direction: Direction::Other,
-                    side: None,
-                    portal: None,
-                    hidden: false,
-                    travel: Some(TravelStep { kind: link.kind, service: link.service.clone(), fare: link.fare }),
-                },
-            });
-            at = prev;
-        }
-        steps.reverse();
-        let walking = if steps.iter().any(|s| s.travel.is_some()) {
-            self.explore(from, &Travel::none(), Some(to)).get(&to).map(|v| v.hops)
-        } else {
-            None
-        };
-        Some(Route { from: self.map_ref(from), to: self.map_ref(to), steps, walking })
+        self.quickest(from, to, travel)
+    }
+
+    /// The fewest portals from one map to another on foot.
+    pub(super) fn portals_on_foot(&self, from: u32, to: u32) -> Option<u32> {
+        self.explore(from, &Travel::none(), Some(to)).get(&to).map(|v| v.hops)
     }
 
     /// Portals from `from` to every map reachable through them.
@@ -655,16 +625,15 @@ impl Atlas {
 
     /// Breadth-first search from `from` over portals and travel, stopping once `stop` is
     /// reached. Portals are tried first, so a walk wins over a ride of the same length.
-    fn explore<'a>(&'a self, from: u32, travel: &'a Travel, stop: Option<u32>) -> HashMap<u32, Visit<'a>> {
-        let mut visits = HashMap::from([(from, Visit { hops: 0, prev: None, via: None })]);
+    fn explore(&self, from: u32, travel: &Travel, stop: Option<u32>) -> HashMap<u32, Visit> {
+        let mut visits = HashMap::from([(from, Visit { hops: 0, via: None })]);
         let mut queue = VecDeque::from([from]);
         while let Some(at) = queue.pop_front() {
             if stop == Some(at) {
                 break;
             }
             let (hops, via) = (visits[&at].hops + 1, visits[&at].via);
-            let portals =
-                self.exits.get(&at).into_iter().flatten().filter(|e| e.to.known).map(|e| (e.to.id, Edge::Portal(e)));
+            let portals = self.exits.get(&at).into_iter().flatten().filter(|e| e.to.known).map(|e| (e.to.id, false));
             // Leaving the island can't be undone, so a scroll is never suggested as a shortcut off it.
             let stays =
                 |l: &&TravelLink| l.from.is_some() || !self.on_starting_island(at) || self.on_starting_island(l.to);
@@ -672,11 +641,11 @@ impl Atlas {
                 .leaving(at)
                 .filter(|l| self.maps.contains_key(&l.to))
                 .filter(stays)
-                .map(|l| (l.to, Edge::Travel(l)));
-            for (next, edge) in portals.chain(rides) {
+                .map(|l| (l.to, true));
+            for (next, ride) in portals.chain(rides) {
                 if let Entry::Vacant(entry) = visits.entry(next) {
-                    let via = via.or(matches!(edge, Edge::Travel(_)).then_some(next));
-                    entry.insert(Visit { hops, prev: Some((at, edge)), via });
+                    let via = via.or(ride.then_some(next));
+                    entry.insert(Visit { hops, via });
                     queue.push_back(next);
                 }
             }
@@ -1202,7 +1171,7 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn routes_take_the_fewest_portals() {
+    fn routes_without_placed_portals_take_the_fewest() {
         let atlas = world();
         let route = atlas.route(5, 4).unwrap();
         let steps: Vec<(&str, Direction, Option<&str>, &str)> = route

@@ -54,7 +54,11 @@
   let page = $state<QuestPage | null>(null);
   let searching = $state(false);
 
-  const narrowed = $derived([search.region, search.repeat, search.atLevel].filter((v) => v != null).length);
+  const narrowed = $derived(
+    [search.region, search.repeat, search.atLevel, search.noPrior || null].filter((v) => v != null).length,
+  );
+  /** How many quests to take now the tab names before "Show all". */
+  const TAKE_NOW = 6;
   const browsing = $derived(search.text.trim() !== "" || narrowed > 0);
   const asked = $derived(JSON.stringify(search));
 
@@ -80,6 +84,21 @@
         });
     }, SEARCH_DELAY);
     return () => clearTimeout(timer);
+  });
+
+  // Quests the character can start at their level that need no other quest first, the nearest
+  // to their level first. Which ones they've done is the game's to know, so some may be done.
+  let takeNow = $state<QuestPage | null>(null);
+  $effect(() => {
+    void mapData.status?.dataUpdatedAt;
+    const at = level;
+    if (!ready || at == null || pinned) {
+      takeNow = null;
+      return;
+    }
+    untrack(() => backend.searchQuests({ ...blankSearch(), atLevel: at, noPrior: true })).then((found) => {
+      if (level === at) takeNow = found;
+    });
   });
 
   async function more() {
@@ -175,6 +194,10 @@
             <span>Only what Lv {level} can start</span>
           </label>
         {/if}
+        <label class="check">
+          <input type="checkbox" checked={!!search.noPrior} onchange={(e) => setSearch({ noPrior: e.currentTarget.checked || undefined })} />
+          <span>Only quests that need no other first</span>
+        </label>
       </div>
     {/if}
   </div>
@@ -206,6 +229,20 @@
     </p>
   {/if}
   {#if ready}<FollowedQuests tracked={quest} {map} {session} plain={pinned} />{/if}
+  {#if ready && !pinned && level != null && takeNow?.quests.length}
+    <Card title={`Quests to take at Lv ${level}`}>
+      <p class="lead">
+        Quests your level can start that need no other quest first, the nearest to your level first. Leafline can't see
+        which you've done.
+      </p>
+      {@render rows(takeNow.quests.slice(0, TAKE_NOW))}
+      {#if takeNow.total > TAKE_NOW}
+        <button class="back inline" onclick={() => setSearch({ atLevel: level, noPrior: true })}
+          >Show all {takeNow.total.toLocaleString()}</button
+        >
+      {/if}
+    </Card>
+  {/if}
   {#if !ready && !pinned}
     <Card title="Quest search" plain={pinned}>
       <p class="lead">Search every quest once the map data is downloaded.</p>

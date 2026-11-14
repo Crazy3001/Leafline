@@ -357,6 +357,18 @@ mod tests {
     }
 
     #[test]
+    fn a_quest_item_a_shop_sells_can_be_bought_instead() {
+        use crate::mapdata::guide::QuestQuery;
+        use crate::mapdata::travel::Travel;
+        let atlas = stocked();
+        let query = QuestQuery { title: "Shell Sorting".into(), objectives: vec!["Twig Wand".into(), "Pebble Snail".into()] };
+        let guide = atlas.quest_guide(&[query], Some(5), &[], &[], &Travel::none()).pop().unwrap();
+        let wand: Vec<_> = guide.objectives[0].shops.iter().map(|o| (o.npc.as_str(), o.price, o.hops)).collect();
+        assert_eq!(wand[0], ("Innkeeper Bo", 350, Some(0)), "the cheapest, in the map the player is on");
+        assert!(guide.objectives[1].shops.is_empty(), "a monster to defeat is not for sale");
+    }
+
+    #[test]
     fn a_file_in_another_format_or_without_dates_is_refused() {
         assert!(parse(br#"{"schema": 2, "shops": []}"#).is_err());
         let undated = r#"{"schema": 1, "shops": [{"npc": "A", "map": "B", "items": [{"item": "C", "price": 1, "seen": "soon"}]}]}"#;
