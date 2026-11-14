@@ -204,8 +204,9 @@
           <label for="update-check">
             <span class="name">Check for updates at startup</span>
             <span class="help">
-              Asks GitHub for the latest version number and says in Settings if there's a newer one. Nothing about the
-              game or you is sent. Change it any time in Settings → About.
+              Asks GitHub for the latest version number and says in Settings if there's a newer one, which you can then
+              download and install from there. Nothing about the game or you is sent. Change it any time in Settings →
+              About.
             </span>
           </label>
           <input

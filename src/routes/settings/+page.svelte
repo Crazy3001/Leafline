@@ -195,6 +195,17 @@
     };
   });
 
+  async function installNow() {
+    updateError = null;
+    try {
+      await backend.installUpdate();
+    } catch (e) {
+      updateError = String(e);
+    }
+  }
+
+  const megabytes = (bytes: number) => (bytes / 1_000_000).toFixed(1);
+
   async function checkNow() {
     updateError = null;
     try {
@@ -867,11 +878,35 @@
       </p>
 
       {#if update.state === "available"}
+        {@const notes = update.url}
         <div class="update" role="status">
           <span>Leafline {update.latest} is out. You have {update.current}.</span>
-          <button class="link" onclick={() => backend.openLink(update.state === "available" ? update.url : "")}>
-            Release notes and download<ExternalLink size={11} />
-          </button>
+          {#if update.installable}
+            <button class="button" onclick={installNow}><Download size={12} />Download and install</button>
+          {/if}
+          <button class="link" onclick={() => backend.openLink(notes)}>Release notes<ExternalLink size={11} /></button>
+          <span class="update-note">
+            {#if update.installable}
+              Downloads the installer from GitHub, checks it against the release's SHA-256 and runs it only if they match.
+              Leafline closes while it installs; your records and settings stay.
+            {:else}
+              This release has no installer Leafline can check, so download it from the release page.
+            {/if}
+          </span>
+          {#if update.problem}<span class="update-note warn">{update.problem}</span>{/if}
+        </div>
+      {:else if update.state === "downloading"}
+        <div class="update" role="status">
+          <span>
+            Downloading Leafline {update.latest}…
+            <span class="tabular"
+              >{megabytes(update.received)}{#if update.total}&nbsp;of {megabytes(update.total)}{/if} MB</span
+            >
+          </span>
+        </div>
+      {:else if update.state === "installing"}
+        <div class="update" role="status">
+          <span>The installer for Leafline {update.latest} checked out and is starting. Leafline is closing.</span>
         </div>
       {/if}
 
@@ -903,7 +938,7 @@
           <span class="name">Check for updates</span>
           <span class="help">
             At startup, asks GitHub for the number of the latest release and says here if it's newer. Nothing about the
-            game or you is sent, and nothing is downloaded or installed.
+            game or you is sent. An update is downloaded and installed only when you press Download and install.
           </span>
           {#if display.updateCheck && updateLine}<span class="help status">{updateLine}</span>{/if}
           {#if updateError}<span class="help warn">{updateError}</span>{/if}
@@ -1606,6 +1641,16 @@
     border-left: 2px solid var(--accent);
     background: var(--accent-soft);
     font-size: var(--text-md);
+  }
+
+  .update-note {
+    flex-basis: 100%;
+    color: var(--muted);
+    font-size: var(--text-sm);
+  }
+
+  .update-note.warn {
+    color: var(--warn);
   }
 
   .help.status {
