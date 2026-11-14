@@ -2,23 +2,23 @@
   // The one link card a window shows, beside the link that opened it. Every window's layout
   // holds one; it stays empty until a coloured name is clicked.
   import { tip } from "$lib/tip.svelte";
-  import { ArrowLeft, Maximize2, Pin, X } from "@lucide/svelte";
+  import { ArrowLeft, Maximize2, PictureInPicture2, Pin, X } from "@lucide/svelte";
+  import { isTauri } from "@tauri-apps/api/core";
 
-  import ItemPeek from "./ItemPeek.svelte";
-  import MapPeek from "./MapPeek.svelte";
-  import MobPeek from "./MobPeek.svelte";
-  import NpcPeek from "./NpcPeek.svelte";
-  import QuestPeek from "./QuestPeek.svelte";
-  import SkillPeek from "./SkillPeek.svelte";
+  import { backend } from "$lib/api";
+  import CardContent from "./CardContent.svelte";
+
   import { setContext } from "svelte";
 
   import {
     SECTION_SCOPE,
+    cardPath,
     closePeek,
     openFull,
     peek,
     peekBack,
     pinPeek,
+    raiseCard,
     unpinCard,
     type PeekKind,
     type PeekTarget,
@@ -106,6 +106,18 @@
     });
   }
 
+  /** Cards can leave the window only in the app, where each gets a window of its own. */
+  const canPopOut = isTauri();
+
+  /** Opens the card in its own window where it sits now, then lets go of it here. */
+  async function popOut(target: PeekTarget, box: DOMRect | undefined, done: () => void) {
+    const path = cardPath(target);
+    if (!path || !box) return;
+    const zoom = window.outerWidth / window.innerWidth || 1;
+    await backend.popOutCard(path, window.screenX + box.left * zoom, window.screenY + box.top * zoom);
+    done();
+  }
+
   function pin() {
     const box = openCard?.getBoundingClientRect();
     if (box) pinPeek(box.left, box.top);
@@ -149,21 +161,7 @@
   });
 </script>
 
-{#snippet content(target: PeekTarget)}
-  {#if target.kind === "item"}
-    <ItemPeek {target} />
-  {:else if target.kind === "mob"}
-    <MobPeek {target} />
-  {:else if target.kind === "npc"}
-    <NpcPeek {target} />
-  {:else if target.kind === "map"}
-    <MapPeek {target} />
-  {:else if target.kind === "skill"}
-    <SkillPeek {target} />
-  {:else}
-    <QuestPeek {target} />
-  {/if}
-{/snippet}
+{#snippet content(target: PeekTarget)}<CardContent {target} />{/snippet}
 
 <!-- Pinned cards: each stays put until its own close, and can be dragged by its header. -->
 {#each peek.pinned as card (card.key)}
@@ -176,6 +174,8 @@
     style:top="{card.top}px"
     style:width="{Math.min(WIDTH, viewport.width - MARGIN * 2)}px"
     style:max-height="{Math.max(viewport.height - card.top - MARGIN, 160)}px"
+    style:z-index={900 + card.z}
+    onpointerdowncapture={() => raiseCard(card.key)}
   >
     <header class="grab" role="toolbar" aria-label="Card header: drag to move" tabindex="-1" onpointerdown={(e) => dragPinned(e, card)}>
       <span class="kind ref-{card.target.kind}">{KIND[card.target.kind].label}</span>
@@ -184,6 +184,16 @@
       <button class="full" use:tip={`In the ${KIND[card.target.kind].tab} tab`} onclick={() => openFull(card.target)}>
         <Maximize2 size={12} />Full view
       </button>
+      {#if canPopOut}
+        <button
+          class="icon"
+          aria-label="Pop out"
+          use:tip={"Into a window of its own, to move anywhere on the screen"}
+          onclick={(e) =>
+            popOut(card.target, (e.currentTarget as HTMLElement).closest(".peek")?.getBoundingClientRect(), () => unpinCard(card.key))}
+          ><PictureInPicture2 size={13} /></button
+        >
+      {/if}
       <button class="icon" aria-label="Close" use:tip={"Close"} onclick={() => unpinCard(card.key)}><X size={14} /></button>
     </header>
     <div class="body">{@render content(card.target)}</div>
@@ -202,6 +212,8 @@
     style:top={place.top == null ? null : `${place.top + peek.drag.y}px`}
     style:bottom={place.bottom == null ? null : `${place.bottom - peek.drag.y}px`}
     style:max-height="{place.maxHeight}px"
+    style:z-index={900 + peek.z}
+    onpointerdowncapture={() => raiseCard(null)}
   >
     <header class="grab" role="toolbar" aria-label="Card header: drag to move" tabindex="-1" onpointerdown={dragOpen}>
       {#if peek.stack.length > 1}
@@ -215,6 +227,14 @@
       <button class="icon" aria-label="Pin this card" use:tip={"Pin: keep it here and open more beside it"} onclick={pin}
         ><Pin size={13} /></button
       >
+      {#if canPopOut}
+        <button
+          class="icon"
+          aria-label="Pop out"
+          use:tip={"Into a window of its own, to move anywhere on the screen"}
+          onclick={() => popOut(top, openCard?.getBoundingClientRect(), closePeek)}><PictureInPicture2 size={13} /></button
+        >
+      {/if}
       <button class="icon" aria-label="Close" use:tip={"Close (Esc)"} onclick={closePeek}><X size={14} /></button>
     </header>
     <div class="body" bind:this={card}>

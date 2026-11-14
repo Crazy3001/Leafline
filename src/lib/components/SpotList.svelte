@@ -571,7 +571,7 @@
           </select>
         </label>
         {#if used.skill}
-          <p>Counting {used.skill.name} at Lv {used.skill.level}: {used.skill.percent}% of your attack.</p>
+          <p>Counting <Ref kind="skill" name={used.skill.name} /> at Lv {used.skill.level}: {used.skill.percent}% of your attack.</p>
         {/if}
         {#if assumptions.value.skillName === "custom" || !damage.value?.skills.length}
           <label>

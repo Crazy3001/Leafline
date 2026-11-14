@@ -365,6 +365,8 @@ export interface Backend {
   pinStatus(): Promise<PinStatus>;
   /** Opens a panel in its own window that stays up while the overlay is hidden. */
   pinPanel(panel: PinId): Promise<PinStatus>;
+  /** Opens a link card in a small window of its own at a screen position (logical pixels). */
+  popOutCard(path: string, x: number, y: number): Promise<void>;
   unpinPanel(panel: PinId): Promise<PinStatus>;
   onPins(handler: (status: PinStatus) => void): Promise<UnlistenFn>;
   /** The player resized the calling pinned panel, with its new width and height in screen units. */
@@ -566,6 +568,7 @@ const tauriBackend: Backend = {
   currentReadings: () => invoke("current_readings"),
   pinStatus: () => invoke("pin_status"),
   pinPanel: (panel) => invoke("pin_panel", { panel }),
+  popOutCard: (path, x, y) => invoke("pop_out_card", { path, x, y }),
   unpinPanel: (panel) => invoke("unpin_panel", { panel }),
   onPins: (handler) => listen<PinStatus>("pins", (e) => handler(e.payload)),
   onPinResized: (handler) => getCurrentWindow().listen<[number, number]>("pin-resized", (e) => handler(e.payload)),

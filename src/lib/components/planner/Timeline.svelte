@@ -4,6 +4,7 @@
   import { Check, ChevronDown, ChevronRight, TriangleAlert } from "@lucide/svelte";
 
   import IconRef from "$lib/components/IconRef.svelte";
+  import Ref from "$lib/components/Ref.svelte";
   import { tip } from "$lib/tip.svelte";
   import Pic from "$lib/ui/Pic.svelte";
 
@@ -59,15 +60,20 @@
   }
 </script>
 
-{#snippet lines(row: TimelineRow)}
+{#snippet lines(row: TimelineRow, linked = true)}
   {#each row.lines as line, i (i)}
     {#if line.items}
       <span class="line gear" aria-label={line.text}>
-        {#each line.items as name (name)}<IconRef kind="item" {name} size={22} />{/each}
+        {#each line.items as name (name)}{#if linked}<IconRef kind="item" {name} size={22} />{:else}<Pic kind="item" {name} size={22} />{/if}{/each}
       </span>
     {:else}
       <span class="line {line.kind}" class:with-icon={line.skillId != null}
-        >{#if line.skillId != null}<Pic kind="skill" id={line.skillId} size={16} />{/if}<span class="text">{line.text}</span
+        ><span class="text"
+          >{#if linked && line.skillId != null && line.skillName && line.text.startsWith(line.skillName)}<Ref
+              kind="skill"
+              id={line.skillId}
+              name={line.skillName}
+            />{line.text.slice(line.skillName.length)}{:else}{line.text}{/if}</span
         >{#if line.kind === "met"}<span class="tick" use:tip={"Goal met"} aria-label="Goal met"><Check size={12} /></span>{/if}</span
       >
     {/if}
@@ -109,7 +115,7 @@
               <span class="at tabular">{span(row)}</span>
               <span class="what">
                 {#if here(row)}<span class="line you">You are here, Lv {level}</span>{/if}
-                {@render lines(row)}
+                {@render lines(row, false)}
               </span>
               <span class="chev" aria-hidden="true">{#if open}<ChevronDown size={12} />{:else}<ChevronRight size={12} />{/if}</span>
             </button>

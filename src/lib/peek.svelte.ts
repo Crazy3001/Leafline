@@ -32,6 +32,8 @@ export interface PinnedCard {
   target: PeekTarget;
   left: number;
   top: number;
+  /** Stacking order: the card last pressed is on top. */
+  z: number;
 }
 
 export const peek = $state<{
@@ -40,7 +42,21 @@ export const peek = $state<{
   /** How far the open card has been dragged from where it opened. */
   drag: { x: number; y: number };
   pinned: PinnedCard[];
-}>({ stack: [], anchor: null, drag: { x: 0, y: 0 }, pinned: [] });
+  /** The open card's stacking order, against the pinned ones. */
+  z: number;
+}>({ stack: [], anchor: null, drag: { x: 0, y: 0 }, pinned: [], z: 0 });
+
+let topZ = 0;
+
+/** Brings a card to the top: a pinned one by its key, or the open card with null. */
+export function raiseCard(key: number | null) {
+  topZ += 1;
+  if (key == null) peek.z = topZ;
+  else {
+    const card = peek.pinned.find((p) => p.key === key);
+    if (card) card.z = topZ;
+  }
+}
 
 let pinKey = 0;
 
@@ -48,8 +64,14 @@ let pinKey = 0;
 export function pinPeek(left: number, top: number) {
   const target = peek.stack.at(-1);
   if (!target) return;
-  peek.pinned.push({ key: ++pinKey, target, left, top });
+  peek.pinned.push({ key: ++pinKey, target, left, top, z: ++topZ });
   closePeek();
+}
+
+/** The page a card's own window shows: `card/<kind>/<id>`, or `n-<name>` when only a name is known. */
+export function cardPath(target: PeekTarget): string | null {
+  if (target.id != null) return `card/${target.kind}/${target.id}`;
+  return target.name ? `card/${target.kind}/n-${encodeURIComponent(target.name)}` : null;
 }
 
 export function unpinCard(key: number) {
@@ -78,6 +100,9 @@ export function openPeek(target: PeekTarget, from: Element | null) {
   peek.stack = [target];
   peek.anchor = anchorOf(from);
   peek.drag = { x: 0, y: 0 };
+  // A new card opens over every pinned one.
+  topZ += 1;
+  peek.z = topZ;
 }
 
 /** Opens the next card over the open one, from a link in it that isn't a coloured name. */

@@ -1,6 +1,7 @@
 //! Tauri wiring: windows, tray, hotkeys and commands.
 
 mod builds;
+mod cards;
 mod commands;
 mod damage;
 mod desk;
@@ -131,6 +132,7 @@ pub fn run() {
             readings::current_readings,
             pins::pin_status,
             pins::pin_panel,
+            cards::pop_out_card,
             pins::unpin_panel,
             pins::toggle_pins,
             pins::show_panel,

@@ -473,7 +473,7 @@
         {#if step.advance}<p class="advance">{step.advance}</p>{/if}
         {#each step.sp as gain (gain.skillId)}
           <p>
-            <span class="tag">{gain.to - gain.from} SP</span><Pic kind="skill" id={gain.skillId} size={18} class="skill-pic" />{gain.name}
+            <span class="tag">{gain.to - gain.from} SP</span><Ref kind="skill" id={gain.skillId} name={gain.name} />
             <span class="tabular dim">{gain.from} → {gain.to}</span>
           </p>
         {/each}
@@ -574,7 +574,7 @@
               <span class="what">
                 {#if s.advance}<span class="advance">{s.advance}</span>{/if}
                 <!-- What the level adds, then the total it makes: "Double Stab +3 (4)". -->
-                {#each s.sp as gain (gain.skillId)}<span><Pic kind="skill" id={gain.skillId} size={16} class="skill-pic" />{gain.name} <span class="tabular">+{gain.to - gain.from}</span> <span class="total tabular">({gain.to})</span></span>{/each}
+                {#each s.sp as gain (gain.skillId)}<span><Ref kind="skill" id={gain.skillId} name={gain.name} /> <span class="tabular">+{gain.to - gain.from}</span> <span class="total tabular">({gain.to})</span></span>{/each}
                 {#each s.ap as gain (gain.stat)}<span>{statLabel(gain.stat)} <span class="tabular">+{gain.amount}</span> <span class="total tabular">({gain.total})</span></span>{/each}
                 {#each s.gear as name (name)}<Ref kind="item" name={name} />{/each}
               </span>

@@ -8,8 +8,9 @@ export interface TimelineLine {
   text: string;
   /** "advance": a job advancement; "gear": gear to get; "met": a skill goal reached. */
   kind: "plain" | "advance" | "gear" | "met" | "sub";
-  /** The skill a skill line is about, for its picture. */
+  /** The skill a skill line is about, for its link; the line's text starts with its name. */
   skillId?: number;
+  skillName?: string;
   /** A gear line's pieces, shown as their pictures. */
   items?: string[];
 }
@@ -80,7 +81,7 @@ function describe(run: LevelStep[], goals: SkillLevel[], level: number | null): 
     const met = goals.some((g) => g.skillId === id && g.level === s.to);
     const each = s.amounts.every((a) => a === s.amounts[0]) && s.amounts.length === run.length;
     const text = one || !each ? `${s.name} → ${s.to}` : `${s.name} +${s.amounts[0]}/lv → ${s.to}`;
-    lines.push({ text, kind: met ? "met" : "plain", skillId: id });
+    lines.push({ text, kind: met ? "met" : "plain", skillId: id, skillName: s.name });
   }
 
   const stats = new Map<BaseStat, { amounts: number[]; at: number[]; total: number }>();
