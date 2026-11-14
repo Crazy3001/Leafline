@@ -1,14 +1,15 @@
 # Builds the Windows installers and puts them on a draft GitHub release.
 #
-# Push a tag such as v0.1.0 (it must match the version in tauri.conf.json), or run it by hand
-# from the Actions tab. The release stays a draft until someone publishes it on GitHub, so
-# nothing reaches players by accident. Leafline's update check reads the latest published
-# release of this repository.
+# Run it by hand from the Actions tab on main, after the version in tauri.conf.json is bumped.
+# It makes the draft and its v<version> tag. The release stays a draft until someone publishes
+# it on GitHub, so nothing reaches players by accident. Leafline's update check reads the latest
+# published release of this repository.
+#
+# There is no tag trigger on purpose: publishing a draft creates its tag, and a tag trigger
+# would then rebuild the release and fail against the published one, which can't be changed.
 name: Release
 
 on:
-  push:
-    tags: ["v*"]
   workflow_dispatch:
 
 permissions:

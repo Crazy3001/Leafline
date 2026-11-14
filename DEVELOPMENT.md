@@ -14,7 +14,7 @@ npm run tauri build    # installers in src-tauri/target/release/bundle/
 
 `npm run dev` serves the UI in a plain browser with a mock backend that returns a saved analysis and session, which is handy for design work. The mock is left out of production builds.
 
-Releases are built by `.github/workflows/release.yml`: push a tag such as `v0.1.0` that matches the version in `tauri.conf.json`, and it attaches both installers to a draft release.
+Releases are built by `.github/workflows/release.yml`: bump the version in `tauri.conf.json`, `Cargo.toml` and `package.json` on main, then run the workflow by hand from the Actions tab. It attaches both installers and `SHA256SUMS.txt` to a draft release tagged `v<version>`; check the draft's tag before publishing it.
 
 ## Testing the readers
 
