@@ -12,7 +12,6 @@
 
   import { backend } from "$lib/api";
   import Segmented from "$lib/ui/Segmented.svelte";
-  import { DROPS_CREDIT, DROPS_URL } from "$lib/mapdata.svelte";
   import type { MonsterDrops } from "$lib/types";
 
   type Drop = MonsterDrops["drops"][number];
@@ -124,7 +123,6 @@
   );
 
   const unlogged = $derived((drops ?? []).filter((e) => !e.drops.length).map((e) => e.monster));
-  const fewKills = $derived((drops ?? []).filter((e) => e.sampleKills != null && e.sampleKills < FEW_KILLS));
 
   async function load() {
     loading = true;
@@ -140,11 +138,10 @@
     }
   }
 
-  /** A dropper's picture says nothing alone: its name and how often it drops this. */
+  /** A dropper's picture says nothing alone: its name, and for mesos how many. */
   function dropperTip(source: MapItem["sources"][number], meso = false) {
     const amount = meso ? quantity(source).replace(" ×", "") : "";
-    const rate = source.rate != null ? `${percent(source.rate)}${source.sampleKills ? ` over ${source.sampleKills.toLocaleString()} kills` : ""}` : "rate not measured";
-    return `${source.monster}\n${meso && amount ? `${amount} mesos · ` : ""}${rate}`;
+    return meso && amount ? `${source.monster}\n${amount} mesos` : source.monster;
   }
 
   function percent(value: number | null) {
@@ -152,8 +149,6 @@
     return value >= 10 ? `${value.toFixed(0)}%` : `${value.toFixed(1)}%`;
   }
 
-  /** Below this many kills, drops rarer than about 1 in N are likely missing from the log. */
-  const FEW_KILLS = 200;
 
   function quantity(drop: Drop) {
     if (drop.minQuantity == null || drop.maxQuantity == null) return "";
@@ -177,9 +172,7 @@
             <ul class="wrap">
               {#each entry.drops.filter((d) => !isMeso(d)) as drop (drop.item)}
                 <li>
-                  <Ref kind="item" name={drop.item} />{#if drop.quest}<span class="tag">quest</span>{/if}{#if drop.rate != null}<span
-                      class="rate tabular">{percent(drop.rate)}</span
-                    >{/if}
+                  <Ref kind="item" name={drop.item} />{#if drop.quest}<span class="tag">quest</span>{/if}
                 </li>
               {/each}
             </ul>
@@ -218,7 +211,7 @@
             </span>
             <ul class="tip-list">
               {#each item.sources as source (source.monster)}
-                <li><Pic kind="mob" name={source.monster} size={16} />{source.monster}<span class="tip-num">{source.rate != null ? percent(source.rate) : "seen"}</span></li>
+                <li><Pic kind="mob" name={source.monster} size={16} />{source.monster}</li>
               {/each}
             </ul>
           {/snippet}
@@ -231,16 +224,7 @@
   {#if items.length && unlogged.length && view === "item"}
     <p class="note none">Nothing logged yet for {unlogged.join(", ")}.</p>
   {/if}
-  {#if fewKills.length && view === "item"}
-    <p class="few">
-      Few kills logged for {fewKills.map((e) => `${e.monster} (${e.sampleKills})`).join(", ")}, so rarer drops, such as
-      most equips and potions, may not show up yet.
-    </p>
-  {/if}
-  <p class="credit">
-    Known drops, without rates.
-    <button class="link" onclick={() => backend.openLink(DROPS_URL)}>{DROPS_CREDIT}</button>
-  </p>
+
 {:else if error}
   <p class="error">{error}</p>
   <button class="load" onclick={load} disabled={loading}><RefreshCw size={13} />Try again</button>
@@ -329,12 +313,6 @@
     color: var(--mesos);
   }
 
-  .rate {
-    margin-left: 4px;
-    color: var(--muted);
-    font-size: var(--text-xs);
-  }
-
   .view {
     margin-bottom: 6px;
   }
@@ -390,15 +368,6 @@
     min-width: 0;
   }
 
-  .few {
-    margin: 8px 0 0;
-    padding: 4px 7px;
-    border-radius: var(--radius-sm);
-    background: var(--warn-soft);
-    color: var(--muted);
-    font-size: var(--text-xs);
-  }
-
   .tag {
     margin-left: 4px;
     padding: 0 4px;
@@ -450,26 +419,6 @@
     to {
       transform: rotate(360deg);
     }
-  }
-
-  .credit {
-    margin: 10px 0 0;
-    font-size: var(--text-xs);
-    color: var(--faint);
-  }
-
-  .link {
-    display: block;
-    margin-top: 3px;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--muted);
-    font-size: var(--text-xs);
-    text-align: left;
-    text-decoration: underline;
-    text-decoration-color: var(--border-strong);
-    cursor: pointer;
   }
 
   .error {

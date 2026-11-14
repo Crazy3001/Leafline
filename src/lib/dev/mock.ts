@@ -923,7 +923,7 @@ export const mockBackend: Backend = {
     };
     const beats = (a: number[], b: number[]) => a[0] > b[0] || (a[0] === b[0] && a[1] > b[1]);
     const overall = pieces.some((p) => mockSlotOf(p) === "Overall");
-    const outfit: Outfit = { level, slots: [], paths: [] };
+    const outfit: Outfit = { level, slots: [], paths: [], wornGender: "male" };
     for (const slot of MOCK_SLOTS) {
       if (overall && (slot === "Top" || slot === "Bottom")) continue;
       const wearing = pieces.findLast((p) => mockSlotOf(p) === slot) ?? null;
@@ -1032,7 +1032,7 @@ export const mockBackend: Backend = {
   mapRegions: async () => ["Ashlands", "Fern Isle"],
   mapAreas: async () => ["Fern Isle", "Ashlands"],
   searchNpcs: async (query) => sampleNpcs(query),
-  findNpc: async (name) => sampleNpcs({ text: name, kind: null, region: null, area: null, offset: 0 }).npcs[0]?.id ?? null,
+  findNpc: async (name) => sampleNpcs({ text: name, kind: null, region: null, area: null, sort: null, offset: 0 }).npcs[0]?.id ?? null,
   async npcSheet(id, mapName) {
     const sheet = sampleNpcSheet(id, mapName ? 2 : null);
     return sheet && { from: mapName ? sampleCard(2)!.map : null, sheet };

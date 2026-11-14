@@ -12,10 +12,7 @@
   import { backend } from "$lib/api";
   import { formatCompact, formatDuration, objectiveProgress, splitMapLabel } from "$lib/format";
   import { measuredRates, watchHistory } from "$lib/history.svelte";
-  import { showItemNamed } from "$lib/items.svelte";
-  import { showMonsterNamed } from "$lib/monsters.svelte";
-  import { showNpcNamed } from "$lib/places.svelte";
-  import { DROPS_URL, OSMS_URL, mapData, watchMapData } from "$lib/mapdata.svelte";
+  import { mapData, watchMapData } from "$lib/mapdata.svelte";
   import { payout, questView, toggleExpanded, unfollow } from "$lib/quests.svelte";
   import type { Guide, MapRef, MapReading, ObjectiveGuide, Objective, QuestReading, QuestWhere, SessionSummary } from "$lib/types";
 
@@ -296,11 +293,6 @@
         <span class="faint">Downloads Leafline's drop list</span>
       </div>
       {#if lookupError}<p class="footer error">{lookupError}</p>{/if}
-    {/if}
-    {#if guide}
-      <p class="credit">
-        Maps: <button onclick={() => backend.openLink(OSMS_URL)}>OSMS</button> (CC BY 4.0){#if showsDrops}{" · "}Drops: game text, <button onclick={() => backend.openLink(DROPS_URL)}>StrategyWiki</button> (CC BY-SA 4.0), players{/if}
-      </p>
     {/if}
   {/if}
 </Card>
@@ -628,17 +620,4 @@
     font-size: var(--text-xs);
   }
 
-  .credit button {
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--muted);
-    font-size: inherit;
-    cursor: pointer;
-  }
-
-  .credit button:hover {
-    color: var(--text);
-    text-decoration: underline;
-  }
 </style>

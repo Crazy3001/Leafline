@@ -1493,6 +1493,8 @@ export interface NpcQuery {
   region: string | null;
   /** One of `mapAreas`. */
   area: string | null;
+  /** `name`, `quests` (most first) or `map`; the best match first otherwise. */
+  sort: string | null;
   offset: number;
 }
 
@@ -1666,6 +1668,8 @@ export interface Outfit {
   slots: SlotGear[];
   /** Each slot's way up from this level, which `slots` takes its suggestion and next step from. */
   paths: GearPath[];
+  /** Who the gear worn was made for, when a piece of it says. */
+  wornGender: string | null;
 }
 
 /** One piece on a slot's way up, at the first level the plan can wear it. */

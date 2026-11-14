@@ -13,7 +13,6 @@
   import PicFrame from "$lib/ui/PicFrame.svelte";
   import { backend } from "$lib/api";
   import { formatCompact } from "$lib/format";
-  import { OSMS_CREDIT, OSMS_URL } from "$lib/mapdata.svelte";
   import { travelKey } from "$lib/settings.svelte";
   import type { MapReading, NpcWhere, QuestRow } from "$lib/types";
 
@@ -115,7 +114,6 @@
       </Section>
     {/if}
 
-    <button class="credit" onclick={() => backend.openLink(OSMS_URL)}>{OSMS_CREDIT}</button>
   {:else if error}
     <p class="note">{error}</p>
   {:else}
@@ -191,21 +189,4 @@
     }
   }
 
-  .credit {
-    display: block;
-    margin-top: 12px;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--faint);
-    font-size: var(--text-xs);
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .credit:hover,
-  .credit:focus-visible {
-    color: var(--muted);
-    outline: none;
-  }
 </style>

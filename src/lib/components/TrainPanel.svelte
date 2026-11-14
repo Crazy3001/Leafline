@@ -18,7 +18,6 @@
   import { formatCompact, formatDuration, formatNumber, splitMapLabel } from "$lib/format";
   import { characters } from "$lib/characters.svelte";
   import { history, watchHistory } from "$lib/history.svelte";
-  import { showMapNamed } from "$lib/places.svelte";
   import { live } from "$lib/readings.svelte";
   import {
     chartPoints,
@@ -307,40 +306,6 @@
   </Block>
 
   {#if !glance}
-  <Block title="This session">
-    {#snippet aside()}
-      <Segmented
-        size="sm"
-        label="Graph shows"
-        value={metric}
-        options={[
-          { id: "exp", label: percentOnly ? "% / hr" : "EXP / hr" },
-          { id: "mesos", label: "Mesos / hr" },
-        ]}
-        onchange={pickMetric}
-      />
-    {/snippet}
-    {#if session.activeSeconds >= GRAPH_AFTER && points.filter((p) => p.y != null).length > 1}
-      <LineChart
-        {points}
-        xMax={Math.max(session.activeSeconds, points[points.length - 1]?.x ?? 0)}
-        color={chartColor}
-        format={rateFormat(metric, percentOnly)}
-        bands={mapBands(session.timeline)}
-        markers={eventMarkers(session.events ?? [])}
-        detail={(i) => pointDetail(session.timeline[i])}
-        label="{metric === 'exp' ? 'EXP' : 'Mesos'} per hour over this session"
-      />
-      <p class="caption">
-        Each point is the rate over the 5 minutes before it; the first 2½ minutes are left out.
-        {#if metric === "mesos"}Mesos are spread evenly between your looks at them, so the line reaches only your last look.{/if}
-        {#if session.events?.length}Green dots are level-ups, red ones deaths.{/if}
-      </p>
-    {:else}
-      <p class="caption">The graph starts after 5 minutes of play.</p>
-    {/if}
-  </Block>
-
   {#if here}
     <Block title="This map">
       {#snippet aside()}<span class="map-name">{here.name}</span>{/snippet}
@@ -424,6 +389,41 @@
       {/if}
     </Block>
   {/if}
+  <!-- Where to go next sits under the live numbers; the rate graph is detail, last. -->
+  <SpotList {level} {map} {session} />
+  <Block title="This session">
+    {#snippet aside()}
+      <Segmented
+        size="sm"
+        label="Graph shows"
+        value={metric}
+        options={[
+          { id: "exp", label: percentOnly ? "% / hr" : "EXP / hr" },
+          { id: "mesos", label: "Mesos / hr" },
+        ]}
+        onchange={pickMetric}
+      />
+    {/snippet}
+    {#if session.activeSeconds >= GRAPH_AFTER && points.filter((p) => p.y != null).length > 1}
+      <LineChart
+        {points}
+        xMax={Math.max(session.activeSeconds, points[points.length - 1]?.x ?? 0)}
+        color={chartColor}
+        format={rateFormat(metric, percentOnly)}
+        bands={mapBands(session.timeline)}
+        markers={eventMarkers(session.events ?? [])}
+        detail={(i) => pointDetail(session.timeline[i])}
+        label="{metric === 'exp' ? 'EXP' : 'Mesos'} per hour over this session"
+      />
+      <p class="caption">
+        Each point is the rate over the 5 minutes before it; the first 2½ minutes are left out.
+        {#if metric === "mesos"}Mesos are spread evenly between your looks at them, so the line reaches only your last look.{/if}
+        {#if session.events?.length}Green dots are level-ups, red ones deaths.{/if}
+      </p>
+    {:else}
+      <p class="caption">The graph starts after 5 minutes of play.</p>
+    {/if}
+  </Block>
   {/if}
 {:else if !glance}
   <!-- No session yet: the goal and where to train come first, your bests and the last sessions after. -->
@@ -475,10 +475,6 @@
     </ul>
     <div><Button onclick={openTrainingLog}>All sessions</Button></div>
   </Block>
-{/if}
-
-{#if tracking && session && headline && !glance}
-  <SpotList {level} {map} {session} />
 {/if}
 
 <TimersCard />

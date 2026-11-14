@@ -17,7 +17,7 @@
   import MapDataPanel from "../map/MapDataPanel.svelte";
   import MapDetailsView from "../map/MapDetailsView.svelte";
   import { backend } from "$lib/api";
-  import { OSMS_CREDIT, OSMS_URL, mapData, watchMapData } from "$lib/mapdata.svelte";
+  import { mapData, watchMapData } from "$lib/mapdata.svelte";
   import { blankMapQuery, mapView } from "$lib/places.svelte";
   import type { MapDetails, MapMatch, MapPage, MapQuery, MapRow } from "$lib/types";
 
@@ -198,7 +198,6 @@
         {:else}
           <p class="quiet">No maps match.</p>
         {/if}
-        <button class="credit" onclick={() => backend.openLink(OSMS_URL)}>{OSMS_CREDIT}</button>
       {:else if searching}
         <p class="quiet"><span class="spin"><LoaderCircle size={13} /></span> Searching…</p>
       {/if}
@@ -313,21 +312,4 @@
     }
   }
 
-  .credit {
-    display: block;
-    margin-top: 8px;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--faint);
-    font-size: var(--text-xs);
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .credit:hover,
-  .credit:focus-visible {
-    color: var(--muted);
-    outline: none;
-  }
 </style>

@@ -1,7 +1,11 @@
 <script lang="ts">
   // The plan level by level, beside every tab. Short folds runs of levels that spend points the
   // same way into one line; job advancements, gear and the character's own level keep their own.
-  import { ChevronDown, ChevronRight, TriangleAlert } from "@lucide/svelte";
+  import { Check, ChevronDown, ChevronRight, TriangleAlert } from "@lucide/svelte";
+
+  import IconRef from "$lib/components/IconRef.svelte";
+  import { tip } from "$lib/tip.svelte";
+  import Pic from "$lib/ui/Pic.svelte";
 
   import { timeline, type TimelineRow } from "$lib/planner";
   import type { Expansion, SkillLevel } from "$lib/types";
@@ -57,7 +61,16 @@
 
 {#snippet lines(row: TimelineRow)}
   {#each row.lines as line, i (i)}
-    <span class="line {line.kind}">{line.text}{#if line.kind === "met"}<span class="tick">· goal met</span>{/if}</span>
+    {#if line.items}
+      <span class="line gear" aria-label={line.text}>
+        {#each line.items as name (name)}<IconRef kind="item" {name} size={22} />{/each}
+      </span>
+    {:else}
+      <span class="line {line.kind}" class:with-icon={line.skillId != null}
+        >{#if line.skillId != null}<Pic kind="skill" id={line.skillId} size={16} />{/if}<span class="text">{line.text}</span
+        >{#if line.kind === "met"}<span class="tick" use:tip={"Goal met"} aria-label="Goal met"><Check size={12} /></span>{/if}</span
+      >
+    {/if}
   {/each}
 {/snippet}
 
@@ -123,7 +136,7 @@
       {/each}
     </ol>
     {#if mode === "short"}
-      <p class="key">Click a run of levels to open it. Gold lines are job advancements, green ones goals met.</p>
+      <p class="key">Click a run of levels to open it. Gold lines are job advancements; a tick marks a goal met.</p>
     {/if}
   {:else}
     <p class="key">Your plan shows here as you add goals.</p>
@@ -249,12 +262,28 @@
     font-weight: 600;
   }
 
+  /* New gear as a row of its pictures; each names itself on hover and opens its card. */
   .line.gear {
-    color: var(--text);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    margin: 1px 0 2px -2px;
+  }
+
+  .line.with-icon {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .line .text {
+    min-width: 0;
   }
 
   .tick {
-    margin-left: 5px;
+    display: inline-grid;
+    flex: none;
+    margin-left: 4px;
     color: var(--good);
   }
 

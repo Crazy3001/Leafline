@@ -11,8 +11,7 @@
   import { buildState, watchBuilds } from "$lib/builds.svelte";
   import { attackSpeedText, formatMesos } from "$lib/format";
   import { blankQuery, itemView, statRows, type CheckedStat } from "$lib/items.svelte";
-  import { DROPS_CREDIT, DROPS_URL, OSMS_CREDIT, OSMS_URL, mapData } from "$lib/mapdata.svelte";
-  import { showNpcNamed } from "$lib/places.svelte";
+  import { mapData } from "$lib/mapdata.svelte";
   import { live } from "$lib/readings.svelte";
   import type { GearPiece, ItemRecord, ItemTooltip, ItemWhere, MapReading } from "$lib/types";
 
@@ -205,10 +204,6 @@
   <Section title="Where to get it">
     {#if found}
       <ItemSources {found} />
-      <p class="credit">
-        <button onclick={() => backend.openLink(DROPS_URL)}>{DROPS_CREDIT}</button>
-        <button onclick={() => backend.openLink(OSMS_URL)}>{OSMS_CREDIT}</button>
-      </p>
     {:else if error}
       <p class="note">{error}</p>
     {:else if loading}
@@ -311,25 +306,4 @@
     }
   }
 
-  .credit {
-    display: grid;
-    gap: 2px;
-    margin: 8px 0 0;
-  }
-
-  .credit button {
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--faint);
-    font-size: var(--text-xs);
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .credit button:hover,
-  .credit button:focus-visible {
-    color: var(--muted);
-    outline: none;
-  }
 </style>

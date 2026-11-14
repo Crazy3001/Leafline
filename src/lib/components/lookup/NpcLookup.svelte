@@ -14,7 +14,7 @@
   import Card from "../Card.svelte";
   import MapDataPanel from "../map/MapDataPanel.svelte";
   import { backend } from "$lib/api";
-  import { OSMS_CREDIT, OSMS_URL, mapData, watchMapData } from "$lib/mapdata.svelte";
+  import { mapData, watchMapData } from "$lib/mapdata.svelte";
   import { blankNpcQuery, npcView } from "$lib/places.svelte";
   import type { MapMatch, MapReading, NpcPage, NpcQuery, NpcRow } from "$lib/types";
 
@@ -42,7 +42,7 @@
   let page = $state<NpcPage | null>(null);
   let searching = $state(false);
 
-  const narrowed = $derived(query.region != null ? 1 : 0);
+  const narrowed = $derived([query.region, query.sort].filter((v) => v != null).length);
   const browsing = $derived(query.text.trim() !== "" || query.kind != null || query.area != null || narrowed > 0);
   const asked = $derived(JSON.stringify(query));
 
@@ -128,6 +128,15 @@
             {#each regions as region (region)}<option value={region}>{region}</option>{/each}
           </select>
         </label>
+        <label>
+          <span>Sort</span>
+          <select value={query.sort ?? ""} onchange={(e) => setQuery({ sort: e.currentTarget.value || null })}>
+            <option value="">Best match</option>
+            <option value="name">Name</option>
+            <option value="quests">Most quests</option>
+            <option value="map">Map</option>
+          </select>
+        </label>
       </FilterBox>
     {/if}
   </div>
@@ -159,7 +168,6 @@
         {:else}
           <p class="quiet">No NPCs match.</p>
         {/if}
-        <button class="credit" onclick={() => backend.openLink(OSMS_URL)}>{OSMS_CREDIT}</button>
       {:else if searching}
         <p class="quiet"><span class="spin"><LoaderCircle size={13} /></span> Searching…</p>
       {/if}
@@ -256,21 +264,4 @@
     }
   }
 
-  .credit {
-    display: block;
-    margin-top: 8px;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--faint);
-    font-size: var(--text-xs);
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .credit:hover,
-  .credit:focus-visible {
-    color: var(--muted);
-    outline: none;
-  }
 </style>

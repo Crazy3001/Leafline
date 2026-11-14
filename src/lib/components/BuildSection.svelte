@@ -12,7 +12,7 @@
   import MapDataPanel from "./map/MapDataPanel.svelte";
   import { backend } from "$lib/api";
   import { STATS, buildState, statLabel, watchBuilds } from "$lib/builds.svelte";
-  import { OSMS_CREDIT, OSMS_URL, mapData, watchMapData } from "$lib/mapdata.svelte";
+  import { mapData, watchMapData } from "$lib/mapdata.svelte";
   import { gives } from "$lib/items.svelte";
   import { openPlanner } from "$lib/nav.svelte";
   import { display, keyHint } from "$lib/settings.svelte";
@@ -473,7 +473,7 @@
         {#if step.advance}<p class="advance">{step.advance}</p>{/if}
         {#each step.sp as gain (gain.skillId)}
           <p>
-            <span class="tag">{gain.to - gain.from} SP</span>{gain.name}
+            <span class="tag">{gain.to - gain.from} SP</span><Pic kind="skill" id={gain.skillId} size={18} class="skill-pic" />{gain.name}
             <span class="tabular dim">{gain.from} → {gain.to}</span>
           </p>
         {/each}
@@ -504,9 +504,6 @@
           {warnings.length === 1 ? "1 thing to fix" : `${warnings.length} things to fix`} in this plan
         </button>
       {/if}
-      <footer>
-        <button class="credit" onclick={() => backend.openLink(OSMS_URL)}>{OSMS_CREDIT}</button>
-      </footer>
     </section>
   {/if}
 {:else}
@@ -572,7 +569,7 @@
               <span class="what">
                 {#if s.advance}<span class="advance">{s.advance}</span>{/if}
                 <!-- What the level adds, then the total it makes: "Double Stab +3 (4)". -->
-                {#each s.sp as gain (gain.skillId)}<span>{gain.name} <span class="tabular">+{gain.to - gain.from}</span> <span class="total tabular">({gain.to})</span></span>{/each}
+                {#each s.sp as gain (gain.skillId)}<span><Pic kind="skill" id={gain.skillId} size={16} class="skill-pic" />{gain.name} <span class="tabular">+{gain.to - gain.from}</span> <span class="total tabular">({gain.to})</span></span>{/each}
                 {#each s.ap as gain (gain.stat)}<span>{statLabel(gain.stat)} <span class="tabular">+{gain.amount}</span> <span class="total tabular">({gain.total})</span></span>{/each}
                 {#each s.gear as name (name)}<Ref kind="item" name={name} />{/each}
               </span>
@@ -719,7 +716,6 @@
       {#if plan.build.guide}
         <button class="credit" onclick={() => backend.openGuide(plan!.build.guide)}><ExternalLink size={11} />Open guide</button>
       {/if}
-      <button class="credit" onclick={() => backend.openLink(OSMS_URL)}>{OSMS_CREDIT}</button>
     </footer>
   {/if}
 </section>
@@ -1391,5 +1387,10 @@
   .credit:focus-visible {
     color: var(--muted);
     outline: none;
+  }
+
+  /* The picture of a skill, in line with its name. */
+  :global(.skill-pic) {
+    margin-right: 4px;
   }
 </style>

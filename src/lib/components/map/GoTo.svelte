@@ -35,7 +35,7 @@
     }
     const [foundMaps, foundNpcs] = await Promise.all([
       backend.searchMaps(query).catch(() => []),
-      backend.searchNpcs({ text: query, kind: null, region: null, area: null, offset: 0 }).catch(() => null),
+      backend.searchNpcs({ text: query, kind: null, region: null, area: null, sort: null, offset: 0 }).catch(() => null),
     ]);
     if (ask !== asked) return;
     maps = foundMaps.slice(0, 5);

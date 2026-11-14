@@ -2,12 +2,9 @@
   // Everything the cached data says about one map. No map images or coordinates are shown.
   import { tip } from "$lib/tip.svelte";
   import Ref from "$lib/components/Ref.svelte";
-  import { ExternalLink, Skull } from "@lucide/svelte";
+  import { Skull } from "@lucide/svelte";
 
-  import { backend } from "$lib/api";
   import { formatCompact, formatNumber, monsterLabel } from "$lib/format";
-  import { OSMS_CREDIT, OSMS_URL } from "$lib/mapdata.svelte";
-  import { showNpcNamed } from "$lib/places.svelte";
   import type { MapDetails, MapRef } from "$lib/types";
   import ConnectionCompass from "./ConnectionCompass.svelte";
   import MapPicture from "./MapPicture.svelte";
@@ -198,15 +195,7 @@
   </Section>
 {/if}
 
-<div class="links">
-  {#each details.links as link}
-    <button class="out" onclick={() => backend.openLink(link.url)}>
-      {link.label}<ExternalLink size={11} />
-    </button>
-  {/each}
-</div>
 {/if}
-<button class="credit" onclick={() => backend.openLink(OSMS_URL)}>{OSMS_CREDIT}</button>
 
 <style>
   .facts {
@@ -394,47 +383,4 @@
     }
   }
 
-  .links {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-    margin-top: 12px;
-  }
-
-  .out {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    height: 24px;
-    padding: 0 8px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--muted);
-    font-size: var(--text-xs);
-    cursor: pointer;
-  }
-
-  .out:hover {
-    border-color: var(--border-strong);
-    color: var(--text);
-  }
-
-  .credit {
-    display: block;
-    margin-top: 8px;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--faint);
-    font-size: var(--text-xs);
-    line-height: 1.4;
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .credit:hover {
-    color: var(--muted);
-    text-decoration: underline;
-  }
 </style>

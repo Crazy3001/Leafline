@@ -7,7 +7,6 @@
 
   import { backend } from "$lib/api";
   import { groundDistance } from "$lib/format";
-  import { showMonsterNamed } from "$lib/monsters.svelte";
   import { travelKey } from "$lib/settings.svelte";
   import RouteSteps from "$lib/components/map/RouteSteps.svelte";
   import GoButton from "$lib/components/GoButton.svelte";
@@ -44,19 +43,6 @@
       .finally(() => (routing = false));
   });
 
-  function rate(value: number | null) {
-    if (value == null) return "";
-    return `${value >= 10 ? value.toFixed(0) : value.toFixed(1)}%`;
-  }
-
-  function rateTitle(drop: NonNullable<ObjectiveGuide["hunts"][number]["drop"]>) {
-    const parts = ["Drop rate players measured"];
-    if (drop.sampleKills) parts.push(`over ${drop.sampleKills.toLocaleString()} kills`);
-    if (drop.gameVersion) parts.push(`(v${drop.gameVersion})`);
-    if (drop.rateLow != null && drop.rateHigh != null) parts.push(`· likely ${drop.rateLow.toFixed(1)}–${drop.rateHigh.toFixed(1)}%`);
-    return parts.join(" ");
-  }
-
   const distance = (ground: HuntingGround) => groundDistance(ground, from != null);
 </script>
 
@@ -67,7 +53,7 @@
       <span class="line">
         {#if guide.kind === "item"}
           <span class="who">{top.monster.name}</span>
-          {#if top.drop?.rate != null}<span class="muted" use:tip={rateTitle(top.drop)}>{rate(top.drop.rate)}</span>{/if}
+
           <span class="sep">·</span>
         {/if}
         <span class="where">{best.map.name}</span>
@@ -89,9 +75,6 @@
           <div class="mob">
             <Ref kind="mob" name={hunt.monster.name} />
             <span class="muted">Lv {hunt.monster.level}{hunt.monster.boss ? " · boss" : ""}</span>
-            {#if hunt.drop?.rate != null}
-              <span class="rate" use:tip={rateTitle(hunt.drop)}>{rate(hunt.drop.rate)} drop</span>
-            {/if}
           </div>
           <ul class="maps">
             {#each hunt.maps as ground (ground.map.id)}
@@ -119,7 +102,7 @@
       {/each}
       {#each guide.hunts.filter((h) => !h.monster.known) as hunt (hunt.monster.name)}
         <p class="note">
-          {hunt.monster.name}{#if hunt.drop?.rate != null}<span use:tip={rateTitle(hunt.drop)}> ({rate(hunt.drop.rate)})</span>{/if} also drops
+          {hunt.monster.name} also drops
           it, but isn't in the map data.
         </p>
       {/each}
@@ -261,12 +244,6 @@
 
   .mob :global(.ref) {
     font-weight: 600;
-  }
-
-  .rate {
-    margin-left: auto;
-    color: var(--muted);
-    font-size: var(--text-xs);
   }
 
   .maps {

@@ -102,10 +102,10 @@
           {formatNumber(mesos.mesos)} mesos
         {:else if session?.mesos != null}
           {formatNumber(session.mesos)} mesos
-          <span class="seen">(last seen {formatDuration(session.mesosAge)} ago)</span>
+          <span class="seen">({formatDuration(session.mesosAge)} ago)</span>
         {:else if known}
           <span>{formatNumber(known.mesos)} mesos</span>
-          <span class="seen">(last seen {formatAgo(now - known.seenAt)})</span>
+          <span class="seen">({formatAgo(now - known.seenAt)})</span>
         {:else}
           Mesos not visible
         {/if}

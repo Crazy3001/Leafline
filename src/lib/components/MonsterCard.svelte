@@ -2,7 +2,7 @@
   // One monster from the search: its numbers, what it is weak to, where it lives, what players
   // saw it drop, and the quests that want it. The numbers are the data's base values.
   import { tip } from "$lib/tip.svelte";
-  import { ExternalLink, LoaderCircle, Skull } from "@lucide/svelte";
+  import { LoaderCircle, Skull } from "@lucide/svelte";
   import { untrack } from "svelte";
 
   import Card from "./Card.svelte";
@@ -12,7 +12,7 @@
   import { backend } from "$lib/api";
   import { formatCompact, formatDuration, formatNumber, monsterLabel } from "$lib/format";
   import { measuredRates, watchHistory } from "$lib/history.svelte";
-  import { OSMS_CREDIT, OSMS_URL, WIKI_URL } from "$lib/mapdata.svelte";
+  import { WIKI_URL } from "$lib/mapdata.svelte";
   import Ref from "./Ref.svelte";
   import PicFrame from "$lib/ui/PicFrame.svelte";
   import { travelKey } from "$lib/settings.svelte";
@@ -252,14 +252,6 @@
       </Section>
     {/if}
 
-    {#if !compact}
-    <div class="links">
-      <button class="out" onclick={() => backend.openLink(wikiPage(sheet.name))}>
-        mapleclassic.wiki<ExternalLink size={11} />
-      </button>
-    </div>
-    {/if}
-    <button class="credit" onclick={() => backend.openLink(OSMS_URL)}>{OSMS_CREDIT}</button>
   {:else if error}
     <p class="soft note">{error}</p>
   {:else}

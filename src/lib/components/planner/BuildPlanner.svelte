@@ -16,9 +16,10 @@
   import MapDataPanel from "$lib/components/map/MapDataPanel.svelte";
   import NewBuild from "$lib/components/planner/NewBuild.svelte";
   import Timeline from "$lib/components/planner/Timeline.svelte";
+  import Segmented from "$lib/ui/Segmented.svelte";
   import { guideLinks } from "$lib/guides";
   import { gives } from "$lib/items.svelte";
-  import { OSMS_CREDIT, OSMS_URL, mapData, watchMapData } from "$lib/mapdata.svelte";
+  import { mapData, watchMapData } from "$lib/mapdata.svelte";
   import { apSplit, skillReached, statReached, stepAt, type Reached } from "$lib/planner";
   import { live, watchLive } from "$lib/readings.svelte";
   import { DEFAULT_RULES, changeSettings, display, keyHint, watchSettings } from "$lib/settings.svelte";
@@ -504,10 +505,18 @@
     rulesTimer = setTimeout(() => changeSettings({ buildRules: next }), SAVE_DELAY);
   }
 
+  const GENDERS = [
+    { id: "", label: "Either" },
+    { id: "male", label: "Male" },
+    { id: "female", label: "Female" },
+  ];
+  /** The character's gender as the plan has it, or as the gear worn tells. */
+  const gender = $derived(draft?.start.gender ?? outfit?.wornGender ?? null);
+  const genderWord = $derived(gender === "male" ? "Male" : gender === "female" ? "Female" : null);
   const rulesChanged = $derived(JSON.stringify(display.buildRules) !== JSON.stringify(DEFAULT_RULES));
   const pathSummary = $derived(
     draft
-      ? `${jobPath} · ${draft.character ? `${draft.character}, ` : ""}Lv ${draft.start.level} · planned to Lv ${draft.plan.planTo}`
+      ? `${jobPath} · ${draft.character ? `${draft.character}, ` : ""}Lv ${draft.start.level}${genderWord ? ` · ${genderWord}` : ""} · planned to Lv ${draft.plan.planTo}`
       : "",
   );
 </script>
@@ -739,6 +748,19 @@
             level tier the data has for this plan, each better than the last. Add a piece to pick it over the data's choice
             for its tier. The first one ahead shows as Next in Character → Gear.
           </p>
+          <div class="gender">
+            <span class="faint">Gear made for</span>
+            <Segmented
+              label="Gear made for"
+              size="sm"
+              options={GENDERS}
+              value={draft.start.gender ?? ""}
+              onchange={(g) => draft && (draft.start.gender = g || null)}
+            />
+            {#if !draft.start.gender && outfit?.wornGender}
+              <span class="faint">Your worn gear is {outfit.wornGender}-only, so the path keeps to {outfit.wornGender} gear.</span>
+            {/if}
+          </div>
           <ul class="slots">
             {#each gearSlots as slot (slot)}
               {@const worn = wearing(slot)}
@@ -989,7 +1011,6 @@
           </section>
         {/if}
 
-        <button class="credit" onclick={() => backend.openLink(OSMS_URL)}>{OSMS_CREDIT}</button>
       </div>
     </main>
 
@@ -1551,6 +1572,15 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     background: var(--surface);
+  }
+
+  .gender {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+    margin: 0 0 8px;
+    font-size: var(--text-sm);
   }
 
   .chip.worn {

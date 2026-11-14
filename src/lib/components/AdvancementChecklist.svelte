@@ -102,7 +102,7 @@
       const instructor = journey?.giver ? await place(journey.giver) : null;
       let tester: Place | null = null;
       if (tier === 2) {
-        const npcs = await backend.searchNpcs({ text: `${className} Job Instructor`, kind: null, region: null, area: null, offset: 0 });
+        const npcs = await backend.searchNpcs({ text: `${className} Job Instructor`, kind: null, region: null, area: null, sort: null, offset: 0 });
         const row = npcs.closest ? null : [...npcs.npcs].sort((a, b) => a.id - b.id)[0];
         if (row) tester = await place(row.name, row.id);
       }

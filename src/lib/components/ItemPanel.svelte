@@ -17,7 +17,7 @@
   import { backend } from "$lib/api";
   import Pic from "$lib/ui/Pic.svelte";
   import { JOBS, blankQuery, gearView, gives, itemSlot, itemView, lastLine, watchItems } from "$lib/items.svelte";
-  import { OSMS_CREDIT, OSMS_URL, mapData, watchMapData } from "$lib/mapdata.svelte";
+  import { mapData, watchMapData } from "$lib/mapdata.svelte";
   import { live } from "$lib/readings.svelte";
   import { hotkey } from "$lib/settings.svelte";
   import type { ItemFilters, ItemKind, ItemPage, ItemRecord, ItemTooltip, MapReading } from "$lib/types";
@@ -291,7 +291,6 @@
       {:else}
         <p class="quiet">No items match.</p>
       {/if}
-      <button class="credit" onclick={() => backend.openLink(OSMS_URL)}>{OSMS_CREDIT}</button>
     {:else if searching}
       <p class="quiet"><span class="spin"><LoaderCircle size={13} /></span> Searching…</p>
     {/if}
@@ -456,21 +455,4 @@
     text-align: center;
   }
 
-  .credit {
-    display: block;
-    margin-top: 8px;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--faint);
-    font-size: var(--text-xs);
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .credit:hover,
-  .credit:focus-visible {
-    color: var(--muted);
-    outline: none;
-  }
 </style>

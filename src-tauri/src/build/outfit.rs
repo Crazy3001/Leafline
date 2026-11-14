@@ -7,7 +7,7 @@ use serde::Serialize;
 
 use super::catalog::{Catalog, novelty};
 use super::fit::ARMOUR;
-use super::plan::{Build, Expansion, GearCheck, MAX_LEVEL, Piece, Stats, piece_bonus};
+use super::plan::{Build, Expansion, GearCheck, MAX_LEVEL, Piece, Start, Stats, piece_bonus};
 use super::rules::Rules;
 use super::suggest::{Scorer, Wearer};
 use crate::mapdata::osms::ItemRecord;
@@ -71,6 +71,8 @@ pub struct Outfit {
     pub slots: Vec<SlotGear>,
     /// Each slot's way up from this level, which `slots` takes its suggestion and next step from.
     pub paths: Vec<GearPath>,
+    /// Who the gear worn was made for, when a piece of it says: `male` or `female`.
+    pub worn_gender: Option<String>,
 }
 
 /// The slots in order. An overall takes the top's and bottom's place.
@@ -141,6 +143,7 @@ pub fn outfit(build: &Build, expansion: &Expansion, rules: &Rules, catalog: &Cat
         });
     }
     outfit.paths = paths;
+    outfit.worn_gender = worn_gender(build, catalog);
     outfit
 }
 
@@ -170,14 +173,24 @@ pub struct GearPath {
     pub passed: Vec<ItemRecord>,
 }
 
-/// Each slot's way up from `from` to the plan's end. A piece joins when the plan can first wear
-/// it, if it is of a higher tier (needs a higher level) than the last one and scores above it.
+/// Each slot's way up from `from` to the plan's end. A piece joins at the level it asks for (job
+/// and gender count, stats don't: the player raises those to suit), if it is of a higher tier (needs a higher level) than the last one and scores above it.
 /// Within a tier the plan's own goal wins over the data's pick, when it too beats the last piece.
 /// What is worn is never offered again. An overall or a shield has a path only when worn or
 /// planned, and then only of the plan's goals; a worn overall leaves the top and bottom out.
 pub fn gear_paths(build: &Build, expansion: &Expansion, rules: &Rules, catalog: &Catalog, from: u32) -> Vec<GearPath> {
     let from = from.clamp(1, MAX_LEVEL);
     let end = expansion.steps.last().map_or(from, |s| s.level).max(from);
+    // A build that doesn't say who its gear is for goes by the gear worn, so a path holds nothing
+    // the character can't put on.
+    let gendered;
+    let build = match (&build.start.gender, worn_gender(build, catalog)) {
+        (None, Some(gender)) => {
+            gendered = Build { start: Start { gender: Some(gender), ..build.start.clone() }, ..build.clone() };
+            &gendered
+        }
+        _ => build,
+    };
     let wearers: Vec<(u32, Wearer)> = (from..=end).map(|at| (at, Wearer::new(build, expansion, rules, catalog, at))).collect();
     let scorer = Scorer::new(build);
     let trained = catalog.weapons_of_branch(build.plan.job);
@@ -218,7 +231,7 @@ pub fn gear_paths(build: &Build, expansion: &Expansion, rules: &Rules, catalog: 
                 .iter()
                 .copied()
                 .filter(|i| {
-                    wearer.can_wear(i)
+                    wearer.old_enough(i)
                         && floor.is_none_or(|f| scorer.of(i) > f)
                         && tier.is_none_or(|t| if first { i.req_level >= t } else { i.req_level > t })
                 })
@@ -596,6 +609,12 @@ mod tests {
             steps,
             [("Heckler", 40, true), ("Silver Crow", 45, false), ("Rower", 50, true), ("Golden Crow", 60, false), ("Gross Jaeger", 70, true)]
         );
+        // Stats don't hold a piece back: with far too little DEX, each still comes at its level.
+        let weak = Build { start: Start { stats: Some(Stats { str: 4, dex: 20, int: 4, luk: 4 }), ..build.start.clone() }, ..build.clone() };
+        let weak_outfit = at(&weak, &catalog, 33);
+        let weak_steps: Vec<u32> =
+            weak_outfit.paths.iter().find(|p| p.slot == "Weapon").unwrap().steps.iter().map(|s| s.level).collect();
+        assert_eq!(weak_steps, [40, 45, 50, 60, 70]);
         // Two hat goals at or below Lv 33: only the better one, as the piece to get now.
         let hat = path("Hat");
         assert_eq!(hat.now.as_ref().map(|s| (s.item.name.as_str(), s.planned)), Some(("Green Hawkeye", true)));

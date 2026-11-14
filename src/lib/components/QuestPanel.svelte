@@ -13,7 +13,7 @@
   import FollowedQuests from "./quest/FollowedQuests.svelte";
   import { backend } from "$lib/api";
   import { formatCompact } from "$lib/format";
-  import { OSMS_CREDIT, OSMS_URL, mapData, watchMapData } from "$lib/mapdata.svelte";
+  import { mapData, watchMapData } from "$lib/mapdata.svelte";
   import { blankSearch, followedQuests, noteCharacter, questView, watchQuests } from "$lib/quests.svelte";
   import type { MapReading, QuestPage, QuestReading, QuestRow, QuestSearch, SessionSummary } from "$lib/types";
 
@@ -193,7 +193,6 @@
       {:else}
         <p class="quiet">No quests match.</p>
       {/if}
-      <button class="credit" onclick={() => backend.openLink(OSMS_URL)}>{OSMS_CREDIT}</button>
     {:else if searching}
       <p class="quiet"><span class="spin"><LoaderCircle size={13} /></span> Searching…</p>
     {/if}
@@ -435,21 +434,4 @@
     text-align: center;
   }
 
-  .credit {
-    display: block;
-    margin-top: 8px;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--faint);
-    font-size: var(--text-xs);
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .credit:hover,
-  .credit:focus-visible {
-    color: var(--muted);
-    outline: none;
-  }
 </style>

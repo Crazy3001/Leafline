@@ -17,7 +17,7 @@
   import { backend } from "$lib/api";
   import Pic from "$lib/ui/Pic.svelte";
   import { formatCompact, formatNumber, monsterLabel } from "$lib/format";
-  import { OSMS_CREDIT, OSMS_URL, mapData, watchMapData } from "$lib/mapdata.svelte";
+  import { mapData, watchMapData } from "$lib/mapdata.svelte";
   import { backFromMonster, blankMonsterQuery, monsterView, openMonster } from "$lib/monsters.svelte";
   import type { MapMatch, MapReading, MonsterFilters, MonsterPage, MonsterQuery, MonsterRow, MobRow, QuestReading, SessionSummary } from "$lib/types";
 
@@ -281,7 +281,6 @@
         {:else}
           <p class="quiet">No monsters match.</p>
         {/if}
-        <button class="credit" onclick={() => backend.openLink(OSMS_URL)}>{OSMS_CREDIT}</button>
       {:else if searching}
         <p class="quiet"><span class="spin"><LoaderCircle size={13} /></span> Searching…</p>
       {/if}
@@ -480,21 +479,4 @@
     }
   }
 
-  .credit {
-    display: block;
-    margin-top: 8px;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--faint);
-    font-size: var(--text-xs);
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .credit:hover,
-  .credit:focus-visible {
-    color: var(--muted);
-    outline: none;
-  }
 </style>

@@ -6,7 +6,6 @@
   import Card from "./Card.svelte";
   import QuestSteps from "./quest/QuestSteps.svelte";
   import { backend } from "$lib/api";
-  import { DROPS_CREDIT, DROPS_URL, OSMS_CREDIT, OSMS_URL } from "$lib/mapdata.svelte";
   import { follow, isFollowed, unfollow } from "$lib/quests.svelte";
   import type { MapReading, QuestReading, QuestWhere } from "$lib/types";
 
@@ -84,12 +83,6 @@
 
     <QuestSteps {sheet} from={found?.from ?? null} />
 
-    {#if !compact}
-    <p class="credit">
-      <button onclick={() => backend.openLink(OSMS_URL)}>{OSMS_CREDIT}</button>
-      <button onclick={() => backend.openLink(DROPS_URL)}>{DROPS_CREDIT}</button>
-    </p>
-    {/if}
   {:else if error}
     <p class="note">{error}</p>
   {:else}
@@ -202,25 +195,4 @@
     }
   }
 
-  .credit {
-    display: grid;
-    gap: 2px;
-    margin: 12px 0 0;
-  }
-
-  .credit button {
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--faint);
-    font-size: var(--text-xs);
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .credit button:hover,
-  .credit button:focus-visible {
-    color: var(--muted);
-    outline: none;
-  }
 </style>

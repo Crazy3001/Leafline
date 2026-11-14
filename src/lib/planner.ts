@@ -6,8 +6,12 @@ import type { BaseStat, BaseStats, LevelStep, SkillLevel, StatGoal } from "$lib/
 /** One line of a timeline row, and what it marks. */
 export interface TimelineLine {
   text: string;
-  /** "advance": a job advancement; "gear": goal gear to get; "met": a skill goal reached. */
+  /** "advance": a job advancement; "gear": gear to get; "met": a skill goal reached. */
   kind: "plain" | "advance" | "gear" | "met" | "sub";
+  /** The skill a skill line is about, for its picture. */
+  skillId?: number;
+  /** A gear line's pieces, shown as their pictures. */
+  items?: string[];
 }
 
 /** One row: a level, or a run of levels that do the same thing. */
@@ -59,7 +63,8 @@ function describe(run: LevelStep[], goals: SkillLevel[], level: number | null): 
   const one = run.length === 1;
   const lines: TimelineLine[] = [];
   for (const step of run) if (step.advance) lines.push({ text: step.advance, kind: "advance" });
-  for (const step of run) if (gearAhead(step, level)) for (const name of step.gear) lines.push({ text: `Get ${name}`, kind: "gear" });
+  const gear = run.filter((step) => gearAhead(step, level)).flatMap((step) => step.gear);
+  if (gear.length) lines.push({ text: `Gear: ${gear.join(", ")}`, kind: "gear", items: gear });
 
   const skills = new Map<number, { name: string; amounts: number[]; from: number; to: number }>();
   for (const step of run) {
@@ -74,8 +79,8 @@ function describe(run: LevelStep[], goals: SkillLevel[], level: number | null): 
   for (const [id, s] of skills) {
     const met = goals.some((g) => g.skillId === id && g.level === s.to);
     const each = s.amounts.every((a) => a === s.amounts[0]) && s.amounts.length === run.length;
-    const text = one ? `${s.name} ${s.from} → ${s.to}` : each ? `${s.name} +${s.amounts[0]} a level, to ${s.to}` : `${s.name} to ${s.to}`;
-    lines.push({ text, kind: met ? "met" : "plain" });
+    const text = one || !each ? `${s.name} → ${s.to}` : `${s.name} +${s.amounts[0]}/lv → ${s.to}`;
+    lines.push({ text, kind: met ? "met" : "plain", skillId: id });
   }
 
   const stats = new Map<BaseStat, { amounts: number[]; at: number[]; total: number }>();
@@ -90,11 +95,10 @@ function describe(run: LevelStep[], goals: SkillLevel[], level: number | null): 
   }
   const parts = [...stats].map(([stat, s]) => {
     const label = statLabel(stat);
-    if (one) return `${label} +${s.amounts[0]}, to ${s.total}`;
+    if (one) return `${label} → ${s.total}`;
     const every = s.amounts.length === run.length && s.amounts.every((a) => a === s.amounts[0]);
-    if (every) return `${label} +${s.amounts[0]} a level, to ${s.total}`;
-    if (s.at.length === 1) return `${label} +${s.amounts[0]} at ${s.at[0]}, to ${s.total}`;
-    return `${label} to ${s.total}`;
+    if (every) return `${label} +${s.amounts[0]}/lv → ${s.total}`;
+    return `${label} → ${s.total}`;
   });
   if (parts.length) lines.push({ text: parts.join(" · "), kind: "sub" });
   return lines;
