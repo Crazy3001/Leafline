@@ -628,8 +628,11 @@ export interface Trip {
   offer: { title: string; quest: string; destination: Destination; giver: boolean } | null;
 }
 
-/** A Route pin's word to the overlay: send the trip as it stands, or drop the turn-in offer. */
-export type TripMessage = "ask" | "dismiss-offer";
+/**
+ * A Route pin's word to the overlay: send the trip as it stands, drop the turn-in offer, or work
+ * the route out again (once the taxis and scrolls are downloaded).
+ */
+export type TripMessage = "ask" | "dismiss-offer" | "reroute";
 
 /** Taxis and return scrolls (see src-tauri/src/mapdata/travel.rs). */
 export type TravelKind = "cab" | "vipCab" | "scroll" | "npc";

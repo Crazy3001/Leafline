@@ -53,6 +53,7 @@ export function startWayfinder() {
   started = true;
   backend.onTripMessage((message) => {
     if (message === "dismiss-offer") trip.offer = null;
+    else if (message === "reroute") startTrip();
     else void backend.sendTrip($state.snapshot(trip));
   });
   watchDestination();
@@ -203,6 +204,12 @@ export function endTrip() {
 export function dismissOffer() {
   trip.offer = null;
   if (!started) void backend.tripMessage("dismiss-offer");
+}
+
+/** Works the route out again, as when the taxis and scrolls it may use have just arrived. */
+export function rerouteTrip() {
+  if (started) startTrip();
+  else void backend.tripMessage("reroute");
 }
 
 let following = false;

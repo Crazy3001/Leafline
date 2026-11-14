@@ -21,6 +21,12 @@ export function stepVerb(step: RouteStep): string {
   return step.side ? sides[step.side] : verbs[step.direction];
 }
 
+/** Rough walking time: under a minute in tens of seconds, then whole minutes. */
+export function walkTime(seconds: number): string {
+  if (seconds < 60) return `${Math.max(10, Math.round(seconds / 10) * 10)} s`;
+  return `${Math.round(seconds / 60)} min`;
+}
+
 /**
  * A header this close to a map's name settles it, as `SETTLED_SCORE` does in
  * src-tauri/src/mapdata/atlas.rs. Below it a reading only counts for a map the route expects.

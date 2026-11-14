@@ -1,23 +1,29 @@
 <script lang="ts">
   // A route's steps as the player takes them, and how many portals it takes. Rides and return
-  // scrolls, when the player turned them on, stand apart from portal steps.
+  // scrolls, when the player turned them on, stand apart from portal steps. On a trip being
+  // followed, the steps taken are ticked off and the one to take now stands out.
   import { tip } from "$lib/tip.svelte";
-  import { CarTaxiFront, EyeOff, Plane, ScrollText } from "@lucide/svelte";
+  import { CarTaxiFront, Check, EyeOff, Plane, ScrollText } from "@lucide/svelte";
 
   import Ref from "$lib/components/Ref.svelte";
   import { formatNumber } from "$lib/format";
   import type { MapRoute } from "$lib/types";
 
-  /** Rough walking time: under a minute in tens of seconds, then whole minutes. */
-  function walkTime(seconds: number) {
-    if (seconds < 60) return `${Math.max(10, Math.round(seconds / 10) * 10)} s`;
-    return `${Math.round(seconds / 60)} min`;
-  }
-  import { HIDDEN_PORTAL_HINT, stepVerb as verb } from "$lib/wayfinding";
+  import { HIDDEN_PORTAL_HINT, stepVerb as verb, walkTime } from "$lib/wayfinding";
 
-  let { route }: { route: MapRoute } = $props();
+  let {
+    route,
+    current = null,
+    note = true,
+  }: {
+    route: MapRoute;
+    /** On a trip being followed, the step to take now. */
+    current?: number | null;
+    /** The line under the steps saying how many portals and how long; off where it is said elsewhere. */
+    note?: boolean;
+  } = $props();
 
-  const rides =$derived(route.steps.filter((s) => s.travel).length);
+  const rides = $derived(route.steps.filter((s) => s.travel).length);
   const portals = $derived(route.steps.length - rides);
 </script>
 
@@ -26,8 +32,15 @@
 {:else}
   <ol class="steps">
     {#each route.steps as step, i}
-      <li class:ride={step.travel} class:end={i === route.steps.length - 1}>
-        <span class="n tabular">{i + 1}</span>
+      {@const done = current != null && i < current}
+      <li
+        class:ride={step.travel}
+        class:end={i === route.steps.length - 1}
+        class:done
+        class:now={current === i}
+        aria-current={current === i ? "step" : undefined}
+      >
+        <span class="n tabular">{#if done}<Check size={11} strokeWidth={3} />{:else}{i + 1}{/if}</span>
         <span class="text">
           {#if step.travel}
             <span class="service">
@@ -54,7 +67,9 @@
       </li>
     {/each}
   </ol>
-  {#if rides}
+  {#if !note}
+    <!-- Said by whoever shows the steps. -->
+  {:else if rides}
     <p class="note">
       {portals} portal{portals === 1 ? "" : "s"} and {rides}
       {rides === 1 ? "ride or scroll" : "rides or scrolls"}{#if route.walking != null}, instead of {route.walking} portals on foot{:else}; no portals lead
@@ -131,6 +146,27 @@
     background: var(--map);
     box-shadow: 0 0 10px color-mix(in srgb, var(--map) 45%, transparent);
     color: var(--accent-ink);
+  }
+
+  /* Steps already taken fade back; the one to take now gets the accent. */
+  .done .n {
+    border-color: color-mix(in srgb, var(--map) 35%, transparent);
+    color: color-mix(in srgb, var(--map) 70%, transparent);
+  }
+
+  .done .text {
+    opacity: 0.55;
+  }
+
+  .now .n {
+    border-color: var(--accent-strong);
+    background: var(--accent-soft);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+    color: var(--accent-strong);
+  }
+
+  .now .text {
+    font-weight: 600;
   }
 
   .text {
