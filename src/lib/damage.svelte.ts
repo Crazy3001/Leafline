@@ -78,15 +78,23 @@ export function effective(typed: Assumptions, read: PlayerDamage | null, stats: 
       : (typed.skillName ? skills.find((s) => s.name === typed.skillName) : null) ??
         [...skills].sort((a, b) => b.percent - a.percent)[0] ??
         null;
-  const buffedMin = stats?.buffed?.attackMin ?? null;
-  const buffedMax = stats?.buffed?.attackMax ?? null;
+  // The range with the buffs on now, or without any when none is on: the window's own range can
+  // hold a buff that has since run out.
+  const now = stats?.buffed ?? stats?.base ?? null;
+  const buffedMin = now?.attackMin ?? null;
+  const buffedMax = now?.attackMax ?? null;
   const buffed =
-    attackRead && buffedMin != null && buffedMax != null && (buffedMin !== read!.attackMin || buffedMax !== read!.attackMax);
+    attackRead &&
+    stats?.buffed != null &&
+    buffedMin != null &&
+    buffedMax != null &&
+    (buffedMin !== stats.base?.attackMin || buffedMax !== stats.base?.attackMax);
+  const useNow = attackRead && buffedMin != null && buffedMax != null;
   return {
     assumptions: {
       ...typed,
-      attackMin: attackRead ? (buffed ? buffedMin : read!.attackMin) : typed.attackMin,
-      attackMax: attackRead ? (buffed ? buffedMax : read!.attackMax) : typed.attackMax,
+      attackMin: attackRead ? (useNow ? buffedMin : read!.attackMin) : typed.attackMin,
+      attackMax: attackRead ? (useNow ? buffedMax : read!.attackMax) : typed.attackMax,
       skillFactor: skill ? skill.percent / 100 : typed.skillFactor,
     },
     skill,
