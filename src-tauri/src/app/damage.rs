@@ -12,7 +12,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 
 use super::mapdata::MapDataState;
 use super::records::now;
-use super::sheet::{SkillSeen, StatSheet};
+use super::sheet::{SkillSeen, StatSheet, buffs_of, seen_buffs, seen_on};
 use crate::build::Catalog;
 use crate::mapdata::osms::SkillRecord;
 use crate::error::{Error, Result};
@@ -182,12 +182,26 @@ pub fn note(app: &AppHandle, scan: &CharacterScan) {
             sheet.take_detail(detail);
         }
         entry.read_at = Some(now());
-        // The window's numbers already count whatever was on as it was read.
-        entry.read_with.clone_from(&entry.buffs_on);
     }
     if let (Some(window), Some(catalog)) = (skills, catalog) {
         merge(&mut entry.skills, damaging_skills(window, &catalog));
         merge_seen(&mut entry.skill_levels, seen_skills(window, &catalog));
+    }
+    if detail.is_some()
+        && let Some(sheet) = entry.sheet
+    {
+        // The pane shows in red what buffs add, so it says which buffs are on: their switches
+        // follow it. Buffs it can't show, such as a booster, stay as the player set them.
+        let (rows, _) = buffs_of(app, name, entry);
+        if let Some(on) = seen_on(&rows, &sheet) {
+            let seen = seen_buffs(&rows);
+            entry.buffs_on.retain(|id| !seen.contains(id));
+            entry.buffs_on.extend(on);
+        }
+    }
+    if stats.is_some() || detail.is_some() {
+        // The window's numbers count whatever was on as it was read.
+        entry.read_with.clone_from(&entry.buffs_on);
     }
     if *entry == before {
         return;

@@ -14,7 +14,7 @@ use super::mapdata::MapDataState;
 use super::records::UserDataState;
 use crate::build::{Build, Catalog};
 use crate::mapdata::osms::{Effects, SkillRecord};
-use crate::readers::character::{DetailWindow, StatWindow};
+use crate::readers::character::{DetailBonus, DetailWindow, StatWindow};
 
 /// Everything the stat window and its detail pane showed. Each read fills in what it saw; a part
 /// that wasn't open keeps what an earlier read gave.
@@ -48,6 +48,10 @@ pub struct StatSheet {
     pub crit_damage: Option<u32>,
     pub speed: Option<u32>,
     pub jump: Option<u32>,
+    /// What buffs added to each detail line, as the pane showed it in red: the `+14` of `90 (+14)`.
+    pub buff_bonus: DetailBonus,
+    /// The Attack line was red, so a buff was in the range.
+    pub attack_buffed: bool,
 }
 
 impl StatSheet {
@@ -75,6 +79,8 @@ impl StatSheet {
         self.crit_damage = keep(d.crit_damage, self.crit_damage);
         self.speed = keep(d.speed, self.speed);
         self.jump = keep(d.jump, self.jump);
+        self.buff_bonus = d.bonus;
+        self.attack_buffed = d.attack_buffed;
     }
 }
 
@@ -110,12 +116,14 @@ pub struct BuffRow {
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StatsView {
+    /// As the window showed it, buffs and all.
     pub sheet: Option<StatSheet>,
     /// When the stat window or its detail pane was last read, in Unix seconds.
     pub read_at: Option<i64>,
     pub buffs: Vec<BuffRow>,
-    /// The sheet with the buffs on now in place of those on at the read. `None` when it would be
-    /// the same.
+    /// The sheet without any buff: what the window showed less what it said buffs added.
+    pub base: Option<StatSheet>,
+    /// The sheet with the buffs on now. `None` when none is on that changes a number.
     pub buffed: Option<StatSheet>,
     /// The worn gear's Attack, which a buff's Attack is counted against. `None` with no gear worn
     /// that has any.
@@ -211,41 +219,65 @@ fn sum<'a>(rows: impl Iterator<Item = &'a BuffRow>) -> Effects {
     })
 }
 
-/// The sheet with the buffs on now in place of those on when it was read, and whether the attack
-/// range had to be left as read. `None` when nothing changes.
-pub fn with_buffs(sheet: &StatSheet, rows: &[BuffRow], weapon_attack: Option<u32>) -> Option<(StatSheet, bool)> {
+/// The sheet without buffs. Each detail line loses what the pane said buffs added to it. The
+/// Attack line gives no share, only its red, so a red range is scaled back by the buffs that were
+/// on as it was read, when the gear's Attack is known.
+pub fn without_buffs(sheet: &StatSheet, rows: &[BuffRow], weapon_attack: Option<u32>) -> StatSheet {
+    let b = &sheet.buff_bonus;
+    let less = |value: Option<u32>, by: i32| value.map(|v| (i64::from(v) - i64::from(by)).max(0) as u32);
+    let mut out = *sheet;
+    out.weapon_def = less(sheet.weapon_def, b.weapon_def);
+    out.magic = less(sheet.magic, b.magic);
+    out.magic_def = less(sheet.magic_def, b.magic_def);
+    out.accuracy = less(sheet.accuracy, b.accuracy);
+    out.evasion = less(sheet.evasion, b.evasion);
+    out.crit_rate = less(sheet.crit_rate, b.crit_rate);
+    out.crit_damage = less(sheet.crit_damage, b.crit_damage);
+    out.speed = less(sheet.speed, b.speed);
+    out.jump = less(sheet.jump, b.jump);
+    out.buff_bonus = DetailBonus::default();
+    let then = sum(rows.iter().filter(|r| r.on_at_read)).attack;
+    if sheet.attack_buffed
+        && then != 0
+        && let Some(gear) = weapon_attack
+    {
+        let scale = |v: Option<u32>| v.map(|v| (f64::from(v) * f64::from(gear) / f64::from(gear as i32 + then).max(1.0)).round() as u32);
+        out.attack_min = scale(sheet.attack_min);
+        out.attack_max = scale(sheet.attack_max);
+    }
+    out.attack_buffed = false;
+    out
+}
+
+/// The sheet without buffs, `base`, with the buffs on now, and whether a buff's Attack had to be
+/// left out of the range for want of the gear's Attack. `None` when no buff on changes a number.
+pub fn with_buffs(base: &StatSheet, rows: &[BuffRow], weapon_attack: Option<u32>) -> Option<(StatSheet, bool)> {
     let now = sum(rows.iter().filter(|r| r.on));
-    let then = sum(rows.iter().filter(|r| r.on_at_read));
-    if now == then {
+    if !now.any() {
         return None;
     }
-    let shift = |value: Option<u32>, by: i32| value.map(|v| (i64::from(v) + i64::from(by)).max(0) as u32);
-    let mut out = *sheet;
-    out.magic = shift(sheet.magic, now.magic - then.magic);
-    out.magic_def = shift(sheet.magic_def, now.magic_def - then.magic_def);
-    out.accuracy = shift(sheet.accuracy, now.accuracy - then.accuracy);
-    out.evasion = shift(sheet.evasion, now.evasion - then.evasion);
-    out.speed = shift(sheet.speed, now.speed - then.speed);
-    out.jump = shift(sheet.jump, now.jump - then.jump);
+    let more = |value: Option<u32>, by: i32| value.map(|v| (i64::from(v) + i64::from(by)).max(0) as u32);
+    let mut out = *base;
+    out.magic = more(base.magic, now.magic);
+    out.magic_def = more(base.magic_def, now.magic_def);
+    out.accuracy = more(base.accuracy, now.accuracy);
+    out.evasion = more(base.evasion, now.evasion);
+    out.speed = more(base.speed, now.speed);
+    out.jump = more(base.jump, now.jump);
     // Weapon Def.: the share is of the defence without buffs, and the flat part comes on top.
-    out.weapon_def = sheet.weapon_def.map(|shown| {
-        let base = (f64::from(shown) - f64::from(then.weapon_def)) / (1.0 + f64::from(then.weapon_def_percent) / 100.0);
-        (base * (1.0 + f64::from(now.weapon_def_percent) / 100.0) + f64::from(now.weapon_def)).round().max(0.0) as u32
+    out.weapon_def = base.weapon_def.map(|v| {
+        (f64::from(v) * (1.0 + f64::from(now.weapon_def_percent) / 100.0) + f64::from(now.weapon_def)).round().max(0.0) as u32
     });
-    // The attack range grows with Attack: the range read went with the gear's Attack and the
-    // buffs then, so it is scaled by the Attack now over that. Without the gear's Attack the
-    // share is unknown, and the range stays as read.
+    // The attack range grows with Attack, by the gear's Attack and the buffs' over the gear's.
     let mut unscaled = false;
-    if now.attack != then.attack {
+    if now.attack != 0 {
         match weapon_attack {
             Some(gear) => {
-                let then_attack = f64::from(gear) + f64::from(then.attack);
-                let now_attack = f64::from(gear) + f64::from(now.attack);
-                if then_attack > 0.0 {
-                    let scale = |v: Option<u32>| v.map(|v| (f64::from(v) * now_attack.max(0.0) / then_attack).round() as u32);
-                    out.attack_min = scale(sheet.attack_min);
-                    out.attack_max = scale(sheet.attack_max);
-                }
+                let scale = |v: Option<u32>| {
+                    v.map(|v| (f64::from(v) * f64::from(gear as i32 + now.attack).max(0.0) / f64::from(gear)).round() as u32)
+                };
+                out.attack_min = scale(base.attack_min);
+                out.attack_max = scale(base.attack_max);
             }
             None => unscaled = true,
         }
@@ -253,24 +285,67 @@ pub fn with_buffs(sheet: &StatSheet, rows: &[BuffRow], weapon_attack: Option<u32
     Some((out, unscaled))
 }
 
-/// The view of `name`'s stats from what is stored.
-pub fn view(app: &AppHandle, name: &str, stored: Option<&PlayerDamage>) -> StatsView {
+/// How many buffs are tried together when working out which are on.
+const MOST_TRIED: usize = 12;
+
+/// Which buffs the detail pane shows are on: the one set of the character's buffs, among those
+/// that change a line it shows, whose numbers add up to what it showed in red, a red Attack line
+/// meaning one with Attack is on. `None` when no set fits, or more than one does, which leaves
+/// the switches as the player set them.
+pub fn seen_on(rows: &[BuffRow], sheet: &StatSheet) -> Option<Vec<u32>> {
+    let tried: Vec<&BuffRow> = rows.iter().filter(|r| r.level.is_some() && r.effects.any()).take(MOST_TRIED).collect();
+    let shown = &sheet.buff_bonus;
+    let base_def = sheet.weapon_def.map(|v| i64::from(v) - i64::from(shown.weapon_def));
+    let fits = |set: u32| {
+        let all = sum(tried.iter().enumerate().filter(|(i, _)| set & (1 << i) != 0).map(|(_, r)| *r));
+        let def = i64::from(all.weapon_def) + base_def.map_or(0, |b| (b as f64 * f64::from(all.weapon_def_percent) / 100.0).round() as i64);
+        all.accuracy == shown.accuracy
+            && all.evasion == shown.evasion
+            && all.magic == shown.magic
+            && all.magic_def == shown.magic_def
+            && all.speed == shown.speed
+            && all.jump == shown.jump
+            && (def - i64::from(shown.weapon_def)).abs() <= 1
+            && (all.attack != 0) == sheet.attack_buffed
+    };
+    let mut found = (0..1u32 << tried.len()).filter(|&set| fits(set));
+    let set = found.next()?;
+    if found.next().is_some() {
+        return None;
+    }
+    Some(tried.iter().enumerate().filter(|(i, _)| set & (1 << i) != 0).map(|(_, r)| r.id).collect())
+}
+
+/// The ids of the buffs [`seen_on`] can tell about: on or off, the pane would show it.
+pub fn seen_buffs(rows: &[BuffRow]) -> Vec<u32> {
+    rows.iter().filter(|r| r.level.is_some() && r.effects.any()).take(MOST_TRIED).map(|r| r.id).collect()
+}
+
+/// The character's buffs and the gear's Attack, from their build and what was read.
+pub fn buffs_of(app: &AppHandle, name: &str, stored: &PlayerDamage) -> (Vec<BuffRow>, Option<u32>) {
     let build = app.state::<UserDataState>().with(|db| db.active_build(Some(name))).ok().flatten();
     // A build tied to someone else isn't this character's.
     let build = build.filter(|b| b.character.as_deref().is_none_or(|owner| owner.eq_ignore_ascii_case(name)));
-    let empty = PlayerDamage::default();
-    let stored = stored.unwrap_or(&empty);
     let buffs = app
         .state::<MapDataState>()
         .catalog()
         .map(|catalog| buff_rows(&catalog, build.as_ref(), &stored.skill_levels, &stored.buffs_on, &stored.read_with))
         .unwrap_or_default();
-    let weapon_attack = weapon_attack(build.as_ref());
-    let buffed = stored.sheet.as_ref().and_then(|sheet| with_buffs(sheet, &buffs, weapon_attack));
+    (buffs, weapon_attack(build.as_ref()))
+}
+
+/// The view of `name`'s stats from what is stored.
+pub fn view(app: &AppHandle, name: &str, stored: Option<&PlayerDamage>) -> StatsView {
+    let empty = PlayerDamage::default();
+    let stored = stored.unwrap_or(&empty);
+    let (buffs, weapon_attack) = buffs_of(app, name, stored);
+    let base = stored.sheet.as_ref().map(|sheet| without_buffs(sheet, &buffs, weapon_attack));
+    let buffed = base.as_ref().and_then(|base| with_buffs(base, &buffs, weapon_attack));
     StatsView {
         sheet: stored.sheet,
         read_at: stored.read_at,
         buffs,
+        base,
         attack_unscaled: buffed.is_some_and(|(_, unscaled)| unscaled),
         buffed: buffed.map(|(sheet, _)| sheet),
         weapon_attack,
@@ -368,18 +443,44 @@ mod tests {
         }
     }
 
+    /// The window as it shows Focus Lv 2 on: `86 (+10)`, `43 (+10)` in red.
+    fn focused() -> StatSheet {
+        StatSheet {
+            accuracy: Some(86),
+            evasion: Some(43),
+            buff_bonus: DetailBonus { accuracy: 10, evasion: 10, ..DetailBonus::default() },
+            ..sheet()
+        }
+    }
+
     #[test]
-    fn buffs_on_now_are_added_and_those_on_at_the_read_taken_out() {
-        let rows = buff_rows(&catalog(), Some(&build(300)), &[seen("Focus", 2)], &[2], &[]);
-        let (buffed, unscaled) = with_buffs(&sheet(), &rows, None).unwrap();
-        assert_eq!((buffed.accuracy, buffed.evasion, buffed.attack_max), (Some(86), Some(43), Some(200)));
-        assert!(!unscaled, "no Attack changed");
-        // Read with Focus on, and Focus still on: nothing changes.
+    fn what_the_pane_says_buffs_add_is_taken_off_and_the_buffs_on_now_added() {
+        // Read with Focus on in the game, and marked on: shown as it was, 76 beside it.
         let rows = buff_rows(&catalog(), Some(&build(300)), &[seen("Focus", 2)], &[2], &[2]);
-        assert!(with_buffs(&sheet(), &rows, None).is_none());
-        // Read with it on, now off.
-        let rows = buff_rows(&catalog(), Some(&build(300)), &[seen("Focus", 2)], &[], &[2]);
-        assert_eq!(with_buffs(&sheet(), &rows, None).unwrap().0.accuracy, Some(66));
+        let base = without_buffs(&focused(), &rows, None);
+        assert_eq!((base.accuracy, base.evasion), (Some(76), Some(33)));
+        let (buffed, unscaled) = with_buffs(&base, &rows, None).unwrap();
+        assert_eq!((buffed.accuracy, buffed.evasion, buffed.attack_max, unscaled), (Some(86), Some(43), Some(200), false));
+        // Read with it off in the game while it was still marked on: the plain numbers are the
+        // ones without buffs, never less.
+        let base = without_buffs(&sheet(), &rows, None);
+        assert_eq!(base.accuracy, Some(76));
+        // Nothing marked on: nothing to add.
+        let off = buff_rows(&catalog(), Some(&build(300)), &[seen("Focus", 2)], &[], &[]);
+        assert!(with_buffs(&base, &off, None).is_none());
+    }
+
+    #[test]
+    fn the_pane_says_which_buffs_are_on() {
+        let rows = buff_rows(&catalog(), Some(&build(300)), &[seen("Focus", 2)], &[], &[]);
+        assert_eq!(seen_on(&rows, &focused()), Some(vec![2]));
+        assert_eq!(seen_on(&rows, &sheet()), Some(vec![]), "no red: off");
+        let odd = StatSheet { buff_bonus: DetailBonus { accuracy: 7, ..DetailBonus::default() }, ..sheet() };
+        assert_eq!(seen_on(&rows, &odd), None, "nothing fits: the switches stay");
+        // A red Attack line is a buff with Attack.
+        let rows = buff_rows(&catalog(), Some(&build(110)), &[seen("Rage", 1), seen("Iron Body", 1)], &[], &[]);
+        let raging = StatSheet { attack_buffed: true, weapon_def: Some(130), buff_bonus: DetailBonus { weapon_def: -10, ..DetailBonus::default() }, ..sheet() };
+        assert_eq!(seen_on(&rows, &raging), Some(vec![1]));
     }
 
     #[test]
@@ -391,13 +492,22 @@ mod tests {
         assert_eq!(buffed.weapon_def, Some(110), "Rage takes Weapon Def. off");
         let (buffed, unscaled) = with_buffs(&sheet(), &rows, None).unwrap();
         assert_eq!((buffed.attack_max, unscaled), (Some(200), true));
+        // Read red with Rage on: scaled back to the gear's Attack alone.
+        let rows = buff_rows(&catalog(), Some(&build(110)), &[seen("Rage", 3)], &[1], &[1]);
+        let red = StatSheet { attack_min: Some(150), attack_max: Some(300), attack_buffed: true, ..sheet() };
+        let base = without_buffs(&red, &rows, Some(60));
+        assert_eq!((base.attack_min, base.attack_max), (Some(100), Some(200)));
     }
 
     #[test]
     fn a_share_of_weapon_def_is_of_the_defence_without_buffs() {
-        let rows = buff_rows(&catalog(), Some(&build(110)), &[seen("Iron Body", 1)], &[], &[5]);
-        // Read at 140 with Iron Body's 40% on: 100 without it.
-        assert_eq!(with_buffs(&sheet(), &rows, None).unwrap().0.weapon_def, Some(100));
+        let rows = buff_rows(&catalog(), Some(&build(110)), &[seen("Iron Body", 1)], &[5], &[5]);
+        // Shown as 140 (+40) with Iron Body's 40% on: 100 without it, 140 with it.
+        let read = StatSheet { buff_bonus: DetailBonus { weapon_def: 40, ..DetailBonus::default() }, ..sheet() };
+        let base = without_buffs(&read, &rows, None);
+        assert_eq!(base.weapon_def, Some(100));
+        assert_eq!(with_buffs(&base, &rows, None).unwrap().0.weapon_def, Some(140));
+        assert_eq!(seen_on(&rows, &read), Some(vec![5]));
     }
 
     #[test]

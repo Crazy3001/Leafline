@@ -830,6 +830,10 @@ export interface StatSheet {
   critDamage: number | null;
   speed: number | null;
   jump: number | null;
+  /** What buffs added to each detail line, as the window showed it in red: the 14 of "90 (+14)". */
+  buffBonus: Record<"weaponDef" | "magic" | "magicDef" | "accuracy" | "evasion" | "critRate" | "critDamage" | "speed" | "jump", number>;
+  /** The Attack line was red: a buff was in the range. */
+  attackBuffed: boolean;
 }
 
 /** What a buff changes at one of its levels. All add, except weaponDefPercent, a share. */
@@ -864,10 +868,13 @@ export interface BuffRow {
 }
 
 export interface StatsView {
+  /** As the window showed it, buffs and all. */
   sheet: StatSheet | null;
   readAt: number | null;
   buffs: BuffRow[];
-  /** The sheet with the buffs on now; null when it would be the same. */
+  /** Without any buff: what the window showed less what it said buffs added. */
+  base: StatSheet | null;
+  /** With the buffs on now; null when none on changes a number. */
   buffed: StatSheet | null;
   /** The worn gear's Attack, which a buff's Attack is counted against. */
   weaponAttack: number | null;

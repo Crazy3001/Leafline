@@ -29,7 +29,8 @@
   });
 
   const stats = $derived(damage.name && character && damage.name.toLowerCase() === character.toLowerCase() ? damage.stats : null);
-  const sheet = $derived(stats?.sheet ?? null);
+  /** The numbers without any buff; with buffs on, each one they change shows its new number beside. */
+  const sheet = $derived(stats?.base ?? stats?.sheet ?? null);
   const buffed = $derived(stats?.buffed ?? null);
   const buffs = $derived(stats?.buffs ?? []);
 
@@ -91,7 +92,7 @@
   ];
 
   const value = (s: StatSheet | null, key: Key) => (s?.[key] ?? null) as number | null;
-  /** The number with buffs on, when they change it. */
+  /** The number with the buffs on now, when they change it. */
   const changed = (key: Key) => {
     const now = value(buffed, key);
     return now != null && now !== value(sheet, key) ? now : null;
@@ -120,7 +121,6 @@
     return parts.length ? parts.join(", ") : null;
   }
 
-  const onAtRead = $derived(buffs.filter((b) => b.onAtRead).map((b) => b.name));
   const anyOn = $derived(buffs.some((b) => b.on));
 </script>
 
@@ -144,10 +144,7 @@
     </p>
   {:else}
     {#if anyOn && buffed}
-      <p class="quiet-line">With your buffs on. The number read is beside each one they change.</p>
-    {/if}
-    {#if onAtRead.length}
-      <p class="quiet-line">Read with {onAtRead.join(", ")} on, so {onAtRead.length === 1 ? "it is" : "they are"} already in the numbers read.</p>
+      <p class="quiet-line">With your buffs on. Each number they change has the one without them beside it.</p>
     {/if}
 
     <dl class="grid four">
@@ -218,7 +215,9 @@
       {/if}
     </p>
   {:else}
-    <p class="quiet-line">Turn on the ones you have running. Each counts at its level.</p>
+    <p class="quiet-line">
+      Turn on the ones you have running. Each counts at its level. When the Character Stat window shows a buff in red, its switch follows.
+    </p>
     <ul class="buffs">
       {#each buffs as b (b.id)}
         {@const effect = effectText(b)}

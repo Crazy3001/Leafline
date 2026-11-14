@@ -1290,6 +1290,8 @@ function mockStats(): StatsView {
     critDamage: 141,
     speed: 101,
     jump: 100,
+    buffBonus: { weaponDef: 0, magic: 0, magicDef: 0, accuracy: 0, evasion: 0, critRate: 0, critDamage: 0, speed: 0, jump: 0 },
+    attackBuffed: false,
   };
   const none: SkillEffects = { attack: 0, magic: 0, weaponDef: 0, weaponDefPercent: 0, magicDef: 0, accuracy: 0, evasion: 0, speed: 0, jump: 0, seconds: 300 };
   const row = (id: number, name: string, level: number | null, maxLevel: number, effects: Partial<SkillEffects>, description: string | null): BuffRow => ({
@@ -1313,5 +1315,5 @@ function mockStats(): StatsView {
   const buffed = on.length
     ? { ...sheet, accuracy: sheet.accuracy! + add("accuracy"), evasion: sheet.evasion! + add("evasion") }
     : null;
-  return { sheet, readAt: Date.now() / 1000 - 260, buffs, buffed, weaponAttack: 49, attackUnscaled: false };
+  return { sheet, readAt: Date.now() / 1000 - 260, buffs, base: sheet, buffed, weaponAttack: 49, attackUnscaled: false };
 }

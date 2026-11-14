@@ -11,8 +11,10 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
   open, Attack, Weapon and Magic Def., Magic, Accuracy, Evasion, Crit. rate and damage, Speed and
   Jump. It says when it was last read, and **Read** reads it again.
 - **Buffs.** Your job's buffs, each at the level your Skill window last showed, with a switch to
-  say which are running. With any on, the stats show what they come to with them, the number read
-  beside each, and the training estimates count a buff's Attack in your attack range.
+  say which are running. When the Character Stat window shows a buff in red, such as
+  Accuracy 90 (+14), the switches follow it. With any on, the stats show what they come to, the
+  number without buffs beside each, and the training estimates count a buff's Attack in your
+  attack range.
 - **Game pictures.** Items, monsters and NPCs show their icons beside their names, in lists and on
   their cards, and maps show their area's emblem and a picture of the whole map. Each picture is
   downloaded from OSMS Data Explorer the first time it is shown and kept on this PC. Turn them off
