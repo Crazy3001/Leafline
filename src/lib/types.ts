@@ -297,6 +297,8 @@ export interface SessionSummary {
   expGained: number;
   expPerHour: number | null;
   percentPerHour: number | null;
+  /** The rates are a first estimate from the first kills, under a minute of play. */
+  measuring?: boolean;
   secondsToLevel: number | null;
   /** Rates over the last five minutes of active time. */
   recentExpPerHour: number | null;
@@ -731,6 +733,8 @@ export interface ObjectiveGuide {
   /** Whether the drop list has been searched for who drops this item. */
   lookedUp: boolean;
   hunts: Hunt[];
+  /** For an item: NPC shops that sell it, the cheapest first, so it can be bought instead. */
+  shops: ShopOffer[];
 }
 
 export interface QuestGuide {
@@ -1630,6 +1634,8 @@ export interface QuestSearch {
   repeat: string | null;
   /** Only quests a character of this level can start. */
   atLevel: number | null;
+  /** Only quests that need no other quest finished first. */
+  noPrior?: boolean;
   offset: number;
 }
 
@@ -1666,6 +1672,17 @@ export interface QuestSheet {
     /** Always given. Otherwise it is one of a choice, or down to chance. */
     sure: boolean;
   }[];
+  /** What the quests after this one in its chain pay together, when it leads on. */
+  chainRest: ChainRest | null;
+}
+
+/** The quests left in a chain after one of them, and their EXP and mesos added up. */
+export interface ChainRest {
+  quests: QuestRef[];
+  exp: number;
+  mesos: number;
+  /** The highest level any of them asks for. */
+  levelMax: number | null;
 }
 
 export interface QuestWhere {

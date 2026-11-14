@@ -363,6 +363,8 @@ pub struct ObjectiveGuide {
     pub looked_up: bool,
     /// Monsters to hunt: the one named, or the item's droppers, highest drop rate first.
     pub hunts: Vec<Hunt>,
+    /// For an item: NPC shops that sell it, the cheapest first, so it can be bought instead.
+    pub shops: Vec<super::shops::ShopOffer>,
 }
 
 /// Where to get an item.
@@ -466,6 +468,21 @@ pub(super) fn nearest_first(maps: &mut [HuntingGround]) {
     });
 }
 
+/// Keeps the first `keep` maps of a list in [`nearest_first`] order, and the map with the most of
+/// the monster in place of the last of them if it was not among them, so a choice of the closest
+/// map or the fullest one has both to offer.
+pub(super) fn keep_nearest_and_richest(maps: &mut Vec<HuntingGround>, keep: usize) {
+    let richest = maps
+        .iter()
+        .enumerate()
+        .max_by(|(ia, a), (ib, b)| a.count.cmp(&b.count).then(ib.cmp(ia)))
+        .map(|(i, _)| i);
+    if let Some(i) = richest.filter(|&i| i >= keep && keep > 0) {
+        maps.swap(keep - 1, i);
+    }
+    maps.truncate(keep);
+}
+
 /// What the guide knows about the player, beyond the map they are on.
 #[derive(Debug, Default)]
 pub(super) struct Context {
@@ -522,6 +539,7 @@ impl Atlas {
                 item: None,
                 looked_up: false,
                 hunts: vec![self.hunt(&ids, None, context, false)],
+                shops: Vec::new(),
             };
         }
 
@@ -562,13 +580,22 @@ impl Atlas {
                 }
             })
             .collect();
+        // An item's own page lists its shops apart; a quest's objective carries them.
+        let shops = if every { Vec::new() } else { self.shops_selling(sources.and_then(|s| s.item.as_deref()).unwrap_or(target), context) };
         ObjectiveGuide {
             target: target.to_string(),
             kind: TargetKind::Item,
             item: sources.and_then(|s| s.item.clone()),
             looked_up: sources.is_some(),
             hunts,
+            shops,
         }
+    }
+
+    /// The NPC shops selling the item called `name`, the cheapest first.
+    fn shops_selling(&self, name: &str, context: &Context) -> Vec<super::shops::ShopOffer> {
+        let ids: Vec<u32> = self.item_keys.get(&fold(name)).copied().into_iter().collect();
+        self.sold_by(&ids, name, |map| context.hops.get(&map).copied())
     }
 
     /// Where to get an item by its data ids (all of an item's copies): who drops it, as a quest
@@ -623,7 +650,7 @@ impl Atlas {
         let main = records.iter().copied().min_by_key(|m| main_first(m)).expect("hunt needs a known monster");
         let mut maps = self.hunting_grounds(&records, context);
         if !every {
-            maps.truncate(MAPS_PER_MONSTER);
+            keep_nearest_and_richest(&mut maps, MAPS_PER_MONSTER);
         }
         Hunt {
             monster: MonsterRef {
@@ -902,6 +929,17 @@ mod tests {
         let mut unplaced = vec![ground("Shore I", 11, None), ground("Far Grove", 28, None)];
         nearest_first(&mut unplaced);
         assert_eq!(unplaced[0].map.name, "Far Grove");
+    }
+
+    #[test]
+    fn a_shortened_list_of_maps_keeps_the_fullest_one() {
+        let names = |maps: &[HuntingGround]| maps.iter().map(|m| m.map.name.clone()).collect::<Vec<_>>();
+        let mut maps = vec![ground("Near", 4, Some(1)), ground("Next", 3, Some(2)), ground("Far", 2, Some(3)), ground("Full", 9, Some(9))];
+        keep_nearest_and_richest(&mut maps, 2);
+        assert_eq!(names(&maps), ["Near", "Full"]);
+        let mut maps = vec![ground("Full", 9, Some(1)), ground("Next", 3, Some(2)), ground("Far", 2, Some(3))];
+        keep_nearest_and_richest(&mut maps, 2);
+        assert_eq!(names(&maps), ["Full", "Next"], "already kept: nothing moves");
     }
 
     #[test]
