@@ -17,6 +17,7 @@
   import RouteFromHere from "./RouteFromHere.svelte";
   import RoutePlanner from "./RoutePlanner.svelte";
   import Section from "./Section.svelte";
+  import Segmented from "$lib/ui/Segmented.svelte";
 
   let {
     details,
@@ -76,6 +77,32 @@
       });
   });
 
+  /** A map whose portal is pointed at, in the Portals section or on the picture: lit in both. */
+  let litExit = $state<number | null>(null);
+
+  // The Portals section as a compass or a plain list, remembered as a convenience.
+  type Layout = "compass" | "list";
+  const LAYOUT_KEY = "leafline.portals.layout";
+  let layout = $state<Layout>(
+    (() => {
+      try {
+        return localStorage.getItem(LAYOUT_KEY) === "list" ? "list" : "compass";
+      } catch {
+        return "compass";
+      }
+    })(),
+  );
+  function setLayout(value: Layout) {
+    layout = value;
+    try {
+      localStorage.setItem(LAYOUT_KEY, value);
+    } catch {
+      // A convenience only.
+    }
+  }
+  /** Placed from the picture: the portals' real spots, rather than only the data's thirds. */
+  const located = $derived(picture?.points.some((p) => p.kind === "portal" && !p.teleport) ?? false);
+
   /** The portal the trip being followed takes next, when it leaves from this map. */
   const nextStep = $derived.by(() => {
     const step = trip.route?.steps[trip.next];
@@ -105,6 +132,8 @@
       mobs={details.mobs}
       npcs={details.npcs}
       next={nextStep}
+      lit={litExit}
+      onhoverportal={(id) => (litExit = id)}
     />
   </Section>
 {/if}
@@ -118,9 +147,33 @@
 {#if !glance}
   <Section title="Portals" count={details.exits.length}>
     {#snippet aside()}
-      {#if placed}<span>rough positions</span>{/if}
+      {#if placed && !located}<span>rough positions</span>{/if}
     {/snippet}
-    <ConnectionCompass exits={details.exits} map={details.map} {current} {onnavigate} />
+    {#if details.exits.length > 2}
+      <div class="portal-layout">
+        <Segmented
+          size="sm"
+          label="Show the portals as"
+          value={layout}
+          options={[
+            { id: "compass", label: "Compass", title: "Around the map, on the side each portal stands" },
+            { id: "list", label: "List", title: "Every portal in a row, left to right across the map" },
+          ]}
+          onchange={setLayout}
+        />
+      </div>
+    {/if}
+    <ConnectionCompass
+      exits={details.exits}
+      map={details.map}
+      {current}
+      {layout}
+      points={picture?.points ?? null}
+      next={nextStep}
+      lit={litExit}
+      onhover={(id) => (litExit = id)}
+      {onnavigate}
+    />
   </Section>
 {/if}
 
@@ -235,6 +288,12 @@
 {/if}
 
 <style>
+  .portal-layout {
+    display: flex;
+    justify-content: flex-end;
+    margin: -2px 0 6px;
+  }
+
   .facts {
     display: flex;
     flex-wrap: wrap;

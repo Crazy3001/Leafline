@@ -6,6 +6,20 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
 ## Unreleased
 
 ### Added
+- **More from the route bar.** Under the next step, a strip of the map you are on with the
+  portal to take lit up. **All N steps** opens every step of the trip, with the ones you have
+  taken ticked off, how many portals and about how long on foot. **Travel** turns taxis and
+  return scrolls on or off right there (the same switches as in Settings), and offers to download
+  them when they are not on this PC yet. A long trip shows one bar filling up.
+- **Zoom on the map picture.** Scroll over it to zoom in where the pointer is, drag to move
+  around, double-click to zoom in or fit the whole map again, or use the small buttons in the
+  corner. Marks keep their size, so a crowded town spreads out. Zoomed all the way out, scrolling
+  moves the panel as before. The portal your trip takes next shows in amber with a **Next** flag.
+- **Portals, placed and linked.** Each portal card has a small locator showing where it really
+  stands on the map, and portals on the same side follow their real order. Pointing at a portal
+  card lights it on the map picture, and pointing at a portal on the picture lights its card. The
+  trip's next portal is flagged and never folds away behind "+N more". **List** shows every
+  portal in a row, left to right across the map.
 - **Character → Stats.** Every number your Character Stat window shows, read from the game:
   STR, DEX, INT and LUK with what gear adds, Max HP and MP, Fame, AP left, and with **Detail**
   open, Attack, Weapon and Magic Def., Magic, Accuracy, Evasion, Crit. rate and damage, Speed and

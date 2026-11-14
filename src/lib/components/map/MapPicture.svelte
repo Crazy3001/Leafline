@@ -102,7 +102,7 @@
   function wheel(node: HTMLElement) {
     const on = (e: WheelEvent) => {
       if (e.ctrlKey && e.deltaMode === 0 && Math.abs(e.deltaY) < 10) return; // a pinch: the window zooms
-      const step = e.deltaMode === 1 ? 0.06 : 0.0018;
+      const step = e.deltaMode === 1 ? 0.08 : 0.0025;
       const to = Math.min(Math.max(zoom * Math.exp(-e.deltaY * step), 1), MAX_ZOOM);
       if (to === zoom) return;
       e.preventDefault();

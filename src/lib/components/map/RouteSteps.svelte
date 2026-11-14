@@ -30,7 +30,7 @@
 {#if route.steps.length === 0}
   <p class="note">You are already there.</p>
 {:else}
-  <ol class="steps">
+  <ol class="steps" class:following={current != null}>
     {#each route.steps as step, i}
       {@const done = current != null && i < current}
       <li
@@ -148,6 +148,13 @@
     color: var(--accent-ink);
   }
 
+  /* On a trip being followed the end is only outlined, so the step to take now is the one that stands out. */
+  .following .end:not(.now) .n {
+    background: var(--surface-2);
+    box-shadow: none;
+    color: var(--map);
+  }
+
   /* Steps already taken fade back; the one to take now gets the accent. */
   .done .n {
     border-color: color-mix(in srgb, var(--map) 35%, transparent);
@@ -160,9 +167,9 @@
 
   .now .n {
     border-color: var(--accent-strong);
-    background: var(--accent-soft);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
-    color: var(--accent-strong);
+    background: var(--accent-strong);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
+    color: var(--accent-ink);
   }
 
   .now .text {
