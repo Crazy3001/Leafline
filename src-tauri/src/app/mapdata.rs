@@ -317,12 +317,14 @@ pub struct RouteInfo {
     walk_seconds: Option<f64>,
 }
 
-/// The fewest steps between two maps, through portals and any travel the player turned on.
+/// The quickest way between two maps, through portals and any travel the player turned on,
+/// timed by the walk between portals. Where the data doesn't place every portal on the way, the
+/// map layouts give a rougher time.
 #[tauri::command]
 pub fn map_route(app: AppHandle, state: State<MapDataState>, from: u32, to: u32) -> Option<RouteInfo> {
     let atlas = state.atlas()?;
     let route = atlas.route_with(from, to, &travel(&app, &atlas))?;
-    let walk_seconds = layout::route_walk_seconds(&route, &state.layouts());
+    let walk_seconds = route.walk_seconds.or_else(|| layout::route_walk_seconds(&route, &state.layouts()));
     Some(RouteInfo { route, walk_seconds })
 }
 

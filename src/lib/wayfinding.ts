@@ -13,6 +13,9 @@ const verbs: Record<Direction, string> = {
 };
 const sides: Record<Side, string> = { left: "Left portal", centre: "Middle portal", right: "Right portal" };
 
+/** What to do at a hidden portal: the game draws nothing there, so the spot has to be found. */
+export const HIDDEN_PORTAL_HINT = "hidden: stand on the spot and press ↑";
+
 /** What to take for a portal step: its side when the data places it, otherwise its direction. */
 export function stepVerb(step: RouteStep): string {
   return step.side ? sides[step.side] : verbs[step.direction];
