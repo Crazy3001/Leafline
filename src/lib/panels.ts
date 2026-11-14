@@ -17,7 +17,9 @@ export const PIN_WIDTH = 340;
 /**
  * How tall a pinned window grows before it scrolls. A pinned window shows its panel in short
  * (see PanelView), so most stay well under these; the caps keep a long quest list or map from
- * covering the game.
+ * covering the game. The route stays a slim bar until its map strip or a drop-down (all the steps,
+ * the travel switches) opens, then grows to fit them; a long list of steps scrolls inside its
+ * drop-down instead of going past this.
  */
 export const PIN_MAX_HEIGHT: Record<PinId, number> = {
   character: 520,
@@ -25,7 +27,7 @@ export const PIN_MAX_HEIGHT: Record<PinId, number> = {
   train: 400,
   quests: 520,
   item: 560,
-  route: 200,
+  route: 640,
 };
 
 /** The "Go here" next step in a window of its own: pinned from the next-step bar, not a tab. */

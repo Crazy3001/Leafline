@@ -305,12 +305,14 @@ const tripHandlers: ((trip: Trip) => void)[] = [];
 const tripMessageHandlers: ((message: TripMessage) => void)[] = [];
 type Relayed = { kind: "trip"; trip: Trip } | { kind: "message"; message: TripMessage } | { kind: "nav"; nav: NavState };
 const relay = typeof BroadcastChannel === "undefined" ? null : new BroadcastChannel("leafline-dev");
+/** A copy the channel can send: what comes from the page can be a reactive object, which it cannot. */
+const plain = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
 function relayed(event: MessageEvent<Relayed>) {
   const data = event.data;
   if (data.kind === "trip") tripHandlers.forEach((h) => h(data.trip));
   else if (data.kind === "message") {
     // A tab opened later starts with no destination, where the app keeps one for every window.
-    if (data.message === "ask" && nav.destination) relay?.postMessage({ kind: "nav", nav });
+    if (data.message === "ask" && nav.destination) relay?.postMessage({ kind: "nav", nav: plain(nav) });
     tripMessageHandlers.forEach((h) => h(data.message));
   }
   else {
@@ -435,7 +437,7 @@ const samePlace = (a: Destination, b: Destination) =>
 function changeNav(next: NavState): NavState {
   nav = next;
   navHandlers.forEach((h) => h(nav));
-  relay?.postMessage({ kind: "nav", nav });
+  relay?.postMessage({ kind: "nav", nav: plain(nav) });
   return nav;
 }
 
@@ -1205,7 +1207,7 @@ export const mockBackend: Backend = {
     showPanelHandlers.forEach((h) => h(tab));
   },
   async sendTrip(trip) {
-    relay?.postMessage({ kind: "trip", trip });
+    relay?.postMessage({ kind: "trip", trip: plain(trip) });
   },
   async onTrip(handler) {
     tripHandlers.push(handler);

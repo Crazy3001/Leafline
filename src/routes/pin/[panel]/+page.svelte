@@ -20,6 +20,9 @@
   const panel = $derived<PinId>(pinId(page.params.panel) ?? "character");
   /** Taller than this, the panel scrolls instead of growing. */
   const maxHeight = $derived(PIN_MAX_HEIGHT[panel]);
+  /** The route's height always follows what it shows, since its drop-downs open and close as
+   *  you go: a size set by hand keeps only its width. */
+  const followsHeight = $derived(panel === "route");
   const info = $derived(pinInfo(panel));
   const Icon = $derived(info.icon);
 
@@ -77,7 +80,7 @@
 
   /** Sizes the window to the content, or to the player's size if they set one. The window is sized in screen units, the page in zoomed ones. */
   function fit() {
-    if (sized) {
+    if (sized && !followsHeight) {
       setWindow(sized.width * display.scale, sized.height * display.scale);
       return;
     }
@@ -86,7 +89,7 @@
     capped = natural > maxHeight;
     // A link card needs room: the window grows to its cap while one is open.
     const height = peek.stack.length ? maxHeight : Math.min(maxHeight, natural);
-    setWindow(PIN_WIDTH * display.scale, height * display.scale);
+    setWindow((sized?.width ?? PIN_WIDTH) * display.scale, height * display.scale);
   }
 
   // Clicks leave the game focused; typing in a box takes focus while it lasts.
@@ -96,13 +99,16 @@
     watchLive();
     watchSettings();
     if (panel === "route") followTrip();
-    const resized = backend.onPinResized(([width, height]) =>
-      keepSize({ width: width / display.scale, height: height / display.scale }),
-    );
+    const resized = backend.onPinResized(([width, height]) => {
+      keepSize({ width: width / display.scale, height: height / display.scale });
+      // The route takes the new width, and its height goes back to fitting what it shows.
+      if (followsHeight) fit();
+    });
     // Follow the content: grow and shrink the window as readings change. Not while it has a set
-    // size, which a drag in progress would otherwise be pulled back to.
+    // size, which a drag in progress would otherwise be pulled back to; the route's height always
+    // follows.
     const observer = new ResizeObserver(() => {
-      if (!sized) fit();
+      if (!sized || followsHeight) fit();
     });
     if (content) observer.observe(content);
     return () => {
@@ -129,7 +135,7 @@
 <div
   class="frame"
   class:locked={live.status.clickThrough}
-  class:sized
+  class:sized={sized && !followsHeight}
   style:opacity={display.opacity * (live.status.clickThrough ? 0.85 : 1)}
   bind:this={frame}
 >
