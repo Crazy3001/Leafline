@@ -405,6 +405,8 @@ export interface Backend {
   updateStatus(): Promise<UpdateStatus>;
   /** Checks now; refused while the check is turned off. */
   checkForUpdate(): Promise<UpdateStatus>;
+  /** Downloads the newer release's installer, checks its SHA-256, runs it and closes Leafline. */
+  installUpdate(): Promise<void>;
   onUpdateStatus(handler: (status: UpdateStatus) => void): Promise<UnlistenFn>;
   /** The travel connections routes can use, and which file they come from. */
   travelInfo(): Promise<TravelInfo>;
@@ -600,6 +602,7 @@ const tauriBackend: Backend = {
   onSettings: (handler) => listen<DisplaySettings>("settings", (e) => handler(e.payload)),
   updateStatus: () => invoke("update_status"),
   checkForUpdate: () => invoke("check_for_update"),
+  installUpdate: () => invoke("install_update"),
   onUpdateStatus: (handler) => listen<UpdateStatus>("update", (e) => handler(e.payload)),
   showSettings: () => invoke("show_settings"),
   showSetup: () => invoke("show_setup"),

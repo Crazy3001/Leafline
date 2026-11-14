@@ -173,6 +173,7 @@ pub fn run() {
             records::set_session_potion,
             update::update_status,
             update::check_for_update,
+            update::install_update,
             records::set_item_note,
             records::map_note,
             records::set_map_note,

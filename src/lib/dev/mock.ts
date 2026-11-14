@@ -1255,6 +1255,22 @@ export const mockBackend: Backend = {
     mockUpdateCheck();
     return updateStatus;
   },
+  async installUpdate() {
+    // A made-up download that ends in a mismatch, so the preview shows both states and closes nothing.
+    const total = 8_400_000;
+    for (let received = 0; received <= total; received += 1_400_000) {
+      setUpdate({ state: "downloading", current: "0.1.0", latest: "0.2.0", received, total });
+      await delay(250);
+    }
+    setUpdate({
+      state: "available",
+      current: "0.1.0",
+      latest: "0.2.0",
+      url: "https://github.com/OWNER/leafline/releases",
+      installable: true,
+      problem: "The download didn't match the release's SHA-256, so it was deleted and not run.",
+    });
+  },
   async onUpdateStatus(handler) {
     updateHandlers.push(handler);
     return () => {};
@@ -1275,7 +1291,14 @@ function mockUpdateCheck() {
   setUpdate({ state: "checking" });
   setTimeout(() => {
     if (displaySettings.updateCheck)
-      setUpdate({ state: "available", current: "0.1.0", latest: "0.2.0", url: "https://github.com/OWNER/leafline/releases" });
+      setUpdate({
+        state: "available",
+        current: "0.1.0",
+        latest: "0.2.0",
+        url: "https://github.com/OWNER/leafline/releases",
+        installable: true,
+        problem: null,
+      });
   }, 700);
 }
 

@@ -106,6 +106,10 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
 - **Tracked items.** **Track it** on any item's page stars it. Starred items are listed in
   **Lookup → Items**, each with the monster that drops it and the best map to hunt it, a route,
   and a shop when one sells it. Each character keeps its own list.
+- **Download and install updates.** With the update check on, Settings → About offers
+  **Download and install** when a new version is out. Leafline downloads the installer from the
+  release, checks its SHA-256 against the release's checksum list, and runs it only if they
+  match, then closes so it can install. Nothing is downloaded until you press it.
 - **When you'll level.** Time to level now also says the clock time you'll get there at this pace,
   in the Train tab and in the compact HUD's tooltip.
 

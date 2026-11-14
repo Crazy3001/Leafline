@@ -1060,7 +1060,18 @@ export type UpdateStatus =
   | { state: "off" }
   | { state: "checking" }
   | { state: "upToDate"; current: string; latest: string }
-  | { state: "available"; current: string; latest: string; url: string }
+  | {
+      state: "available";
+      current: string;
+      latest: string;
+      url: string;
+      /** The release has a setup program and checksums, so it can be downloaded and installed. */
+      installable: boolean;
+      /** Why the last download and install didn't go through. */
+      problem: string | null;
+    }
+  | { state: "downloading"; current: string; latest: string; received: number; total: number | null }
+  | { state: "installing"; latest: string }
   | { state: "unavailable"; current: string; reason: string }
   | { state: "failed"; current: string; message: string };
 
