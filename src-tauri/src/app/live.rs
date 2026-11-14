@@ -622,6 +622,7 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
                     report::note(format!("Couldn't read the {part}"));
                 }
                 let mut town = false;
+                let mut kill_exp = Vec::new();
                 if let Some(map) = analysis.map.as_mut()
                     && let Some(atlas) = app.state::<MapDataState>().atlas()
                 {
@@ -639,6 +640,8 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
                     map.twin = twin;
                     if let Some(known) = atlas.settled(&map.name, map.street.as_deref()) {
                         town = atlas.is_town(known.id);
+                        // What a kill here is worth, to count kills and tell quest EXP apart.
+                        kill_exp = atlas.card(known.id).map(|c| c.mobs.iter().map(|m| m.exp).collect()).unwrap_or_default();
                         map.name = known.name;
                         map.street = known.street;
                     }
@@ -652,6 +655,7 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
                 let read_ms = started.elapsed().as_secs_f32() * 1000.0;
                 let mut sample = Sample::from_analysis(unix_seconds(SystemTime::now()), &analysis);
                 sample.town = town;
+                sample.kill_exp = kill_exp;
                 if !held {
                     if tracker.is_other_character(&sample) {
                         keeper.save(app, &tracker.summary());

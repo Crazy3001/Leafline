@@ -177,6 +177,14 @@ INSERT INTO potion_slots_by_character (character, slot, name, price) SELECT '', 
 DROP TABLE potion_slots;
 ALTER TABLE potion_slots_by_character RENAME TO potion_slots;
 ",
+    "
+ALTER TABLE session_lines ADD COLUMN kills INTEGER;
+ALTER TABLE session_lines ADD COLUMN other_exp INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE session_lines ADD COLUMN deaths INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE session_lines ADD COLUMN exp_lost INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE session_lines ADD COLUMN gains_missed INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE session_lines ADD COLUMN fighter TEXT;
+",
 ];
 
 /// Daily copies of the records that are kept.
