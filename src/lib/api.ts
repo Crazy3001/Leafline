@@ -10,6 +10,7 @@ import { availableMonitors, getCurrentWindow } from "@tauri-apps/api/window";
 import { open, save } from "@tauri-apps/plugin-dialog";
 
 import type {
+  MonsterFight,
   Analysis,
   EstimateCheck,
   Build,
@@ -177,6 +178,15 @@ export interface Backend {
     character: string | null,
     skill: string | null,
   ): Promise<TrainingSpots | null>;
+  /** How a fight with one monster goes for the character, from the combat model. Null until their attack is known. */
+  monsterFight(
+    id: number,
+    character: string | null,
+    level: number | null,
+    measured: MeasuredRate[],
+    assumptions: Assumptions,
+    skill: string | null,
+  ): Promise<MonsterFight | null>;
   /** How close the estimates come on the player's own maps, each hidden in turn. */
   checkEstimates(
     measured: MeasuredRate[],
@@ -476,6 +486,8 @@ const tauriBackend: Backend = {
   dropsFetchedAt: () => invoke("drops_fetched_at"),
   trainingSpots: (mapName, mapStreet, mapTwin, measured, level, assumptions, character, skill) =>
     invoke("training_spots", { mapName, mapStreet, mapTwin, measured, level, assumptions, character, skill }),
+  monsterFight: (id, character, level, measured, assumptions, skill) =>
+    invoke("monster_fight", { id, character, level, measured, assumptions, skill }),
   checkEstimates: (measured, level, assumptions, character, skill) =>
     invoke("check_estimates", { measured, level, assumptions, character, skill }),
   searchQuests: (search) => invoke("search_quests", { search }),

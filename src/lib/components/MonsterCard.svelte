@@ -7,6 +7,7 @@
 
   import Card from "./Card.svelte";
   import MonsterDropList from "./monster/MonsterDropList.svelte";
+  import YourFight from "./monster/YourFight.svelte";
   import PlaceList from "./map/PlaceList.svelte";
   import Section from "./map/Section.svelte";
   import { backend } from "$lib/api";
@@ -204,6 +205,12 @@
       <p class="traits">
         Listed respawn <span class="tabular">{formatDuration(sheet.respawn)}</span>
       </p>
+    {/if}
+
+    {#if !compact}
+      <Section title="Your fight">
+        <YourFight {id} {level} {session} />
+      </Section>
     {/if}
 
     <Section title="Where to find it" count={sheet.maps.length}>

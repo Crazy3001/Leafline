@@ -128,20 +128,61 @@ pub struct Duel {
 /// Attacks to defeat `foe`, simulated kill by kill, since a monster that falls to one blow 60%
 /// of the time takes 1.4 attacks, not the one its HP over the average blow would say.
 pub fn duel(fighter: &Fighter, foe: &MobRow, defence_k: f64) -> Duel {
+    let detail = fight(fighter, foe, defence_k);
+    Duel { hit: detail.hit, attacks: detail.attacks }
+}
+
+/// One fight against one monster type, in full: what a blow does after its defence and the level
+/// penalty, the chance it lands, and how many attacks kills took.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Fight {
+    pub hit: f64,
+    /// Attacks a kill takes on average.
+    pub attacks: f64,
+    /// Kills by the attacks they took: `(attacks, share of kills)`, fewest first, small shares
+    /// left out. Empty when the monster can't really be killed.
+    pub spread: Vec<(u32, f64)>,
+    /// What one landed blow does, its lowest and highest without a critical hit.
+    pub blow_low: f64,
+    pub blow_high: f64,
+    /// What is left of a blow after the level penalty, 0 to 1.
+    pub level_factor: f64,
+    /// What the monster's defence divides a blow by.
+    pub defence_divisor: f64,
+}
+
+/// Kills taking a share of attacks smaller than this aren't listed in a fight's spread.
+const SPREAD_FLOOR: f64 = 0.02;
+
+/// [`duel`], with everything it worked out.
+pub fn fight(fighter: &Fighter, foe: &MobRow, defence_k: f64) -> Fight {
     let hit = match (fighter.magic, fighter.accuracy) {
         (false, Some(acc)) => hit_chance(acc, fighter.level, foe.level, f64::from(foe.evasion.unwrap_or(0))),
         _ => 1.0,
     };
     let defence = if fighter.magic { foe.magic_def } else { foe.weapon_def };
     let divisor = 1.0 + f64::from(defence.unwrap_or(0)) / defence_k.max(1.0);
-    let scale = level_factor(fighter.level, foe.level) / divisor;
+    let penalty = level_factor(fighter.level, foe.level);
+    let scale = penalty / divisor;
+    let blow = |x: f64| (x * scale).floor().max(1.0);
+    let mut detail = Fight {
+        hit,
+        attacks: f64::from(MAX_ATTACKS),
+        spread: Vec::new(),
+        blow_low: blow(fighter.low.min(fighter.high)),
+        blow_high: blow(fighter.high.max(fighter.low)),
+        level_factor: penalty,
+        defence_divisor: divisor,
+    };
     if hit <= 0.0 || fighter.high <= 0.0 {
-        return Duel { hit, attacks: f64::from(MAX_ATTACKS) };
+        return detail;
     }
     let mut rng = Rng(u64::from(foe.hp) << 32 ^ u64::from(foe.level) << 16 ^ fighter.high.to_bits().rotate_left(7));
     let (low, span) = (fighter.low.min(fighter.high), (fighter.high - fighter.low).abs());
     let lines = fighter.lines.max(1);
     let mut total = 0u64;
+    let mut tally: Vec<u32> = Vec::new();
     for _ in 0..SIMULATED_KILLS {
         let mut hp = f64::from(foe.hp.max(1));
         let mut attacks = 0;
@@ -162,8 +203,22 @@ pub fn duel(fighter: &Fighter, foe: &MobRow, defence_k: f64) -> Duel {
             }
         }
         total += u64::from(attacks);
+        if hp <= 0.0 {
+            let at = attacks as usize;
+            if tally.len() < at {
+                tally.resize(at, 0);
+            }
+            tally[at - 1] += 1;
+        }
     }
-    Duel { hit, attacks: total as f64 / f64::from(SIMULATED_KILLS) }
+    detail.attacks = total as f64 / f64::from(SIMULATED_KILLS);
+    detail.spread = tally
+        .iter()
+        .enumerate()
+        .map(|(i, &n)| (i as u32 + 1, f64::from(n) / f64::from(SIMULATED_KILLS)))
+        .filter(|&(_, share)| share >= SPREAD_FLOOR)
+        .collect();
+    detail
 }
 
 /// A map's monsters as the player would fight them, bosses left out, each counted by how many
@@ -396,6 +451,20 @@ mod tests {
             magic_def: Some(defence),
             evasion: Some(avoid),
         }
+    }
+
+    #[test]
+    fn a_fight_lists_how_often_each_number_of_attacks_kills() {
+        let me = fighter(40.0, 60.0);
+        let detail = fight(&me, &foe(me.level, 100, 0, 0), 100.0);
+        let shares: f64 = detail.spread.iter().map(|(_, s)| s).sum();
+        assert!(shares > 0.95 && shares <= 1.0 + 1e-9, "{shares}");
+        assert!(detail.spread.iter().all(|&(n, _)| (2..=3).contains(&n)), "{:?}", detail.spread);
+        assert!((detail.attacks - duel(&me, &foe(me.level, 100, 0, 0), 100.0).attacks).abs() < 1e-9);
+        assert_eq!((detail.blow_low, detail.blow_high), (40.0, 60.0));
+        let armoured = fight(&me, &foe(me.level, 100, 100, 0), 100.0);
+        assert_eq!(armoured.defence_divisor, 2.0);
+        assert_eq!((armoured.blow_low, armoured.blow_high), (20.0, 30.0));
     }
 
     fn fighter(low: f64, high: f64) -> Fighter {

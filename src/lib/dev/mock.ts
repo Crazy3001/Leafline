@@ -622,6 +622,17 @@ export const mockBackend: Backend = {
     if (!mapStatus.ready) return null;
     return preview?.spots ?? sampleSpots(2, measured, level, assumptions);
   },
+  async monsterFight(id, character, level) {
+    // A made-up fight, so the monster page's Your fight section shows in the browser preview.
+    if (!character && level == null) return null;
+    return {
+      fighter: { level: level ?? 30, low: 180, high: 420, lines: 1, targets: 1, accuracy: 60, magic: false, critRate: 0.05, critBonus: 0.35, attackSeconds: 0.9 },
+      fight: { hit: 0.93, attacks: 2.3, spread: [[1, 0.12], [2, 0.5], [3, 0.31], [4, 0.07]], blowLow: 95, blowHigh: 230, levelFactor: id % 2 ? 0.92 : 1, defenceDivisor: 1.6 },
+      attackSecondsPerKill: 2.07,
+      defenceK: 100,
+      fitted: false,
+    };
+  },
   async checkEstimates() {
     await delay(300);
     return { maps: [], modelTypicalMiss: null, modelWithin20: null, olderTypicalMiss: null, olderWithin20: null };
