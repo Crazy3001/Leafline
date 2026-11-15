@@ -436,12 +436,12 @@ function playRate(k: Kind): PlayRate | null {
   return k.seconds > 0 ? { activeSeconds: k.seconds, expPerHour: (k.exp * 3600) / k.seconds, best: k.best } : null;
 }
 
-/** Party sizes in a few words: `2 ppl`, `2–4 ppl`. */
+/** Party sizes, for after "parties of": `2`, `2–4`. */
 export function partySizes(sizes: number[]): string {
   if (!sizes.length) return "";
   const low = sizes[0];
   const high = sizes[sizes.length - 1];
-  return low === high ? `${low} ppl` : `${low}–${high} ppl`;
+  return low === high ? `${low}` : `${low}–${high}`;
 }
 
 export function mapBars(stats: MapStats[], metric: Metric): Bar[] {
