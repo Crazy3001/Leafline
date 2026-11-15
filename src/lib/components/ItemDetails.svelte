@@ -6,6 +6,7 @@
 
   import ItemCraftingView from "./item/ItemCrafting.svelte";
   import ItemSources from "./item/ItemSources.svelte";
+  import ScrollOdds from "./item/ScrollOdds.svelte";
   import Section from "./map/Section.svelte";
   import { backend } from "$lib/api";
   import { buildState, watchBuilds } from "$lib/builds.svelte";
@@ -208,6 +209,17 @@
     {/if}
   </div>
   {#if pieceError}<p class="piece-error">{pieceError}</p>{/if}
+
+  {#if shown.kind === "scroll" && shown.scroll}
+    {@const raise = shown.stats.find((s) => s.value > 0) ?? null}
+    <Section title="Odds" open={false}>
+      <ScrollOdds rate={shown.scroll.successRate} stat={raise?.value ?? 1} statLabel={raise?.label ?? null} />
+    </Section>
+  {:else if shown.kind === "equip" && (slotsLeft ?? shown.upgradeSlots)}
+    <Section title="Scrolling odds" open={false}>
+      <ScrollOdds slots={slotsLeft ?? shown.upgradeSlots ?? 7} />
+    </Section>
+  {/if}
 
   <Section title="Where to get it">
     {#if found}
