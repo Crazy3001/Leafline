@@ -3,6 +3,32 @@
 What changed in each release of Leafline. Leafline is a work in progress: if something reads
 wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?template=bug_report.yml).
 
+## Unreleased
+
+### Added
+- **Your fight.** Every monster's page shows how a fight with it goes for your character: how
+  many attacks a kill takes and how often each count comes up, the chance your blows land, what a
+  blow does after its defence and the level gap, and the seconds of attacking a kill takes. It
+  uses your attack from the Character Stat window, or what you typed in Assumptions. The formulas
+  are the community's, and the defence part learns from your own fights.
+- **Scrolling odds.** A scroll's page has **Odds**, and a piece of gear **Scrolling odds**: the
+  chance of reaching the passes you want, of the item breaking, the stat it ends with, the scrolls
+  used, the chance of each number of passes, and with prices typed, what one item that gets there
+  costs. Every number can be changed.
+- **Plan levelling a craft.** Lookup → Crafting, with a discipline picked, has **Plan levelling**:
+  type your skill level and the EXP your crafting window shows, and the recipes open to you are
+  ranked by mesos per EXP or by fewest crafts, with how many crafts it takes, what they cost and
+  what to farm.
+- **Monsters on the map picture.** Spawn points show the monster's own picture instead of a dot,
+  a little bigger as you zoom in.
+- **What spawns where.** Lookup → Maps rows show each map's monsters with their share of the
+  spawns, how many spawn and how thickly (spawns per 1,000 px of floor), and sort by either.
+
+### Changed
+- **A cleaner compact HUD**, with your level, an EXP bar like the game's, how the last five
+  minutes compare, when you'll level, and quest counters under each quest's name.
+- **The Train tab's EXP bar** looks like the game's, with your EXP and percent written on it.
+
 ## 0.3.1 (2026-11-14)
 
 ### Fixed

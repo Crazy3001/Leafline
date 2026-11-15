@@ -13,6 +13,7 @@ sends input, and stays free.
 - Better reading over bright, busy maps, for the Quest Helper and for item pickups
 - More tested screen sizes and UI sizes
 - Every reading says how sure it is, and a doubtful one is left out instead of guessed
+- Clear readings with Windows HDR on, by correcting the washed-out picture instead of only warning
 - Installers signed, so Windows stops warning about them
 
 **Loot and profit**
@@ -38,6 +39,8 @@ sends input, and stays free.
 - A before-and-after look at a gear change: stats, damage and EXP per hour
 - Is this upgrade worth it: what a piece of gear gains you for what it costs
 - NPC shop prices kept up to date as they change
+- Knowing which quests you've done, by reading the game's quest log when you open it, so quest
+  lists leave them out
 
 **Maps and getting around**
 - Hidden portals checked in game on every map, with ones the data misses added
@@ -46,7 +49,7 @@ sends input, and stays free.
 
 **Timers and alerts**
 - Timers you start yourself, for bosses and buffs
-- Field boss spawn times
+- Field boss timers by channel, with respawn times you can correct
 - Level-up and rare-drop alerts, plus a daily and weekly summary
 
 **Training details**
@@ -54,6 +57,7 @@ sends input, and stays free.
 - A mode that keeps one session going across maps
 - Party quest mode: completion times and rewards
 - A count of kills per monster
+- A one-line compact bar to sit under the game's own EXP bar
 - Training estimates that look ahead: how many levels a map stays good for
 
 **Party and social**

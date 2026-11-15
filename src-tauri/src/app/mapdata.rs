@@ -826,6 +826,7 @@ pub struct MonsterFight {
 /// How a fight with monster `id` goes for `character` at `level`: hit chance, hits to kill, what a
 /// blow does. `None` until the character's attack has been read or typed, or with no map data.
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub fn monster_fight(
     app: AppHandle,
     state: State<MapDataState>,
