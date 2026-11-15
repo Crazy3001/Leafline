@@ -27,9 +27,6 @@ sends input, and stays free.
 - Compare two characters, or this week with last
 
 **Training**
-- Party and solo EXP shown apart, so you can see whether a party is worth it
-- EXP lost to deaths shown on each session
-- A nudge when a different map becomes better as you level
 - Exact EXP across a jump of several levels
 
 **Items, quests and shops**

@@ -28,6 +28,17 @@ impl PictureState {
         let dir = app.path().app_local_data_dir()?.join(FOLDER);
         Ok(Self { cache: PictureCache::new(dir, PictureHttp::default()) })
     }
+
+    /// Whether the picture at `url` is on this PC already.
+    pub(super) fn has(&self, url: &str) -> bool {
+        self.cache.has(url)
+    }
+
+    /// The picture at `url`, decoded, downloaded first if it isn't kept yet.
+    pub(super) fn image(&self, url: &str) -> Result<image::RgbaImage> {
+        let picture = self.cache.get(url)?;
+        Ok(image::load_from_memory(&picture.bytes)?.to_rgba8())
+    }
 }
 
 /// A map's picture as the windows show it, cut to what is drawn, with its markers.

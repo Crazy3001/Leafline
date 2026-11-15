@@ -1,7 +1,9 @@
 //! The potions the player hunts with, for mesos per hour after potion costs. The player names
-//! their potion slots and sets what each potion costs them; nothing about potions is bundled or
-//! read from the game. For a session they type how many they had at the start and how many they
-//! have now, and the difference is what the hunt cost.
+//! their potion slots and sets what each potion costs them; nothing about potions is bundled.
+//! A slot the player puts on a quick slot is counted from the count the game shows there: the
+//! session tracker adds up the drops, and what it read is kept with the session. Otherwise, or
+//! as well, they type how many they had at the start and how many they have now, and the
+//! difference is what the hunt cost. A read count wins over a typed one.
 //!
 //! Counts are kept by the session's start time rather than its id, because a session is only
 //! saved after a few minutes of play and the player may type the start count before that.
@@ -24,6 +26,10 @@ pub struct PotionSlot {
     pub name: String,
     /// What one costs the player, in mesos.
     pub price: i64,
+    /// The quick slot it sits on, 0 to 7 (top row left to right, then the bottom row), for its
+    /// count to be read from the game. `None` to type the counts.
+    #[serde(default)]
+    pub quick_slot: Option<u32>,
 }
 
 /// One slot's counts for a session, with the name and price as they were when last typed.
@@ -35,7 +41,9 @@ pub struct SessionPotion {
     pub price: i64,
     pub start: Option<i64>,
     pub now: Option<i64>,
-    /// Start minus now, once both are typed; never below zero.
+    /// How many went, as counted from the quick slot.
+    pub read: Option<i64>,
+    /// What was read, or else start minus now once both are typed; never below zero.
     pub used: i64,
 }
 
@@ -45,9 +53,10 @@ impl SessionPotion {
     }
 }
 
-fn used(start: Option<i64>, now: Option<i64>) -> i64 {
-    match (start, now) {
-        (Some(start), Some(now)) => (start - now).max(0),
+fn used(start: Option<i64>, now: Option<i64>, read: Option<i64>) -> i64 {
+    match (read, start, now) {
+        (Some(read), _, _) => read.max(0),
+        (None, Some(start), Some(now)) => (start - now).max(0),
         _ => 0,
     }
 }
@@ -75,10 +84,7 @@ impl UserData {
     }
 
     fn slots_of(&self, owner: &str) -> Result<Vec<PotionSlot>> {
-        let mut stmt =
-            self.conn.prepare("SELECT slot, name, price FROM potion_slots WHERE character = ?1 ORDER BY slot")?;
-        let rows = stmt.query_map([owner], |row| Ok(PotionSlot { slot: row.get(0)?, name: row.get(1)?, price: row.get(2)? }))?;
-        Ok(rows.collect::<rusqlite::Result<_>>()?)
+        slots_of(&self.conn, owner)
     }
 
     /// Replaces the potion slots. A slot keeps its number, so a session's counts stay with it;
@@ -90,6 +96,9 @@ impl UserData {
             return Err(Error::Invalid(format!("Up to {MAX_SLOTS} potion slots can be set.")));
         }
         for slot in slots {
+            if slot.quick_slot.is_some_and(|q| q as usize >= crate::readers::quickslot::SLOTS) {
+                return Err(Error::Invalid("There are 8 quick slots.".into()));
+            }
             if slot.name.trim().is_empty() {
                 return Err(Error::Invalid("Each potion slot needs a name.".into()));
             }
@@ -112,8 +121,8 @@ impl UserData {
                 next
             };
             tx.execute(
-                "INSERT INTO potion_slots (character, slot, name, price) VALUES (?1, ?2, ?3, ?4)",
-                params![owner, number, slot.name.trim(), slot.price],
+                "INSERT INTO potion_slots (character, slot, name, price, quick_slot) VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![owner, number, slot.name.trim(), slot.price, slot.quick_slot],
             )?;
         }
         tx.commit()?;
@@ -123,11 +132,12 @@ impl UserData {
     /// The counts typed for a session, in slot order.
     pub fn session_potions(&self, started_at: f64) -> Result<Vec<SessionPotion>> {
         let mut stmt = self.conn.prepare(
-            "SELECT slot, name, price, start_count, now_count FROM session_potions WHERE started_at = ?1 ORDER BY slot",
+            "SELECT slot, name, price, start_count, now_count, read_used FROM session_potions
+             WHERE started_at = ?1 ORDER BY slot",
         )?;
         let rows = stmt.query_map([key(started_at)], |row| {
-            let (start, now) = (row.get(3)?, row.get(4)?);
-            Ok(SessionPotion { slot: row.get(0)?, name: row.get(1)?, price: row.get(2)?, start, now, used: used(start, now) })
+            let (start, now, read) = (row.get(3)?, row.get(4)?, row.get(5)?);
+            Ok(SessionPotion { slot: row.get(0)?, name: row.get(1)?, price: row.get(2)?, start, now, read, used: used(start, now, read) })
         })?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
@@ -135,14 +145,15 @@ impl UserData {
     /// Every session's counts, by start time.
     pub(super) fn all_session_potions(&self) -> Result<HashMap<i64, Vec<SessionPotion>>> {
         let mut stmt = self.conn.prepare(
-            "SELECT started_at, slot, name, price, start_count, now_count FROM session_potions ORDER BY started_at, slot",
+            "SELECT started_at, slot, name, price, start_count, now_count, read_used FROM session_potions
+             ORDER BY started_at, slot",
         )?;
         let mut by: HashMap<i64, Vec<SessionPotion>> = HashMap::new();
         let rows = stmt.query_map([], |row| {
-            let (start, now) = (row.get(4)?, row.get(5)?);
+            let (start, now, read) = (row.get(4)?, row.get(5)?, row.get(6)?);
             Ok((
                 row.get::<_, i64>(0)?,
-                SessionPotion { slot: row.get(1)?, name: row.get(2)?, price: row.get(3)?, start, now, used: used(start, now) },
+                SessionPotion { slot: row.get(1)?, name: row.get(2)?, price: row.get(3)?, start, now, read, used: used(start, now, read) },
             ))
         })?;
         for row in rows {
@@ -166,8 +177,15 @@ impl UserData {
             return Err(Error::Invalid("A potion count can't be below zero.".into()));
         }
         if start.is_none() && now.is_none() {
-            self.conn
-                .execute("DELETE FROM session_potions WHERE started_at = ?1 AND slot = ?2", params![key(started_at), slot])?;
+            // A count read from the quick slot stays; only the typed ones go.
+            self.conn.execute(
+                "DELETE FROM session_potions WHERE started_at = ?1 AND slot = ?2 AND read_used IS NULL",
+                params![key(started_at), slot],
+            )?;
+            self.conn.execute(
+                "UPDATE session_potions SET start_count = NULL, now_count = NULL WHERE started_at = ?1 AND slot = ?2",
+                params![key(started_at), slot],
+            )?;
             return Ok(());
         }
         let found = self.potion_slots(character)?.into_iter().find(|s| s.slot == slot).map(|s| (s.name, s.price));
@@ -194,6 +212,40 @@ impl UserData {
     }
 }
 
+fn slots_of(conn: &rusqlite::Connection, owner: &str) -> Result<Vec<PotionSlot>> {
+    let mut stmt =
+        conn.prepare("SELECT slot, name, price, quick_slot FROM potion_slots WHERE character = ?1 ORDER BY slot")?;
+    let rows = stmt.query_map([owner], |row| {
+        Ok(PotionSlot { slot: row.get(0)?, name: row.get(1)?, price: row.get(2)?, quick_slot: row.get(3)? })
+    })?;
+    Ok(rows.collect::<rusqlite::Result<_>>()?)
+}
+
+/// Keeps what the session tracker counted from the quick slots against the character's potion
+/// slots that sit on them, with each slot's name and price now. Typed counts are left as they are.
+pub(super) fn write_read_potions(
+    tx: &rusqlite::Transaction,
+    character: Option<&str>,
+    started_at: Option<f64>,
+    uses: &[crate::session::QuickSlotUse],
+) -> Result<()> {
+    let Some(started_at) = started_at else { return Ok(()) };
+    let mut slots = slots_of(tx, &owner(character))?;
+    if slots.is_empty() {
+        slots = slots_of(tx, "")?;
+    }
+    for slot in slots {
+        let Some(used) = slot.quick_slot.and_then(|q| uses.iter().find(|u| u.slot == q)) else { continue };
+        tx.execute(
+            "INSERT INTO session_potions (started_at, slot, name, price, read_used) VALUES (?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT (started_at, slot) DO UPDATE SET
+                 name = excluded.name, price = excluded.price, read_used = excluded.read_used",
+            params![key(started_at), slot.slot, slot.name, slot.price, i64::from(used.used)],
+        )?;
+    }
+    Ok(())
+}
+
 /// What a session's potions cost, by its start time.
 pub(super) fn cost_of(potions: &[SessionPotion]) -> i64 {
     potions.iter().map(SessionPotion::cost).sum()
@@ -208,7 +260,7 @@ mod tests {
     use super::*;
 
     fn slot(name: &str, price: i64) -> PotionSlot {
-        PotionSlot { slot: 0, name: name.into(), price }
+        PotionSlot { slot: 0, name: name.into(), price, quick_slot: None }
     }
 
     #[test]
@@ -217,9 +269,10 @@ mod tests {
         db.set_potion_slots(None, &[slot(" White Potion ", 320), slot("Blue Potion", 200)]).unwrap();
         let slots = db.potion_slots(None).unwrap();
         assert_eq!(slots, [
-            PotionSlot { slot: 1, name: "White Potion".into(), price: 320 },
-            PotionSlot { slot: 2, name: "Blue Potion".into(), price: 200 },
+            PotionSlot { slot: 1, name: "White Potion".into(), price: 320, quick_slot: None },
+            PotionSlot { slot: 2, name: "Blue Potion".into(), price: 200, quick_slot: None },
         ]);
+        assert!(db.set_potion_slots(None, &[PotionSlot { quick_slot: Some(8), ..slot("Elixir", 1) }]).is_err());
         assert!(db.set_potion_slots(None, &[slot("", 1)]).is_err());
         assert!(db.set_potion_slots(None, &[slot("Elixir", -1)]).is_err());
         assert!(db.set_potion_slots(None, &vec![slot("Red Potion", 50); MAX_SLOTS + 1]).is_err());
@@ -248,7 +301,7 @@ mod tests {
         assert_eq!(cost_of(&potions), 88 * 320);
 
         // A new price applies to counts typed afterwards, not to the ones already kept.
-        db.set_potion_slots(None, &[PotionSlot { slot: 1, name: "White Potion".into(), price: 400 }]).unwrap();
+        db.set_potion_slots(None, &[PotionSlot { slot: 1, name: "White Potion".into(), price: 400, quick_slot: None }]).unwrap();
         assert_eq!(db.session_potions(at).unwrap()[0].price, 320);
         db.set_session_potion(None, at, 1, Some(300), Some(200)).unwrap();
         assert_eq!(db.session_potions(at).unwrap()[0].price, 400);

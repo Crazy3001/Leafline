@@ -8,6 +8,7 @@
   import Logo from "$lib/components/Logo.svelte";
   import NextStep from "$lib/components/NextStep.svelte";
   import PanelView from "$lib/components/PanelView.svelte";
+  import { bag, watchBag } from "$lib/bag.svelte";
   import { itemView, watchItems } from "$lib/items.svelte";
   import { monsterView, watchMonsters } from "$lib/monsters.svelte";
   import { tabRequest } from "$lib/nav.svelte";
@@ -59,6 +60,17 @@
   // An item check is asked for by hotkey, so its result opens by itself.
   $effect(() => {
     if (live.itemRead?.found) select("item");
+  });
+
+  // So is a bag check, shown in the Item tab.
+  watchBag();
+  let bagSeen = bag.seq;
+  $effect(() => {
+    if (bag.seq !== bagSeen) {
+      bagSeen = bag.seq;
+      itemView.id = null;
+      select("item");
+    }
   });
 
   // So is reading the character's windows, whose result is in the Character tab. When the live

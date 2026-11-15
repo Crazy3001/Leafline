@@ -9,6 +9,7 @@
 //! them.
 
 pub mod atlas;
+pub mod bag;
 pub mod bestiary;
 pub mod combat;
 pub mod drops;

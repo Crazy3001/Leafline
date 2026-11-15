@@ -29,6 +29,39 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
   minutes compare, when you'll level, and quest counters under each quest's name.
 - **The Train tab's EXP bar** looks like the game's, with your EXP and percent written on it.
 
+**Training**
+- **What deaths cost.** Each saved session keeps the EXP its deaths lost. The training log shows
+  deaths in the session list, the EXP lost under the **Deaths** tile with about how much play that
+  undid, and a **Deaths** column per map. The Train tab says the same while you play. Characters
+  whose HUD shows only a percentage get it as a share of a level. The CSV export has two new
+  columns, deaths and exp_lost.
+- **Solo and party apart.** In a party, the EXP you get is your share, so one rate over both says
+  little about either. With **Party** set to **Either**, the training log's Maps and Records views
+  show **Solo EXP / hr** and **Party EXP / hr** side by side, and a map you pick shows both with
+  the party sizes you played in. A best run says whether it was solo or in a party. The Train tab's
+  **This map** compares you with your best there played the same way, and gives the other way's
+  average.
+- **Potions counted for you.** Pick the quick slot each potion sits on in **Potions → Edit potions**,
+  and Leafline counts what you drink from the number the game shows there, while the quick-slot bar
+  is in view. Buying more doesn't count as drunk. Potions not on a quick slot are still typed in.
+- **Sell or keep.** Open your Item Inventory on the Equip, Use, Set-up or Etc tab and press the new
+  **Sell or keep** hotkey (set it in Settings). Leafline names each item by its picture and marks
+  what to keep: what a quest on your Quest Helper or one you follow asks for, what crafting uses,
+  gear your build will wear, items you track, and scrolls. The rest is marked to sell, with what the
+  bag fetches at NPC prices. Items the game draws alike, such as a tier of scrolls, say so. The
+  first check downloads the pictures of the items most likely at your level; **Look further**
+  tries every item of the tab. It needs **Show game pictures** on. NPC prices come from the item
+  data and haven't been checked in game yet.
+- **When another map gets better.** While you train, once you've gone up a level on a map and
+  another map's forecast now beats it by 15% or more (the trip there counted), **This map** says so
+  in one quiet line, with **Go** and **Not now**. Not now hides it until your next level. It never
+  pops up or makes a sound.
+
+### Changed
+- **Your records are upgraded** the first time 0.4 opens them, so that sessions keep what their
+  deaths cost and the potions read from your quick slots. Sessions saved before keep their deaths
+  and get the EXP lost from their maps.
+
 ## 0.3.1 (2026-11-14)
 
 ### Fixed

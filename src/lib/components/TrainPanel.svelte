@@ -12,10 +12,12 @@
   import LevelGoal from "./LevelGoal.svelte";
   import PotionCosts from "./PotionCosts.svelte";
   import SaveSpot from "./SaveSpot.svelte";
-  import SpotList, { SPOTS_ID } from "./SpotList.svelte";
+  import SpotList, { SPOTS_ID, type BetterMap } from "./SpotList.svelte";
+  import GoButton from "$lib/components/GoButton.svelte";
+  import { mapPlace } from "$lib/destination.svelte";
   import TimersCard from "./TimersCard.svelte";
   import { openTrainingLog } from "$lib/nav.svelte";
-  import { formatClockIn, formatCompact, formatDuration, formatNumber, splitMapLabel } from "$lib/format";
+  import { formatClockIn, formatCompact, formatDuration, formatNumber, partyLabel, splitMapLabel } from "$lib/format";
   import { characters } from "$lib/characters.svelte";
   import { history, watchHistory } from "$lib/history.svelte";
   import { live } from "$lib/readings.svelte";
@@ -30,6 +32,7 @@
     rateFormat,
     shortDay,
     showUnplaced,
+    deathCost,
     type Metric,
   } from "$lib/training";
   import type { MapReading, SessionSummary } from "$lib/types";
@@ -136,8 +139,16 @@
     const now = session.maps.find((m) => m.map === session.map);
     const saved = stats.find((s) => s.map === session.map);
     if (!now?.expPerHour && !saved) return null;
-    return { name: splitMapLabel(session.map).name, now: now?.expPerHour ?? null, saved };
+    // Your best here as you play now, solo or in a party: a party's EXP is your share of it.
+    const inParty = (session.party ?? 1) > 1;
+    const same = inParty ? saved?.party : saved?.solo;
+    const other = inParty ? saved?.solo : saved?.party;
+    return { name: splitMapLabel(session.map).name, now: now?.expPerHour ?? null, saved, inParty, best: same?.best ?? null, other };
   });
+
+  /** Another map the forecast now puts above this one, from Where to train. */
+  let better = $state<BetterMap | null>(null);
+  let spotList = $state<{ wave: () => void } | null>(null);
 
   const coverage = $derived(session ? mesosCoverage(session) : null);
   const reminder = $derived(session ? mesosReminder(session) : null);
@@ -164,6 +175,10 @@
   }
 
   const dropped = $derived(session ? session.rejected.exp + session.rejected.mesos : 0);
+  /** About how much play the deaths undid, at this map's pace. */
+  const deathPlay = $derived(
+    session ? (deathCost({ ...session, expPerHour: session.paceExpPerHour ?? session.expPerHour })?.play ?? null) : null,
+  );
 
   /** Your best maps by EXP an hour, for before a session. */
   const BESTS_SHOWN = 5;
@@ -206,6 +221,20 @@
     return maps.length ? splitMapLabel(maps[0].map).name : "No map read";
   }
 </script>
+
+{#snippet nudge(b: BetterMap)}
+  <p class="nudge">
+    <span
+      >At Lv {b.level}, <Ref kind="map" id={b.spot.map.id} name={b.spot.map.name} /> should beat this map now: about
+      <span class="tabular">{formatCompact(b.there)}</span> EXP / hr against <span class="tabular">{formatCompact(b.here)}</span> here,
+      by the forecast in Where to train.</span
+    >
+    <span class="nudge-actions">
+      <GoButton place={mapPlace(b.spot.map)} />
+      <button class="link" onclick={() => spotList?.wave()}>Not now</button>
+    </span>
+  </p>
+{/snippet}
 
 {#snippet jump()}
   <Button variant="ghost" size="sm" onclick={jumpToSpots}>
@@ -321,6 +350,7 @@
         activeSeconds={session.activeSeconds}
         mesosPerHour={session.mesosPerHour}
         character={session.name ?? characters.active}
+        quickSlots={session.quickSlots ?? null}
       />
     {/if}
 
@@ -342,10 +372,16 @@
   </Block>
 
   {#if !glance}
+  {#if better && !here}
+    <Block title="This map">
+      {@render nudge(better)}
+    </Block>
+  {/if}
   {#if here}
     <Block title="This map">
       {#snippet aside()}<span class="map-name">{here.name}</span>{/snippet}
-      {@const best = here.saved?.best?.expPerHour ?? null}
+      {#if better}{@render nudge(better)}{/if}
+      {@const best = here.best?.expPerHour ?? null}
       {@const top = Math.max(here.now ?? 0, best ?? 0, 1)}
       {@const bestMesos = here.saved?.bestMesos?.mesosPerHour ?? null}
       {@const mesosNow = session.maps.find((m) => m.map === session.map)?.mesosPerHour ?? null}
@@ -355,7 +391,7 @@
         <Meter value={(here.now ?? 0) / top} height={8} />
         <span class="tabular">{formatCompact(here.now)}</span>
         {#if best != null}
-          <span class="muted">Best here</span>
+          <span class="muted">{here.inParty ? "Party best" : "Solo best"}</span>
           <Meter value={best / top} height={8} color="var(--muted)" />
           <span class="tabular">{formatCompact(best)}</span>
         {/if}
@@ -368,11 +404,19 @@
           <span class="tabular">{formatCompact(bestMesos)}</span>
         {/if}
       </div>
-      {#if here.saved?.best}
+      {#if here.saved && (here.best || here.other)}
         <p class="caption">
-          Best: {here.saved.best.level != null ? `Lv ${here.saved.best.level}, ` : ""}{(here.saved.best.party ?? 1) > 1
-            ? `party of ${here.saved.best.party}`
-            : "solo"}, {shortDay(here.saved.best.at)}. {formatDuration(here.saved.activeSeconds)} here over {here.saved.sessions}
+          {#if here.best}
+            Best: {here.best.level != null ? `Lv ${here.best.level}, ` : ""}{(here.best.party ?? 1) > 1
+              ? `party of ${here.best.party}`
+              : "solo"}, {shortDay(here.best.at)}.
+          {:else}
+            No {here.inParty ? "party" : "solo"} run here of 10 minutes yet.
+          {/if}
+          {#if here.other}
+            {here.inParty ? "Solo" : "In a party"} you've averaged {formatCompact(here.other.expPerHour)} here.
+          {/if}
+          {formatDuration(here.saved.activeSeconds)} here over {here.saved.sessions}
           session{here.saved.sessions === 1 ? "" : "s"}.
         </p>
       {:else}
@@ -414,7 +458,7 @@
             <li>
               {session.deaths} death{session.deaths === 1 ? "" : "s"}, {session.percentOnly
                 ? `${session.percentLost.toFixed(2)}% of a level`
-                : `${formatNumber(session.expLost)} EXP`} lost and left out of the rates.
+                : `${formatNumber(session.expLost)} EXP`} lost and left out of the rates{deathPlay ? `: ${deathPlay}` : ""}.
             </li>
           {/if}
           {#if session.mesosExcluded !== 0}
@@ -426,7 +470,7 @@
     </Block>
   {/if}
   <!-- Where to go next sits under the live numbers; the rate graph is detail, last. -->
-  <SpotList {level} {map} {session} />
+  <SpotList {level} {map} {session} bind:better bind:this={spotList} />
   <Block title="This session">
     {#snippet aside()}
       <Segmented
@@ -478,7 +522,11 @@
               <td><Ref kind="map" name={m.map}>{m.name}</Ref> <SaveSpot label={m.map} name={m.name} /></td>
               <td class="tabular">{formatCompact(m.best!.expPerHour)}</td>
               <td class="tabular">{m.bestMesos ? formatCompact(m.bestMesos.mesosPerHour) : "—"}</td>
-              <td class="tabular muted">{m.best!.level != null ? `Lv ${m.best!.level} · ` : ""}{shortDay(m.best!.at)}</td>
+              <td class="tabular muted"
+                >{m.best!.level != null ? `Lv ${m.best!.level} · ` : ""}{(m.best!.party ?? 1) > 1 ? `${partyLabel(m.best!.party)} · ` : ""}{shortDay(
+                  m.best!.at,
+                )}</td
+              >
             </tr>
           {/each}
         </tbody>
@@ -666,6 +714,37 @@
     margin: 0;
     font-size: var(--text-xs);
     color: var(--faint);
+  }
+
+  /* Another map should beat this one now: a quiet line, never an alert. */
+  .nudge {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px var(--space-2);
+    margin: 0 0 var(--space-2);
+    font-size: var(--text-sm);
+    color: var(--muted);
+  }
+
+  .nudge-actions {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--space-2);
+  }
+
+  .link {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--faint);
+    font: inherit;
+    font-size: var(--text-xs);
+    cursor: pointer;
+  }
+
+  .link:hover {
+    color: var(--text);
   }
 
   .map-name {

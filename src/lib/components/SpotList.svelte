@@ -1,6 +1,17 @@
 <script lang="ts" module>
+  import type { TrainingSpot as Spot } from "$lib/types";
+
   /** The section's element id, for the Train tab's jump link. */
   export const SPOTS_ID = "where-to-train";
+
+  /** A map the forecast now puts above the one being trained on, for the Train tab's quiet line. */
+  export interface BetterMap {
+    spot: Spot;
+    /** EXP an hour there and here, as For you weighs them (the trip there counted). */
+    there: number;
+    here: number;
+    level: number;
+  }
 </script>
 
 <script lang="ts">
@@ -53,6 +64,7 @@
     map = null,
     session = null,
     last = true,
+    better = $bindable(null),
   }: {
     /** Read from the HUD or the session; the player can set it when it isn't. */
     level: number | null;
@@ -60,6 +72,8 @@
     session?: SessionSummary | null;
     /** The bottom section of the tab, with no rule under it. */
     last?: boolean;
+    /** Set while a session runs on a map that another one should now beat; see [`nudge`]. */
+    better?: BetterMap | null;
   } = $props();
 
   type Sort = "you" | "played" | "near" | "saved";
@@ -245,6 +259,53 @@
     const fresh = shown.find((s) => (forecast(s)?.playedSeconds ?? 0) === 0 && (forecast(s)?.high ?? 0) > best);
     return fresh?.map.id ?? null;
   });
+  /** How much better another map must look, as For you weighs it, before the Train tab says so. */
+  const NUDGE_MARGIN = 1.15;
+  /**
+   * The maps that already beat this one when the player started here, by map. The nudge is for a
+   * map that becomes better as the player levels, not for one they chose to pass up.
+   */
+  let arrival = $state<{ map: number; level: number; ahead: Set<number> } | null>(null);
+  /** Maps beating this one by the margin, best first, by the forecast For you shows. */
+  const ahead = $derived.by(() => {
+    const from = data?.from?.id;
+    if (from == null || level == null || !session || session.town) return null;
+    const here = (data?.spots ?? []).find((s) => s.map.id === from);
+    if (!here || !forecast(here)) return null;
+    const rate = forYou(here);
+    if (rate <= 0) return null;
+    const beat = (data?.spots ?? [])
+      .filter((s) => s.map.id !== from && s.reachable && forecast(s) && near(s) && !tooHard(s))
+      .map((s) => ({ spot: s, there: forYou(s) }))
+      .filter((c) => c.there >= rate * NUDGE_MARGIN)
+      .sort((a, b) => b.there - a.there);
+    return { from, rate, beat };
+  });
+  $effect(() => {
+    const now = ahead;
+    if (!now || level == null) return;
+    const known = untrack(() => arrival);
+    if (known?.map !== now.from) arrival = { map: now.from, level, ahead: new Set(now.beat.map((c) => c.spot.map.id)) };
+  });
+  /** Levels a nudge was waved away at, by map, until the next level. */
+  let waved = $state<Map<number, number>>(new Map());
+  $effect(() => {
+    const now = ahead;
+    const start = arrival;
+    let next: BetterMap | null = null;
+    if (now && start && start.map === now.from && level != null && level > start.level && waved.get(now.from) !== level) {
+      const fresh = now.beat.find((c) => !start.ahead.has(c.spot.map.id));
+      if (fresh) next = { spot: fresh.spot, there: fresh.there, here: now.rate, level };
+    }
+    better = next;
+  });
+  /** Hides the nudge for this map until the next level. */
+  export function wave() {
+    const from = arrival?.map;
+    if (from == null || level == null) return;
+    waved = new Map(waved).set(from, level);
+  }
+
   const missingSaved = $derived(saved.filter((s) => !(data?.spots ?? []).some((spot) => spot.map.id === s.mapId)));
 
   function stored(key: string, fallback: string) {

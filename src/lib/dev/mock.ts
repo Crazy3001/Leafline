@@ -4,6 +4,7 @@
 import type { Backend } from "../api";
 import type {
   Analysis,
+  BagCheck,
   BaseStats,
   ItemNote,
   LoggedDrop,
@@ -147,6 +148,25 @@ const slotsFor = (character: string | null) => {
   return own.length || !character ? own : (potionSlotSets.get("") ?? []);
 };
 const sessionPotions = new Map<number, SessionPotion[]>();
+const bagHandlers: ((check: BagCheck) => void)[] = [];
+/** A made-up Etc tab: names and prices are invented for the preview. */
+const sampleBag: BagCheck = {
+  busy: false,
+  at: Math.floor(Date.now() / 1000),
+  tab: "etc",
+  character: "Leafling",
+  wide: false,
+  more: 312,
+  problem: null,
+  unknown: [9],
+  items: [
+    { slot: 0, count: 27, ids: [9001], name: "Fern Leaf", price: 8, priceRange: null, untradable: false, keep: [], wantedBy: [] },
+    { slot: 1, count: 70, ids: [9002], name: "Moss Ribbon", price: 10, priceRange: null, untradable: false, keep: [], wantedBy: [{ id: 1, name: "A Ribbon for Mai" }] },
+    { slot: 2, count: 13, ids: [9003], name: "Copper Ore", price: 12, priceRange: null, untradable: false, keep: [{ kind: "recipe" }], wantedBy: [] },
+    { slot: 3, count: 109, ids: [9004], name: "Burrow Fur", price: 6, priceRange: null, untradable: false, keep: [], wantedBy: [] },
+    { slot: 4, count: 1, ids: [9005, 9006, 9007], name: "Hat Scroll: Greater", price: null, priceRange: [50, 80], untradable: false, keep: [{ kind: "scroll" }], wantedBy: [] },
+  ],
+};
 const potionHandlers: (() => void)[] = [];
 
 function mockHistory(): History {
@@ -494,6 +514,7 @@ export const mockBackend: Backend = {
     { action: "ToggleLive", keys: "", suggestedKeys: "", label: "Start or stop live reading", inSetup: false, taken: false },
     { action: "ReadItem", keys: "F10", suggestedKeys: "Super+Numpad1", label: "Read the item you're hovering", inSetup: true, taken: true },
     { action: "ReadCharacter", keys: "", suggestedKeys: "", label: "Read your stat and skill windows, to update your build", inSetup: true, taken: false },
+    { action: "CheckBag", keys: "", suggestedKeys: "", label: "Sell or keep: check the inventory tab that's open", inSetup: false, taken: false },
     { action: "PauseTracking", keys: "", suggestedKeys: "", label: "Pause or resume tracking", inSetup: false, taken: false },
     { action: "NewSession", keys: "", suggestedKeys: "", label: "Start a new session", inSetup: false, taken: false },
     { action: "SaveFrame", keys: "", suggestedKeys: "", label: "Save the picture last read", inSetup: true, taken: false },
@@ -667,7 +688,7 @@ export const mockBackend: Backend = {
     const def = slotsFor(character).find((p) => p.slot === slot);
     if ((start != null || now != null) && def) {
       const used = start != null && now != null ? Math.max(0, start - now) : 0;
-      rows.push({ slot, name: def.name, price: def.price, start, now, used });
+      rows.push({ slot, name: def.name, price: def.price, start, now, read: null, used });
     }
     sessionPotions.set(startedAt, rows.sort((a, b) => a.slot - b.slot));
     potionHandlers.forEach((h) => h());
@@ -1122,6 +1143,15 @@ export const mockBackend: Backend = {
   },
   async onCharacterRead(handler) {
     characterHandlers.push(handler);
+    return () => {};
+  },
+  async bagLookFurther() {
+    const wide = { ...sampleBag, wide: true, more: 0, unknown: [] };
+    bagHandlers.forEach((h) => h(wide));
+  },
+  lastBag: async () => sampleBag,
+  async onBag(handler) {
+    bagHandlers.push(handler);
     return () => {};
   },
   async findGear(who) {

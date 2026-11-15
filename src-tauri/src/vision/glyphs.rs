@@ -34,6 +34,12 @@ impl Mask {
         Self { width: right - left, height: bottom - top, ink: ink.collect() }
     }
 
+    /// A mask whose pixel `(x, y)` is ink where `is_ink(x, y)` says so.
+    pub fn from_fn(width: u32, height: u32, is_ink: impl Fn(u32, u32) -> bool) -> Self {
+        let ink = (0..height).flat_map(|y| (0..width).map(move |x| (x, y))).map(|(x, y)| is_ink(x, y));
+        Self { width, height, ink: ink.collect() }
+    }
+
     pub fn width(&self) -> u32 {
         self.width
     }

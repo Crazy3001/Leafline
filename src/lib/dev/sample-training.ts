@@ -103,6 +103,9 @@ export const sampleSavedSessions: SavedSession[] = PLANS.map((plan, i) => {
       percentGained: (rate * minutes) / 60 / 1000,
       mesosGained: Math.round((plan.mesosPerHour * minutes) / 60),
       mesosSeconds: minutes * 60,
+      // Each death here costs a tenth of what an hour brings, all on the first map.
+      deaths: j === 0 ? plan.deaths.length : 0,
+      expLost: j === 0 ? Math.round(plan.deaths.length * plan.expPerHour * 0.1) : 0,
     };
   });
   // Most active time first, as the backend lists them.
@@ -124,6 +127,8 @@ export const sampleSavedSessions: SavedSession[] = PLANS.map((plan, i) => {
     job: "Crossbowman",
     character: "Leafling",
     deaths: plan.deaths.length,
+    expLost: Math.round(plan.deaths.length * plan.expPerHour * 0.1),
+    percentLost: 0,
     note: plan.note ?? "",
     lines,
     maps: lines.map((l) => ({ map: l.map!, activeSeconds: l.activeSeconds, expGained: l.expGained, mesosGained: l.mesosGained })),

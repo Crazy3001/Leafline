@@ -269,6 +269,8 @@ export interface SessionLine {
   otherExp?: number;
   deaths?: number;
   expLost?: number;
+  /** Percent of a level lost to deaths, for a HUD that shows only a percentage. */
+  percentLost?: number;
   /** Hunting gains that matched no sum of the map's monsters' EXP. */
   gainsMissed?: number;
   /** The character as the estimates saw them when the stretch began. */
@@ -374,6 +376,8 @@ export interface SessionSummary {
   maps: MapSummary[];
   /** Per map, level, party size and job, most active time first. */
   lines: SessionLine[];
+  /** The quick slots that showed a count, with how many went from each. */
+  quickSlots?: QuickSlotUse[];
   /** Quest counter gains per objective and map, most active time first. */
   counters: CounterRate[];
   rejected: { exp: number; mesos: number };
@@ -1246,6 +1250,10 @@ export interface SavedSession {
   /** The character's name, when the tracker read it. */
   character: string | null;
   deaths: number;
+  /** EXP lost to those deaths, left out of the rates. */
+  expLost: number;
+  /** Percent of a level lost to them, for a HUD that shows only a percentage. */
+  percentLost: number;
   /** The player's own note. It stays on this PC. */
   note: string;
   /** Per map, level, party size and job, most active time first. */
@@ -1307,6 +1315,56 @@ export interface PotionSlot {
   name: string;
   /** What one costs the player, in mesos. */
   price: number;
+  /** The quick slot it sits on, 0 to 7 (top row left to right, then the bottom row), to read
+   *  its count from the game; null to type the counts. */
+  quickSlot?: number | null;
+}
+
+// Sell or keep (see src-tauri/src/app/bag.rs).
+
+export type BagTab = "equip" | "use" | "setup" | "etc" | "cash" | "deco";
+
+/** What the data or the build says to keep an item for. */
+export type BagKeep = { kind: "recipe" } | { kind: "plan" } | { kind: "quest" } | { kind: "scroll" };
+
+export interface BagItem {
+  slot: number;
+  count: number;
+  /** Every item drawn the same, best first. More than one when the picture can't tell them apart. */
+  ids: number[];
+  name: string;
+  /** What an NPC pays for one, from the item data (not confirmed in Classic). */
+  price: number | null;
+  /** The lowest and highest when the items drawn alike differ. */
+  priceRange: [number, number] | null;
+  untradable: boolean;
+  keep: BagKeep[];
+  /** Quests that ask for it. */
+  wantedBy: { id: number; name: string }[];
+}
+
+export interface BagCheck {
+  /** A check is under way; the rest is from the one before. */
+  busy: boolean;
+  /** Unix seconds. */
+  at: number;
+  tab: BagTab | null;
+  character: string | null;
+  items: BagItem[];
+  /** Slots holding something no picture matched. */
+  unknown: number[];
+  /** Every item of the tab was tried. */
+  wide: boolean;
+  /** Pictures "Look further" would still download. */
+  more: number;
+  problem: string | null;
+}
+
+/** One quick slot over a session: the count it shows now and how many went from it. */
+export interface QuickSlotUse {
+  slot: number;
+  count: number | null;
+  used: number;
 }
 
 /** A slot's counts for a session, with the name and price as they were when typed. */
@@ -1316,7 +1374,9 @@ export interface SessionPotion {
   price: number;
   start: number | null;
   now: number | null;
-  /** Start minus now once both are typed, never below zero. */
+  /** How many went, as counted from the quick slot. */
+  read?: number | null;
+  /** What was read, or else start minus now once both are typed; never below zero. */
   used: number;
 }
 

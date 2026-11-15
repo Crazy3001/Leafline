@@ -208,7 +208,7 @@ fn read_item_once(app: &AppHandle) -> Result<(u32, u32, Vec<ItemTooltip>)> {
 }
 
 /// One picture of the game, for something the player asked to read.
-fn one_picture(app: &AppHandle) -> Result<Frame> {
+pub(super) fn one_picture(app: &AppHandle) -> Result<Frame> {
     let choice = app.state::<SettingsState>().get().live;
     let window = capture::find(choice.window.as_ref())?
         .ok_or_else(|| Error::Invalid("Leafline can't find the game window. Pick it in Settings.".into()))?;

@@ -18,7 +18,7 @@
 ## What it does
 
 ### Training
-- **EXP and meso rates as you play:** EXP gained, EXP/hour from your second kill, kills per hour, time to level with a likely range, mesos/hour (after potions, if you set their cost), overall, per map and over the last five minutes, with a trend graph.
+- **EXP and meso rates as you play:** EXP gained, EXP/hour from your second kill, kills per hour, time to level with a likely range, mesos/hour (after potions, counted from your quick slots once you set their cost), solo and party apart, overall, per map and over the last five minutes, with a trend graph.
 - **Readings are checked, not trusted:** EXP points and percent have to agree, a level-up has to show twice, and big meso jumps need several readings. Time in town, deaths, quest rewards and shop trades are kept out of the rates.
 - **Sessions save themselves** as you go, with a line for each map, level, party size and job, and carry on after a crash or restart. The **training log** compares sessions and maps, keeps your records per map, and lists the drops you logged. Export it all to CSV. Each character keeps its own numbers.
 - **Where to train:** the Train tab ranks maps by a forecast worked out from your character's stats, gear and buffs and from how you really play, with a likely range and plain reasons for each. A check shows how close the estimates have been. Bookmark the spots you like, and set a level goal.
@@ -29,6 +29,7 @@
 ### Items
 - **Item check:** hover an item in game and press your hotkey. Leafline reads the tooltip and shows its stats with the base and bonus, its requirements, whether it's clean or scrolled (and how many scrolls failed), and whether your build can wear it.
 - **Where to get it:** every monster players have seen drop it, each with the maps it lives on and a route there, the NPC shops that sell it, the quests that give it, and the recipe that crafts it.
+- **Sell or keep:** open an inventory tab and press your hotkey. Leafline names each item by its picture, says which to keep (a quest you're doing needs it, crafting uses it, your build will wear it, you're tracking it) and which to sell, and what the bag fetches from an NPC.
 - **Tracked items:** star an item to keep it listed with who drops it, the best map to hunt it and a shop when one sells it.
 - **Drop log:** log an item as a drop from a monster on your map, and send it on to MeowDB's community drop lists with one click if you like.
 - **Your own notes** on any item, kept on your PC.

@@ -36,6 +36,7 @@
   import { panelInfo } from "$lib/panels";
   import { placeLinks, watchPlaces } from "$lib/places.svelte";
   import { questView, watchQuests } from "$lib/quests.svelte";
+  import { bag, watchBag } from "$lib/bag.svelte";
   import { live, watchLive } from "$lib/readings.svelte";
   import { watchSettings } from "$lib/settings.svelte";
   import { watchTyping } from "$lib/typing";
@@ -208,6 +209,16 @@
 
   $effect(() => {
     if (live.itemRead?.found) bringUp("item");
+  });
+
+  // A bag check shows in the Item panel too.
+  watchBag();
+  let bagSeen = bag.seq;
+  $effect(() => {
+    if (bag.seq !== bagSeen) {
+      bagSeen = bag.seq;
+      bringUp("item");
+    }
   });
 
   const columnOptions = Array.from({ length: MAX_COLUMNS }, (_, i) => ({ id: i + 1, label: `${i + 1}` }));

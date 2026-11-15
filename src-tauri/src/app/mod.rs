@@ -1,5 +1,6 @@
 //! Tauri wiring: windows, tray, hotkeys and commands.
 
+mod bag;
 mod builds;
 mod cards;
 mod commands;
@@ -61,6 +62,7 @@ pub fn run() {
         .manage(OverlayState::default())
         .manage(cards::CardState::default())
         .manage(LiveState::default())
+        .manage(bag::BagState::default())
         .manage(Readings::default())
         .manage(Bindings::default())
         .manage(UpdateState::default())
@@ -114,6 +116,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             live::live_status,
+            bag::bag_look_further,
+            bag::last_bag,
             live::start_live,
             live::stop_live,
             live::live_windows,

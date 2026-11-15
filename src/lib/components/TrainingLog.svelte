@@ -40,6 +40,8 @@
     rateFormat,
     shortDay,
     showUnplaced,
+    deathCost,
+    partySizes,
     type LineFilter,
     type Metric,
   } from "$lib/training";
@@ -185,6 +187,11 @@
     const start = s.level - s.levelUps;
     return s.levelUps ? `Lv ${start} → ${s.level}` : `Lv ${s.level}`;
   };
+  /** What a session's deaths cost, for under its Deaths tile. */
+  function deathLine(s: SavedSession): string | null {
+    const cost = deathCost(s);
+    return cost ? [cost.lost ? `${cost.lost} lost` : null, cost.play].filter(Boolean).join(", ") || null : null;
+  }
   const percentOnly = (s: SavedSession) => s.expPerHour == null && s.percentPerHour != null;
   const expRate = (s: SavedSession) =>
     percentOnly(s) ? `${s.percentPerHour?.toFixed(1)}%` : formatCompact(s.expPerHour);
@@ -228,6 +235,11 @@
     party,
   });
   const stats = $derived(mapStats(sessions, filter));
+  /** Both kinds of play in view: EXP / hr is shown solo and in a party apart. */
+  const splitParty = $derived(party === "any" && stats.some((m) => m.solo) && stats.some((m) => m.party));
+  const kindRate = (k: { expPerHour: number } | null) => (k ? formatCompact(k.expPerHour) : "—");
+  /** Who a best run was with: `solo`, `party of 3`. */
+  const withWhom = (p: number | null) => ((p ?? 1) > 1 ? `party of ${p}` : "solo");
   const bars = $derived(mapBars(stats, metric));
   const picked = $derived(stats.find((m) => m.map === pickedMap) ?? stats[0] ?? null);
 
@@ -371,7 +383,13 @@
                 <span class="tabular muted">{shortDay(s.startedAt ?? s.savedAt)}</span>
                 <span class="what">
                   <span use:clipped class="ellipsis">{title(s)}</span>
-                  {#if levelText(s)}<span class="small">{levelText(s)}</span>{/if}
+                  {#if levelText(s) || s.deaths > 0}
+                    <span class="small"
+                      >{levelText(s) ?? ""}{levelText(s) && s.deaths > 0 ? " · " : ""}{#if s.deaths > 0}<span class="died"
+                          >{s.deaths} death{s.deaths === 1 ? "" : "s"}</span
+                        >{/if}</span
+                    >
+                  {/if}
                 </span>
                 <span class="tabular r">{dur(s.activeSeconds)}</span>
                 <span class="tabular r strong">{expRate(s)}</span>
@@ -414,7 +432,13 @@
                 <Stat size="lg" label="Played" value={dur(s.activeSeconds)} />
                 <Stat size="lg" label="EXP gained" value={formatNumber(s.expGained)} />
                 <Stat size="lg" label="Levels" value={String(s.levelUps)} />
-                <Stat size="lg" label="Deaths" value={String(s.deaths)} />
+                <Stat
+                  size="lg"
+                  label="Deaths"
+                  value={String(s.deaths)}
+                  sub={deathLine(s)}
+                  title={s.deaths > 0 ? "EXP lost to deaths is left out of EXP / hr. The play time is at this session's rate." : undefined}
+                />
               </div>
 
               <div class="panel">
@@ -465,7 +489,13 @@
                 <div class="grow2">
                   <h3>By map</h3>
                   <table>
-                    <thead><tr><th>Map</th><th>Level</th><th>Party</th><th>Time</th><th>EXP / hr</th><th>Mesos / hr</th></tr></thead>
+                    <thead
+                      ><tr
+                        ><th>Map</th><th>Level</th><th>Party</th><th>Time</th><th>EXP / hr</th><th>Mesos / hr</th>{#if s.deaths > 0}<th
+                            >Deaths</th
+                          >{/if}</tr
+                      ></thead
+                    >
                     <tbody>
                       {#each s.lines.filter((l) => showUnplaced(l, s.activeSeconds)) as l, i (i)}
                         <tr>
@@ -502,6 +532,17 @@
                           <td>{dur(l.activeSeconds)}</td>
                           <td>{l.activeSeconds > 0 ? (l.expGained > 0 ? formatCompact((l.expGained * 3600) / l.activeSeconds) : l.percentGained > 0 ? `${((l.percentGained * 3600) / l.activeSeconds).toFixed(1)}%` : "—") : "—"}</td>
                           <td>{l.mesosSeconds > 0 ? formatCompact((l.mesosGained * 3600) / l.mesosSeconds) : "—"}</td>
+                          {#if s.deaths > 0}
+                            <td class:died={(l.deaths ?? 0) > 0}>
+                              {#if (l.deaths ?? 0) > 0}
+                                {l.deaths}{(l.expLost ?? 0) > 0
+                                  ? ` · −${formatCompact(l.expLost)}`
+                                  : (l.percentLost ?? 0) > 0
+                                    ? ` · −${(l.percentLost ?? 0).toFixed(2)}%`
+                                    : ""}
+                              {:else}—{/if}
+                            </td>
+                          {/if}
                         </tr>
                       {/each}
                     </tbody>
@@ -596,12 +637,28 @@
                     <p class="muted">
                       Best session {longDay(picked.best.at)}, {formatCompact(picked.best.expPerHour)} EXP / hr{picked.best.level != null
                         ? ` at Lv ${picked.best.level}`
-                        : ""}
+                        : ""}, {withWhom(picked.best.party)}
                     </p>
                   {/if}
                 </div>
                 <div class="tiles two">
-                  <Stat size="lg" label="EXP / hr" value={formatCompact(picked.expPerHour)} />
+                  {#if picked.solo && picked.party}
+                    <Stat size="lg" label="Solo EXP / hr" value={kindRate(picked.solo)} sub={`${dur(picked.solo.activeSeconds)} played`} />
+                    <Stat
+                      size="lg"
+                      label="Party EXP / hr"
+                      value={kindRate(picked.party)}
+                      sub={`${dur(picked.party.activeSeconds)} in parties of ${partySizes(picked.partySizes)}`}
+                      title="Your share of the party's EXP, which depends on the party."
+                    />
+                  {:else}
+                    <Stat
+                      size="lg"
+                      label={picked.party ? "Party EXP / hr" : "EXP / hr"}
+                      value={formatCompact(picked.expPerHour)}
+                      sub={picked.party ? `parties of ${partySizes(picked.partySizes)}` : party === "any" ? "solo" : null}
+                    />
+                  {/if}
                   <Stat size="lg" label="Mesos / hr" value={formatCompact(picked.mesosPerHour)} />
                   <Stat size="lg" label="Played" value={dur(picked.activeSeconds)} />
                   <Stat size="lg" label="Sessions" value={String(picked.sessions)} />
@@ -631,16 +688,27 @@
             <h2>Every map you trained on</h2>
             <div class="scroll">
               <table class="wide">
-                <thead><tr><th>Map</th><th>Sessions</th><th>Played</th><th>EXP / hr</th><th>Mesos / hr</th><th>Best session</th></tr></thead>
+                <thead
+                  ><tr
+                    ><th>Map</th><th>Sessions</th><th>Played</th>{#if splitParty}<th>Solo EXP / hr</th><th>Party EXP / hr</th>{:else}<th
+                        >EXP / hr</th
+                      >{/if}<th>Mesos / hr</th><th>Best session</th></tr
+                  ></thead
+                >
                 <tbody>
                   {#each stats as m (m.map)}
                     <tr>
                       <td><Ref kind="map" name={m.map}>{m.name}</Ref></td>
                       <td>{m.sessions}</td>
                       <td>{dur(m.activeSeconds)}</td>
-                      <td>{formatCompact(m.expPerHour)}</td>
+                      {#if splitParty}
+                        <td>{kindRate(m.solo)}</td>
+                        <td use:tip={m.party ? `In parties of ${partySizes(m.partySizes)}` : undefined}>{kindRate(m.party)}</td>
+                      {:else}
+                        <td>{formatCompact(m.expPerHour)}</td>
+                      {/if}
                       <td>{formatCompact(m.mesosPerHour)}</td>
-                      <td>{m.best ? `${shortDay(m.best.at)} · ${formatCompact(m.best.expPerHour)}` : "—"}</td>
+                      <td>{m.best ? `${shortDay(m.best.at)} · ${formatCompact(m.best.expPerHour)}${(m.best.party ?? 1) > 1 ? " · party" : ""}` : "—"}</td>
                     </tr>
                   {/each}
                 </tbody>
@@ -964,6 +1032,10 @@
   .small {
     font-size: var(--text-xs);
     color: var(--faint);
+  }
+
+  .died {
+    color: var(--bad);
   }
 
   .r {
