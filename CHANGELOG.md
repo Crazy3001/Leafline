@@ -3,6 +3,13 @@
 What changed in each release of Leafline. Leafline is a work in progress: if something reads
 wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?template=bug_report.yml).
 
+## 0.3.1 (2026-11-14)
+
+### Fixed
+- **The Route pin fits what it shows.** Opening **All N steps** or **Travel** under the next step
+  now grows the pinned Route window to fit, and closing them shrinks it back, instead of the
+  window staying short and scrolling. A width you set by hand is kept; the height always follows.
+
 ## 0.3.0 (2026-11-14)
 
 ### Added
