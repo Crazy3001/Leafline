@@ -3,6 +3,31 @@
 What changed in each release of Leafline. Leafline is a work in progress: if something reads
 wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?template=bug_report.yml).
 
+## Unreleased
+
+### Added
+
+**Training**
+- **What deaths cost.** Each saved session keeps the EXP its deaths lost. The training log shows
+  deaths in the session list, the EXP lost under the **Deaths** tile with about how much play that
+  undid, and a **Deaths** column per map. The Train tab says the same while you play. Characters
+  whose HUD shows only a percentage get it as a share of a level. The CSV export has two new
+  columns, deaths and exp_lost.
+- **Solo and party apart.** In a party, the EXP you get is your share, so one rate over both says
+  little about either. With **Party** set to **Either**, the training log's Maps and Records views
+  show **Solo EXP / hr** and **Party EXP / hr** side by side, and a map you pick shows both with
+  the party sizes you played in. A best run says whether it was solo or in a party. The Train tab's
+  **This map** compares you with your best there played the same way, and gives the other way's
+  average.
+- **When another map gets better.** While you train, once you've gone up a level on a map and
+  another map's forecast now beats it by 15% or more (the trip there counted), **This map** says so
+  in one quiet line, with **Go** and **Not now**. Not now hides it until your next level. It never
+  pops up or makes a sound.
+
+### Changed
+- **Your records are upgraded** the first time 0.4 opens them, so that sessions keep what their
+  deaths cost. Sessions saved before keep their deaths and get the EXP lost from their maps.
+
 ## 0.3.1 (2026-11-14)
 
 ### Fixed
