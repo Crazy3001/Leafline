@@ -7,6 +7,7 @@
     percent,
     points = null,
     needed = null,
+    small = false,
   }: {
     /** 0 to 100. */
     percent: number;
@@ -14,17 +15,21 @@
     points?: number | null;
     /** The EXP the level needs, when measured. */
     needed?: number | null;
+    /** Thinner, with only the percent written on it, for the compact HUD. */
+    small?: boolean;
   } = $props();
 
   const share = $derived(Math.max(0, Math.min(100, Number.isFinite(percent) ? percent : 0)));
   const text = $derived(
-    points != null
+    small
+      ? `${share.toFixed(2)}%`
+      : points != null
       ? `${formatNumber(points)}${needed ? ` / ${formatNumber(needed)}` : ""} [${share.toFixed(2)}%]`
       : `${share.toFixed(2)}%`,
   );
 </script>
 
-<div class="bar" role="meter" aria-label="EXP towards the next level" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(share)}>
+<div class="bar" class:small role="meter" aria-label="EXP towards the next level" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(share)}>
   <div class="fill" style:width="{share}%"></div>
   <span class="text tabular"><b>EXP</b> {text}</span>
 </div>
@@ -40,6 +45,15 @@
     box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
   }
 
+  .bar.small {
+    height: 13px;
+    border-radius: 3px;
+  }
+
+  .bar.small .text {
+    font-size: 9.5px;
+  }
+
   .fill {
     height: 100%;
     background: var(--exp-bar, #b5e61d);
@@ -52,8 +66,10 @@
   .text {
     position: absolute;
     inset: 0;
-    display: grid;
-    place-items: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
     color: #fff;
     font-size: 10.5px;
     font-weight: 600;
@@ -65,7 +81,6 @@
   }
 
   .text b {
-    margin-right: 3px;
     color: #ffe680;
     font-style: italic;
     font-weight: 800;

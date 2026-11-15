@@ -1,7 +1,8 @@
 <script lang="ts">
   // The compact HUD: the numbers worth a glance while playing, in a small window that fits what it
-  // shows. One layout: EXP per hour, the last five minutes, mesos per hour, time to level, then
-  // the quest counters. Everything else stays in the full overlay.
+  // shows. One layout: the level and an EXP bar like the game's, EXP per hour with how the last
+  // five minutes compare, when the level comes, then mesos per hour and the session, then the quest
+  // counters under each quest's name. Everything else stays in the full overlay.
   import { tip } from "$lib/tip.svelte";
   import { Check, Maximize2, Pause, Play } from "@lucide/svelte";
   import { onMount } from "svelte";
@@ -11,6 +12,7 @@
   import Logo from "$lib/components/Logo.svelte";
   import NextStep from "$lib/components/NextStep.svelte";
   import { formatClockIn, formatCompact, formatDuration, objectiveProgress } from "$lib/format";
+  import ExpBar from "$lib/ui/ExpBar.svelte";
   import { live } from "$lib/readings.svelte";
   import { display, keyHint } from "$lib/settings.svelte";
   import { mesosCoverage } from "$lib/training";
@@ -52,9 +54,8 @@
         : "—"
       : formatCompact(session?.recentExpPerHour),
   );
-  const objectives = $derived(
-    (live.analysis?.quest?.quests ?? []).flatMap((q) => q.objectives.map((o) => ({ ...o, quest: q.title }))),
-  );
+  const quests = $derived((live.analysis?.quest?.quests ?? []).filter((q) => q.objectives.length));
+  const level = $derived(session?.level ?? live.analysis?.hud?.level ?? null);
 
   let asked = "";
 
@@ -85,8 +86,9 @@
 </script>
 
 <div class="hud" bind:this={frame}>
-  <div class="level-track" use:tip={percent != null ? `${percent.toFixed(2)}% toward the next level` : "Toward the next level"}>
-    <span class="level-fill" style:width="{Math.min(100, percent ?? 0)}%"></span>
+  <div class="level-row" data-tauri-drag-region>
+    <span class="lv tabular" data-tauri-drag-region>{level != null ? `Lv ${level}` : "Lv –"}</span>
+    <span class="exp-bar" data-tauri-drag-region><ExpBar percent={percent ?? 0} small /></span>
   </div>
 
   <div class="top" data-tauri-drag-region>
@@ -98,6 +100,12 @@
         {#if session?.held || session?.paused}<span class="paused" data-tauri-drag-region>Paused</span>{:else if session?.measuring}<span
             class="paused"
             data-tauri-drag-region>Measuring</span
+          >{:else if pace != null && pace !== 0}<span
+            class="pace chip"
+            class:up={pace > 0}
+            class:down={pace < 0}
+            use:tip={"The last five minutes against the whole session"}
+            data-tauri-drag-region>{pace > 0 ? "▲" : "▼"}{Math.abs(pace)}%</span
           >{/if}
       {:else}
         <span class="unit" data-tauri-drag-region>{session && session.activeSeconds > 0 ? "Measuring…" : "Starts with your first EXP"}</span>
@@ -118,14 +126,16 @@
     </button>
   </div>
 
+  {#if session?.secondsToLevel != null}
+    <p class="level-up tabular" data-tauri-drag-region>
+      Level up in <b>{formatDuration(session.secondsToLevel)}</b>{#if levelAt}<span class="at"> · about {levelAt}</span>{/if}
+    </p>
+  {/if}
+
   <div class="tiles" data-tauri-drag-region>
     <span class="tile" data-tauri-drag-region>
       <span class="label" data-tauri-drag-region>Last 5 min</span>
-      <span class="tile-value num" data-tauri-drag-region>
-        {recent}{#if pace != null && pace !== 0}<span class="pace" class:up={pace > 0} class:down={pace < 0}
-            >{pace > 0 ? "▲" : "▼"}{Math.abs(pace)}%</span
-          >{/if}
-      </span>
+      <span class="tile-value num" data-tauri-drag-region>{recent}</span>
     </span>
     <span
       class="tile"
@@ -137,35 +147,38 @@
       >
     </span>
     <span class="tile" data-tauri-drag-region>
-      <span class="label" data-tauri-drag-region>To level</span>
-      <span class="tile-value num" data-tauri-drag-region use:tip={levelAt ? `About ${levelAt} at this pace` : undefined}
-        >{formatDuration(session?.secondsToLevel)}</span
-      >
+      <span class="label" data-tauri-drag-region>Session</span>
+      <span class="tile-value num" data-tauri-drag-region>{session?.activeSeconds ? formatDuration(session.activeSeconds) : "—"}</span>
     </span>
   </div>
 
   <NextStep variant="hud" />
 
-  {#if objectives.length}
-    <ul class="counters">
-      {#each objectives as objective, i (i)}
-        <!-- A line the data says is there but no reading has counted shows no count, not a 0. -->
-        {@const progress = objective.unread ? 0 : objectiveProgress(objective)}
-        {@const done = progress >= 1}
-        <li class:done use:tip={objective.quest}>
-          <span class="target">
-            {#if done}<Check size={10} />{/if}
-            <!-- The counter names an item or a monster; whichever has a picture shows it. -->
-            <Pic kind="item" name={objective.target} size={16} /><Pic kind="mob" name={objective.target} size={16} />
-            {objective.target}
-          </span>
-          <span class="count tabular" class:faint={objective.unread}
-            >{objective.unread ? "–" : objective.current}/{objective.required}</span
-          >
-          <span class="track"><span class="fill" style:width="{progress * 100}%"></span></span>
-        </li>
+  {#if quests.length}
+    <div class="quests">
+      {#each quests as quest, q (q)}
+        <p class="quest-title" title={quest.title}>{quest.title}</p>
+        <ul class="counters">
+          {#each quest.objectives as objective, i (i)}
+            <!-- A line the data says is there but no reading has counted shows no count, not a 0. -->
+            {@const progress = objective.unread ? 0 : objectiveProgress(objective)}
+            {@const done = progress >= 1}
+            <li class:done>
+              <span class="target">
+                {#if done}<Check size={10} />{/if}
+                <!-- The counter names an item or a monster; whichever has a picture shows it. -->
+                <Pic kind="item" name={objective.target} size={16} /><Pic kind="mob" name={objective.target} size={16} />
+                {objective.target}
+              </span>
+              <span class="count tabular" class:faint={objective.unread}
+                >{objective.unread ? "–" : objective.current}/{objective.required}</span
+              >
+              <span class="track"><span class="fill" style:width="{progress * 100}%"></span></span>
+            </li>
+          {/each}
+        </ul>
       {/each}
-    </ul>
+    </div>
   {/if}
 </div>
 
@@ -176,23 +189,53 @@
     user-select: none;
   }
 
-  .level-track {
-    height: 3px;
-    background: var(--surface-3);
+  .level-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px 0 10px;
+    cursor: grab;
   }
 
-  .level-fill {
-    display: block;
-    height: 100%;
-    background: var(--exp);
+  .lv {
+    flex: none;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: linear-gradient(#ffb547, #e8891c);
+    color: #2a1600;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+  }
+
+  .exp-bar {
+    flex: 1;
+    min-width: 0;
   }
 
   .top {
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    padding: 6px 4px 2px 10px;
+    padding: 4px 4px 0 10px;
     cursor: grab;
+  }
+
+  .level-up {
+    margin: 0;
+    padding: 0 10px 2px;
+    color: var(--muted);
+    font-size: var(--text-xs);
+    cursor: grab;
+  }
+
+  .level-up b {
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .level-up .at {
+    color: var(--faint);
   }
 
   .logo {
@@ -257,6 +300,7 @@
     flex-direction: column;
     min-width: 0;
     padding: 4px 6px;
+    border-radius: var(--radius-sm);
     background: var(--surface-2);
   }
 
@@ -292,12 +336,37 @@
     color: var(--warn);
   }
 
+  .pace.chip {
+    margin-left: 0;
+    padding: 0 5px;
+    border-radius: var(--radius-pill);
+    background: rgba(255, 255, 255, 0.06);
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .quests {
+    padding: 4px 10px 8px;
+    border-top: 1px solid var(--border);
+  }
+
+  .quest-title {
+    margin: 4px 0 2px;
+    overflow: hidden;
+    color: var(--faint);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
   .counters {
     display: grid;
     gap: 5px;
     margin: 0;
-    padding: 6px 10px 8px;
-    border-top: 1px solid var(--border);
+    padding: 0;
     list-style: none;
     font-size: var(--text-xs);
   }
@@ -328,14 +397,17 @@
 
   .track {
     grid-column: 1 / -1;
-    height: 2px;
+    height: 3px;
+    overflow: hidden;
+    border-radius: var(--radius-pill);
     background: var(--surface-3);
   }
 
   .fill {
     display: block;
     height: 100%;
-    background: var(--muted);
+    border-radius: inherit;
+    background: var(--accent);
   }
 
   .done .target,
