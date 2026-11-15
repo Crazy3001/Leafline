@@ -37,6 +37,7 @@
   import Button from "$lib/ui/Button.svelte";
   import LineChart from "$lib/ui/LineChart.svelte";
   import Meter from "$lib/ui/Meter.svelte";
+  import ExpBar from "$lib/ui/ExpBar.svelte";
   import Segmented from "$lib/ui/Segmented.svelte";
   import Stat from "$lib/ui/Stat.svelte";
 
@@ -277,7 +278,7 @@
     {#if lv != null && percent != null}
       <div class="level">
         <div class="level-line"><span class="muted">Lv {lv} to {lv + 1}</span><span class="tabular">{percent.toFixed(2)}%</span></div>
-        <Meter value={percent / 100} label="EXP towards the next level" />
+        <ExpBar {percent} points={session.exp?.points ?? null} needed={session.expNeeded} />
         {#if toLevel || levelPace}
           <span class="muted tabular" use:tip={toLevel?.tip ?? ""}>
             {#if toLevel}{toLevel.line}{/if}{#if toLevel && levelPace}{" · "}{/if}{#if levelPace}{levelPace}{/if}
