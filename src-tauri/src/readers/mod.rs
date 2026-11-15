@@ -5,6 +5,7 @@ pub mod character;
 pub mod counts;
 mod digits;
 pub mod hud;
+pub mod inventory;
 pub mod map;
 pub mod mesos;
 pub mod npc;

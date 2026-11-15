@@ -55,7 +55,11 @@ struct Glyph {
 
 /// Outlined shapes in `left..right`, `top..bottom` of the window: runs of fill joined at edges or
 /// corners, with nothing but fill or black beside them on any side.
-fn glyphs(frame: &Frame, (left, top, right, bottom): (u32, u32, u32, u32)) -> Vec<Glyph> {
+fn glyphs(
+    frame: &Frame,
+    (left, top, right, bottom): (u32, u32, u32, u32),
+    walled: &dyn Fn(u32, u32) -> bool,
+) -> Vec<Glyph> {
     let (right, bottom) = (right.min(frame.width()), bottom.min(frame.height()));
     if left >= right || top >= bottom {
         return Vec::new();
@@ -89,7 +93,7 @@ fn glyphs(frame: &Frame, (left, top, right, bottom): (u32, u32, u32, u32)) -> Ve
                         seen[at(nx, ny)] = true;
                         stack.push((nx, ny));
                     }
-                } else if straight && !is_outline(frame, left + nx, top + ny) {
+                } else if straight && !is_outline(frame, left + nx, top + ny) && !walled(left + nx, top + ny) {
                     closed = false;
                 }
             }
@@ -113,7 +117,13 @@ fn glyphs(frame: &Frame, (left, top, right, bottom): (u32, u32, u32, u32)) -> Ve
 /// Every count in `area` of the window whose digits are `cell` window pixels to a font pixel, or
 /// at any size when `cell` is `None`. A number with a digit no rule fits is left out.
 pub fn read(frame: &Frame, area: (u32, u32, u32, u32), cell: Option<u32>) -> Vec<Count> {
-    let mut digits: Vec<Glyph> = glyphs(frame, area)
+    read_walled(frame, area, cell, &|_, _| false)
+}
+
+/// Like [`read`], with window pixels where `walled` says so taken as outline: where a count
+/// meets the frame of the slot it is drawn in.
+pub fn read_walled(frame: &Frame, area: (u32, u32, u32, u32), cell: Option<u32>, walled: &dyn Fn(u32, u32) -> bool) -> Vec<Count> {
+    let mut digits: Vec<Glyph> = glyphs(frame, area, walled)
         .into_iter()
         .filter(|g| g.height.is_multiple_of(DIGIT_ROWS))
         .filter(|g| cell.is_none_or(|c| g.height == DIGIT_ROWS * c))
