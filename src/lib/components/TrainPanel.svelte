@@ -15,7 +15,7 @@
   import SpotList, { SPOTS_ID } from "./SpotList.svelte";
   import TimersCard from "./TimersCard.svelte";
   import { openTrainingLog } from "$lib/nav.svelte";
-  import { formatClockIn, formatCompact, formatDuration, formatNumber, splitMapLabel } from "$lib/format";
+  import { formatClockIn, formatCompact, formatDuration, formatNumber, partyLabel, splitMapLabel } from "$lib/format";
   import { characters } from "$lib/characters.svelte";
   import { history, watchHistory } from "$lib/history.svelte";
   import { live } from "$lib/readings.svelte";
@@ -136,7 +136,11 @@
     const now = session.maps.find((m) => m.map === session.map);
     const saved = stats.find((s) => s.map === session.map);
     if (!now?.expPerHour && !saved) return null;
-    return { name: splitMapLabel(session.map).name, now: now?.expPerHour ?? null, saved };
+    // Your best here as you play now, solo or in a party: a party's EXP is your share of it.
+    const inParty = (session.party ?? 1) > 1;
+    const same = inParty ? saved?.party : saved?.solo;
+    const other = inParty ? saved?.solo : saved?.party;
+    return { name: splitMapLabel(session.map).name, now: now?.expPerHour ?? null, saved, inParty, best: same?.best ?? null, other };
   });
 
   const coverage = $derived(session ? mesosCoverage(session) : null);
@@ -349,7 +353,7 @@
   {#if here}
     <Block title="This map">
       {#snippet aside()}<span class="map-name">{here.name}</span>{/snippet}
-      {@const best = here.saved?.best?.expPerHour ?? null}
+      {@const best = here.best?.expPerHour ?? null}
       {@const top = Math.max(here.now ?? 0, best ?? 0, 1)}
       {@const bestMesos = here.saved?.bestMesos?.mesosPerHour ?? null}
       {@const mesosNow = session.maps.find((m) => m.map === session.map)?.mesosPerHour ?? null}
@@ -359,7 +363,7 @@
         <Meter value={(here.now ?? 0) / top} height={8} />
         <span class="tabular">{formatCompact(here.now)}</span>
         {#if best != null}
-          <span class="muted">Best here</span>
+          <span class="muted">{here.inParty ? "Party best" : "Solo best"}</span>
           <Meter value={best / top} height={8} color="var(--muted)" />
           <span class="tabular">{formatCompact(best)}</span>
         {/if}
@@ -372,11 +376,19 @@
           <span class="tabular">{formatCompact(bestMesos)}</span>
         {/if}
       </div>
-      {#if here.saved?.best}
+      {#if here.saved && (here.best || here.other)}
         <p class="caption">
-          Best: {here.saved.best.level != null ? `Lv ${here.saved.best.level}, ` : ""}{(here.saved.best.party ?? 1) > 1
-            ? `party of ${here.saved.best.party}`
-            : "solo"}, {shortDay(here.saved.best.at)}. {formatDuration(here.saved.activeSeconds)} here over {here.saved.sessions}
+          {#if here.best}
+            Best: {here.best.level != null ? `Lv ${here.best.level}, ` : ""}{(here.best.party ?? 1) > 1
+              ? `party of ${here.best.party}`
+              : "solo"}, {shortDay(here.best.at)}.
+          {:else}
+            No {here.inParty ? "party" : "solo"} run here of 10 minutes yet.
+          {/if}
+          {#if here.other}
+            {here.inParty ? "Solo" : "In a party"} you've averaged {formatCompact(here.other.expPerHour)} here.
+          {/if}
+          {formatDuration(here.saved.activeSeconds)} here over {here.saved.sessions}
           session{here.saved.sessions === 1 ? "" : "s"}.
         </p>
       {:else}
@@ -482,7 +494,11 @@
               <td><Ref kind="map" name={m.map}>{m.name}</Ref> <SaveSpot label={m.map} name={m.name} /></td>
               <td class="tabular">{formatCompact(m.best!.expPerHour)}</td>
               <td class="tabular">{m.bestMesos ? formatCompact(m.bestMesos.mesosPerHour) : "—"}</td>
-              <td class="tabular muted">{m.best!.level != null ? `Lv ${m.best!.level} · ` : ""}{shortDay(m.best!.at)}</td>
+              <td class="tabular muted"
+                >{m.best!.level != null ? `Lv ${m.best!.level} · ` : ""}{(m.best!.party ?? 1) > 1 ? `${partyLabel(m.best!.party)} · ` : ""}{shortDay(
+                  m.best!.at,
+                )}</td
+              >
             </tr>
           {/each}
         </tbody>

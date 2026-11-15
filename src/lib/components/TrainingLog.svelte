@@ -41,6 +41,7 @@
     shortDay,
     showUnplaced,
     deathCost,
+    partySizes,
     type LineFilter,
     type Metric,
   } from "$lib/training";
@@ -234,6 +235,11 @@
     party,
   });
   const stats = $derived(mapStats(sessions, filter));
+  /** Both kinds of play in view: EXP / hr is shown solo and in a party apart. */
+  const splitParty = $derived(party === "any" && stats.some((m) => m.solo) && stats.some((m) => m.party));
+  const kindRate = (k: { expPerHour: number } | null) => (k ? formatCompact(k.expPerHour) : "—");
+  /** Who a best run was with: `solo`, `party of 3`. */
+  const withWhom = (p: number | null) => ((p ?? 1) > 1 ? `party of ${p}` : "solo");
   const bars = $derived(mapBars(stats, metric));
   const picked = $derived(stats.find((m) => m.map === pickedMap) ?? stats[0] ?? null);
 
@@ -631,12 +637,28 @@
                     <p class="muted">
                       Best session {longDay(picked.best.at)}, {formatCompact(picked.best.expPerHour)} EXP / hr{picked.best.level != null
                         ? ` at Lv ${picked.best.level}`
-                        : ""}
+                        : ""}, {withWhom(picked.best.party)}
                     </p>
                   {/if}
                 </div>
                 <div class="tiles two">
-                  <Stat size="lg" label="EXP / hr" value={formatCompact(picked.expPerHour)} />
+                  {#if picked.solo && picked.party}
+                    <Stat size="lg" label="Solo EXP / hr" value={kindRate(picked.solo)} sub={`${dur(picked.solo.activeSeconds)} played`} />
+                    <Stat
+                      size="lg"
+                      label="Party EXP / hr"
+                      value={kindRate(picked.party)}
+                      sub={`${dur(picked.party.activeSeconds)} in parties of ${partySizes(picked.partySizes)}`}
+                      title="Your share of the party's EXP, which depends on the party."
+                    />
+                  {:else}
+                    <Stat
+                      size="lg"
+                      label={picked.party ? "Party EXP / hr" : "EXP / hr"}
+                      value={formatCompact(picked.expPerHour)}
+                      sub={picked.party ? `parties of ${partySizes(picked.partySizes)}` : party === "any" ? "solo" : null}
+                    />
+                  {/if}
                   <Stat size="lg" label="Mesos / hr" value={formatCompact(picked.mesosPerHour)} />
                   <Stat size="lg" label="Played" value={dur(picked.activeSeconds)} />
                   <Stat size="lg" label="Sessions" value={String(picked.sessions)} />
@@ -666,16 +688,27 @@
             <h2>Every map you trained on</h2>
             <div class="scroll">
               <table class="wide">
-                <thead><tr><th>Map</th><th>Sessions</th><th>Played</th><th>EXP / hr</th><th>Mesos / hr</th><th>Best session</th></tr></thead>
+                <thead
+                  ><tr
+                    ><th>Map</th><th>Sessions</th><th>Played</th>{#if splitParty}<th>Solo EXP / hr</th><th>Party EXP / hr</th>{:else}<th
+                        >EXP / hr</th
+                      >{/if}<th>Mesos / hr</th><th>Best session</th></tr
+                  ></thead
+                >
                 <tbody>
                   {#each stats as m (m.map)}
                     <tr>
                       <td><Ref kind="map" name={m.map}>{m.name}</Ref></td>
                       <td>{m.sessions}</td>
                       <td>{dur(m.activeSeconds)}</td>
-                      <td>{formatCompact(m.expPerHour)}</td>
+                      {#if splitParty}
+                        <td>{kindRate(m.solo)}</td>
+                        <td use:tip={m.party ? `In parties of ${partySizes(m.partySizes)}` : undefined}>{kindRate(m.party)}</td>
+                      {:else}
+                        <td>{formatCompact(m.expPerHour)}</td>
+                      {/if}
                       <td>{formatCompact(m.mesosPerHour)}</td>
-                      <td>{m.best ? `${shortDay(m.best.at)} · ${formatCompact(m.best.expPerHour)}` : "—"}</td>
+                      <td>{m.best ? `${shortDay(m.best.at)} · ${formatCompact(m.best.expPerHour)}${(m.best.party ?? 1) > 1 ? " · party" : ""}` : "—"}</td>
                     </tr>
                   {/each}
                 </tbody>

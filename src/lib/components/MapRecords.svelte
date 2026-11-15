@@ -8,7 +8,17 @@
 
   import { formatCompact, formatDuration, partyLabel } from "$lib/format";
   import { showMapNamed } from "$lib/places.svelte";
-  import { bandRange, levelBands, mapRecords, mapStats, shortDay, SHORT_SECONDS, type LineFilter, type RecordRates } from "$lib/training";
+  import {
+    bandRange,
+    levelBands,
+    mapRecords,
+    mapStats,
+    partySizes,
+    shortDay,
+    SHORT_SECONDS,
+    type LineFilter,
+    type RecordRates,
+  } from "$lib/training";
   import type { SavedSession } from "$lib/types";
   import Segmented from "$lib/ui/Segmented.svelte";
 
@@ -35,10 +45,13 @@
   const bests = $derived(new Map(mapStats(sessions, filter).map((m) => [m.map, m])));
   /** Show the after-potions column once any session has potion counts. */
   const withPotions = $derived(sessions.some((s) => s.potionCost > 0));
-  const columns = $derived(withPotions ? 7 : 6);
+  /** With both kinds of play in view, EXP / hr is shown solo and in a party apart: a party's
+   *  EXP is your share of it, so one number over both says little about either. */
+  const split = $derived(party === "any" && records.some((r) => r.party) && records.some((r) => r.solo));
+  const columns = $derived((withPotions ? 7 : 6) + (split ? 1 : 0));
 
-  const exp = (r: RecordRates) =>
-    r.expPerHour != null ? formatCompact(r.expPerHour) : r.percentPerHour != null ? `${r.percentPerHour.toFixed(1)}%` : "—";
+  const exp = (r: RecordRates | null) =>
+    r == null ? "—" : r.expPerHour != null ? formatCompact(r.expPerHour) : r.percentPerHour != null ? `${r.percentPerHour.toFixed(1)}%` : "—";
   const mesos = (r: RecordRates) => (r.mesosPerHour != null ? formatCompact(r.mesosPerHour) : "—");
   const net = (r: RecordRates) => (r.netPerHour != null ? formatCompact(r.netPerHour) : "—");
   const mesosTitle = (r: RecordRates) =>
@@ -111,7 +124,12 @@
             <th>Map, then level · party · job</th>
             <th>Sessions</th>
             <th>Played</th>
-            <th>EXP / hr</th>
+            {#if split}
+              <th use:tip={"EXP / hr over solo play on the map"}>Solo EXP / hr</th>
+              <th use:tip={"EXP / hr over party play on the map: your share, which depends on the party"}>Party EXP / hr</th>
+            {:else}
+              <th>EXP / hr</th>
+            {/if}
             <th>Mesos / hr</th>
             {#if withPotions}<th>After potions</th>{/if}
             <th>Best run</th>
@@ -130,13 +148,20 @@
               </td>
               <td>{m.sessions}</td>
               <td>{formatDuration(m.activeSeconds)}</td>
-              <td class="strong">{exp(m)}</td>
+              {#if split}
+                <td class="strong">{exp(m.solo)}</td>
+                <td class="strong" use:tip={m.party ? `In parties of ${partySizes(m.partySizes)}` : undefined}>{exp(m.party)}</td>
+              {:else}
+                <td class="strong">{exp(m)}</td>
+              {/if}
               <td class="strong" use:tip={mesosTitle(m)}>{mesos(m)}{m.mesosPerHour != null && m.mesosShare < 0.9 ? "*" : ""}</td>
               {#if withPotions}<td class="strong">{net(m)}</td>{/if}
               <td>
                 {#if bests.get(m.map)?.best}
                   {@const best = bests.get(m.map)!.best!}
-                  <span use:tip={`${shortDay(best.at)}${best.level != null ? `, Lv ${best.level}` : ''}`}>{formatCompact(best.expPerHour)}</span>
+                  <span use:tip={`${shortDay(best.at)}${best.level != null ? `, Lv ${best.level}` : ''}, ${(best.party ?? 1) > 1 ? `party of ${best.party}` : 'solo'}`}
+                    >{formatCompact(best.expPerHour)}</span
+                  >
                 {:else}—{/if}
               </td>
             </tr>
@@ -148,7 +173,12 @@
                   </td>
                   <td>{row.sessions}</td>
                   <td>{formatDuration(row.activeSeconds)}</td>
-                  <td>{exp(row)}</td>
+                  {#if split}
+                    <td>{(row.party ?? 1) <= 1 ? exp(row) : "—"}</td>
+                    <td>{(row.party ?? 1) > 1 ? exp(row) : "—"}</td>
+                  {:else}
+                    <td>{exp(row)}</td>
+                  {/if}
                   <td use:tip={mesosTitle(row)}>{mesos(row)}{row.mesosPerHour != null && row.mesosShare < 0.9 ? "*" : ""}</td>
                   {#if withPotions}<td>{net(row)}</td>{/if}
                   <td></td>
@@ -169,6 +199,7 @@
     </div>
     <p class="caption">
       Best run is the best single session of 10 minutes or more on the map, in EXP / hr.
+      {#if split}Solo and party play are shown apart, since a party's EXP is your share of it.{/if}
       Faded rows rest on under 30 minutes of play. * Mesos / hr covers only part of the time, while the mesos were in view.
       {#if withPotions}After potions shares each session's potion cost across its maps by time played.{/if}
     </p>
