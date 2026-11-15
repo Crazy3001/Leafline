@@ -30,6 +30,7 @@
     rateFormat,
     shortDay,
     showUnplaced,
+    deathCost,
     type Metric,
   } from "$lib/training";
   import type { MapReading, SessionSummary } from "$lib/types";
@@ -163,6 +164,10 @@
   }
 
   const dropped = $derived(session ? session.rejected.exp + session.rejected.mesos : 0);
+  /** About how much play the deaths undid, at this map's pace. */
+  const deathPlay = $derived(
+    session ? (deathCost({ ...session, expPerHour: session.paceExpPerHour ?? session.expPerHour })?.play ?? null) : null,
+  );
 
   /** Your best maps by EXP an hour, for before a session. */
   const BESTS_SHOWN = 5;
@@ -413,7 +418,7 @@
             <li>
               {session.deaths} death{session.deaths === 1 ? "" : "s"}, {session.percentOnly
                 ? `${session.percentLost.toFixed(2)}% of a level`
-                : `${formatNumber(session.expLost)} EXP`} lost and left out of the rates.
+                : `${formatNumber(session.expLost)} EXP`} lost and left out of the rates{deathPlay ? `: ${deathPlay}` : ""}.
             </li>
           {/if}
           {#if session.mesosExcluded !== 0}

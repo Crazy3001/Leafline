@@ -345,6 +345,8 @@ pub struct SessionLine {
     pub other_exp: i64,
     pub deaths: u32,
     pub exp_lost: u64,
+    /// Percent of a level lost to deaths, for a HUD that shows only a percentage.
+    pub percent_lost: f64,
     /// Hunting gains on a map the data knows that matched no sum of its monsters' EXP, so the
     /// kills are short by about that many.
     pub gains_missed: u32,
@@ -1069,13 +1071,15 @@ impl SessionTracker {
         self.event(EventKind::Death, None);
         let lost = last.exp.points.saturating_sub(next.exp.points);
         self.exp_lost += lost;
-        self.percent_lost += f64::from(last.exp.percent - next.exp.percent).max(0.0);
+        let percent = f64::from(last.exp.percent - next.exp.percent).max(0.0);
+        self.percent_lost += percent;
         let map = last.map.clone();
         self.totals(map.clone()).exp_lost += lost;
         let level = self.level_known.then_some(last.level);
         let line = self.line(map, level);
         line.deaths += 1;
         line.exp_lost += lost;
+        line.percent_lost += percent;
         self.exp = Some(next);
     }
 
@@ -1190,9 +1194,14 @@ impl SessionTracker {
             self.percent_pending = None;
             if point.level == last.level && percent < last.percent {
                 self.deaths += 1;
-                self.percent_lost += f64::from(last.percent - percent);
+                let lost = f64::from(last.percent - percent);
+                self.percent_lost += lost;
                 self.run_clock(Some(false), (point.at - last.at).max(0.0), false);
                 self.event(EventKind::Death, None);
+                let level = self.level_known.then_some(last.level);
+                let line = self.line(last.map.clone(), level);
+                line.deaths += 1;
+                line.percent_lost += lost;
                 self.percent_point = Some(point);
             } else {
                 self.advance_percent(&last, point);
@@ -1918,6 +1927,11 @@ mod tests {
         assert_eq!(summary.level_ups, 1);
         assert_eq!(summary.deaths, 1);
         assert!((summary.percent_lost - 2.0).abs() < 0.01, "{}", summary.percent_lost);
+        // The death is on the map's line too, so the training log can show it per map.
+        let deaths: u32 = summary.lines.iter().map(|l| l.deaths).sum();
+        let lost: f64 = summary.lines.iter().map(|l| l.percent_lost).sum();
+        assert_eq!(deaths, 1);
+        assert!((lost - 2.0).abs() < 0.01, "{lost}");
     }
 
     #[test]

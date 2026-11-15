@@ -293,6 +293,8 @@ const SESSION_COLUMNS: &[&str] = &[
     "percent_gained",
     "mesos_gained",
     "mesos_per_hour",
+    "deaths",
+    "exp_lost",
     "note",
 ];
 
@@ -355,6 +357,8 @@ fn session_rows(s: SavedSession) -> Vec<Vec<String>> {
         String::new(),
         s.mesos_gained.to_string(),
         rate(s.mesos_per_hour),
+        s.deaths.to_string(),
+        s.exp_lost.to_string(),
         s.note.clone(),
     ]];
     for line in s.lines {
@@ -373,6 +377,8 @@ fn session_rows(s: SavedSession) -> Vec<Vec<String>> {
             format!("{:.2}", line.percent_gained),
             line.mesos_gained.to_string(),
             if mesos_hours > 0.0 { format!("{:.0}", line.mesos_gained as f64 / mesos_hours) } else { String::new() },
+            line.deaths.to_string(),
+            line.exp_lost.to_string(),
             String::new(),
         ]);
     }

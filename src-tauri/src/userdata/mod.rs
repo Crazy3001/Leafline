@@ -185,6 +185,12 @@ ALTER TABLE session_lines ADD COLUMN exp_lost INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE session_lines ADD COLUMN gains_missed INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE session_lines ADD COLUMN fighter TEXT;
 ",
+    "
+ALTER TABLE sessions ADD COLUMN exp_lost INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE sessions ADD COLUMN percent_lost REAL NOT NULL DEFAULT 0;
+ALTER TABLE session_lines ADD COLUMN percent_lost REAL NOT NULL DEFAULT 0;
+UPDATE sessions SET exp_lost = (SELECT COALESCE(SUM(l.exp_lost), 0) FROM session_lines l WHERE l.session_id = sessions.id);
+",
 ];
 
 /// Daily copies of the records that are kept.

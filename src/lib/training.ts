@@ -58,6 +58,29 @@ export function mesosReminder(s: SessionSummary): string | null {
     : `${counted} Open your inventory to count it.`;
 }
 
+/**
+ * What deaths cost: the EXP lost (or the share of a level, on a HUD that shows only a percentage)
+ * and about how much play that undoes at the rate given. Null with no deaths.
+ */
+export function deathCost(o: {
+  deaths: number;
+  expLost: number;
+  percentLost: number;
+  expPerHour: number | null;
+  percentPerHour: number | null;
+}): { lost: string | null; play: string | null; seconds: number | null } | null {
+  if (o.deaths <= 0) return null;
+  const byExp = o.expLost > 0;
+  const lost = byExp ? `${formatCompact(o.expLost)} EXP` : o.percentLost > 0 ? `${o.percentLost.toFixed(2)}% of a level` : null;
+  const seconds =
+    byExp && o.expPerHour && o.expPerHour > 0
+      ? (o.expLost / o.expPerHour) * 3600
+      : !byExp && o.percentLost > 0 && o.percentPerHour && o.percentPerHour > 0
+        ? (o.percentLost / o.percentPerHour) * 3600
+        : null;
+  return { lost, seconds, play: seconds != null && seconds >= 30 ? `about ${formatDuration(seconds)} of play` : null };
+}
+
 export type Metric = "exp" | "mesos";
 
 /**

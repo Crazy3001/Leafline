@@ -40,6 +40,7 @@
     rateFormat,
     shortDay,
     showUnplaced,
+    deathCost,
     type LineFilter,
     type Metric,
   } from "$lib/training";
@@ -185,6 +186,11 @@
     const start = s.level - s.levelUps;
     return s.levelUps ? `Lv ${start} → ${s.level}` : `Lv ${s.level}`;
   };
+  /** What a session's deaths cost, for under its Deaths tile. */
+  function deathLine(s: SavedSession): string | null {
+    const cost = deathCost(s);
+    return cost ? [cost.lost ? `${cost.lost} lost` : null, cost.play].filter(Boolean).join(", ") || null : null;
+  }
   const percentOnly = (s: SavedSession) => s.expPerHour == null && s.percentPerHour != null;
   const expRate = (s: SavedSession) =>
     percentOnly(s) ? `${s.percentPerHour?.toFixed(1)}%` : formatCompact(s.expPerHour);
@@ -371,7 +377,13 @@
                 <span class="tabular muted">{shortDay(s.startedAt ?? s.savedAt)}</span>
                 <span class="what">
                   <span use:clipped class="ellipsis">{title(s)}</span>
-                  {#if levelText(s)}<span class="small">{levelText(s)}</span>{/if}
+                  {#if levelText(s) || s.deaths > 0}
+                    <span class="small"
+                      >{levelText(s) ?? ""}{levelText(s) && s.deaths > 0 ? " · " : ""}{#if s.deaths > 0}<span class="died"
+                          >{s.deaths} death{s.deaths === 1 ? "" : "s"}</span
+                        >{/if}</span
+                    >
+                  {/if}
                 </span>
                 <span class="tabular r">{dur(s.activeSeconds)}</span>
                 <span class="tabular r strong">{expRate(s)}</span>
@@ -414,7 +426,13 @@
                 <Stat size="lg" label="Played" value={dur(s.activeSeconds)} />
                 <Stat size="lg" label="EXP gained" value={formatNumber(s.expGained)} />
                 <Stat size="lg" label="Levels" value={String(s.levelUps)} />
-                <Stat size="lg" label="Deaths" value={String(s.deaths)} />
+                <Stat
+                  size="lg"
+                  label="Deaths"
+                  value={String(s.deaths)}
+                  sub={deathLine(s)}
+                  title={s.deaths > 0 ? "EXP lost to deaths is left out of EXP / hr. The play time is at this session's rate." : undefined}
+                />
               </div>
 
               <div class="panel">
@@ -465,7 +483,13 @@
                 <div class="grow2">
                   <h3>By map</h3>
                   <table>
-                    <thead><tr><th>Map</th><th>Level</th><th>Party</th><th>Time</th><th>EXP / hr</th><th>Mesos / hr</th></tr></thead>
+                    <thead
+                      ><tr
+                        ><th>Map</th><th>Level</th><th>Party</th><th>Time</th><th>EXP / hr</th><th>Mesos / hr</th>{#if s.deaths > 0}<th
+                            >Deaths</th
+                          >{/if}</tr
+                      ></thead
+                    >
                     <tbody>
                       {#each s.lines.filter((l) => showUnplaced(l, s.activeSeconds)) as l, i (i)}
                         <tr>
@@ -502,6 +526,17 @@
                           <td>{dur(l.activeSeconds)}</td>
                           <td>{l.activeSeconds > 0 ? (l.expGained > 0 ? formatCompact((l.expGained * 3600) / l.activeSeconds) : l.percentGained > 0 ? `${((l.percentGained * 3600) / l.activeSeconds).toFixed(1)}%` : "—") : "—"}</td>
                           <td>{l.mesosSeconds > 0 ? formatCompact((l.mesosGained * 3600) / l.mesosSeconds) : "—"}</td>
+                          {#if s.deaths > 0}
+                            <td class:died={(l.deaths ?? 0) > 0}>
+                              {#if (l.deaths ?? 0) > 0}
+                                {l.deaths}{(l.expLost ?? 0) > 0
+                                  ? ` · −${formatCompact(l.expLost)}`
+                                  : (l.percentLost ?? 0) > 0
+                                    ? ` · −${(l.percentLost ?? 0).toFixed(2)}%`
+                                    : ""}
+                              {:else}—{/if}
+                            </td>
+                          {/if}
                         </tr>
                       {/each}
                     </tbody>
@@ -964,6 +999,10 @@
   .small {
     font-size: var(--text-xs);
     color: var(--faint);
+  }
+
+  .died {
+    color: var(--bad);
   }
 
   .r {

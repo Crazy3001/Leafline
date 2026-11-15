@@ -269,6 +269,8 @@ export interface SessionLine {
   otherExp?: number;
   deaths?: number;
   expLost?: number;
+  /** Percent of a level lost to deaths, for a HUD that shows only a percentage. */
+  percentLost?: number;
   /** Hunting gains that matched no sum of the map's monsters' EXP. */
   gainsMissed?: number;
   /** The character as the estimates saw them when the stretch began. */
@@ -1228,6 +1230,10 @@ export interface SavedSession {
   /** The character's name, when the tracker read it. */
   character: string | null;
   deaths: number;
+  /** EXP lost to those deaths, left out of the rates. */
+  expLost: number;
+  /** Percent of a level lost to them, for a HUD that shows only a percentage. */
+  percentLost: number;
   /** The player's own note. It stays on this PC. */
   note: string;
   /** Per map, level, party size and job, most active time first. */
