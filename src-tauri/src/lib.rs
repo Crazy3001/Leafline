@@ -9,6 +9,7 @@ pub mod capture;
 pub mod error;
 pub mod mapdata;
 pub mod pipeline;
+pub mod questlog;
 pub mod readers;
 pub mod replay;
 pub mod session;
