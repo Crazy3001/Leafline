@@ -324,6 +324,11 @@ impl<S: Source> PictureCache<S> {
         failures.get(url).is_some_and(|f| f.at.elapsed() < f.wait)
     }
 
+    /// Whether the picture at `url` is kept on this PC already.
+    pub fn has(&self, url: &str) -> bool {
+        allowed(url) && self.path(url).exists()
+    }
+
     /// The picture at `url`: from this PC if kept, else downloaded and kept.
     pub fn get(&self, url: &str) -> Result<Picture> {
         if !allowed(url) {

@@ -1302,6 +1302,46 @@ export interface PotionSlot {
   quickSlot?: number | null;
 }
 
+// Sell or keep (see src-tauri/src/app/bag.rs).
+
+export type BagTab = "equip" | "use" | "setup" | "etc" | "cash" | "deco";
+
+/** What the data or the build says to keep an item for. */
+export type BagKeep = { kind: "recipe" } | { kind: "plan" } | { kind: "quest" } | { kind: "scroll" };
+
+export interface BagItem {
+  slot: number;
+  count: number;
+  /** Every item drawn the same, best first. More than one when the picture can't tell them apart. */
+  ids: number[];
+  name: string;
+  /** What an NPC pays for one, from the item data (not confirmed in Classic). */
+  price: number | null;
+  /** The lowest and highest when the items drawn alike differ. */
+  priceRange: [number, number] | null;
+  untradable: boolean;
+  keep: BagKeep[];
+  /** Quests that ask for it. */
+  wantedBy: { id: number; name: string }[];
+}
+
+export interface BagCheck {
+  /** A check is under way; the rest is from the one before. */
+  busy: boolean;
+  /** Unix seconds. */
+  at: number;
+  tab: BagTab | null;
+  character: string | null;
+  items: BagItem[];
+  /** Slots holding something no picture matched. */
+  unknown: number[];
+  /** Every item of the tab was tried. */
+  wide: boolean;
+  /** Pictures "Look further" would still download. */
+  more: number;
+  problem: string | null;
+}
+
 /** One quick slot over a session: the count it shows now and how many went from it. */
 export interface QuickSlotUse {
   slot: number;

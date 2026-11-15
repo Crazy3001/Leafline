@@ -209,12 +209,20 @@ pub struct KeepFacts {
     pub in_recipes: HashSet<u32>,
     /// Gear the build will wear.
     pub planned: HashSet<u32>,
+    /// Item → the quests that ask for it, as (id, name).
+    pub wanted_by: HashMap<u32, Vec<(u32, String)>>,
 }
 
 impl KeepFacts {
-    pub fn new(catalog: &Catalog, planned: HashSet<u32>) -> Self {
+    pub fn new(atlas: &Atlas, catalog: &Catalog, planned: HashSet<u32>) -> Self {
         let in_recipes = catalog.recipe_list().iter().flat_map(|r| r.ingredients.iter().map(|i| i.item_id)).collect();
-        Self { in_recipes, planned }
+        let mut wanted_by: HashMap<u32, Vec<(u32, String)>> = HashMap::new();
+        for quest in atlas.quests.values() {
+            for need in &quest.items {
+                wanted_by.entry(need.item_id).or_default().push((quest.id, quest.name.clone()));
+            }
+        }
+        Self { in_recipes, planned, wanted_by }
     }
 }
 

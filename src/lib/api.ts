@@ -11,6 +11,7 @@ import { open, save } from "@tauri-apps/plugin-dialog";
 
 import type {
   Analysis,
+  BagCheck,
   EstimateCheck,
   Build,
   BuildCatalog,
@@ -349,6 +350,11 @@ export interface Backend {
   fillGear(build: number, level: number): Promise<number>;
   /** Reads the open stat and skill windows once and moves the build to match. */
   readCharacter(): Promise<void>;
+  /** Sell or keep: tries every item of the tab last checked, downloading their pictures. */
+  bagLookFurther(): Promise<void>;
+  /** The last bag check, if any. */
+  lastBag(): Promise<BagCheck | null>;
+  onBag(handler: (check: BagCheck) => void): Promise<UnlistenFn>;
   onCharacterRead(handler: (read: CharacterRead) => void): Promise<UnlistenFn>;
   /** Gear for a character. `seenJob` is the job the HUD shows. Null until map data is downloaded. */
   findGear(who: GearFor, character: string | null, seenJob: string | null): Promise<GearFound | null>;
@@ -579,6 +585,9 @@ const tauriBackend: Backend = {
   gearSuggestions: (build, level) => invoke("gear_suggestions", { id: build, level }),
   findGear: (who, character, seenJob) => invoke("find_gear", { who, character, seenJob }),
   readCharacter: () => invoke("read_character_windows"),
+  bagLookFurther: () => invoke("bag_look_further"),
+  lastBag: () => invoke("last_bag"),
+  onBag: (handler) => listen<BagCheck>("bag", (e) => handler(e.payload)),
   onCharacterRead: (handler) => listen<CharacterRead>("character-read", (e) => handler(e.payload)),
   starterPlans: () => invoke("starter_plans"),
   listBuilds: () => invoke("list_builds"),

@@ -22,7 +22,7 @@ use tauri::{AppHandle, Emitter, Manager, Wry};
 use tauri_plugin_global_shortcut::{Builder, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
 use super::settings::HotkeyChoice;
-use super::{live, overlay, pins, report};
+use super::{bag, live, overlay, pins, report};
 use crate::error::{Error, Result};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -35,13 +35,14 @@ pub enum Action {
     ToggleLive,
     ReadItem,
     ReadCharacter,
+    CheckBag,
     PauseTracking,
     NewSession,
     SaveFrame,
 }
 
 impl Action {
-    pub const ALL: [Action; 10] = [
+    pub const ALL: [Action; 11] = [
         Action::ToggleOverlay,
         Action::ToggleClickThrough,
         Action::TogglePins,
@@ -49,6 +50,7 @@ impl Action {
         Action::ToggleLive,
         Action::ReadItem,
         Action::ReadCharacter,
+        Action::CheckBag,
         Action::PauseTracking,
         Action::NewSession,
         Action::SaveFrame,
@@ -80,6 +82,7 @@ impl Action {
             Action::ToggleLive => "Start or stop live reading",
             Action::ReadItem => "Read the item you're hovering",
             Action::ReadCharacter => "Read your stat and skill windows, to update your build",
+            Action::CheckBag => "Sell or keep: check the inventory tab that's open",
             Action::PauseTracking => "Pause or resume tracking",
             Action::NewSession => "Start a new session",
             Action::SaveFrame => "Save the picture last read",
@@ -105,6 +108,7 @@ impl Action {
             Action::ToggleLive => live::toggle(app),
             Action::ReadItem => live::read_item(app),
             Action::ReadCharacter => live::read_character(app),
+            Action::CheckBag => bag::check(app),
             Action::PauseTracking => {
                 live::toggle_held(app);
                 Ok(())

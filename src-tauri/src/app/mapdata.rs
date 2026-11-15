@@ -133,6 +133,11 @@ impl MapDataState {
         Ok(())
     }
 
+    /// Every (monster, item) pair the drop list holds, by name.
+    pub(super) fn dropped_pairs(&self) -> Result<Vec<(String, String)>> {
+        Store::open(&self.path)?.dropped_pairs()
+    }
+
     pub(super) fn atlas(&self) -> Option<Arc<Atlas>> {
         self.atlas.read().expect("atlas lock").clone()
     }
