@@ -455,6 +455,26 @@
         <details class="advanced">
           <summary>Advanced</summary>
         <div class="row">
+          <label for="pickup-log">
+            <span class="name">Count loot</span>
+            <span class="help"
+              >Reads the lines at the bottom right that say what you picked up, four times a second, for the Train tab's
+              loot and profit. Off uses less CPU.</span
+            >
+          </label>
+          <div class="control">
+            <input
+              id="pickup-log"
+              class="switch"
+              type="checkbox"
+              role="switch"
+              checked={display.live.pickupLog}
+              onchange={(e) => setLive({ pickupLog: e.currentTarget.checked })}
+            />
+          </div>
+        </div>
+
+        <div class="row">
           <div class="label" id="interval-label">
             <span class="name">Read every</span>
             <span class="help">Shorter catches quick changes; longer uses less CPU.</span>

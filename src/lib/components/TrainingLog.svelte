@@ -12,6 +12,8 @@
   import MapNote from "./MapNote.svelte";
   import MapRecords from "./MapRecords.svelte";
   import PotionCosts from "./PotionCosts.svelte";
+  import LootLog from "./LootLog.svelte";
+  import { lootPerHour } from "$lib/loot.svelte";
   import { netMesosPerHour } from "$lib/potions.svelte";
   import ShareDialog from "./ShareDialog.svelte";
   import { backend } from "$lib/api";
@@ -442,8 +444,19 @@
               </div>
 
               <div class="panel">
-                <PotionCosts startedAt={s.startedAt} activeSeconds={s.activeSeconds} mesosPerHour={s.mesosPerHour} character={s.character} />
+                <PotionCosts
+                  startedAt={s.startedAt}
+                  activeSeconds={s.activeSeconds}
+                  mesosPerHour={s.mesosPerHour ?? (s.loot && s.loot.seconds >= 30 ? (s.loot.mesos * 3600) / s.loot.seconds : null)}
+                  character={s.character}
+                  lootPerHour={s.loot ? lootPerHour(s.loot.items, s.loot.seconds) : null}
+                />
               </div>
+              {#if s.loot}
+                <div class="panel">
+                  <LootLog loot={s.loot} collapsible={false} />
+                </div>
+              {/if}
 
               <div class="panel chart">
                 <div class="list-head">

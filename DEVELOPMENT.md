@@ -56,7 +56,7 @@ Every reader locates its UI element by appearance (colour, shape, nearby text) r
 
 ### Live capture
 
-Every few seconds Leafline takes a picture of the game window with Windows Graphics Capture, the API OBS and Discord use. The picture comes from the window itself, so the overlay and anything in front of it are never in it, and a covered game is still read. Leafline asks Windows only for the window's title, class, position and size, and never sends the game a message or opens its process. A picture that hasn't changed isn't read again, and pictures are at least a second apart. Item tooltips are read only on the player's hotkey, from a single picture.
+Every few seconds Leafline takes a picture of the game window with Windows Graphics Capture, the API OBS and Discord use. The picture comes from the window itself, so the overlay and anything in front of it are never in it, and a covered game is still read. Leafline asks Windows only for the window's title, class, position and size, and never sends the game a message or opens its process. A picture that hasn't changed isn't read again, and full readings are at least a second apart. Between them, while **Count loot** is on, Leafline looks at the game four times a second and reads only the Pickup Log's corner (the lines that say what was picked up), since a line there starts fading at once and several can arrive within half a second. Item tooltips are read only on the player's hotkey, from a single picture.
 
 ### Reading the HUD
 

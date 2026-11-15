@@ -174,6 +174,7 @@ pub fn run() {
             records::saved_spots,
             records::set_spot_saved,
             records::potion_slots,
+            records::loot_prices,
             records::set_potion_slots,
             records::session_potions,
             records::set_session_potion,

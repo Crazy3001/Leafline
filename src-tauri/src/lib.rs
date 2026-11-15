@@ -7,6 +7,7 @@ mod app;
 pub mod build;
 pub mod capture;
 pub mod error;
+pub mod loot;
 pub mod mapdata;
 pub mod pipeline;
 pub mod readers;

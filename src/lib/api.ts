@@ -58,6 +58,7 @@ import type {
   StatsView,
   SavedSpot,
   PotionSlot,
+  LootPrice,
   SessionPotion,
   LevelExp,
   ItemCrafting,
@@ -243,6 +244,8 @@ export interface Backend {
   setBuff(name: string, skill: number, on: boolean): Promise<void>;
   /** A character's potion slots, in slot order; the shared ones until it sets its own. */
   potionSlots(character: string | null): Promise<PotionSlot[]>;
+  /** What one of each item is worth: the player's own logged price, else the NPC price. */
+  lootPrices(ids: number[]): Promise<LootPrice[]>;
   /** Replaces a character's potion slots; a new slot has number 0. Returns them numbered. */
   setPotionSlots(character: string | null, slots: PotionSlot[]): Promise<PotionSlot[]>;
   /** The potion counts typed for the session that started at `startedAt`. */
@@ -318,7 +321,7 @@ export interface Backend {
   diagnostics(): Promise<string>;
   onHistory(handler: () => void): Promise<UnlistenFn>;
   /** Asks where to save, then writes the price log or session history as CSV. Null if cancelled. */
-  exportCsv(what: "sessions" | "drops"): Promise<number | null>;
+  exportCsv(what: "sessions" | "drops" | "loot"): Promise<number | null>;
 
   /** The jobs and skills to plan with. Null until map data is downloaded. */
   buildCatalog(): Promise<BuildCatalog | null>;
@@ -514,6 +517,7 @@ const tauriBackend: Backend = {
   characterStats: (name) => invoke("character_stats", { name }),
   setBuff: (name, skill, on) => invoke("set_buff", { name, skill, on }),
   potionSlots: (character) => invoke("potion_slots", { character }),
+  lootPrices: (ids) => invoke("loot_prices", { ids }),
   setPotionSlots: (character, slots) => invoke("set_potion_slots", { character, slots }),
   sessionPotions: (startedAt) => invoke("session_potions", { startedAt }),
   setSessionPotion: (character, startedAt, slot, start, now) =>
@@ -561,7 +565,7 @@ const tauriBackend: Backend = {
   async exportCsv(what) {
     const stamp = new Date().toISOString().slice(0, 10);
     const path = await save({
-      defaultPath: `leafline-${what === "drops" ? "drop-log" : "sessions"}-${stamp}.csv`,
+      defaultPath: `leafline-${what === "drops" ? "drop-log" : what === "loot" ? "loot" : "sessions"}-${stamp}.csv`,
       filters: [{ name: "CSV", extensions: ["csv"] }],
     });
     return path ? invoke<number>("export_csv", { what, path }) : null;

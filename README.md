@@ -18,7 +18,7 @@
 ## What it does
 
 ### Training
-- **EXP and meso rates as you play:** EXP gained, EXP/hour from your second kill, kills per hour, time to level with a likely range, mesos/hour (after potions, counted from your quick slots once you set their cost), solo and party apart, overall, per map and over the last five minutes, with a trend graph.
+- **EXP and meso rates as you play:** EXP gained, EXP/hour from your second kill, kills per hour, time to level with a likely range, mesos/hour (after potions, counted from your quick slots once you set their cost), the loot you pick up with what it's worth, solo and party apart, overall, per map and over the last five minutes, with a trend graph.
 - **Readings are checked, not trusted:** EXP points and percent have to agree, a level-up has to show twice, and big meso jumps need several readings. Time in town, deaths, quest rewards and shop trades are kept out of the rates.
 - **Sessions save themselves** as you go, with a line for each map, level, party size and job, and carry on after a crash or restart. The **training log** compares sessions and maps, keeps your records per map, and lists the drops you logged. Export it all to CSV. Each character keeps its own numbers.
 - **Where to train:** the Train tab ranks maps by a forecast worked out from your character's stats, gear and buffs and from how you really play, with a likely range and plain reasons for each. A check shows how close the estimates have been. Bookmark the spots you like, and set a level goal.

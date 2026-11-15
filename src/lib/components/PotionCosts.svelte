@@ -17,6 +17,7 @@
     character = null,
     collapsible = true,
     quickSlots = null,
+    lootPerHour = null,
   }: {
     /** The session's start, which its counts are kept by. */
     startedAt: number | null;
@@ -28,6 +29,8 @@
     collapsible?: boolean;
     /** The running session's quick-slot counts, newer than what was last saved. */
     quickSlots?: QuickSlotUse[] | null;
+    /** What the loot picked up is worth an hour, added in before potions come off. */
+    lootPerHour?: number | null;
   } = $props();
 
   const OPEN_KEY = "leafline.train.potionsOpen";
@@ -121,7 +124,7 @@
     return out.sort((a, b) => a.slot - b.slot);
   });
   const cost = $derived(rows.reduce((a, r) => a + (r.used ?? 0) * (r.typed?.price ?? r.price), 0));
-  const net = $derived(netMesosPerHour(mesosPerHour, cost, activeSeconds));
+  const net = $derived(netMesosPerHour(mesosPerHour, cost, activeSeconds, lootPerHour));
   const anyUsed = $derived(rows.some((r) => r.used != null));
   const anyRead = $derived(slots.some((s) => s.quickSlot != null));
 
@@ -195,7 +198,10 @@
       <span class="title">Potions</span>
       <span class="grow"></span>
       {#if anyUsed && net != null}
-        <span class="sum tabular"><span class="muted">after potions</span> {formatCompact(net)} mesos / hr</span>
+        <span class="sum tabular"
+          ><span class="muted">{lootPerHour != null ? "with loot, after potions" : "after potions"}</span>
+          {formatCompact(net)} mesos / hr</span
+        >
       {:else if !slots.length}
         <span class="muted">Not set up</span>
       {/if}

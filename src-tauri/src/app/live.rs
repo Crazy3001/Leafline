@@ -22,11 +22,15 @@ use super::report;
 use super::settings::{self, SettingsState};
 use super::{overlay, pins, readings, recovery};
 use crate::capture::{self, Capturer, GameWindow, Grab};
+use crate::build::catalog::Catalog;
 use crate::error::{Error, Result};
+use crate::loot::Pickup;
 use crate::mapdata::QuestTitles;
+use crate::mapdata::loot::name_item;
 use crate::pipeline;
 use crate::readers::character::{self, Watch};
 use crate::readers::npc;
+use crate::readers::pickup::{self, PickupReader};
 use crate::readers::tooltip::ItemTooltip;
 use crate::session::{Sample, SessionSummary, SessionTracker, TrackerConfig};
 use crate::vision::{Frame, Ocr};
@@ -42,6 +46,11 @@ pub const CHARACTER_READ_EVENT: &str = "character-read";
 
 /// How long a grab waits for the game to draw a fresh picture.
 const FRESH_FRAME_WAIT: Duration = Duration::from_millis(300);
+/// How often the Pickup Log is looked at between readings. A new line starts fading at once and
+/// six can come in half a second, as the recording of 2026-11-15 showed; four looks a second saw
+/// every one of them at nearly full brightness. The one-picture-a-second limit was lifted for
+/// this on 2026-11-15. Only the log's corner of each picture is read.
+const PICKUP_EVERY: Duration = Duration::from_millis(250);
 /// The least time between two pictures of the game, live or for an item check.
 const MIN_PICTURE_GAP: Duration = Duration::from_secs(1);
 /// How long a save takes the item check's picture over the last live one, so a tooltip that
@@ -544,6 +553,7 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
     let mut estimates = Estimates::default();
     let mut twin = None;
     let mut held = false;
+    let mut pickups = PickupReader::default();
     let mut game: Option<(Capturer, GameWindow, bool)> = None;
     // Windows can stop delivering pictures to a capture that was open while the window was
     // minimised, so the status would stay "minimised" after the game came back. A fresh capture
@@ -569,6 +579,7 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
             keeper.save(app, &tracker.summary());
             keeper = Keeper::fresh(app);
             tracker = fresh_tracker(choice.pause_after);
+            pickups.reset();
             last_active = (0.0, Instant::now());
             held = false;
             state.held.store(false, Ordering::SeqCst);
@@ -581,6 +592,7 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
             keeper.save(app, &tracker.summary());
             keeper = Keeper::fresh(app);
             tracker = fresh_tracker(choice.pause_after);
+            pickups.reset();
             last_active = (0.0, Instant::now());
             readings::publish_session(app, &tracker.summary());
         }
@@ -698,8 +710,12 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
                         keeper = Keeper::fresh(app);
                         tracker = fresh_tracker(choice.pause_after);
                         last_active = (0.0, Instant::now());
+                        pickups.reset();
                     }
                     tracker.push(&sample);
+                }
+                if choice.pickup_log {
+                    read_pickups(app, &mut pickups, &mut tracker, &frame, &ocr);
                 }
                 let session = tracker.summary();
                 if !held {
@@ -748,7 +764,17 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
                 set_status(app, LiveStatus::Waiting { reason: "The game window closed.".into() });
             }
         }
-        pause(&state, tick, choice.interval);
+        match game.as_mut() {
+            Some((capturer, _, _)) if choice.pickup_log => {
+                let mut look = |frame: &Frame| {
+                    if read_pickups(app, &mut pickups, &mut tracker, frame, &ocr) {
+                        readings::publish_session(app, &tracker.summary());
+                    }
+                };
+                pause_looking(&state, tick, choice.interval, capturer, &mut look);
+            }
+            _ => pause(&state, tick, choice.interval),
+        }
     }
     keeper.save(app, &tracker.summary());
     keeper.checkpoint(app, &tracker, true);
@@ -757,6 +783,57 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
 
 fn choice_pause_after(app: &AppHandle) -> f64 {
     app.state::<SettingsState>().get().live.pause_after
+}
+
+/// Reads the Pickup Log in `frame` into the session: each line once, items named from the item
+/// data. Returns whether anything arrived.
+fn read_pickups(app: &AppHandle, reader: &mut PickupReader, tracker: &mut SessionTracker, frame: &Frame, ocr: &Ocr) -> bool {
+    let read = reader.read(unix_seconds(SystemTime::now()), frame, ocr);
+    if read.layout.is_some() {
+        tracker.watching_loot();
+    }
+    if read.arrivals.is_empty() {
+        return false;
+    }
+    let catalog = app.state::<MapDataState>().catalog();
+    let lines: Vec<Pickup> = read.arrivals.iter().map(|a| as_pickup(catalog.as_deref(), a)).collect();
+    tracker.push_pickups(&lines);
+    true
+}
+
+/// A settled log line as the session counts it.
+fn as_pickup(catalog: Option<&Catalog>, arrival: &pickup::Arrival) -> Pickup {
+    let Some(line) = &arrival.line else { return Pickup::Unread };
+    match &line.gain {
+        pickup::Gain::Mesos { amount } => Pickup::Mesos(*amount),
+        pickup::Gain::Exp { amount } => Pickup::Exp { amount: *amount, party: line.party },
+        pickup::Gain::PartyBonus { amount } => Pickup::PartyBonus(*amount),
+        pickup::Gain::Item { name, quantity, tab, cut_short } => match catalog.and_then(|c| name_item(c, name, *tab, *cut_short)) {
+            Some(item) => Pickup::Item { id: Some(item.id), name: item.name.clone(), count: *quantity },
+            None => Pickup::Item { id: None, name: name.clone(), count: *quantity },
+        },
+    }
+}
+
+/// [`pause`], looking at the game every [`PICKUP_EVERY`] meanwhile and handing each new picture
+/// to `look`.
+fn pause_looking(state: &LiveState, tick: Instant, interval: f64, capturer: &mut Capturer, look: &mut impl FnMut(&Frame)) {
+    let until = tick + Duration::from_secs_f64(interval);
+    let mut next = Instant::now() + PICKUP_EVERY;
+    while !state.stop.load(Ordering::SeqCst) {
+        let now = Instant::now();
+        if now >= until {
+            break;
+        }
+        if now >= next {
+            next = now + PICKUP_EVERY;
+            if let Ok(Grab::Frame(frame)) = capturer.grab(Duration::ZERO) {
+                look(&frame);
+            }
+            continue;
+        }
+        std::thread::sleep((until.min(next) - now).min(Duration::from_millis(100)));
+    }
 }
 
 /// Sleeps until `interval` seconds after `tick`, waking early to stop.

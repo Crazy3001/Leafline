@@ -36,6 +36,7 @@ use std::collections::VecDeque;
 
 use serde::{Deserialize, Serialize};
 
+use crate::loot::{LootSummary, LootTally, Pickup};
 use crate::pipeline::Analysis;
 use crate::readers::hud::{self, Exp};
 use crate::readers::map::MapReading;
@@ -316,6 +317,8 @@ pub struct SessionSummary {
     pub counters: Vec<CounterRate>,
     /// Readings dropped as misreads.
     pub rejected: Rejected,
+    /// What the Pickup Log showed picked up.
+    pub loot: LootSummary,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
@@ -790,9 +793,29 @@ pub struct SessionTracker {
     counters: Vec<CounterTrack>,
     counter_totals: Vec<CounterRate>,
     rejected: Rejected,
+    /// What the Pickup Log showed picked up.
+    #[serde(default)]
+    loot: LootTally,
 }
 
 impl SessionTracker {
+    /// The Pickup Log was seen: its totals count from now.
+    pub fn watching_loot(&mut self) {
+        if !self.held {
+            self.loot.watching(self.clock);
+        }
+    }
+
+    /// Adds lines the Pickup Log showed. None count while tracking is paused by hand.
+    pub fn push_pickups(&mut self, pickups: &[Pickup]) {
+        if self.held {
+            return;
+        }
+        for pickup in pickups {
+            self.loot.add(pickup, self.clock);
+        }
+    }
+
     pub fn new(config: TrackerConfig) -> Self {
         Self { config, ..Self::default() }
     }
@@ -1810,6 +1833,7 @@ impl SessionTracker {
                 .collect(),
             counters,
             rejected: self.rejected,
+            loot: self.loot.summary(self.clock, self.config.min_rate_seconds),
         }
     }
 }
