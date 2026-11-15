@@ -319,6 +319,7 @@ fn icon_key(icon: RowIcon) -> Option<&'static str> {
         RowIcon::Bang => Some("bang"),
         RowIcon::Arrow => Some("arrow"),
         RowIcon::Ring => Some("ring"),
+        RowIcon::GreyRing => Some("greyRing"),
         RowIcon::Unknown => None,
     }
 }
@@ -328,6 +329,7 @@ fn icon_from_key(key: &str) -> Option<RowIcon> {
         "bang" => Some(RowIcon::Bang),
         "arrow" => Some(RowIcon::Arrow),
         "ring" => Some(RowIcon::Ring),
+        "greyRing" => Some(RowIcon::GreyRing),
         _ => None,
     }
 }

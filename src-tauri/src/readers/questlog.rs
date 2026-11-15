@@ -36,6 +36,10 @@ const RULE_SLACK: f32 = 24.0;
 const TAB_PITCH: f32 = 145.0;
 const TAB_STRIP: f32 = 36.0;
 const TABS: usize = 3;
+/// Where each tab's fill is looked at, from its left end along the rule, and how much of it, in
+/// hundredths, must show a tab's pink or grey. The tabs' labels and edges take the rest.
+const TAB_SAMPLE: (f32, f32, f32, f32) = (20.0, -30.0, 100.0, 22.0);
+const TAB_FILLED: usize = 8;
 /// The list's rows: the first starts this far under the rule, each this tall and this far apart,
 /// as many as fit above the window's foot.
 const FIRST_SLOT: f32 = 20.0;
@@ -54,6 +58,8 @@ const ICONS: (f32, f32) = (14.0, 74.0);
 /// The scroll bar: the column its thumb is looked for in, and the track's ends under the rule.
 const SCROLL_COLUMN: f32 = 458.0;
 const TRACK: (f32, f32) = (38.0, 613.0);
+/// Of the track's length, at least this many tenths show its grey: the thumb covers the rest.
+const TRACK_SHARE: u32 = 4;
 /// The track's ends: a thumb this close to one is there.
 const TRACK_SLACK: f32 = 4.0;
 /// The detail pane's blue box is looked for to the right of the list, its top near the rule.
@@ -71,6 +77,8 @@ const BOX_ICON: f32 = 64.0;
 const DOT_WIDTH: u32 = 5;
 const DOTS: usize = 3;
 
+/// A ring's tile shows at least this many of its pale grey pixels.
+const ICON_TILE: usize = 100;
 /// OCR gets the keyed pictures enlarged and with a margin. No one way of enlarging read every
 /// line of the three frames right, so the list is read three ways and the readings vote; the
 /// detail pane is read the first way.
@@ -85,8 +93,10 @@ const BLUE_BOX_LUMINANCE: u8 = 121;
 /// The window around its rule, in design pixels from the rule's left end and top edge: left,
 /// up, right and down, with room to spare.
 const WINDOW_AROUND_RULE: (f32, f32, f32, f32) = (-20.0, -60.0, 570.0, 340.0);
-/// Every this many pixels across, a picture is checked for the rule's red. The rule is longer.
+/// Every this many pixels across, a picture is checked for the rule's red, which must show at
+/// this many in a row: the rule is half its length long at the smallest UI size.
 const LOOK_STEP: u32 = 16;
+const RULE_SAMPLES: usize = 12;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -165,9 +175,13 @@ pub enum RowIcon {
     Bang,
     /// A blue arrow (one or two), on In Progress rows.
     Arrow,
-    /// A blue ring. Every Completed row has one; on In Progress it stood by a quest whose counter
-    /// was full, so it may mean ready to hand in.
+    /// A blue ring on a grey tile. Every Completed row has one; on In Progress it stood by a quest
+    /// whose counter was full, and one quest showed an arrow at 0 / 30 and the ring at 30 / 30, so
+    /// it likely means ready to hand in.
     Ring,
+    /// The same tile with a grey ring, on In Progress rows whose checkbox is greyed too. Its
+    /// meaning isn't known; one such quest showed the blue ring later.
+    GreyRing,
     Unknown,
 }
 
@@ -304,11 +318,13 @@ fn locate(frame: &Frame, hud_scale: Option<f32>) -> Option<(Option<Frame>, Ancho
     let design = RULE_LENGTH / CANONICAL_SCALE;
     let mut rules = color::find_blocks(frame, whole, (design * 0.9) as u32, is_rule);
     rules.retain(|r| r.h <= 12.0 && r.w <= design * 2.7);
+    // Only sizes the game draws at: the Item Inventory has the same tabs on a shorter rule, which
+    // any size at all would stretch to fit.
     let window = (frame.height() as f32 / DESIGN_HEIGHT).max(1.0);
-    let sizes: Vec<f32> = hud_scale.into_iter().chain([window, 1.0, 1.5, 2.5]).collect();
+    let sizes: Vec<f32> = hud_scale.into_iter().chain([window, 1.0, 3.0]).collect();
     rules.iter().find_map(|rule| {
         let measured = rule.w / design;
-        let scale = sizes.iter().copied().find(|s| (s - measured).abs() <= 0.04 * s).unwrap_or(measured);
+        let scale = sizes.iter().copied().find(|s| (s - measured).abs() <= 0.04 * s)?;
         if (scale - CANONICAL_SCALE).abs() <= 0.005 {
             return None;
         }
@@ -349,6 +365,10 @@ fn is_pink_tab(px: &Rgba<u8>) -> bool {
 
 /// The two colours of the region bars: tan for Event, Citizenship and the jobs, blue-grey for
 /// the towns.
+fn is_grey_tab(px: &Rgba<u8>) -> bool {
+    near(px, [187, 187, 187], 4)
+}
+
 fn is_region_bar(px: &Rgba<u8>) -> bool {
     near(px, [176, 148, 109], 10) || near(px, [156, 176, 200], 10)
 }
@@ -403,6 +423,11 @@ fn is_ring(px: &Rgba<u8>) -> bool {
     near(px, [51, 187, 238], 12)
 }
 
+/// The pale grey tile a ring sits on.
+fn is_icon_tile(px: &Rgba<u8>) -> bool {
+    near(px, [238, 238, 238], 3)
+}
+
 fn is_arrow(px: &Rgba<u8>) -> bool {
     let [r, g, b, _] = px.0;
     r <= 40 && b >= 100 && b > g
@@ -413,9 +438,16 @@ fn count(view: &Frame, area: Rect, is: impl Fn(&Rgba<u8>) -> bool) -> usize {
     (y..y + h).flat_map(|row| (x..x + w).map(move |col| (col, row))).filter(|&(col, row)| is(view.get_pixel(col, row))).count()
 }
 
-/// Whether anything in `frame` has the rule's red, checked on a coarse grid across.
+/// Whether any row of `frame` has a run of the rule's red as long as the rule at the smallest UI
+/// size, checked on a coarse grid across, so a red speck in the scenery costs no more.
 fn any_rule(frame: &Frame) -> bool {
-    (0..frame.height()).any(|y| (0..frame.width()).step_by(LOOK_STEP as usize).any(|x| is_rule(frame.get_pixel(x, y))))
+    (0..frame.height()).any(|y| {
+        let mut run = 0;
+        (0..frame.width()).step_by(LOOK_STEP as usize).any(|x| {
+            run = if is_rule(frame.get_pixel(x, y)) { run + 1 } else { 0 };
+            run >= RULE_SAMPLES
+        })
+    })
 }
 
 /// The window in `view`: a red rule of the right length, with a pink tab standing on it.
@@ -431,7 +463,8 @@ fn find(view: &Frame) -> Option<Anchor> {
             return None;
         }
         let index = (((sum / n) - rule.x) / TAB_PITCH).floor().clamp(0.0, (TABS - 1) as f32) as usize;
-        Some(Anchor { left: rule.x, top: rule.y, tab: QuestTab::ALL[index] })
+        let anchor = Anchor { left: rule.x, top: rule.y, tab: QuestTab::ALL[index] };
+        (has_tabs(view, &anchor) && has_track(view, &anchor)).then_some(anchor)
     })
 }
 
@@ -646,16 +679,43 @@ fn ends_in_dots(view: &Frame, area: Rect, ink: fn(&Rgba<u8>) -> bool) -> bool {
     })
 }
 
+/// The icon in a row. The ring's tile tells it from an arrow, which has some of its blue.
 fn icon_in(view: &Frame, area: Rect) -> RowIcon {
+    let tile = count(view, area, is_icon_tile) >= ICON_TILE;
     if count(view, area, is_bang) >= 8 {
         RowIcon::Bang
-    } else if count(view, area, is_ring) >= 24 {
+    } else if tile && count(view, area, is_ring) >= 24 {
         RowIcon::Ring
     } else if count(view, area, is_arrow) >= 12 {
         RowIcon::Arrow
+    } else if tile {
+        RowIcon::GreyRing
     } else {
         RowIcon::Unknown
     }
+}
+
+/// Whether all three tabs stand on the rule, pink or grey. An NPC shop has one tab on the same
+/// rule, and the strip's plain grey beside it.
+fn has_tabs(view: &Frame, anchor: &Anchor) -> bool {
+    (0..TABS).all(|k| {
+        let tab = anchor.at(TAB_SAMPLE.0 + k as f32 * TAB_PITCH, TAB_SAMPLE.1, TAB_SAMPLE.2, TAB_SAMPLE.3);
+        let (_, _, w, h) = tab.to_pixels(view.width(), view.height());
+        let filled = count(view, tab, |px| is_pink_tab(px) || is_grey_tab(px));
+        w * h > 0 && filled * 100 >= (w * h) as usize * TAB_FILLED
+    })
+}
+
+/// Whether the list's scroll track runs where the Quest window has it. Other windows with tabs on
+/// a red rule, such as the Item Inventory, have none there.
+fn has_track(view: &Frame, anchor: &Anchor) -> bool {
+    let x = (anchor.left + SCROLL_COLUMN) as u32;
+    let (top, bottom) = ((anchor.top + TRACK.0) as u32, (anchor.top + TRACK.1) as u32);
+    if x >= view.width() || bottom >= view.height() {
+        return false;
+    }
+    let track = (top..bottom).filter(|&y| is_track(view.get_pixel(x, y))).count() as u32;
+    track * 10 >= (bottom - top) * TRACK_SHARE
 }
 
 /// The scroll thumb's top and bottom, or `None` with nothing to scroll.
@@ -705,10 +765,10 @@ fn detail_body(anchor: &Anchor, blue: &Rect) -> Rect {
 static LEVEL: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)^lev[eo]l\s*([0-9OoIlSB][0-9OoIlSB ]*)").unwrap());
 static COMPLETED: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?i)completed\s*on\s*(\d{1,2})\s*\D{1,2}\s*(\d{1,2})\s*\D{1,2}\s*(\d{4})").unwrap());
-/// `Maple Leaf 30 / 30`. OCR can split a number, `1 0`, and lose the slash; a counter without
-/// one, `30 30`, is taken only when no reading has it.
+/// `Maple Leaf 30 / 30`. OCR can split a number, `1 0`, read the slash as an `r`, or lose it; a
+/// counter without one, `30 30`, is taken only when no reading has it.
 static COUNTER: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^(.*?[A-Za-z].*?)\s+([0-9OoIlSB](?: ?[0-9OoIlSB])*)\s*[/|\\]\s*([0-9OoIlSB](?: ?[0-9OoIlSB])*)$").unwrap()
+    Regex::new(r"^(.*?[A-Za-z].*?)\s+([0-9OoIlSB](?: ?[0-9OoIlSB])*)\s*[/|\\r]\s*([0-9OoIlSB](?: ?[0-9OoIlSB])*)$").unwrap()
 });
 static COUNTER_NO_SLASH: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^(.*?[A-Za-z].*?)\s+([0-9OoIlSB]+)\s+([0-9OoIlSB]+)$").unwrap());
@@ -766,6 +826,27 @@ fn read_detail(view: &Frame, anchor: &Anchor, blue: &Rect, ocr: &Ocr) -> Result<
         .collect();
     let crop = preprocess::crop(view, body);
     let mut unsure = Vec::new();
+    // The boxes alone, read the other ways the list is: OCR can lose a counter's small digits in
+    // the whole pane, and a box is quick to read again.
+    for b in &boxes {
+        let area = Rect::from_edges(body.x + b.x + BOX_ICON, body.y + b.y, body.x + b.right(), body.y + b.bottom());
+        let keyed = preprocess::keep(&preprocess::crop(view, area), is_detail_ink);
+        for &(scale, filter) in &PASSES[1..] {
+            let lines = ocr_lines(ocr, &keyed, scale, filter)?;
+            let whole = [Rect::new(0.0, 0.0, keyed.width() as f32, keyed.height() as f32)];
+            let (found, guessed) = parse_body(&lines, &whole);
+            for counter in found.counters {
+                if !detail.counters.iter().any(|c| c.name == counter.name) {
+                    detail.counters.push(counter);
+                }
+            }
+            for counter in guessed {
+                if !unsure.iter().any(|c: &DetailCounter| c.name == counter.name) {
+                    unsure.push(counter);
+                }
+            }
+        }
+    }
     for keyed in [shaded(&crop, |lum| 255 - lum), preprocess::keep(&crop, is_detail_ink)] {
         let mut keyed = keyed;
         for b in &boxes {
@@ -958,6 +1039,11 @@ mod tests {
         fill(&mut frame, (40, 100, 300, 4), RULE);
         fill(&mut frame, (44, 66, 138, 30), PINK);
         assert!(find(&frame).is_none(), "too short");
+        assert!(locate(&frame, None).is_none(), "nor stretched to fit at a size the game doesn't draw");
+        let mut frame = Frame::from_pixel(1300, 900, WHITE);
+        fill(&mut frame, (40, 100, 478, 4), RULE);
+        fill(&mut frame, (44, 66, 138, 30), PINK);
+        assert!(find(&frame).is_none(), "tabs on a rule with no list's scroll track: another window");
         assert!(!any_rule(&Frame::from_pixel(800, 400, WHITE)));
     }
 
@@ -1031,15 +1117,20 @@ mod tests {
     #[test]
     fn row_icons_are_told_apart_by_colour() {
         let area = Rect::new(0.0, 0.0, 40.0, 40.0);
-        let icon = |colour| {
+        let icon = |tile: bool, colour| {
             let mut frame = Frame::from_pixel(40, 40, WHITE);
+            if tile {
+                fill(&mut frame, (6, 6, 24, 24), Rgba([238, 238, 238, 255]));
+            }
             fill(&mut frame, (10, 10, 8, 8), colour);
             icon_in(&frame, area)
         };
-        assert_eq!(icon(Rgba([238, 170, 0, 255])), RowIcon::Bang);
-        assert_eq!(icon(Rgba([51, 187, 238, 255])), RowIcon::Ring);
-        assert_eq!(icon(Rgba([0, 85, 170, 255])), RowIcon::Arrow);
-        assert_eq!(icon(INK), RowIcon::Unknown);
+        assert_eq!(icon(false, Rgba([238, 170, 0, 255])), RowIcon::Bang);
+        assert_eq!(icon(true, Rgba([51, 187, 238, 255])), RowIcon::Ring);
+        assert_eq!(icon(false, Rgba([51, 187, 238, 255])), RowIcon::Unknown, "the ring's blue without its tile");
+        assert_eq!(icon(false, Rgba([0, 85, 170, 255])), RowIcon::Arrow);
+        assert_eq!(icon(true, Rgba([204, 204, 204, 255])), RowIcon::GreyRing);
+        assert_eq!(icon(false, INK), RowIcon::Unknown);
     }
 
     #[test]
@@ -1063,6 +1154,8 @@ mod tests {
         assert_eq!((&split[1], number(&split[2]), number(&split[3])), ("Snail Shell", Some(10), Some(10)));
         assert!(COUNTER.captures("Maple Leaf 30").is_none(), "one number is no counter");
         assert!(COUNTER_NO_SLASH.captures("Maple Leaf 30").is_none());
+        let slash_as_r = COUNTER.captures("Maple Leaf 30 r 30").unwrap();
+        assert_eq!((number(&slash_as_r[2]), number(&slash_as_r[3])), (Some(30), Some(30)));
         let bare = COUNTER_NO_SLASH.captures("Maple Leaf 30 30").unwrap();
         assert_eq!((number(&bare[2]), number(&bare[3])), (Some(30), Some(30)));
         assert!(COUNTER.captures("Lv. 10 and above").is_none());

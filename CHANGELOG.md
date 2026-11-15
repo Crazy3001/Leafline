@@ -3,6 +3,33 @@
 What changed in each release of Leafline. Leafline is a work in progress: if something reads
 wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?template=bug_report.yml).
 
+## Unreleased
+
+### Added
+
+**Quests**
+- **Your quest log, read from the Quest window.** While the game's Quest window is open, Leafline
+  reads its **Available**, **In Progress** and **Completed** lists and the quest picked beside
+  them, and keeps what it learns for each character on this PC. Scroll each tab to its end once so
+  it sees every row; the region counts on the bars tell it when a tab has been seen whole. It is
+  only true as of the last look, and everything says when that was. Reading never forgets a quest
+  you've done.
+- **Done, in progress and available, everywhere a quest is named.** Quest names in the Quests tab,
+  on quest pages, on map and NPC cards carry a small mark, and quest pages say when the game showed
+  it done or how far along it was.
+- **Quests to take at your level** leaves out the ones you've done and the ones you've taken, counts
+  a quest whose earlier quests you've finished as one you can start, and marks the ones the game
+  listed as **Available**. The quest search has an **Only quests not done** filter.
+- **Every quest in progress, not only the Quest Helper's five,** shown with its steps and directions
+  and the counts the Quest window last showed.
+- **Ready to hand in:** quests whose counts were full, or that the game marked done, each with who
+  takes it in and a **Go** button.
+- **Done by region:** how many quests you've done in each region against how many there are.
+- **The rest of a chain shows where you are** along it, and map and NPC cards say how many of their
+  quests you haven't done.
+- **Where the game and the data differ.** When the Quest window shows a level, a count or a reward
+  the quest data says otherwise, the quest page says so. It stays on this PC.
+
 ## 0.3.1 (2026-11-14)
 
 ### Fixed

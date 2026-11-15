@@ -22,8 +22,14 @@
     session = null,
     plain = false,
     followed = null,
+    heading = null,
+    note = null,
   }: {
     quest: QuestReading;
+    /** The card's title, when it isn't the Quest Helper's or the followed quests'. */
+    heading?: string | null;
+    /** A word beside the title, in place of the tracked count. */
+    note?: string | null;
     /**
      * Quests followed by hand, by id, one for each of `quest.quests`: built from the data, with
      * no counts, since the Quest Helper isn't showing them.
@@ -166,9 +172,9 @@
   <Ref kind="npc" name={person} />{#if maps.length}<span class="faint">{" · "}</span>{#each maps as m, k (m.id)}{#if k}<span class="faint">, </span>{/if}{#if m.known}<Ref kind="map" id={m.id} name={m.name} />{:else}<span class="faint">{m.name}</span>{/if}{/each}{/if}{" "}<GoButton place={npcPlace(person, maps)} />
 {/snippet}
 
-<Card title={followed ? "Followed quests" : "Quests"} {plain}>
+<Card title={heading ?? (followed ? "Followed quests" : "Quests")} {plain}>
   {#snippet aside()}
-    {#if followed}<span>No counts</span>{:else if quest.page}<span class="tabular">{quest.page[0]} tracked</span>{/if}
+    {#if note}<span>{note}</span>{:else if followed}<span>No counts</span>{:else if quest.page}<span class="tabular">{quest.page[0]} tracked</span>{/if}
   {/snippet}
 
   {#each quest.quests as { title, objectives }, i}
@@ -251,7 +257,7 @@
           {/if}
         </ol>
       {/if}
-      {#if !objectives.length && !expanded && !followed}
+      {#if !objectives.length && !expanded && !followed && !heading}
         <p class="empty">Its lines could not be read.</p>
       {/if}
       {#if sheet && payout(sheet.sheet).length}
