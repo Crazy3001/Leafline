@@ -1,5 +1,6 @@
 <script lang="ts">
   // One result of a lookup: a name with its picture, a line under it, and a short fact at the right.
+  import type { Snippet } from "svelte";
   import { clipped } from "$lib/tip.svelte";
   import Pic from "$lib/ui/Pic.svelte";
   import type { PictureKind } from "$lib/pictures";
@@ -11,6 +12,7 @@
     aside = null,
     small = null,
     goal = false,
+    below,
     onclick,
   }: {
     name: string;
@@ -22,6 +24,8 @@
     small?: string | null;
     /** One of the build's own goals. */
     goal?: boolean;
+    /** More under the line, such as a map's monsters. */
+    below?: Snippet;
     onclick: () => void;
   } = $props();
 </script>
@@ -32,6 +36,7 @@
   >
   {#if aside}<span class="aside tabular">{aside}</span>{/if}
   {#if line}<span class="line">{line}</span>{/if}
+  {#if below}<span class="below">{@render below()}</span>{/if}
 </button>
 
 <style>
@@ -82,6 +87,12 @@
     color: var(--muted);
     font-size: var(--text-xs);
     white-space: nowrap;
+  }
+
+  .below {
+    grid-column: 1 / -1;
+    min-width: 0;
+    margin-top: 3px;
   }
 
   .line {

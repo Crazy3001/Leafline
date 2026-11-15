@@ -66,7 +66,8 @@ pub struct MapQuery {
     /// Maps with a monster in this range of levels.
     pub level_min: Option<u32>,
     pub level_max: Option<u32>,
-    /// `level` for the lowest first. By name otherwise.
+    /// `level` for the lowest first, `density` for the most spawns per floor, `spawns` for the
+    /// most spawn points. By name otherwise.
     pub sort: Option<String>,
     pub offset: usize,
 }
@@ -80,7 +81,26 @@ pub struct MapRow {
     pub level_range: Option<(u32, u32)>,
     /// Why a search found it, when that isn't its name.
     pub note: Option<String>,
+    /// Its monsters, the most first, each with its share of the spawns; a few at most.
+    pub mobs: Vec<MobShare>,
+    /// How many monsters of any kind the map spawns.
+    pub spawns: u32,
+    /// Spawns per 1,000 px of floor, when the map's layout is known.
+    pub density: Option<f64>,
 }
+
+/// One monster's part of a map's spawns.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MobShare {
+    pub id: u32,
+    pub name: String,
+    /// 0 to 1.
+    pub share: f64,
+}
+
+/// How many monsters a map row names.
+const ROW_MOBS: usize = 4;
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -158,6 +178,30 @@ pub struct NpcSheet {
 
 impl Atlas {
     /// Lowest and highest monster level on a map, and the names of what lives there.
+    /// A map's monsters, the most first, with their share of its spawns, and the spawns in all.
+    fn mob_shares(&self, id: u32) -> (Vec<MobShare>, u32) {
+        let mut counts: Vec<(u32, u32)> = Vec::new();
+        for &(mob, count) in self.spawns.get(&id).into_iter().flatten() {
+            let Some(name) = self.monsters.get(&mob).map(|m| &m.name) else { continue };
+            // Monsters sharing a name are one monster to the player.
+            match counts.iter_mut().find(|(other, _)| self.monsters.get(other).is_some_and(|m| &m.name == name)) {
+                Some(entry) => entry.1 += count,
+                None => counts.push((mob, count)),
+            }
+        }
+        let total: u32 = counts.iter().map(|(_, c)| c).sum();
+        counts.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+        let mobs = counts
+            .into_iter()
+            .take(ROW_MOBS)
+            .filter_map(|(mob, count)| {
+                let name = self.monsters.get(&mob)?.name.clone();
+                Some(MobShare { id: mob, name, share: if total > 0 { f64::from(count) / f64::from(total) } else { 0.0 } })
+            })
+            .collect();
+        (mobs, total)
+    }
+
     fn map_monsters(&self, id: u32) -> (Option<(u32, u32)>, Vec<&str>) {
         let monsters: Vec<_> = self.spawns.get(&id).into_iter().flatten().filter_map(|(mob, _)| self.monsters.get(mob)).collect();
         let levels = monsters.iter().map(|m| m.level);
@@ -189,6 +233,11 @@ impl Atlas {
 
     /// One page of the maps `query` finds.
     pub fn browse_maps(&self, query: &MapQuery) -> MapPage {
+        self.browse_maps_with(query, |_| None)
+    }
+
+    /// [`Self::browse_maps`], with each map's floor length (from its layout) for its density.
+    pub fn browse_maps_with(&self, query: &MapQuery, floor: impl Fn(u32) -> Option<u32>) -> MapPage {
         let words: Vec<String> = item_key(&query.text).split_whitespace().map(str::to_string).collect();
         let overlaps = |range: Option<(u32, u32)>| {
             let wanted = query.level_min.is_some() || query.level_max.is_some();
@@ -202,12 +251,18 @@ impl Atlas {
                 && query.area.as_ref().is_none_or(|area| area_of(map).as_ref() == Some(area))
                 && query.kind.as_deref().is_none_or(|kind| (kind == "town") == map.is_town)
         };
-        let row = |map: &MapRecord, range, note| MapRow {
-            map: self.map_ref(map.id),
-            region: map.region.clone(),
-            is_town: map.is_town,
-            level_range: range,
-            note,
+        let row = |map: &MapRecord, range, note| {
+            let (mobs, spawns) = self.mob_shares(map.id);
+            MapRow {
+                map: self.map_ref(map.id),
+                region: map.region.clone(),
+                is_town: map.is_town,
+                level_range: range,
+                note,
+                mobs,
+                spawns,
+                density: floor(map.id).filter(|&f| f > 0 && spawns > 0).map(|f| f64::from(spawns) * 1000.0 / f64::from(f)),
+            }
         };
         let candidates: Vec<&MapRecord> = self.maps.values().filter(admits).collect();
         let mut found: Vec<(u8, MapRow)> = candidates
@@ -233,6 +288,15 @@ impl Atlas {
             found = near.into_iter().map(|(_, row)| (0, row)).collect();
         } else if query.sort.as_deref() == Some("level") {
             found.sort_by_key(|(rank, row)| (*rank, row.level_range.is_none(), row.level_range, row.map.name.clone()));
+        } else if query.sort.as_deref() == Some("density") {
+            found.sort_by(|(ra, a), (rb, b)| {
+                ra.cmp(rb)
+                    .then(a.density.is_none().cmp(&b.density.is_none()))
+                    .then(b.density.unwrap_or(0.0).total_cmp(&a.density.unwrap_or(0.0)))
+                    .then_with(|| a.map.name.cmp(&b.map.name))
+            });
+        } else if query.sort.as_deref() == Some("spawns") {
+            found.sort_by(|(ra, a), (rb, b)| ra.cmp(rb).then(b.spawns.cmp(&a.spawns)).then_with(|| a.map.name.cmp(&b.map.name)));
         } else {
             found.sort_by_key(|(rank, row)| (*rank, row.map.name.clone(), row.map.id));
         }
@@ -381,6 +445,33 @@ impl Atlas {
             .collect();
         takes.sort_by_key(|q| (q.level_min, q.name.clone()));
         Some(NpcSheet { shop: self.shop_of(id), id, name, maps, quests, takes })
+    }
+}
+
+#[cfg(test)]
+mod map_row_tests {
+    use super::*;
+    use crate::mapdata::atlas::tests::world;
+
+    #[test]
+    fn map_rows_say_what_spawns_and_how_thickly() {
+        let atlas = world();
+        let query = MapQuery { sort: Some("density".into()), ..MapQuery::default() };
+        // Made-up floor lengths: Meadow II packed tight, Meadow I spread out.
+        let page = atlas.browse_maps_with(&query, |id| match id {
+            2 => Some(10_000),
+            3 => Some(1_000),
+            _ => None,
+        });
+        let with_density: Vec<&MapRow> = page.maps.iter().filter(|r| r.density.is_some()).collect();
+        assert!(with_density.len() >= 2);
+        assert!(with_density[0].density >= with_density[1].density, "the densest first");
+        assert!(page.maps.iter().position(|r| r.density.is_none()) > page.maps.iter().position(|r| r.density.is_some()));
+        let row = page.maps.iter().find(|r| !r.mobs.is_empty()).unwrap();
+        let shares: f64 = row.mobs.iter().map(|m| m.share).sum();
+        assert!(shares <= 1.0 + 1e-9 && shares > 0.0);
+        assert!(row.mobs.windows(2).all(|w| w[0].share >= w[1].share), "the most first");
+        assert!(row.spawns > 0);
     }
 }
 

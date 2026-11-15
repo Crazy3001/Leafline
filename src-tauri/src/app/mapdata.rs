@@ -12,7 +12,7 @@ use tauri_plugin_opener::OpenerExt;
 use super::fighter::{self, Choice};
 use super::settings::SettingsState;
 use super::{overlay, pins};
-use crate::mapdata::combat::{Fighter, Fit};
+use crate::mapdata::combat::{self, Fighter, Fit, Tuning};
 use crate::mapdata::training::EstimateCheck;
 use crate::build::Catalog;
 use crate::build::catalog::item_group;
@@ -651,7 +651,11 @@ pub fn show_monster(app: AppHandle, id: Option<u32>, text: Option<String>) -> Re
 /// One page of the map search.
 #[tauri::command]
 pub fn browse_maps(state: State<MapDataState>, query: MapQuery) -> MapPage {
-    state.atlas().map(|atlas| atlas.browse_maps(&query)).unwrap_or_default()
+    let layouts = state.layouts();
+    state
+        .atlas()
+        .map(|atlas| atlas.browse_maps_with(&query, |id| layouts.get(&id).map(|l| l.walkable)))
+        .unwrap_or_default()
 }
 
 #[tauri::command]
@@ -795,6 +799,48 @@ pub fn training_spots(
         &layouts,
     );
     Some(Spots { from, speed: estimator.map(|e| e.speed), fighter, fit: model.map(|m| m.fit), spots })
+}
+
+/// One monster against the player's character, from the combat model.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MonsterFight {
+    pub fighter: Fighter,
+    pub fight: combat::Fight,
+    /// Seconds of attacking a kill takes, at the fighter's attack speed, nothing else counted.
+    pub attack_seconds_per_kill: f64,
+    /// `K` in the defence divisor `1 + defence / K`, and whether it was fitted to the player's
+    /// own play rather than the starting guess.
+    pub defence_k: f64,
+    pub fitted: bool,
+}
+
+/// How a fight with monster `id` goes for `character` at `level`: hit chance, hits to kill, what a
+/// blow does. `None` until the character's attack has been read or typed, or with no map data.
+#[tauri::command]
+pub fn monster_fight(
+    app: AppHandle,
+    state: State<MapDataState>,
+    id: u32,
+    character: Option<String>,
+    level: Option<u32>,
+    measured: Vec<MeasuredRate>,
+    assumptions: Option<Assumptions>,
+    skill: Option<String>,
+) -> Option<MonsterFight> {
+    let atlas = state.atlas()?;
+    let foe = atlas.mob_row(id)?;
+    let assumptions = assumptions.unwrap_or_default();
+    let choice = Choice { assumptions: Some(&assumptions), skill: skill.as_deref() };
+    let name = character.as_deref().filter(|n| !n.trim().is_empty())?;
+    let fighter = fighter::fighter(&app, name, level, &choice)?;
+    let model = atlas.model(&measured, Some(fighter), assumptions, &state.layouts());
+    let (defence_k, fitted) = match &model {
+        Some(m) if m.fit.stretches > 0 => (m.fit.tuning.defence, true),
+        _ => (Tuning::default().defence, false),
+    };
+    let fight = combat::fight(&fighter, &foe, defence_k);
+    Some(MonsterFight { attack_seconds_per_kill: fight.attacks * fighter.attack_seconds, fighter, fight, defence_k, fitted })
 }
 
 /// How close the estimates come on the player's own maps, each hidden in turn and estimated from

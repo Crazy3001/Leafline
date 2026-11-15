@@ -825,6 +825,24 @@ export interface Fighter {
   attackSeconds: number;
 }
 
+/** One monster against the player's character, from the combat model (see src-tauri/src/mapdata/combat.rs). */
+export interface MonsterFight {
+  fighter: Fighter;
+  fight: {
+    hit: number;
+    attacks: number;
+    /** Kills by the attacks they took: [attacks, share of kills], fewest first. */
+    spread: [number, number][];
+    blowLow: number;
+    blowHigh: number;
+    levelFactor: number;
+    defenceDivisor: number;
+  };
+  attackSecondsPerKill: number;
+  defenceK: number;
+  fitted: boolean;
+}
+
 /** What the rules leave open, as fitted to the player's play. */
 export interface Tuning {
   efficiency: number;
@@ -1704,6 +1722,12 @@ export interface MapRow {
   levelRange: [number, number] | null;
   /** Why a search found it, when that isn't its name. */
   note: string | null;
+  /** Its monsters, the most first, each with its share (0 to 1) of the spawns; a few at most. */
+  mobs?: { id: number; name: string; share: number }[];
+  /** How many monsters of any kind the map spawns. */
+  spawns?: number;
+  /** Spawns per 1,000 px of floor, when the map's layout is known. */
+  density?: number | null;
 }
 
 export interface MapPage {

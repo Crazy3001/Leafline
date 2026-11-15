@@ -12,6 +12,7 @@
   import FilterBox from "./FilterBox.svelte";
   import KindTabs from "./KindTabs.svelte";
   import LookupRow from "./LookupRow.svelte";
+  import MobChips from "./MobChips.svelte";
   import SearchBar from "./SearchBar.svelte";
   import Card from "../Card.svelte";
   import MapDataPanel from "../map/MapDataPanel.svelte";
@@ -111,7 +112,12 @@
   const levels = (range: [number, number] | null) => (range ? (range[0] === range[1] ? `Lv ${range[0]}` : `Lv ${range[0]}–${range[1]}`) : null);
 
   function line(row: MapRow) {
-    return row.note ?? [row.map.street !== row.map.name ? row.map.street : null, row.isTown ? "Town" : null].filter(Boolean).join(" · ");
+    if (row.note) return row.note;
+    const spawns = row.spawns ? `${row.spawns} spawns` : null;
+    const density = row.density != null ? `density ${row.density.toFixed(1)}` : null;
+    return [row.map.street !== row.map.name ? row.map.street : null, row.isTown ? "Town" : null, spawns, density]
+      .filter(Boolean)
+      .join(" · ");
   }
 </script>
 
@@ -156,6 +162,8 @@
           <select value={query.sort ?? ""} onchange={(e) => setQuery({ sort: e.currentTarget.value || null })}>
             <option value="">Name</option>
             <option value="level">Lowest monsters</option>
+            <option value="density">Most spawns per floor</option>
+            <option value="spawns">Most spawns</option>
           </select>
         </label>
       </FilterBox>
@@ -191,7 +199,11 @@
           {#if !page.closest}<p class="count tabular">{page.total.toLocaleString()} {page.total === 1 ? "map" : "maps"}</p>{/if}
           <ul class="rows">
             {#each page.maps as row (row.map.id)}
-              <li><LookupRow name={row.map.name} picture={{ kind: "mark", id: row.map.id }} line={line(row)} aside={levels(row.levelRange)} onclick={() => open(row.map.id)} /></li>
+              <li>
+                <LookupRow name={row.map.name} picture={{ kind: "mark", id: row.map.id }} line={line(row)} aside={levels(row.levelRange)} onclick={() => open(row.map.id)}>
+                  {#snippet below()}{#if row.mobs?.length}<MobChips mobs={row.mobs} />{/if}{/snippet}
+                </LookupRow>
+              </li>
             {/each}
           </ul>
           {#if page.maps.length < page.total}<button class="back inline" onclick={more}>Show more</button>{/if}
