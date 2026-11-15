@@ -8,6 +8,7 @@
   import SearchBar from "../lookup/SearchBar.svelte";
   import Chips from "../lookup/Chips.svelte";
   import RecipeRow from "./RecipeRow.svelte";
+  import CraftLevelling from "./CraftLevelling.svelte";
   import { backend } from "$lib/api";
   import { mapData, watchMapData } from "$lib/mapdata.svelte";
   import type { CraftingPage, Recipe } from "$lib/types";
@@ -27,6 +28,8 @@
   let page = $state<CraftingPage | null>(null);
   /** Every recipe, once, for each discipline's picture: the first thing it makes. */
   let all = $state<Recipe[]>([]);
+  /** The levelling planner, open for the discipline picked. */
+  let levelling = $state(false);
 
   function stored(key: string) {
     try {
@@ -131,6 +134,14 @@
         value={maxLevel == null ? null : String(maxLevel)}
         onselect={(level) => (maxLevel = level == null ? null : Number(level))}
       />
+      {#if discipline}
+        <button class="level-up" aria-expanded={levelling} onclick={() => (levelling = !levelling)}>
+          {levelling ? "Hide" : "Plan"} levelling {discipline}
+        </button>
+        {#if levelling}
+          <CraftLevelling {discipline} recipes={all.filter((r) => r.discipline === discipline)} />
+        {/if}
+      {/if}
     {/if}
   </div>
 
@@ -229,6 +240,21 @@
     color: var(--muted);
     font-size: 10px;
     font-weight: 600;
+  }
+
+  .level-up {
+    margin: 2px 0 4px;
+    padding: 3px 10px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-pill);
+    background: transparent;
+    color: var(--accent-strong);
+    font-size: var(--text-xs);
+    cursor: pointer;
+  }
+
+  .level-up:hover {
+    background: var(--accent-soft);
   }
 
   h3 {

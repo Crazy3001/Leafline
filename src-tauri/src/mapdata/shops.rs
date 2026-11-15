@@ -254,6 +254,12 @@ impl Atlas {
         self.shops.iter().find(|s| s.npc_id == Some(npc_id)).map(|s| self.shop_view(s))
     }
 
+    /// The lowest price any NPC shop asks for the item with this id, if one sells it.
+    pub fn cheapest_price(&self, id: u32) -> Option<u64> {
+        let name = self.item_names.get(&id)?;
+        self.sold_by(&[id], name, |_| None).first().map(|offer| offer.price)
+    }
+
     /// Every shop selling an item, by any of its ids or by name, the cheapest first. `hops` gives
     /// portals from where the player is.
     pub fn sold_by(&self, ids: &[u32], name: &str, hops: impl Fn(u32) -> Option<u32>) -> Vec<ShopOffer> {

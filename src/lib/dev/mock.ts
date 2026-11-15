@@ -721,6 +721,11 @@ export const mockBackend: Backend = {
   async popOutCard(path) {
     window.open(`/${path}`, "_blank", "width=380,height=540");
   },
+  async shopPrices(ids) {
+    // Made-up shop prices for two of the sample ingredients.
+    const known: Record<number, number> = { 900101: 12, 900103: 8 };
+    return ids.filter((id) => id in known).map((id) => [id, known[id]] as [number, number]);
+  },
   async craftingRecipes(query) {
     // A few made-up recipes, enough to lay the Crafting tab out.
     const item = (id: number, name: string, count = 1) => ({ id, name, count });

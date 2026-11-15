@@ -801,6 +801,14 @@ pub fn training_spots(
     Some(Spots { from, speed: estimator.map(|e| e.speed), fighter, fit: model.map(|m| m.fit), spots })
 }
 
+/// The lowest NPC shop price of each of these items that a shop sells, for working out what
+/// crafting costs. Items no shop sells are left out.
+#[tauri::command]
+pub fn shop_prices(state: State<MapDataState>, ids: Vec<u32>) -> Vec<(u32, u64)> {
+    let Some(atlas) = state.atlas() else { return Vec::new() };
+    ids.into_iter().filter_map(|id| Some((id, atlas.cheapest_price(id)?))).collect()
+}
+
 /// One monster against the player's character, from the combat model.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]

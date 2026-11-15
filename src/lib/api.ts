@@ -296,6 +296,8 @@ export interface Backend {
   itemCrafting(id: number): Promise<ItemCrafting | null>;
   /** The Crafting section's recipes. */
   craftingRecipes(query: CraftingQuery): Promise<CraftingPage>;
+  /** The lowest NPC shop price of each item a shop sells, as [id, price]; the rest are left out. */
+  shopPrices(ids: number[]): Promise<[number, number][]>;
   /** How a saved session's rates moved over time. */
   sessionTimeline(id: number): Promise<SessionTimeline>;
   /** Opens the desk view on its Training log tab, or brings it forward there. */
@@ -552,6 +554,7 @@ const tauriBackend: Backend = {
   levelExp: () => invoke("level_exp"),
   itemCrafting: (id) => invoke("item_crafting", { id }),
   craftingRecipes: (query) => invoke("crafting_recipes", { query }),
+  shopPrices: (ids) => invoke("shop_prices", { ids }),
   sessionTimeline: (id) => invoke("session_timeline", { id }),
   showTraining: () => invoke("show_training"),
   showDesk: () => invoke("show_desk"),

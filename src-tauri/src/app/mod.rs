@@ -241,6 +241,7 @@ pub fn run() {
             mapdata::show_monster,
             mapdata::browse_maps,
             mapdata::monster_fight,
+            mapdata::shop_prices,
             mapdata::map_regions,
             mapdata::map_areas,
             mapdata::search_npcs,
