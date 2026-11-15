@@ -325,6 +325,7 @@ fn write_session(tx: &rusqlite::Transaction, id: i64, session: &SessionSummary, 
             session.percent_lost
         ],
     )?;
+    super::potions::write_read_potions(tx, session.name.as_deref(), session.started_at, &session.quick_slots)?;
     tx.execute("DELETE FROM session_maps WHERE session_id = ?1", [id])?;
     tx.execute("DELETE FROM session_lines WHERE session_id = ?1", [id])?;
     tx.execute("DELETE FROM session_points WHERE session_id = ?1", [id])?;
@@ -495,7 +496,7 @@ mod tests {
     #[test]
     fn sessions_saved_before_exp_lost_was_kept_get_it_from_their_lines() {
         let conn = rusqlite::Connection::open_in_memory().unwrap();
-        let before = super::super::MIGRATIONS.len() - 1;
+        let before = super::super::MIGRATIONS.iter().position(|step| step.contains("percent_lost")).unwrap();
         for step in &super::super::MIGRATIONS[..before] {
             conn.execute_batch(step).unwrap();
         }
@@ -540,7 +541,7 @@ mod tests {
     fn potions_typed_before_the_save_reach_the_saved_session() {
         use crate::userdata::potions::PotionSlot;
         let mut db = UserData::open_in_memory().unwrap();
-        db.set_potion_slots(None, &[PotionSlot { slot: 0, name: "White Potion".into(), price: 320 }]).unwrap();
+        db.set_potion_slots(None, &[PotionSlot { slot: 0, name: "White Potion".into(), price: 320, quick_slot: None }]).unwrap();
         // Typed in the first minutes, while the session wasn't saved yet.
         db.set_session_potion(None, 1000.0, 1, Some(300), Some(250)).unwrap();
         let id = db.save_session(&session(30.0, 6000, &[]), "", 1).unwrap();
@@ -548,6 +549,34 @@ mod tests {
         assert_eq!((saved.potions.len(), saved.potion_cost), (1, 50 * 320));
         db.delete_session(id).unwrap();
         assert!(db.session_potions(1000.0).unwrap().is_empty());
+    }
+
+    #[test]
+    fn potions_counted_from_the_quick_slots_are_kept_with_the_session() {
+        use crate::session::QuickSlotUse;
+        use crate::userdata::potions::PotionSlot;
+        let mut db = UserData::open_in_memory().unwrap();
+        let slots = [
+            PotionSlot { slot: 0, name: "Orange Potion".into(), price: 160, quick_slot: Some(5) },
+            PotionSlot { slot: 0, name: "Blue Potion".into(), price: 200, quick_slot: None },
+        ];
+        db.set_potion_slots(Some("Leafling"), &slots).unwrap();
+        // Typed for the second slot, read for the first.
+        db.set_session_potion(Some("Leafling"), 1000.0, 2, Some(50), Some(40)).unwrap();
+        let mut summary = session(30.0, 6000, &[]);
+        summary.name = Some("Leafling".into());
+        summary.quick_slots = vec![QuickSlotUse { slot: 5, count: Some(150), used: 11 }, QuickSlotUse { slot: 6, count: Some(9), used: 4 }];
+        let id = db.save_session(&summary, "", 1).unwrap();
+        let saved = &db.sessions().unwrap()[0];
+        let used: Vec<(u32, Option<i64>, i64)> = saved.potions.iter().map(|p| (p.slot, p.read, p.used)).collect();
+        assert_eq!(used, [(1, Some(11), 11), (2, None, 10)]);
+        assert_eq!(saved.potion_cost, 11 * 160 + 10 * 200);
+        // Clearing what was typed for the read slot leaves the reading.
+        db.set_session_potion(Some("Leafling"), 1000.0, 1, None, None).unwrap();
+        assert_eq!(db.session_potions(1000.0).unwrap()[0].read, Some(11));
+        summary.quick_slots[0].used = 14;
+        db.update_session(id, &summary, 2).unwrap();
+        assert_eq!(db.session_potions(1000.0).unwrap()[0].used, 14);
     }
 
     #[test]

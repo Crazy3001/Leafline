@@ -12,6 +12,7 @@ use crate::readers::mesos::MesoReading;
 use crate::readers::quest::QuestReading;
 use crate::readers::tooltip::ItemTooltip;
 use crate::readers::ui::{self, CANONICAL_SCALE, Canonical};
+use crate::readers::quickslot::{self, QuickSlots};
 use crate::readers::{character, hud, map, mesos, party, quest, shop, tooltip};
 use crate::vision::{Frame, Line, Ocr, Rect, Word, group_lines};
 
@@ -33,6 +34,8 @@ pub struct Analysis {
     /// How many are in the party, the player included; 1 with no party list in view.
     pub party_size: u32,
     pub map: Option<MapReading>,
+    /// The counts on the quick-slot bar, for the potions drunk.
+    pub quick_slots: Option<QuickSlots>,
     /// Every line from the whole-frame OCR pass, for the analyze example's debug output.
     pub overview: Vec<Line>,
     pub timings: Vec<Timing>,
@@ -134,6 +137,10 @@ fn read(frame: &Frame, ocr: &Ocr, items: bool) -> Result<Analysis> {
     timed("Shop & party", started);
 
     let started = Instant::now();
+    let quick_slots = quickslot::read(frame);
+    timed("Quick slots", started);
+
+    let started = Instant::now();
     let map = kept(&mut failed, "map name", map::read(frame, ocr)).flatten();
     timed("Map", started);
 
@@ -149,6 +156,7 @@ fn read(frame: &Frame, ocr: &Ocr, items: bool) -> Result<Analysis> {
         shop_open,
         party_size,
         map,
+        quick_slots,
         overview,
         timings,
         failed,

@@ -376,6 +376,8 @@ export interface SessionSummary {
   maps: MapSummary[];
   /** Per map, level, party size and job, most active time first. */
   lines: SessionLine[];
+  /** The quick slots that showed a count, with how many went from each. */
+  quickSlots?: QuickSlotUse[];
   /** Quest counter gains per objective and map, most active time first. */
   counters: CounterRate[];
   rejected: { exp: number; mesos: number };
@@ -1295,6 +1297,16 @@ export interface PotionSlot {
   name: string;
   /** What one costs the player, in mesos. */
   price: number;
+  /** The quick slot it sits on, 0 to 7 (top row left to right, then the bottom row), to read
+   *  its count from the game; null to type the counts. */
+  quickSlot?: number | null;
+}
+
+/** One quick slot over a session: the count it shows now and how many went from it. */
+export interface QuickSlotUse {
+  slot: number;
+  count: number | null;
+  used: number;
 }
 
 /** A slot's counts for a session, with the name and price as they were when typed. */
@@ -1304,7 +1316,9 @@ export interface SessionPotion {
   price: number;
   start: number | null;
   now: number | null;
-  /** Start minus now once both are typed, never below zero. */
+  /** How many went, as counted from the quick slot. */
+  read?: number | null;
+  /** What was read, or else start minus now once both are typed; never below zero. */
   used: number;
 }
 

@@ -349,6 +349,7 @@
         activeSeconds={session.activeSeconds}
         mesosPerHour={session.mesosPerHour}
         character={session.name ?? characters.active}
+        quickSlots={session.quickSlots ?? null}
       />
     {/if}
 

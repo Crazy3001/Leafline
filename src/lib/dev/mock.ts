@@ -656,7 +656,7 @@ export const mockBackend: Backend = {
     const def = slotsFor(character).find((p) => p.slot === slot);
     if ((start != null || now != null) && def) {
       const used = start != null && now != null ? Math.max(0, start - now) : 0;
-      rows.push({ slot, name: def.name, price: def.price, start, now, used });
+      rows.push({ slot, name: def.name, price: def.price, start, now, read: null, used });
     }
     sessionPotions.set(startedAt, rows.sort((a, b) => a.slot - b.slot));
     potionHandlers.forEach((h) => h());

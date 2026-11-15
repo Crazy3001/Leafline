@@ -29,6 +29,10 @@ const WINDOW: Font = Font { rows: 9, upper: 2, lower: 6 };
 /// The same round numbers a row shorter, in the Quest Helper.
 const QUEST: Font = Font { rows: 8, upper: 2, lower: 5 };
 
+/// The outlined numbers on items: how many sit on a quick slot or in an inventory slot. As tall
+/// as the window font, but the 4's bar and the 9's tail sit a row higher.
+const COUNT: Font = Font { rows: 9, upper: 2, lower: 5 };
+
 /// The window font's digits are no wider than this.
 const WINDOW_DIGIT_WIDTH: u32 = 5;
 /// A digit no wider than this is a 1, which is narrow in every font.
@@ -170,6 +174,11 @@ pub fn quest_number(masks: &[Mask]) -> Option<String> {
     round_number(masks, QUEST)
 }
 
+/// Reads an item count, such as the number on a quick slot. `None` if any digit can't be read.
+pub fn count_number(masks: &[Mask]) -> Option<String> {
+    round_number(masks, COUNT)
+}
+
 fn round_number(masks: &[Mask], font: Font) -> Option<String> {
     masks.iter().map(|mask| round_digit(mask, font)).collect()
 }
@@ -277,6 +286,32 @@ mod tests {
         let zero = shorter([".###.", "#...#", "#...#", "#...#", "#...#", "#...#", "#...#", ".###."]);
         let one = shorter(["..#", ".##", "#.#", "..#", "..#", "..#", "..#", "..#"]);
         assert_eq!(quest_number(&[one, zero]), Some("10".to_string()));
+    }
+
+    // Made-up count digits: square corners, and the 4 and 9 turning a row higher than the
+    // window font's, which is all the count font's rules hang on.
+    fn count_digit(c: char) -> [&'static str; 9] {
+        match c {
+            '0' => ["#####", "#...#", "#...#", "#...#", "#...#", "#...#", "#...#", "#...#", "#####"],
+            '1' => ["..#", ".##", "..#", "..#", "..#", "..#", "..#", "..#", "..#"],
+            '2' => ["#####", "#...#", "....#", "....#", "...#.", "..#..", ".#...", "#....", "#####"],
+            '3' => ["####.", "....#", "....#", "....#", ".###.", "....#", "....#", "....#", "####."],
+            '4' => ["...#.", "..##.", ".#.#.", "#..#.", "#..#.", "#####", "...#.", "...#.", "...#."],
+            '5' => ["#####", "#....", "#....", "####.", "....#", "....#", "....#", "#...#", "####."],
+            '6' => ["..##.", ".#...", "#....", "####.", "#...#", "#...#", "#...#", "#...#", "####."],
+            '7' => ["#####", "....#", "...#.", "...#.", "..#..", "..#..", ".#...", ".#...", ".#..."],
+            '8' => ["#####", "#...#", "#...#", "#...#", "#####", "#...#", "#...#", "#...#", "#####"],
+            _ => ["#####", "#...#", "#...#", "#...#", "#...#", ".####", "....#", "....#", "#####"],
+        }
+    }
+
+    #[test]
+    fn every_count_digit_has_its_own_answer() {
+        for c in "0123456789".chars() {
+            assert_eq!(count_number(&[tall(count_digit(c))]), Some(c.to_string()), "{c}");
+        }
+        let all: Vec<Mask> = "161".chars().map(|c| tall(count_digit(c))).collect();
+        assert_eq!(count_number(&all), Some("161".to_string()));
     }
 
     #[test]

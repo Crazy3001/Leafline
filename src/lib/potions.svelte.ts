@@ -3,6 +3,12 @@
 
 import { potionsPerHour, profitPerHour } from "./profit";
 
+/** The quick-slot bar's slots by their default keys, top row first. The keys can be changed in
+ *  the game, so the position is what counts. */
+export const QUICK_SLOTS = ["Shift", "Ins", "Home", "PgUp", "Ctrl", "Del", "End", "PgDn"].map(
+  (key, i) => `${i < 4 ? "Top" : "Bottom"} ${(i % 4) + 1} · ${key}`,
+);
+
 /** As many slots as the backend keeps. */
 export const MAX_SLOTS = 8;
 
