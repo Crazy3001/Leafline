@@ -12,7 +12,9 @@
   import LevelGoal from "./LevelGoal.svelte";
   import PotionCosts from "./PotionCosts.svelte";
   import SaveSpot from "./SaveSpot.svelte";
-  import SpotList, { SPOTS_ID } from "./SpotList.svelte";
+  import SpotList, { SPOTS_ID, type BetterMap } from "./SpotList.svelte";
+  import GoButton from "$lib/components/GoButton.svelte";
+  import { mapPlace } from "$lib/destination.svelte";
   import TimersCard from "./TimersCard.svelte";
   import { openTrainingLog } from "$lib/nav.svelte";
   import { formatClockIn, formatCompact, formatDuration, formatNumber, partyLabel, splitMapLabel } from "$lib/format";
@@ -143,6 +145,10 @@
     return { name: splitMapLabel(session.map).name, now: now?.expPerHour ?? null, saved, inParty, best: same?.best ?? null, other };
   });
 
+  /** Another map the forecast now puts above this one, from Where to train. */
+  let better = $state<BetterMap | null>(null);
+  let spotList = $state<{ wave: () => void } | null>(null);
+
   const coverage = $derived(session ? mesosCoverage(session) : null);
   const reminder = $derived(session ? mesosReminder(session) : null);
 
@@ -214,6 +220,20 @@
     return maps.length ? splitMapLabel(maps[0].map).name : "No map read";
   }
 </script>
+
+{#snippet nudge(b: BetterMap)}
+  <p class="nudge">
+    <span
+      >At Lv {b.level}, <Ref kind="map" id={b.spot.map.id} name={b.spot.map.name} /> should beat this map now: about
+      <span class="tabular">{formatCompact(b.there)}</span> EXP / hr against <span class="tabular">{formatCompact(b.here)}</span> here,
+      by the forecast in Where to train.</span
+    >
+    <span class="nudge-actions">
+      <GoButton place={mapPlace(b.spot.map)} />
+      <button class="link" onclick={() => spotList?.wave()}>Not now</button>
+    </span>
+  </p>
+{/snippet}
 
 {#snippet jump()}
   <Button variant="ghost" size="sm" onclick={jumpToSpots}>
@@ -350,9 +370,15 @@
   </Block>
 
   {#if !glance}
+  {#if better && !here}
+    <Block title="This map">
+      {@render nudge(better)}
+    </Block>
+  {/if}
   {#if here}
     <Block title="This map">
       {#snippet aside()}<span class="map-name">{here.name}</span>{/snippet}
+      {#if better}{@render nudge(better)}{/if}
       {@const best = here.best?.expPerHour ?? null}
       {@const top = Math.max(here.now ?? 0, best ?? 0, 1)}
       {@const bestMesos = here.saved?.bestMesos?.mesosPerHour ?? null}
@@ -442,7 +468,7 @@
     </Block>
   {/if}
   <!-- Where to go next sits under the live numbers; the rate graph is detail, last. -->
-  <SpotList {level} {map} {session} />
+  <SpotList {level} {map} {session} bind:better bind:this={spotList} />
   <Block title="This session">
     {#snippet aside()}
       <Segmented
@@ -686,6 +712,37 @@
     margin: 0;
     font-size: var(--text-xs);
     color: var(--faint);
+  }
+
+  /* Another map should beat this one now: a quiet line, never an alert. */
+  .nudge {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px var(--space-2);
+    margin: 0 0 var(--space-2);
+    font-size: var(--text-sm);
+    color: var(--muted);
+  }
+
+  .nudge-actions {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--space-2);
+  }
+
+  .link {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--faint);
+    font: inherit;
+    font-size: var(--text-xs);
+    cursor: pointer;
+  }
+
+  .link:hover {
+    color: var(--text);
   }
 
   .map-name {
