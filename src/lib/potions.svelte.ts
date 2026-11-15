@@ -1,6 +1,8 @@
 // The sum behind
 // mesos per hour after potion costs. Names and prices are the player's own; nothing is bundled.
 
+import { potionsPerHour, profitPerHour } from "./profit";
+
 /** As many slots as the backend keeps. */
 export const MAX_SLOTS = 8;
 
@@ -10,5 +12,5 @@ export const MAX_SLOTS = 8;
  */
 export function netMesosPerHour(mesosPerHour: number | null, cost: number, activeSeconds: number): number | null {
   if (mesosPerHour == null || activeSeconds <= 0) return null;
-  return mesosPerHour - (cost * 3600) / activeSeconds;
+  return profitPerHour({ mesosPerHour, potionsPerHour: potionsPerHour(cost, activeSeconds) });
 }
