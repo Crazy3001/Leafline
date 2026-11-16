@@ -26,6 +26,7 @@ fn main() {
     let show_rows = args.iter().any(|a| a == "--rows");
     let ocr = Ocr::new().expect("OCR engine");
     let mut reader = PickupReader::default();
+    let mut timings: Vec<(f64, bool)> = Vec::new();
     // `--items <map data file>` names items as Leafline would, from a copy of its map data.
     let catalog = value("--items").map(|path| {
         let data = leafline_lib::mapdata::store::Store::open(std::path::Path::new(&path)).expect("open map data").load().expect("load").expect("downloaded");
@@ -48,7 +49,10 @@ fn main() {
         }
         // `--ui-scale 1.875` for a recording at UI Size Default Ratio at 1440p.
         let ui_scale: Option<f32> = value("--ui-scale").map(|v| v.parse().expect("--ui-scale n"));
+        let started = std::time::Instant::now();
         let read = reader.read(at, &frame, ui_scale, &ocr);
+        let ms = started.elapsed().as_secs_f64() * 1000.0;
+        timings.push((ms, read.layout.is_some()));
         if let Some(view) = leafline_lib::readers::pickup::view(&frame, ui_scale) {
             frame = view;
         }
@@ -82,6 +86,20 @@ fn main() {
             let to = arrival.line.as_ref().map(|l| named(&l.gain)).unwrap_or_default();
             println!("{:7.3}  + {:?}{to}", arrival.at, arrival.line);
         }
+    }
+    if args.iter().any(|a| a == "--time") {
+        let mut found: Vec<f64> = timings.iter().filter(|t| t.1).map(|t| t.0).collect();
+        let mut searching: Vec<f64> = timings.iter().filter(|t| !t.1).map(|t| t.0).collect();
+        let show = |name: &str, v: &mut Vec<f64>| {
+            if v.is_empty() {
+                return;
+            }
+            v.sort_by(f64::total_cmp);
+            let mean = v.iter().sum::<f64>() / v.len() as f64;
+            println!("time {name}: {} looks, mean {mean:.1} ms, p95 {:.1} ms, max {:.1} ms", v.len(), v[v.len() * 95 / 100], v[v.len() - 1]);
+        };
+        show("log found", &mut found);
+        show("searching", &mut searching);
     }
     for arrival in reader.finish() {
         let to = arrival.line.as_ref().map(|l| named(&l.gain)).unwrap_or_default();

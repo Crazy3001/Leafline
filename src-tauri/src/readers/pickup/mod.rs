@@ -33,6 +33,10 @@ const UNCONFIRMED_FOR: f64 = 3.0;
 /// A row this bright when the log is confirmed arrived moments ago (a line fades about 0.18 a
 /// second), so it is counted rather than taken as already there.
 const JUST_ARRIVED: f32 = 0.95;
+/// How fast a line fades, at most, against full brightness a second (some fade faster than the
+/// usual 0.18), and the faintest a line seen within a search's wait can be.
+const FADES_PER_SECOND: f32 = 0.25;
+const LEAST_FRESH: f32 = 0.6;
 /// Seconds before the confirming look that such a row is taken to have arrived after.
 const JUST_BEFORE: f64 = 0.25;
 
@@ -42,6 +46,12 @@ pub struct PickupReader {
     layout: Option<Layout>,
     /// When the layout was found, until a row of it has read as a log line.
     unconfirmed_since: Option<f64>,
+    /// When the log was last searched for, while it isn't known.
+    searched_at: Option<f64>,
+    /// When a search last found nothing: every line seen since arrived after it.
+    found_nothing_at: Option<f64>,
+    /// When the log was last in view.
+    seen_at: Option<f64>,
     size: (u32, u32),
     follower: Follower,
 }
@@ -55,32 +65,76 @@ pub struct PickupRead {
     pub layout: Option<Layout>,
 }
 
-/// The part of the window the log can be in: the right of it, below the middle.
+/// The part of the window the log can be in: its right edge, below the middle and above the
+/// HUD. Lines are right-aligned there and at most about a fifth of the window wide (a long item
+/// name at 2x on a 2560-wide window); the bottom line sits about three quarters of the way down.
 fn corner(frame: &Frame) -> Rect {
     let (width, height) = (frame.width() as f32, frame.height() as f32);
-    Rect::from_edges(width * 0.55, height * 0.45, width, height)
+    Rect::from_edges(width * 0.7, height * 0.6, width, height * 0.92)
 }
+
+/// [`corner`] in whole pixels, for the search.
+fn corner_pixels(frame: &Frame) -> (u32, u32, u32, u32) {
+    let c = corner(frame);
+    (c.x as u32, c.y as u32, c.right() as u32, c.bottom() as u32)
+}
+
+/// How long to wait between searches while the log isn't on screen, in seconds: the search is
+/// the costliest step, and a line stays readable for well over a second.
+const SEARCH_EVERY: f64 = 1.0;
+/// How long after the log was last in view every look still searches for it, in seconds.
+const SEARCH_FREELY_FOR: f64 = 10.0;
 
 /// The window's bottom right redrawn on the design grid, when the game draws its interface at
 /// another scale than the one the log is read at. At UI Size Default Ratio (1.875x at 1440p) the
 /// game smooths the log's font, and the font's pixels only come back square on that grid.
 pub fn view(frame: &Frame, ui_scale: Option<f32>) -> Option<Frame> {
     let scale = ui_scale.filter(|s| (s - CANONICAL_SCALE).abs() > 0.02)?;
-    Some(Canonical::within(frame, scale, corner(frame)).frame)
+    let (width, height) = (frame.width() as f32, frame.height() as f32);
+    Some(Canonical::within(frame, scale, Rect::from_edges(width * 0.55, height * 0.45, width, height)).frame)
 }
 
 impl PickupReader {
     /// Reads `frame`, taken at `at` seconds. `ui_scale` is the scale the game draws its interface
     /// at, as the HUD measures it, when known.
     pub fn read(&mut self, at: f64, frame: &Frame, ui_scale: Option<f32>, ocr: &Ocr) -> PickupRead {
-        match view(frame, ui_scale) {
-            Some(view) => self.read_with(at, &view, look::SMOOTHED_FULL, |picture| read_text(ocr, picture)),
-            None => self.read_with(at, frame, look::FULL, |picture| read_text(ocr, picture)),
+        // While the log has been out of view for a while (in town, say), look for it only now
+        // and then. Just after it was lost, every look still searches.
+        let long_gone = self.seen_at.is_none_or(|t| at - t > SEARCH_FREELY_FOR);
+        if self.layout.is_none() && long_gone && self.searched_at.is_some_and(|t| at - t < SEARCH_EVERY && at >= t) {
+            return PickupRead::default();
         }
+        let read = match view(frame, ui_scale) {
+            // The redrawn corner is all of where the log can be.
+            Some(view) => {
+                let area = (0, 0, view.width(), view.height());
+                self.read_in(at, &view, look::SMOOTHED_FULL, area, |picture| read_text(ocr, picture))
+            }
+            None => self.read_in(at, frame, look::FULL, corner_pixels(frame), |picture| read_text(ocr, picture)),
+        };
+        if read.layout.is_some() {
+            self.seen_at = Some(at);
+            // Lines seen from now on may have been counted: an empty search before this says
+            // nothing about them.
+            self.found_nothing_at = None;
+        }
+        read
     }
 
     /// [`Self::read`] with the OCR given, for tests.
-    pub fn read_with(&mut self, at: f64, frame: &Frame, full: f32, mut text: impl FnMut(&Frame) -> Option<String>) -> PickupRead {
+    pub fn read_with(&mut self, at: f64, frame: &Frame, full: f32, text: impl FnMut(&Frame) -> Option<String>) -> PickupRead {
+        let area = (0, 0, frame.width(), frame.height());
+        self.read_in(at, frame, full, area, text)
+    }
+
+    fn read_in(
+        &mut self,
+        at: f64,
+        frame: &Frame,
+        full: f32,
+        area: (u32, u32, u32, u32),
+        mut text: impl FnMut(&Frame) -> Option<String>,
+    ) -> PickupRead {
         if frame.dimensions() != self.size {
             *self = Self { size: frame.dimensions(), ..Self::default() };
         }
@@ -117,7 +171,12 @@ impl PickupReader {
             }
             Some(parsed)
         };
-        let Some(mut layout) = self.layout.filter(|l| l.full == full).or_else(|| look::locate(frame, full)) else {
+        let known = self.layout.filter(|l| l.full == full);
+        if known.is_none() {
+            self.found_nothing_at = self.searched_at;
+            self.searched_at = Some(at);
+        }
+        let Some(mut layout) = known.or_else(|| look::locate(frame, full, area)) else {
             return PickupRead::default();
         };
         if self.layout.is_none() {
@@ -141,7 +200,12 @@ impl PickupReader {
                 self.follower.reset();
                 // Lines older than the ones that arrived just now came before: they start the
                 // stack, moved back down to where they were, and the new ones are counted.
-                let new = rows.iter().take_while(|r| r.as_ref().is_some_and(|r| r.brightness >= JUST_ARRIVED)).count();
+                // Since a search that found nothing, a line had time to fade a little.
+                let fresh = self
+                    .found_nothing_at
+                    .filter(|t| at - t <= SEARCH_EVERY + 0.5)
+                    .map_or(JUST_ARRIVED, |t| (JUST_ARRIVED - FADES_PER_SECOND * (at - t) as f32).max(LEAST_FRESH));
+                let new = rows.iter().take_while(|r| r.as_ref().is_some_and(|r| r.brightness >= fresh)).count();
                 let before: Rows = rows.iter().skip(new).cloned().chain(std::iter::repeat_n(None, new)).collect();
                 self.follower.push(at - JUST_BEFORE, before, |_| None);
                 let arrivals = self.follower.push(at, rows, |slot| read_slot(&layout, slot));

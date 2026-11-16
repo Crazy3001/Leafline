@@ -93,28 +93,28 @@ fn cell(frame: &Frame, x: u32, y: u32, scale: u32) -> Cell {
     none
 }
 
-/// Finds the log in `frame` from a line at full brightness or near it: its font size, its right
-/// edge and its bottom row. `full` is [`FULL`] or [`SMOOTHED_FULL`]. `None` when no such line
-/// shows.
-pub fn locate(frame: &Frame, full: f32) -> Option<Layout> {
+/// Finds the log in `area` of `frame` (left, top, right, bottom) from a line at full brightness
+/// or near it: its font size, its right edge and its bottom row. `full` is [`FULL`] or
+/// [`SMOOTHED_FULL`]. `None` when no such line shows.
+pub fn locate(frame: &Frame, full: f32, area: (u32, u32, u32, u32)) -> Option<Layout> {
     let (width, height) = frame.dimensions();
     (1..=4)
-        .filter_map(|scale| locate_at(frame, scale, full).map(|(layout, ink)| (ink, layout)))
+        .filter_map(|scale| locate_at(frame, scale, full, area).map(|(layout, ink)| (ink, layout)))
         .max_by_key(|(ink, _)| *ink)
         .map(|(_, layout)| layout)
         .filter(|layout| layout.right + layout.scale * 40 >= width && layout.bottom < height)
 }
 
 /// The lowest bright line drawn at `scale`, with how much ink it has.
-fn locate_at(frame: &Frame, scale: u32, full: f32) -> Option<(Layout, usize)> {
+fn locate_at(frame: &Frame, scale: u32, full: f32, area: (u32, u32, u32, u32)) -> Option<(Layout, usize)> {
     let (width, height) = frame.dimensions();
-    let (left, top) = (width * 11 / 20, height * 9 / 20);
+    let (left, top, right_edge, bottom) = area;
     // Bright ink, row by row: (y, rightmost x, count).
     let mut rows: Vec<(u32, u32, usize)> = Vec::new();
-    for y in top..height.saturating_sub(scale) {
+    for y in top..bottom.min(height).saturating_sub(scale) {
         let mut right = None;
         let mut count = 0;
-        for x in left..width.saturating_sub(scale) {
+        for x in left..right_edge.min(width).saturating_sub(scale) {
             let c = cell(frame, x, y, scale);
             let [r, g, b, _] = frame.get_pixel(x, y).0;
             // White ink, or yellow (a partymate's share and the party bonus, `fefb25` or so).
@@ -406,13 +406,13 @@ pub(super) mod tests {
         let mut frame = world(800, 450);
         draw(&mut frame, &glyphs(1, 120), 790, 380, 2, 1.0, [246, 246, 245]);
         draw(&mut frame, &glyphs(2, 90), 790, 352, 2, 0.6, [246, 246, 245]);
-        let layout = locate(&frame, FULL).expect("found");
+        let layout = locate(&frame, FULL, (0, 0, 800, 450)).expect("found");
         assert_eq!((layout.scale, layout.right, layout.bottom), (2, 790, 380));
     }
 
     #[test]
     fn finds_nothing_in_a_world_without_a_log() {
-        assert_eq!(locate(&world(800, 450), FULL), None);
+        assert_eq!(locate(&world(800, 450), FULL, (0, 0, 800, 450)), None);
     }
 
     #[test]
