@@ -3,7 +3,8 @@
 @import "./lib/ui/fonts.css";
 @import "./lib/ui/themes.css";
 
-:root {
+:root,
+[data-theme="ember"] {
   color-scheme: dark;
 
   /*

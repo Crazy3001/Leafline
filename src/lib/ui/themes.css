@@ -9,7 +9,8 @@
  * less of the window is bright beside the game, and cards get a top light and a soft drop so the
  * look isn't flat. Accent, link and state colours are darkened to read as text.
  */
-:root[data-theme="ember-light"] {
+:root[data-theme="ember-light"],
+[data-theme="ember-light"] {
   color-scheme: light;
 
   --bg: #d9d3c8;
@@ -87,7 +88,8 @@
  * Sprout: cream paper, white cards with a thick ink outline and a sticker edge under them,
  * rounded letters, pastel number tiles.
  */
-:root[data-theme="sprout"] {
+:root[data-theme="sprout"],
+[data-theme="sprout"] {
   color-scheme: light;
 
   --font-sans: "Nunito", "Segoe UI", system-ui, -apple-system, sans-serif;
@@ -181,7 +183,8 @@
 }
 
 /* Sprout Night: the same stickers on plum, for playing after dark. */
-:root[data-theme="sprout-night"] {
+:root[data-theme="sprout-night"],
+[data-theme="sprout-night"] {
   color-scheme: dark;
 
   --font-sans: "Nunito", "Segoe UI", system-ui, -apple-system, sans-serif;
@@ -272,4 +275,14 @@
   --shadow-lg: 0 6px 0 #0f0a15, 0 18px 40px rgba(0, 0, 0, 0.45);
   --scroll-thumb: rgba(255, 241, 220, 0.16);
   --scroll-thumb-hover: rgba(255, 241, 220, 0.28);
+}
+
+/*
+ * A look named on an element inside the page, as the look picker's small previews do: the
+ * names above change there, and so must what the page set from them once on <html>.
+ */
+[data-theme]:not(:root) {
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-weight: var(--weight-body);
 }

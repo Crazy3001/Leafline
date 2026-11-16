@@ -31,6 +31,7 @@
   import { changeSettings, display, hotkey, keyHint, keyName, usesNumpad, watchSettings } from "$lib/settings.svelte";
   import { watchTyping } from "$lib/typing";
   import Segmented from "$lib/ui/Segmented.svelte";
+  import ThemePicker from "$lib/ui/ThemePicker.svelte";
   import type {
     GameWindow,
     HotkeyChoice,
@@ -44,6 +45,7 @@
 
   const SECTIONS = [
     { id: "live", title: "Live reading" },
+    { id: "look", title: "Look" },
     { id: "overlay", title: "Overlay" },
     { id: "routes", title: "Routes" },
     { id: "hotkeys", title: "Hotkeys" },
@@ -524,6 +526,12 @@
       <p class="note">
         Works windowed and in Full Screen. Pictures stay in memory unless you save one{keyHint("SaveFrame")}.
       </p>
+    </section>
+
+    <section id="look">
+      <h2>Look</h2>
+      <p class="lead">Four looks over the same layout. Pick one; every Leafline window changes at once.</p>
+      <ThemePicker />
     </section>
 
     <section id="overlay">
