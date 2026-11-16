@@ -557,7 +557,7 @@
 
   .actions button.active,
   .pin.active {
-    color: var(--accent);
+    color: var(--accent-text);
   }
 
   .tabs {
@@ -626,7 +626,7 @@
   }
 
   [role="tab"][aria-selected="true"] .icon {
-    color: var(--accent);
+    color: var(--accent-text);
   }
 
   [role="tab"].empty:not([aria-selected="true"]) {
@@ -645,7 +645,7 @@
   }
 
   .pinned .icon {
-    color: var(--accent);
+    color: var(--accent-text);
   }
 
   .dot {
@@ -728,7 +728,7 @@
     height: 18px;
     border-radius: 50%;
     background: var(--accent-soft);
-    color: var(--accent);
+    color: var(--accent-text);
     font-size: var(--text-xs);
     font-weight: 600;
   }
@@ -737,7 +737,7 @@
     padding: 0;
     border: 0;
     background: transparent;
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
     font-size: inherit;
     cursor: pointer;
   }

@@ -343,7 +343,7 @@
 
   .open:hover,
   .open:focus-visible {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
     outline: none;
   }
 
@@ -379,7 +379,7 @@
   }
 
   .payout .exp {
-    color: var(--exp);
+    color: var(--exp-text);
   }
 
   .payout .mesos {

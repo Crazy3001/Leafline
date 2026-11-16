@@ -289,7 +289,7 @@
   }
 
   .rank b {
-    color: var(--exp);
+    color: var(--exp-text);
     font-weight: 600;
   }
 
@@ -411,7 +411,7 @@
 
   .link:hover,
   .link:focus-visible {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
     text-decoration: underline;
     outline: none;
   }
@@ -450,7 +450,7 @@
   }
 
   .quests .yours-now {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
     font-weight: 600;
   }
 

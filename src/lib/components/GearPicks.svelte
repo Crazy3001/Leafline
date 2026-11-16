@@ -122,7 +122,7 @@
   }
 
   li :global(.ref.name.goal) {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
   li :global(.ref.name small) {

@@ -250,7 +250,7 @@
 
   .here .at,
   .advance .at {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
   .what {
@@ -264,7 +264,7 @@
 
   .line.advance,
   .line.you {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
     font-weight: 600;
   }
 
@@ -311,7 +311,7 @@
   }
 
   .inner li.here .at {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
   .key {

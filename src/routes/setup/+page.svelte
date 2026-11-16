@@ -493,7 +493,7 @@
 
   .current .num {
     border-color: var(--accent);
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
   .done .num {
@@ -653,7 +653,7 @@
     display: inline-grid;
     flex: none;
     margin-top: 1px;
-    color: var(--accent);
+    color: var(--accent-text);
   }
 
   .places {
@@ -785,7 +785,7 @@
     padding: 0;
     border: 0;
     background: none;
-    color: var(--accent);
+    color: var(--accent-text);
     cursor: pointer;
   }
 

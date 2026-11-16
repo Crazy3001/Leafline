@@ -1160,7 +1160,7 @@
   }
 
   .side.active {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
   .side:disabled {
@@ -1536,7 +1536,7 @@
   }
 
   .along tr.now td {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
   .slots {
@@ -1629,7 +1629,7 @@
   }
 
   .chip :global(.ref.upgraded) {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
   .add-chip {
@@ -1648,7 +1648,7 @@
   .add-chip:hover,
   .add-chip.on {
     border-color: var(--accent);
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
 

@@ -498,7 +498,7 @@
   }
 
   .node.next .dir {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
   .flag {
@@ -636,7 +636,7 @@
   }
 
   .row.next .row-dir {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
   .row.yours .row-dir {

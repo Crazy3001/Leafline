@@ -48,13 +48,13 @@
   .go:hover,
   .go:focus-visible {
     border-color: var(--accent);
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
     outline: none;
   }
 
   .go.on {
     border-color: var(--accent);
     background: var(--accent-soft);
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 </style>

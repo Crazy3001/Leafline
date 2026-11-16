@@ -248,7 +248,7 @@
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-pill);
     background: transparent;
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
     font-size: var(--text-xs);
     cursor: pointer;
   }

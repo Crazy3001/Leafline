@@ -1635,7 +1635,7 @@
   }
 
   .link:hover {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
   @media (max-width: 600px) {

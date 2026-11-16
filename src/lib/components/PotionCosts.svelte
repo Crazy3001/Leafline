@@ -333,7 +333,7 @@
   }
 
   .head:hover .title {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
   .title {

@@ -441,7 +441,7 @@
     font-family: var(--font-display);
     font-size: var(--text-xl);
     font-weight: 600;
-    color: var(--accent);
+    color: var(--accent-text);
   }
 
   .sep {
@@ -533,7 +533,7 @@
   button.ontop[aria-pressed="true"] {
     border-color: color-mix(in srgb, var(--accent) 60%, transparent);
     background: var(--accent-soft);
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
   button:focus-visible {
@@ -589,7 +589,7 @@
     box-shadow:
       inset 0 1px 0 var(--highlight),
       0 1px 4px rgba(0, 0, 0, 0.4);
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
     font-weight: 600;
   }
 
@@ -722,7 +722,7 @@
 
   .item.current {
     background: var(--accent-soft);
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
   .note {

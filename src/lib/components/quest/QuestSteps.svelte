@@ -259,7 +259,7 @@
 
   dd.exp,
   .chain .exp {
-    color: var(--exp);
+    color: var(--exp-text);
   }
 
   .chain {

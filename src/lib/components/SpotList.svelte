@@ -923,7 +923,7 @@
   }
 
   .row:hover .name {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
   .row:focus-visible {
@@ -967,7 +967,7 @@
   }
 
   .meta .here {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
   .check-est {

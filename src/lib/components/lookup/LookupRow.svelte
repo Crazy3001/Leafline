@@ -73,7 +73,7 @@
   }
 
   .name.goal {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
   small {

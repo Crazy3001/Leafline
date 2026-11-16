@@ -52,6 +52,8 @@ pub struct Settings {
     /// Show item, monster, NPC and map pictures, downloaded from OSMS the first time each is
     /// shown. Off, nothing is downloaded and names stand alone.
     pub show_pictures: bool,
+    /// The look every window is drawn in.
+    pub theme: Theme,
 }
 
 impl Default for Settings {
@@ -70,8 +72,24 @@ impl Default for Settings {
             setup_done: false,
             update_check: false,
             show_pictures: true,
+            theme: Theme::default(),
         }
     }
+}
+
+/// The four looks. One layout; a look changes colours, fonts, corners and outlines only.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Theme {
+    /// Dark graphite and amber.
+    #[default]
+    Ember,
+    /// Ember on warm stone, with the header and tab bar kept dark.
+    EmberLight,
+    /// Light and playful: cream, ink outlines, rounded letters.
+    Sprout,
+    /// Sprout after dark.
+    SproutNight,
 }
 
 /// How the compact HUD was laid out. Since 2026-11-05 it has one layout and this is no longer

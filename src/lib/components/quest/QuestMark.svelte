@@ -76,7 +76,7 @@
   }
 
   .mark-inProgress {
-    color: var(--accent);
+    color: var(--accent-text);
   }
 
   .mark-available {

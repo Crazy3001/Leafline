@@ -89,7 +89,7 @@
   }
 
   .save.on {
-    color: var(--accent);
+    color: var(--accent-text);
   }
 
   .save:focus-visible {

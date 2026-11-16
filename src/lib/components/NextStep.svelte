@@ -380,7 +380,7 @@
     border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
     border-radius: var(--radius-sm);
     background: var(--accent-soft);
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
   .turn.ride {
@@ -482,7 +482,7 @@
   }
 
   .tool.square.lit {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
   .tool.open {
@@ -596,7 +596,7 @@
     border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
     border-radius: var(--radius-sm);
     background: var(--accent-soft);
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
     font-size: var(--text-xs);
     cursor: pointer;
   }
@@ -647,7 +647,7 @@
     display: inline-grid;
     flex: none;
     margin-top: 3px;
-    color: var(--accent);
+    color: var(--accent-text);
   }
 
   .icon.good {
@@ -679,7 +679,7 @@
   }
 
   .label {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
     font-family: var(--font-display);
     font-weight: 400;
   }
@@ -693,7 +693,7 @@
   }
 
   .arrow {
-    color: var(--accent);
+    color: var(--accent-text);
     font-weight: 400;
   }
 

@@ -108,7 +108,7 @@
 
   .head:hover .title,
   .head:focus-visible .title {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
   .head:focus-visible {

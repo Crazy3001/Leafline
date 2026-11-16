@@ -287,7 +287,7 @@
 
 <style>
   .row-line .exp {
-    color: var(--exp);
+    color: var(--exp-text);
   }
 
   .lead {
@@ -374,7 +374,7 @@
 
   .tool.active {
     border-color: color-mix(in srgb, var(--accent) 45%, transparent);
-    color: var(--accent);
+    color: var(--accent-text);
   }
 
   .filters {

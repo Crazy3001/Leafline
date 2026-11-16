@@ -1,0 +1,258 @@
+/*
+ * The three looks beside Ember. Each one only renames colours, fonts, corners and outlines that
+ * app.css sets for Ember on :root; no layout rule belongs here. The look is the `data-theme` on
+ * <html>, set from the settings (see theme.svelte.ts).
+ */
+
+/*
+ * Ember Light: warm stone with off-white cards. The header and the tab bar stay dark graphite so
+ * less of the window is bright beside the game, and cards get a top light and a soft drop so the
+ * look isn't flat. Accent, link and state colours are darkened to read as text.
+ */
+:root[data-theme="ember-light"] {
+  color-scheme: light;
+
+  --bg: #d9d3c8;
+  --surface: #f2eee6;
+  --surface-2: #e5e0d6;
+  --surface-3: #d6cfc3;
+  --surface-raised: #f7f4ee;
+  --glass: rgba(217, 211, 200, 0.96);
+  --track: #cdc6ba;
+  --border: rgba(60, 45, 20, 0.16);
+  --border-strong: rgba(60, 45, 20, 0.3);
+  --line: rgba(60, 45, 20, 0.16);
+  --highlight: rgba(255, 255, 255, 0.7);
+  --hover: rgba(60, 45, 20, 0.07);
+  --press: rgba(60, 45, 20, 0.12);
+  --scrim: rgba(32, 29, 24, 0.5);
+
+  --text: #201d18;
+  --muted: #4f4a42;
+  --faint: #5f594f;
+
+  --accent-soft: rgba(244, 169, 59, 0.24);
+  --accent-text: #8a5000;
+  --accent-text-strong: #6b3d00;
+
+  --hp: #d1403b;
+  --mp: #2f7fd6;
+  --exp-text: #7a5e00;
+  --map: #7d5106;
+  --travel: #0c6f60;
+  --good: #1f7434;
+  --good-soft: rgba(31, 116, 52, 0.14);
+  --good-ink: #ffffff;
+  --warn: #a04e08;
+  --warn-soft: rgba(160, 78, 8, 0.14);
+  --bad: #b8321f;
+  --bad-soft: rgba(184, 50, 31, 0.12);
+  --mesos: #8a5000;
+
+  --ref-item: #1b58b3;
+  --ref-mob: #b8321f;
+  --ref-npc: #0c6f60;
+  --ref-map: #7d5106;
+  --ref-skill: #5f37b5;
+
+  --header-bg: #17191d;
+  --header-track: #2c3037;
+  --header-hover: #24272d;
+  --header-radius: 0 0 18px 18px;
+  --header-gap: 12px;
+  --nav-bg: #17191d;
+  --nav-text: #a2a7b1;
+  --nav-line: transparent;
+
+  --tile-1: #e5e0d6;
+  --tile-2: #e5e0d6;
+  --tile-text: #201d18;
+  --tile-label: #5f594f;
+
+  --card-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 3px 10px rgba(50, 35, 15, 0.16);
+  --control-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 1px 3px rgba(50, 35, 15, 0.14);
+  --go-shadow: 0 4px 12px rgba(150, 95, 0, 0.3);
+  --shadow: 0 4px 14px rgba(50, 35, 15, 0.2);
+  --shadow-lg: 0 18px 48px rgba(50, 35, 15, 0.32), 0 2px 8px rgba(50, 35, 15, 0.18);
+  --scroll-thumb: rgba(60, 45, 20, 0.22);
+  --scroll-thumb-hover: rgba(60, 45, 20, 0.36);
+}
+
+/*
+ * Sprout: cream paper, white cards with a thick ink outline and a sticker edge under them,
+ * rounded letters, pastel number tiles.
+ */
+:root[data-theme="sprout"] {
+  color-scheme: light;
+
+  --font-sans: "Nunito", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-display: "Fredoka", "Nunito", "Segoe UI", system-ui, sans-serif;
+  --weight-body: 600;
+  --weight-strong: 800;
+
+  --bg: #fff4e0;
+  --surface: #ffffff;
+  --surface-2: #fbeed6;
+  --surface-3: #f3e6cf;
+  --surface-raised: #ffffff;
+  --glass: rgba(255, 244, 224, 0.97);
+  --track: #f3e6cf;
+  --border: rgba(59, 42, 32, 0.16);
+  --border-strong: rgba(59, 42, 32, 0.36);
+  --line: #3b2a20;
+  --line-w: 2px;
+  --highlight: transparent;
+  --hover: rgba(59, 42, 32, 0.07);
+  --press: rgba(59, 42, 32, 0.13);
+  --scrim: rgba(59, 42, 32, 0.45);
+
+  --text: #3b2a20;
+  --muted: #6f5848;
+  --faint: #7a6252;
+
+  --accent: #ffa24d;
+  --accent-strong: #ffb873;
+  --accent-soft: rgba(255, 162, 77, 0.26);
+  --accent-ink: #3b2a20;
+  --accent-sub: #5a3410;
+  --accent-text: #a34c00;
+  --accent-text-strong: #7d3a00;
+
+  --hp: #e8504a;
+  --mp: #3d8fe6;
+  --exp: #ffd23f;
+  --exp-text: #8a6400;
+  --map: #96600a;
+  --travel: #0c7464;
+  --good: #2a8540;
+  --good-soft: rgba(47, 143, 67, 0.16);
+  --good-ink: #ffffff;
+  --warn: #b05208;
+  --warn-soft: rgba(176, 82, 8, 0.14);
+  --bad: #c93a26;
+  --bad-soft: rgba(201, 58, 38, 0.12);
+  --mesos: #a34c00;
+
+  --ref-item: #1f62c4;
+  --ref-mob: #c93a26;
+  --ref-npc: #0c7464;
+  --ref-map: #96600a;
+  --ref-skill: #6a3fc0;
+
+  --header-bg: #fff4e0;
+  --header-text: #3b2a20;
+  --header-muted: #6f5848;
+  --header-faint: #7a6252;
+  --header-track: #f3e6cf;
+  --header-hover: #fbeed6;
+  --header-good: #2a8540;
+  --header-exp: #8a6400;
+  --header-accent: #a34c00;
+  --nav-bg: #ffffff;
+  --nav-text: #7a6252;
+  --nav-line: #3b2a20;
+
+  --tile-1: #ffe9a8;
+  --tile-2: #ffd0dc;
+  --tile-text: #3b2a20;
+  --tile-label: #6b5444;
+
+  --radius-sm: 9px;
+  --radius: 14px;
+  --radius-lg: 20px;
+  --card-shadow: 0 4px 0 #3b2a20;
+  --control-shadow: 0 2px 0 #3b2a20;
+  --go-shadow: 0 4px 0 #3b2a20;
+  --shadow: 0 4px 0 #3b2a20;
+  --shadow-lg: 0 6px 0 #3b2a20, 0 18px 40px rgba(59, 42, 32, 0.25);
+  --scroll-thumb: rgba(59, 42, 32, 0.25);
+  --scroll-thumb-hover: rgba(59, 42, 32, 0.4);
+}
+
+/* Sprout Night: the same stickers on plum, for playing after dark. */
+:root[data-theme="sprout-night"] {
+  color-scheme: dark;
+
+  --font-sans: "Nunito", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-display: "Fredoka", "Nunito", "Segoe UI", system-ui, sans-serif;
+  --weight-body: 600;
+  --weight-strong: 800;
+
+  --bg: #211a2b;
+  --surface: #2e2439;
+  --surface-2: #3a2f4a;
+  --surface-3: #47395a;
+  --surface-raised: #352a42;
+  --glass: rgba(33, 26, 43, 0.96);
+  --track: #17111f;
+  --border: rgba(255, 241, 220, 0.1);
+  --border-strong: rgba(255, 241, 220, 0.22);
+  --line: #0f0a15;
+  --line-w: 2px;
+  --highlight: transparent;
+  --hover: rgba(255, 241, 220, 0.07);
+  --press: rgba(255, 241, 220, 0.13);
+  --scrim: rgba(10, 6, 14, 0.6);
+
+  --text: #fff1dc;
+  --muted: #c4b5d0;
+  --faint: #b9a8c6;
+
+  --accent: #ffa24d;
+  --accent-strong: #ffb873;
+  --accent-soft: rgba(255, 162, 77, 0.18);
+  --accent-ink: #2a1c12;
+  --accent-sub: #4f2c0c;
+  --accent-text: #ffb86b;
+  --accent-text-strong: #ffd09a;
+
+  --hp: #f0625c;
+  --mp: #62a6f0;
+  --exp: #ffd23f;
+  --exp-text: #ffd23f;
+  --map: #ffcf70;
+  --travel: #7fe0cc;
+  --good: #8fe39b;
+  --good-soft: rgba(143, 227, 155, 0.16);
+  --good-ink: #12260f;
+  --warn: #ffab66;
+  --warn-soft: rgba(255, 171, 102, 0.16);
+  --bad: #ff9d8c;
+  --bad-soft: rgba(255, 157, 140, 0.15);
+  --mesos: #ffb86b;
+
+  --ref-item: #9ccbff;
+  --ref-mob: #ff9d8c;
+  --ref-npc: #7fe0cc;
+  --ref-map: #ffcf70;
+  --ref-skill: #d2b8ff;
+
+  --header-bg: #211a2b;
+  --header-text: #fff1dc;
+  --header-muted: #c4b5d0;
+  --header-faint: #b9a8c6;
+  --header-track: #17111f;
+  --header-hover: #2e2439;
+  --header-good: #8fe39b;
+  --header-exp: #ffd23f;
+  --header-accent: #ffb86b;
+  --nav-bg: #2e2439;
+  --nav-text: #b9a8c6;
+  --nav-line: #0f0a15;
+
+  --tile-1: #f5d98a;
+  --tile-2: #f2b6c6;
+  --tile-text: #2a1c12;
+  --tile-label: #5a4334;
+
+  --radius-sm: 9px;
+  --radius: 14px;
+  --radius-lg: 20px;
+  --card-shadow: 0 4px 0 #0f0a15;
+  --control-shadow: 0 2px 0 #0f0a15;
+  --go-shadow: 0 4px 0 #0f0a15;
+  --shadow: 0 4px 0 #0f0a15;
+  --shadow-lg: 0 6px 0 #0f0a15, 0 18px 40px rgba(0, 0, 0, 0.45);
+  --scroll-thumb: rgba(255, 241, 220, 0.16);
+  --scroll-thumb-hover: rgba(255, 241, 220, 0.28);
+}

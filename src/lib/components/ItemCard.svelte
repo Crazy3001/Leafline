@@ -356,7 +356,7 @@
   }
 
   .name.upgraded {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
   .notice {
@@ -396,7 +396,7 @@
   }
 
   .tip b {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
   .actions {
@@ -544,7 +544,7 @@
   }
 
   .job.eligible {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
     border-color: rgba(243, 177, 63, 0.35);
     background: var(--accent-soft);
   }

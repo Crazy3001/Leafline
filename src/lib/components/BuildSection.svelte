@@ -1054,7 +1054,7 @@
 
   /* Scrolled, in the game's amber, as the item check shows it. */
   .line :global(.ref.upgraded) {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
   .line .none {
@@ -1256,7 +1256,7 @@
 
   .found :global(svg) {
     flex: none;
-    color: var(--accent);
+    color: var(--accent-text);
   }
 
   .skill-group {
@@ -1337,7 +1337,7 @@
   }
 
   .skill-next b {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
     font-weight: 600;
   }
 

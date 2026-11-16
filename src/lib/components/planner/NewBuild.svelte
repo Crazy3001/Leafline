@@ -234,7 +234,7 @@
   }
 
   .class-name.seen-first {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
   .choice {
@@ -255,7 +255,7 @@
   .choice.on {
     border-color: var(--accent);
     background: var(--accent-soft);
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
   .starts {

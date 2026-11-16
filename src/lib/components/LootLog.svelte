@@ -168,7 +168,7 @@
   }
 
   .head:hover .title {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
   .title {
@@ -246,7 +246,7 @@
   }
 
   td.own {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
   .actions {

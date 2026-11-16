@@ -1182,6 +1182,9 @@ export interface LoggedDrop extends NewDrop {
 
 export type CompactShape = "card" | "wide" | "bar";
 
+/** The look every window is drawn in (src/lib/ui/themes.css). */
+export type Theme = "ember" | "ember-light" | "sprout" | "sprout-night";
+
 export interface HotkeyChoice {
   enabled: boolean;
   /** Keys the player changed, by action. Empty turns that hotkey off. */
@@ -1213,6 +1216,8 @@ export interface DisplaySettings {
   updateCheck: boolean;
   /** Item, monster, NPC and map pictures, downloaded from OSMS the first time each is shown. */
   showPictures: boolean;
+  /** The look every window is drawn in. */
+  theme: Theme;
 }
 
 /** The optional update check (src-tauri/src/app/update.rs). */

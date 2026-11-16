@@ -387,7 +387,7 @@
   }
 
   .head button.on {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
   .name {
