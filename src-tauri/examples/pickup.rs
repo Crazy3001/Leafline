@@ -71,7 +71,8 @@ fn main() {
                 let text: Vec<&str> = words.iter().map(|w| w.text.as_str()).collect();
                 let parsed = leafline_lib::readers::pickup::parse::parse(&text.join(" "));
                 let shapes = look::line_ink(&frame, &layout, slot).as_deref().and_then(leafline_lib::readers::pickup::figure::figure);
-                println!("{at:7.3}  [{slot}] {:.2} {} {:?} => {:?} | digits {shapes:?}", row.brightness, if parsed.is_some() { "OK" } else { "--" }, text.join(" "), parsed.map(|p| p.gain));
+                let font = look::line_ink(&frame, &layout, slot).as_deref().and_then(leafline_lib::readers::pickup::font::read_line);
+                println!("{at:7.3}  [{slot}] {:.2} {} {:?} => {:?} | digits {shapes:?} | font {font:?}", row.brightness, if parsed.is_some() { "OK" } else { "--" }, text.join(" "), parsed.map(|p| p.gain));
                 if let Some(dir) = value("--dump") {
                     let _ = picture.save(format!("{dir}/{:06}-{slot}.png", (at * 1000.0) as u64));
                 }

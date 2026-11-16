@@ -14,7 +14,7 @@ use super::parse::{Gain, Parsed};
 
 /// The figure's glyphs as the game draws them, a row per font pixel, `#` for ink. Rows below
 /// the ninth are where only the brackets reach.
-const GLYPHS: [(char, [&str; 11]); 13] = [
+pub(super) const GLYPHS: [(char, [&str; 11]); 13] = [
     ('0', [".###.", "#...#", "#...#", "#...#", "#...#", "#...#", "#...#", "#...#", ".###.", ".....", "....."]),
     ('1', ["..#", ".##", "#.#", "..#", "..#", "..#", "..#", "..#", "..#", "...", "..."]),
     ('2', [".###.", "#...#", "....#", "....#", "...#.", "...#.", "..#..", ".#...", "#####", ".....", "....."]),

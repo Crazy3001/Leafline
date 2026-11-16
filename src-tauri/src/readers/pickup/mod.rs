@@ -8,6 +8,7 @@
 //! over.
 
 pub mod figure;
+pub mod font;
 pub mod follow;
 pub mod look;
 pub mod parse;
@@ -86,16 +87,30 @@ impl PickupReader {
         let mut read_slot = |layout: &Layout, slot: usize| {
             // A fixed line (EXP, mesos, the party bonus) is read from its shapes alone: the
             // figure's digits and the width of the words before it. OCR is for the rest.
-            let figure = look::line_ink(frame, layout, slot).as_deref().and_then(figure::figure);
+            let ink = look::line_ink(frame, layout, slot);
+            let figure = ink.as_deref().and_then(figure::figure);
             if let Some(line) = figure.and_then(|f| f.line()) {
                 return Some(line);
             }
+            // The whole line read by its glyphs: first when every glyph is one the font table
+            // knows, else after OCR, with the glyphs it didn't know as gaps for name matching.
+            let glyphs = ink.as_deref().and_then(font::read_line).and_then(|text| Some((parse::parse(&text)?, text)));
+            let (whole, gapped): (Option<Parsed>, Option<Parsed>) = match glyphs {
+                Some((parsed, text)) if !text.contains(font::UNKNOWN) => (Some(parsed), None),
+                Some((parsed, _)) => (None, Some(parsed)),
+                None => (None, None),
+            };
+            if whole.is_some() {
+                return whole;
+            }
             // The ink cut as usual, then stricter (the world behind bleeds in), then looser (a
             // faded or thin stroke breaks up), until a read parses.
-            let mut parsed = INK_LEVELS.iter().find_map(|&level| {
+            let Some(mut parsed) = INK_LEVELS.iter().find_map(|&level| {
                 let picture = look::line_picture_at(frame, layout, slot, OCR_ZOOM, level)?;
                 parse::parse(&text(&picture)?)
-            })?;
+            }) else {
+                return gapped;
+            };
             // Digits read by their shapes are exact where they all read: they replace OCR's.
             if let Some(figure) = figure {
                 parsed.set_amount(figure.amount);

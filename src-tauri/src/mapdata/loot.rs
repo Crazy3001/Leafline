@@ -18,7 +18,41 @@ use crate::readers::inventory::Tab;
 /// log's pixel font: `rn` for `m`, `vv` for `w`, `q` for `g`, and `l`, `I`, `1` and `|` for each
 /// other. The better of the plain and the forgiving comparison counts.
 fn like(a: &str, b: &str) -> f64 {
+    if a.contains('?') || b.contains('?') {
+        return wild_like(a, b).max(wild_like(&lookalike(a), &lookalike(b)));
+    }
     strsim::normalized_levenshtein(a, b).max(strsim::normalized_levenshtein(&lookalike(a), &lookalike(b)))
+}
+
+/// [`strsim::normalized_levenshtein`] with `?` (a glyph the font reader didn't know) taken as any
+/// one letter.
+fn wild_like(a: &str, b: &str) -> f64 {
+    let (a, b): (Vec<char>, Vec<char>) = (a.chars().collect(), b.chars().collect());
+    if a.is_empty() && b.is_empty() {
+        return 1.0;
+    }
+    let mut row: Vec<usize> = (0..=b.len()).collect();
+    for (i, ca) in a.iter().enumerate() {
+        let mut last = row[0];
+        row[0] = i + 1;
+        for (j, cb) in b.iter().enumerate() {
+            let same = ca == cb || *ca == '?' || *cb == '?';
+            let next = (last + usize::from(!same)).min(row[j] + 1).min(row[j + 1] + 1);
+            last = row[j + 1];
+            row[j + 1] = next;
+        }
+    }
+    1.0 - row[b.len()] as f64 / a.len().max(b.len()) as f64
+}
+
+/// [`item_key`], keeping the font reader's `?` for a letter it didn't know.
+fn read_key(name: &str) -> String {
+    name.chars()
+        .map(|c| if c.is_ascii_alphanumeric() || c == '?' { c.to_ascii_lowercase() } else { ' ' })
+        .collect::<String>()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 fn lookalike(s: &str) -> String {
@@ -38,7 +72,7 @@ const END_LIKE: f64 = 0.85;
 
 /// The item a name read off the Pickup Log is. `tab` narrows it when it was read.
 pub fn name_item<'a>(catalog: &'a Catalog, read: &str, tab: Option<Tab>, cut_short: bool) -> Option<&'a ItemRecord> {
-    let key = item_key(read);
+    let key = read_key(read);
     if key.is_empty() {
         return None;
     }
@@ -202,6 +236,13 @@ mod tests {
     fn the_fonts_usual_slips_are_forgiven() {
         assert_eq!(named("Bjue Snaii Shell", Some(Tab::Etc), false), Some(2), "l read as j and i");
         assert_eq!(named("Red Potjon", Some(Tab::Use), false), Some(5));
+    }
+
+    #[test]
+    fn a_letter_the_font_reader_didnt_know_is_any_letter() {
+        assert_eq!(named("Blue Sn?il Shell", Some(Tab::Etc), false), Some(2));
+        assert_eq!(named("?ed Snail Shell", Some(Tab::Etc), false), Some(3));
+        assert_eq!(named("??d Snail Shell", Some(Tab::Etc), false), Some(3), "Red is the one that fits");
     }
 
     #[test]
