@@ -119,8 +119,17 @@ impl Follower {
 /// What a line's reads agree it says. Reads with their `+` outvote those without; of those, the
 /// figures read most often win, and a tie between two is no answer. A single read stands.
 fn vote(reads: &[Parsed]) -> Option<Gain> {
+    // Figures read from the game's glyphs outvote OCR's; reads with their `+` outvote those
+    // without.
+    let exact: Vec<&Parsed> = reads.iter().filter(|r| r.exact).collect();
     let sure: Vec<&Parsed> = reads.iter().filter(|r| r.sure).collect();
-    let reads: Vec<&Parsed> = if sure.is_empty() { reads.iter().collect() } else { sure };
+    let reads: Vec<&Parsed> = if !exact.is_empty() {
+        exact
+    } else if !sure.is_empty() {
+        sure
+    } else {
+        reads.iter().collect()
+    };
     let mut groups: Vec<(_, Vec<&Parsed>)> = Vec::new();
     for read in reads {
         match groups.iter_mut().find(|(figures, _)| *figures == read.figures()) {
