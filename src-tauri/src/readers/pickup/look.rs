@@ -225,14 +225,22 @@ pub fn line_below(frame: &Frame, layout: &Layout) -> bool {
         && row(frame, &lower, 0).is_some_and(|r| r.brightness >= 0.85 && r.colour == Colour::White)
 }
 
-/// The line in `slot` as black ink on white, one font pixel to `zoom` square pixels, for OCR.
-/// Font pixels the shadow test misses (a stroke running down to the right covers its own
-/// shadow) are taken back where they are as light as the line's ink and touch it.
-pub fn line_picture(frame: &Frame, layout: &Layout, slot: usize, zoom: u32) -> Option<Frame> {
+/// The ink of the line in `slot`, font pixel by font pixel: `ink[row][column]` with column 0 at
+/// the right, out to the line's start. Font pixels the shadow test misses (a stroke running down
+/// to the right covers its own shadow) are taken back where they look like the line's ink.
+pub fn line_ink(frame: &Frame, layout: &Layout, slot: usize) -> Option<Vec<Vec<bool>>> {
+    line_ink_at(frame, layout, slot, INK_LEVEL)
+}
+
+/// How much of a line's own brightness a font pixel's ink must reach to count, as a share.
+pub const INK_LEVEL: f32 = 0.5;
+
+/// [`line_ink`] with the ink cut at `level` of the line's brightness instead of [`INK_LEVEL`].
+pub fn line_ink_at(frame: &Frame, layout: &Layout, slot: usize, level: f32) -> Option<Vec<Vec<bool>>> {
     let top = layout.top(slot)?;
     let cells = grid(frame, layout, top, WIDEST);
     let brightness = brightness(&cells, layout)?;
-    let threshold = 0.5 * brightness * layout.full;
+    let threshold = level * brightness * layout.full;
     let mut ink: Vec<Vec<bool>> = cells.iter().map(|row| row.iter().map(|c| c.strength >= threshold).collect()).collect();
     // Where the line starts: the last ink before a gap wider than words have.
     let columns = ink[0].len();
@@ -308,6 +316,19 @@ pub fn line_picture(frame: &Frame, layout: &Layout, slot: usize, zoom: u32) -> O
             }
         }
     }
+    ink.iter_mut().for_each(|row| row.truncate(start + 1));
+    Some(ink)
+}
+
+/// The line in `slot` as black ink on white, one font pixel to `zoom` square pixels, for OCR.
+pub fn line_picture(frame: &Frame, layout: &Layout, slot: usize, zoom: u32) -> Option<Frame> {
+    line_picture_at(frame, layout, slot, zoom, INK_LEVEL)
+}
+
+/// [`line_picture`] with the ink cut at `level` of the line's brightness.
+pub fn line_picture_at(frame: &Frame, layout: &Layout, slot: usize, zoom: u32, level: f32) -> Option<Frame> {
+    let ink = line_ink_at(frame, layout, slot, level)?;
+    let start = ink[0].len().checked_sub(1)?;
     let margin = 4 * zoom;
     let (w, h) = ((start as u32 + 1) * zoom + 2 * margin, LINE_HEIGHT * zoom + 2 * margin);
     Some(Frame::from_fn(w, h, |x, y| {

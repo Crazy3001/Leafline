@@ -37,6 +37,14 @@ pub struct Parsed {
 }
 
 impl Parsed {
+    /// Puts in an amount read exactly, for a line that has one.
+    pub fn set_amount(&mut self, exact: u64) {
+        if let Gain::Exp { amount } | Gain::PartyBonus { amount } | Gain::Mesos { amount } = &mut self.gain {
+            *amount = exact;
+            self.sure = true;
+        }
+    }
+
     /// The figures a vote compares: the kind, amount and quantity, not an item's name.
     pub fn figures(&self) -> (u8, u64) {
         match &self.gain {

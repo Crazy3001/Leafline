@@ -14,6 +14,17 @@ use super::osms::ItemRecord;
 use crate::build::catalog::Catalog;
 use crate::readers::inventory::Tab;
 
+/// How alike two names (as [`item_key`]s) are, 0 to 1, forgiving the slips OCR makes on the
+/// log's pixel font: `rn` for `m`, `vv` for `w`, `q` for `g`, and `l`, `I`, `1` and `|` for each
+/// other. The better of the plain and the forgiving comparison counts.
+fn like(a: &str, b: &str) -> f64 {
+    strsim::normalized_levenshtein(a, b).max(strsim::normalized_levenshtein(&lookalike(a), &lookalike(b)))
+}
+
+fn lookalike(s: &str) -> String {
+    s.replace("rn", "m").replace("vv", "w").replace(['l', '1', '|', 'j', 'I'], "i").replace('q', "g").replace('0', "o").replace('5', "s")
+}
+
 /// The least likeness, 0 to 1, for a misread name to be an item's.
 const LIKE: f64 = 0.8;
 /// How much closer than the next item's name it must be.
@@ -47,7 +58,7 @@ pub fn name_item<'a>(catalog: &'a Catalog, read: &str, tab: Option<Tab>, cut_sho
         return Some(item);
     }
     // A whole name close to the read, but no clear winner, is a doubt: the end can't settle it.
-    let any_close = candidates.iter().any(|i| strsim::normalized_levenshtein(&item_key(&i.name), &key) >= LIKE);
+    let any_close = candidates.iter().any(|i| like(&item_key(&i.name), &key) >= LIKE);
     if any_close {
         return None;
     }
@@ -69,7 +80,7 @@ fn by_end<'a>(items: &[&'a ItemRecord], end: &str) -> Option<&'a ItemRecord> {
             let name = item_key(&item.name);
             // The part of the name as long as what was read, from its end.
             let tail = name.get(name.len().checked_sub(end.len())?..)?;
-            Some((strsim::normalized_levenshtein(tail, end), *item))
+            Some((like(tail, end), *item))
         })
         .collect();
     scored.sort_by(|a, b| b.0.total_cmp(&a.0));
@@ -89,7 +100,7 @@ fn by_start<'a>(items: &[&'a ItemRecord], start: &str) -> Option<&'a ItemRecord>
         .copied()
         .filter(|item| {
             let name = item_key(&item.name);
-            name.len() > start.len() && strsim::normalized_levenshtein(&name[..start.len()], start) >= LIKE + 0.1
+            name.len() > start.len() && like(&name[..start.len()], start) >= LIKE + 0.1
         })
         .collect();
     one_name(fits)
@@ -98,7 +109,7 @@ fn by_start<'a>(items: &[&'a ItemRecord], start: &str) -> Option<&'a ItemRecord>
 /// The item whose name is like `key` and clearly closer to it than any other name.
 fn closest<'a>(items: &[&'a ItemRecord], key: &str) -> Option<&'a ItemRecord> {
     let mut scored: Vec<(f64, &ItemRecord)> =
-        items.iter().map(|item| (strsim::normalized_levenshtein(&item_key(&item.name), key), *item)).collect();
+        items.iter().map(|item| (like(&item_key(&item.name), key), *item)).collect();
     scored.sort_by(|a, b| b.0.total_cmp(&a.0));
     let (best, item) = *scored.first()?;
     if best < LIKE {
@@ -185,6 +196,12 @@ mod tests {
         assert_eq!(named("rulus Brown Loosecap", Some(Tab::Equip), false), Some(13));
         assert_eq!(named("arowo Loosecap", Some(Tab::Equip), false), Some(13), "arowo is two letters from Brown");
         assert_eq!(named("zz Loosecap", Some(Tab::Equip), false), None, "Loosecap alone is Brown or Black");
+    }
+
+    #[test]
+    fn the_fonts_usual_slips_are_forgiven() {
+        assert_eq!(named("Bjue Snaii Shell", Some(Tab::Etc), false), Some(2), "l read as j and i");
+        assert_eq!(named("Red Potjon", Some(Tab::Use), false), Some(5));
     }
 
     #[test]

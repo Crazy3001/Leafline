@@ -92,7 +92,11 @@ impl Follower {
         let mut out = Vec::new();
         while self.following.front().is_some_and(|f| f.done) {
             let line = self.following.pop_front().expect("front checked");
-            out.push(Arrival { at: line.at, line: vote(&line.reads).map(|gain| Line { gain, party: line.colour == Colour::Yellow }) });
+            let party = line.colour == Colour::Yellow;
+            // Only EXP lines are drawn in yellow: a yellow line read as mesos or an item is a
+            // misread (a pet's closeness line is yellow too).
+            let gain = vote(&line.reads).filter(|gain| !party || matches!(gain, Gain::Exp { .. } | Gain::PartyBonus { .. }));
+            out.push(Arrival { at: line.at, line: gain.map(|gain| Line { gain, party }) });
         }
         out
     }

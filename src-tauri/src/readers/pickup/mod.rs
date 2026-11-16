@@ -7,6 +7,7 @@
 //! one line's words. A line Leafline isn't sure of is left out: loot may be counted short, never
 //! over.
 
+pub mod figure;
 pub mod follow;
 pub mod look;
 pub mod parse;
@@ -23,6 +24,8 @@ use crate::vision::{Frame, Ocr, Rect};
 /// Font pixels to a square of the picture handed to OCR. Of 2 to 6, 3 read the most lines of
 /// the recording of 2026-11-15 (about three in four at the first read).
 const OCR_ZOOM: u32 = 3;
+/// The ink cuts a line's picture is tried at, in turn, until OCR reads it.
+const INK_LEVELS: [f32; 3] = [look::INK_LEVEL, 0.65, 0.35];
 /// How long a log found but never read as one is kept, in seconds, before it is looked for
 /// again: it may have been something else drawn the same way.
 const UNCONFIRMED_FOR: f64 = 3.0;
@@ -81,8 +84,23 @@ impl PickupReader {
             *self = Self { size: frame.dimensions(), ..Self::default() };
         }
         let mut read_slot = |layout: &Layout, slot: usize| {
-            let picture = look::line_picture(frame, layout, slot, OCR_ZOOM)?;
-            parse::parse(&text(&picture)?)
+            // A fixed line (EXP, mesos, the party bonus) is read from its shapes alone: the
+            // figure's digits and the width of the words before it. OCR is for the rest.
+            let figure = look::line_ink(frame, layout, slot).as_deref().and_then(figure::figure);
+            if let Some(line) = figure.and_then(|f| f.line()) {
+                return Some(line);
+            }
+            // The ink cut as usual, then stricter (the world behind bleeds in), then looser (a
+            // faded or thin stroke breaks up), until a read parses.
+            let mut parsed = INK_LEVELS.iter().find_map(|&level| {
+                let picture = look::line_picture_at(frame, layout, slot, OCR_ZOOM, level)?;
+                parse::parse(&text(&picture)?)
+            })?;
+            // Digits read by their shapes are exact where they all read: they replace OCR's.
+            if let Some(figure) = figure {
+                parsed.set_amount(figure.amount);
+            }
+            Some(parsed)
         };
         let Some(mut layout) = self.layout.filter(|l| l.full == full).or_else(|| look::locate(frame, full)) else {
             return PickupRead::default();
