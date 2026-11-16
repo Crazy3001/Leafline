@@ -330,7 +330,7 @@
     min-width: 0;
     padding: 4px 7px;
     border-radius: var(--radius-sm);
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--hover);
   }
 
   dt {

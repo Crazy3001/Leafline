@@ -23,6 +23,8 @@
   --border: rgba(60, 45, 20, 0.16);
   --border-strong: rgba(60, 45, 20, 0.3);
   --line: rgba(60, 45, 20, 0.16);
+  --control-line: rgba(60, 45, 20, 0.3);
+  --well: rgba(60, 45, 20, 0.08);
   --highlight: rgba(255, 255, 255, 0.7);
   --hover: rgba(60, 45, 20, 0.07);
   --press: rgba(60, 45, 20, 0.12);
@@ -107,6 +109,8 @@
   --border: rgba(59, 42, 32, 0.16);
   --border-strong: rgba(59, 42, 32, 0.36);
   --line: #3b2a20;
+  --control-line: #3b2a20;
+  --well: rgba(59, 42, 32, 0.07);
   --line-w: 2px;
   --highlight: transparent;
   --hover: rgba(59, 42, 32, 0.07);
@@ -202,6 +206,8 @@
   --border: rgba(255, 241, 220, 0.1);
   --border-strong: rgba(255, 241, 220, 0.22);
   --line: #0f0a15;
+  --control-line: #0f0a15;
+  --well: rgba(0, 0, 0, 0.25);
   --line-w: 2px;
   --highlight: transparent;
   --hover: rgba(255, 241, 220, 0.07);

@@ -912,7 +912,7 @@
   .stats div {
     padding: 5px 8px;
     border-radius: var(--radius-sm);
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--hover);
   }
 
   dt {
@@ -1005,7 +1005,7 @@
 
   .remove:hover,
   .remove:focus-visible {
-    background: rgba(255, 255, 255, 0.07);
+    background: var(--hover);
     color: var(--text);
     text-decoration: none;
     outline: none;
@@ -1314,7 +1314,7 @@
     position: relative;
     grid-column: 1 / -1;
     height: 5px;
-    background: rgba(255, 255, 255, 0.07);
+    background: var(--hover);
   }
 
   .bar span {

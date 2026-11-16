@@ -1119,7 +1119,7 @@
   }
 
   .build:hover {
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--hover);
     color: var(--text);
   }
 
@@ -1155,7 +1155,7 @@
 
   .side:hover:not(:disabled),
   .side.active {
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--hover);
     color: var(--text);
   }
 
@@ -1469,7 +1469,7 @@
   }
 
   .icon:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.07);
+    background: var(--hover);
     color: var(--text);
   }
 
@@ -1693,14 +1693,14 @@
     padding: 4px 8px;
     border: 0;
     border-radius: var(--radius-sm);
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--hover);
     color: var(--text);
     text-align: left;
     cursor: pointer;
   }
 
   .found button:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--hover);
   }
 
   .found button:disabled {
@@ -1774,7 +1774,7 @@
 
   .plain:hover:not(:disabled) {
     color: var(--text);
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--hover);
   }
 
   .plain:disabled {

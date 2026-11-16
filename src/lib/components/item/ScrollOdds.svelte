@@ -166,7 +166,7 @@
     gap: 2px;
     padding: 2px;
     border-radius: var(--radius-sm);
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--hover);
   }
 
   .rates button {
@@ -195,7 +195,7 @@
   .facts div {
     padding: 4px 7px;
     border-radius: var(--radius-sm);
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--hover);
   }
 
   .facts .wide {
@@ -249,7 +249,7 @@
     height: 6px;
     overflow: hidden;
     border-radius: var(--radius-pill);
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--hover);
   }
 
   .bar span {

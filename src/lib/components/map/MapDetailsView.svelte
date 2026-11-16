@@ -387,7 +387,7 @@
     margin-left: 3px;
     padding: 0 4px;
     border-radius: var(--radius-sm);
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--hover);
     font-size: var(--text-xs);
     color: var(--faint);
   }

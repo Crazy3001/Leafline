@@ -220,7 +220,7 @@
   }
 
   button.hint:hover {
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--hover);
     color: var(--text);
   }
 
@@ -322,7 +322,7 @@
   }
 
   .ground:hover {
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--hover);
     color: var(--text);
   }
 
@@ -377,7 +377,7 @@
     margin: 0 0 6px;
     padding: 2px;
     border-radius: var(--radius-sm);
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--hover);
   }
 
   .order button {

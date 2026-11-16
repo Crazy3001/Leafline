@@ -587,7 +587,7 @@
     padding: 4px 10px;
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--hover);
     color: var(--text);
     font-size: var(--text-sm);
     cursor: pointer;

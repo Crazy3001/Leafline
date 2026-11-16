@@ -52,7 +52,7 @@
   .track {
     height: 8px;
     border-radius: var(--radius-pill);
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--hover);
     box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
     overflow: hidden;
   }

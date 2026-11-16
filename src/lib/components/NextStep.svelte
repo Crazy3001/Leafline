@@ -769,7 +769,7 @@
 
   .close:hover,
   .close:focus-visible {
-    background: rgba(255, 255, 255, 0.07);
+    background: var(--hover);
     color: var(--text);
     outline: none;
   }

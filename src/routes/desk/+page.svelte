@@ -557,7 +557,7 @@
     padding: 3px;
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    background: rgba(0, 0, 0, 0.28);
+    background: var(--well);
   }
 
   .tab,
@@ -580,7 +580,7 @@
   }
 
   .tab:hover {
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--hover);
     color: var(--text);
   }
 
@@ -717,7 +717,7 @@
   }
 
   .item:hover {
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--hover);
   }
 
   .item.current {

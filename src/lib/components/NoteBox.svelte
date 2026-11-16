@@ -185,7 +185,7 @@
     padding: 6px 8px;
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
-    background: rgba(0, 0, 0, 0.25);
+    background: var(--well);
     color: var(--text);
     font: inherit;
     font-size: var(--text-md);

@@ -35,10 +35,10 @@
     gap: 6px;
     height: var(--control-h);
     padding: 0 12px;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
-    background: linear-gradient(180deg, var(--surface-3), var(--surface-2));
-    box-shadow: inset 0 1px 0 var(--highlight);
+    border: var(--line-w) solid var(--control-line);
+    border-radius: var(--radius);
+    background: var(--surface-2);
+    box-shadow: var(--control-shadow);
     color: var(--text);
     font-size: var(--text-sm);
     font-weight: 500;
@@ -52,7 +52,6 @@
   }
 
   .btn:hover:not(:disabled) {
-    border-color: rgba(214, 222, 240, 0.24);
     background: var(--surface-3);
   }
 
@@ -61,7 +60,7 @@
   }
 
   .btn:focus-visible {
-    outline: 2px solid var(--accent);
+    outline: 2px solid var(--accent-text);
     outline-offset: 1px;
   }
 
@@ -72,23 +71,23 @@
 
   .sm {
     height: var(--control-h-sm);
+    border-radius: var(--radius-sm);
     padding: 0 8px;
     font-size: var(--text-xs);
   }
 
-  .primary {
+  :global(:root:not([data-theme^="sprout"])) .primary {
     border-color: transparent;
-    background: linear-gradient(180deg, var(--accent-strong), var(--accent));
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.25),
-      0 4px 14px color-mix(in srgb, var(--accent) 25%, transparent);
+  }
+
+  .primary {
+    background: var(--accent);
     color: var(--accent-ink);
     font-weight: 600;
   }
 
   .primary:hover:not(:disabled) {
-    border-color: transparent;
-    background: linear-gradient(180deg, #ffcd80, var(--accent-strong));
+    background: var(--accent-strong);
   }
 
   .ghost {
@@ -99,7 +98,7 @@
   }
 
   .ghost:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.07);
+    background: var(--hover);
     color: var(--text);
   }
 

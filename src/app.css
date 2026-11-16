@@ -40,6 +40,10 @@
   /* The outline of a card or a control: a hairline here, thick ink in Sprout. */
   --line: rgba(214, 222, 240, 0.08);
   --line-w: 1px;
+  /* A button or a chip: a little stronger than a card's, so it reads as pressable. */
+  --control-line: rgba(214, 222, 240, 0.15);
+  /* A sunken well: a list's background, the groove tabs sat in. */
+  --well: rgba(0, 0, 0, 0.28);
   /* A soft top light on raised things. */
   --highlight: rgba(255, 255, 255, 0.04);
   /* What a row or a quiet button gains under the pointer, and when pressed. */
@@ -238,27 +242,21 @@ button {
 }
 
 /*
- * The band that opens each section of a panel (Card, Block, the map card's parts, the build):
- * a soft rounded band set in from the panel's edges, its title in full text colour, so one
- * section reads as ending before the next begins even over a busy game scene.
+ * The heading of a section inside a card (Card, Block, the map card's parts, the build): its
+ * title in the display face, and whatever sits beside it pushed to the right.
  */
 .strip {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 32px;
-  padding: 4px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: linear-gradient(180deg, var(--surface-3), var(--surface-2));
-  box-shadow: inset 0 1px 0 var(--highlight);
+  min-height: 24px;
 }
 
 .strip-title {
   font-family: var(--font-display);
-  font-size: var(--text-md);
-  font-weight: 600;
-  letter-spacing: 0.01em;
+  font-size: 14px;
+  font-weight: var(--weight-strong);
+  line-height: 1.3;
   color: var(--text);
 }
 

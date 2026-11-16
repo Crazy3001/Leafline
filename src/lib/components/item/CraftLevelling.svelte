@@ -189,7 +189,7 @@
     gap: 2px;
     padding: 2px;
     border-radius: var(--radius-sm);
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--hover);
   }
 
   .sort button {
@@ -219,7 +219,7 @@
   .plans li {
     padding: 5px 7px;
     border-radius: var(--radius-sm);
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--hover);
   }
 
   .plans li.best {

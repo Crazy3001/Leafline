@@ -30,15 +30,16 @@
     flex-direction: column;
     gap: 2px;
     min-width: 0;
-    padding: var(--space-2);
+    padding: var(--space-2) 10px;
+    border-radius: var(--radius);
     background: var(--surface-2);
   }
 
   .lg {
     padding: 10px var(--space-3);
-    border: 1px solid var(--border);
+    border: var(--line-w) solid var(--line);
     border-radius: var(--radius);
-    background: var(--surface);
+    background: var(--surface-2);
   }
 
   .label {

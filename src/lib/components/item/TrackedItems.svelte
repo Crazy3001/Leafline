@@ -125,7 +125,7 @@
 
   .remove:hover,
   .remove:focus-visible {
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--hover);
     color: var(--text);
   }
 

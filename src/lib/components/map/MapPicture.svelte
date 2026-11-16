@@ -444,7 +444,7 @@
 
   .zoom button:hover:not(:disabled),
   .zoom button:focus-visible {
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--hover);
     color: var(--text);
     outline: none;
   }

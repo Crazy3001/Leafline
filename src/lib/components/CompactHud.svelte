@@ -283,7 +283,7 @@
   }
 
   .icon:hover {
-    background: rgba(255, 255, 255, 0.07);
+    background: var(--hover);
     color: var(--text);
   }
 
@@ -340,7 +340,7 @@
     margin-left: 0;
     padding: 0 5px;
     border-radius: var(--radius-pill);
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--hover);
     font-size: 10px;
     font-variant-numeric: tabular-nums;
   }

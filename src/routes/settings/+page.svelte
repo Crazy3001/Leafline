@@ -1085,7 +1085,7 @@
 
   .nav a:hover,
   .nav a:focus-visible {
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--hover);
     color: var(--text);
     outline: none;
   }
@@ -1175,7 +1175,7 @@
     display: flex;
     padding: 2px;
     border-radius: var(--radius-sm);
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--hover);
   }
 
   .segmented button {
@@ -1549,7 +1549,7 @@
     margin-right: 6px;
     padding: 0 7px;
     border-radius: var(--radius-sm);
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--hover);
     color: var(--muted);
     font-size: var(--text-xs);
     font-weight: 600;

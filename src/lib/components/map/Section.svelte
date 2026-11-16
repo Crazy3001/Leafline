@@ -119,7 +119,7 @@
   .count {
     padding: 0 7px;
     border-radius: var(--radius-pill);
-    background: rgba(255, 255, 255, 0.07);
+    background: var(--hover);
     font-size: var(--text-xs);
     color: var(--faint);
   }
