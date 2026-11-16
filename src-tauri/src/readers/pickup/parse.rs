@@ -34,6 +34,8 @@ pub struct Parsed {
     /// figure is then taken with its first digit dropped when that digit is a 4, the way OCR
     /// reads a `+` most often, so a misread can only count less, never more.
     pub sure: bool,
+    /// The figure was read from the game's own glyphs, not by OCR: it outvotes OCR's.
+    pub exact: bool,
 }
 
 impl Parsed {
@@ -42,6 +44,7 @@ impl Parsed {
         if let Gain::Exp { amount } | Gain::PartyBonus { amount } | Gain::Mesos { amount } = &mut self.gain {
             *amount = exact;
             self.sure = true;
+            self.exact = true;
         }
     }
 
@@ -92,7 +95,7 @@ pub fn parse(text: &str) -> Option<Parsed> {
         Fixed::PartyBonus => Gain::PartyBonus { amount },
         Fixed::Mesos => Gain::Mesos { amount },
     };
-    Some(Parsed { gain, sure })
+    Some(Parsed { gain, sure, exact: false })
 }
 
 /// Which fixed line the words before the figure are. OCR often drops a word or two of a pixel
@@ -166,7 +169,7 @@ fn item(before: &str, inside: &str) -> Option<Parsed> {
     if letters(&name).len() < 2 || fixed(&name).is_some() {
         return None;
     }
-    Some(Parsed { gain: Gain::Item { name, quantity, tab: tab(inside), cut_short }, sure })
+    Some(Parsed { gain: Gain::Item { name, quantity, tab: tab(inside), cut_short }, sure, exact: false })
 }
 
 /// The inventory tab a bracket names, read with a letter or so wrong.

@@ -66,7 +66,7 @@ impl Figure {
             Fixed::PartyBonus => Gain::PartyBonus { amount },
             Fixed::Mesos => Gain::Mesos { amount },
         };
-        Some(Parsed { gain, sure: true })
+        Some(Parsed { gain, sure: true, exact: true })
     }
 }
 

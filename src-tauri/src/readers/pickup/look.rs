@@ -264,6 +264,8 @@ pub fn line_ink_at(frame: &Frame, layout: &Layout, slot: usize, level: f32) -> O
         let y = top + j as u32 * s;
         (x < frame.width() && y < frame.height()).then(|| frame.get_pixel(x, y).0)
     };
+    let yellow = cells.iter().flatten().filter(|c| c.colour == Colour::Yellow).count()
+        > 2 * cells.iter().flatten().filter(|c| c.colour == Colour::White).count();
     // The line's ink colour: every ink pixel of a line drawn at full brightness is close to the
     // same colour, where a light world behind it varies.
     let ink_colour: Option<[u8; 3]> = {
@@ -276,7 +278,10 @@ pub fn line_ink_at(frame: &Frame, layout: &Layout, slot: usize, level: f32) -> O
             }
         }
         channels.iter_mut().for_each(|c| c.sort_unstable());
-        (channels[0].len() >= MIN_INK && brightness >= 0.9).then(|| [0, 1, 2].map(|c| channels[c][channels[c].len() / 2]))
+        // Yellow ink varies more, and a party line fades fast, so its colour is taken from a
+        // fainter line too.
+        let enough = if yellow { 0.75 } else { 0.9 };
+        (channels[0].len() >= MIN_INK && brightness >= enough).then(|| [0, 1, 2].map(|c| channels[c][channels[c].len() / 2]))
     };
     // Exactly the ink's colour: tells ink from a light world at full brightness.
     let exact = |i: usize, j: usize| match (ink_colour, pixel(i, j)) {
@@ -286,11 +291,13 @@ pub fn line_ink_at(frame: &Frame, layout: &Layout, slot: usize, level: f32) -> O
     };
     // As light as the ink and about as grey: the only test left once a line has faded a little.
     let light = brightness * 246.0 * 0.8;
-    let yellow = cells.iter().flatten().filter(|c| c.colour == Colour::Yellow).count()
-        > 2 * cells.iter().flatten().filter(|c| c.colour == Colour::White).count();
     let pale = |i: usize, j: usize| {
         pixel(i, j).is_some_and(|px| {
-            px[..2].iter().all(|&v| f32::from(v) >= light) && (yellow || px.iter().max().unwrap() - px.iter().min().unwrap() <= 24)
+            let [r, g, b, _] = px;
+            let looks_yellow = r.abs_diff(g) <= 24 && u32::from(b) * 5 <= u32::from(r.min(g)) * 3;
+            // As before for white: every channel within 24 of full (alpha counts as one).
+            let looks_white = px.iter().max().unwrap() - px.iter().min().unwrap() <= 24;
+            [r, g].iter().all(|&v| f32::from(v) >= light) && if yellow { looks_yellow } else { looks_white }
         })
     };
     // A font pixel fails the shadow test only where the one its shadow falls on, down and to the
@@ -311,7 +318,10 @@ pub fn line_ink_at(frame: &Frame, layout: &Layout, slot: usize, level: f32) -> O
     };
     for j in (0..LINE_HEIGHT as usize - 1).rev() {
         for i in 1..=start {
-            if !ink[j][i] && ink[j + 1][i - 1] && (alone(&exact_cells, i, j) || alone(&pale_cells, i, j)) {
+            // A world as yellow as a party line's ink is rare, so there the ink's colour alone is
+            // enough; a white line needs the pixel to stand alone among light ones too.
+            let exact = if yellow { exact_cells[j][i] } else { alone(&exact_cells, i, j) };
+            if !ink[j][i] && ink[j + 1][i - 1] && (exact || alone(&pale_cells, i, j)) {
                 ink[j][i] = true;
             }
         }

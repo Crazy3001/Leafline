@@ -75,6 +75,15 @@ fn main() {
                 let text: Vec<&str> = words.iter().map(|w| w.text.as_str()).collect();
                 let parsed = leafline_lib::readers::pickup::parse::parse(&text.join(" "));
                 let shapes = look::line_ink(&frame, &layout, slot).as_deref().and_then(leafline_lib::readers::pickup::figure::figure);
+                // `PICKUP_INK=<time>/<slot>` prints that row's ink.
+                if std::env::var("PICKUP_INK").is_ok_and(|v| v == format!("{at:.3}/{slot}"))
+                    && let Some(ink) = look::line_ink(&frame, &layout, slot)
+                {
+                    for row in &ink {
+                        let cols = row.len();
+                        println!("{}", (0..cols.min(40)).rev().map(|i| if row[i] { '#' } else { '.' }).collect::<String>());
+                    }
+                }
                 let font = look::line_ink(&frame, &layout, slot).as_deref().and_then(leafline_lib::readers::pickup::font::read_line);
                 println!("{at:7.3}  [{slot}] {:.2} {} {:?} => {:?} | digits {shapes:?} | font {font:?}", row.brightness, if parsed.is_some() { "OK" } else { "--" }, text.join(" "), parsed.map(|p| p.gain));
                 if let Some(dir) = value("--dump") {
