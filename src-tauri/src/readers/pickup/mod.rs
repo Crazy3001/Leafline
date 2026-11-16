@@ -17,7 +17,8 @@ pub use look::Layout;
 pub use parse::{Gain, Parsed};
 pub use stack::{Colour, Row, Rows, Shape};
 
-use crate::vision::{Frame, Ocr};
+use super::ui::{CANONICAL_SCALE, Canonical};
+use crate::vision::{Frame, Ocr, Rect};
 
 /// Font pixels to a square of the picture handed to OCR. Of 2 to 6, 3 read the most lines of
 /// the recording of 2026-11-15 (about three in four at the first read).
@@ -25,6 +26,11 @@ const OCR_ZOOM: u32 = 3;
 /// How long a log found but never read as one is kept, in seconds, before it is looked for
 /// again: it may have been something else drawn the same way.
 const UNCONFIRMED_FOR: f64 = 3.0;
+/// A row this bright when the log is confirmed arrived moments ago (a line fades about 0.18 a
+/// second), so it is counted rather than taken as already there.
+const JUST_ARRIVED: f32 = 0.95;
+/// Seconds before the confirming look that such a row is taken to have arrived after.
+const JUST_BEFORE: f64 = 0.25;
 
 /// Reads the Pickup Log from a stream of pictures of the game window, in order.
 #[derive(Debug, Default)]
@@ -45,14 +51,32 @@ pub struct PickupRead {
     pub layout: Option<Layout>,
 }
 
+/// The part of the window the log can be in: the right of it, below the middle.
+fn corner(frame: &Frame) -> Rect {
+    let (width, height) = (frame.width() as f32, frame.height() as f32);
+    Rect::from_edges(width * 0.55, height * 0.45, width, height)
+}
+
+/// The window's bottom right redrawn on the design grid, when the game draws its interface at
+/// another scale than the one the log is read at. At UI Size Default Ratio (1.875x at 1440p) the
+/// game smooths the log's font, and the font's pixels only come back square on that grid.
+pub fn view(frame: &Frame, ui_scale: Option<f32>) -> Option<Frame> {
+    let scale = ui_scale.filter(|s| (s - CANONICAL_SCALE).abs() > 0.02)?;
+    Some(Canonical::within(frame, scale, corner(frame)).frame)
+}
+
 impl PickupReader {
-    /// Reads `frame`, taken at `at` seconds.
-    pub fn read(&mut self, at: f64, frame: &Frame, ocr: &Ocr) -> PickupRead {
-        self.read_with(at, frame, |picture| read_text(ocr, picture))
+    /// Reads `frame`, taken at `at` seconds. `ui_scale` is the scale the game draws its interface
+    /// at, as the HUD measures it, when known.
+    pub fn read(&mut self, at: f64, frame: &Frame, ui_scale: Option<f32>, ocr: &Ocr) -> PickupRead {
+        match view(frame, ui_scale) {
+            Some(view) => self.read_with(at, &view, look::SMOOTHED_FULL, |picture| read_text(ocr, picture)),
+            None => self.read_with(at, frame, look::FULL, |picture| read_text(ocr, picture)),
+        }
     }
 
     /// [`Self::read`] with the OCR given, for tests.
-    pub fn read_with(&mut self, at: f64, frame: &Frame, mut text: impl FnMut(&Frame) -> Option<String>) -> PickupRead {
+    pub fn read_with(&mut self, at: f64, frame: &Frame, full: f32, mut text: impl FnMut(&Frame) -> Option<String>) -> PickupRead {
         if frame.dimensions() != self.size {
             *self = Self { size: frame.dimensions(), ..Self::default() };
         }
@@ -60,17 +84,17 @@ impl PickupReader {
             let picture = look::line_picture(frame, layout, slot, OCR_ZOOM)?;
             parse::parse(&text(&picture)?)
         };
-        let Some(mut layout) = self.layout.or_else(|| look::locate(frame)) else {
+        let Some(mut layout) = self.layout.filter(|l| l.full == full).or_else(|| look::locate(frame, full)) else {
             return PickupRead::default();
         };
-        // Found while its bottom row was empty: the bottom is lower than it seemed.
-        if look::line_below(frame, &layout) {
-            layout = layout.lower();
-            self.follower.reset();
-            self.unconfirmed_since.get_or_insert(at);
-        }
         if self.layout.is_none() {
             self.unconfirmed_since = Some(at);
+        }
+        // Found while its bottom row was empty: the bottom is lower than it seemed. Only asked
+        // before a row has read as a log line: after that the place is known, and a light world
+        // below the log (a pale stone wall) must not move it.
+        if self.unconfirmed_since.is_some() && look::line_below(frame, &layout) {
+            layout = layout.lower();
         }
         self.layout = Some(layout);
         let rows = look::rows(frame, &layout);
@@ -82,8 +106,13 @@ impl PickupReader {
             if brightest.is_some_and(|(_, slot)| read_slot(&layout, slot).is_some()) {
                 self.unconfirmed_since = None;
                 self.follower.reset();
-                self.follower.push(at, rows, |_| None);
-                return PickupRead { arrivals: Vec::new(), layout: Some(layout) };
+                // Lines older than the ones that arrived just now came before: they start the
+                // stack, moved back down to where they were, and the new ones are counted.
+                let new = rows.iter().take_while(|r| r.as_ref().is_some_and(|r| r.brightness >= JUST_ARRIVED)).count();
+                let before: Rows = rows.iter().skip(new).cloned().chain(std::iter::repeat_n(None, new)).collect();
+                self.follower.push(at - JUST_BEFORE, before, |_| None);
+                let arrivals = self.follower.push(at, rows, |slot| read_slot(&layout, slot));
+                return PickupRead { arrivals, layout: Some(layout) };
             }
             if at - since >= UNCONFIRMED_FOR {
                 self.layout = None;
@@ -143,11 +172,12 @@ mod tests {
         let mut arrived = Vec::new();
         let mut step = |reader: &mut PickupReader, lines: &[(u32, f32)]| {
             at += 0.25;
-            arrived.extend(reader.read_with(at, &picture(lines), text_by_width).arrivals);
+            arrived.extend(reader.read_with(at, &picture(lines), look::FULL, text_by_width).arrivals);
         };
-        step(&mut reader, &[(1, 1.0)]);
-        step(&mut reader, &[(1, 0.95)]);
-        step(&mut reader, &[(2, 1.0), (1, 0.9)]);
+        // Line 1 is already fading when the log is first seen: it came before.
+        step(&mut reader, &[(1, 0.9)]);
+        step(&mut reader, &[(1, 0.88)]);
+        step(&mut reader, &[(2, 1.0), (1, 0.86)]);
         for k in 0..6 {
             step(&mut reader, &[(2, 0.95 - k as f32 * 0.05), (1, 0.85 - k as f32 * 0.05)]);
         }
@@ -158,10 +188,17 @@ mod tests {
     }
 
     #[test]
+    fn a_line_that_had_only_just_arrived_when_the_log_was_found_counts() {
+        let mut reader = PickupReader::default();
+        let read = reader.read_with(0.25, &picture(&[(2, 1.0), (1, 0.6)]), look::FULL, text_by_width);
+        assert_eq!(read.arrivals.len() + reader.finish().len(), 1, "line 2 just came; line 1 was there before");
+    }
+
+    #[test]
     fn a_log_that_never_reads_as_one_counts_nothing() {
         let mut reader = PickupReader::default();
         for k in 0..20 {
-            let read = reader.read_with(k as f64 * 0.25, &picture(&[(k % 3 + 1, 1.0)]), |_| Some("Swiftleaf: hi".into()));
+            let read = reader.read_with(k as f64 * 0.25, &picture(&[(k % 3 + 1, 1.0)]), look::FULL, |_| Some("Swiftleaf: hi".into()));
             assert!(read.arrivals.is_empty());
         }
     }

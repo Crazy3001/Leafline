@@ -26,6 +26,17 @@ fn main() {
     let show_rows = args.iter().any(|a| a == "--rows");
     let ocr = Ocr::new().expect("OCR engine");
     let mut reader = PickupReader::default();
+    // `--items <map data file>` names items as Leafline would, from a copy of its map data.
+    let catalog = value("--items").map(|path| {
+        let data = leafline_lib::mapdata::store::Store::open(std::path::Path::new(&path)).expect("open map data").load().expect("load").expect("downloaded");
+        leafline_lib::build::catalog::Catalog::new(Vec::new(), data.items)
+    });
+    let named = |gain: &leafline_lib::readers::pickup::Gain| match (gain, catalog.as_ref()) {
+        (leafline_lib::readers::pickup::Gain::Item { name, tab, cut_short, .. }, Some(catalog)) => {
+            format!("  -> {:?}", leafline_lib::mapdata::loot::name_item(catalog, name, *tab, *cut_short).map(|i| i.name.clone()))
+        }
+        _ => String::new(),
+    };
     let prefix = value("--prefix").unwrap_or_default();
     for path in pictures(&folder, &prefix).into_iter().step_by(every) {
         let at = millis(&path) as f64 / 1000.0;
@@ -35,7 +46,12 @@ fn main() {
         {
             frame = placed(&frame, w, h);
         }
-        let read = reader.read(at, &frame, &ocr);
+        // `--ui-scale 1.875` for a recording at UI Size Default Ratio at 1440p.
+        let ui_scale: Option<f32> = value("--ui-scale").map(|v| v.parse().expect("--ui-scale n"));
+        let read = reader.read(at, &frame, ui_scale, &ocr);
+        if let Some(view) = leafline_lib::readers::pickup::view(&frame, ui_scale) {
+            frame = view;
+        }
         if args.iter().any(|a| a == "--layout") {
             println!("{at:7.3}  layout {:?}", read.layout);
         }
@@ -61,11 +77,13 @@ fn main() {
             }
         }
         for arrival in read.arrivals {
-            println!("{:7.3}  + {:?}", arrival.at, arrival.line);
+            let to = arrival.line.as_ref().map(|l| named(&l.gain)).unwrap_or_default();
+            println!("{:7.3}  + {:?}{to}", arrival.at, arrival.line);
         }
     }
     for arrival in reader.finish() {
-        println!("{:7.3}  + {:?}", arrival.at, arrival.line);
+        let to = arrival.line.as_ref().map(|l| named(&l.gain)).unwrap_or_default();
+        println!("{:7.3}  + {:?}{to}", arrival.at, arrival.line);
     }
 }
 

@@ -53,7 +53,8 @@ impl Parsed {
 static LAST_BRACKET: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[(\[{]([^()\[\]{}]*)[)\]}]?\s*$").unwrap());
 /// An item's quantity, as the last `x<digits>` before `earned`: digits in an item's own name
 /// never count. OCR reads the `x` as `×` or `X`, and a 1 as `l`, `I` or `|`.
-static QUANTITY: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)^(.*?)\s*[x×]\s*([0-9lI|]{1,4})\s*$").unwrap());
+/// The font's `x1` reads as `HI` as often as not.
+static QUANTITY: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)^(.*?)\s*[x×h]\s*([0-9lI|]{1,4})\s*$").unwrap());
 /// A figure whose opening bracket OCR lost: `'+19)`.
 static BARE_FIGURE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\+\s*([0-9OoIl|,.]+)\s*[)\]}]\s*$").unwrap());
 /// A count OCR misread so that it can't be told (`YI` for `x1`): a short last word with no
@@ -153,7 +154,8 @@ fn item(before: &str, inside: &str) -> Option<Parsed> {
     let trimmed = name.trim_end_matches(['.', ',', '·', '…', ':', ';']);
     let cut_short = name.len() - trimmed.len() >= 2 || name.ends_with('…');
     name = trimmed.trim().to_string();
-    if letters(&name).len() < 2 {
+    // The words of another kind of line run into `earned` are no item.
+    if letters(&name).len() < 2 || fixed(&name).is_some() {
         return None;
     }
     Some(Parsed { gain: Gain::Item { name, quantity, tab: tab(inside), cut_short }, sure })
@@ -278,6 +280,13 @@ mod tests {
         assert!(matches!(gain("Red Potion earneq. OJse)"), Some(Gain::Item { ref name, quantity: 1, .. }) if name == "Red Potion"));
         assert!(matches!(gain("Red Potion V.I aqrned. 0.-Jse)"), Some(Gain::Item { ref name, .. }) if name == "Red Potion"));
         assert!(matches!(gain("Red Potion•xl earned. OJse)"), Some(Gain::Item { quantity: 1, .. })));
+    }
+
+    #[test]
+    fn the_fonts_x1_read_as_hi_is_a_count_of_one() {
+        let read = parse("*Battle Bow HI earned. (Equip3").unwrap();
+        assert_eq!(read.gain, Gain::Item { name: "*Battle Bow".into(), quantity: 1, tab: Some(Tab::Equip), cut_short: false });
+        assert!(read.sure);
     }
 
     #[test]

@@ -21,8 +21,12 @@ const PITCH: u32 = 14;
 /// Font pixels from a line's top to below its shadow under a descender.
 const LINE_HEIGHT: u32 = 12;
 /// How much lighter than its shadow a full-brightness ink pixel is (white `f6f6f5` over
-/// black `020201`).
-const FULL: f32 = 244.0;
+/// black `020201`) where the font is drawn pixel for pixel.
+pub const FULL: f32 = 244.0;
+/// The same where the game smooths the font (UI Size Default Ratio) and the picture is redrawn
+/// on the design grid: ink and shadow blur into each other (the recording of 2026-11-15 at
+/// 1.875x: a new line's ink 150 to 155 lighter than its shadow).
+pub const SMOOTHED_FULL: f32 = 155.0;
 /// The least shadow difference that may be ink, before the line's own brightness is known.
 const FAINTEST: i32 = 36;
 /// A row fainter than this is too far gone to compare or read.
@@ -37,7 +41,7 @@ const WIDEST: u32 = 300;
 const WORD_GAP: u32 = 8;
 
 /// Where the log is in a picture of the game window.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Layout {
     /// Window pixels to a font pixel.
     pub scale: u32,
@@ -45,6 +49,8 @@ pub struct Layout {
     pub right: u32,
     /// The top of the bottom row: the top of its capitals and brackets.
     pub bottom: u32,
+    /// How much lighter than its shadow a line at full brightness is here.
+    pub full: f32,
 }
 
 impl Layout {
@@ -88,18 +94,19 @@ fn cell(frame: &Frame, x: u32, y: u32, scale: u32) -> Cell {
 }
 
 /// Finds the log in `frame` from a line at full brightness or near it: its font size, its right
-/// edge and its bottom row. `None` when no such line shows.
-pub fn locate(frame: &Frame) -> Option<Layout> {
+/// edge and its bottom row. `full` is [`FULL`] or [`SMOOTHED_FULL`]. `None` when no such line
+/// shows.
+pub fn locate(frame: &Frame, full: f32) -> Option<Layout> {
     let (width, height) = frame.dimensions();
     (1..=4)
-        .filter_map(|scale| locate_at(frame, scale).map(|(layout, ink)| (ink, layout)))
+        .filter_map(|scale| locate_at(frame, scale, full).map(|(layout, ink)| (ink, layout)))
         .max_by_key(|(ink, _)| *ink)
         .map(|(_, layout)| layout)
         .filter(|layout| layout.right + layout.scale * 40 >= width && layout.bottom < height)
 }
 
 /// The lowest bright line drawn at `scale`, with how much ink it has.
-fn locate_at(frame: &Frame, scale: u32) -> Option<(Layout, usize)> {
+fn locate_at(frame: &Frame, scale: u32, full: f32) -> Option<(Layout, usize)> {
     let (width, height) = frame.dimensions();
     let (left, top) = (width * 11 / 20, height * 9 / 20);
     // Bright ink, row by row: (y, rightmost x, count).
@@ -109,7 +116,11 @@ fn locate_at(frame: &Frame, scale: u32) -> Option<(Layout, usize)> {
         let mut count = 0;
         for x in left..width.saturating_sub(scale) {
             let c = cell(frame, x, y, scale);
-            if c.strength >= 0.75 * FULL && frame.get_pixel(x, y).0[..3].iter().all(|&v| v >= 0xc8) {
+            let [r, g, b, _] = frame.get_pixel(x, y).0;
+            // White ink, or yellow (a partymate's share and the party bonus, `fefb25` or so).
+            // Smoothed (Default Ratio), a bright line is light grey on dark grey.
+            let lit = r >= 0xb0 && g >= 0xb0 && (b >= 0xb0 || c.colour == Colour::Yellow);
+            if c.strength >= 0.75 * full && lit {
                 count += 1;
                 right = Some(x);
             }
@@ -136,7 +147,7 @@ fn locate_at(frame: &Frame, scale: u32) -> Option<(Layout, usize)> {
             let tall = bottom - top + 1;
             tall >= 8 * scale && tall <= 12 * scale && *ink >= MIN_INK * (scale * scale) as usize
         })
-        .map(|(top, _, right, ink)| (Layout { scale, right: right + 1, bottom: top }, ink))
+        .map(|(top, _, right, ink)| (Layout { scale, right: right + 1, bottom: top, full }, ink))
 }
 
 /// The cells of the row at `top`, `columns` font pixels leftwards from `right`, row by row:
@@ -155,21 +166,20 @@ fn grid(frame: &Frame, layout: &Layout, top: u32, columns: u32) -> Vec<Vec<Cell>
         .collect()
 }
 
-/// How bright a row's ink is against a line at full brightness: the strength most of its ink
-/// reaches, as one cell's own world can make it a little more or less.
-fn brightness(cells: &[Vec<Cell>]) -> Option<f32> {
+/// The strength most of a row's ink reaches, as one cell's own world can make it a little more
+/// or less.
+fn strength_of(cells: &[Vec<Cell>]) -> Option<f32> {
     let mut strengths: Vec<f32> = cells.iter().flatten().map(|c| c.strength).filter(|&s| s > 0.0).collect();
     if strengths.len() < MIN_INK {
         return None;
     }
     strengths.sort_by(f32::total_cmp);
-    Some(strengths[strengths.len() * 4 / 5] / FULL)
+    Some(strengths[strengths.len() * 4 / 5])
 }
 
-/// The colour most of a row's ink is.
-fn colour_of(cells: &[Vec<Cell>]) -> Colour {
-    let count = |colour| cells.iter().flatten().filter(|c| c.colour == colour).count();
-    if count(Colour::Yellow) > count(Colour::White) * 2 { Colour::Yellow } else { Colour::White }
+/// How bright a row's ink is against a line at full brightness in this layout.
+fn brightness(cells: &[Vec<Cell>], layout: &Layout) -> Option<f32> {
+    Some(strength_of(cells)? / layout.full)
 }
 
 /// The log's rows in `frame`, bottom first: `None` where no line shows, or one too faint to
@@ -181,11 +191,11 @@ pub fn rows(frame: &Frame, layout: &Layout) -> Rows {
 fn row(frame: &Frame, layout: &Layout, slot: usize) -> Option<Row> {
     let top = layout.top(slot)?;
     let cells = grid(frame, layout, top, SHAPE_WIDTH as u32);
-    let brightness = brightness(&cells)?;
+    let brightness = brightness(&cells, layout)?;
     if brightness < MIN_BRIGHTNESS {
         return None;
     }
-    let ink = |c: &Cell| c.strength >= 0.5 * brightness * FULL;
+    let ink = |c: &Cell| c.strength >= 0.5 * brightness * layout.full;
     // Every line ends with its closing bracket at the log's right edge.
     let rightmost = (0..SHAPE_WIDTH).find(|&i| cells.iter().any(|row| ink(&row[i])))?;
     if rightmost > 1 {
@@ -221,8 +231,8 @@ pub fn line_below(frame: &Frame, layout: &Layout) -> bool {
 pub fn line_picture(frame: &Frame, layout: &Layout, slot: usize, zoom: u32) -> Option<Frame> {
     let top = layout.top(slot)?;
     let cells = grid(frame, layout, top, WIDEST);
-    let brightness = brightness(&cells)?;
-    let threshold = 0.5 * brightness * FULL;
+    let brightness = brightness(&cells, layout)?;
+    let threshold = 0.5 * brightness * layout.full;
     let mut ink: Vec<Vec<bool>> = cells.iter().map(|row| row.iter().map(|c| c.strength >= threshold).collect()).collect();
     // Where the line starts: the last ink before a gap wider than words have.
     let columns = ink[0].len();
@@ -241,24 +251,59 @@ pub fn line_picture(frame: &Frame, layout: &Layout, slot: usize, zoom: u32) -> O
         }
     }
     let s = layout.scale;
-    let light = brightness * 246.0 * 0.8;
-    let lit = |i: usize, j: usize| {
-        let Some(x) = layout.right.checked_sub((i as u32 + 1) * s) else { return false };
+    let pixel = |i: usize, j: usize| {
+        let x = layout.right.checked_sub((i as u32 + 1) * s)?;
         let y = top + j as u32 * s;
-        x < frame.width() && y < frame.height() && {
-            let px = frame.get_pixel(x, y);
-            px.0[..2].iter().all(|&v| f32::from(v) >= light) && match colour_of(&cells) {
-                Colour::Yellow => true,
-                _ => crate::vision::preprocess::saturation(px) <= 24,
+        (x < frame.width() && y < frame.height()).then(|| frame.get_pixel(x, y).0)
+    };
+    // The line's ink colour: every ink pixel of a line drawn at full brightness is close to the
+    // same colour, where a light world behind it varies.
+    let ink_colour: Option<[u8; 3]> = {
+        let mut channels: [Vec<u8>; 3] = Default::default();
+        for (j, row) in ink.iter().enumerate() {
+            for (i, &on) in row.iter().enumerate().take(start + 1) {
+                if let (true, Some(px)) = (on, pixel(i, j)) {
+                    (0..3).for_each(|c| channels[c].push(px[c]));
+                }
             }
         }
+        channels.iter_mut().for_each(|c| c.sort_unstable());
+        (channels[0].len() >= MIN_INK && brightness >= 0.9).then(|| [0, 1, 2].map(|c| channels[c][channels[c].len() / 2]))
+    };
+    // Exactly the ink's colour: tells ink from a light world at full brightness.
+    let exact = |i: usize, j: usize| match (ink_colour, pixel(i, j)) {
+        // Yellow ink varies by ten levels or so from pixel to pixel; white by one or two.
+        (Some(colour), Some(px)) => (0..3).all(|c| px[c].abs_diff(colour[c]) <= 12),
+        _ => false,
+    };
+    // As light as the ink and about as grey: the only test left once a line has faded a little.
+    let light = brightness * 246.0 * 0.8;
+    let yellow = cells.iter().flatten().filter(|c| c.colour == Colour::Yellow).count()
+        > 2 * cells.iter().flatten().filter(|c| c.colour == Colour::White).count();
+    let pale = |i: usize, j: usize| {
+        pixel(i, j).is_some_and(|px| {
+            px[..2].iter().all(|&v| f32::from(v) >= light) && (yellow || px.iter().max().unwrap() - px.iter().min().unwrap() <= 24)
+        })
     };
     // A font pixel fails the shadow test only where the one its shadow falls on, down and to the
-    // right, is ink too. Going up from the bottom row, such a pixel as light as the ink is ink,
-    // so a stroke running down to the right comes back whole and nothing else is added.
+    // right, is ink too. Going up from the bottom row, such a pixel that looks like the ink is
+    // ink, so a stroke running down to the right comes back whole. Over a world as light as the
+    // ink (a pale stone wall, clouds) that would fill in the letters, so a test counts only
+    // where few other pixels that aren't ink pass it nearby.
+    let passing = |test: &dyn Fn(usize, usize) -> bool| -> Vec<Vec<bool>> {
+        (0..LINE_HEIGHT as usize).map(|j| (0..=start).map(|i| !ink[j][i] && test(i, j)).collect()).collect()
+    };
+    let (exact_cells, pale_cells) = (passing(&exact), passing(&pale));
+    let alone = |cells: &[Vec<bool>], i: usize, j: usize| {
+        let near = (j.saturating_sub(2)..(j + 3).min(LINE_HEIGHT as usize))
+            .flat_map(|y| (i.saturating_sub(2)..(i + 3).min(start + 1)).map(move |x| (x, y)))
+            .filter(|&(x, y)| (x, y) != (i, j) && cells[y][x])
+            .count();
+        cells[j][i] && near <= 2
+    };
     for j in (0..LINE_HEIGHT as usize - 1).rev() {
         for i in 1..=start {
-            if !ink[j][i] && ink[j + 1][i - 1] && lit(i, j) {
+            if !ink[j][i] && ink[j + 1][i - 1] && (alone(&exact_cells, i, j) || alone(&pale_cells, i, j)) {
                 ink[j][i] = true;
             }
         }
@@ -340,13 +385,13 @@ pub(super) mod tests {
         let mut frame = world(800, 450);
         draw(&mut frame, &glyphs(1, 120), 790, 380, 2, 1.0, [246, 246, 245]);
         draw(&mut frame, &glyphs(2, 90), 790, 352, 2, 0.6, [246, 246, 245]);
-        let layout = locate(&frame).expect("found");
-        assert_eq!(layout, Layout { scale: 2, right: 790, bottom: 380 });
+        let layout = locate(&frame, FULL).expect("found");
+        assert_eq!((layout.scale, layout.right, layout.bottom), (2, 790, 380));
     }
 
     #[test]
     fn finds_nothing_in_a_world_without_a_log() {
-        assert_eq!(locate(&world(800, 450)), None);
+        assert_eq!(locate(&world(800, 450), FULL), None);
     }
 
     #[test]
@@ -355,7 +400,7 @@ pub(super) mod tests {
         draw(&mut frame, &glyphs(1, 120), 790, 380, 2, 1.0, [246, 246, 245]);
         draw(&mut frame, &glyphs(2, 90), 790, 352, 2, 0.6, [246, 246, 245]);
         draw(&mut frame, &glyphs(3, 100), 790, 324, 2, 0.15, [246, 246, 245]);
-        let rows = rows(&frame, &Layout { scale: 2, right: 790, bottom: 380 });
+        let rows = rows(&frame, &Layout { scale: 2, right: 790, bottom: 380, full: FULL });
         assert_eq!(rows.len(), SLOTS);
         let seen: Vec<Option<f32>> = rows.iter().map(|r| r.as_ref().map(|r| (r.brightness * 10.0).round() / 10.0)).collect();
         assert_eq!(seen, vec![Some(1.0), Some(0.6), None, None, None, None, None], "too faint, then empty");
@@ -363,7 +408,7 @@ pub(super) mod tests {
 
     #[test]
     fn a_row_keeps_its_shape_as_it_fades() {
-        let layout = Layout { scale: 2, right: 790, bottom: 380 };
+        let layout = Layout { scale: 2, right: 790, bottom: 380, full: FULL };
         let mut bright = world(800, 450);
         draw(&mut bright, &glyphs(4, 100), 790, 380, 2, 1.0, [246, 246, 245]);
         let mut faded = world(800, 450);
@@ -377,7 +422,7 @@ pub(super) mod tests {
 
     #[test]
     fn yellow_lines_are_told_from_white() {
-        let layout = Layout { scale: 2, right: 790, bottom: 380 };
+        let layout = Layout { scale: 2, right: 790, bottom: 380, full: FULL };
         let mut frame = world(800, 450);
         draw(&mut frame, &glyphs(6, 100), 790, 380, 2, 1.0, [255, 255, 0]);
         draw(&mut frame, &glyphs(7, 100), 790, 352, 2, 1.0, [246, 246, 245]);
@@ -388,7 +433,7 @@ pub(super) mod tests {
 
     #[test]
     fn text_not_ending_at_the_logs_edge_is_no_row() {
-        let layout = Layout { scale: 2, right: 790, bottom: 380 };
+        let layout = Layout { scale: 2, right: 790, bottom: 380, full: FULL };
         let mut frame = world(800, 450);
         draw(&mut frame, &glyphs(8, 100), 760, 380, 2, 1.0, [246, 246, 245]);
         assert_eq!(rows(&frame, &layout)[0], None);
@@ -396,7 +441,7 @@ pub(super) mod tests {
 
     #[test]
     fn the_picture_for_ocr_is_the_whole_line_in_black_on_white() {
-        let layout = Layout { scale: 2, right: 790, bottom: 380 };
+        let layout = Layout { scale: 2, right: 790, bottom: 380, full: FULL };
         let mut frame = world(800, 450);
         let glyphs = glyphs(9, 150);
         draw(&mut frame, &glyphs, 790, 380, 2, 1.0, [246, 246, 245]);

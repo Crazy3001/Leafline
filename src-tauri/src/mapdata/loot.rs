@@ -4,7 +4,9 @@
 //! letter now and then, so a name is matched to the closest in the data, but only when it is
 //! clearly closer to that item than to any other of the tab's: a name that could be two items is
 //! left unnamed, and an unnamed item is never tallied. A long name the game cut short with `...`
-//! is matched by its start.
+//! is matched by its start. Lines are right-aligned, so when the world behind spoils part of a
+//! name it is often the start that goes: a name is also matched by its end, when only one item
+//! of the tab ends that way.
 
 use super::bag;
 use super::drops::item_key;
@@ -18,6 +20,10 @@ const LIKE: f64 = 0.8;
 const LEAD: f64 = 0.08;
 /// A cut-short name shorter than this, in letters, says too little.
 const SHORTEST_START: usize = 8;
+/// The fewest letters a name's end must have to be matched alone.
+const SHORTEST_END: usize = 7;
+/// The least likeness, 0 to 1, of a name's end to an item's.
+const END_LIKE: f64 = 0.85;
 
 /// The item a name read off the Pickup Log is. `tab` narrows it when it was read.
 pub fn name_item<'a>(catalog: &'a Catalog, read: &str, tab: Option<Tab>, cut_short: bool) -> Option<&'a ItemRecord> {
@@ -37,7 +43,39 @@ pub fn name_item<'a>(catalog: &'a Catalog, read: &str, tab: Option<Tab>, cut_sho
     if cut_short {
         return by_start(&candidates, &key);
     }
-    closest(&candidates, &key)
+    if let Some(item) = closest(&candidates, &key) {
+        return Some(item);
+    }
+    // A whole name close to the read, but no clear winner, is a doubt: the end can't settle it.
+    let any_close = candidates.iter().any(|i| strsim::normalized_levenshtein(&item_key(&i.name), &key) >= LIKE);
+    if any_close {
+        return None;
+    }
+    // The whole read, then with its first words dropped: junk read before a name (`rulus•hroom
+    // Soore`) spoils a match on the whole.
+    let words: Vec<&str> = key.split(' ').collect();
+    (0..words.len()).find_map(|skip| by_end(&candidates, &words[skip..].join(" ")))
+}
+
+/// The one name in `items` that ends with `end`, a letter or so off: a name whose start the
+/// world behind it spoiled (`#qle Crow` for `Eagle Crow`).
+fn by_end<'a>(items: &[&'a ItemRecord], end: &str) -> Option<&'a ItemRecord> {
+    if end.chars().filter(char::is_ascii_alphabetic).count() < SHORTEST_END {
+        return None;
+    }
+    let mut scored: Vec<(f64, &ItemRecord)> = items
+        .iter()
+        .filter_map(|item| {
+            let name = item_key(&item.name);
+            // The part of the name as long as what was read, from its end.
+            let tail = name.get(name.len().checked_sub(end.len())?..)?;
+            Some((strsim::normalized_levenshtein(tail, end), *item))
+        })
+        .collect();
+    scored.sort_by(|a, b| b.0.total_cmp(&a.0));
+    let (best, item) = *scored.first()?;
+    let runner_up = scored.iter().find(|(_, other)| other.name != item.name).map_or(0.0, |(score, _)| *score);
+    (best >= END_LIKE && best - runner_up >= LEAD).then_some(item)
 }
 
 /// The one name in `items` that starts with `start`, a letter or so off. Items that share the
@@ -100,6 +138,10 @@ mod tests {
                 of(8, "Scroll for Two-Handed Axe for ATT", ItemKind::Scroll),
                 of(9, "Leaf", ItemKind::Use),
                 of(10, "Pig's Ribbon", ItemKind::Etc),
+                of(12, "Eagle Crow", ItemKind::Equip),
+                of(13, "Brown Loosecap", ItemKind::Equip),
+                of(14, "Black Loosecap", ItemKind::Equip),
+                of(15, "Black Split Pants", ItemKind::Equip),
                 of(11, "Pig's Ribbons", ItemKind::Etc),
             ],
         )
@@ -127,6 +169,22 @@ mod tests {
         assert_eq!(named("Bed Snail Shell", Some(Tab::Etc), false), Some(3), "far nearer Red than Blue");
         assert_eq!(named("Pig's Ribbonz", Some(Tab::Etc), false), None, "a letter from each of two names");
         assert_eq!(named("Mushroom Cap", Some(Tab::Etc), false), None, "not in the data");
+    }
+
+    #[test]
+    fn a_name_whose_start_was_spoiled_is_matched_by_its_end() {
+        assert_eq!(named("#qle Crow", Some(Tab::Equip), false), Some(12), "seen on a pale wall");
+        assert_eq!(named("Ellack..,.SpIit Pants", Some(Tab::Equip), false), Some(15));
+        assert_eq!(named("Loosecap", Some(Tab::Equip), false), None, "Brown or Black");
+        assert_eq!(named("ow Crow", Some(Tab::Equip), false), None, "too little left");
+    }
+
+    #[test]
+    fn junk_read_before_a_name_is_dropped_word_by_word() {
+        assert_eq!(named("zq Blue Snail Shel", Some(Tab::Etc), false), Some(2));
+        assert_eq!(named("rulus Brown Loosecap", Some(Tab::Equip), false), Some(13));
+        assert_eq!(named("arowo Loosecap", Some(Tab::Equip), false), Some(13), "arowo is two letters from Brown");
+        assert_eq!(named("zz Loosecap", Some(Tab::Equip), false), None, "Loosecap alone is Brown or Black");
     }
 
     #[test]

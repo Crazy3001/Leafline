@@ -554,6 +554,9 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
     let mut twin = None;
     let mut held = false;
     let mut pickups = PickupReader::default();
+    // The scale the game draws its interface at, from the last HUD read: the Pickup Log is
+    // redrawn on the design grid when it isn't the one its font is read at.
+    let mut ui_scale: Option<f32> = None;
     let mut game: Option<(Capturer, GameWindow, bool)> = None;
     // Windows can stop delivering pictures to a capture that was open while the window was
     // minimised, so the status would stay "minimised" after the game came back. A fresh capture
@@ -714,8 +717,11 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
                     }
                     tracker.push(&sample);
                 }
+                if let Some(layout) = &analysis.hud_layout {
+                    ui_scale = Some(crate::readers::ui::hud_scale(&frame, layout));
+                }
                 if choice.pickup_log {
-                    read_pickups(app, &mut pickups, &mut tracker, &frame, &ocr);
+                    read_pickups(app, &mut pickups, &mut tracker, &frame, ui_scale, &ocr);
                 }
                 let session = tracker.summary();
                 if !held {
@@ -767,7 +773,7 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
         match game.as_mut() {
             Some((capturer, _, _)) if choice.pickup_log => {
                 let mut look = |frame: &Frame| {
-                    if read_pickups(app, &mut pickups, &mut tracker, frame, &ocr) {
+                    if read_pickups(app, &mut pickups, &mut tracker, frame, ui_scale, &ocr) {
                         readings::publish_session(app, &tracker.summary());
                     }
                 };
@@ -787,8 +793,15 @@ fn choice_pause_after(app: &AppHandle) -> f64 {
 
 /// Reads the Pickup Log in `frame` into the session: each line once, items named from the item
 /// data. Returns whether anything arrived.
-fn read_pickups(app: &AppHandle, reader: &mut PickupReader, tracker: &mut SessionTracker, frame: &Frame, ocr: &Ocr) -> bool {
-    let read = reader.read(unix_seconds(SystemTime::now()), frame, ocr);
+fn read_pickups(
+    app: &AppHandle,
+    reader: &mut PickupReader,
+    tracker: &mut SessionTracker,
+    frame: &Frame,
+    ui_scale: Option<f32>,
+    ocr: &Ocr,
+) -> bool {
+    let read = reader.read(unix_seconds(SystemTime::now()), frame, ui_scale, ocr);
     if read.layout.is_some() {
         tracker.watching_loot();
     }
