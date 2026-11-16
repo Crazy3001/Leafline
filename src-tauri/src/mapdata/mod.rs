@@ -21,6 +21,7 @@ pub mod osms;
 pub mod pictures;
 pub mod places;
 pub mod questbook;
+pub mod questlog;
 pub mod shops;
 pub mod store;
 pub mod training;

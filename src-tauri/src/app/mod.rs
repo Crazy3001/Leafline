@@ -14,6 +14,7 @@ mod nav;
 mod overlay;
 mod pictures;
 mod pins;
+mod questlog;
 mod readings;
 mod recovery;
 mod records;
@@ -237,6 +238,9 @@ pub fn run() {
             mapdata::item_origin,
             mapdata::search_quests,
             mapdata::quest_regions,
+            questlog::quest_log,
+            questlog::forget_quest_log,
+            questlog::quest_region_totals,
             mapdata::quest_sheet,
             mapdata::show_quest,
             mapdata::search_monsters,

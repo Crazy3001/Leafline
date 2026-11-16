@@ -85,6 +85,8 @@ import type {
   Trip,
   TripMessage,
   PlaceLink,
+  QuestLog,
+  RegionTotal,
   QuestPage,
   QuestQuery,
   QuestSearch,
@@ -200,6 +202,13 @@ export interface Backend {
   /** One page of the quest search. */
   searchQuests(search: QuestSearch): Promise<QuestPage>;
   questRegions(): Promise<string[]>;
+  /** A character's quest log as the game's Quest window last showed it, or the last one read's. */
+  questLog(name: string | null): Promise<QuestLog>;
+  forgetQuestLog(name: string): Promise<void>;
+  /** How many quests the data files under each region. */
+  questRegionTotals(): Promise<RegionTotal[]>;
+  /** A character's quest log changed; with their name. */
+  onQuestLog(handler: (name: string) => void): Promise<UnlistenFn>;
   /** All the data says about a quest. */
   questSheet(id: number, mapName: string | null, mapStreet: string | null, mapTwin: number | null): Promise<QuestWhere | null>;
   /** Brings a quest up in the Quests tab from any window. */
@@ -503,6 +512,10 @@ const tauriBackend: Backend = {
     invoke("check_estimates", { measured, level, assumptions, character, skill }),
   searchQuests: (search) => invoke("search_quests", { search }),
   questRegions: () => invoke("quest_regions"),
+  questLog: (name) => invoke("quest_log", { name }),
+  forgetQuestLog: (name) => invoke("forget_quest_log", { name }),
+  questRegionTotals: () => invoke("quest_region_totals"),
+  onQuestLog: (handler) => listen<string>("quest-log", (e) => handler(e.payload)),
   questSheet: (id, mapName, mapStreet, mapTwin) => invoke("quest_sheet", { id, mapName, mapStreet, mapTwin }),
   showQuest: (id) => invoke("show_quest", { id }),
   onShowQuest: (handler) => listen<number>("show-quest", (e) => handler(e.payload)),

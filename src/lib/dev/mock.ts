@@ -46,6 +46,7 @@ import type {
   DeskStatus,
   Trip,
   TripMessage,
+  QuestLog,
   QuestRow,
   SessionSummary,
 } from "../types";
@@ -351,6 +352,57 @@ const mockQuests: QuestRow[] = [
   { id: 91, name: "Finding the Instructor", region: "Mossbank", levelMin: 30, giver: "Warden Ilse", repeat: null, exp: 0, mesos: 0 },
 ];
 const characterHandlers: ((read: CharacterRead) => void)[] = [];
+
+/** A made-up quest log, as if the Quest window had been looked through an hour ago. */
+const hourAgo = () => Math.floor(Date.now() / 1000) - 3600;
+const loggedQuest = (q: Partial<QuestLog["quests"][number]> & { title: string }): QuestLog["quests"][number] => ({
+  key: q.questId != null ? `#${q.questId}` : `t:${q.title.toLowerCase()}`,
+  cut: false,
+  questId: null,
+  region: null,
+  state: "none",
+  stateSeenAt: hourAgo(),
+  done: false,
+  doneOn: null,
+  doneSeenAt: null,
+  onHelper: null,
+  icon: null,
+  level: null,
+  counters: [],
+  talkTo: null,
+  rewards: [],
+  rewardExp: null,
+  rewardMesos: null,
+  detailSeenAt: null,
+  ...q,
+});
+const mockQuestLog = (): QuestLog => ({
+  character: "Mossbank",
+  looks: [
+    { tab: "inProgress", seenAt: hourAgo(), wholeAt: hourAgo() },
+    { tab: "completed", seenAt: hourAgo(), wholeAt: null },
+  ],
+  quests: [
+    loggedQuest({ title: "Shell Sorting", questId: 70, region: "Mossbank", done: true, doneOn: "2026-10-25", doneSeenAt: hourAgo() }),
+    loggedQuest({
+      title: "Slime Samples",
+      questId: 71,
+      region: "Fern Isle",
+      state: "inProgress",
+      icon: "ring",
+      level: 2,
+      counters: [{ name: "Moss Slime", have: 5, need: 5 }],
+      rewards: [{ name: "Berry Tonic", count: 5 }],
+      detailSeenAt: hourAgo(),
+    }),
+    loggedQuest({ title: "Finding the Instructor", questId: 91, region: "Mossbank", state: "available" }),
+    loggedQuest({ title: "A Lantern for the Ferry", region: "Fern Isle", state: "inProgress", icon: "arrow" }),
+  ],
+  regions: [
+    { tab: "completed", region: "Mossbank", count: 1, seenAt: hourAgo() },
+    { tab: "inProgress", region: "Fern Isle", count: 2, seenAt: hourAgo() },
+  ],
+});
 
 /** Made-up builds kept in this browser tab. */
 let mockBuilds: (Build & { usedAt: number })[] = [
@@ -1068,11 +1120,19 @@ export const mockBackend: Backend = {
       (q) =>
         q.name.toLowerCase().includes(search.text.toLowerCase()) &&
         (!search.region || q.region === search.region) &&
-        (search.atLevel == null || (q.levelMin ?? 0) <= search.atLevel),
+        (search.atLevel == null || (q.levelMin ?? 0) <= search.atLevel) &&
+        !(search.hideDone && !q.repeat && search.done?.includes(q.id)),
     );
     return { quests, total: quests.length };
   },
   questRegions: async () => ["Fern Isle", "Mossbank"],
+  questLog: async () => mockQuestLog(),
+  forgetQuestLog: async () => {},
+  questRegionTotals: async () => [
+    { region: "Fern Isle", quests: 1 },
+    { region: "Mossbank", quests: 3 },
+  ],
+  onQuestLog: async () => () => {},
   async questSheet(id) {
     const row = mockQuests.find((q) => q.id === id);
     if (!row) return null;

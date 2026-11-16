@@ -1,6 +1,7 @@
 <script lang="ts">
   // A coloured name that opens its card: an item, monster, NPC, map or quest. The colour says
-  // which, and a small picture sits before it when there is one.
+  // which, and a small picture sits before it when there is one. A quest also carries where it
+  // stands in the character's quest log, when the log has seen it.
   import type { Snippet } from "svelte";
 
   import { tip, type Tip } from "$lib/tip.svelte";
@@ -8,6 +9,7 @@
   import { openPeek, type PeekKind } from "$lib/peek.svelte";
   import { splitMapLabel } from "$lib/format";
   import Pic from "$lib/ui/Pic.svelte";
+  import QuestMark from "./quest/QuestMark.svelte";
   import type { PictureKind } from "$lib/pictures";
 
   let {
@@ -46,4 +48,4 @@
     e.stopPropagation();
     openPeek({ kind, id, name }, e.currentTarget);
   }}
->{#if picture}<Pic kind={picture} {id} name={pictureName} size={kind === "map" ? 14 : 18} class="ref-pic" />{/if}{#if children}{@render children()}{:else}{name}{/if}</button>
+>{#if picture}<Pic kind={picture} {id} name={pictureName} size={kind === "map" ? 14 : 18} class="ref-pic" />{/if}{#if children}{@render children()}{:else}{name}{/if}{#if kind === "quest" && id != null}<QuestMark {id} />{/if}</button>

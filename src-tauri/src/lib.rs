@@ -10,6 +10,7 @@ pub mod error;
 pub mod loot;
 pub mod mapdata;
 pub mod pipeline;
+pub mod questlog;
 pub mod readers;
 pub mod replay;
 pub mod session;

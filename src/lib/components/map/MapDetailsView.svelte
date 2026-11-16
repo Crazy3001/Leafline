@@ -3,6 +3,7 @@
   // portals lead, its monsters, drops, quests, NPCs and shops.
   import { tip } from "$lib/tip.svelte";
   import Ref from "$lib/components/Ref.svelte";
+  import { notDone, questCount, watchQuestLog } from "$lib/questlog.svelte";
   import { Skull } from "@lucide/svelte";
 
   import { backend } from "$lib/api";
@@ -35,6 +36,7 @@
 
   const compact = $derived(variant !== "full");
   const glance = $derived(variant === "glance");
+  watchQuestLog();
   /** The player's map, while they look at another. */
   const away = $derived(current && current.id !== details.map.id ? current : null);
   const placed = $derived(details.exits.some((e) => e.side));
@@ -219,7 +221,11 @@
 {/if}
 
 {#if details.quests.length}
+  {@const left = notDone(details.quests.map((need) => need.quest.id))}
   <Section title="Quests hunting here" count={details.quests.length} open={!compact && details.quests.length <= 4}>
+    {#if left != null}
+      <p class="undone">{left === 0 ? "Your quest log shows them all done." : `${left} not done, going by your quest log.`}</p>
+    {/if}
     <ul class="quests">
       {#each details.quests as need (need.quest.id)}
         <li>
@@ -245,7 +251,7 @@
           <Ref kind="npc" id={npc.id} name={npc.name} />
           {#if npc.quests.length}
             <span class="gives" use:tip={npc.quests.map((q) => q.name).join("\n")}>
-              {npc.quests.length} quest{npc.quests.length === 1 ? "" : "s"}
+              {questCount(npc.quests.map((q) => q.id))}
             </span>
           {/if}
         </li>
@@ -415,6 +421,12 @@
   .quest-sub {
     font-size: var(--text-xs);
     color: var(--muted);
+  }
+
+  .undone {
+    margin: 0 0 4px;
+    color: var(--muted);
+    font-size: var(--text-xs);
   }
 
   .giver {

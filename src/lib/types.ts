@@ -1917,9 +1917,77 @@ export interface QuestSearch {
   repeat: string | null;
   /** Only quests a character of this level can start. */
   atLevel: number | null;
-  /** Only quests that need no other quest finished first. */
+  /** Only quests that need no other quest finished first, or none but those in `done`. */
   noPrior?: boolean;
+  /** Quests the character has done, as their quest log last showed it. */
+  done?: number[];
+  /** Leave out the quests in `done`, unless they can be done again. */
+  hideDone?: boolean;
   offset: number;
+}
+
+/** A tab of the game's Quest window. */
+export type QuestTab = "available" | "inProgress" | "completed";
+
+/**
+ * A quest's place in the log as last seen: on the Available or In Progress tab, gone from In
+ * Progress (handed in or dropped), or none of these.
+ */
+export type LogState = "available" | "inProgress" | "gone" | "none";
+
+/** The mark the game draws before a row. A ring stood by a quest whose counter was full. */
+export type RowIcon = "bang" | "arrow" | "ring" | "greyRing" | "unknown";
+
+export interface DetailCounter {
+  name: string;
+  have: number;
+  need: number;
+}
+
+export interface DetailReward {
+  name: string;
+  count: number;
+}
+
+/** What Leafline knows of one quest in a character's log, as the Quest window last showed it. */
+export interface LoggedQuest {
+  key: string;
+  title: string;
+  /** The game cut the title short and the data has no quest it fits. */
+  cut: boolean;
+  questId: number | null;
+  region: string | null;
+  state: LogState;
+  /** Unix seconds. */
+  stateSeenAt: number | null;
+  done: boolean;
+  /** `2026-10-25`, from the detail pane. */
+  doneOn: string | null;
+  doneSeenAt: number | null;
+  onHelper: boolean | null;
+  icon: RowIcon | null;
+  /** From the detail pane, when it was open on this quest. */
+  level: number | null;
+  counters: DetailCounter[];
+  talkTo: string | null;
+  rewards: DetailReward[];
+  rewardExp: number | null;
+  rewardMesos: number | null;
+  detailSeenAt: number | null;
+}
+
+export interface QuestLog {
+  character: string | null;
+  /** When each tab was last looked at, and last looked through from top to end. */
+  looks: { tab: QuestTab; seenAt: number; wholeAt: number | null }[];
+  quests: LoggedQuest[];
+  /** The region bars' counts as each tab last showed them. */
+  regions: { tab: QuestTab; region: string; count: number; seenAt: number }[];
+}
+
+export interface RegionTotal {
+  region: string;
+  quests: number;
 }
 
 export interface QuestRow {

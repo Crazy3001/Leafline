@@ -4,7 +4,7 @@
 //!
 //! Item tooltips are not part of this. An item check is one picture on the player's hotkey. The
 //! character's stat and skill windows are read from these same pictures while they are open, and
-//! from one picture on a hotkey otherwise.
+//! from one picture on a hotkey otherwise. So is the Quest window, only while it is open.
 
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -20,6 +20,7 @@ use super::builds;
 use super::fighter;
 use super::report;
 use super::settings::{self, SettingsState};
+use super::questlog::QuestLogFollow;
 use super::{overlay, pins, readings, recovery};
 use crate::capture::{self, Capturer, GameWindow, Grab};
 use crate::build::catalog::Catalog;
@@ -553,6 +554,7 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
     let mut titles = QuestTitles::default();
     let mut names = NameSnap::new(app.state::<UserDataState>().with(|db| db.character_names()).unwrap_or_default());
     let mut windows = Watch::default();
+    let mut quest_log = QuestLogFollow::default();
     let mut estimates = Estimates::default();
     let mut twin = None;
     let mut held = false;
@@ -734,6 +736,7 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
                     last_active = (session.active_seconds, Instant::now());
                 }
                 follow_windows(app, &mut windows, &frame, &analysis, &ocr);
+                quest_log.follow(app, &frame, &analysis, &ocr);
                 readings::publish_live_analysis(app, analysis);
                 readings::publish_session(app, &session);
                 if keeper.due() {
