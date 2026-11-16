@@ -75,6 +75,10 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
 - **Your records are upgraded** the first time 0.4 opens them, so that sessions keep what their
   deaths cost, the potions read from your quick slots and the loot picked up. Sessions saved before keep their deaths
   and get the EXP lost from their maps.
+- **Quest Helper counts read as drawn.** At UI Size Ideal Ratio, each line under a quest's title
+  (`23 / 20 Orange Mushroom Cap`) is now read letter by letter against the game's own lettering,
+  so counts and names come out exactly as shown. Lines over bright clouds are no longer lost.
+  Quest titles, the other UI Sizes and the map name are read as before.
 
 ## 0.3.1 (2026-11-14)
 
