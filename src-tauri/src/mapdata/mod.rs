@@ -14,6 +14,7 @@ pub mod bestiary;
 pub mod combat;
 pub mod drops;
 pub mod layout;
+pub mod loot;
 pub mod fetch;
 pub mod guide;
 pub mod osms;

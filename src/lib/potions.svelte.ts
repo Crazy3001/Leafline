@@ -13,10 +13,16 @@ export const QUICK_SLOTS = ["Shift", "Ins", "Home", "PgUp", "Ctrl", "Del", "End"
 export const MAX_SLOTS = 8;
 
 /**
- * Mesos per hour with the potions' cost taken out. The cost is spread over the whole active
- * time, since potions are drunk while hunting whether or not the mesos were in view.
+ * Mesos per hour, plus what the loot picked up is worth when the Pickup Log was read, with the
+ * potions' cost taken out. The cost is spread over the whole active time, since potions are
+ * drunk while hunting whether or not the mesos were in view.
  */
-export function netMesosPerHour(mesosPerHour: number | null, cost: number, activeSeconds: number): number | null {
-  if (mesosPerHour == null || activeSeconds <= 0) return null;
-  return profitPerHour({ mesosPerHour, potionsPerHour: potionsPerHour(cost, activeSeconds) });
+export function netMesosPerHour(
+  mesosPerHour: number | null,
+  cost: number,
+  activeSeconds: number,
+  lootPerHour: number | null = null,
+): number | null {
+  if ((mesosPerHour == null && lootPerHour == null) || activeSeconds <= 0) return null;
+  return profitPerHour({ mesosPerHour, lootPerHour, potionsPerHour: potionsPerHour(cost, activeSeconds) });
 }

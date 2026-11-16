@@ -17,9 +17,7 @@ sends input, and stays free.
 - Installers signed, so Windows stops warning about them
 
 **Loot and profit**
-- Recording what you pick up automatically, with the count for each session
 - A guess at which monster dropped each item, labelled as confirmed, likely or unknown
-- Loot value at NPC prices, and mesos per hour with loot and potions both counted
 - Drop rates per kill, built from your own kills
 
 **Your characters**

@@ -10,6 +10,7 @@ pub mod map;
 pub mod mesos;
 pub mod npc;
 pub mod party;
+pub mod pickup;
 pub mod quest;
 pub mod quickslot;
 pub mod shop;

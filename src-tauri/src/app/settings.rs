@@ -114,11 +114,13 @@ pub struct LiveChoice {
     pub pause_after: f64,
     /// The window the player picked, for when Leafline can't tell which one is the game.
     pub window: Option<WindowChoice>,
+    /// The Pickup Log is read between readings, for the loot picked up.
+    pub pickup_log: bool,
 }
 
 impl Default for LiveChoice {
     fn default() -> Self {
-        Self { enabled: true, interval: 2.0, pause_after: 15.0, window: None }
+        Self { enabled: true, interval: 2.0, pause_after: 15.0, window: None, pickup_log: true }
     }
 }
 

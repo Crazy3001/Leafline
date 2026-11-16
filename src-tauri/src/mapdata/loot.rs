@@ -1,0 +1,254 @@
+//! Naming what the Pickup Log says was picked up, from the item data.
+//!
+//! The log words an item as the game names it, with the inventory tab it went to. OCR slips a
+//! letter now and then, so a name is matched to the closest in the data, but only when it is
+//! clearly closer to that item than to any other of the tab's: a name that could be two items is
+//! left unnamed, and an unnamed item is never tallied. A long name the game cut short with `...`
+//! is matched by its start. Lines are right-aligned, so when the world behind spoils part of a
+//! name it is often the start that goes: a name is also matched by its end, when only one item
+//! of the tab ends that way.
+
+use super::bag;
+use super::drops::item_key;
+use super::osms::ItemRecord;
+use crate::build::catalog::Catalog;
+use crate::readers::inventory::Tab;
+
+/// How alike two names (as [`item_key`]s) are, 0 to 1, forgiving the slips OCR makes on the
+/// log's pixel font: `rn` for `m`, `vv` for `w`, `q` for `g`, and `l`, `I`, `1` and `|` for each
+/// other. The better of the plain and the forgiving comparison counts.
+fn like(a: &str, b: &str) -> f64 {
+    if a.contains('?') || b.contains('?') {
+        return wild_like(a, b).max(wild_like(&lookalike(a), &lookalike(b)));
+    }
+    strsim::normalized_levenshtein(a, b).max(strsim::normalized_levenshtein(&lookalike(a), &lookalike(b)))
+}
+
+/// [`strsim::normalized_levenshtein`] with `?` (a glyph the font reader didn't know) taken as any
+/// one letter.
+fn wild_like(a: &str, b: &str) -> f64 {
+    let (a, b): (Vec<char>, Vec<char>) = (a.chars().collect(), b.chars().collect());
+    if a.is_empty() && b.is_empty() {
+        return 1.0;
+    }
+    let mut row: Vec<usize> = (0..=b.len()).collect();
+    for (i, ca) in a.iter().enumerate() {
+        let mut last = row[0];
+        row[0] = i + 1;
+        for (j, cb) in b.iter().enumerate() {
+            let same = ca == cb || *ca == '?' || *cb == '?';
+            let next = (last + usize::from(!same)).min(row[j] + 1).min(row[j + 1] + 1);
+            last = row[j + 1];
+            row[j + 1] = next;
+        }
+    }
+    1.0 - row[b.len()] as f64 / a.len().max(b.len()) as f64
+}
+
+/// [`item_key`], keeping the font reader's `?` for a letter it didn't know.
+fn read_key(name: &str) -> String {
+    name.chars()
+        .map(|c| if c.is_ascii_alphanumeric() || c == '?' { c.to_ascii_lowercase() } else { ' ' })
+        .collect::<String>()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn lookalike(s: &str) -> String {
+    s.replace("rn", "m").replace("vv", "w").replace(['l', '1', '|', 'j', 'I'], "i").replace('q', "g").replace('0', "o").replace('5', "s")
+}
+
+/// The least likeness, 0 to 1, for a misread name to be an item's.
+const LIKE: f64 = 0.8;
+/// How much closer than the next item's name it must be.
+const LEAD: f64 = 0.08;
+/// A cut-short name shorter than this, in letters, says too little.
+const SHORTEST_START: usize = 8;
+/// The fewest letters a name's end must have to be matched alone.
+const SHORTEST_END: usize = 7;
+/// The least likeness, 0 to 1, of a name's end to an item's.
+const END_LIKE: f64 = 0.85;
+
+/// The item a name read off the Pickup Log is. `tab` narrows it when it was read.
+pub fn name_item<'a>(catalog: &'a Catalog, read: &str, tab: Option<Tab>, cut_short: bool) -> Option<&'a ItemRecord> {
+    let key = read_key(read);
+    if key.is_empty() {
+        return None;
+    }
+    let in_tab = |item: &&ItemRecord| tab.is_none_or(|tab| bag::kinds(tab).contains(&item.kind));
+    // An exact name stands whatever the tab read as.
+    if let Some(item) = catalog.items().iter().filter(in_tab).find(|i| item_key(&i.name) == key) {
+        return Some(item);
+    }
+    if !cut_short && let Some(item) = catalog.items().iter().find(|i| item_key(&i.name) == key) {
+        return Some(item);
+    }
+    let candidates: Vec<&ItemRecord> = catalog.items().iter().filter(in_tab).collect();
+    if cut_short {
+        return by_start(&candidates, &key);
+    }
+    if let Some(item) = closest(&candidates, &key) {
+        return Some(item);
+    }
+    // A whole name close to the read, but no clear winner, is a doubt: the end can't settle it.
+    let any_close = candidates.iter().any(|i| like(&item_key(&i.name), &key) >= LIKE);
+    if any_close {
+        return None;
+    }
+    // The whole read, then with its first words dropped: junk read before a name (`rulus•hroom
+    // Soore`) spoils a match on the whole.
+    let words: Vec<&str> = key.split(' ').collect();
+    (0..words.len()).find_map(|skip| by_end(&candidates, &words[skip..].join(" ")))
+}
+
+/// The one name in `items` that ends with `end`, a letter or so off: a name whose start the
+/// world behind it spoiled (`#qle Crow` for `Eagle Crow`).
+fn by_end<'a>(items: &[&'a ItemRecord], end: &str) -> Option<&'a ItemRecord> {
+    if end.chars().filter(char::is_ascii_alphabetic).count() < SHORTEST_END {
+        return None;
+    }
+    let mut scored: Vec<(f64, &ItemRecord)> = items
+        .iter()
+        .filter_map(|item| {
+            let name = item_key(&item.name);
+            // The part of the name as long as what was read, from its end.
+            let tail = name.get(name.len().checked_sub(end.len())?..)?;
+            Some((like(tail, end), *item))
+        })
+        .collect();
+    scored.sort_by(|a, b| b.0.total_cmp(&a.0));
+    let (best, item) = *scored.first()?;
+    let runner_up = scored.iter().find(|(_, other)| other.name != item.name).map_or(0.0, |(score, _)| *score);
+    (best >= END_LIKE && best - runner_up >= LEAD).then_some(item)
+}
+
+/// The one name in `items` that starts with `start`, a letter or so off. Items that share the
+/// name count as one.
+fn by_start<'a>(items: &[&'a ItemRecord], start: &str) -> Option<&'a ItemRecord> {
+    if start.chars().filter(char::is_ascii_alphabetic).count() < SHORTEST_START {
+        return None;
+    }
+    let fits: Vec<&ItemRecord> = items
+        .iter()
+        .copied()
+        .filter(|item| {
+            let name = item_key(&item.name);
+            name.len() > start.len() && like(&name[..start.len()], start) >= LIKE + 0.1
+        })
+        .collect();
+    one_name(fits)
+}
+
+/// The item whose name is like `key` and clearly closer to it than any other name.
+fn closest<'a>(items: &[&'a ItemRecord], key: &str) -> Option<&'a ItemRecord> {
+    let mut scored: Vec<(f64, &ItemRecord)> =
+        items.iter().map(|item| (like(&item_key(&item.name), key), *item)).collect();
+    scored.sort_by(|a, b| b.0.total_cmp(&a.0));
+    let (best, item) = *scored.first()?;
+    if best < LIKE {
+        return None;
+    }
+    let runner_up = scored.iter().find(|(_, other)| other.name != item.name).map_or(0.0, |(score, _)| *score);
+    (best - runner_up >= LEAD).then_some(item)
+}
+
+/// The item when every one of `items` has the same name, else none.
+fn one_name(items: Vec<&ItemRecord>) -> Option<&ItemRecord> {
+    let first = *items.first()?;
+    items.iter().all(|i| i.name == first.name).then_some(first)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::build::catalog::tests::item;
+    use crate::mapdata::osms::ItemKind;
+
+    fn of(id: u32, name: &str, kind: ItemKind) -> ItemRecord {
+        ItemRecord { kind, ..item(id, name, 0, &[]) }
+    }
+
+    fn catalog() -> Catalog {
+        Catalog::new(
+            Vec::new(),
+            vec![
+                of(1, "Snail Shell", ItemKind::Etc),
+                of(2, "Blue Snail Shell", ItemKind::Etc),
+                of(3, "Red Snail Shell", ItemKind::Etc),
+                of(4, "Leaf", ItemKind::Etc),
+                of(5, "Red Potion", ItemKind::Use),
+                of(6, "Scroll for One-Handed Sword for ATT", ItemKind::Scroll),
+                of(7, "Scroll for One-Handed Sword for Accuracy", ItemKind::Scroll),
+                of(8, "Scroll for Two-Handed Axe for ATT", ItemKind::Scroll),
+                of(9, "Leaf", ItemKind::Use),
+                of(10, "Pig's Ribbon", ItemKind::Etc),
+                of(12, "Eagle Crow", ItemKind::Equip),
+                of(13, "Brown Loosecap", ItemKind::Equip),
+                of(14, "Black Loosecap", ItemKind::Equip),
+                of(15, "Black Split Pants", ItemKind::Equip),
+                of(11, "Pig's Ribbons", ItemKind::Etc),
+            ],
+        )
+    }
+
+    fn named(read: &str, tab: Option<Tab>, cut: bool) -> Option<u32> {
+        name_item(&catalog(), read, tab, cut).map(|i| i.id)
+    }
+
+    #[test]
+    fn exact_names_stand() {
+        assert_eq!(named("Snail Shell", Some(Tab::Etc), false), Some(1));
+        assert_eq!(named("Red Potion", Some(Tab::Etc), false), Some(5), "an exact name stands over a misread tab");
+        assert_eq!(named("Leaf", Some(Tab::Use), false), Some(9), "the tab picks between two of a name");
+    }
+
+    #[test]
+    fn a_letter_wrong_is_the_item_it_is_clearly_closest_to() {
+        assert_eq!(named("Blue Snail Shel", Some(Tab::Etc), false), Some(2));
+        assert_eq!(named("Red Potlon", Some(Tab::Use), false), Some(5));
+    }
+
+    #[test]
+    fn a_name_that_could_be_two_items_is_left_unnamed() {
+        assert_eq!(named("Bed Snail Shell", Some(Tab::Etc), false), Some(3), "far nearer Red than Blue");
+        assert_eq!(named("Pig's Ribbonz", Some(Tab::Etc), false), None, "a letter from each of two names");
+        assert_eq!(named("Mushroom Cap", Some(Tab::Etc), false), None, "not in the data");
+    }
+
+    #[test]
+    fn a_name_whose_start_was_spoiled_is_matched_by_its_end() {
+        assert_eq!(named("#qle Crow", Some(Tab::Equip), false), Some(12), "seen on a pale wall");
+        assert_eq!(named("Ellack..,.SpIit Pants", Some(Tab::Equip), false), Some(15));
+        assert_eq!(named("Loosecap", Some(Tab::Equip), false), None, "Brown or Black");
+        assert_eq!(named("ow Crow", Some(Tab::Equip), false), None, "too little left");
+    }
+
+    #[test]
+    fn junk_read_before_a_name_is_dropped_word_by_word() {
+        assert_eq!(named("zq Blue Snail Shel", Some(Tab::Etc), false), Some(2));
+        assert_eq!(named("rulus Brown Loosecap", Some(Tab::Equip), false), Some(13));
+        assert_eq!(named("arowo Loosecap", Some(Tab::Equip), false), Some(13), "arowo is two letters from Brown");
+        assert_eq!(named("zz Loosecap", Some(Tab::Equip), false), None, "Loosecap alone is Brown or Black");
+    }
+
+    #[test]
+    fn the_fonts_usual_slips_are_forgiven() {
+        assert_eq!(named("Bjue Snaii Shell", Some(Tab::Etc), false), Some(2), "l read as j and i");
+        assert_eq!(named("Red Potjon", Some(Tab::Use), false), Some(5));
+    }
+
+    #[test]
+    fn a_letter_the_font_reader_didnt_know_is_any_letter() {
+        assert_eq!(named("Blue Sn?il Shell", Some(Tab::Etc), false), Some(2));
+        assert_eq!(named("?ed Snail Shell", Some(Tab::Etc), false), Some(3));
+        assert_eq!(named("??d Snail Shell", Some(Tab::Etc), false), Some(3), "Red is the one that fits");
+    }
+
+    #[test]
+    fn a_cut_short_name_is_matched_by_its_start() {
+        assert_eq!(named("Scroll for Two-Handed A", Some(Tab::Use), true), Some(8));
+        assert_eq!(named("Scroll for One-Handed Sw", Some(Tab::Use), true), None, "two scrolls start so");
+        assert_eq!(named("Red", Some(Tab::Etc), true), None, "too short");
+    }
+}

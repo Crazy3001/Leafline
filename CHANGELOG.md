@@ -52,6 +52,20 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
   first check downloads the pictures of the items most likely at your level; **Look further**
   tries every item of the tab. It needs **Show game pictures** on. NPC prices come from the item
   data and haven't been checked in game yet.
+- **Loot counted for you.** While live reading is on, Leafline reads the lines at the bottom right
+  of the game that say what you picked up (`Leaf x1 earned. (Etc)`, `You have gained mesos (+27)`),
+  each line once, even when the same words come twice in a row or several arrive at once. The
+  Train tab's new **Loot** section lists each item with how many, what one is worth (your own
+  logged price if you have one, else the NPC price) and the total, plus the mesos picked up. A line
+  Leafline can't read or name is left out and said so, so loot can come out short but never over.
+  Each saved session keeps its loot, the training log shows it, and **Export loot CSV** saves it.
+  Turn it off under **Settings → Live reading → Advanced → Count loot**.
+- **A word about UI Size.** When the game draws its interface at UI Size Default Ratio, which
+  smooths its text, Settings and the overlay say that some readings may be missed and that Ideal
+  Ratio reads best.
+- **Profit with loot.** The Potions line now reads mesos plus loot, less potions, per hour. When
+  your inventory's mesos weren't seen twice, **Mesos / hr** uses the mesos picked up instead, and
+  when they were, it shows the picked-up rate beside it as a check.
 - **When another map gets better.** While you train, once you've gone up a level on a map and
   another map's forecast now beats it by 15% or more (the trip there counted), **This map** says so
   in one quiet line, with **Go** and **Not now**. Not now hides it until your next level. It never
@@ -59,7 +73,7 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
 
 ### Changed
 - **Your records are upgraded** the first time 0.4 opens them, so that sessions keep what their
-  deaths cost and the potions read from your quick slots. Sessions saved before keep their deaths
+  deaths cost, the potions read from your quick slots and the loot picked up. Sessions saved before keep their deaths
   and get the EXP lost from their maps.
 
 ## 0.3.1 (2026-11-14)

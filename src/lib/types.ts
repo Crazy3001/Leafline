@@ -209,6 +209,8 @@ export type LiveStatus =
       readMs: number;
       /** Windows HDR is on for the game's display, which washes the picture out. */
       hdr: boolean;
+      /** The game's UI Size draws its text smoothed (Default Ratio), which reads less well. */
+      smoothedUi?: boolean;
       /** Tracking is paused by hand. */
       held: boolean;
     }
@@ -236,6 +238,8 @@ export interface LiveChoice {
   /** Seconds without EXP before the clock pauses, 5 to 300. */
   pauseAfter: number;
   window: WindowChoice | null;
+  /** The Pickup Log is read between readings, for the loot picked up. */
+  pickupLog: boolean;
 }
 
 export interface ShortcutInfo {
@@ -381,6 +385,8 @@ export interface SessionSummary {
   /** Quest counter gains per objective and map, most active time first. */
   counters: CounterRate[];
   rejected: { exp: number; mesos: number };
+  /** What the Pickup Log showed picked up. */
+  loot?: LootSummary;
 }
 
 /** The recent rates at one moment of a session (see src-tauri/src/session.rs). */
@@ -1264,6 +1270,8 @@ export interface SavedSession {
   potions: SessionPotion[];
   /** What the potions used cost, in mesos. */
   potionCost: number;
+  /** What the Pickup Log showed picked up, when it was read. */
+  loot?: SessionLoot | null;
 }
 
 // Crafting (see src-tauri/src/build/crafting.rs): recipes from the map data.
@@ -1358,6 +1366,54 @@ export interface BagCheck {
   /** Pictures "Look further" would still download. */
   more: number;
   problem: string | null;
+}
+
+/** One item and how many of it the Pickup Log showed picked up. */
+export interface LootItem {
+  id: number;
+  name: string;
+  count: number;
+}
+
+/** A session's loot as it goes (see src-tauri/src/loot.rs). */
+export interface LootSummary {
+  /** The log has been seen this session, so the totals mean something. */
+  watched: boolean;
+  /** Active seconds since it was first seen: what the rates are over. */
+  seconds: number;
+  mesos: number;
+  mesosPerHour: number | null;
+  /** Most picked up first. */
+  items: LootItem[];
+  /** Lines counted, read or not. */
+  lines: number;
+  unread: number;
+  /** Items whose name matched nothing in the item data. */
+  unnamed: number;
+  ownExp: number;
+  partyExp: number;
+  partyBonus: number;
+  /** A partymate's share or party bonus showed in the last five minutes of play. */
+  partyNow: boolean;
+}
+
+/** A saved session's loot. */
+export interface SessionLoot {
+  mesos: number;
+  seconds: number;
+  lines: number;
+  unread: number;
+  unnamed: number;
+  items: LootItem[];
+}
+
+/** What one of an item is worth. */
+export interface LootPrice {
+  id: number;
+  /** The NPC price the item data lists. */
+  npc: number | null;
+  /** The middle of the prices the player logged for it. */
+  own: number | null;
 }
 
 /** One quick slot over a session: the count it shows now and how many went from it. */

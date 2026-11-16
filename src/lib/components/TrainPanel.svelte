@@ -11,6 +11,8 @@
   import CharacterPicker from "./CharacterPicker.svelte";
   import LevelGoal from "./LevelGoal.svelte";
   import PotionCosts from "./PotionCosts.svelte";
+  import LootLog from "./LootLog.svelte";
+  import { lootPerHour as lootRate } from "$lib/loot.svelte";
   import SaveSpot from "./SaveSpot.svelte";
   import SpotList, { SPOTS_ID, type BetterMap } from "./SpotList.svelte";
   import GoButton from "$lib/components/GoButton.svelte";
@@ -151,6 +153,18 @@
   let spotList = $state<{ wave: () => void } | null>(null);
 
   const coverage = $derived(session ? mesosCoverage(session) : null);
+  // Mesos picked up, from the Pickup Log: the rate when the inventory's mesos were never seen
+  // twice, and a check on it when they were.
+  const pickedMesos = $derived(session?.loot?.watched ? (session.loot.mesosPerHour ?? null) : null);
+  const mesosRate = $derived(session?.mesosPerHour ?? pickedMesos);
+  const mesosSub = $derived.by(() => {
+    if (!session) return null;
+    if (session.mesosPerHour == null && pickedMesos != null) return "picked up";
+    if (coverage?.partial) return coverage.label;
+    if (pickedMesos != null) return `${formatCompact(pickedMesos)} picked up`;
+    return null;
+  });
+  const lootValueRate = $derived(session?.loot?.watched ? lootRate(session.loot.items, session.loot.seconds) : null);
   const reminder = $derived(session ? mesosReminder(session) : null);
 
   // How Mesos / hr works, said once until the player dismisses it.
@@ -329,9 +343,9 @@
     <div class="tiles">
       <Stat
         label="Mesos / hr"
-        value={formatCompact(session.mesosPerHour)}
-        sub={coverage?.partial ? coverage.label : null}
-        faint={coverage?.partial && coverage.thin}
+        value={formatCompact(mesosRate)}
+        sub={mesosSub}
+        faint={session.mesosPerHour != null && coverage?.partial && coverage.thin}
       />
       <Stat
         label="EXP gained"
@@ -348,10 +362,12 @@
       <PotionCosts
         startedAt={session.startedAt}
         activeSeconds={session.activeSeconds}
-        mesosPerHour={session.mesosPerHour}
+        mesosPerHour={mesosRate}
         character={session.name ?? characters.active}
         quickSlots={session.quickSlots ?? null}
+        lootPerHour={lootValueRate}
       />
+      <LootLog loot={session.loot} reading={liveState === "reading"} />
     {/if}
 
     {#if reminder}

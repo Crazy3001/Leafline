@@ -5,6 +5,7 @@ use rusqlite::params;
 use serde::Serialize;
 
 use super::UserData;
+use super::loot::SessionLoot;
 use super::potions::{SessionPotion, cost_of, session_key};
 use crate::error::{Error, Result};
 use crate::session::{EventKind, SessionEvent, SessionLine, SessionSummary, TimelinePoint};
@@ -45,6 +46,8 @@ pub struct SavedSession {
     pub potions: Vec<SessionPotion>,
     /// What the potions used cost, in mesos.
     pub potion_cost: i64,
+    /// What the Pickup Log showed picked up, when it was read.
+    pub loot: Option<SessionLoot>,
 }
 
 /// The EXP a level takes, as the player's own HUD showed it. Leafline ships no EXP table; this
@@ -135,6 +138,7 @@ impl UserData {
             .or_else(|err| if err == rusqlite::Error::QueryReturnedNoRows { Ok(None) } else { Err(err) })?;
         let tx = self.conn.transaction()?;
         UserData::delete_session_potions(&tx, started_at)?;
+        super::loot::delete_loot(&tx, started_at)?;
         tx.execute("DELETE FROM session_points WHERE session_id = ?1", [id])?;
         tx.execute("DELETE FROM session_events WHERE session_id = ?1", [id])?;
         tx.execute("DELETE FROM session_maps WHERE session_id = ?1", [id])?;
@@ -185,6 +189,7 @@ impl UserData {
                     lines: Vec::new(),
                     potions: Vec::new(),
                     potion_cost: 0,
+                    loot: None,
                 })
             })?
             .collect::<rusqlite::Result<_>>()?;
@@ -198,7 +203,9 @@ impl UserData {
              FROM session_lines WHERE session_id = ?1 ORDER BY active_seconds DESC",
         )?;
         let mut potions = self.all_session_potions()?;
+        let mut loot = self.all_session_loot()?;
         for session in &mut sessions {
+            session.loot = session.started_at.and_then(|at| loot.remove(&session_key(at)));
             if let Some(typed) = session.started_at.and_then(|at| potions.remove(&session_key(at))) {
                 session.potion_cost = cost_of(&typed);
                 session.potions = typed;
@@ -326,6 +333,7 @@ fn write_session(tx: &rusqlite::Transaction, id: i64, session: &SessionSummary, 
         ],
     )?;
     super::potions::write_read_potions(tx, session.name.as_deref(), session.started_at, &session.quick_slots)?;
+    super::loot::write_loot(tx, session.started_at, &session.loot)?;
     tx.execute("DELETE FROM session_maps WHERE session_id = ?1", [id])?;
     tx.execute("DELETE FROM session_lines WHERE session_id = ?1", [id])?;
     tx.execute("DELETE FROM session_points WHERE session_id = ?1", [id])?;
@@ -535,6 +543,27 @@ mod tests {
         unknown.level = Some(32);
         db.update_session(id, &unknown, 3).unwrap();
         assert_eq!(db.level_exp().unwrap(), [LevelExp { level: 30, needed: 25_000 }, LevelExp { level: 31, needed: 27_500 }]);
+    }
+
+    #[test]
+    fn a_sessions_loot_is_kept_replaced_on_each_save_and_deleted_with_it() {
+        use crate::loot::{LootItem, LootSummary};
+        let mut db = UserData::open_in_memory().unwrap();
+        let shell = |count| LootItem { id: 4000000, name: "Snail Shell".into(), count };
+        let mut first = session(30.0, 6000, &[]);
+        first.loot = LootSummary { watched: true, seconds: 1700.0, mesos: 900, items: vec![shell(3)], lines: 9, ..LootSummary::default() };
+        let id = db.save_session(&first, "", 1).unwrap();
+        let mut later = first.clone();
+        later.loot.items = vec![shell(5), LootItem { id: 2000000, name: "Red Potion".into(), count: 1 }];
+        later.loot.mesos = 1200;
+        db.update_session(id, &later, 2).unwrap();
+        let loot = db.sessions().unwrap()[0].loot.clone().expect("kept");
+        assert_eq!((loot.mesos, loot.seconds), (1200, 1700.0));
+        let items: Vec<(&str, u64)> = loot.items.iter().map(|i| (i.name.as_str(), i.count)).collect();
+        assert_eq!(items, [("Snail Shell", 5), ("Red Potion", 1)]);
+        db.delete_session(id).unwrap();
+        db.save_session(&session(30.0, 6000, &[]), "", 3).unwrap();
+        assert_eq!(db.sessions().unwrap()[0].loot, None, "deleted with its session; an unwatched log keeps nothing");
     }
 
     #[test]

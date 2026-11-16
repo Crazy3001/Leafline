@@ -7,6 +7,7 @@
 pub mod builds;
 pub mod characters;
 pub mod drops;
+pub mod loot;
 pub mod notes;
 pub mod potions;
 pub mod prices;
@@ -194,6 +195,21 @@ UPDATE sessions SET exp_lost = (SELECT COALESCE(SUM(l.exp_lost), 0) FROM session
     "
 ALTER TABLE potion_slots ADD COLUMN quick_slot INTEGER;
 ALTER TABLE session_potions ADD COLUMN read_used INTEGER;
+",
+    "
+CREATE TABLE session_pickups (
+    started_at INTEGER PRIMARY KEY,
+    mesos INTEGER NOT NULL,
+    seconds REAL NOT NULL,
+    lines INTEGER NOT NULL,
+    unread INTEGER NOT NULL,
+    unnamed INTEGER NOT NULL);
+CREATE TABLE session_loot (
+    started_at INTEGER NOT NULL,
+    item_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    count INTEGER NOT NULL,
+    PRIMARY KEY (started_at, item_id));
 ",
 ];
 

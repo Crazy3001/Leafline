@@ -236,7 +236,7 @@ let displaySettings: DisplaySettings = {
   compactShape: "card",
   hotkeys: { enabled: true, keys: {} },
   travel: { enabled: false, cabs: true, vipCabs: false, scrolls: true },
-  live: { enabled: true, interval: 2, pauseAfter: 15, window: null },
+  live: { enabled: true, interval: 2, pauseAfter: 15, window: null, pickupLog: true },
   framesFolder: null,
   setupDone: true,
   updateCheck: false,
@@ -534,7 +534,7 @@ export const mockBackend: Backend = {
     clearInterval(liveTimer);
     liveTimer = setInterval(() => {
       frames += 1;
-      setLive({ state: "reading", window: "MapleStory", width: 2560, height: 1440, frames, readMs: 412, hdr: false, held: false });
+      setLive({ state: "reading", window: "MapleStory", width: 2560, height: 1440, frames, readMs: 412, hdr: false, smoothedUi: false, held: false });
       analysisHandlers.forEach((h) => h(sampleAnalysis));
     }, displaySettings.live.interval * 1000);
   },
@@ -667,6 +667,7 @@ export const mockBackend: Backend = {
   },
   savedSpots: async () => [...savedSpots],
   potionSlots: async (character) => [...slotsFor(character)],
+  lootPrices: async (ids) => ids.map((id) => ({ id, npc: id % 7 === 0 ? null : 5 + (id % 40), own: id % 5 === 0 ? 300 : null })),
   async setPotionSlots(character, slots) {
     const taken = new Set(slots.map((s) => s.slot).filter((n) => n > 0));
     const kept = slots
