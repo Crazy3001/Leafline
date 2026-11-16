@@ -4,6 +4,7 @@
 pub mod character;
 pub mod counts;
 mod digits;
+mod gamefont;
 pub mod hud;
 pub mod inventory;
 pub mod map;
@@ -12,6 +13,7 @@ pub mod npc;
 pub mod party;
 pub mod pickup;
 pub mod quest;
+mod questfont;
 pub mod quickslot;
 pub mod shop;
 mod text;

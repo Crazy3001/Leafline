@@ -9,6 +9,10 @@
 //! slash in `0 / 1`, which leaves `0 11`. They are drawn in a pixel font in pure black, so
 //! each counter's digits are also cut out by shape. Their count rules out impossible readings,
 //! and digits read cleanly elsewhere in the panel teach the shapes of the ones OCR missed.
+//!
+//! Before all that, each objective row is read by the game's own objective font (see
+//! [`questfont`](super::questfont)): at Ideal Ratio every glyph is drawn the same, so a row read
+//! whole gives its counter and target exactly as drawn, and OCR is left the rows it can't read.
 
 use std::sync::LazyLock;
 
@@ -16,7 +20,7 @@ use image::{Rgba, imageops};
 use regex::Regex;
 use serde::Serialize;
 
-use super::digits;
+use super::{digits, gamefont, questfont};
 use super::text::{digitize, similarity, squash, starts_like, trim_noise};
 use crate::error::Result;
 use crate::vision::glyphs::{GlyphSet, Mask, ink_columns, ink_rows};
@@ -108,10 +112,24 @@ pub fn read_with_digits(frame: &Frame, digits: &Frame, overview: &[Line], ocr: &
     passes.push(overview.iter().filter(|l| panel_contains(&panel, l)).cloned().collect());
 
     let page = PAGE.captures(&header.text).and_then(|c| Some((c[1].parse().ok()?, c[2].parse().ok()?)));
-    let mut rows = parse_rows(&passes, header.rect.bottom(), PITCH * h);
+    let rows = parse_rows(&passes, header.rect.bottom(), PITCH * h);
+    // Rows the game's own objective font reads whole, `23 / 20 Orange Mushroom Cap`.
+    let drawn: Vec<Option<DrawnObjective>> =
+        rows.iter().map(|row| glyph_line(frame, panel, row.y(), h).as_deref().and_then(glyph_objective)).collect();
     // Scenery and name tags under the panel can look like text to OCR, but only the panel's
-    // own rows are drawn in pure black.
-    rows.retain(|row| has_text(frame, panel, row.y(), h) && !on_white(frame, panel, row.y(), h));
+    // own rows are drawn in pure black. A speech bubble's text stands on plain white; so can the
+    // panel's own over bright clouds, where an objective read by its glyphs, and the title just
+    // above one, are still the panel's.
+    let keep: Vec<bool> = (0..rows.len())
+        .map(|i| {
+            let y = rows[i].y();
+            let titles_one = drawn.get(i + 1).is_some_and(Option::is_some) && rows[i + 1].y() - y <= 1.5 * PITCH * h;
+            drawn[i].is_some()
+                || (has_text(frame, panel, y, h) && (titles_one || !on_white(frame, panel, y, h)))
+        })
+        .collect();
+    let (mut rows, drawn): (Vec<Row>, Vec<_>) =
+        rows.into_iter().zip(drawn).zip(keep).filter(|(_, keep)| *keep).map(|(pair, _)| pair).unzip();
     // OCR can lose a counter altogether, leaving `O Snail` looking like a title, but a row that
     // starts `digits / digits` as drawn is an objective, whatever is behind the panel.
     // The digits cut from the view that keeps thin strokes, where they read as a counter: there
@@ -134,7 +152,23 @@ pub fn read_with_digits(frame: &Frame, digits: &Frame, overview: &[Line], ocr: &
             _ => {}
         }
     }
-    let mut quests = assemble(&rows, &settle_counters(&rows, &glyphs));
+    // A row the game's own objective font reads whole is an objective as drawn: its counter
+    // stands, and its target too when every letter of it is known.
+    let known: Vec<Option<(u32, u32)>> = rows
+        .iter_mut()
+        .zip(drawn)
+        .map(|(row, drawn)| {
+            let (counter, target) = drawn?;
+            let y = row.y();
+            let target = target.unwrap_or_else(|| match row {
+                Row::Objective { target, .. } => target.clone(),
+                Row::Title { title, .. } => past_counter_debris(&after_counter(title)),
+            });
+            *row = Row::Objective { y, target, counters: vec![counter] };
+            Some(counter)
+        })
+        .collect();
+    let mut quests = assemble(&rows, &settle_counters(&rows, &glyphs, &known));
     if let Some((shown, _)) = page {
         quests.truncate(shown as usize);
     }
@@ -498,6 +532,33 @@ impl CounterGlyphs {
     }
 }
 
+/// The row centred at `y` read by the Quest Helper's objective font, glyph by glyph. `None` when
+/// the row isn't on a crisp 2x grid of font pixels.
+fn glyph_line(frame: &Frame, panel: Rect, y: f32, text_height: f32) -> Option<String> {
+    let band = Rect::from_edges(panel.x, y - 0.8 * text_height, panel.right(), y + 0.8 * text_height);
+    let grid = gamefont::ink_grid(frame, band, 2, is_text)?;
+    let rows = gamefont::line_rows(&questfont::OBJECTIVE, &grid, grid.len() / 2)?;
+    // The close button stands well off a title's end; an objective's words are never that far apart.
+    Some(gamefont::read_line(&questfont::OBJECTIVE, &gamefont::first_stretch(&rows, 12)))
+}
+
+/// A counter read by the game's glyphs, with its target when every letter of it is known.
+type DrawnObjective = ((u32, u32), Option<String>);
+
+/// An objective's counter from a line read by its glyphs, with its target when every letter of
+/// it is known. `None` unless the line starts `digits / digits` with every one of those read.
+fn glyph_objective(line: &str) -> Option<DrawnObjective> {
+    static DRAWN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^(\d+) ?/ ?(\d+) (\S.*)$").unwrap());
+    let caps = DRAWN.captures(line)?;
+    let tidy = |s: &str| s == "0" || !s.starts_with('0');
+    if !tidy(&caps[1]) || !tidy(&caps[2]) {
+        return None;
+    }
+    let counter = (caps[1].parse().ok()?, caps[2].parse().ok()?);
+    let target = caps[3].trim();
+    Some((counter, (!target.contains(gamefont::UNKNOWN)).then(|| target.to_string())))
+}
+
 /// A target with OCR's leftovers of the counter drawn before it taken off: in `g '10 Slime` the
 /// `9 /` became letters, so it reads as part of the name. Words up to the last of the first three
 /// holding a digit go; a name has none there.
@@ -536,14 +597,23 @@ fn is_slash(mask: &Mask) -> bool {
     }
 }
 
-/// Each objective's counter: the most agreed OCR reading with as many digits as are drawn.
+/// Each objective's counter: the one read by the game's font where `known`, else the most agreed
+/// OCR reading with as many digits as are drawn.
 /// Readings that fit teach a digit shape set, which then reads the counters no OCR reading
 /// fits. Without glyphs (the row could not be cut out) the most agreed reading stands.
-fn settle_counters(rows: &[Row], glyphs: &[Option<CounterGlyphs>]) -> Vec<Option<(u32, u32)>> {
+fn settle_counters(
+    rows: &[Row],
+    glyphs: &[Option<CounterGlyphs>],
+    known: &[Option<(u32, u32)>],
+) -> Vec<Option<(u32, u32)>> {
     let mut settled: Vec<Option<(u32, u32)>> = rows
         .iter()
         .zip(glyphs)
-        .map(|(row, glyphs)| {
+        .zip(known)
+        .map(|((row, glyphs), known)| {
+            if known.is_some() {
+                return *known;
+            }
             let Row::Objective { counters, .. } = row else { return None };
             match glyphs {
                 Some(glyphs) => glyphs.shaped().or_else(|| counters.iter().copied().find(|&c| glyphs.fits(c))),
@@ -731,6 +801,15 @@ mod tests {
     }
 
     #[test]
+    fn objectives_from_lines_read_by_glyphs() {
+        assert_eq!(glyph_objective("23 /20 Orange Mushroom Cap"), Some(((23, 20), Some("Orange Mushroom Cap".into()))));
+        assert_eq!(glyph_objective("0 /1 Pi?k Anthurium"), Some(((0, 1), None)), "an unknown letter leaves the target to OCR");
+        assert_eq!(glyph_objective("0 /?0 Slime"), None, "an unknown digit leaves the counter to OCR");
+        assert_eq!(glyph_objective("Maya's First Collection"), None);
+        assert_eq!(glyph_objective("05 /10 Snail"), None);
+    }
+
+    #[test]
     fn header_tolerates_ocr_noise() {
         assert!(is_header("Ouest Helpor (1/5)"));
         assert!(is_header("QuasVHelpar (5E)"));
@@ -799,6 +878,6 @@ mod tests {
         ];
         let glyphs =
             vec![None, glyphs_of(&strip("10 / 30 HH")), glyphs_of(&strip("0 / 1 HH")), glyphs_of(&strip("3 / 13 HH"))];
-        assert_eq!(settle_counters(&rows, &glyphs), [None, Some((10, 30)), Some((0, 1)), Some((3, 13))]);
+        assert_eq!(settle_counters(&rows, &glyphs, &[None; 4]), [None, Some((10, 30)), Some((0, 1)), Some((3, 13))]);
     }
 }
