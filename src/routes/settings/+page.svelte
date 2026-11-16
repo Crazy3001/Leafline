@@ -509,6 +509,12 @@
         </details>
       </fieldset>
       {#if liveError}<p class="note warn">{liveError}</p>{/if}
+      {#if live.liveStatus.state === "reading" && live.liveStatus.smoothedUi}
+        <p class="note">
+          The game's UI Size is Default Ratio, which smooths its text: some readings, such as loot names, may be missed.
+          UI Size: Ideal Ratio, in the game's Graphics options, reads best.
+        </p>
+      {/if}
       {#if live.liveStatus.state === "reading" && live.liveStatus.hdr}
         <p class="note warn">
           Windows HDR is on for the game's display, which washes the picture out and spoils readings. Turn HDR off in

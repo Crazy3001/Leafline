@@ -534,7 +534,7 @@ export const mockBackend: Backend = {
     clearInterval(liveTimer);
     liveTimer = setInterval(() => {
       frames += 1;
-      setLive({ state: "reading", window: "MapleStory", width: 2560, height: 1440, frames, readMs: 412, hdr: false, held: false });
+      setLive({ state: "reading", window: "MapleStory", width: 2560, height: 1440, frames, readMs: 412, hdr: false, smoothedUi: false, held: false });
       analysisHandlers.forEach((h) => h(sampleAnalysis));
     }, displaySettings.live.interval * 1000);
   },

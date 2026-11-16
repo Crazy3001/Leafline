@@ -88,6 +88,9 @@ pub enum LiveStatus {
         read_ms: f32,
         /// Windows HDR is on for the game's display, which washes the picture out.
         hdr: bool,
+        /// The game draws its interface at a scale that isn't a whole number (UI Size Default
+        /// Ratio), smoothing its text, which reads less well than Ideal Ratio.
+        smoothed_ui: bool,
         /// Tracking is paused by hand.
         held: bool,
     },
@@ -752,6 +755,7 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
                         frames,
                         read_ms,
                         hdr: *hdr,
+                        smoothed_ui: ui_scale.is_some_and(|s| (s - s.round()).abs() > 0.02),
                         held,
                     },
                 );

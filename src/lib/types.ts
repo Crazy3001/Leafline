@@ -209,6 +209,8 @@ export type LiveStatus =
       readMs: number;
       /** Windows HDR is on for the game's display, which washes the picture out. */
       hdr: boolean;
+      /** The game's UI Size draws its text smoothed (Default Ratio), which reads less well. */
+      smoothedUi?: boolean;
       /** Tracking is paused by hand. */
       held: boolean;
     }

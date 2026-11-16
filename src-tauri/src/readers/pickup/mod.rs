@@ -9,6 +9,7 @@
 
 pub mod figure;
 pub mod font;
+pub mod smooth;
 pub mod follow;
 pub mod look;
 pub mod parse;
@@ -33,10 +34,6 @@ const UNCONFIRMED_FOR: f64 = 3.0;
 /// A row this bright when the log is confirmed arrived moments ago (a line fades about 0.18 a
 /// second), so it is counted rather than taken as already there.
 const JUST_ARRIVED: f32 = 0.95;
-/// How fast a line fades, at most, against full brightness a second (some fade faster than the
-/// usual 0.18), and the faintest a line seen within a search's wait can be.
-const FADES_PER_SECOND: f32 = 0.25;
-const LEAST_FRESH: f32 = 0.6;
 /// Seconds before the confirming look that such a row is taken to have arrived after.
 const JUST_BEFORE: f64 = 0.25;
 
@@ -48,13 +45,19 @@ pub struct PickupReader {
     unconfirmed_since: Option<f64>,
     /// When the log was last searched for, while it isn't known.
     searched_at: Option<f64>,
-    /// When a search last found nothing: every line seen since arrived after it.
-    found_nothing_at: Option<f64>,
     /// When the log was last in view.
     seen_at: Option<f64>,
     size: (u32, u32),
     follower: Follower,
+    /// Lines counted lately where the font is smoothed, for [`SMOOTHED_REPEAT`].
+    smoothed_recent: Vec<(f64, Gain)>,
 }
+
+/// Where the game smooths its font, a line's brightness wavers from one look to the next, so the
+/// stack's shift is less sure there: a line that reads the same as one counted this many seconds
+/// before is taken for that one seen again, not a second pickup. Two alike in quick succession
+/// may then be counted as one, which is the safe way to be wrong.
+const SMOOTHED_REPEAT: f64 = 3.0;
 
 /// What a picture showed of the log.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -104,7 +107,8 @@ impl PickupReader {
         if self.layout.is_none() && long_gone && self.searched_at.is_some_and(|t| at - t < SEARCH_EVERY && at >= t) {
             return PickupRead::default();
         }
-        let read = match view(frame, ui_scale) {
+        let smoothed = view(frame, ui_scale).is_some();
+        let mut read = match view(frame, ui_scale) {
             // The redrawn corner is all of where the log can be.
             Some(view) => {
                 let area = (0, 0, view.width(), view.height());
@@ -114,9 +118,19 @@ impl PickupReader {
         };
         if read.layout.is_some() {
             self.seen_at = Some(at);
-            // Lines seen from now on may have been counted: an empty search before this says
-            // nothing about them.
-            self.found_nothing_at = None;
+        }
+        if smoothed {
+            // Lines settle a little after they arrive, so arrival times are compared, and kept
+            // a while longer than the window.
+            self.smoothed_recent.retain(|(t, _)| at - t < SMOOTHED_REPEAT * 3.0);
+            for arrival in &mut read.arrivals {
+                let Some(gain) = arrival.line.as_ref().map(|l| l.gain.clone()) else { continue };
+                if self.smoothed_recent.iter().any(|(t, g)| *g == gain && (arrival.at - t).abs() < SMOOTHED_REPEAT) {
+                    arrival.line = None;
+                } else {
+                    self.smoothed_recent.push((arrival.at, gain));
+                }
+            }
         }
         read
     }
@@ -141,6 +155,19 @@ impl PickupReader {
         let mut read_slot = |layout: &Layout, slot: usize| {
             // A fixed line (EXP, mesos, the party bonus) is read from its shapes alone: the
             // figure's digits and the width of the words before it. OCR is for the rest.
+            // Where the game smooths its font, its glyphs are matched by how the ink follows them.
+            if layout.full == look::SMOOTHED_FULL
+                && let Some(strength) = look::line_strength(frame, layout, slot)
+            {
+                if let Some(line) = smooth::figure(&strength).and_then(|f| f.line()) {
+                    return Some(line);
+                }
+                if let Some(text) = smooth::read_line(&strength)
+                    && let Some(parsed) = parse::parse(&text)
+                {
+                    return Some(parsed);
+                }
+            }
             let ink = look::line_ink(frame, layout, slot);
             let figure = ink.as_deref().and_then(figure::figure);
             if let Some(line) = figure.and_then(|f| f.line()) {
@@ -173,7 +200,6 @@ impl PickupReader {
         };
         let known = self.layout.filter(|l| l.full == full);
         if known.is_none() {
-            self.found_nothing_at = self.searched_at;
             self.searched_at = Some(at);
         }
         let Some(mut layout) = known.or_else(|| look::locate(frame, full, area)) else {
@@ -200,12 +226,9 @@ impl PickupReader {
                 self.follower.reset();
                 // Lines older than the ones that arrived just now came before: they start the
                 // stack, moved back down to where they were, and the new ones are counted.
-                // Since a search that found nothing, a line had time to fade a little.
-                let fresh = self
-                    .found_nothing_at
-                    .filter(|t| at - t <= SEARCH_EVERY + 0.5)
-                    .map_or(JUST_ARRIVED, |t| (JUST_ARRIVED - FADES_PER_SECOND * (at - t) as f32).max(LEAST_FRESH));
-                let new = rows.iter().take_while(|r| r.as_ref().is_some_and(|r| r.brightness >= fresh)).count();
+                // Only a line at full brightness counts: one found later may have been counted
+                // before the log was lost (brightness reads high where the font is smoothed).
+                let new = rows.iter().take_while(|r| r.as_ref().is_some_and(|r| r.brightness >= JUST_ARRIVED)).count();
                 let before: Rows = rows.iter().skip(new).cloned().chain(std::iter::repeat_n(None, new)).collect();
                 self.follower.push(at - JUST_BEFORE, before, |_| None);
                 let arrivals = self.follower.push(at, rows, |slot| read_slot(&layout, slot));

@@ -166,6 +166,8 @@
       return { tone: "warn", text: "Windows HDR is on for the game's display, so readings will be off. Turn HDR off, then restart the game." };
     if (live.analysis?.failed.length)
       return { tone: "warn", text: `Can't read the ${live.analysis.failed.join(", ")} right now.`, report: true };
+    if (s.state === "reading" && s.smoothedUi)
+      return { tone: "quiet", text: "UI Size Default Ratio smooths the game's text, so some readings may be missed. Ideal Ratio, in the game's Graphics options, reads best." };
     return null;
   });
 

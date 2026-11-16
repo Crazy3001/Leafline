@@ -38,6 +38,9 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
   Leafline can't read or name is left out and said so, so loot can come out short but never over.
   Each saved session keeps its loot, the training log shows it, and **Export loot CSV** saves it.
   Turn it off under **Settings → Live reading → Advanced → Count loot**.
+- **A word about UI Size.** When the game draws its interface at UI Size Default Ratio, which
+  smooths its text, Settings and the overlay say that some readings may be missed and that Ideal
+  Ratio reads best.
 - **Profit with loot.** The Potions line now reads mesos plus loot, less potions, per hour. When
   your inventory's mesos weren't seen twice, **Mesos / hr** uses the mesos picked up instead, and
   when they were, it shows the picked-up rate beside it as a check.

@@ -320,6 +320,32 @@ pub fn line_ink_at(frame: &Frame, layout: &Layout, slot: usize, level: f32) -> O
     Some(ink)
 }
 
+/// How strong the ink of the line in `slot` is in each font pixel, for the smoothed font:
+/// `[row][column]` in screen order, from a row above the line's top, against the line's own
+/// brightness (about 1 for full ink).
+pub fn line_strength(frame: &Frame, layout: &Layout, slot: usize) -> Option<super::smooth::Strength> {
+    let top = layout.top(slot)?;
+    let cells = grid(frame, layout, top, WIDEST);
+    let full = brightness(&cells, layout)? * layout.full;
+    let s = layout.scale;
+    let above: Vec<Cell> = (0..WIDEST)
+        .map(|i| match (layout.right.checked_sub((i + 1) * s), top.checked_sub(s)) {
+            (Some(x), Some(y)) => cell(frame, x, y, s),
+            _ => Cell { strength: 0.0, colour: Colour::Other },
+        })
+        .collect();
+    let rows = std::iter::once(&above).chain(cells.iter());
+    Some(
+        rows.map(|row| {
+            row.iter()
+                .rev()
+                .map(|c| if c.colour == Colour::Other { 0.0 } else { (c.strength / full).min(1.5) })
+                .collect()
+        })
+        .collect(),
+    )
+}
+
 /// The line in `slot` as black ink on white, one font pixel to `zoom` square pixels, for OCR.
 pub fn line_picture(frame: &Frame, layout: &Layout, slot: usize, zoom: u32) -> Option<Frame> {
     line_picture_at(frame, layout, slot, zoom, INK_LEVEL)
