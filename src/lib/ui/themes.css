@@ -68,6 +68,11 @@
   --tile-2: #e5e0d6;
   --tile-text: #201d18;
   --tile-label: #5f594f;
+  --tile-good: #1f7434;
+  --tile-mesos: #8a5000;
+  --tile-exp-line: #b08800;
+  --tile-mesos-line: #c77700;
+  --window-line: rgba(40, 30, 12, 0.45);
 
   --card-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 3px 10px rgba(50, 35, 15, 0.16);
   --control-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 1px 3px rgba(50, 35, 15, 0.14);
@@ -156,6 +161,12 @@
   --tile-2: #ffd0dc;
   --tile-text: #3b2a20;
   --tile-label: #6b5444;
+  --tile-border: #3b2a20;
+  --tile-good: #1f6e33;
+  --tile-mesos: #a34c00;
+  --tile-exp-line: #3b2a20;
+  --tile-mesos-line: #3b2a20;
+  --window-line: #3b2a20;
 
   --radius-sm: 9px;
   --radius: 14px;
@@ -244,6 +255,12 @@
   --tile-2: #f2b6c6;
   --tile-text: #2a1c12;
   --tile-label: #5a4334;
+  --tile-border: #0f0a15;
+  --tile-good: #1d6b2c;
+  --tile-mesos: #8a4300;
+  --tile-exp-line: #2a1c12;
+  --tile-mesos-line: #2a1c12;
+  --window-line: #0f0a15;
 
   --radius-sm: 9px;
   --radius: 14px;

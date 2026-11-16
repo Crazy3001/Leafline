@@ -124,6 +124,14 @@
   --tile-2: #1d2025;
   --tile-text: #eef0f3;
   --tile-label: #8b919c;
+  --tile-border: transparent;
+  /* On a tile: the good-news line, the meso figure, and the two small lines. */
+  --tile-good: #6cc77a;
+  --tile-mesos: #f4a93b;
+  --tile-exp-line: #e8c840;
+  --tile-mesos-line: #f4a93b;
+  /* The window's own edge, which has to show over a bright game scene. */
+  --window-line: rgba(214, 222, 240, 0.15);
 
   --radius-sm: 6px;
   --radius: 10px;
@@ -201,6 +209,26 @@ button {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--faint);
+}
+
+/* A small label over a number or a group. */
+.label {
+  color: var(--faint);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: var(--label-tracking);
+  text-transform: var(--label-case);
+}
+
+/*
+ * The one card: a surface with the look's outline, corners and edge. A hairline in Ember, a top
+ * light and soft drop in Ember Light, thick ink and a sticker edge in Sprout.
+ */
+.card {
+  border: var(--line-w) solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--card-shadow);
 }
 
 .num {
