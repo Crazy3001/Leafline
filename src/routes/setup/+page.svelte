@@ -21,14 +21,18 @@
   import { backend } from "$lib/api";
   import HotkeyButton from "$lib/components/HotkeyButton.svelte";
   import Logo from "$lib/components/Logo.svelte";
+  import ThemePicker from "$lib/ui/ThemePicker.svelte";
   import MapDataPanel from "$lib/components/map/MapDataPanel.svelte";
   import { WIKI_URL, mapData } from "$lib/mapdata.svelte";
   import { changeSettings, display, keyName, quietHotkeys, usesNumpad, watchSettings } from "$lib/settings.svelte";
   import type { ShortcutInfo } from "$lib/types";
   import { watchTyping } from "$lib/typing";
 
-  const STEPS = ["Welcome", "Hotkeys", "Game settings", "Views", "Map data"];
-  const SCREENS_STEP = 3;
+  const STEPS = ["Welcome", "Look", "Hotkeys", "Game settings", "Views", "Map data"];
+  const LOOK_STEP = 1;
+  const KEYS_STEP = 2;
+  const GAME_STEP = 3;
+  const SCREENS_STEP = 4;
 
   let step = $state(0);
   let shortcuts = $state<ShortcutInfo[]>([]);
@@ -110,7 +114,7 @@
   }
 
   async function next() {
-    if (step === 1 && !testing) {
+    if (step === KEYS_STEP && !testing) {
       if (!(await saveKeys())) return;
       arrived = {};
       testing = true;
@@ -121,7 +125,7 @@
   }
 
   function back() {
-    if (step === 1 && testing) testing = false;
+    if (step === KEYS_STEP && testing) testing = false;
     else step -= 1;
   }
 
@@ -224,7 +228,16 @@
           {#each never as item (item)}<li><span class="mark"><X size={12} /></span>{item}</li>{/each}
         </ul>
       </section>
-    {:else if step === 1 && testing}
+    {:else if step === LOOK_STEP}
+      <section>
+        <h1>Pick your look</h1>
+        <p class="lead">
+          Four looks over the same layout. This window changes as you pick, and so will every other Leafline window.
+          You can change it any time in Settings.
+        </p>
+        <ThemePicker />
+      </section>
+    {:else if step === KEYS_STEP && testing}
       <section>
         <h1>Test your hotkeys</h1>
         <p class="lead">
@@ -264,7 +277,7 @@
           </p>
         {/if}
       </section>
-    {:else if step === 1}
+    {:else if step === KEYS_STEP}
       <section>
         <h1>Hotkeys</h1>
         <p class="lead">
@@ -299,7 +312,7 @@
         {/if}
         {#if keysError || clash}<p class="note warn">{keysError ?? clash}</p>{/if}
       </section>
-    {:else if step === 2}
+    {:else if step === GAME_STEP}
       <section>
         <h1>Game settings</h1>
         <p class="lead">Leafline reads the game's own text, so a few game settings help it read reliably.</p>
@@ -414,12 +427,12 @@
     {#if finishError}<p class="note warn">{finishError}</p>{/if}
     <div class="nav">
       {#if step > 0}
-        <button class="button" onclick={back}><ArrowLeft size={13} />{step === 1 && testing ? "Change keys" : "Back"}</button>
+        <button class="button" onclick={back}><ArrowLeft size={13} />{step === KEYS_STEP && testing ? "Change keys" : "Back"}</button>
       {/if}
       <span class="spacer"></span>
       {#if step < STEPS.length - 1}
         <button class="button primary" onclick={next}>
-          {step === 1 && !testing ? "Set and test" : "Next"}<ArrowRight size={13} />
+          {step === KEYS_STEP && !testing ? "Set and test" : "Next"}<ArrowRight size={13} />
         </button>
       {:else}
         <button class="button primary" onclick={finish} disabled={finishing}>
