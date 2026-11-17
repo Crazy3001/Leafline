@@ -5,7 +5,8 @@
   import Card from "./Card.svelte";
   import MapNote from "./MapNote.svelte";
   import MapDataPanel from "./map/MapDataPanel.svelte";
-  import MapDetailsView from "./map/MapDetailsView.svelte";
+  import MapDetailsView, { mapFacts } from "./map/MapDetailsView.svelte";
+  import Ref from "./Ref.svelte";
   import MapPicker from "./map/MapPicker.svelte";
   import GoTo from "./map/GoTo.svelte";
   import GoButton from "./GoButton.svelte";
@@ -31,6 +32,8 @@
   } = $props();
 
   const compact = $derived(variant !== "full");
+  /** In a tab, the map's parts are cards of their own under its heading, not one long card. */
+  const split = $derived(variant === "compact" && !plain);
 
   watchMapData();
 
@@ -80,13 +83,34 @@
   // A poor match, or other maps nearly as close: let the user correct it. OCR slips a letter
   // often, so a lone good match isn't worth a warning.
   const doubtful = $derived(!!found && !browsing && (found.score < 0.85 || found.alternatives.length > 0));
+
+  /** The parts of the map shown, for the chips that jump to them. */
+  const jumps = $derived.by(() => {
+    const d = shown;
+    if (!d) return [];
+    const some = d.mobs.length > 0;
+    return [
+      { id: "map-portals", label: "Portals", count: d.exits.length as number | null, show: true },
+      { id: "map-monsters", label: "Monsters", count: d.mobTotal, show: some },
+      { id: "map-drops", label: "Drops", count: null, show: some },
+      { id: "map-quests", label: "Quests", count: d.quests.length, show: d.quests.length > 0 },
+      { id: "map-npcs", label: "NPCs", count: d.npcs.length, show: d.npcs.length > 0 },
+      { id: "map-shops", label: "Shops", count: d.shops?.length ?? 0, show: (d.shops?.length ?? 0) > 0 },
+    ].filter((j) => j.show);
+  });
+
+  /** Opens a part if it is folded and brings it to the top. */
+  function jumpTo(id: string) {
+    const part = document.getElementById(id);
+    if (!part) return;
+    const head = part.querySelector<HTMLButtonElement>(":scope > button[aria-expanded]");
+    if (head?.getAttribute("aria-expanded") === "false") head.click();
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    requestAnimationFrame(() => part.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" }));
+  }
 </script>
 
-<Card title="Map" {plain}>
-  {#snippet aside()}
-    {#if map?.collapsed && !browsing}<span>Minimap title</span>{/if}
-  {/snippet}
-
+{#snippet heading()}
   {#if browsing}
     <button class="back" onclick={() => (browsing = null)}>
       <MapPin size={13} />
@@ -111,7 +135,19 @@
           <div class="name">{map.name}</div>
         {/if}
       </div>
+      {#if split && map?.collapsed && !browsing}<span class="source">Minimap title</span>{/if}
     </div>
+    {#if split && shown}
+      {@const facts = mapFacts(shown)}
+      {#if facts.length || shown.returnMap}
+        <div class="facts">
+          {#each facts as fact, i}<span class="fact" class:town={i === 0 && shown.isTown}>{fact}</span>{/each}
+          {#if shown.returnMap}
+            <span class="return">Returns to <Ref kind="map" id={shown.returnMap.id} name={shown.returnMap.name} /></span>
+          {/if}
+        </div>
+      {/if}
+    {/if}
     {#if shown && variant !== "glance"}
       <div class="save-row"><SaveSpot mapId={shown.map.id} name={shown.map.name} text /></div>
     {/if}
@@ -137,35 +173,172 @@
       {/if}
     </div>
   {/if}
+{/snippet}
 
-  <!-- Setting a place is done in the tab; a pinned window follows it in the Route pin. -->
-  {#if ready && variant !== "glance"}
-    <div class="goto"><GoTo /></div>
-  {/if}
-
-  {#if shown}
-    <MapNote mapId={shown.map.id} name={shown.map.name} />
-    {#key shown.map.id}
-      <MapDetailsView details={shown} {current} {variant} onnavigate={navigate} />
-    {/key}
-  {:else if !ready}
-    {#if mapData.status}
-      <div class="setup"><MapDataPanel compact /></div>
+{#if split}
+  <!-- The tab: where to go on top, the map's own card, chips that jump to its parts, then each
+       part as a card. -->
+  {#if ready}<div class="goto top"><GoTo /></div>{/if}
+  <section class="card head">
+    {@render heading()}
+    {#if shown}
+      <MapNote mapId={shown.map.id} name={shown.map.name} />
+    {:else if !ready}
+      {#if mapData.status}
+        <div class="setup"><MapDataPanel compact /></div>
+      {/if}
+    {:else if map && !looking}
+      <p class="empty miss">No map in the data matches this name closely enough.</p>
     {/if}
-  {:else if map && !looking}
-    <p class="empty miss">No map in the data matches this name closely enough.</p>
+  </section>
+  {#if shown}
+    {#if jumps.length > 1}
+      <nav class="jump" aria-label="Jump to a part of this map">
+        {#each jumps as j (j.id)}
+          <button onclick={() => jumpTo(j.id)}>{j.label}{#if j.count != null}<span class="tabular n">{j.count}</span>{/if}</button>
+        {/each}
+      </nav>
+    {/if}
+    {#key shown.map.id}
+      <MapDetailsView details={shown} {current} {variant} split onnavigate={navigate} />
+    {/key}
   {/if}
+{:else}
+  <Card title="Map" {plain}>
+    {#snippet aside()}
+      {#if map?.collapsed && !browsing}<span>Minimap title</span>{/if}
+    {/snippet}
 
-  {#if ready && !compact}
-    <div class="lookup">
-      <MapPicker label="Look up a map" placeholder="Look up any map…" onpick={(m) => navigate(m.id)} />
-    </div>
-  {/if}
-</Card>
+    {@render heading()}
+
+    <!-- Setting a place is done in the tab; a pinned window follows it in the Route pin. -->
+    {#if ready && variant !== "glance"}
+      <div class="goto"><GoTo /></div>
+    {/if}
+
+    {#if shown}
+      <MapNote mapId={shown.map.id} name={shown.map.name} />
+      {#key shown.map.id}
+        <MapDetailsView details={shown} {current} {variant} onnavigate={navigate} />
+      {/key}
+    {:else if !ready}
+      {#if mapData.status}
+        <div class="setup"><MapDataPanel compact /></div>
+      {/if}
+    {:else if map && !looking}
+      <p class="empty miss">No map in the data matches this name closely enough.</p>
+    {/if}
+
+    {#if ready && !compact}
+      <div class="lookup">
+        <MapPicker label="Look up a map" placeholder="Look up any map…" onpick={(m) => navigate(m.id)} />
+      </div>
+    {/if}
+  </Card>
+{/if}
 
 <style>
   .goto {
     margin: var(--space-2) 0;
+  }
+
+  .goto.top {
+    margin: 0 10px 10px;
+  }
+
+  /* The map's own card in the tab; the frame is the shared .card. */
+  .head {
+    margin: 0 10px 10px;
+    padding: 12px 14px 14px;
+  }
+
+  .source {
+    align-self: flex-start;
+    margin-left: auto;
+    color: var(--faint);
+    font-size: var(--text-xs);
+    white-space: nowrap;
+  }
+
+  .facts {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 6px;
+    margin-top: 8px;
+    font-size: var(--text-xs);
+  }
+
+  .fact {
+    color: var(--muted);
+  }
+
+  .fact + .fact::before,
+  .fact + .return::before {
+    content: "·";
+    margin-right: 6px;
+    color: var(--faint);
+  }
+
+  .fact.town {
+    color: var(--good);
+  }
+
+  .return {
+    color: var(--faint);
+  }
+
+  .return :global(.ref) {
+    font-size: var(--text-xs);
+  }
+
+  /* Chips that lead to the parts below. In the overlay they stay in view while the map scrolls. */
+  .jump {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding: 0 10px 10px;
+  }
+
+  :global(#panel) .jump {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    padding-top: 6px;
+    margin-top: -6px;
+    background: var(--bg);
+  }
+
+  .jump button {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 6px;
+    height: var(--control-h-sm);
+    padding: 0 10px;
+    border: var(--line-w) solid var(--control-line);
+    border-radius: var(--radius-pill);
+    background: var(--surface);
+    color: var(--muted);
+    font-size: var(--text-xs);
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .jump button:hover {
+    background: var(--surface-2);
+    color: var(--text);
+  }
+
+  .jump button:focus-visible {
+    outline: 2px solid var(--accent-text);
+    outline-offset: 1px;
+  }
+
+  .jump .n {
+    color: var(--faint);
+    font-size: var(--text-xs);
   }
 
   .save-row {

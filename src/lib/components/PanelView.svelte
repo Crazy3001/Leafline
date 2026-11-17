@@ -17,6 +17,7 @@
     session,
     pinned = false,
     roomy = false,
+    shelled = false,
   }: {
     panel: Panel;
     analysis: Analysis | null;
@@ -24,6 +25,8 @@
     pinned?: boolean;
     /** A tall column with room, as in the desk view: panels that split into views show them all. */
     roomy?: boolean;
+    /** Under the main window's header, which shows the level, name, job and EXP: panels leave those out. */
+    shelled?: boolean;
   } = $props();
 </script>
 
@@ -33,7 +36,7 @@
 
 {#if panel === "character"}
   <!-- One card for who the character is and where the build plan has them, so the level shows once. -->
-  <CharacterCard hud={analysis?.hud ?? null} mesos={analysis?.mesos ?? null} {session} remember plain={pinned} linkTrain={!pinned}>
+  <CharacterCard hud={analysis?.hud ?? null} mesos={analysis?.mesos ?? null} {session} remember plain={pinned} linkTrain={!pinned} trim={shelled}>
     <BuildSection level={analysis?.hud?.level ?? session?.level ?? null} character={analysis?.hud?.name ?? null} glance={pinned} />
   </CharacterCard>
 {:else if panel === "map"}

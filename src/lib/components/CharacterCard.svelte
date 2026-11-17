@@ -17,6 +17,7 @@
     remember = false,
     plain = false,
     linkTrain = false,
+    trim = false,
     children,
   }: {
     hud: HudReading | null;
@@ -27,6 +28,9 @@
     plain?: boolean;
     /** Link the session's rate to the Train tab, which has the rest. Off where there is no tab. */
     linkTrain?: boolean;
+    /** Under the main window's header, which already shows the level, name, job, EXP and time to
+     *  level: only the mesos, HP and MP, and what follows as a card of its own. */
+    trim?: boolean;
     /** More about the character under the rates, in the same card: the overlay puts the build plan here. */
     children?: Snippet;
   } = $props();
@@ -81,6 +85,33 @@
   });
 </script>
 
+{#snippet purse()}
+  <div class="mesos tabular">
+    <span class="coin" aria-hidden="true"></span>
+    {#if mesos}
+      {formatNumber(mesos.mesos)} mesos
+    {:else if session?.mesos != null}
+      {formatNumber(session.mesos)} mesos
+      <span class="seen">({formatDuration(session.mesosAge)} ago)</span>
+    {:else if known}
+      <span>{formatNumber(known.mesos)} mesos</span>
+      <span class="seen">({formatAgo(now - known.seenAt)})</span>
+    {:else}
+      Mesos not visible
+    {/if}
+  </div>
+{/snippet}
+
+{#if trim}
+  <section class="card vitals" aria-label="Mesos, HP and MP">
+    <div class="gauges two">
+      <Gauge label="HP" color="var(--hp)" fraction={fraction(hud?.hp)} value={gaugeText(hud?.hp)} />
+      <Gauge label="MP" color="var(--mp)" fraction={fraction(hud?.mp)} value={gaugeText(hud?.mp)} />
+    </div>
+    {@render purse()}
+  </section>
+  {#if children}<section class="card more">{@render children()}</section>{/if}
+{:else}
 <Card title="Character" {plain}>
   {#snippet aside()}
     {#if hud?.job}<span>{hud.job}</span>{/if}
@@ -96,20 +127,7 @@
         {displayName ?? "Unknown character"}
         {#if lastPlayed}<span class="seen">last played</span>{/if}
       </div>
-      <div class="mesos tabular">
-        <span class="coin" aria-hidden="true"></span>
-        {#if mesos}
-          {formatNumber(mesos.mesos)} mesos
-        {:else if session?.mesos != null}
-          {formatNumber(session.mesos)} mesos
-          <span class="seen">({formatDuration(session.mesosAge)} ago)</span>
-        {:else if known}
-          <span>{formatNumber(known.mesos)} mesos</span>
-          <span class="seen">({formatAgo(now - known.seenAt)})</span>
-        {:else}
-          Mesos not visible
-        {/if}
-      </div>
+      {@render purse()}
     </div>
   </div>
 
@@ -141,6 +159,7 @@
   {/if}
   {@render children?.()}
 </Card>
+{/if}
 
 <style>
   .to-train {
@@ -251,5 +270,22 @@
   .gauges {
     display: grid;
     gap: 8px;
+  }
+
+  /* Under the window's header: the frame is the shared .card. */
+  .vitals,
+  .more {
+    margin: 0 10px 10px;
+    padding: 12px 14px 14px;
+  }
+
+  .vitals {
+    display: grid;
+    gap: 10px;
+  }
+
+  .gauges.two {
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
   }
 </style>

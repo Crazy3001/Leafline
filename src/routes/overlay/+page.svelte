@@ -309,7 +309,7 @@
             <NowScreen analysis={live.analysis} session={live.session} ongo={select} />
           {:else if live.analysis || live.session || tab === "me" || tab === "quests"}
             <!-- A build can be planned and quests looked up with nothing read yet. -->
-            <div class="panel"><PanelView panel={tabInfo(tab).panel} analysis={live.analysis} session={live.session} /></div>
+            <div class="panel"><PanelView panel={tabInfo(tab).panel} analysis={live.analysis} session={live.session} shelled /></div>
           {:else}
             <Welcome />
           {/if}

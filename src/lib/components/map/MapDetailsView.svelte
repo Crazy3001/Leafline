@@ -1,3 +1,20 @@
+<script lang="ts" module>
+  import type { MapDetails as Details } from "$lib/types";
+
+  /** A map in a few words: a town or not, its monsters' levels, its region. */
+  export function mapFacts(details: Details): string[] {
+    return [
+      details.isTown ? "Town" : null,
+      details.levelRange
+        ? details.levelRange[0] === details.levelRange[1]
+          ? `Lv ${details.levelRange[0]}`
+          : `Lv ${details.levelRange[0]}–${details.levelRange[1]}`
+        : null,
+      details.region,
+    ].filter((f): f is string => !!f);
+  }
+</script>
+
 <script lang="ts">
   // Everything the cached data says about one map: its picture with the marks on it, where its
   // portals lead, its monsters, drops, quests, NPCs and shops.
@@ -17,13 +34,15 @@
   import ShopStock from "../item/ShopStock.svelte";
   import RouteFromHere from "./RouteFromHere.svelte";
   import RoutePlanner from "./RoutePlanner.svelte";
-  import Section from "./Section.svelte";
+  import Section, { SECTION_LOOK } from "./Section.svelte";
+  import { setContext } from "svelte";
   import Segmented from "$lib/ui/Segmented.svelte";
 
   let {
     details,
     current = null,
     variant = "full",
+    split = false,
     onnavigate,
   }: {
     details: MapDetails;
@@ -31,11 +50,18 @@
     current?: MapRef | null;
     /** `glance` keeps the facts and the monsters, for a pinned window. */
     variant?: "full" | "compact" | "glance";
+    /** In the Map tab: each section a card of its own with an id to jump to, and the facts left
+     *  to the map's own card above. */
+    split?: boolean;
     onnavigate: (id: number) => void;
   } = $props();
 
   const compact = $derived(variant !== "full");
   const glance = $derived(variant === "glance");
+  // svelte-ignore state_referenced_locally
+  if (split) setContext(SECTION_LOOK, "cards");
+  /** A section's id, where chips jump to it. */
+  const anchor = (name: string) => (split ? `map-${name}` : undefined);
   watchQuestLog();
   /** The player's map, while they look at another. */
   const away = $derived(current && current.id !== details.map.id ? current : null);
@@ -43,17 +69,7 @@
   /** Shops opened to show what they sell, by NPC name. */
   let openShops = $state<string[]>([]);
 
-  const facts = $derived(
-    [
-      details.isTown ? "Town" : null,
-      details.levelRange
-        ? details.levelRange[0] === details.levelRange[1]
-          ? `Lv ${details.levelRange[0]}`
-          : `Lv ${details.levelRange[0]}–${details.levelRange[1]}`
-        : null,
-      details.region,
-    ].filter((f): f is string => !!f),
-  );
+  const facts = $derived(mapFacts(details));
   const monsterNames = $derived([...new Set(details.mobs.map((m) => m.name))]);
   /** The desk view has room for the map's picture; over the game it waits to be opened. */
   const desk = typeof location !== "undefined" && location.pathname.startsWith("/desk");
@@ -117,7 +133,7 @@
   });
 </script>
 
-{#if facts.length || details.returnMap}
+{#if !split && (facts.length || details.returnMap)}
   <div class="facts">
     {#each facts as fact, i}<span class="fact" class:town={i === 0 && details.isTown}>{fact}</span>{/each}
     {#if details.returnMap}
@@ -130,7 +146,7 @@
 {/if}
 
 {#if display.showPictures}
-  <Section title="Map" memory="map-picture-{desk ? 'desk' : 'overlay'}" open={desk}>
+  <Section title={split ? "Picture" : "Map"} memory="map-picture-{desk ? 'desk' : 'overlay'}" open={desk} anchor={anchor("picture")}>
     <MapPicture
       mapId={details.map.id}
       {picture}
@@ -152,7 +168,7 @@
 {/if}
 
 {#if !glance}
-  <Section title="Portals" count={details.exits.length}>
+  <Section title="Portals" count={details.exits.length} anchor={anchor("portals")}>
     {#snippet aside()}
       {#if placed && !located}<span>rough positions</span>{/if}
     {/snippet}
@@ -185,7 +201,7 @@
 {/if}
 
 {#if details.mobs.length}
-  <Section title="Monsters" count={details.mobTotal}>
+  <Section title="Monsters" count={details.mobTotal} anchor={anchor("monsters")}>
     {#snippet aside()}<span use:tip={"Base EXP for killing every monster once, before any modifiers"}
         >{formatCompact(details.expPerClear)} EXP / clear</span
       >{/snippet}
@@ -215,14 +231,14 @@
 <!-- A pinned window stops at the monsters; portals, drops, quests, NPCs and routes are in the tab. -->
 {#if !glance}
 {#if monsterNames.length}
-  <Section title="Drops">
+  <Section title="Drops" anchor={anchor("drops")}>
     <MapDrops monsters={monsterNames} />
   </Section>
 {/if}
 
 {#if details.quests.length}
   {@const left = notDone(details.quests.map((need) => need.quest.id))}
-  <Section title="Quests hunting here" count={details.quests.length} open={!compact && details.quests.length <= 4}>
+  <Section title="Quests hunting here" count={details.quests.length} open={!compact && details.quests.length <= 4} anchor={anchor("quests")}>
     {#if left != null}
       <p class="undone">{left === 0 ? "Your quest log shows them all done." : `${left} not done, going by your quest log.`}</p>
     {/if}
@@ -244,7 +260,7 @@
 {/if}
 
 {#if details.npcs.length}
-  <Section title="NPCs" count={details.npcs.length} open={!compact}>
+  <Section title="NPCs" count={details.npcs.length} open={!compact} anchor={anchor("npcs")}>
     <ul class="npcs">
       {#each details.npcs as npc (npc.id)}
         <li>
@@ -261,7 +277,7 @@
 {/if}
 
 {#if details.shops?.length}
-  <Section title="Shops" count={details.shops.length} open={!compact}>
+  <Section title="Shops" count={details.shops.length} open={!compact} anchor={anchor("shops")}>
     <ul class="shops">
       {#each details.shops as shop (shop.npc)}
         {@const open = openShops.includes(shop.npc)}
