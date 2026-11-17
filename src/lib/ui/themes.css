@@ -87,8 +87,9 @@
 }
 
 /*
- * Sprout Light: cream paper, white cards with a thick ink outline and a sticker edge under them,
- * rounded letters, pastel number tiles.
+ * Sprout Light: oat paper, cream cards with a thick ink outline and a sticker edge under them,
+ * rounded letters, soft pastel number tiles. Nothing is pure white, and the header and the tab bar
+ * are cocoa, so the window doesn't glare beside the game.
  */
 :root[data-theme="sprout-light"],
 [data-theme="sprout-light"] {
@@ -99,77 +100,79 @@
   --weight-body: 600;
   --weight-strong: 800;
 
-  --bg: #fff4e0;
-  --surface: #ffffff;
-  --surface-2: #fbeed6;
-  --surface-3: #f3e6cf;
-  --surface-raised: #ffffff;
-  --glass: rgba(255, 244, 224, 0.97);
-  --track: #f3e6cf;
-  --border: rgba(59, 42, 32, 0.16);
-  --border-strong: rgba(59, 42, 32, 0.36);
+  --bg: #e2d1b1;
+  --surface: #f5ebd7;
+  --surface-2: #ebdec4;
+  --surface-3: #dfcfb0;
+  --surface-raised: #f9f1e1;
+  --glass: rgba(226, 209, 177, 0.97);
+  --track: #d6c4a2;
+  --border: rgba(59, 42, 32, 0.18);
+  --border-strong: rgba(59, 42, 32, 0.38);
   --line: #3b2a20;
   --control-line: #3b2a20;
-  --well: rgba(59, 42, 32, 0.07);
+  --well: rgba(59, 42, 32, 0.08);
   --line-w: 2px;
   --highlight: transparent;
   --hover: rgba(59, 42, 32, 0.07);
   --press: rgba(59, 42, 32, 0.13);
-  --scrim: rgba(59, 42, 32, 0.45);
+  --scrim: rgba(40, 28, 20, 0.5);
 
   --text: #3b2a20;
-  --muted: #6f5848;
-  --faint: #7a6252;
+  --muted: #5c483a;
+  --faint: #645042;
 
-  --accent: #ffa24d;
-  --accent-strong: #ffb873;
-  --accent-soft: rgba(255, 162, 77, 0.26);
+  --accent: #f79a45;
+  --accent-strong: #ffb06a;
+  --accent-soft: rgba(247, 154, 69, 0.26);
   --accent-ink: #3b2a20;
-  --accent-sub: #5a3410;
-  --accent-text: #a34c00;
-  --accent-text-strong: #7d3a00;
+  --accent-sub: #55300d;
+  --accent-text: #8c4100;
+  --accent-text-strong: #6e3300;
 
-  --hp: #e8504a;
-  --mp: #3d8fe6;
-  --exp: #ffd23f;
-  --exp-text: #8a6400;
-  --map: #96600a;
-  --travel: #0c7464;
-  --good: #2a8540;
-  --good-soft: rgba(47, 143, 67, 0.16);
+  --hp: #de4a44;
+  --mp: #3987db;
+  --exp: #f2c230;
+  --exp-text: #725200;
+  --map: #7c4e05;
+  --travel: #076357;
+  --good: #1a5f2d;
+  --good-soft: rgba(26, 95, 45, 0.14);
   --good-ink: #ffffff;
-  --warn: #b05208;
-  --warn-soft: rgba(176, 82, 8, 0.14);
-  --bad: #c93a26;
-  --bad-soft: rgba(201, 58, 38, 0.12);
-  --mesos: #a34c00;
+  --warn: #893d05;
+  --warn-soft: rgba(137, 61, 5, 0.14);
+  --bad: #a0291a;
+  --bad-soft: rgba(160, 41, 26, 0.12);
+  --mesos: #8c4100;
 
-  --ref-item: #1f62c4;
-  --ref-mob: #c93a26;
-  --ref-npc: #0c7464;
-  --ref-map: #96600a;
-  --ref-skill: #6a3fc0;
+  --ref-item: #1a54aa;
+  --ref-mob: #a0291a;
+  --ref-npc: #076357;
+  --ref-map: #7c4e05;
+  --ref-skill: #5a35a8;
 
-  --header-bg: #fff4e0;
-  --header-text: #3b2a20;
-  --header-muted: #6f5848;
-  --header-faint: #7a6252;
-  --header-track: #f3e6cf;
-  --header-hover: #fbeed6;
-  --header-good: #2a8540;
-  --header-exp: #8a6400;
-  --header-accent: #a34c00;
-  --nav-bg: #ffffff;
-  --nav-text: #7a6252;
-  --nav-line: #3b2a20;
+  --header-bg: #3b2a20;
+  --header-text: #fff1dc;
+  --header-muted: #dcc9b6;
+  --header-faint: #cbb5a0;
+  --header-track: #5c4536;
+  --header-hover: #4e3a2d;
+  --header-good: #a4e0a8;
+  --header-exp: #ffd23f;
+  --header-accent: #ffb873;
+  --header-radius: 0 0 20px 20px;
+  --header-gap: 12px;
+  --nav-bg: #3b2a20;
+  --nav-text: #d6c1ad;
+  --nav-line: #1e140e;
 
-  --tile-1: #ffe9a8;
-  --tile-2: #ffd0dc;
+  --tile-1: #efd994;
+  --tile-2: #eec1c8;
   --tile-text: #3b2a20;
-  --tile-label: #6b5444;
+  --tile-label: #5c483a;
   --tile-border: #3b2a20;
-  --tile-good: #1f6e33;
-  --tile-mesos: #a34c00;
+  --tile-good: #185729;
+  --tile-mesos: #8c4100;
   --tile-exp-line: #3b2a20;
   --tile-mesos-line: #3b2a20;
   --window-line: #3b2a20;
@@ -181,9 +184,9 @@
   --control-shadow: 0 2px 0 #3b2a20;
   --go-shadow: 0 4px 0 #3b2a20;
   --shadow: 0 4px 0 #3b2a20;
-  --shadow-lg: 0 6px 0 #3b2a20, 0 18px 40px rgba(59, 42, 32, 0.25);
-  --scroll-thumb: rgba(59, 42, 32, 0.25);
-  --scroll-thumb-hover: rgba(59, 42, 32, 0.4);
+  --shadow-lg: 0 6px 0 #3b2a20, 0 18px 40px rgba(59, 42, 32, 0.28);
+  --scroll-thumb: rgba(59, 42, 32, 0.28);
+  --scroll-thumb-hover: rgba(59, 42, 32, 0.44);
 }
 
 /* Sprout Dark: the same stickers on plum, for playing after dark. */
