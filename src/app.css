@@ -4,12 +4,12 @@
 @import "./lib/ui/themes.css";
 
 :root,
-[data-theme="ember"] {
+[data-theme="ember-dark"] {
   color-scheme: dark;
 
   /*
-   * Everything below is the Ember look, the default. The other three looks (Ember Light, Sprout,
-   * Sprout Night) change these same names in ui/themes.css; the layout never changes with a look.
+   * Everything below is the Ember Dark look, the default. The other three looks (Ember Light, Sprout
+   * Light, Sprout Dark) change these same names in ui/themes.css; the layout never changes with a look.
    */
   --font-sans: "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
   --font-display: "Space Grotesk", "Inter", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
@@ -226,7 +226,7 @@ button {
 }
 
 /*
- * The one card: a surface with the look's outline, corners and edge. A hairline in Ember, a top
+ * The one card: a surface with the look's outline, corners and edge. A hairline in Ember Dark, a top
  * light and soft drop in Ember Light, thick ink and a sticker edge in Sprout.
  */
 .card {

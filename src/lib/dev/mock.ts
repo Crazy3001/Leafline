@@ -242,7 +242,7 @@ let displaySettings: DisplaySettings = {
   setupDone: true,
   updateCheck: false,
   showPictures: true,
-  theme: "ember",
+  theme: "ember-dark",
   buildRules: { apPerLevel: 5, spPerLevel: 3, beginnerSpPerLevel: 1, advancementSp: 1, firstJobLevel: 10, secondJobLevel: 30 },
 };
 

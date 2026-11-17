@@ -32,8 +32,8 @@
     {@const on = display.theme === t.id}
     <button class="choice" class:on role="radio" aria-checked={on} tabindex={on ? 0 : -1} data-id={t.id} onclick={() => pick(t.id)}>
       <!-- A small window in this look. Decoration only: the name under it says which. -->
-      <!-- The other looks are written as changes to Ember, so each preview starts from Ember. -->
-      <span class="base" data-theme="ember" aria-hidden="true">
+      <!-- The other looks are written as changes to Ember Dark, so each preview starts from it. -->
+      <span class="base" data-theme="ember-dark" aria-hidden="true">
       <span class="mini" data-theme={t.id}>
         <span class="m-head">
           <span class="m-ring"></span>

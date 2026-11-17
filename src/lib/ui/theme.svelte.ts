@@ -1,5 +1,5 @@
 // The look every window is drawn in: one of four sets of colours, fonts, corners and outlines
-// over the same layout (app.css for Ember, ui/themes.css for the rest).
+// over the same layout (app.css for Ember Dark, ui/themes.css for the rest).
 
 import { display, settingsLoad, watchSettings } from "$lib/settings.svelte";
 import type { Theme } from "$lib/types";
@@ -13,10 +13,10 @@ export interface ThemeChoice {
 }
 
 export const THEMES: ThemeChoice[] = [
-  { id: "ember", name: "Ember", line: "Dark graphite and amber", dark: true },
+  { id: "ember-dark", name: "Ember Dark", line: "Graphite and amber", dark: true },
   { id: "ember-light", name: "Ember Light", line: "Warm stone, dark header", dark: false },
-  { id: "sprout", name: "Sprout", line: "Cream, ink and stickers", dark: false },
-  { id: "sprout-night", name: "Sprout Night", line: "Sprout after dark", dark: true },
+  { id: "sprout-light", name: "Sprout Light", line: "Cream, ink and stickers", dark: false },
+  { id: "sprout-dark", name: "Sprout Dark", line: "Plum, ink and stickers", dark: true },
 ];
 
 /** Remembered per window so a window opens in its look before the settings arrive. */
@@ -55,7 +55,7 @@ export function followTheme() {
   if (first) document.documentElement.dataset.theme = first;
   watchSettings();
   $effect(() => {
-    const theme = known(display.theme) ? display.theme : "ember";
+    const theme = known(display.theme) ? display.theme : "ember-dark";
     if (settingsLoad.done || !first) apply(theme);
   });
 }

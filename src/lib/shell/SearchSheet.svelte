@@ -178,6 +178,21 @@
     browsing = true;
   }
 
+  /** One thing's page is open, so the row that switches kinds would only be in the way. */
+  const onPage = $derived(
+    lookup.mode === "items"
+      ? itemView.id != null
+      : lookup.mode === "monsters"
+        ? monsterView.id != null
+        : lookup.mode === "maps"
+          ? mapView.id != null
+          : lookup.mode === "npcs"
+            ? npcView.id != null
+            : lookup.mode === "skills"
+              ? skillView.id != null
+              : false,
+  );
+
   const npcLine = (n: NpcRow) => [n.map, n.maps > 1 ? `+${n.maps - 1} more` : null].filter(Boolean).join(" · ") || null;
   const skillLine = (s: SkillInfo) => `${s.className}${s.jobTier && s.jobTier !== s.className ? ` · ${s.jobTier}` : ""}${s.passive ? " · passive" : ""}`;
 </script>
@@ -313,6 +328,7 @@
   {#if words}
     <button class="back" onclick={() => (browsing = false)}><ArrowLeft size={13} />Results for “{words}”</button>
   {/if}
+  <div class="lookup" class:page={onPage}>
   <LookupPanel
     tooltips={live.analysis?.tooltips ?? []}
     {level}
@@ -322,6 +338,7 @@
     quest={live.analysis?.quest ?? null}
     session={live.session}
   />
+  </div>
 {/if}
 
 <style>
@@ -494,6 +511,10 @@
   .tool-line {
     color: var(--faint);
     font-size: var(--text-xs);
+  }
+
+  .lookup.page :global(.modes) {
+    display: none;
   }
 
   .quiet {

@@ -83,13 +83,13 @@ impl Default for Settings {
 pub enum Theme {
     /// Dark graphite and amber.
     #[default]
-    Ember,
+    EmberDark,
     /// Ember on warm stone, with the header and tab bar kept dark.
     EmberLight,
     /// Light and playful: cream, ink outlines, rounded letters.
-    Sprout,
-    /// Sprout after dark.
-    SproutNight,
+    SproutLight,
+    /// The same stickers on plum.
+    SproutDark,
 }
 
 /// How the compact HUD was laid out. Since 2026-11-05 it has one layout and this is no longer

@@ -1,6 +1,6 @@
 /*
- * The three looks beside Ember. Each one only renames colours, fonts, corners and outlines that
- * app.css sets for Ember on :root; no layout rule belongs here. The look is the `data-theme` on
+ * The three looks beside Ember Dark. Each one only renames colours, fonts, corners and outlines that
+ * app.css sets for Ember Dark on :root; no layout rule belongs here. The look is the `data-theme` on
  * <html>, set from the settings (see theme.svelte.ts).
  */
 
@@ -87,11 +87,11 @@
 }
 
 /*
- * Sprout: cream paper, white cards with a thick ink outline and a sticker edge under them,
+ * Sprout Light: cream paper, white cards with a thick ink outline and a sticker edge under them,
  * rounded letters, pastel number tiles.
  */
-:root[data-theme="sprout"],
-[data-theme="sprout"] {
+:root[data-theme="sprout-light"],
+[data-theme="sprout-light"] {
   color-scheme: light;
 
   --font-sans: "Nunito", "Segoe UI", system-ui, -apple-system, sans-serif;
@@ -186,9 +186,9 @@
   --scroll-thumb-hover: rgba(59, 42, 32, 0.4);
 }
 
-/* Sprout Night: the same stickers on plum, for playing after dark. */
-:root[data-theme="sprout-night"],
-[data-theme="sprout-night"] {
+/* Sprout Dark: the same stickers on plum, for playing after dark. */
+:root[data-theme="sprout-dark"],
+[data-theme="sprout-dark"] {
   color-scheme: dark;
 
   --font-sans: "Nunito", "Segoe UI", system-ui, -apple-system, sans-serif;
