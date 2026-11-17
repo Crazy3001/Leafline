@@ -338,7 +338,14 @@
             {:else if over.page === "tracked"}
               <TrackedItems map={live.analysis?.map ?? null} />
             {:else if over.page === "characters"}
-              <CharacterPicker />
+              {#if characters.known.length > 1}
+                <CharacterPicker />
+              {:else}
+                <p class="tool-note">
+                  {characters.active ? `Leafline has only seen ${characters.active} so far.` : "Leafline hasn't read a character's name yet."}
+                  Once it has sessions for a second character, pick here whose numbers the tabs show.
+                </p>
+              {/if}
             {/if}
           </div>
         </Sheet>
@@ -456,5 +463,21 @@
   .tool {
     display: grid;
     align-content: start;
+    padding: 10px 0;
+  }
+
+  /* The drop log brings no margins of its own: it was made for the training log's wide page. */
+  .tool :global(.split),
+  .tool :global(.empty),
+  .tool :global(.problem) {
+    margin-right: 10px;
+    margin-left: 10px;
+  }
+
+  .tool-note {
+    margin: 4px 14px;
+    color: var(--muted);
+    font-size: var(--text-sm);
+    line-height: 1.5;
   }
 </style>

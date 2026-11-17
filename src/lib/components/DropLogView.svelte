@@ -120,6 +120,17 @@
     align-items: start;
   }
 
+  /* In a narrow window (the Tools sheet) the two panels stack, and the wide table scrolls sideways. */
+  @media (max-width: 560px) {
+    .split {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .panel.list {
+      overflow-x: auto;
+    }
+  }
+
   .panel {
     padding: 12px 14px;
     border: 1px solid var(--border);
