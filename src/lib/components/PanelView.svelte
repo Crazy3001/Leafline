@@ -16,7 +16,15 @@
     analysis,
     session,
     pinned = false,
-  }: { panel: Panel; analysis: Analysis | null; session: SessionSummary | null; pinned?: boolean } = $props();
+    roomy = false,
+  }: {
+    panel: Panel;
+    analysis: Analysis | null;
+    session: SessionSummary | null;
+    pinned?: boolean;
+    /** A tall column with room, as in the desk view: panels that split into views show them all. */
+    roomy?: boolean;
+  } = $props();
 </script>
 
 {#snippet empty(text: string)}
@@ -35,7 +43,7 @@
     {@render empty("The minimap isn't in view. Its map's details show here when it is.")}
   {/if}
 {:else if panel === "train"}
-  <TrainPanel level={analysis?.hud?.level ?? session?.level ?? null} map={analysis?.map ?? null} {session} glance={pinned} />
+  <TrainPanel level={analysis?.hud?.level ?? session?.level ?? null} map={analysis?.map ?? null} {session} glance={pinned} whole={roomy} />
 {:else if panel === "quests"}
   <QuestPanel
     quest={analysis?.quest ?? null}

@@ -1,8 +1,8 @@
 <script lang="ts">
-  // The Train tab: the session being played (rates, the level goal, a graph of the whole session,
-  // how this map compares with your bests on it, the maps played), then where to train next, with
-  // a jump to it from the top. Before a session starts: the goal, where to train, your best maps
-  // and the last sessions.
+  // The Train tab, one of three views at a time, picked by chips. Session: the session being
+  // played (rates, the level goal, how this map compares with your bests on it, the maps played, a
+  // graph of the whole session), or before one starts, how it starts and the goal. Where to
+  // train: the maps for your level. History: your best maps and the last sessions.
   import { tip } from "$lib/tip.svelte";
   import Ref from "$lib/components/Ref.svelte";
   import SessionControls from "./SessionControls.svelte";
@@ -51,6 +51,7 @@
     map = null,
     session = null,
     glance = false,
+    whole = false,
   }: {
     level: number | null;
     map?: MapReading | null;
@@ -58,6 +59,8 @@
     /** A pinned window's short form: the session's rates and controls, and timers. The graph,
      *  the maps, where to train and past sessions stay in the tab. */
     glance?: boolean;
+    /** Where there is room, as in the desk view: every view stacked, with no chips. */
+    whole?: boolean;
   } = $props();
 
   watchHistory();
@@ -66,6 +69,36 @@
   let metric = $state<Metric>(storedMetric());
 
   const tracking = $derived(session != null && session.activeSeconds > 0);
+
+  type View = "session" | "where" | "history";
+  const VIEW_KEY = "leafline.train.view";
+  const VIEWS: { id: View; label: string }[] = [
+    { id: "session", label: "Session" },
+    { id: "where", label: "Where to train" },
+    { id: "history", label: "History" },
+  ];
+  function storedView(): View {
+    try {
+      const saved = localStorage.getItem(VIEW_KEY);
+      if (VIEWS.some((v) => v.id === saved)) return saved as View;
+    } catch {
+      // Starts on the session.
+    }
+    return "session";
+  }
+  let view = $state<View>(storedView());
+  function setView(next: View) {
+    view = next;
+    try {
+      localStorage.setItem(VIEW_KEY, next);
+    } catch {
+      // A convenience only.
+    }
+  }
+  /** What shows. A pinned window has only the session; the desk view stacks all of it. */
+  const onSession = $derived(glance || whole || view === "session");
+  const onWhere = $derived(!glance && (whole || view === "where"));
+  const onHistory = $derived(!glance && (whole ? !tracking : view === "history"));
   const percentOnly = $derived(session?.percentOnly ?? false);
   const signed = (value: number) => (value > 0 ? `+${formatNumber(value)}` : formatNumber(value));
 
@@ -257,6 +290,10 @@
 {/snippet}
 
 {#if !glance}<CharacterPicker />{/if}
+{#if !glance && !whole}
+  <div class="views"><Segmented label="Train shows" options={VIEWS} value={view} onchange={setView} /></div>
+{/if}
+{#if onSession}
 <Block title="Session">
   {#snippet aside()}
     {#if session?.held}
@@ -271,7 +308,7 @@
     {/if}
   {/snippet}
 
-  <SessionControls trailing={tracking && !glance ? jump : undefined} />
+  <SessionControls trailing={tracking && whole && !glance ? jump : undefined} />
 
   {#if !tracking && glance}
     <p class="caption">Starts with your first EXP.</p>
@@ -290,8 +327,9 @@
     </div>
   {/if}
 </Block>
+{/if}
 
-{#if tracking && session && headline}
+{#if tracking && session && headline && onSession}
   <Block>
     <div class="headline">
       <div class="big">
@@ -485,8 +523,22 @@
       {/if}
     </Block>
   {/if}
-  <!-- Where to go next sits under the live numbers; the rate graph is detail, last. -->
-  <SpotList {level} {map} {session} bind:better bind:this={spotList} />
+  {/if}
+{:else if onSession && !glance}
+  <!-- No session yet: how it starts, above, then the goal. -->
+  <Block title="Level goal">
+    <LevelGoal {level} percent={session?.percent ?? null} character={session?.name ?? characters.active} />
+  </Block>
+{/if}
+
+{#if !glance}
+  <!-- Stays in the page while another view shows: it works out the better-map line for This map. -->
+  <div class="view" class:off={!onWhere}>
+    <SpotList {level} {map} {session} bind:better bind:this={spotList} />
+  </div>
+{/if}
+
+{#if tracking && session && headline && onSession && !glance}
   <Block title="This session">
     {#snippet aside()}
       <Segmented
@@ -520,15 +572,11 @@
       <p class="caption">The graph starts after 5 minutes of play.</p>
     {/if}
   </Block>
-  {/if}
-{:else if !glance}
-  <!-- No session yet: the goal and where to train come first, your bests and the last sessions after. -->
-  <Block title="Level goal">
-    <LevelGoal {level} percent={session?.percent ?? null} character={session?.name ?? characters.active} />
-  </Block>
-  <SpotList {level} {map} {session} last={!lastOne && !bests.length} />
+{/if}
+
+{#if onHistory}
   {#if bests.length}
-    <Block title="Your best maps" last={!lastOne}>
+    <Block title="Your best maps">
       {#snippet aside()}<span>Best single run, 10 min or more</span>{/snippet}
       <table>
         <thead><tr><th>Map</th><th>EXP / hr</th><th>Mesos / hr</th><th>When</th></tr></thead>
@@ -549,9 +597,7 @@
       </table>
     </Block>
   {/if}
-{/if}
-
-{#if !(tracking && session && headline) && lastOne && !glance}
+  {#if lastOne}
   <Block title="Last time">
     {#snippet aside()}
       {#if lastOne.character}<span>{lastOne.character}{lastOne.job ? ` · ${lastOne.job}` : ""}</span>{/if}
@@ -575,11 +621,34 @@
     </ul>
     <div><Button onclick={openTrainingLog}>All sessions</Button></div>
   </Block>
+  {:else if !whole}
+    <Block title="Past sessions">
+      <p class="caption">
+        Nothing saved yet. A session is saved when it ends; your best maps and your last sessions then show here, and
+        all of them in the training log.
+      </p>
+      <div><Button onclick={openTrainingLog}>Training log</Button></div>
+    </Block>
+  {/if}
 {/if}
 
-<TimersCard />
+{#if onSession}<TimersCard />{/if}
 
 <style>
+  /* A block pads itself; the chips sit beside blocks, so they match it. */
+  .views {
+    display: flex;
+    padding: 0 10px 10px;
+  }
+
+  .view {
+    display: contents;
+  }
+
+  .view.off {
+    display: none;
+  }
+
   .state {
     display: inline-flex;
     align-items: center;

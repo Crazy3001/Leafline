@@ -393,7 +393,7 @@
                 {:else if panel === "planner"}
                   <BuildPlanner embedded />
                 {:else}
-                  <PanelView {panel} analysis={live.analysis} session={live.session} />
+                  <PanelView {panel} analysis={live.analysis} session={live.session} roomy />
                 {/if}
               {/key}
             </div>
