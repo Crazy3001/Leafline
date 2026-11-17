@@ -229,7 +229,7 @@
     border: 1px solid var(--accent);
     border-radius: var(--radius-sm);
     background: var(--accent);
-    color: var(--bg);
+    color: var(--accent-ink);
     font-size: var(--text-sm);
     font-weight: 600;
     cursor: pointer;

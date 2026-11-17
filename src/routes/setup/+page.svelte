@@ -758,7 +758,7 @@
   .button.primary {
     border-color: var(--accent);
     background: var(--accent);
-    color: #1c1305;
+    color: var(--accent-ink);
     font-weight: 600;
   }
 

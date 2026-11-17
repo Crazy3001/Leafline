@@ -310,7 +310,7 @@
     border: 0;
     border-radius: var(--radius-sm);
     background: var(--accent);
-    color: #1a1204;
+    color: var(--accent-ink);
     font-size: var(--text-sm);
     font-weight: 600;
     cursor: pointer;

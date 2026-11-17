@@ -254,7 +254,7 @@
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: transparent;
-    color: var(--bg);
+    color: var(--accent-ink);
     transform: translateY(2px);
     cursor: pointer;
   }

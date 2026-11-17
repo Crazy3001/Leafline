@@ -202,7 +202,7 @@
     padding: 1px 5px;
     border-radius: 3px;
     background: linear-gradient(#ffb547, #e8891c);
-    color: #2a1600;
+    color: var(--accent-ink);
     font-size: 10px;
     font-weight: 800;
     letter-spacing: 0.02em;

@@ -357,7 +357,7 @@
     border: 0;
     border-radius: var(--radius-sm);
     background: var(--accent);
-    color: var(--bg);
+    color: var(--accent-ink);
     font: inherit;
     font-weight: 600;
     cursor: pointer;

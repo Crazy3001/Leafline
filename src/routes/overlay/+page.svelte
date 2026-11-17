@@ -14,7 +14,6 @@
   import BagCheck from "$lib/components/item/BagCheck.svelte";
   import CraftingPanel from "$lib/components/item/CraftingPanel.svelte";
   import TrackedItems from "$lib/components/item/TrackedItems.svelte";
-  import LookupPanel from "$lib/components/LookupPanel.svelte";
   import NextStep from "$lib/components/NextStep.svelte";
   import PanelView from "$lib/components/PanelView.svelte";
   import TimersCard from "$lib/components/TimersCard.svelte";
@@ -29,6 +28,7 @@
   import { display, hotkey, keyHint, watchSettings } from "$lib/settings.svelte";
   import BottomNav from "$lib/shell/BottomNav.svelte";
   import NowScreen from "$lib/shell/NowScreen.svelte";
+  import SearchSheet from "$lib/shell/SearchSheet.svelte";
   import ShellHeader from "$lib/shell/ShellHeader.svelte";
   import { TABS, tabId, tabInfo, tabOfPanel, toolPageTitle, type Tab, type ToolInfo, type ToolPage } from "$lib/shell/tabs";
   import ToolsList from "$lib/shell/ToolsList.svelte";
@@ -42,10 +42,12 @@
   const TAB_KEY = "leafline.overlay.tab.v2";
 
   /** What is open over the tab, if anything. */
-  type Over = { kind: "search" } | { kind: "tools" } | { kind: "tool"; page: ToolPage };
+  type Over = { kind: "search"; focus: boolean } | { kind: "tools" } | { kind: "tool"; page: ToolPage };
 
   let tab = $state<Tab>(storedTab());
   let over = $state<Over | null>(null);
+  /** Counts the pages something other than the player opened in search: an item check, a link. */
+  let landed = $state(0);
   /** What each tab's panel showed when last looked at, to mark tabs with something new. */
   let seen = $state<Partial<Record<Tab, string | null>>>({});
 
@@ -134,10 +136,14 @@
     }
   }
 
-  /** Opens search over the tab, on one kind of thing when asked. */
+  /**
+   * Opens search over the tab on a page something else asked for (an item check, a link, a tool),
+   * on one kind of thing when asked. The cursor stays out of the box, so the game keeps the keys.
+   */
   function search(mode?: typeof lookup.mode) {
     if (mode) lookup.mode = mode;
-    over = { kind: "search" };
+    landed += 1;
+    if (over?.kind !== "search") over = { kind: "search", focus: false };
   }
 
   /** Where a link to one of the old panels lands now. */
@@ -253,7 +259,8 @@
     else void backend.hideOverlay();
   }
 
-  const toggleOver = (kind: "search" | "tools") => (over = over?.kind === kind ? null : { kind });
+  const toggleOver = (kind: "search" | "tools") =>
+    (over = over?.kind === kind ? null : kind === "search" ? { kind, focus: true } : { kind });
 </script>
 
 <svelte:head><title>Leafline</title></svelte:head>
@@ -310,16 +317,8 @@
       </div>
 
       {#if over?.kind === "search"}
-        <Sheet title="Search" sub="Items, monsters, maps, NPCs and skills" onclose={() => (over = null)}>
-          <LookupPanel
-            tooltips={live.analysis?.tooltips ?? []}
-            level={live.analysis?.hud?.level ?? live.session?.level ?? null}
-            character={live.analysis?.hud?.name ?? null}
-            job={live.analysis?.hud?.job ?? null}
-            map={live.analysis?.map ?? null}
-            quest={live.analysis?.quest ?? null}
-            session={live.session}
-          />
+        <Sheet title="Search" onclose={() => (over = null)}>
+          <SearchSheet focus={over.focus} {landed} ontool={openTool} />
         </Sheet>
       {:else if over?.kind === "tools"}
         <Sheet title="Tools" onclose={() => (over = null)}>
