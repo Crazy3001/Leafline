@@ -8,6 +8,7 @@
   import { untrack } from "svelte";
 
   import Card from "./Card.svelte";
+  import Segmented from "$lib/ui/Segmented.svelte";
   import MapDataPanel from "./map/MapDataPanel.svelte";
   import QuestCard from "./QuestCard.svelte";
   import QuestSheetCard from "./QuestSheetCard.svelte";
@@ -69,6 +70,36 @@
   const doneKey = $derived(done.join(","));
   /** How many quests to take now the tab names before "Show all". */
   const TAKE_NOW = 6;
+
+  // The tab shows one of three things at a time, picked by chips: what you're on now, the
+  // whole quest log, or what to pick up next. A pinned window shows only what you're on.
+  type View = "now" | "log" | "take";
+  const VIEW_KEY = "leafline.quests.view";
+  const VIEWS: { id: View; label: string }[] = [
+    { id: "now", label: "On now" },
+    { id: "log", label: "Quest log" },
+    { id: "take", label: "To take" },
+  ];
+  function storedView(): View {
+    try {
+      const saved = localStorage.getItem(VIEW_KEY);
+      if (VIEWS.some((v) => v.id === saved)) return saved as View;
+    } catch {
+      // Starts on what you're on now.
+    }
+    return "now";
+  }
+  let view = $state<View>(storedView());
+  function setView(next: View) {
+    view = next;
+    try {
+      localStorage.setItem(VIEW_KEY, next);
+    } catch {
+      // A convenience only.
+    }
+  }
+  /** What shows: a pinned window, or a tab with no map data to list quests from, has only the first. */
+  const showing = $derived<View>(pinned || !ready ? "now" : view);
   const browsing = $derived(search.text.trim() !== "" || narrowed > 0);
   const asked = $derived(JSON.stringify(search));
 
@@ -248,17 +279,27 @@
     {/if}
   </div>
 {:else}
-  {#if quest}
+  {#if ready && !pinned}
+    <div class="views"><Segmented label="Which quests" options={VIEWS} value={view} onchange={setView} /></div>
+  {/if}
+  {#if showing !== "now"}
+    <!-- The log or the list to take, below. -->
+  {:else if quest}
     <QuestCard {quest} {map} {session} plain={pinned} />
   {:else if !(ready && (followedQuests().length || questLog.log?.quests.some((q) => q.state === "inProgress")))}
     <p class="empty">
       Open the Quest Helper in game to track quest counters here, or search for a quest and follow it.
     </p>
   {/if}
-  {#if ready}<FollowedQuests tracked={quest} {map} {session} plain={pinned} />{/if}
-  {#if ready}<LoggedQuests tracked={quest} {map} {session} plain={pinned} />{/if}
-  {#if !pinned}<QuestLogCard />{/if}
-  {#if ready && !pinned && level != null && toTake.length}
+  {#if ready && showing === "now"}<FollowedQuests tracked={quest} {map} {session} plain={pinned} />{/if}
+  {#if ready && showing === "now"}<LoggedQuests tracked={quest} {map} {session} plain={pinned} />{/if}
+  {#if !pinned && (showing === "log" || !ready)}<QuestLogCard />{/if}
+  {#if showing === "take" && (level == null || !toTake.length)}
+    <p class="empty">
+      {level == null ? "Leafline needs to read your level from the HUD to say which quests you can take." : `Nothing new to take at Lv ${level}.`}
+    </p>
+  {/if}
+  {#if ready && showing === "take" && level != null && toTake.length}
     <Card title={`Quests to take at Lv ${level}`}>
       <p class="lead">
         {#if hasLog()}
@@ -297,6 +338,11 @@
   }
 
   /* A card pads itself; these sit beside cards, so they match it. A pinned window pads its body. */
+  .views {
+    display: flex;
+    padding: 0 10px 10px;
+  }
+
   .controls {
     padding: 10px 12px 0;
   }
