@@ -17,7 +17,7 @@ use std::time::{Duration, Instant};
 use image::imageops::FilterType;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use tauri::Url;
+use url::Url;
 
 use super::fetch::Source;
 use super::osms::Dataset;

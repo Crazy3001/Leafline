@@ -2057,10 +2057,8 @@ dependencies = [
 name = "leafline"
 version = "0.4.0"
 dependencies = [
- "base64 0.22.1",
  "image",
- "regex",
- "rusqlite",
+ "leafline-core",
  "serde",
  "serde_json",
  "sha2 0.11.1",
@@ -2072,8 +2070,27 @@ dependencies = [
  "tauri-plugin-opener",
  "tauri-plugin-single-instance",
  "tauri-plugin-window-state",
+ "ureq",
+ "windows",
+]
+
+[[package]]
+name = "leafline-core"
+version = "0.4.0"
+dependencies = [
+ "base64 0.22.1",
+ "image",
+ "regex",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "strsim",
+ "tauri",
  "thiserror 2.0.21",
  "ureq",
+ "url",
+ "web-time",
  "windows",
 ]
 

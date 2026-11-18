@@ -17,6 +17,6 @@ mod questfont;
 pub mod questlog;
 pub mod quickslot;
 pub mod shop;
-pub(crate) mod text;
+pub mod text;
 pub mod tooltip;
 pub mod ui;

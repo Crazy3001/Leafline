@@ -1,0 +1,55 @@
+[package]
+name = "leafline-core"
+version = "0.4.0"
+description = "What Leafline's program and website share: map data, readers, records and plans"
+license = "MIT"
+edition = "2024"
+publish = false
+
+[features]
+# Lets the program's commands use `?` on Tauri's errors. Never on for the website.
+tauri = ["dep:tauri"]
+# Made-up records for the program's own unit tests.
+test-helpers = []
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2.0.21"
+image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "webp"] }
+regex = "1.13.1"
+strsim = "0.11.1"
+rusqlite = { version = "0.41.1", features = ["bundled"] }
+ureq = "2.12.1"
+sha2 = "0.11.1"
+base64 = "0.22.1"
+url = "2"
+# std's clock on the program, the browser's on the website (std's panics on wasm32).
+web-time = "1"
+tauri = { version = "2", optional = true, default-features = false }
+
+[target."cfg(windows)".dependencies]
+windows = { version = "0.62.2", features = [
+    "Foundation",
+    "Globalization",
+    "Graphics",
+    "Graphics_Capture",
+    "Graphics_DirectX",
+    "Graphics_DirectX_Direct3D11",
+    "Graphics_Imaging",
+    "Media_Ocr",
+    "Storage_Streams",
+    "Win32_Foundation",
+    "Win32_Graphics_Direct3D",
+    "Win32_Graphics_Direct3D11",
+    "Win32_Graphics_Dwm",
+    "Win32_Graphics_Dxgi",
+    "Win32_Graphics_Dxgi_Common",
+    "Win32_Graphics_Gdi",
+    "Win32_System_WinRT_Direct3D11",
+    "Win32_System_WinRT_Graphics_Capture",
+    "Win32_UI_HiDpi",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }

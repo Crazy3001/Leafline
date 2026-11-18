@@ -10,6 +10,8 @@ pub enum Error {
     Ocr(String),
     #[error("{0}")]
     Invalid(String),
+    /// Only in the program, which turns this feature on.
+    #[cfg(feature = "tauri")]
     #[error(transparent)]
     Tauri(#[from] tauri::Error),
     #[error("local database: {0}")]

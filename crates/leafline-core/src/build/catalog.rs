@@ -581,10 +581,10 @@ pub fn usable_by(item: &ItemRecord, branch: Branch) -> bool {
     item.classes.is_empty() || item.classes.iter().any(|c| c.eq_ignore_ascii_case(branch.name()))
 }
 
-#[cfg(test)]
-pub(crate) mod tests {
-    use super::*;
-    use crate::mapdata::osms::{ItemStat, ScrollInfo, SkillNeed};
+/// Made-up records for tests, here and in the program's own.
+#[cfg(any(test, feature = "test-helpers"))]
+pub mod testing {
+    use crate::mapdata::osms::{SkillNeed, SkillRecord};
 
     /// A made-up skill.
     pub fn skill(id: u32, name: &str, job_id: u32, max_level: u32, needs: &[(u32, u32)]) -> SkillRecord {
@@ -604,6 +604,14 @@ pub(crate) mod tests {
             buff: false,
         }
     }
+}
+
+#[cfg(test)]
+pub(crate) mod tests {
+    use super::*;
+    use crate::mapdata::osms::{ItemStat, ScrollInfo};
+
+    pub use super::testing::skill;
 
     /// A made-up piece of equipment.
     pub fn item(id: u32, name: &str, req_level: u32, classes: &[&str]) -> ItemRecord {

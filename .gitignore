@@ -1,4 +1,6 @@
 node_modules
+# Cargo builds, for the whole workspace.
+/target/
 /build
 /.svelte-kit
 /package

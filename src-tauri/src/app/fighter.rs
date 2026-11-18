@@ -195,7 +195,7 @@ impl Parts<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::build::catalog::tests::skill;
+    use crate::build::catalog::testing::skill;
     use crate::mapdata::osms::Effects;
 
     fn catalog() -> Catalog {

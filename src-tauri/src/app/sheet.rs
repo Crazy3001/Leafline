@@ -368,7 +368,7 @@ pub fn set_buff(app: AppHandle, name: String, skill: u32, on: bool) -> crate::er
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::build::catalog::tests::skill;
+    use crate::build::catalog::testing::skill;
     use crate::build::plan::{Piece, PieceStat};
 
     fn buff(id: u32, name: &str, job_id: u32, levels: &[Effects]) -> SkillRecord {

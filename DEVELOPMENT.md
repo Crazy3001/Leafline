@@ -9,7 +9,7 @@ Prerequisites: [Rust](https://rustup.rs), [Node.js](https://nodejs.org) 20+, the
 ```bash
 npm install
 npm run tauri dev      # development build with hot reload
-npm run tauri build    # installers in src-tauri/target/release/bundle/
+npm run tauri build    # installers in target/release/bundle/
 ```
 
 `npm run dev` serves the UI in a plain browser with a mock backend that returns a saved analysis and session, which is handy for design work. The mock is left out of production builds.

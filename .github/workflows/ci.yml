@@ -42,13 +42,9 @@ jobs:
           components: clippy
 
       - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
 
       - name: Rust unit tests
-        working-directory: src-tauri
-        run: cargo test --lib
+        run: cargo test --workspace --lib
 
       - name: Clippy
-        working-directory: src-tauri
-        run: cargo clippy --all-targets -- -D warnings
+        run: cargo clippy --workspace --all-targets -- -D warnings

@@ -281,7 +281,7 @@ mod tests {
     }
 
     fn catalog() -> Catalog {
-        use crate::build::catalog::tests::skill;
+        use crate::build::catalog::testing::skill;
         let levelled = |id, name: &str, passive: bool, descriptions: &[&str]| {
             let mut s = skill(id, name, 300, descriptions.len() as u32, &[]);
             s.passive = passive;
