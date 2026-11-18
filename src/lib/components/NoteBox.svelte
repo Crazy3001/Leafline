@@ -185,7 +185,7 @@
     padding: 6px 8px;
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
-    background: rgba(0, 0, 0, 0.25);
+    background: var(--well);
     color: var(--text);
     font: inherit;
     font-size: var(--text-md);
@@ -229,7 +229,7 @@
     border: 1px solid var(--accent);
     border-radius: var(--radius-sm);
     background: var(--accent);
-    color: var(--bg);
+    color: var(--accent-ink);
     font-size: var(--text-sm);
     font-weight: 600;
     cursor: pointer;

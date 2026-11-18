@@ -5,6 +5,7 @@ use rusqlite::params;
 use serde::Serialize;
 
 use super::UserData;
+use super::loot::SessionLoot;
 use super::potions::{SessionPotion, cost_of, session_key};
 use crate::error::{Error, Result};
 use crate::session::{EventKind, SessionEvent, SessionLine, SessionSummary, TimelinePoint};
@@ -31,6 +32,10 @@ pub struct SavedSession {
     /// The character's name, when the tracker read it.
     pub character: Option<String>,
     pub deaths: u32,
+    /// EXP lost to those deaths, left out of the rates.
+    pub exp_lost: u64,
+    /// Percent of a level lost to them, for a HUD that shows only a percentage.
+    pub percent_lost: f64,
     /// The player's own note. It stays on this PC.
     pub note: String,
     /// Per map, most active time first. Time that couldn't be placed on a map is left out.
@@ -41,6 +46,8 @@ pub struct SavedSession {
     pub potions: Vec<SessionPotion>,
     /// What the potions used cost, in mesos.
     pub potion_cost: i64,
+    /// What the Pickup Log showed picked up, when it was read.
+    pub loot: Option<SessionLoot>,
 }
 
 /// The EXP a level takes, as the player's own HUD showed it. Leafline ships no EXP table; this
@@ -131,6 +138,7 @@ impl UserData {
             .or_else(|err| if err == rusqlite::Error::QueryReturnedNoRows { Ok(None) } else { Err(err) })?;
         let tx = self.conn.transaction()?;
         UserData::delete_session_potions(&tx, started_at)?;
+        super::loot::delete_loot(&tx, started_at)?;
         tx.execute("DELETE FROM session_points WHERE session_id = ?1", [id])?;
         tx.execute("DELETE FROM session_events WHERE session_id = ?1", [id])?;
         tx.execute("DELETE FROM session_maps WHERE session_id = ?1", [id])?;
@@ -151,7 +159,8 @@ impl UserData {
     pub fn sessions(&self) -> Result<Vec<SavedSession>> {
         let mut stmt = self.conn.prepare(
             "SELECT id, label, saved_at, started_at, level, level_ups, active_seconds, elapsed_seconds, exp_gained,
-                    exp_per_hour, mesos_gained, mesos_per_hour, percent_per_hour, job, deaths, note, character
+                    exp_per_hour, mesos_gained, mesos_per_hour, percent_per_hour, job, deaths, note, character,
+                    exp_lost, percent_lost
              FROM sessions ORDER BY COALESCE(started_at, saved_at) DESC, id DESC",
         )?;
         let mut sessions: Vec<SavedSession> = stmt
@@ -174,10 +183,13 @@ impl UserData {
                     deaths: row.get(14)?,
                     note: row.get(15)?,
                     character: row.get(16)?,
+                    exp_lost: row.get::<_, i64>(17)?.max(0) as u64,
+                    percent_lost: row.get(18)?,
                     maps: Vec::new(),
                     lines: Vec::new(),
                     potions: Vec::new(),
                     potion_cost: 0,
+                    loot: None,
                 })
             })?
             .collect::<rusqlite::Result<_>>()?;
@@ -187,11 +199,13 @@ impl UserData {
         )?;
         let mut lines = self.conn.prepare(
             "SELECT map, level, party, job, active_seconds, exp_gained, percent_gained, mesos_gained, mesos_seconds,
-                    kills, other_exp, deaths, exp_lost, gains_missed, fighter
+                    kills, other_exp, deaths, exp_lost, gains_missed, fighter, percent_lost
              FROM session_lines WHERE session_id = ?1 ORDER BY active_seconds DESC",
         )?;
         let mut potions = self.all_session_potions()?;
+        let mut loot = self.all_session_loot()?;
         for session in &mut sessions {
+            session.loot = session.started_at.and_then(|at| loot.remove(&session_key(at)));
             if let Some(typed) = session.started_at.and_then(|at| potions.remove(&session_key(at))) {
                 session.potion_cost = cost_of(&typed);
                 session.potions = typed;
@@ -217,6 +231,7 @@ impl UserData {
                         fighter: row
                             .get::<_, Option<String>>(14)?
                             .and_then(|json| serde_json::from_str(&json).ok()),
+                        percent_lost: row.get(15)?,
                     })
                 })?
                 .collect::<rusqlite::Result<_>>()?;
@@ -295,7 +310,7 @@ fn write_session(tx: &rusqlite::Transaction, id: i64, session: &SessionSummary, 
         "UPDATE sessions SET saved_at = ?2, started_at = ?3, level = ?4, level_ups = ?5, active_seconds = ?6,
                              elapsed_seconds = ?7, exp_gained = ?8, exp_per_hour = ?9, mesos_gained = ?10,
                              mesos_per_hour = ?11, percent_per_hour = ?12, job = ?13, deaths = ?14,
-                             character = COALESCE(?15, character)
+                             character = COALESCE(?15, character), exp_lost = ?16, percent_lost = ?17
          WHERE id = ?1",
         params![
             id,
@@ -312,9 +327,13 @@ fn write_session(tx: &rusqlite::Transaction, id: i64, session: &SessionSummary, 
             session.percent_per_hour,
             session.job,
             session.deaths,
-            session.name
+            session.name,
+            session.exp_lost as i64,
+            session.percent_lost
         ],
     )?;
+    super::potions::write_read_potions(tx, session.name.as_deref(), session.started_at, &session.quick_slots)?;
+    super::loot::write_loot(tx, session.started_at, &session.loot)?;
     tx.execute("DELETE FROM session_maps WHERE session_id = ?1", [id])?;
     tx.execute("DELETE FROM session_lines WHERE session_id = ?1", [id])?;
     tx.execute("DELETE FROM session_points WHERE session_id = ?1", [id])?;
@@ -365,8 +384,8 @@ fn write_session(tx: &rusqlite::Transaction, id: i64, session: &SessionSummary, 
         tx.execute(
             "INSERT INTO session_lines (session_id, map, level, party, job, active_seconds, exp_gained,
                                         percent_gained, mesos_gained, mesos_seconds,
-                                        kills, other_exp, deaths, exp_lost, gains_missed, fighter)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
+                                        kills, other_exp, deaths, exp_lost, gains_missed, fighter, percent_lost)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)",
             params![
                 id,
                 map,
@@ -383,7 +402,8 @@ fn write_session(tx: &rusqlite::Transaction, id: i64, session: &SessionSummary, 
                 line.deaths,
                 line.exp_lost as i64,
                 line.gains_missed,
-                line.fighter.as_ref().map(serde_json::Value::to_string)
+                line.fighter.as_ref().map(serde_json::Value::to_string),
+                line.percent_lost
             ],
         )?;
     }
@@ -457,6 +477,59 @@ mod tests {
     }
 
     #[test]
+    fn deaths_keep_what_they_cost() {
+        let mut db = UserData::open_in_memory().unwrap();
+        let meadow = "Fern Road : Mossbank Meadow I";
+        let mut summary = session(30.0, 6000, &[(Some(meadow), 30.0, 6000)]);
+        summary.deaths = 2;
+        summary.exp_lost = 900;
+        summary.percent_lost = 3.5;
+        summary.lines = vec![SessionLine {
+            map: Some(meadow.into()),
+            active_seconds: 1800.0,
+            exp_gained: 6000,
+            deaths: 2,
+            exp_lost: 900,
+            percent_lost: 3.5,
+            ..SessionLine::default()
+        }];
+        db.save_session(&summary, "", 1).unwrap();
+        let saved = &db.sessions().unwrap()[0];
+        assert_eq!((saved.deaths, saved.exp_lost), (2, 900));
+        assert!((saved.percent_lost - 3.5).abs() < 1e-9);
+        assert_eq!((saved.lines[0].deaths, saved.lines[0].exp_lost), (2, 900));
+        assert!((saved.lines[0].percent_lost - 3.5).abs() < 1e-9);
+    }
+
+    #[test]
+    fn sessions_saved_before_exp_lost_was_kept_get_it_from_their_lines() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        let before = super::super::MIGRATIONS.iter().position(|step| step.contains("percent_lost")).unwrap();
+        for step in &super::super::MIGRATIONS[..before] {
+            conn.execute_batch(step).unwrap();
+        }
+        conn.execute(
+            "INSERT INTO sessions (id, label, saved_at, level_ups, active_seconds, elapsed_seconds, exp_gained, mesos_gained, deaths)
+             VALUES (1, '', 1, 0, 600, 600, 1000, 0, 2)",
+            [],
+        )
+        .unwrap();
+        for lost in [300, 450] {
+            conn.execute(
+                "INSERT INTO session_lines (session_id, map, active_seconds, exp_gained, percent_gained, mesos_gained,
+                                            mesos_seconds, deaths, exp_lost)
+                 VALUES (1, 'Fern Road : Burrow Den', 300, 500, 0, 0, 0, 1, ?1)",
+                [lost],
+            )
+            .unwrap();
+        }
+        conn.pragma_update(None, "user_version", before as i64).unwrap();
+        let db = UserData::init(conn).unwrap();
+        let saved = &db.sessions().unwrap()[0];
+        assert_eq!((saved.deaths, saved.exp_lost), (2, 750));
+    }
+
+    #[test]
     fn the_exp_a_level_takes_is_learned_from_saves() {
         let mut db = UserData::open_in_memory().unwrap();
         let mut at_30 = session(10.0, 1000, &[]);
@@ -473,10 +546,31 @@ mod tests {
     }
 
     #[test]
+    fn a_sessions_loot_is_kept_replaced_on_each_save_and_deleted_with_it() {
+        use crate::loot::{LootItem, LootSummary};
+        let mut db = UserData::open_in_memory().unwrap();
+        let shell = |count| LootItem { id: 4000000, name: "Snail Shell".into(), count };
+        let mut first = session(30.0, 6000, &[]);
+        first.loot = LootSummary { watched: true, seconds: 1700.0, mesos: 900, items: vec![shell(3)], lines: 9, ..LootSummary::default() };
+        let id = db.save_session(&first, "", 1).unwrap();
+        let mut later = first.clone();
+        later.loot.items = vec![shell(5), LootItem { id: 2000000, name: "Red Potion".into(), count: 1 }];
+        later.loot.mesos = 1200;
+        db.update_session(id, &later, 2).unwrap();
+        let loot = db.sessions().unwrap()[0].loot.clone().expect("kept");
+        assert_eq!((loot.mesos, loot.seconds), (1200, 1700.0));
+        let items: Vec<(&str, u64)> = loot.items.iter().map(|i| (i.name.as_str(), i.count)).collect();
+        assert_eq!(items, [("Snail Shell", 5), ("Red Potion", 1)]);
+        db.delete_session(id).unwrap();
+        db.save_session(&session(30.0, 6000, &[]), "", 3).unwrap();
+        assert_eq!(db.sessions().unwrap()[0].loot, None, "deleted with its session; an unwatched log keeps nothing");
+    }
+
+    #[test]
     fn potions_typed_before_the_save_reach_the_saved_session() {
         use crate::userdata::potions::PotionSlot;
         let mut db = UserData::open_in_memory().unwrap();
-        db.set_potion_slots(None, &[PotionSlot { slot: 0, name: "White Potion".into(), price: 320 }]).unwrap();
+        db.set_potion_slots(None, &[PotionSlot { slot: 0, name: "White Potion".into(), price: 320, quick_slot: None }]).unwrap();
         // Typed in the first minutes, while the session wasn't saved yet.
         db.set_session_potion(None, 1000.0, 1, Some(300), Some(250)).unwrap();
         let id = db.save_session(&session(30.0, 6000, &[]), "", 1).unwrap();
@@ -484,6 +578,34 @@ mod tests {
         assert_eq!((saved.potions.len(), saved.potion_cost), (1, 50 * 320));
         db.delete_session(id).unwrap();
         assert!(db.session_potions(1000.0).unwrap().is_empty());
+    }
+
+    #[test]
+    fn potions_counted_from_the_quick_slots_are_kept_with_the_session() {
+        use crate::session::QuickSlotUse;
+        use crate::userdata::potions::PotionSlot;
+        let mut db = UserData::open_in_memory().unwrap();
+        let slots = [
+            PotionSlot { slot: 0, name: "Orange Potion".into(), price: 160, quick_slot: Some(5) },
+            PotionSlot { slot: 0, name: "Blue Potion".into(), price: 200, quick_slot: None },
+        ];
+        db.set_potion_slots(Some("Leafling"), &slots).unwrap();
+        // Typed for the second slot, read for the first.
+        db.set_session_potion(Some("Leafling"), 1000.0, 2, Some(50), Some(40)).unwrap();
+        let mut summary = session(30.0, 6000, &[]);
+        summary.name = Some("Leafling".into());
+        summary.quick_slots = vec![QuickSlotUse { slot: 5, count: Some(150), used: 11 }, QuickSlotUse { slot: 6, count: Some(9), used: 4 }];
+        let id = db.save_session(&summary, "", 1).unwrap();
+        let saved = &db.sessions().unwrap()[0];
+        let used: Vec<(u32, Option<i64>, i64)> = saved.potions.iter().map(|p| (p.slot, p.read, p.used)).collect();
+        assert_eq!(used, [(1, Some(11), 11), (2, None, 10)]);
+        assert_eq!(saved.potion_cost, 11 * 160 + 10 * 200);
+        // Clearing what was typed for the read slot leaves the reading.
+        db.set_session_potion(Some("Leafling"), 1000.0, 1, None, None).unwrap();
+        assert_eq!(db.session_potions(1000.0).unwrap()[0].read, Some(11));
+        summary.quick_slots[0].used = 14;
+        db.update_session(id, &summary, 2).unwrap();
+        assert_eq!(db.session_potions(1000.0).unwrap()[0].used, 14);
     }
 
     #[test]

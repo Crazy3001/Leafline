@@ -27,7 +27,7 @@
     width: 100%;
     overflow: hidden;
     border-radius: var(--radius-pill);
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--hover);
   }
 
   .fill {

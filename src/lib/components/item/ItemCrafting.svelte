@@ -47,7 +47,7 @@
     padding: 0;
     border: 0;
     background: transparent;
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
     font: inherit;
     font-size: var(--text-sm);
     cursor: pointer;

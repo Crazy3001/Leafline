@@ -1,15 +1,18 @@
 //! What the player records themselves: prices they saw or paid, notes on items, sessions they
 //! saved, training spots they picked, builds they planned, drops they logged, the potions they
-//! hunt with, and each character's last known mesos. Kept in its own SQLite file, apart from
+//! hunt with, each character's last known mesos, and each character's quest log as the game's
+//! Quest window last showed it. Kept in its own SQLite file, apart from
 //! the map data cache, because that cache can be thrown away and downloaded again while these
 //! records cannot.
 
 pub mod builds;
 pub mod characters;
 pub mod drops;
+pub mod loot;
 pub mod notes;
 pub mod potions;
 pub mod prices;
+pub mod questlog;
 pub mod sessions;
 pub mod spots;
 
@@ -184,6 +187,68 @@ ALTER TABLE session_lines ADD COLUMN deaths INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE session_lines ADD COLUMN exp_lost INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE session_lines ADD COLUMN gains_missed INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE session_lines ADD COLUMN fighter TEXT;
+",
+    "
+ALTER TABLE sessions ADD COLUMN exp_lost INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE sessions ADD COLUMN percent_lost REAL NOT NULL DEFAULT 0;
+ALTER TABLE session_lines ADD COLUMN percent_lost REAL NOT NULL DEFAULT 0;
+UPDATE sessions SET exp_lost = (SELECT COALESCE(SUM(l.exp_lost), 0) FROM session_lines l WHERE l.session_id = sessions.id);
+",
+    "
+ALTER TABLE potion_slots ADD COLUMN quick_slot INTEGER;
+ALTER TABLE session_potions ADD COLUMN read_used INTEGER;
+",
+    "
+CREATE TABLE session_pickups (
+    started_at INTEGER PRIMARY KEY,
+    mesos INTEGER NOT NULL,
+    seconds REAL NOT NULL,
+    lines INTEGER NOT NULL,
+    unread INTEGER NOT NULL,
+    unnamed INTEGER NOT NULL);
+CREATE TABLE session_loot (
+    started_at INTEGER NOT NULL,
+    item_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    count INTEGER NOT NULL,
+    PRIMARY KEY (started_at, item_id));
+",
+    "
+CREATE TABLE quest_log (
+    character TEXT NOT NULL COLLATE NOCASE,
+    key TEXT NOT NULL,
+    title TEXT NOT NULL,
+    cut INTEGER NOT NULL DEFAULT 0,
+    quest_id INTEGER,
+    region TEXT,
+    state TEXT NOT NULL DEFAULT '',
+    state_seen_at INTEGER,
+    done INTEGER NOT NULL DEFAULT 0,
+    done_on TEXT,
+    done_seen_at INTEGER,
+    on_helper INTEGER,
+    icon TEXT,
+    level INTEGER,
+    counters TEXT,
+    talk_to TEXT,
+    rewards TEXT,
+    reward_exp INTEGER,
+    reward_mesos INTEGER,
+    detail_seen_at INTEGER,
+    PRIMARY KEY (character, key));
+CREATE TABLE quest_log_regions (
+    character TEXT NOT NULL COLLATE NOCASE,
+    tab TEXT NOT NULL,
+    region TEXT NOT NULL,
+    count INTEGER NOT NULL,
+    seen_at INTEGER NOT NULL,
+    PRIMARY KEY (character, tab, region));
+CREATE TABLE quest_log_looks (
+    character TEXT NOT NULL COLLATE NOCASE,
+    tab TEXT NOT NULL,
+    seen_at INTEGER NOT NULL,
+    whole_at INTEGER,
+    PRIMARY KEY (character, tab));
 ",
 ];
 

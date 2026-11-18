@@ -320,7 +320,7 @@
     min-width: 0;
     padding: 5px 8px;
     border-radius: var(--radius-sm);
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--hover);
   }
 
   .grid .wide {
@@ -382,7 +382,7 @@
     row-gap: 1px;
     padding: 6px 8px;
     border-radius: var(--radius-sm);
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--hover);
     font-size: var(--text-sm);
   }
 

@@ -1,8 +1,8 @@
 <script lang="ts">
-  // The Train tab: the session being played (rates, the level goal, a graph of the whole session,
-  // how this map compares with your bests on it, the maps played), then where to train next, with
-  // a jump to it from the top. Before a session starts: the goal, where to train, your best maps
-  // and the last sessions.
+  // The Train tab, one of three views at a time, picked by chips. Session: the session being
+  // played (rates, the level goal, how this map compares with your bests on it, the maps played, a
+  // graph of the whole session), or before one starts, how it starts and the goal. Where to
+  // train: the maps for your level. History: your best maps and the last sessions.
   import { tip } from "$lib/tip.svelte";
   import Ref from "$lib/components/Ref.svelte";
   import SessionControls from "./SessionControls.svelte";
@@ -11,11 +11,15 @@
   import CharacterPicker from "./CharacterPicker.svelte";
   import LevelGoal from "./LevelGoal.svelte";
   import PotionCosts from "./PotionCosts.svelte";
+  import LootLog from "./LootLog.svelte";
+  import { lootPerHour as lootRate } from "$lib/loot.svelte";
   import SaveSpot from "./SaveSpot.svelte";
-  import SpotList, { SPOTS_ID } from "./SpotList.svelte";
+  import SpotList, { SPOTS_ID, type BetterMap } from "./SpotList.svelte";
+  import GoButton from "$lib/components/GoButton.svelte";
+  import { mapPlace } from "$lib/destination.svelte";
   import TimersCard from "./TimersCard.svelte";
   import { openTrainingLog } from "$lib/nav.svelte";
-  import { formatClockIn, formatCompact, formatDuration, formatNumber, splitMapLabel } from "$lib/format";
+  import { formatClockIn, formatCompact, formatDuration, formatNumber, partyLabel, splitMapLabel } from "$lib/format";
   import { characters } from "$lib/characters.svelte";
   import { history, watchHistory } from "$lib/history.svelte";
   import { live } from "$lib/readings.svelte";
@@ -24,12 +28,14 @@
     eventMarkers,
     mapBands,
     mapStats,
+    longEnough,
     mesosCoverage,
     mesosReminder,
     pointDetail,
     rateFormat,
     shortDay,
     showUnplaced,
+    deathCost,
     type Metric,
   } from "$lib/training";
   import type { MapReading, SessionSummary } from "$lib/types";
@@ -37,6 +43,7 @@
   import Button from "$lib/ui/Button.svelte";
   import LineChart from "$lib/ui/LineChart.svelte";
   import Meter from "$lib/ui/Meter.svelte";
+  import ExpBar from "$lib/ui/ExpBar.svelte";
   import Segmented from "$lib/ui/Segmented.svelte";
   import Stat from "$lib/ui/Stat.svelte";
 
@@ -45,6 +52,8 @@
     map = null,
     session = null,
     glance = false,
+    whole = false,
+    glanced = false,
   }: {
     level: number | null;
     map?: MapReading | null;
@@ -52,6 +61,10 @@
     /** A pinned window's short form: the session's rates and controls, and timers. The graph,
      *  the maps, where to train and past sessions stay in the tab. */
     glance?: boolean;
+    /** Where there is room, as in the desk view: every view stacked, with no chips. */
+    whole?: boolean;
+    /** The desk view's Now strip shows the big rate, the level line and the session buttons. */
+    glanced?: boolean;
   } = $props();
 
   watchHistory();
@@ -60,6 +73,36 @@
   let metric = $state<Metric>(storedMetric());
 
   const tracking = $derived(session != null && session.activeSeconds > 0);
+
+  type View = "session" | "where" | "history";
+  const VIEW_KEY = "leafline.train.view";
+  const VIEWS: { id: View; label: string }[] = [
+    { id: "session", label: "Session" },
+    { id: "where", label: "Where to train" },
+    { id: "history", label: "History" },
+  ];
+  function storedView(): View {
+    try {
+      const saved = localStorage.getItem(VIEW_KEY);
+      if (VIEWS.some((v) => v.id === saved)) return saved as View;
+    } catch {
+      // Starts on the session.
+    }
+    return "session";
+  }
+  let view = $state<View>(storedView());
+  function setView(next: View) {
+    view = next;
+    try {
+      localStorage.setItem(VIEW_KEY, next);
+    } catch {
+      // A convenience only.
+    }
+  }
+  /** What shows. A pinned window has only the session; the desk view stacks all of it. */
+  const onSession = $derived(glance || whole || view === "session");
+  const onWhere = $derived(!glance && (whole || view === "where"));
+  const onHistory = $derived(!glance && (whole ? !tracking : view === "history"));
   const percentOnly = $derived(session?.percentOnly ?? false);
   const signed = (value: number) => (value > 0 ? `+${formatNumber(value)}` : formatNumber(value));
 
@@ -135,10 +178,30 @@
     const now = session.maps.find((m) => m.map === session.map);
     const saved = stats.find((s) => s.map === session.map);
     if (!now?.expPerHour && !saved) return null;
-    return { name: splitMapLabel(session.map).name, now: now?.expPerHour ?? null, saved };
+    // Your best here as you play now, solo or in a party: a party's EXP is your share of it.
+    const inParty = (session.party ?? 1) > 1;
+    const same = inParty ? saved?.party : saved?.solo;
+    const other = inParty ? saved?.solo : saved?.party;
+    return { name: splitMapLabel(session.map).name, now: now?.expPerHour ?? null, saved, inParty, best: same?.best ?? null, other };
   });
 
+  /** Another map the forecast now puts above this one, from Where to train. */
+  let better = $state<BetterMap | null>(null);
+  let spotList = $state<{ wave: () => void } | null>(null);
+
   const coverage = $derived(session ? mesosCoverage(session) : null);
+  // Mesos picked up, from the Pickup Log: the rate when the inventory's mesos were never seen
+  // twice, and a check on it when they were.
+  const pickedMesos = $derived(session?.loot?.watched ? (session.loot.mesosPerHour ?? null) : null);
+  const mesosRate = $derived(session?.mesosPerHour ?? pickedMesos);
+  const mesosSub = $derived.by(() => {
+    if (!session) return null;
+    if (session.mesosPerHour == null && pickedMesos != null) return "picked up";
+    if (coverage?.partial) return coverage.label;
+    if (pickedMesos != null) return `${formatCompact(pickedMesos)} picked up`;
+    return null;
+  });
+  const lootValueRate = $derived(session?.loot?.watched ? lootRate(session.loot.items, session.loot.seconds) : null);
   const reminder = $derived(session ? mesosReminder(session) : null);
 
   // How Mesos / hr works, said once until the player dismisses it.
@@ -163,6 +226,10 @@
   }
 
   const dropped = $derived(session ? session.rejected.exp + session.rejected.mesos : 0);
+  /** About how much play the deaths undid, at this map's pace. */
+  const deathPlay = $derived(
+    session ? (deathCost({ ...session, expPerHour: session.paceExpPerHour ?? session.expPerHour })?.play ?? null) : null,
+  );
 
   /** Your best maps by EXP an hour, for before a session. */
   const BESTS_SHOWN = 5;
@@ -174,7 +241,7 @@
   );
 
   // Before a session: the last few saved ones.
-  const lastSessions = $derived(characters.sessions(history.value?.sessions ?? []).slice(0, 3));
+  const lastSessions = $derived(characters.sessions(history.value?.sessions ?? []).filter(longEnough).slice(0, 3));
   const lastOne = $derived(lastSessions[0] ?? null);
 
   const liveState = $derived(live.liveStatus.state);
@@ -206,13 +273,31 @@
   }
 </script>
 
+{#snippet nudge(b: BetterMap)}
+  <p class="nudge">
+    <span
+      >At Lv {b.level}, <Ref kind="map" id={b.spot.map.id} name={b.spot.map.name} /> should beat this map now: about
+      <span class="tabular">{formatCompact(b.there)}</span> EXP / hr against <span class="tabular">{formatCompact(b.here)}</span> here,
+      by the forecast in Where to train.</span
+    >
+    <span class="nudge-actions">
+      <GoButton place={mapPlace(b.spot.map)} />
+      <button class="link" onclick={() => spotList?.wave()}>Not now</button>
+    </span>
+  </p>
+{/snippet}
+
 {#snippet jump()}
   <Button variant="ghost" size="sm" onclick={jumpToSpots}>
     Where to train <ArrowDown size={12} />
   </Button>
 {/snippet}
 
-{#if !glance}<CharacterPicker />{/if}
+{#if !glance && !glanced}<CharacterPicker />{/if}
+{#if !glance && !whole}
+  <div class="views"><Segmented label="Train shows" options={VIEWS} value={view} onchange={setView} /></div>
+{/if}
+{#if onSession && !(glanced && tracking)}
 <Block title="Session">
   {#snippet aside()}
     {#if session?.held}
@@ -227,7 +312,7 @@
     {/if}
   {/snippet}
 
-  <SessionControls trailing={tracking && !glance ? jump : undefined} />
+  {#if !glanced}<SessionControls trailing={tracking && whole && !glance ? jump : undefined} />{/if}
 
   {#if !tracking && glance}
     <p class="caption">Starts with your first EXP.</p>
@@ -246,9 +331,11 @@
     </div>
   {/if}
 </Block>
+{/if}
 
-{#if tracking && session && headline}
+{#if tracking && session && headline && onSession}
   <Block>
+    {#if !glanced}
     <div class="headline">
       <div class="big">
         <span class="label"
@@ -277,7 +364,7 @@
     {#if lv != null && percent != null}
       <div class="level">
         <div class="level-line"><span class="muted">Lv {lv} to {lv + 1}</span><span class="tabular">{percent.toFixed(2)}%</span></div>
-        <Meter value={percent / 100} label="EXP towards the next level" />
+        <ExpBar {percent} points={session.exp?.points ?? null} needed={session.expNeeded} />
         {#if toLevel || levelPace}
           <span class="muted tabular" use:tip={toLevel?.tip ?? ""}>
             {#if toLevel}{toLevel.line}{/if}{#if toLevel && levelPace}{" · "}{/if}{#if levelPace}{levelPace}{/if}
@@ -285,6 +372,7 @@
           {#if toLevel?.breaks}<span class="muted tabular">{toLevel.breaks}</span>{/if}
         {/if}
       </div>
+    {/if}
     {/if}
 
     {#if !glance}
@@ -299,9 +387,9 @@
     <div class="tiles">
       <Stat
         label="Mesos / hr"
-        value={formatCompact(session.mesosPerHour)}
-        sub={coverage?.partial ? coverage.label : null}
-        faint={coverage?.partial && coverage.thin}
+        value={formatCompact(mesosRate)}
+        sub={mesosSub}
+        faint={session.mesosPerHour != null && coverage?.partial && coverage.thin}
       />
       <Stat
         label="EXP gained"
@@ -318,9 +406,12 @@
       <PotionCosts
         startedAt={session.startedAt}
         activeSeconds={session.activeSeconds}
-        mesosPerHour={session.mesosPerHour}
+        mesosPerHour={mesosRate}
         character={session.name ?? characters.active}
+        quickSlots={session.quickSlots ?? null}
+        lootPerHour={lootValueRate}
       />
+      <LootLog loot={session.loot} reading={liveState === "reading"} />
     {/if}
 
     {#if reminder}
@@ -341,10 +432,16 @@
   </Block>
 
   {#if !glance}
+  {#if better && !here}
+    <Block title="This map">
+      {@render nudge(better)}
+    </Block>
+  {/if}
   {#if here}
     <Block title="This map">
       {#snippet aside()}<span class="map-name">{here.name}</span>{/snippet}
-      {@const best = here.saved?.best?.expPerHour ?? null}
+      {#if better}{@render nudge(better)}{/if}
+      {@const best = here.best?.expPerHour ?? null}
       {@const top = Math.max(here.now ?? 0, best ?? 0, 1)}
       {@const bestMesos = here.saved?.bestMesos?.mesosPerHour ?? null}
       {@const mesosNow = session.maps.find((m) => m.map === session.map)?.mesosPerHour ?? null}
@@ -354,7 +451,7 @@
         <Meter value={(here.now ?? 0) / top} height={8} />
         <span class="tabular">{formatCompact(here.now)}</span>
         {#if best != null}
-          <span class="muted">Best here</span>
+          <span class="muted">{here.inParty ? "Party best" : "Solo best"}</span>
           <Meter value={best / top} height={8} color="var(--muted)" />
           <span class="tabular">{formatCompact(best)}</span>
         {/if}
@@ -367,11 +464,19 @@
           <span class="tabular">{formatCompact(bestMesos)}</span>
         {/if}
       </div>
-      {#if here.saved?.best}
+      {#if here.saved && (here.best || here.other)}
         <p class="caption">
-          Best: {here.saved.best.level != null ? `Lv ${here.saved.best.level}, ` : ""}{(here.saved.best.party ?? 1) > 1
-            ? `party of ${here.saved.best.party}`
-            : "solo"}, {shortDay(here.saved.best.at)}. {formatDuration(here.saved.activeSeconds)} here over {here.saved.sessions}
+          {#if here.best}
+            Best: {here.best.level != null ? `Lv ${here.best.level}, ` : ""}{(here.best.party ?? 1) > 1
+              ? `party of ${here.best.party}`
+              : "solo"}, {shortDay(here.best.at)}.
+          {:else}
+            No {here.inParty ? "party" : "solo"} run here of 10 minutes yet.
+          {/if}
+          {#if here.other}
+            {here.inParty ? "Solo" : "In a party"} you've averaged {formatCompact(here.other.expPerHour)} here.
+          {/if}
+          {formatDuration(here.saved.activeSeconds)} here over {here.saved.sessions}
           session{here.saved.sessions === 1 ? "" : "s"}.
         </p>
       {:else}
@@ -413,7 +518,7 @@
             <li>
               {session.deaths} death{session.deaths === 1 ? "" : "s"}, {session.percentOnly
                 ? `${session.percentLost.toFixed(2)}% of a level`
-                : `${formatNumber(session.expLost)} EXP`} lost and left out of the rates.
+                : `${formatNumber(session.expLost)} EXP`} lost and left out of the rates{deathPlay ? `: ${deathPlay}` : ""}.
             </li>
           {/if}
           {#if session.mesosExcluded !== 0}
@@ -424,8 +529,22 @@
       {/if}
     </Block>
   {/if}
-  <!-- Where to go next sits under the live numbers; the rate graph is detail, last. -->
-  <SpotList {level} {map} {session} />
+  {/if}
+{:else if onSession && !glance}
+  <!-- No session yet: how it starts, above, then the goal. -->
+  <Block title="Level goal">
+    <LevelGoal {level} percent={session?.percent ?? null} character={session?.name ?? characters.active} />
+  </Block>
+{/if}
+
+{#if !glance}
+  <!-- Stays in the page while another view shows: it works out the better-map line for This map. -->
+  <div class="view" class:off={!onWhere}>
+    <SpotList {level} {map} {session} bind:better bind:this={spotList} />
+  </div>
+{/if}
+
+{#if tracking && session && headline && onSession && !glance}
   <Block title="This session">
     {#snippet aside()}
       <Segmented
@@ -459,15 +578,11 @@
       <p class="caption">The graph starts after 5 minutes of play.</p>
     {/if}
   </Block>
-  {/if}
-{:else if !glance}
-  <!-- No session yet: the goal and where to train come first, your bests and the last sessions after. -->
-  <Block title="Level goal">
-    <LevelGoal {level} percent={session?.percent ?? null} character={session?.name ?? characters.active} />
-  </Block>
-  <SpotList {level} {map} {session} last={!lastOne && !bests.length} />
+{/if}
+
+{#if onHistory}
   {#if bests.length}
-    <Block title="Your best maps" last={!lastOne}>
+    <Block title="Your best maps">
       {#snippet aside()}<span>Best single run, 10 min or more</span>{/snippet}
       <table>
         <thead><tr><th>Map</th><th>EXP / hr</th><th>Mesos / hr</th><th>When</th></tr></thead>
@@ -477,16 +592,18 @@
               <td><Ref kind="map" name={m.map}>{m.name}</Ref> <SaveSpot label={m.map} name={m.name} /></td>
               <td class="tabular">{formatCompact(m.best!.expPerHour)}</td>
               <td class="tabular">{m.bestMesos ? formatCompact(m.bestMesos.mesosPerHour) : "—"}</td>
-              <td class="tabular muted">{m.best!.level != null ? `Lv ${m.best!.level} · ` : ""}{shortDay(m.best!.at)}</td>
+              <td class="tabular muted"
+                >{m.best!.level != null ? `Lv ${m.best!.level} · ` : ""}{(m.best!.party ?? 1) > 1 ? `${partyLabel(m.best!.party)} · ` : ""}{shortDay(
+                  m.best!.at,
+                )}</td
+              >
             </tr>
           {/each}
         </tbody>
       </table>
     </Block>
   {/if}
-{/if}
-
-{#if !(tracking && session && headline) && lastOne && !glance}
+  {#if lastOne}
   <Block title="Last time">
     {#snippet aside()}
       {#if lastOne.character}<span>{lastOne.character}{lastOne.job ? ` · ${lastOne.job}` : ""}</span>{/if}
@@ -510,11 +627,34 @@
     </ul>
     <div><Button onclick={openTrainingLog}>All sessions</Button></div>
   </Block>
+  {:else if !whole}
+    <Block title="Past sessions">
+      <p class="caption">
+        Nothing saved yet. A session is saved when it ends; your best maps and your last sessions then show here, and
+        all of them in the training log.
+      </p>
+      <div><Button onclick={openTrainingLog}>Training log</Button></div>
+    </Block>
+  {/if}
 {/if}
 
-<TimersCard />
+{#if onSession}<TimersCard />{/if}
 
 <style>
+  /* A block pads itself; the chips sit beside blocks, so they match it. */
+  .views {
+    display: flex;
+    padding: 0 10px 10px;
+  }
+
+  .view {
+    display: contents;
+  }
+
+  .view.off {
+    display: none;
+  }
+
   .state {
     display: inline-flex;
     align-items: center;
@@ -665,6 +805,37 @@
     margin: 0;
     font-size: var(--text-xs);
     color: var(--faint);
+  }
+
+  /* Another map should beat this one now: a quiet line, never an alert. */
+  .nudge {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px var(--space-2);
+    margin: 0 0 var(--space-2);
+    font-size: var(--text-sm);
+    color: var(--muted);
+  }
+
+  .nudge-actions {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--space-2);
+  }
+
+  .link {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--faint);
+    font: inherit;
+    font-size: var(--text-xs);
+    cursor: pointer;
+  }
+
+  .link:hover {
+    color: var(--text);
   }
 
   .map-name {

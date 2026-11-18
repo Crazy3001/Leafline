@@ -21,12 +21,13 @@ export const display = $state<DisplaySettings>({
   compactShape: "card",
   hotkeys: { enabled: true, keys: {} },
   travel: { enabled: false, cabs: true, vipCabs: false, scrolls: true },
-  live: { enabled: true, interval: 2, pauseAfter: 15, window: null },
+  live: { enabled: true, interval: 2, pauseAfter: 15, window: null, pickupLog: true },
   buildRules: DEFAULT_RULES,
   framesFolder: null,
   setupDone: false,
   updateCheck: false,
   showPictures: true,
+  theme: "ember-dark",
 });
 
 const NUMPAD: Record<string, string> = { Add: "+", Subtract: "-", Multiply: "*", Divide: "/", Decimal: ".", Enter: "Enter" };
@@ -79,13 +80,19 @@ export function travelKey(): string {
   return t.enabled ? `${t.cabs}${t.vipCabs}${t.scrolls}` : "off";
 }
 
+/** True once the saved settings have been read, so a window can tell a default from a choice. */
+export const settingsLoad = $state({ done: false });
+
 let watching = false;
 
 /** Loads the settings once and follows changes made in the Settings window. */
 export function watchSettings() {
   if (watching) return;
   watching = true;
-  backend.settings().then((s) => Object.assign(display, s));
+  backend.settings().then((s) => {
+    Object.assign(display, s);
+    settingsLoad.done = true;
+  });
   backend.onSettings((s) => Object.assign(display, s));
 }
 

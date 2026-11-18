@@ -356,7 +356,7 @@
   }
 
   .name.upgraded {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
   .notice {
@@ -396,7 +396,7 @@
   }
 
   .tip b {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
   .actions {
@@ -420,7 +420,7 @@
     padding: 5px 10px;
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--hover);
     color: var(--text);
     font-size: var(--text-sm);
     cursor: pointer;
@@ -518,7 +518,7 @@
   .chip {
     padding: 2px 7px;
     border-radius: var(--radius-sm);
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--hover);
     border: 1px solid var(--border);
     font-size: var(--text-xs);
     color: var(--muted);
@@ -544,7 +544,7 @@
   }
 
   .job.eligible {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
     border-color: rgba(243, 177, 63, 0.35);
     background: var(--accent-soft);
   }

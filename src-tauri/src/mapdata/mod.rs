@@ -9,16 +9,19 @@
 //! them.
 
 pub mod atlas;
+pub mod bag;
 pub mod bestiary;
 pub mod combat;
 pub mod drops;
 pub mod layout;
+pub mod loot;
 pub mod fetch;
 pub mod guide;
 pub mod osms;
 pub mod pictures;
 pub mod places;
 pub mod questbook;
+pub mod questlog;
 pub mod shops;
 pub mod store;
 pub mod training;

@@ -167,7 +167,7 @@
   .totals div {
     padding: 6px 8px;
     border-radius: var(--radius-sm);
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--hover);
   }
 
   dt {

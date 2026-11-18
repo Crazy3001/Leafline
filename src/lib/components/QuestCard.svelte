@@ -22,8 +22,14 @@
     session = null,
     plain = false,
     followed = null,
+    heading = null,
+    note = null,
   }: {
     quest: QuestReading;
+    /** The card's title, when it isn't the Quest Helper's or the followed quests'. */
+    heading?: string | null;
+    /** A word beside the title, in place of the tracked count. */
+    note?: string | null;
     /**
      * Quests followed by hand, by id, one for each of `quest.quests`: built from the data, with
      * no counts, since the Quest Helper isn't showing them.
@@ -166,11 +172,13 @@
   <Ref kind="npc" name={person} />{#if maps.length}<span class="faint">{" · "}</span>{#each maps as m, k (m.id)}{#if k}<span class="faint">, </span>{/if}{#if m.known}<Ref kind="map" id={m.id} name={m.name} />{:else}<span class="faint">{m.name}</span>{/if}{/each}{/if}{" "}<GoButton place={npcPlace(person, maps)} />
 {/snippet}
 
-<Card title={followed ? "Followed quests" : "Quests"} {plain}>
+<Card title={heading ?? (followed ? "Followed quests" : "Quests")} {plain}>
   {#snippet aside()}
-    {#if followed}<span>No counts</span>{:else if quest.page}<span class="tabular">{quest.page[0]} tracked</span>{/if}
+    {#if note}<span>{note}</span>{:else if followed}<span>No counts</span>{:else if quest.page}<span class="tabular">{quest.page[0]} tracked</span>{/if}
   {/snippet}
 
+  <!-- Where the card is wide, as in the desk view, the quests sit two across. -->
+  <div class="quest-area"><div class="quests">
   {#each quest.quests as { title, objectives }, i}
     {@const info = guide?.quests[i]}
     {@const finished = objectives.length > 0 && objectives.every((o) => objectiveProgress(o) >= 1 && !o.unread)}
@@ -251,7 +259,7 @@
           {/if}
         </ol>
       {/if}
-      {#if !objectives.length && !expanded && !followed}
+      {#if !objectives.length && !expanded && !followed && !heading}
         <p class="empty">Its lines could not be read.</p>
       {/if}
       {#if sheet && payout(sheet.sheet).length}
@@ -276,6 +284,7 @@
       {quest.page?.[0] === 0 ? "No quests tracked." : "The Quest Helper was found, but its text could not be read."}
     </p>
   {/each}
+  </div></div>
 
   {#if quest.quests.length}
     {#if !followed && quest.quests.some((q) => !q.title)}
@@ -337,7 +346,7 @@
 
   .open:hover,
   .open:focus-visible {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
     outline: none;
   }
 
@@ -373,7 +382,7 @@
   }
 
   .payout .exp {
-    color: var(--exp);
+    color: var(--exp-text);
   }
 
   .payout .mesos {
@@ -420,8 +429,26 @@
     border-left-color: var(--good);
   }
 
-  .quest + .quest {
-    margin-top: 10px;
+  .quest-area {
+    container: quest-list / inline-size;
+  }
+
+  .quests {
+    display: grid;
+    gap: 10px;
+    align-items: start;
+  }
+
+  @container quest-list (min-width: 720px) {
+    .quests {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @container quest-list (min-width: 1150px) {
+    .quests {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
   }
 
   .title {
@@ -581,7 +608,7 @@
     padding: 4px 10px;
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--hover);
     color: var(--text);
     font-size: var(--text-sm);
     cursor: pointer;

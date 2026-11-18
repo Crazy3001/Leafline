@@ -3,6 +3,139 @@
 What changed in each release of Leafline. Leafline is a work in progress: if something reads
 wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?template=bug_report.yml).
 
+## 0.4.0 (2026-11-18)
+
+### A new look
+Every screen is redrawn. Everything Leafline did before is still there, reached from a tab, the
+Tools list or search.
+
+- **Four looks:** Ember Dark (the default), Ember Light, Sprout Light and Sprout Dark. Pick one in
+  setup or in **Settings → Look**.
+- **Five tabs:** **Now**, **Quests**, **Map**, **Train** and **Me**. Now shows the session at a
+  glance with the quest you're on. The header carries your level, name, job, EXP and time to level.
+- **Views by chips.** Quests has **On now**, **Quest log** and **To take**; Train has **Session**,
+  **Where to train** and **History**. The Map tab puts the map's own facts first, then its parts as
+  cards you can jump to.
+- **One search box** for items, monsters, maps, NPCs, skills and tools. Picking a kind's list keeps
+  typing in the same box.
+- **A Tools list** for everything that isn't a tab: Crafting, Sell or keep, Timers, Drop log,
+  Tracked items, Potion costs, Gear finder, Training log, Build planner, Share card, Route planner
+  and Characters.
+- **Go here** sits under the header as one solid card.
+- **The compact HUD is one strip:** level, an EXP bar, EXP and mesos per hour with how the last five
+  minutes compare, time to level and session time, with the next step and quest counters under it.
+- **A Now pin:** pin the session and your quests into their own small window.
+- **The desk view is rebuilt** for a wide window: a sidebar of views (Now, Quests, Map, Train, Me,
+  Look up, the training log, the build planner and the tools) with one search and the Go here bar on
+  top, each view laid out across the width. **My layout** keeps the old columns you arranged
+  yourself. **Pop out** pins Now beside the game.
+- **The build planner opens on a Plan tab:** a chart of your levels with job bands, when each goal
+  is reached, where the AP goes, new gear and advancements, and where you are now. Pick a level for
+  everything that happens at it. Goals are listed in order with done, now, next and short tags, and
+  can be dragged into a new order.
+- **The training log opens on an Overview:** six tiles, EXP per day, your best maps, recent
+  sessions, the next level and the time spent at each level.
+- **Setup** has a Look step, and its steps run down the side. **Settings** has a side menu that
+  follows where you are.
+- **Sessions under 10 minutes** of play aren't listed, ranked or used as your rate, so a few seconds
+  on a map can't top Where to train.
+
+### Added
+- **Your fight.** Every monster's page shows how a fight with it goes for your character: how
+  many attacks a kill takes and how often each count comes up, the chance your blows land, what a
+  blow does after its defence and the level gap, and the seconds of attacking a kill takes. It
+  uses your attack from the Character Stat window, or what you typed in Assumptions. The formulas
+  are the community's, and the defence part learns from your own fights.
+- **Scrolling odds.** A scroll's page has **Odds**, and a piece of gear **Scrolling odds**: the
+  chance of reaching the passes you want, of the item breaking, the stat it ends with, the scrolls
+  used, the chance of each number of passes, and with prices typed, what one item that gets there
+  costs. Every number can be changed.
+- **Plan levelling a craft.** Lookup → Crafting, with a discipline picked, has **Plan levelling**:
+  type your skill level and the EXP your crafting window shows, and the recipes open to you are
+  ranked by mesos per EXP or by fewest crafts, with how many crafts it takes, what they cost and
+  what to farm.
+- **Monsters on the map picture.** Spawn points show the monster's own picture instead of a dot,
+  a little bigger as you zoom in.
+- **What spawns where.** Lookup → Maps rows show each map's monsters with their share of the
+  spawns, how many spawn and how thickly (spawns per 1,000 px of floor), and sort by either.
+
+### Changed
+- **The Train tab's EXP bar** looks like the game's, with your EXP and percent written on it.
+
+**Training**
+- **What deaths cost.** Each saved session keeps the EXP its deaths lost. The training log shows
+  deaths in the session list, the EXP lost under the **Deaths** tile with about how much play that
+  undid, and a **Deaths** column per map. The Train tab says the same while you play. Characters
+  whose HUD shows only a percentage get it as a share of a level. The CSV export has two new
+  columns, deaths and exp_lost.
+- **Solo and party apart.** In a party, the EXP you get is your share, so one rate over both says
+  little about either. With **Party** set to **Either**, the training log's Maps and Records views
+  show **Solo EXP / hr** and **Party EXP / hr** side by side, and a map you pick shows both with
+  the party sizes you played in. A best run says whether it was solo or in a party. The Train tab's
+  **This map** compares you with your best there played the same way, and gives the other way's
+  average.
+- **Potions counted for you.** Pick the quick slot each potion sits on in **Potions → Edit potions**,
+  and Leafline counts what you drink from the number the game shows there, while the quick-slot bar
+  is in view. Buying more doesn't count as drunk. Potions not on a quick slot are still typed in.
+- **Sell or keep.** Open your Item Inventory on the Equip, Use, Set-up or Etc tab and press the new
+  **Sell or keep** hotkey (set it in Settings). Leafline names each item by its picture and marks
+  what to keep: what a quest on your Quest Helper or one you follow asks for, what crafting uses,
+  gear your build will wear, items you track, and scrolls. The rest is marked to sell, with what the
+  bag fetches at NPC prices. Items the game draws alike, such as a tier of scrolls, say so. The
+  first check downloads the pictures of the items most likely at your level; **Look further**
+  tries every item of the tab. It needs **Show game pictures** on. NPC prices come from the item
+  data and haven't been checked in game yet.
+- **Loot counted for you.** While live reading is on, Leafline reads the lines at the bottom right
+  of the game that say what you picked up (`Leaf x1 earned. (Etc)`, `You have gained mesos (+27)`),
+  each line once, even when the same words come twice in a row or several arrive at once. The
+  Train tab's new **Loot** section lists each item with how many, what one is worth (your own
+  logged price if you have one, else the NPC price) and the total, plus the mesos picked up. A line
+  Leafline can't read or name is left out and said so, so loot can come out short but never over.
+  Each saved session keeps its loot, the training log shows it, and **Export loot CSV** saves it.
+  Turn it off under **Settings → Live reading → Advanced → Count loot**.
+- **A word about UI Size.** When the game draws its interface at UI Size Default Ratio, which
+  smooths its text, Settings and the overlay say that some readings may be missed and that Ideal
+  Ratio reads best.
+- **Profit with loot.** The Potions line now reads mesos plus loot, less potions, per hour. When
+  your inventory's mesos weren't seen twice, **Mesos / hr** uses the mesos picked up instead, and
+  when they were, it shows the picked-up rate beside it as a check.
+- **When another map gets better.** While you train, once you've gone up a level on a map and
+  another map's forecast now beats it by 15% or more (the trip there counted), **This map** says so
+  in one quiet line, with **Go** and **Not now**. Not now hides it until your next level. It never
+  pops up or makes a sound.
+
+### Changed
+- **Your records are upgraded** the first time 0.4 opens them, so that sessions keep what their
+  deaths cost, the potions read from your quick slots and the loot picked up. Sessions saved before keep their deaths
+  and get the EXP lost from their maps.
+- **Quest Helper counts read as drawn.** At UI Size Ideal Ratio, each line under a quest's title
+  (`23 / 20 Orange Mushroom Cap`) is now read letter by letter against the game's own lettering,
+  so counts and names come out exactly as shown. Lines over bright clouds are no longer lost.
+  Quest titles, the other UI Sizes and the map name are read as before.
+
+**Quests**
+- **Your quest log, read from the Quest window.** While the game's Quest window is open, Leafline
+  reads its **Available**, **In Progress** and **Completed** lists and the quest picked beside
+  them, and keeps what it learns for each character on this PC. Scroll each tab to its end once so
+  it sees every row; the region counts on the bars tell it when a tab has been seen whole. It is
+  only true as of the last look, and everything says when that was. Reading never forgets a quest
+  you've done.
+- **Done, in progress and available, everywhere a quest is named.** Quest names in the Quests tab,
+  on quest pages, on map and NPC cards carry a small mark, and quest pages say when the game showed
+  it done or how far along it was.
+- **Quests to take at your level** leaves out the ones you've done and the ones you've taken, counts
+  a quest whose earlier quests you've finished as one you can start, and marks the ones the game
+  listed as **Available**. The quest search has an **Only quests not done** filter.
+- **Every quest in progress, not only the Quest Helper's five,** shown with its steps and directions
+  and the counts the Quest window last showed.
+- **Ready to hand in:** quests whose counts were full, or that the game marked done, each with who
+  takes it in and a **Go** button.
+- **Done by region:** how many quests you've done in each region against how many there are.
+- **The rest of a chain shows where you are** along it, and map and NPC cards say how many of their
+  quests you haven't done.
+- **Where the game and the data differ.** When the Quest window shows a level, a count or a reward
+  the quest data says otherwise, the quest page says so. It stays on this PC.
+
 ## 0.3.1 (2026-11-14)
 
 ### Fixed

@@ -52,6 +52,8 @@ pub struct Settings {
     /// Show item, monster, NPC and map pictures, downloaded from OSMS the first time each is
     /// shown. Off, nothing is downloaded and names stand alone.
     pub show_pictures: bool,
+    /// The look every window is drawn in.
+    pub theme: Theme,
 }
 
 impl Default for Settings {
@@ -70,8 +72,24 @@ impl Default for Settings {
             setup_done: false,
             update_check: false,
             show_pictures: true,
+            theme: Theme::default(),
         }
     }
+}
+
+/// The four looks. One layout; a look changes colours, fonts, corners and outlines only.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Theme {
+    /// Dark graphite and amber.
+    #[default]
+    EmberDark,
+    /// Ember on warm stone, with the header and tab bar kept dark.
+    EmberLight,
+    /// Light and playful: cream, ink outlines, rounded letters.
+    SproutLight,
+    /// The same stickers on plum.
+    SproutDark,
 }
 
 /// How the compact HUD was laid out. Since 2026-11-05 it has one layout and this is no longer
@@ -114,11 +132,13 @@ pub struct LiveChoice {
     pub pause_after: f64,
     /// The window the player picked, for when Leafline can't tell which one is the game.
     pub window: Option<WindowChoice>,
+    /// The Pickup Log is read between readings, for the loot picked up.
+    pub pickup_log: bool,
 }
 
 impl Default for LiveChoice {
     fn default() -> Self {
-        Self { enabled: true, interval: 2.0, pause_after: 15.0, window: None }
+        Self { enabled: true, interval: 2.0, pause_after: 15.0, window: None, pickup_log: true }
     }
 }
 
@@ -411,7 +431,8 @@ pub fn open_setup(app: &AppHandle) -> Result<()> {
     let keep = keeps_game_focus(app);
     WebviewWindowBuilder::new(app, SETUP, WebviewUrl::App("setup".into()))
         .title("Leafline — Setup")
-        .inner_size(600.0, 640.0)
+        // Wide enough for the steps' rail beside the step; narrower, they run across the top.
+        .inner_size(820.0, 640.0)
         .min_inner_size(520.0, 520.0)
         .center()
         .focusable(!keep)

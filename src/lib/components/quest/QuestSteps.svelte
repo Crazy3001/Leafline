@@ -9,6 +9,7 @@
   import { showItemNamed } from "$lib/items.svelte";
   import { showMonsterNamed } from "$lib/monsters.svelte";
   import { showNpcNamed } from "$lib/places.svelte";
+  import { hasLog, logged, watchQuestLog } from "$lib/questlog.svelte";
   import type { MapRef, Objective, QuestSheet } from "$lib/types";
 
   let {
@@ -24,6 +25,18 @@
   } = $props();
 
   const info = $derived(sheet.info);
+
+  watchQuestLog();
+  /** How far along the chain the quest log shows the character: its last quest done or taken. */
+  const chainAt = $derived.by(() => {
+    const rest = sheet.chainRest?.quests ?? [];
+    let at = -1;
+    rest.forEach((q, i) => {
+      const entry = logged(q.id);
+      if (entry && (entry.done || entry.state === "inProgress")) at = i;
+    });
+    return at;
+  });
 
   function counted(target: string) {
     return tracked?.find((o) => o.target.toLowerCase() === target.toLowerCase()) ?? null;
@@ -125,9 +138,41 @@
       {#if rest.mesos}<span class="tabular mesos">{formatMesos(rest.mesos)} mesos</span>{/if}
       in all{/if}{#if rest.quests.length > 1}, ending with <Ref kind="quest" id={rest.quests[rest.quests.length - 1].id} name={rest.quests[rest.quests.length - 1].name} />{/if}.
   </p>
+  {#if hasLog()}
+    <!-- Where the quest log puts the character along it: each quest carries its mark. -->
+    <ol class="chain-at">
+      {#each rest.quests as q, i (q.id)}
+        <li class:past={i < chainAt} class:here={i === chainAt}><Ref kind="quest" id={q.id} name={q.name} /></li>
+      {/each}
+    </ol>
+  {/if}
 {/if}
 
 <style>
+  .chain-at {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 0;
+    margin: 4px 0 0;
+    padding: 0;
+    list-style: none;
+    font-size: var(--text-sm);
+  }
+
+  .chain-at li + li::before {
+    content: "→";
+    margin: 0 6px;
+    color: var(--faint);
+  }
+
+  .chain-at li.past {
+    opacity: 0.7;
+  }
+
+  .chain-at li.here {
+    font-weight: 600;
+  }
+
   .story {
     margin: 6px 0 0;
     color: var(--muted);
@@ -199,7 +244,7 @@
   .pay div {
     padding: 4px 7px;
     border-radius: var(--radius-sm);
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--hover);
   }
 
   dt {
@@ -214,7 +259,7 @@
 
   dd.exp,
   .chain .exp {
-    color: var(--exp);
+    color: var(--exp-text);
   }
 
   .chain {

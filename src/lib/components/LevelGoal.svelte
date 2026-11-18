@@ -266,7 +266,7 @@
   }
 
   .icon:hover {
-    background: rgba(255, 255, 255, 0.07);
+    background: var(--hover);
     color: var(--text);
   }
 </style>

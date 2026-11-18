@@ -234,7 +234,7 @@
   }
 
   .class-name.seen-first {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
   .choice {
@@ -255,7 +255,7 @@
   .choice.on {
     border-color: var(--accent);
     background: var(--accent-soft);
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
   .starts {
@@ -357,7 +357,7 @@
     border: 0;
     border-radius: var(--radius-sm);
     background: var(--accent);
-    color: var(--bg);
+    color: var(--accent-ink);
     font: inherit;
     font-weight: 600;
     cursor: pointer;

@@ -1,20 +1,26 @@
 <script lang="ts">
-  // The Quests tab: what the Quest Helper is tracking, and a book of every quest in the map data.
-  // The book needs nothing from the game, so it works with live reading off.
+  // The Quests tab: what the Quest Helper is tracking, the character's quest log as the game's
+  // Quest window last showed it, and a book of every quest in the map data. The book needs nothing
+  // from the game, so it works with live reading off.
   import { clipped, tip } from "$lib/tip.svelte";
   import { FilterBoxState } from "$lib/filterbox.svelte";
   import { ArrowLeft, LoaderCircle, Search, SlidersHorizontal, X } from "@lucide/svelte";
   import { untrack } from "svelte";
 
   import Card from "./Card.svelte";
+  import Segmented from "$lib/ui/Segmented.svelte";
   import MapDataPanel from "./map/MapDataPanel.svelte";
   import QuestCard from "./QuestCard.svelte";
   import QuestSheetCard from "./QuestSheetCard.svelte";
   import FollowedQuests from "./quest/FollowedQuests.svelte";
+  import LoggedQuests from "./quest/LoggedQuests.svelte";
+  import QuestLogCard from "./quest/QuestLogCard.svelte";
+  import QuestMark from "./quest/QuestMark.svelte";
   import { backend } from "$lib/api";
   import { formatCompact } from "$lib/format";
   import { mapData, watchMapData } from "$lib/mapdata.svelte";
   import { blankSearch, followedQuests, noteCharacter, questView, watchQuests } from "$lib/quests.svelte";
+  import { doneIds, hasLog, logged, questLog, refreshRegionTotals, watchQuestLog } from "$lib/questlog.svelte";
   import type { MapReading, QuestPage, QuestReading, QuestRow, QuestSearch, SessionSummary } from "$lib/types";
 
   let {
@@ -43,6 +49,7 @@
 
   watchQuests();
   watchMapData();
+  watchQuestLog();
 
   $effect(() => noteCharacter(character));
 
@@ -55,27 +62,65 @@
   let searching = $state(false);
 
   const narrowed = $derived(
-    [search.region, search.repeat, search.atLevel, search.noPrior || null].filter((v) => v != null).length,
+    [search.region, search.repeat, search.atLevel, search.noPrior || null, search.hideDone || null].filter((v) => v != null)
+      .length,
   );
+  /** The quests the log shows done, as a key: a search asks again when it changes. */
+  const done = $derived(doneIds());
+  const doneKey = $derived(done.join(","));
   /** How many quests to take now the tab names before "Show all". */
   const TAKE_NOW = 6;
+
+  // The tab shows one of three things at a time, picked by chips: what you're on now, the
+  // whole quest log, or what to pick up next. A pinned window shows only what you're on.
+  type View = "now" | "log" | "take";
+  const VIEW_KEY = "leafline.quests.view";
+  const VIEWS: { id: View; label: string }[] = [
+    { id: "now", label: "On now" },
+    { id: "log", label: "Quest log" },
+    { id: "take", label: "To take" },
+  ];
+  function storedView(): View {
+    try {
+      const saved = localStorage.getItem(VIEW_KEY);
+      if (VIEWS.some((v) => v.id === saved)) return saved as View;
+    } catch {
+      // Starts on what you're on now.
+    }
+    return "now";
+  }
+  let view = $state<View>(storedView());
+  function setView(next: View) {
+    view = next;
+    try {
+      localStorage.setItem(VIEW_KEY, next);
+    } catch {
+      // A convenience only.
+    }
+  }
+  /** What shows: a pinned window, or a tab with no map data to list quests from, has only the first. */
+  const showing = $derived<View>(pinned || !ready ? "now" : view);
   const browsing = $derived(search.text.trim() !== "" || narrowed > 0);
   const asked = $derived(JSON.stringify(search));
 
   $effect(() => {
     void mapData.status?.dataUpdatedAt;
-    if (ready) backend.questRegions().then((r) => (regions = r));
+    if (ready) {
+      backend.questRegions().then((r) => (regions = r));
+      refreshRegionTotals();
+    }
   });
 
   $effect(() => {
     const key = asked;
+    void doneKey;
     if (!browsing || !ready) {
       page = null;
       return;
     }
     searching = true;
     const timer = setTimeout(() => {
-      untrack(() => backend.searchQuests({ ...search, offset: 0 }))
+      untrack(() => backend.searchQuests({ ...search, done, offset: 0 }))
         .then((result) => {
           if (key === asked) page = result;
         })
@@ -86,25 +131,32 @@
     return () => clearTimeout(timer);
   });
 
-  // Quests the character can start at their level that need no other quest first, the nearest
-  // to their level first. Which ones they've done is the game's to know, so some may be done.
+  // Quests the character can start at their level that need no other quest first, or none they
+  // haven't done, the nearest to their level first. The quest log says which they've done, as of
+  // the last look at the Quest window; without it some may be done.
   let takeNow = $state<QuestPage | null>(null);
   $effect(() => {
     void mapData.status?.dataUpdatedAt;
+    void doneKey;
     const at = level;
     if (!ready || at == null || pinned) {
       takeNow = null;
       return;
     }
-    untrack(() => backend.searchQuests({ ...blankSearch(), atLevel: at, noPrior: true })).then((found) => {
-      if (level === at) takeNow = found;
-    });
+    untrack(() => backend.searchQuests({ ...blankSearch(), atLevel: at, noPrior: true, done, hideDone: true })).then(
+      (found) => {
+        if (level === at) takeNow = found;
+      },
+    );
   });
+
+  /** Quests to take, less those the log shows taken already. */
+  const toTake = $derived((takeNow?.quests ?? []).filter((row) => logged(row.id)?.state !== "inProgress"));
 
   async function more() {
     if (!page) return;
     const key = asked;
-    const next = await backend.searchQuests({ ...search, offset: page.quests.length });
+    const next = await backend.searchQuests({ ...search, done, offset: page.quests.length });
     if (key === asked && page) page.quests.push(...next.quests);
   }
 
@@ -135,7 +187,7 @@
     {#each list as row (row.id)}
       <li>
         <button onclick={() => (questView.id = row.id)}>
-          <span class="row-name">{row.name}</span>
+          <span class="row-name">{row.name}<QuestMark id={row.id} label /></span>
           <span use:clipped class="row-line">{line(row)}{#if row.exp}{line(row) ? " · " : ""}<span class="exp tabular">{formatCompact(row.exp)} EXP</span>{/if}</span>
         </button>
       </li>
@@ -196,8 +248,14 @@
         {/if}
         <label class="check">
           <input type="checkbox" checked={!!search.noPrior} onchange={(e) => setSearch({ noPrior: e.currentTarget.checked || undefined })} />
-          <span>Only quests that need no other first</span>
+          <span>{hasLog() ? "Only quests you can start: none needed first, or only done ones" : "Only quests that need no other first"}</span>
         </label>
+        {#if hasLog()}
+          <label class="check">
+            <input type="checkbox" checked={!!search.hideDone} onchange={(e) => setSearch({ hideDone: e.currentTarget.checked || undefined })} />
+            <span>Only quests not done</span>
+          </label>
+        {/if}
       </div>
     {/if}
   </div>
@@ -221,24 +279,41 @@
     {/if}
   </div>
 {:else}
-  {#if quest}
+  {#if ready && !pinned}
+    <div class="views"><Segmented label="Which quests" options={VIEWS} value={view} onchange={setView} /></div>
+  {/if}
+  {#if showing !== "now"}
+    <!-- The log or the list to take, below. -->
+  {:else if quest}
     <QuestCard {quest} {map} {session} plain={pinned} />
-  {:else if !(ready && followedQuests().length)}
+  {:else if !(ready && (followedQuests().length || questLog.log?.quests.some((q) => q.state === "inProgress")))}
     <p class="empty">
       Open the Quest Helper in game to track quest counters here, or search for a quest and follow it.
     </p>
   {/if}
-  {#if ready}<FollowedQuests tracked={quest} {map} {session} plain={pinned} />{/if}
-  {#if ready && !pinned && level != null && takeNow?.quests.length}
+  {#if ready && showing === "now"}<FollowedQuests tracked={quest} {map} {session} plain={pinned} />{/if}
+  {#if ready && showing === "now"}<LoggedQuests tracked={quest} {map} {session} plain={pinned} />{/if}
+  {#if !pinned && (showing === "log" || !ready)}<QuestLogCard />{/if}
+  {#if showing === "take" && (level == null || !toTake.length)}
+    <p class="empty">
+      {level == null ? "Leafline needs to read your level from the HUD to say which quests you can take." : `Nothing new to take at Lv ${level}.`}
+    </p>
+  {/if}
+  {#if ready && showing === "take" && level != null && toTake.length}
     <Card title={`Quests to take at Lv ${level}`}>
       <p class="lead">
-        Quests your level can start that need no other quest first, the nearest to your level first. Leafline can't see
-        which you've done.
+        {#if hasLog()}
+          Quests your level can start, the nearest to your level first, leaving out what your quest log shows done as of the
+          last look at the Quest window.
+        {:else}
+          Quests your level can start that need no other quest first, the nearest to your level first. Open the Quest window
+          in game so Leafline can leave out the ones you've done.
+        {/if}
       </p>
-      {@render rows(takeNow.quests.slice(0, TAKE_NOW))}
-      {#if takeNow.total > TAKE_NOW}
-        <button class="back inline" onclick={() => setSearch({ atLevel: level, noPrior: true })}
-          >Show all {takeNow.total.toLocaleString()}</button
+      {@render rows(toTake.slice(0, TAKE_NOW))}
+      {#if (takeNow?.total ?? 0) > TAKE_NOW}
+        <button class="back inline" onclick={() => setSearch({ atLevel: level, noPrior: true, hideDone: hasLog() || undefined })}
+          >Show all {(takeNow?.total ?? 0).toLocaleString()}</button
         >
       {/if}
     </Card>
@@ -253,7 +328,7 @@
 
 <style>
   .row-line .exp {
-    color: var(--exp);
+    color: var(--exp-text);
   }
 
   .lead {
@@ -263,6 +338,11 @@
   }
 
   /* A card pads itself; these sit beside cards, so they match it. A pinned window pads its body. */
+  .views {
+    display: flex;
+    padding: 0 10px 10px;
+  }
+
   .controls {
     padding: 10px 12px 0;
   }
@@ -340,7 +420,7 @@
 
   .tool.active {
     border-color: color-mix(in srgb, var(--accent) 45%, transparent);
-    color: var(--accent);
+    color: var(--accent-text);
   }
 
   .filters {

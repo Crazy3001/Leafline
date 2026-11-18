@@ -6,6 +6,7 @@
 
   import ItemCraftingView from "./item/ItemCrafting.svelte";
   import ItemSources from "./item/ItemSources.svelte";
+  import ScrollOdds from "./item/ScrollOdds.svelte";
   import Section from "./map/Section.svelte";
   import { backend } from "$lib/api";
   import { buildState, watchBuilds } from "$lib/builds.svelte";
@@ -209,6 +210,17 @@
   </div>
   {#if pieceError}<p class="piece-error">{pieceError}</p>{/if}
 
+  {#if shown.kind === "scroll" && shown.scroll}
+    {@const raise = shown.stats.find((s) => s.value > 0) ?? null}
+    <Section title="Odds" open={false}>
+      <ScrollOdds rate={shown.scroll.successRate} stat={raise?.value ?? 1} statLabel={raise?.label ?? null} />
+    </Section>
+  {:else if shown.kind === "equip" && (slotsLeft ?? shown.upgradeSlots)}
+    <Section title="Scrolling odds" open={false}>
+      <ScrollOdds slots={slotsLeft ?? shown.upgradeSlots ?? 7} />
+    </Section>
+  {/if}
+
   <Section title="Where to get it">
     {#if found}
       <ItemSources {found} />
@@ -246,7 +258,7 @@
   .facts div {
     padding: 4px 7px;
     border-radius: var(--radius-sm);
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--hover);
   }
 
   dt {
@@ -294,7 +306,7 @@
   .actions .on {
     border-color: color-mix(in srgb, var(--accent) 45%, transparent);
     background: var(--accent-soft);
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
   .note {

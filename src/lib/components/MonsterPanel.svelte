@@ -387,7 +387,7 @@
   }
 
   .head button.on {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
   .name {
@@ -418,7 +418,7 @@
     flex: none;
     padding: 0 4px;
     border-radius: var(--radius-sm);
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--hover);
     color: var(--faint);
     font-size: var(--text-xs);
     font-weight: 400;

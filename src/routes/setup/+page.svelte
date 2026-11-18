@@ -21,14 +21,18 @@
   import { backend } from "$lib/api";
   import HotkeyButton from "$lib/components/HotkeyButton.svelte";
   import Logo from "$lib/components/Logo.svelte";
+  import ThemePicker from "$lib/ui/ThemePicker.svelte";
   import MapDataPanel from "$lib/components/map/MapDataPanel.svelte";
   import { WIKI_URL, mapData } from "$lib/mapdata.svelte";
   import { changeSettings, display, keyName, quietHotkeys, usesNumpad, watchSettings } from "$lib/settings.svelte";
   import type { ShortcutInfo } from "$lib/types";
   import { watchTyping } from "$lib/typing";
 
-  const STEPS = ["Welcome", "Hotkeys", "Game settings", "Views", "Map data"];
-  const SCREENS_STEP = 3;
+  const STEPS = ["Welcome", "Look", "Hotkeys", "Game settings", "Views", "Map data"];
+  const LOOK_STEP = 1;
+  const KEYS_STEP = 2;
+  const GAME_STEP = 3;
+  const SCREENS_STEP = 4;
 
   let step = $state(0);
   let shortcuts = $state<ShortcutInfo[]>([]);
@@ -110,7 +114,7 @@
   }
 
   async function next() {
-    if (step === 1 && !testing) {
+    if (step === KEYS_STEP && !testing) {
       if (!(await saveKeys())) return;
       arrived = {};
       testing = true;
@@ -121,7 +125,7 @@
   }
 
   function back() {
-    if (step === 1 && testing) testing = false;
+    if (step === KEYS_STEP && testing) testing = false;
     else step -= 1;
   }
 
@@ -161,10 +165,11 @@
 <div class="page">
   <header>
     <div class="brand"><Logo size={20} /><span>Leafline</span></div>
+    <p class="about">Setup · about 2 minutes</p>
     <ol class="steps" aria-label="Setup steps">
       {#each STEPS as title, i (title)}
         <li class:current={i === step} class:done={i < step} aria-current={i === step ? "step" : undefined}>
-          <span class="num tabular">{#if i < step}<Check size={11} />{:else}{i + 1}{/if}</span>{title}
+          <span class="num tabular">{#if i < step}<Check size={11} strokeWidth={3} />{:else}{i + 1}{/if}</span><span class="title">{title}</span>
         </li>
       {/each}
     </ol>
@@ -224,7 +229,16 @@
           {#each never as item (item)}<li><span class="mark"><X size={12} /></span>{item}</li>{/each}
         </ul>
       </section>
-    {:else if step === 1 && testing}
+    {:else if step === LOOK_STEP}
+      <section>
+        <h1>Pick your look</h1>
+        <p class="lead">
+          Four looks over the same layout. This window changes as you pick, and so will every other Leafline window.
+          You can change it any time in Settings.
+        </p>
+        <ThemePicker />
+      </section>
+    {:else if step === KEYS_STEP && testing}
       <section>
         <h1>Test your hotkeys</h1>
         <p class="lead">
@@ -264,7 +278,7 @@
           </p>
         {/if}
       </section>
-    {:else if step === 1}
+    {:else if step === KEYS_STEP}
       <section>
         <h1>Hotkeys</h1>
         <p class="lead">
@@ -299,7 +313,7 @@
         {/if}
         {#if keysError || clash}<p class="note warn">{keysError ?? clash}</p>{/if}
       </section>
-    {:else if step === 2}
+    {:else if step === GAME_STEP}
       <section>
         <h1>Game settings</h1>
         <p class="lead">Leafline reads the game's own text, so a few game settings help it read reliably.</p>
@@ -414,12 +428,12 @@
     {#if finishError}<p class="note warn">{finishError}</p>{/if}
     <div class="nav">
       {#if step > 0}
-        <button class="button" onclick={back}><ArrowLeft size={13} />{step === 1 && testing ? "Change keys" : "Back"}</button>
+        <button class="button" onclick={back}><ArrowLeft size={13} />{step === KEYS_STEP && testing ? "Change keys" : "Back"}</button>
       {/if}
       <span class="spacer"></span>
       {#if step < STEPS.length - 1}
         <button class="button primary" onclick={next}>
-          {step === 1 && !testing ? "Set and test" : "Next"}<ArrowRight size={13} />
+          {step === KEYS_STEP && !testing ? "Set and test" : "Next"}<ArrowRight size={13} />
         </button>
       {:else}
         <button class="button primary" onclick={finish} disabled={finishing}>
@@ -441,63 +455,132 @@
     height: 100vh;
   }
 
+  /* Narrow: the steps run across the top. */
   header {
-    padding: 18px 28px 14px;
+    padding: 16px 28px 14px;
     border-bottom: 1px solid var(--border);
-    background: var(--surface);
+    background: var(--header-bg);
+    color: var(--header-text);
   }
 
   .brand {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 14px;
     font-family: var(--font-display);
     font-size: var(--text-lg);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
+  }
+
+  .about {
+    margin: 2px 0 12px;
+    color: var(--header-faint);
+    font-size: var(--text-xs);
   }
 
   .steps {
     display: flex;
-    gap: 18px;
+    flex-wrap: wrap;
+    gap: 8px 16px;
     margin: 0;
     padding: 0;
     list-style: none;
-    color: var(--faint);
+    color: var(--header-faint);
     font-size: var(--text-sm);
   }
 
   .steps li {
+    position: relative;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
   }
 
   .steps li.current {
-    color: var(--text);
+    color: var(--header-text);
+    font-weight: var(--weight-strong);
   }
 
   .steps li.done {
-    color: var(--muted);
+    color: var(--header-muted);
   }
 
   .num {
+    position: relative;
+    z-index: 1;
     display: inline-grid;
+    flex: none;
     place-items: center;
-    width: 18px;
-    height: 18px;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--header-track);
+    color: var(--header-muted);
     font-size: var(--text-xs);
+    font-weight: 600;
   }
 
   .current .num {
-    border-color: var(--accent);
-    color: var(--accent-strong);
+    background: var(--accent);
+    color: var(--accent-ink);
   }
 
   .done .num {
-    color: var(--good);
+    background: color-mix(in srgb, var(--header-good) 22%, var(--header-bg));
+    color: var(--header-good);
+  }
+
+  /* Wide: a rail down the left, the steps joined by a line that fills as you go. */
+  @media (min-width: 720px) {
+    .page {
+      grid-template-columns: 220px minmax(0, 1fr);
+      grid-template-rows: 1fr auto;
+    }
+
+    header {
+      grid-row: 1 / 3;
+      padding: 22px 18px;
+      border-right: 1px solid var(--border);
+      border-bottom: 0;
+    }
+
+    .about {
+      margin-bottom: 20px;
+    }
+
+    .steps {
+      flex-direction: column;
+      flex-wrap: nowrap;
+      gap: 0;
+    }
+
+    .steps li {
+      padding: 8px 0;
+    }
+
+    .num {
+      width: 26px;
+      height: 26px;
+    }
+
+    .steps li + li::before {
+      content: "";
+      position: absolute;
+      left: 12px;
+      bottom: 50%;
+      width: 2px;
+      height: 100%;
+      background: var(--header-track);
+    }
+
+    .steps li.done + li::before {
+      background: color-mix(in srgb, var(--header-good) 45%, var(--header-bg));
+    }
+
+    main,
+    footer {
+      grid-column: 2;
+    }
   }
 
   main {
@@ -653,7 +736,7 @@
     display: inline-grid;
     flex: none;
     margin-top: 1px;
-    color: var(--accent);
+    color: var(--accent-text);
   }
 
   .places {
@@ -758,7 +841,7 @@
   .button.primary {
     border-color: var(--accent);
     background: var(--accent);
-    color: #1c1305;
+    color: var(--accent-ink);
     font-weight: 600;
   }
 
@@ -785,7 +868,7 @@
     padding: 0;
     border: 0;
     background: none;
-    color: var(--accent);
+    color: var(--accent-text);
     cursor: pointer;
   }
 

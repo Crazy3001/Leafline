@@ -136,7 +136,7 @@
   }
 
   .legend button.on {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
   .maps {
@@ -163,7 +163,7 @@
   }
 
   .ground:hover {
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--hover);
     color: var(--text);
   }
 

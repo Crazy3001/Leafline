@@ -125,7 +125,7 @@
 
   .hotkey.listening {
     border-color: var(--accent);
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
   .hotkey.taken {

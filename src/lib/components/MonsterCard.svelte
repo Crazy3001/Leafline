@@ -7,6 +7,7 @@
 
   import Card from "./Card.svelte";
   import MonsterDropList from "./monster/MonsterDropList.svelte";
+  import YourFight from "./monster/YourFight.svelte";
   import PlaceList from "./map/PlaceList.svelte";
   import Section from "./map/Section.svelte";
   import { backend } from "$lib/api";
@@ -206,6 +207,12 @@
       </p>
     {/if}
 
+    {#if !compact}
+      <Section title="Your fight">
+        <YourFight {id} {level} {session} />
+      </Section>
+    {/if}
+
     <Section title="Where to find it" count={sheet.maps.length}>
       {#if sheet.maps.length}
         <PlaceList places={sheet.maps} from={found?.from ?? null} />
@@ -282,7 +289,7 @@
   }
 
   .rank b {
-    color: var(--exp);
+    color: var(--exp-text);
     font-weight: 600;
   }
 
@@ -323,7 +330,7 @@
     min-width: 0;
     padding: 4px 7px;
     border-radius: var(--radius-sm);
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--hover);
   }
 
   dt {
@@ -404,7 +411,7 @@
 
   .link:hover,
   .link:focus-visible {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
     text-decoration: underline;
     outline: none;
   }
@@ -443,7 +450,7 @@
   }
 
   .quests .yours-now {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
     font-weight: 600;
   }
 

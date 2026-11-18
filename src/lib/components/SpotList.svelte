@@ -1,6 +1,17 @@
 <script lang="ts" module>
+  import type { TrainingSpot as Spot } from "$lib/types";
+
   /** The section's element id, for the Train tab's jump link. */
   export const SPOTS_ID = "where-to-train";
+
+  /** A map the forecast now puts above the one being trained on, for the Train tab's quiet line. */
+  export interface BetterMap {
+    spot: Spot;
+    /** EXP an hour there and here, as For you weighs them (the trip there counted). */
+    there: number;
+    here: number;
+    level: number;
+  }
 </script>
 
 <script lang="ts">
@@ -53,6 +64,7 @@
     map = null,
     session = null,
     last = true,
+    better = $bindable(null),
   }: {
     /** Read from the HUD or the session; the player can set it when it isn't. */
     level: number | null;
@@ -60,6 +72,8 @@
     session?: SessionSummary | null;
     /** The bottom section of the tab, with no rule under it. */
     last?: boolean;
+    /** Set while a session runs on a map that another one should now beat; see [`nudge`]. */
+    better?: BetterMap | null;
   } = $props();
 
   type Sort = "you" | "played" | "near" | "saved";
@@ -172,8 +186,9 @@
    *  so their own rate there is weighed against the estimates. */
   const PLAYED_WELL = 10 * 60;
   const FAR_BELOW = 15;
-  const playedWell = (s: TrainingSpot) =>
-    s.measured != null && s.measured.activeSeconds >= PLAYED_WELL && (level == null || s.averageLevel >= level - FAR_BELOW);
+  /** Your own rate on a map, once there are ten minutes of it: seconds of play there say nothing. */
+  const ownRate = (s: TrainingSpot) => (s.measured != null && s.measured.activeSeconds >= PLAYED_WELL ? s.measured : null);
+  const playedWell = (s: TrainingSpot) => ownRate(s) != null && (level == null || s.averageLevel >= level - FAR_BELOW);
   const near = (s: TrainingSpot) => level == null || (s.averageLevel >= level - BELOW && s.averageLevel <= level + ABOVE);
   const savedIds = $derived(new Set(saved.map((s) => s.mapId)));
   const sorts = $derived<{ id: Sort; label: string; title: string }[]>([
@@ -190,7 +205,7 @@
   const speed = $derived(data?.speed ?? null);
   const fit = $derived(data?.fit ?? null);
   /** The older estimate, for a map the player hasn't measured, when there is no forecast. */
-  const estimate = (s: TrainingSpot) => (s.forecast || s.measured ? null : s.estimate);
+  const estimate = (s: TrainingSpot) => (s.forecast || ownRate(s) ? null : s.estimate);
   const forecast = (s: TrainingSpot): Forecast | null => s.forecast ?? null;
   /** Hours a training session runs, for weighing a long trip against a better map. */
   const SESSION_HOURS = 1;
@@ -200,7 +215,7 @@
   const DEATH_COST = 0.1;
   /** EXP an hour of a session spent here: the trip there takes from the hour, deaths take EXP. */
   function forYou(s: TrainingSpot) {
-    const rate = forecast(s)?.expPerHour ?? s.measured?.expPerHour ?? estimate(s)?.expPerHour;
+    const rate = forecast(s)?.expPerHour ?? ownRate(s)?.expPerHour ?? estimate(s)?.expPerHour;
     if (rate == null) return -1;
     const trip = ((steps(s) ?? 0) * SECONDS_PER_HOP) / 3600;
     const deaths = (forecast(s)?.deathsPerHour ?? 0) * DEATH_COST * (session?.expNeeded ?? 0);
@@ -215,15 +230,15 @@
       sort === "saved"
         ? savedIds.has(s.map.id)
         : sort === "played"
-          ? s.measured != null && s.measured.activeSeconds >= 60
+          ? ownRate(s) != null
           : s.reachable && (allLevels || (near(s) && !tooHard(s)) || savedIds.has(s.map.id) || playedWell(s)),
     );
     // With no estimate at all, maps not tried fall back to base EXP, below every measured one.
     const you = (s: TrainingSpot) =>
-      !s.forecast && speed == null && !s.measured ? s.expPerClear / 1e6 - 1 : forYou(s);
+      !s.forecast && speed == null && !ownRate(s) ? s.expPerClear / 1e6 - 1 : forYou(s);
     const by: Record<Sort, (s: TrainingSpot) => number> = {
       you,
-      played: (s) => s.measured?.expPerHour ?? -1,
+      played: (s) => ownRate(s)?.expPerHour ?? -1,
       near: (s) => -(steps(s) ?? 9999),
       saved: you,
     };
@@ -245,6 +260,53 @@
     const fresh = shown.find((s) => (forecast(s)?.playedSeconds ?? 0) === 0 && (forecast(s)?.high ?? 0) > best);
     return fresh?.map.id ?? null;
   });
+  /** How much better another map must look, as For you weighs it, before the Train tab says so. */
+  const NUDGE_MARGIN = 1.15;
+  /**
+   * The maps that already beat this one when the player started here, by map. The nudge is for a
+   * map that becomes better as the player levels, not for one they chose to pass up.
+   */
+  let arrival = $state<{ map: number; level: number; ahead: Set<number> } | null>(null);
+  /** Maps beating this one by the margin, best first, by the forecast For you shows. */
+  const ahead = $derived.by(() => {
+    const from = data?.from?.id;
+    if (from == null || level == null || !session || session.town) return null;
+    const here = (data?.spots ?? []).find((s) => s.map.id === from);
+    if (!here || !forecast(here)) return null;
+    const rate = forYou(here);
+    if (rate <= 0) return null;
+    const beat = (data?.spots ?? [])
+      .filter((s) => s.map.id !== from && s.reachable && forecast(s) && near(s) && !tooHard(s))
+      .map((s) => ({ spot: s, there: forYou(s) }))
+      .filter((c) => c.there >= rate * NUDGE_MARGIN)
+      .sort((a, b) => b.there - a.there);
+    return { from, rate, beat };
+  });
+  $effect(() => {
+    const now = ahead;
+    if (!now || level == null) return;
+    const known = untrack(() => arrival);
+    if (known?.map !== now.from) arrival = { map: now.from, level, ahead: new Set(now.beat.map((c) => c.spot.map.id)) };
+  });
+  /** Levels a nudge was waved away at, by map, until the next level. */
+  let waved = $state<Map<number, number>>(new Map());
+  $effect(() => {
+    const now = ahead;
+    const start = arrival;
+    let next: BetterMap | null = null;
+    if (now && start && start.map === now.from && level != null && level > start.level && waved.get(now.from) !== level) {
+      const fresh = now.beat.find((c) => !start.ahead.has(c.spot.map.id));
+      if (fresh) next = { spot: fresh.spot, there: fresh.there, here: now.rate, level };
+    }
+    better = next;
+  });
+  /** Hides the nudge for this map until the next level. */
+  export function wave() {
+    const from = arrival?.map;
+    if (from == null || level == null) return;
+    waved = new Map(waved).set(from, level);
+  }
+
   const missingSaved = $derived(saved.filter((s) => !(data?.spots ?? []).some((spot) => spot.map.id === s.mapId)));
 
   function stored(key: string, fallback: string) {
@@ -348,7 +410,8 @@
         range: `Likely ${formatCompact(f.low)}–${formatCompact(f.high)} EXP an hour`,
       };
     }
-    if (spot.measured) return { value: formatCompact(spot.measured.expPerHour), unit: "your EXP / hr", quiet: false };
+    const own = ownRate(spot);
+    if (own) return { value: formatCompact(own.expPerHour), unit: "your EXP / hr", quiet: false };
     const guess = estimate(spot);
     if (guess) return { value: `≈${formatCompact(guess.expPerHour)}`, unit: "est. EXP / hr", quiet: true, sure: guess.sureness };
     return { value: formatCompact(spot.expPerClear), unit: "EXP / clear", quiet: true };
@@ -453,7 +516,8 @@
   }
 
   function why(spot: TrainingSpot) {
-    if (spot.measured) return `Your rate over ${formatDuration(spot.measured.activeSeconds)} of play here.`;
+    const own = ownRate(spot);
+    if (own) return `Your rate over ${formatDuration(own.activeSeconds)} of play here.`;
     if (estimate(spot)) return null;
     return "Not tried yet. Play ten minutes solo on any map and Leafline can estimate this one from your kill speed.";
   }
@@ -521,7 +585,7 @@
                       class="try"
                       use:tip={"Not played yet, and its range reaches past your best map. Trying it teaches Leafline more."}
                       >Worth a try</span
-                    >{" · "}{/if}{#if steps(spot) === 0}<span class="here">You're here</span>{" · "}{/if}{#if sort === "played" && spot.measured}{formatDuration(spot.measured.activeSeconds)} played · {/if}{line.levels}{#each line.mobs as mob, n (mob.id)}{n === 0 ? " · " : ", "}<Ref kind="mob" id={mob.id} name={monsterLabel(mob.name)} icon={false} />{/each}
+                    >{" · "}{/if}{#if steps(spot) === 0}<span class="here">You're here</span>{" · "}{/if}{#if sort === "played" && ownRate(spot)}{formatDuration(ownRate(spot)!.activeSeconds)} played · {/if}{line.levels}{#each line.mobs as mob, n (mob.id)}{n === 0 ? " · " : ", "}<Ref kind="mob" id={mob.id} name={monsterLabel(mob.name)} icon={false} />{/each}
                 </span>
               </span>
               <span class="metric" use:tip={m.range ?? ""}>
@@ -587,7 +651,7 @@
         </li>
       {:else}
         {#if sort === "played"}
-          <li class="quiet empty">No maps played yet. Maps you train on show here with your own rate.</li>
+          <li class="quiet empty">No maps played for 10 minutes or more yet. Maps you train on show here with your own rate.</li>
         {:else if sort !== "saved"}
           <li class="quiet empty">
             {level != null ? `No maps with monsters near Lv ${level}. Tick Every level to see the rest.` : "Set your level to see maps that suit it."}
@@ -862,7 +926,7 @@
   }
 
   .row:hover .name {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
   .row:focus-visible {
@@ -906,7 +970,7 @@
   }
 
   .meta .here {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
   .check-est {

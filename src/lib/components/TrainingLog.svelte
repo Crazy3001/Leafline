@@ -12,6 +12,8 @@
   import MapNote from "./MapNote.svelte";
   import MapRecords from "./MapRecords.svelte";
   import PotionCosts from "./PotionCosts.svelte";
+  import LootLog from "./LootLog.svelte";
+  import { lootPerHour } from "$lib/loot.svelte";
   import { netMesosPerHour } from "$lib/potions.svelte";
   import ShareDialog from "./ShareDialog.svelte";
   import { backend } from "$lib/api";
@@ -36,10 +38,13 @@
     levelBands,
     bandRange,
     mapStats,
+    longEnough,
     pointDetail,
     rateFormat,
     shortDay,
     showUnplaced,
+    deathCost,
+    partySizes,
     type LineFilter,
     type Metric,
   } from "$lib/training";
@@ -55,7 +60,14 @@
   /** In a desk view column: no title of its own, and the views in a row above. */
   let { embedded = false }: { embedded?: boolean } = $props();
 
-  type View = "sessions" | "maps" | "records" | "progress" | "drops";
+  type View = "overview" | "sessions" | "maps" | "records" | "drops";
+  const VIEWS: [View, string][] = [
+    ["overview", "Overview"],
+    ["sessions", "Sessions"],
+    ["maps", "Maps"],
+    ["records", "Records"],
+    ["drops", "Drops"],
+  ];
   type Range = "7" | "30" | "all";
 
   const VIEW_KEY = "leafline.training.view";
@@ -68,7 +80,13 @@
     watchSettings();
   });
 
-  let view = $state<View>(stored(VIEW_KEY, "sessions") as View);
+  /** The Overview was called Progress, and came fourth, until the 0.4 look. */
+  function storedView(): View {
+    const saved = stored(VIEW_KEY, "overview");
+    if (saved === "progress") return "overview";
+    return VIEWS.some(([id]) => id === saved) ? (saved as View) : "overview";
+  }
+  let view = $state<View>(storedView());
   let range = $state<Range>("30");
   let character = $state<string>("");
   /** Once the player has picked a character (or All), their pick stands. */
@@ -120,11 +138,15 @@
     if (!characterChosen && characters.length > 1) character = activeCharacter.viewing ?? (activeCharacter.all ? "" : (all[0]?.character ?? ""));
   });
   const since = $derived(range === "all" ? null : Date.now() / 1000 - Number(range) * 86400);
-  const sessions = $derived(
+  /** Sessions under ten minutes stay out unless asked for. */
+  let showShort = $state(false);
+  const inRange = $derived(
     all.filter(
       (s) => (!character || s.character === character) && (since == null || (s.startedAt ?? s.savedAt) >= since),
     ),
   );
+  const shortCount = $derived(inRange.filter((s) => !longEnough(s)).length);
+  const sessions = $derived(showShort ? inRange : inRange.filter(longEnough));
   const totalSeconds = $derived(sessions.reduce((a, s) => a + s.activeSeconds, 0));
   const selected = $derived(sessions.find((s) => s.id === selectedId) ?? sessions[0] ?? null);
   /** Drops logged while the session shown was running. */
@@ -185,6 +207,11 @@
     const start = s.level - s.levelUps;
     return s.levelUps ? `Lv ${start} → ${s.level}` : `Lv ${s.level}`;
   };
+  /** What a session's deaths cost, for under its Deaths tile. */
+  function deathLine(s: SavedSession): string | null {
+    const cost = deathCost(s);
+    return cost ? [cost.lost ? `${cost.lost} lost` : null, cost.play].filter(Boolean).join(", ") || null : null;
+  }
   const percentOnly = (s: SavedSession) => s.expPerHour == null && s.percentPerHour != null;
   const expRate = (s: SavedSession) =>
     percentOnly(s) ? `${s.percentPerHour?.toFixed(1)}%` : formatCompact(s.expPerHour);
@@ -227,7 +254,12 @@
     levels: bandRange(band),
     party,
   });
-  const stats = $derived(mapStats(sessions, filter));
+  const stats = $derived(mapStats(sessions, filter).filter((m) => showShort || longEnough(m)));
+  /** Both kinds of play in view: EXP / hr is shown solo and in a party apart. */
+  const splitParty = $derived(party === "any" && stats.some((m) => m.solo) && stats.some((m) => m.party));
+  const kindRate = (k: { expPerHour: number } | null) => (k ? formatCompact(k.expPerHour) : "—");
+  /** Who a best run was with: `solo`, `party of 3`. */
+  const withWhom = (p: number | null) => ((p ?? 1) > 1 ? `party of ${p}` : "solo");
   const bars = $derived(mapBars(stats, metric));
   const picked = $derived(stats.find((m) => m.map === pickedMap) ?? stats[0] ?? null);
 
@@ -303,6 +335,29 @@
       }));
   });
   const current = $derived(live.session && live.session.activeSeconds > 0 ? live.session : null);
+
+  // Overview: what the deaths and potions cost over the range, the best single session, the maps
+  // with the best runs, and the last few sessions.
+  const deaths = $derived(sessions.reduce((a, s) => a + s.deaths, 0));
+  const deathSeconds = $derived(sessions.reduce((a, s) => a + (deathCost(s)?.seconds ?? 0), 0));
+  const potionCost = $derived(sessions.reduce((a, s) => a + s.potionCost, 0));
+  const bestSession = $derived(
+    sessions.reduce<SavedSession | null>((b, s) => (s.expPerHour != null && (b?.expPerHour ?? -1) < s.expPerHour ? s : b), null),
+  );
+  const BEST_MAPS = 4;
+  const bestMaps = $derived(
+    mapStats(sessions)
+      .filter((m) => m.best && (showShort || longEnough(m)))
+      .sort((a, b) => b.best!.expPerHour - a.best!.expPerHour)
+      .slice(0, BEST_MAPS),
+  );
+  const bestTop = $derived(Math.max(1, ...bestMaps.map((m) => m.best!.expPerHour)));
+  const RECENT = 5;
+
+  function openSession(id: number) {
+    selectedId = id;
+    pickView("sessions");
+  }
   const paceSeconds = $derived(totals.days > 0 ? totalSeconds / totals.days : null);
 </script>
 
@@ -334,6 +389,12 @@
       ]}
       onchange={(r) => (range = r)}
     />
+    {#if shortCount}
+      <label class="short" title="Sessions with under 10 minutes of play, and maps you spent under 10 minutes on">
+        <input type="checkbox" bind:checked={showShort} />
+        {showShort ? "Showing" : "Show"} {shortCount} short session{shortCount === 1 ? "" : "s"}
+      </label>
+    {/if}
     <span class="grow"></span>
     {#if exported}<span class="quiet">{exported}</span>{/if}
     <Button onclick={exportCsv}><Download size={13} />Export CSV</Button>
@@ -341,8 +402,8 @@
 
   <div class="body">
     <nav aria-label="Training log">
-      {#each [["sessions", "Sessions"], ["maps", "Maps"], ["records", "Records"], ["progress", "Progress"], ["drops", "Drops"]] as [id, name] (id)}
-        <button class="nav" aria-current={view === id ? "page" : undefined} onclick={() => pickView(id as View)}>{name}</button>
+      {#each VIEWS as [id, name] (id)}
+        <button class="nav" aria-current={view === id ? "page" : undefined} onclick={() => pickView(id)}>{name}</button>
       {/each}
     </nav>
 
@@ -371,7 +432,13 @@
                 <span class="tabular muted">{shortDay(s.startedAt ?? s.savedAt)}</span>
                 <span class="what">
                   <span use:clipped class="ellipsis">{title(s)}</span>
-                  {#if levelText(s)}<span class="small">{levelText(s)}</span>{/if}
+                  {#if levelText(s) || s.deaths > 0}
+                    <span class="small"
+                      >{levelText(s) ?? ""}{levelText(s) && s.deaths > 0 ? " · " : ""}{#if s.deaths > 0}<span class="died"
+                          >{s.deaths} death{s.deaths === 1 ? "" : "s"}</span
+                        >{/if}</span
+                    >
+                  {/if}
                 </span>
                 <span class="tabular r">{dur(s.activeSeconds)}</span>
                 <span class="tabular r strong">{expRate(s)}</span>
@@ -414,12 +481,29 @@
                 <Stat size="lg" label="Played" value={dur(s.activeSeconds)} />
                 <Stat size="lg" label="EXP gained" value={formatNumber(s.expGained)} />
                 <Stat size="lg" label="Levels" value={String(s.levelUps)} />
-                <Stat size="lg" label="Deaths" value={String(s.deaths)} />
+                <Stat
+                  size="lg"
+                  label="Deaths"
+                  value={String(s.deaths)}
+                  sub={deathLine(s)}
+                  title={s.deaths > 0 ? "EXP lost to deaths is left out of EXP / hr. The play time is at this session's rate." : undefined}
+                />
               </div>
 
               <div class="panel">
-                <PotionCosts startedAt={s.startedAt} activeSeconds={s.activeSeconds} mesosPerHour={s.mesosPerHour} character={s.character} />
+                <PotionCosts
+                  startedAt={s.startedAt}
+                  activeSeconds={s.activeSeconds}
+                  mesosPerHour={s.mesosPerHour ?? (s.loot && s.loot.seconds >= 30 ? (s.loot.mesos * 3600) / s.loot.seconds : null)}
+                  character={s.character}
+                  lootPerHour={s.loot ? lootPerHour(s.loot.items, s.loot.seconds) : null}
+                />
               </div>
+              {#if s.loot}
+                <div class="panel">
+                  <LootLog loot={s.loot} collapsible={false} />
+                </div>
+              {/if}
 
               <div class="panel chart">
                 <div class="list-head">
@@ -465,7 +549,13 @@
                 <div class="grow2">
                   <h3>By map</h3>
                   <table>
-                    <thead><tr><th>Map</th><th>Level</th><th>Party</th><th>Time</th><th>EXP / hr</th><th>Mesos / hr</th></tr></thead>
+                    <thead
+                      ><tr
+                        ><th>Map</th><th>Level</th><th>Party</th><th>Time</th><th>EXP / hr</th><th>Mesos / hr</th>{#if s.deaths > 0}<th
+                            >Deaths</th
+                          >{/if}</tr
+                      ></thead
+                    >
                     <tbody>
                       {#each s.lines.filter((l) => showUnplaced(l, s.activeSeconds)) as l, i (i)}
                         <tr>
@@ -502,6 +592,17 @@
                           <td>{dur(l.activeSeconds)}</td>
                           <td>{l.activeSeconds > 0 ? (l.expGained > 0 ? formatCompact((l.expGained * 3600) / l.activeSeconds) : l.percentGained > 0 ? `${((l.percentGained * 3600) / l.activeSeconds).toFixed(1)}%` : "—") : "—"}</td>
                           <td>{l.mesosSeconds > 0 ? formatCompact((l.mesosGained * 3600) / l.mesosSeconds) : "—"}</td>
+                          {#if s.deaths > 0}
+                            <td class:died={(l.deaths ?? 0) > 0}>
+                              {#if (l.deaths ?? 0) > 0}
+                                {l.deaths}{(l.expLost ?? 0) > 0
+                                  ? ` · −${formatCompact(l.expLost)}`
+                                  : (l.percentLost ?? 0) > 0
+                                    ? ` · −${(l.percentLost ?? 0).toFixed(2)}%`
+                                    : ""}
+                              {:else}—{/if}
+                            </td>
+                          {/if}
                         </tr>
                       {/each}
                     </tbody>
@@ -596,12 +697,28 @@
                     <p class="muted">
                       Best session {longDay(picked.best.at)}, {formatCompact(picked.best.expPerHour)} EXP / hr{picked.best.level != null
                         ? ` at Lv ${picked.best.level}`
-                        : ""}
+                        : ""}, {withWhom(picked.best.party)}
                     </p>
                   {/if}
                 </div>
                 <div class="tiles two">
-                  <Stat size="lg" label="EXP / hr" value={formatCompact(picked.expPerHour)} />
+                  {#if picked.solo && picked.party}
+                    <Stat size="lg" label="Solo EXP / hr" value={kindRate(picked.solo)} sub={`${dur(picked.solo.activeSeconds)} played`} />
+                    <Stat
+                      size="lg"
+                      label="Party EXP / hr"
+                      value={kindRate(picked.party)}
+                      sub={`${dur(picked.party.activeSeconds)} in parties of ${partySizes(picked.partySizes)}`}
+                      title="Your share of the party's EXP, which depends on the party."
+                    />
+                  {:else}
+                    <Stat
+                      size="lg"
+                      label={picked.party ? "Party EXP / hr" : "EXP / hr"}
+                      value={formatCompact(picked.expPerHour)}
+                      sub={picked.party ? `parties of ${partySizes(picked.partySizes)}` : party === "any" ? "solo" : null}
+                    />
+                  {/if}
                   <Stat size="lg" label="Mesos / hr" value={formatCompact(picked.mesosPerHour)} />
                   <Stat size="lg" label="Played" value={dur(picked.activeSeconds)} />
                   <Stat size="lg" label="Sessions" value={String(picked.sessions)} />
@@ -631,16 +748,27 @@
             <h2>Every map you trained on</h2>
             <div class="scroll">
               <table class="wide">
-                <thead><tr><th>Map</th><th>Sessions</th><th>Played</th><th>EXP / hr</th><th>Mesos / hr</th><th>Best session</th></tr></thead>
+                <thead
+                  ><tr
+                    ><th>Map</th><th>Sessions</th><th>Played</th>{#if splitParty}<th>Solo EXP / hr</th><th>Party EXP / hr</th>{:else}<th
+                        >EXP / hr</th
+                      >{/if}<th>Mesos / hr</th><th>Best session</th></tr
+                  ></thead
+                >
                 <tbody>
                   {#each stats as m (m.map)}
                     <tr>
                       <td><Ref kind="map" name={m.map}>{m.name}</Ref></td>
                       <td>{m.sessions}</td>
                       <td>{dur(m.activeSeconds)}</td>
-                      <td>{formatCompact(m.expPerHour)}</td>
+                      {#if splitParty}
+                        <td>{kindRate(m.solo)}</td>
+                        <td use:tip={m.party ? `In parties of ${partySizes(m.partySizes)}` : undefined}>{kindRate(m.party)}</td>
+                      {:else}
+                        <td>{formatCompact(m.expPerHour)}</td>
+                      {/if}
                       <td>{formatCompact(m.mesosPerHour)}</td>
-                      <td>{m.best ? `${shortDay(m.best.at)} · ${formatCompact(m.best.expPerHour)}` : "—"}</td>
+                      <td>{m.best ? `${shortDay(m.best.at)} · ${formatCompact(m.best.expPerHour)}${(m.best.party ?? 1) > 1 ? " · party" : ""}` : "—"}</td>
                     </tr>
                   {/each}
                 </tbody>
@@ -649,16 +777,33 @@
           </section>
         {/if}
       {:else}
-        <div class="tiles four">
-          <Stat size="lg" label="Played" value={dur(totalSeconds)} sub="{totals.days} day{totals.days === 1 ? '' : 's'}{paceSeconds ? `, ${dur(paceSeconds)} a day` : ''}" />
+        <div class="tiles six">
+          <Stat size="lg" label="EXP gained" value={formatNumber(totals.exp)} sub="{sessions.length} session{sessions.length === 1 ? '' : 's'}" />
+          <Stat size="lg" label="Time trained" value={dur(totalSeconds)} sub="{totals.days} day{totals.days === 1 ? '' : 's'}{paceSeconds ? `, ${dur(paceSeconds)} a day` : ''}" />
+          <Stat
+            size="lg"
+            label="Average EXP / hr"
+            value={totals.expPerHour ? formatCompact(totals.expPerHour) : "—"}
+            sub={bestSession?.expPerHour ? `best session ${formatCompact(bestSession.expPerHour)}` : null}
+          />
+          <Stat
+            size="lg"
+            label={potionCost > 0 ? "Mesos, after potions" : "Mesos gained"}
+            value={formatNumber(totals.mesos - potionCost)}
+            sub={potionCost > 0 ? `potions cost ${formatCompact(potionCost)}` : totals.mesosPerHour ? `${formatCompact(totals.mesosPerHour)} an hour` : null}
+          />
           <Stat
             size="lg"
             label="Levels"
             value={totals.from != null && totals.to != null && totals.to !== totals.from ? `${totals.from} → ${totals.to}` : String(totals.ups)}
             sub="{totals.ups} level-up{totals.ups === 1 ? '' : 's'}"
           />
-          <Stat size="lg" label="EXP gained" value={formatNumber(totals.exp)} sub={totals.expPerHour ? `${formatCompact(totals.expPerHour)} an hour` : null} />
-          <Stat size="lg" label="Mesos gained" value={formatNumber(totals.mesos)} sub={totals.mesosPerHour ? `${formatCompact(totals.mesosPerHour)} an hour` : null} />
+          <Stat
+            size="lg"
+            label="Deaths"
+            value={String(deaths)}
+            sub={deathSeconds >= 30 ? `cost about ${dur(deathSeconds)} of play` : deaths ? null : "none"}
+          />
         </div>
 
         <div class="split">
@@ -683,6 +828,54 @@
               format={(v) => (dayMetric === "time" ? dur(v) : formatCompact(v))}
               label="Play per day"
             />
+          </section>
+
+          {#if bestMaps.length}
+            <section class="panel grow2">
+              <div class="list-head">
+                <h2>Your best maps</h2>
+                <span class="quiet">EXP / hr · the mark is your best run</span>
+              </div>
+              <ul class="bests">
+                {#each bestMaps as m (m.map)}
+                  <li>
+                    <span class="best-name"
+                      ><Ref kind="map" name={m.map}>{m.name}</Ref> <span class="quiet">· {dur(m.activeSeconds)}</span></span
+                    >
+                    <span class="num best-rate">{formatCompact(m.expPerHour)}</span>
+                    <span class="best-bar" aria-hidden="true"
+                      ><span style:width="{(m.expPerHour / bestTop) * 100}%"></span><i style:left="{(m.best!.expPerHour / bestTop) * 100}%"
+                      ></i></span
+                    >
+                  </li>
+                {/each}
+              </ul>
+              <button class="link" onclick={() => pickView("maps")}>Every map you trained on</button>
+            </section>
+          {/if}
+        </div>
+
+        <div class="split">
+          <section class="panel grow3">
+            <div class="list-head">
+              <h2>Recent sessions</h2>
+              <span class="quiet">They save themselves as you play</span>
+            </div>
+            <ul class="recent">
+              {#each sessions.slice(0, RECENT) as s (s.id)}
+                <li>
+                  <button onclick={() => openSession(s.id)}>
+                    <span class="tabular muted">{shortDay(s.startedAt ?? s.savedAt)}</span>
+                    <span class="what"><span use:clipped class="ellipsis">{title(s)}</span>{#if levelText(s)}<span class="small">{levelText(s)}</span>{/if}</span>
+                    <span class="tabular r">{dur(s.activeSeconds)}</span>
+                    <span class="tabular r strong">{expRate(s)}</span>
+                  </button>
+                </li>
+              {/each}
+            </ul>
+            {#if sessions.length > RECENT}
+              <button class="link" onclick={() => pickView("sessions")}>All {sessions.length} sessions</button>
+            {/if}
           </section>
 
           {#if current && current.level != null && current.percent != null}
@@ -821,6 +1014,15 @@
     font-size: var(--text-sm);
   }
 
+  .short {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--muted);
+    font-size: var(--text-sm);
+    cursor: pointer;
+  }
+
   .who {
     font-size: var(--text-sm);
     color: var(--muted);
@@ -884,14 +1086,16 @@
     align-items: flex-start;
   }
 
+  /* The shared card: the look's outline, corners and edge. */
   .panel {
     display: flex;
     flex-direction: column;
     gap: 10px;
     padding: var(--space-3);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
+    border: var(--line-w) solid var(--line);
+    border-radius: var(--radius-lg);
     background: var(--surface);
+    box-shadow: var(--card-shadow);
   }
 
   .list {
@@ -966,6 +1170,10 @@
     color: var(--faint);
   }
 
+  .died {
+    color: var(--bad);
+  }
+
   .r {
     text-align: right;
   }
@@ -1014,8 +1222,108 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .tiles.four {
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  .tiles.six {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  }
+
+  /* Overview: best maps, each run's average as a bar with a mark at its best. */
+  .bests {
+    display: grid;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .bests li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 4px 10px;
+    align-items: baseline;
+  }
+
+  .best-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .best-rate {
+    font-weight: 600;
+  }
+
+  .best-bar {
+    position: relative;
+    grid-column: 1 / -1;
+    height: 6px;
+    border-radius: var(--radius-pill);
+    background: var(--track);
+  }
+
+  .best-bar span {
+    position: absolute;
+    inset: 0 auto 0 0;
+    border-radius: inherit;
+    background: var(--exp);
+  }
+
+  .best-bar i {
+    position: absolute;
+    top: -3px;
+    width: 2px;
+    height: 12px;
+    margin-left: -1px;
+    border-radius: 1px;
+    background: var(--text);
+  }
+
+  .recent {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .recent button {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr) 70px 60px;
+    gap: 10px;
+    align-items: center;
+    width: 100%;
+    padding: 8px 4px;
+    border: 0;
+    border-top: 1px solid var(--border);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .recent li:first-child button {
+    border-top: 0;
+  }
+
+  .recent button:hover {
+    background: var(--hover);
+  }
+
+  .link {
+    align-self: flex-start;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--accent-text);
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .link:hover {
+    color: var(--accent-text-strong);
+    text-decoration: underline;
+    text-underline-offset: 2px;
   }
 
   .caption {

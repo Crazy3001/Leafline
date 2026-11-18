@@ -1,31 +1,58 @@
 <script lang="ts">
-  import { tip } from "$lib/tip.svelte";
-  import { Camera, Lock, LockOpen, Minimize2, MonitorUp, Pin, PinOff, Settings, X } from "@lucide/svelte";
+  // The main window. A header that says who you are and how far through the level; the next step
+  // of a route when one is set; one of five tabs; and the tab bar. Search, an item check, the Tools
+  // list and each tool rise as a sheet over the tab, so the tab is still there when they close.
+  import { X } from "@lucide/svelte";
   import { onMount } from "svelte";
 
   import { backend, fileName } from "$lib/api";
+  import { bag, watchBag } from "$lib/bag.svelte";
+  import { characters } from "$lib/characters.svelte";
+  import CharacterPicker from "$lib/components/CharacterPicker.svelte";
   import CompactHud from "$lib/components/CompactHud.svelte";
-  import Logo from "$lib/components/Logo.svelte";
+  import DropLogView from "$lib/components/DropLogView.svelte";
+  import BagCheck from "$lib/components/item/BagCheck.svelte";
+  import CraftingPanel from "$lib/components/item/CraftingPanel.svelte";
+  import TrackedItems from "$lib/components/item/TrackedItems.svelte";
   import NextStep from "$lib/components/NextStep.svelte";
   import PanelView from "$lib/components/PanelView.svelte";
-  import { itemView, watchItems } from "$lib/items.svelte";
+  import TimersCard from "$lib/components/TimersCard.svelte";
+  import { reportUrl } from "$lib/feedback";
+  import { blankQuery, gearView, itemView, lookup, watchItems } from "$lib/items.svelte";
   import { monsterView, watchMonsters } from "$lib/monsters.svelte";
   import { tabRequest } from "$lib/nav.svelte";
-  import { watchTyping } from "$lib/typing";
-  import { startWayfinder } from "$lib/wayfinder.svelte";
-  import { PANELS, panelId, panelInfo, signature } from "$lib/panels";
+  import { signature } from "$lib/panels";
   import { placeLinks, watchPlaces } from "$lib/places.svelte";
-  import { reportUrl } from "$lib/feedback";
   import { questView, watchQuests } from "$lib/quests.svelte";
   import { live, watchLive } from "$lib/readings.svelte";
   import { display, hotkey, keyHint, watchSettings } from "$lib/settings.svelte";
+  import BottomNav from "$lib/shell/BottomNav.svelte";
+  import NowScreen from "$lib/shell/NowScreen.svelte";
+  import SearchSheet from "$lib/shell/SearchSheet.svelte";
+  import ShellHeader from "$lib/shell/ShellHeader.svelte";
+  import { TABS, tabId, tabInfo, tabOfPanel, toolPageTitle, type Tab, type ToolInfo, type ToolPage } from "$lib/shell/tabs";
+  import ToolsList from "$lib/shell/ToolsList.svelte";
+  import PotionPage from "$lib/shell/PotionPage.svelte";
+  import RoutePage from "$lib/shell/RoutePage.svelte";
+  import SharePage from "$lib/shell/SharePage.svelte";
+  import Welcome from "$lib/shell/Welcome.svelte";
+  import { tip } from "$lib/tip.svelte";
+  import { watchTyping } from "$lib/typing";
   import type { Panel } from "$lib/types";
+  import Sheet from "$lib/ui/Sheet.svelte";
+  import { startWayfinder } from "$lib/wayfinder.svelte";
 
-  const TAB_KEY = "leafline.overlay.tab";
+  const TAB_KEY = "leafline.overlay.tab.v2";
 
-  let tab = $state<Panel>(storedTab());
-  /** What each panel showed when last looked at, to mark tabs with something new. */
-  let seen = $state<Partial<Record<Panel, string | null>>>({});
+  /** What is open over the tab, if anything. */
+  type Over = { kind: "search"; focus: boolean } | { kind: "tools" } | { kind: "tool"; page: ToolPage };
+
+  let tab = $state<Tab>(storedTab());
+  let over = $state<Over | null>(null);
+  /** Counts the pages something other than the player opened in search: an item check, a link. */
+  let landed = $state(0);
+  /** What each tab's panel showed when last looked at, to mark tabs with something new. */
+  let seen = $state<Partial<Record<Tab, string | null>>>({});
 
   // Clicks leave the game focused; typing in a box takes focus while it lasts.
   onMount(() => watchTyping());
@@ -39,74 +66,109 @@
     watchQuests();
     startWayfinder();
     // A pinned panel's way to the whole of its tab.
-    const stop = backend.onShowPanel((panel) => select(panel));
+    const stop = backend.onShowPanel((panel) => showPanel(panel));
     return () => void stop.then((unlisten) => unlisten());
   });
 
+  // Now's numbers change every second, so it never gets a dot; the others follow their panel.
   const signatures = $derived(
-    Object.fromEntries(PANELS.map((p) => [p.id, signature(p.id, live.analysis, live.session)])) as Record<
-      Panel,
-      string | null
-    >,
+    Object.fromEntries(
+      TABS.map((t) => [t.id, signature(t.panel, live.analysis, live.session)]),
+    ) as Record<Tab, string | null>,
   );
 
-  // The open tab is always seen; others get a dot when what they show changes.
+  // The open tab is always seen; others get a dot when what they show changes after its first
+  // reading, so a fresh start doesn't light every tab at once.
   $effect(() => {
-    const current = signatures[tab];
-    seen[tab] = current;
+    seen[tab] = signatures[tab];
+    for (const t of TABS) if (seen[t.id] == null && signatures[t.id] != null) seen[t.id] = signatures[t.id];
   });
 
-  // An item check is asked for by hotkey, so its result opens by itself.
+  // An item check is asked for by hotkey, so its result opens by itself, over whatever tab is open.
   $effect(() => {
-    if (live.itemRead?.found) select("item");
+    if (live.itemRead?.found) search("items");
   });
 
-  // So is reading the character's windows, whose result is in the Character tab. When the live
-  // pictures catch a change by themselves, a line says so and the tab stays where it is.
+  // So is a bag check, shown with the items.
+  watchBag();
+  let bagSeen = bag.seq;
+  $effect(() => {
+    if (bag.seq !== bagSeen) {
+      bagSeen = bag.seq;
+      itemView.id = null;
+      search("items");
+    }
+  });
+
+  // So is reading the character's windows, whose result is in the Me tab. When the live pictures
+  // catch a change by themselves, a line says so and the tab stays where it is.
   $effect(() => {
     const read = live.characterRead;
-    if (read && !read.problem && !read.automatic) select("character");
+    if (read && !read.problem && !read.automatic) select("me");
   });
 
-  // So is a link to an item, from the build planner or a list of drops, or to anything else in
-  // the Lookup tab.
+  // So is a link to an item, monster, map or NPC from anywhere: the build planner, a list of drops.
   $effect(() => {
-    if (itemView.seen || monsterView.seen || placeLinks.seen) select("item");
+    if (itemView.seen || monsterView.seen || placeLinks.seen) search();
   });
 
   $effect(() => {
     if (questView.seen) select("quests");
   });
 
-  // A panel's link to another tab, such as the Character tab's line to Train.
+  // A panel's link to another, such as the character card's line to Train.
   $effect(() => {
-    if (tabRequest.seq && tabRequest.panel) select(tabRequest.panel);
+    if (tabRequest.seq && tabRequest.panel) showPanel(tabRequest.panel);
   });
 
-  const fresh = (panel: Panel) => panel !== tab && signatures[panel] != null && signatures[panel] !== seen[panel];
-  const pinned = $derived(live.pins.pinned.includes(tab));
+  const fresh = (t: Tab) => t !== tab && signatures[t] != null && seen[t] != null && signatures[t] !== seen[t];
+  const isPinned = (t: Tab) => live.pins.pinned.includes(tabInfo(t).panel);
+  const pinned = $derived(isPinned(tab));
+  const pinTitle = $derived(
+    pinned ? `Unpin ${tabInfo(tab).pinName}` : `Pin ${tabInfo(tab).pinName} in a window of its own`,
+  );
 
-  function select(panel: Panel) {
-    tab = panel;
+  /** Opens a tab, closing whatever was over it. */
+  function select(next: Tab) {
+    tab = next;
+    over = null;
     try {
-      localStorage.setItem(TAB_KEY, panel);
+      localStorage.setItem(TAB_KEY, next);
     } catch {
       // Remembering the tab is a convenience only.
     }
   }
 
-  function storedTab(): Panel {
+  /**
+   * Opens search over the tab on a page something else asked for (an item check, a link, a tool),
+   * on one kind of thing when asked. The cursor stays out of the box, so the game keeps the keys.
+   */
+  function search(mode?: typeof lookup.mode) {
+    if (mode) lookup.mode = mode;
+    landed += 1;
+    if (over?.kind !== "search") over = { kind: "search", focus: false };
+  }
+
+  /** Where a link to one of the old panels lands now. */
+  function showPanel(panel: Panel) {
+    const to = tabOfPanel(panel);
+    if (to === "search") search();
+    else select(to);
+  }
+
+  function storedTab(): Tab {
     try {
-      const saved = panelId(localStorage.getItem(TAB_KEY));
+      const saved = tabId(localStorage.getItem(TAB_KEY));
       if (saved) return saved;
     } catch {
       // Private mode or blocked storage: start on the first tab.
     }
-    return "character";
+    return "now";
   }
 
   async function togglePin() {
-    live.pins = pinned ? await backend.unpinPanel(tab) : await backend.pinPanel(tab);
+    const panel = tabInfo(tab).panel;
+    live.pins = pinned ? await backend.unpinPanel(panel) : await backend.pinPanel(panel);
   }
 
   async function toggleLock() {
@@ -139,7 +201,7 @@
     if (live.itemRead?.found === 0)
       return {
         tone: "quiet",
-        text: `No item tooltip found. Hover an item in game, then ${hotkey("ReadItem") ? `press ${hotkey("ReadItem")}` : "use the Read item hotkey"}. If one was showing, the camera button saves that picture so it can be looked at.`,
+        text: `No item tooltip found. Hover an item in game, then ${hotkey("ReadItem") ? `press ${hotkey("ReadItem")}` : "use the Read item hotkey"}. If one was showing, Save frame in Tools keeps that picture so it can be looked at.`,
       };
     if (live.characterRead?.problem) return { tone: "warn", text: live.characterRead.problem, report: true };
     if (live.characterRead) {
@@ -154,6 +216,8 @@
       return { tone: "warn", text: "Windows HDR is on for the game's display, so readings will be off. Turn HDR off, then restart the game." };
     if (live.analysis?.failed.length)
       return { tone: "warn", text: `Can't read the ${live.analysis.failed.join(", ")} right now.`, report: true };
+    if (s.state === "reading" && s.smoothedUi)
+      return { tone: "quiet", text: "UI Size Default Ratio smooths the game's text, so some readings may be missed. Ideal Ratio, in the game's Graphics options, reads best." };
     return null;
   });
 
@@ -177,13 +241,35 @@
     }
   }
 
-  function onTabKey(event: KeyboardEvent) {
-    const i = PANELS.findIndex((p) => p.id === tab);
-    if (event.key === "ArrowRight") select(PANELS[(i + 1) % PANELS.length].id);
-    else if (event.key === "ArrowLeft") select(PANELS[(i - 1 + PANELS.length) % PANELS.length].id);
-    else return;
-    event.preventDefault();
+  function openTool(tool: ToolInfo) {
+    const action = tool.action;
+    if ("page" in action) over = { kind: "tool", page: action.page };
+    else if ("tab" in action) select(action.tab);
+    else if ("search" in action && action.search === "gear") {
+      // Straight to the best gear for your level, not the item list.
+      itemView.id = null;
+      itemView.query = { ...blankQuery(), kind: "equip" };
+      gearView.forMe = true;
+      search("items");
+    } else if ("search" in action) search("items");
+    else {
+      over = null;
+      if (action.window === "training") void backend.showTraining();
+      else void backend.showBuild();
+    }
   }
+
+  function windowAction(action: "desk" | "compact" | "frame" | "settings" | "hide") {
+    over = null;
+    if (action === "desk") void backend.showDesk();
+    else if (action === "compact") void backend.setCompact(true);
+    else if (action === "frame") void saveFrame();
+    else if (action === "settings") void backend.showSettings();
+    else void backend.hideOverlay();
+  }
+
+  const toggleOver = (kind: "search" | "tools") =>
+    (over = over?.kind === kind ? null : kind === "search" ? { kind, focus: true } : { kind });
 </script>
 
 <svelte:head><title>Leafline</title></svelte:head>
@@ -196,63 +282,18 @@
   {#if live.status.compact}
     <CompactHud />
   {:else}
-    <header data-tauri-drag-region>
-      <span class="brand" data-tauri-drag-region>
-        <Logo size={16} />
-        <span data-tauri-drag-region>Leafline</span>
-        <button
-          class="mode"
-          class:on={live.liveStatus.state === "reading"}
-          class:waiting={live.liveStatus.state === "waiting"}
-          use:tip={liveTitle}
-          onclick={toggleLive}
-        >
-          {#if liveOn}<span class="live-dot" aria-hidden="true"></span>Live{:else}Offline{/if}
-        </button>
-      </span>
-      <span class="actions">
-        {#if live.liveStatus.state === "reading"}
-          <button
-            use:tip={`Save frame${keyHint('SaveFrame')}`}
-            aria-label="Save game picture"
-            onclick={saveFrame}
-          >
-            <Camera size={14} />
-          </button>
-        {/if}
-        <button
-          use:tip={"Desk view"}
-          aria-label="Desk view"
-          onclick={() => backend.showDesk()}
-        >
-          <MonitorUp size={14} />
-        </button>
-        <button use:tip={"Settings"} aria-label="Settings" onclick={() => backend.showSettings()}>
-          <Settings size={14} />
-        </button>
-        <button
-          use:tip={`Compact HUD${keyHint('ToggleCompact')}`}
-          aria-label="Compact HUD"
-          onclick={() => backend.setCompact(true)}
-        >
-          <Minimize2 size={14} />
-        </button>
-        <button
-          use:tip={live.status.clickThrough
-            ? hotkey("ToggleClickThrough")
-              ? `Unlock with ${hotkey("ToggleClickThrough")}`
-              : "Unlock: set a Lock hotkey in Settings, or use the tray menu"
-            : `Lock, so clicks pass through to the game${keyHint("ToggleClickThrough")}`}
-          class:active={live.status.clickThrough}
-          onclick={toggleLock}
-        >
-          {#if live.status.clickThrough}<Lock size={14} />{:else}<LockOpen size={14} />{/if}
-        </button>
-        <button use:tip={`Hide${keyHint('ToggleOverlay')}. Pinned panels stay.`} aria-label="Hide overlay" onclick={() => backend.hideOverlay()}>
-          <X size={14} />
-        </button>
-      </span>
-    </header>
+    <ShellHeader
+      {liveTitle}
+      {pinned}
+      {pinTitle}
+      searching={over?.kind === "search"}
+      tooling={over?.kind === "tools" || over?.kind === "tool"}
+      onlive={toggleLive}
+      onsearch={() => toggleOver("search")}
+      onpin={togglePin}
+      onlock={toggleLock}
+      ontools={() => toggleOver("tools")}
+    />
 
     {#if notice}
       <div class="notice {notice.tone}" role="status">
@@ -270,83 +311,63 @@
 
     <NextStep />
 
-    <nav class="tabs">
-      <div class="tablist" role="tablist" aria-label="Panels" tabindex="-1" onkeydown={onTabKey}>
-        {#each PANELS as panel (panel.id)}
-          {@const Icon = panel.icon}
-          <button
-            role="tab"
-            id="tab-{panel.id}"
-            aria-selected={tab === panel.id}
-            aria-controls="panel"
-            tabindex={tab === panel.id ? 0 : -1}
-            class:empty={signatures[panel.id] == null && panel.id !== "item" && panel.id !== "quests"}
-            class:pinned={live.pins.pinned.includes(panel.id)}
-            use:tip={{
-              body: live.pins.pinned.includes(panel.id) ? `${panel.title} (also pinned)` : panel.title,
-              when: (tab) => live.pins.pinned.includes(panel.id) || !tab.querySelector(".tab-title")?.checkVisibility(),
-            }}
-            onclick={() => select(panel.id)}
-          >
-            <span class="icon">
-              <Icon size={13} />
-              {#if fresh(panel.id)}<span class="dot" aria-label="Updated"></span>{/if}
-            </span>
-            <span class="tab-title">{panel.title}</span>
-          </button>
-        {/each}
-      </div>
-      <button
-        class="pin"
-        class:active={pinned}
-        use:tip={pinned ? `Unpin ${panelInfo(tab).title}` : `Pin ${panelInfo(tab).title} in its own window`}
-        onclick={togglePin}
-      >
-        {#if pinned}<PinOff size={14} />{:else}<Pin size={14} />{/if}
-      </button>
-    </nav>
-
-    <div class="main" id="panel" role="tabpanel" aria-labelledby="tab-{tab}">
-      <!-- A build can be planned and items, monsters and quests looked up with nothing read yet. -->
-      {#if live.analysis || live.session || tab === "character" || tab === "item" || tab === "quests"}
+    <div class="stage">
+      <div class="main" id="panel" role="tabpanel" aria-labelledby="tab-{tab}">
         {#key tab}
-          <div class="panel"><PanelView panel={tab} analysis={live.analysis} session={live.session} /></div>
+          {#if tab === "now"}
+            <NowScreen analysis={live.analysis} session={live.session} ongo={select} />
+          {:else if live.analysis || live.session || tab === "me" || tab === "quests"}
+            <!-- A build can be planned and quests looked up with nothing read yet. -->
+            <div class="panel"><PanelView panel={tabInfo(tab).panel} analysis={live.analysis} session={live.session} shelled /></div>
+          {:else}
+            <Welcome />
+          {/if}
         {/key}
-      {:else}
-        <div class="welcome">
-          <Logo size={28} />
-          <h1>Welcome to Leafline</h1>
-          <p class="hint">It reads what your game screen shows and puts useful facts beside it.</p>
-          <ol class="steps">
-            <li>
-              <span class="n">1</span>
-              <span
-                >Turn on <button class="inline" onclick={() => backend.showSettings()}>live reading</button> to read the
-                game as you play.</span
-              >
-            </li>
-            <li>
-              <span class="n">2</span>
-              <span>Download map data in the Map tab for routes, training spots and quest help.</span>
-            </li>
-            <li>
-              <span class="n">3</span>
-              <!-- No hotkey is bound until the player picks one, so name only the ones they have. -->
-              {#if hotkey("ToggleOverlay") || hotkey("ToggleClickThrough")}
-                <span
-                  >{#if hotkey("ToggleOverlay")}<kbd>{hotkey("ToggleOverlay")}</kbd> shows or hides this window.{/if}
-                  {#if hotkey("ToggleClickThrough")}<kbd>{hotkey("ToggleClickThrough")}</kbd> lets clicks pass through
-                    it.{/if}</span
-                >
+      </div>
+
+      {#if over?.kind === "search"}
+        <Sheet title="Search" onclose={() => (over = null)}>
+          <SearchSheet focus={over.focus} {landed} ontool={openTool} />
+        </Sheet>
+      {:else if over?.kind === "tools"}
+        <Sheet title="Tools" onclose={() => (over = null)}>
+          <ToolsList canSaveFrame={live.liveStatus.state === "reading"} ontool={openTool} onwindow={windowAction} />
+        </Sheet>
+      {:else if over?.kind === "tool"}
+        <Sheet title={toolPageTitle(over.page)} onclose={() => (over = null)} onback={() => (over = { kind: "tools" })}>
+          <div class="tool">
+            {#if over.page === "crafting"}
+              <CraftingPanel />
+            {:else if over.page === "sell"}
+              <BagCheck />
+            {:else if over.page === "timers"}
+              <TimersCard />
+            {:else if over.page === "drops"}
+              <DropLogView character={characters.viewing ?? ""} />
+            {:else if over.page === "tracked"}
+              <TrackedItems map={live.analysis?.map ?? null} />
+            {:else if over.page === "potions"}
+              <PotionPage />
+            {:else if over.page === "route"}
+              <RoutePage />
+            {:else if over.page === "share"}
+              <SharePage />
+            {:else if over.page === "characters"}
+              {#if characters.known.length > 1}
+                <CharacterPicker />
               {:else}
-                <span>Pick hotkeys in Settings to show, hide or lock this window without leaving the game.</span>
+                <p class="tool-note">
+                  {characters.active ? `Leafline has only seen ${characters.active} so far.` : "Leafline hasn't read a character's name yet."}
+                  Once it has sessions for a second character, pick here whose numbers the tabs show.
+                </p>
               {/if}
-            </li>
-          </ol>
-          <button class="inline small" onclick={() => backend.showSettings()}>Settings and what Leafline does</button>
-        </div>
+            {/if}
+          </div>
+        </Sheet>
       {/if}
     </div>
+
+    <BottomNav {tab} {fresh} pinned={isPinned} onselect={select} />
   {/if}
 </div>
 
@@ -361,12 +382,9 @@
     display: flex;
     flex-direction: column;
     height: 100vh;
-    background:
-      radial-gradient(120% 60% at 0% 0%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 60%),
-      var(--glass);
-    border: 1px solid var(--border-strong);
+    border: var(--line-w) solid var(--window-line);
     border-radius: var(--radius-lg);
-    box-shadow: inset 0 1px 0 var(--highlight);
+    background: var(--bg);
     overflow: hidden;
     transition: opacity 0.2s ease;
   }
@@ -377,96 +395,18 @@
     border-radius: var(--radius);
   }
 
-  header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    height: 40px;
-    padding: 0 8px 0 14px;
-    user-select: none;
-    cursor: grab;
-  }
-
-  .brand {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    font-family: var(--font-display);
-    font-weight: 600;
-  }
-
-  /* Live reading's state: outlined, in the colour of what it means. Offline is plain. */
-  .mode {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    height: 22px;
-    padding: 0 9px;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-pill);
-    font-family: var(--font-sans);
-    font-size: var(--text-xs);
-    font-weight: 600;
-    color: var(--muted);
-    background: transparent;
-    cursor: pointer;
-    transition: filter 0.12s ease;
-  }
-
-  .mode:hover {
-    filter: brightness(1.25);
-  }
-
-  .mode:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 1px;
-  }
-
-  .mode.on {
-    border-color: color-mix(in srgb, var(--good) 40%, transparent);
-    background: var(--good-soft);
-    color: var(--good);
-  }
-
-  .mode.waiting {
-    border-color: color-mix(in srgb, var(--warn) 40%, transparent);
-    background: var(--warn-soft);
-    color: var(--warn);
-  }
-
-  .live-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: currentColor;
-    box-shadow: 0 0 6px currentColor;
-  }
-
-  .mode.on .live-dot {
-    animation: pulse 1.6s ease-in-out infinite;
-  }
-
-  @keyframes pulse {
-    50% {
-      opacity: 0.35;
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .mode.on .live-dot {
-      animation: none;
-    }
-  }
-
   .notice {
     display: flex;
+    flex: none;
     align-items: flex-start;
     gap: 6px;
-    padding: 6px 10px 6px 12px;
-    border-top: 1px solid var(--border);
+    margin: 0 10px 10px;
+    padding: 7px 8px 7px 12px;
+    border-radius: var(--radius);
+    background: var(--surface-2);
+    color: var(--muted);
     font-size: var(--text-sm);
     line-height: 1.4;
-    color: var(--muted);
   }
 
   .notice > span {
@@ -474,13 +414,18 @@
   }
 
   .notice.warn {
-    color: var(--warn);
     background: var(--warn-soft);
+    color: var(--warn);
   }
 
   .notice.bad {
+    background: var(--bad-soft);
     color: var(--bad);
-    background: color-mix(in srgb, var(--bad) 12%, transparent);
+  }
+
+  .notice.good {
+    background: var(--good-soft);
+    color: var(--good);
   }
 
   .report {
@@ -493,11 +438,6 @@
     text-decoration: underline;
     text-underline-offset: 2px;
     cursor: pointer;
-  }
-
-  .notice.good {
-    color: var(--good);
-    background: var(--good-soft);
   }
 
   .dismiss {
@@ -514,135 +454,13 @@
     cursor: pointer;
   }
 
-  .actions {
-    display: inline-flex;
-    gap: 2px;
-  }
-
-  .actions button,
-  .pin {
-    display: grid;
-    place-items: center;
-    width: 28px;
-    height: 28px;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--muted);
-    cursor: pointer;
-    transition:
-      background 0.12s ease,
-      color 0.12s ease;
-  }
-
-  .actions button:hover,
-  .pin:hover {
-    background: rgba(255, 255, 255, 0.08);
-    color: var(--text);
-  }
-
-  .actions button.active,
-  .pin.active {
-    color: var(--accent);
-  }
-
-  .tabs {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 0 8px 8px;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .tablist {
+  /* The tab and whatever is open over it. */
+  .stage {
+    position: relative;
     display: flex;
     flex: 1;
-    gap: 2px;
-    min-width: 0;
-    padding: 3px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: rgba(0, 0, 0, 0.28);
-    outline: none;
-  }
-
-  [role="tab"] {
-    position: relative;
-    display: inline-flex;
-    flex: 1 1 auto;
-    align-items: center;
-    justify-content: center;
-    gap: 2px;
-    min-width: 0;
-    height: 30px;
-    padding: 0 4px;
-    border: 0;
-    border-radius: 7px;
-    background: transparent;
-    color: var(--muted);
-    font-size: var(--text-sm);
-    font-weight: 500;
-    white-space: nowrap;
-    cursor: pointer;
-    transition:
-      color 0.12s ease,
-      background 0.16s ease,
-      box-shadow 0.16s ease;
-  }
-
-  /* Five titles don't fit a window dragged narrow, so only the open tab keeps its title. */
-  @media (max-width: 330px) {
-    [role="tab"]:not([aria-selected="true"]) .tab-title {
-      display: none;
-    }
-  }
-
-  [role="tab"]:hover {
-    background: rgba(255, 255, 255, 0.04);
-    color: var(--text);
-  }
-
-  [role="tab"][aria-selected="true"] {
-    background: linear-gradient(180deg, var(--surface-3), var(--surface-2));
-    box-shadow:
-      inset 0 1px 0 var(--highlight),
-      0 1px 4px rgba(0, 0, 0, 0.4);
-    color: var(--text);
-    font-weight: 600;
-  }
-
-  [role="tab"][aria-selected="true"] .icon {
-    color: var(--accent);
-  }
-
-  [role="tab"].empty:not([aria-selected="true"]) {
-    color: var(--faint);
-  }
-
-  [role="tab"]:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: -2px;
-    border-radius: var(--radius-sm);
-  }
-
-  .icon {
-    position: relative;
-    display: inline-grid;
-  }
-
-  .pinned .icon {
-    color: var(--accent);
-  }
-
-  .dot {
-    position: absolute;
-    top: -2px;
-    right: -3px;
-    width: 7px;
-    height: 7px;
-    border: 1.5px solid var(--surface);
-    border-radius: 50%;
-    background: var(--accent);
+    flex-direction: column;
+    min-height: 0;
   }
 
   .main {
@@ -657,95 +475,24 @@
     gap: 0;
   }
 
-  @keyframes enter {
-    from {
-      opacity: 0;
-      transform: translateY(3px);
-    }
-  }
-
-  .welcome {
+  .tool {
     display: grid;
-    justify-items: center;
-    gap: 6px;
-    padding: 28px 18px;
-    text-align: center;
+    align-content: start;
+    padding: 10px 0;
+  }
+
+  /* The drop log brings no margins of its own: it was made for the training log's wide page. */
+  .tool :global(.split),
+  .tool :global(.empty),
+  .tool :global(.problem) {
+    margin-right: 10px;
+    margin-left: 10px;
+  }
+
+  .tool-note {
+    margin: 4px 14px;
     color: var(--muted);
-  }
-
-  .welcome h1 {
-    margin: 6px 0 0;
-    font-family: var(--font-display);
-    font-size: var(--text-lg);
-    font-weight: 600;
-    color: var(--text);
-  }
-
-  .welcome p {
-    margin: 0;
-  }
-
-  .hint {
-    max-width: 260px;
     font-size: var(--text-sm);
-    color: var(--faint);
-  }
-
-  .steps {
-    display: grid;
-    gap: 10px;
-    margin: 12px 0 6px;
-    padding: 0;
-    list-style: none;
-    text-align: left;
-    font-size: var(--text-sm);
-  }
-
-  .steps li {
-    display: flex;
-    gap: 9px;
-  }
-
-  .n {
-    display: grid;
-    flex: none;
-    place-items: center;
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    background: var(--accent-soft);
-    color: var(--accent);
-    font-size: var(--text-xs);
-    font-weight: 600;
-  }
-
-  .inline {
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--accent-strong);
-    font-size: inherit;
-    cursor: pointer;
-  }
-
-  .inline:hover,
-  .inline:focus-visible {
-    text-decoration: underline;
-    outline: none;
-  }
-
-  .inline.small {
-    font-size: var(--text-sm);
-    color: var(--muted);
-  }
-
-  kbd {
-    padding: 0 4px;
-    border: 1px solid var(--border-strong);
-    border-bottom-width: 2px;
-    border-radius: var(--radius-sm);
-    font-family: var(--font-sans);
-    font-size: var(--text-xs);
-    color: var(--muted);
+    line-height: 1.5;
   }
 </style>

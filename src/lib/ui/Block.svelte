@@ -12,7 +12,7 @@
   }: { id?: string; title?: string; aside?: Snippet; last?: boolean; children: Snippet } = $props();
 </script>
 
-<section {id} class="block" class:last>
+<section {id} class="block card" class:last>
   {#if title || aside}
     <header class="strip">
       {#if title}<h2 class="strip-title">{title}</h2>{/if}
@@ -27,7 +27,18 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
-    padding: 10px 10px 14px;
+    margin: 0 10px 10px;
+    padding: 11px 14px 14px;
+  }
+
+  /* A block inside a card or another block is a part of it, not a card of its own. */
+  :global(.card) .block {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
   }
 
   /* A block with no heading still keeps its space from the one above. */

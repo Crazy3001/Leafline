@@ -10,6 +10,7 @@
   import PlaceList from "../map/PlaceList.svelte";
   import Section from "../map/Section.svelte";
   import Ref from "../Ref.svelte";
+  import { questCount, watchQuestLog } from "$lib/questlog.svelte";
   import PicFrame from "$lib/ui/PicFrame.svelte";
   import { backend } from "$lib/api";
   import { formatCompact } from "$lib/format";
@@ -46,13 +47,14 @@
   });
 
   const sheet = $derived(found?.sheet.id === id ? found.sheet : null);
+  watchQuestLog();
 
   /** What they do, for the line under their name. */
   const roles = $derived(
     sheet
       ? [
           sheet.shop ? "Shop" : null,
-          sheet.quests.length ? `Gives ${sheet.quests.length} ${sheet.quests.length === 1 ? "quest" : "quests"}` : null,
+          sheet.quests.length ? `Gives ${questCount(sheet.quests.map((q) => q.id))}` : null,
           sheet.takes.length ? `Takes ${sheet.takes.length} in` : null,
         ].filter((r): r is string => !!r)
       : [],

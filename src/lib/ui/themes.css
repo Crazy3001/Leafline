@@ -1,0 +1,297 @@
+/*
+ * The three looks beside Ember Dark. Each one only renames colours, fonts, corners and outlines that
+ * app.css sets for Ember Dark on :root; no layout rule belongs here. The look is the `data-theme` on
+ * <html>, set from the settings (see theme.svelte.ts).
+ */
+
+/*
+ * Ember Light: warm stone with off-white cards. The header and the tab bar stay dark graphite so
+ * less of the window is bright beside the game, and cards get a top light and a soft drop so the
+ * look isn't flat. Accent, link and state colours are darkened to read as text.
+ */
+:root[data-theme="ember-light"],
+[data-theme="ember-light"] {
+  color-scheme: light;
+
+  --bg: #d9d3c8;
+  --surface: #f2eee6;
+  --surface-2: #e5e0d6;
+  --surface-3: #d6cfc3;
+  --surface-raised: #f7f4ee;
+  --glass: rgba(217, 211, 200, 0.96);
+  --track: #cdc6ba;
+  --border: rgba(60, 45, 20, 0.16);
+  --border-strong: rgba(60, 45, 20, 0.3);
+  --line: rgba(60, 45, 20, 0.16);
+  --control-line: rgba(60, 45, 20, 0.3);
+  --well: rgba(60, 45, 20, 0.08);
+  --highlight: rgba(255, 255, 255, 0.7);
+  --hover: rgba(60, 45, 20, 0.07);
+  --press: rgba(60, 45, 20, 0.12);
+  --scrim: rgba(32, 29, 24, 0.5);
+
+  --text: #201d18;
+  --muted: #4f4a42;
+  --faint: #5f594f;
+
+  --accent-soft: rgba(244, 169, 59, 0.24);
+  --accent-text: #8a5000;
+  --accent-text-strong: #6b3d00;
+
+  --hp: #d1403b;
+  --mp: #2f7fd6;
+  --exp-text: #7a5e00;
+  --map: #7d5106;
+  --travel: #0c6f60;
+  --good: #1f7434;
+  --good-soft: rgba(31, 116, 52, 0.14);
+  --good-ink: #ffffff;
+  --warn: #a04e08;
+  --warn-soft: rgba(160, 78, 8, 0.14);
+  --bad: #b8321f;
+  --bad-soft: rgba(184, 50, 31, 0.12);
+  --mesos: #8a5000;
+
+  --ref-item: #1b58b3;
+  --ref-mob: #b8321f;
+  --ref-npc: #0c6f60;
+  --ref-map: #7d5106;
+  --ref-skill: #5f37b5;
+
+  --header-bg: #17191d;
+  --header-track: #2c3037;
+  --header-hover: #24272d;
+  --header-radius: 0 0 18px 18px;
+  --header-gap: 12px;
+  --nav-bg: #17191d;
+  --nav-text: #a2a7b1;
+  --nav-line: transparent;
+
+  --tile-1: #e5e0d6;
+  --tile-2: #e5e0d6;
+  --tile-text: #201d18;
+  --tile-label: #5f594f;
+  --tile-good: #1f7434;
+  --tile-mesos: #8a5000;
+  --tile-exp-line: #b08800;
+  --tile-mesos-line: #c77700;
+  --window-line: rgba(40, 30, 12, 0.45);
+
+  --card-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 3px 10px rgba(50, 35, 15, 0.16);
+  --control-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 1px 3px rgba(50, 35, 15, 0.14);
+  --go-shadow: 0 4px 12px rgba(150, 95, 0, 0.3);
+  --shadow: 0 4px 14px rgba(50, 35, 15, 0.2);
+  --shadow-lg: 0 18px 48px rgba(50, 35, 15, 0.32), 0 2px 8px rgba(50, 35, 15, 0.18);
+  --scroll-thumb: rgba(60, 45, 20, 0.22);
+  --scroll-thumb-hover: rgba(60, 45, 20, 0.36);
+}
+
+/*
+ * Sprout Light: oat paper, cream cards with a thick ink outline and a sticker edge under them,
+ * rounded letters, soft pastel number tiles. Nothing is pure white, and the header and the tab bar
+ * are cocoa, so the window doesn't glare beside the game.
+ */
+:root[data-theme="sprout-light"],
+[data-theme="sprout-light"] {
+  color-scheme: light;
+
+  --font-sans: "Nunito", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-display: "Fredoka", "Nunito", "Segoe UI", system-ui, sans-serif;
+  --weight-body: 600;
+  --weight-strong: 800;
+
+  --bg: #e2d1b1;
+  --surface: #f5ebd7;
+  --surface-2: #ebdec4;
+  --surface-3: #dfcfb0;
+  --surface-raised: #f9f1e1;
+  --glass: rgba(226, 209, 177, 0.97);
+  --track: #d6c4a2;
+  --border: rgba(59, 42, 32, 0.18);
+  --border-strong: rgba(59, 42, 32, 0.38);
+  --line: #3b2a20;
+  --control-line: #3b2a20;
+  --well: rgba(59, 42, 32, 0.08);
+  --line-w: 2px;
+  --highlight: transparent;
+  --hover: rgba(59, 42, 32, 0.07);
+  --press: rgba(59, 42, 32, 0.13);
+  --scrim: rgba(40, 28, 20, 0.5);
+
+  --text: #3b2a20;
+  --muted: #5c483a;
+  --faint: #645042;
+
+  --accent: #f79a45;
+  --accent-strong: #ffb06a;
+  --accent-soft: rgba(247, 154, 69, 0.26);
+  --accent-ink: #3b2a20;
+  --accent-sub: #55300d;
+  --accent-text: #8c4100;
+  --accent-text-strong: #6e3300;
+
+  --hp: #de4a44;
+  --mp: #3987db;
+  --exp: #f2c230;
+  --exp-text: #725200;
+  --map: #7c4e05;
+  --travel: #076357;
+  --good: #1a5f2d;
+  --good-soft: rgba(26, 95, 45, 0.14);
+  --good-ink: #ffffff;
+  --warn: #893d05;
+  --warn-soft: rgba(137, 61, 5, 0.14);
+  --bad: #a0291a;
+  --bad-soft: rgba(160, 41, 26, 0.12);
+  --mesos: #8c4100;
+
+  --ref-item: #1a54aa;
+  --ref-mob: #a0291a;
+  --ref-npc: #076357;
+  --ref-map: #7c4e05;
+  --ref-skill: #5a35a8;
+
+  --header-bg: #3b2a20;
+  --header-text: #fff1dc;
+  --header-muted: #dcc9b6;
+  --header-faint: #cbb5a0;
+  --header-track: #5c4536;
+  --header-hover: #4e3a2d;
+  --header-good: #a4e0a8;
+  --header-exp: #ffd23f;
+  --header-accent: #ffb873;
+  --header-radius: 0 0 20px 20px;
+  --header-gap: 12px;
+  --nav-bg: #3b2a20;
+  --nav-text: #d6c1ad;
+  --nav-line: #1e140e;
+
+  --tile-1: #efd994;
+  --tile-2: #eec1c8;
+  --tile-text: #3b2a20;
+  --tile-label: #5c483a;
+  --tile-border: #3b2a20;
+  --tile-good: #185729;
+  --tile-mesos: #8c4100;
+  --tile-exp-line: #3b2a20;
+  --tile-mesos-line: #3b2a20;
+  --window-line: #3b2a20;
+
+  --radius-sm: 9px;
+  --radius: 14px;
+  --radius-lg: 20px;
+  --card-shadow: 0 4px 0 #3b2a20;
+  --control-shadow: 0 2px 0 #3b2a20;
+  --go-shadow: 0 4px 0 #3b2a20;
+  --shadow: 0 4px 0 #3b2a20;
+  --shadow-lg: 0 6px 0 #3b2a20, 0 18px 40px rgba(59, 42, 32, 0.28);
+  --scroll-thumb: rgba(59, 42, 32, 0.28);
+  --scroll-thumb-hover: rgba(59, 42, 32, 0.44);
+}
+
+/* Sprout Dark: the same stickers on plum, for playing after dark. */
+:root[data-theme="sprout-dark"],
+[data-theme="sprout-dark"] {
+  color-scheme: dark;
+
+  --font-sans: "Nunito", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-display: "Fredoka", "Nunito", "Segoe UI", system-ui, sans-serif;
+  --weight-body: 600;
+  --weight-strong: 800;
+
+  --bg: #211a2b;
+  --surface: #2e2439;
+  --surface-2: #3a2f4a;
+  --surface-3: #47395a;
+  --surface-raised: #352a42;
+  --glass: rgba(33, 26, 43, 0.96);
+  --track: #17111f;
+  --border: rgba(255, 241, 220, 0.1);
+  --border-strong: rgba(255, 241, 220, 0.22);
+  --line: #0f0a15;
+  --control-line: #0f0a15;
+  --well: rgba(0, 0, 0, 0.25);
+  --line-w: 2px;
+  --highlight: transparent;
+  --hover: rgba(255, 241, 220, 0.07);
+  --press: rgba(255, 241, 220, 0.13);
+  --scrim: rgba(10, 6, 14, 0.6);
+
+  --text: #fff1dc;
+  --muted: #c4b5d0;
+  --faint: #b9a8c6;
+
+  --accent: #ffa24d;
+  --accent-strong: #ffb873;
+  --accent-soft: rgba(255, 162, 77, 0.18);
+  --accent-ink: #2a1c12;
+  --accent-sub: #4f2c0c;
+  --accent-text: #ffb86b;
+  --accent-text-strong: #ffd09a;
+
+  --hp: #f0625c;
+  --mp: #62a6f0;
+  --exp: #ffd23f;
+  --exp-text: #ffd23f;
+  --map: #ffcf70;
+  --travel: #7fe0cc;
+  --good: #8fe39b;
+  --good-soft: rgba(143, 227, 155, 0.16);
+  --good-ink: #12260f;
+  --warn: #ffab66;
+  --warn-soft: rgba(255, 171, 102, 0.16);
+  --bad: #ff9d8c;
+  --bad-soft: rgba(255, 157, 140, 0.15);
+  --mesos: #ffb86b;
+
+  --ref-item: #9ccbff;
+  --ref-mob: #ff9d8c;
+  --ref-npc: #7fe0cc;
+  --ref-map: #ffcf70;
+  --ref-skill: #d2b8ff;
+
+  --header-bg: #211a2b;
+  --header-text: #fff1dc;
+  --header-muted: #c4b5d0;
+  --header-faint: #b9a8c6;
+  --header-track: #17111f;
+  --header-hover: #2e2439;
+  --header-good: #8fe39b;
+  --header-exp: #ffd23f;
+  --header-accent: #ffb86b;
+  --nav-bg: #2e2439;
+  --nav-text: #b9a8c6;
+  --nav-line: #0f0a15;
+
+  --tile-1: #f5d98a;
+  --tile-2: #f2b6c6;
+  --tile-text: #2a1c12;
+  --tile-label: #5a4334;
+  --tile-border: #0f0a15;
+  --tile-good: #1d6b2c;
+  --tile-mesos: #8a4300;
+  --tile-exp-line: #2a1c12;
+  --tile-mesos-line: #2a1c12;
+  --window-line: #0f0a15;
+
+  --radius-sm: 9px;
+  --radius: 14px;
+  --radius-lg: 20px;
+  --card-shadow: 0 4px 0 #0f0a15;
+  --control-shadow: 0 2px 0 #0f0a15;
+  --go-shadow: 0 4px 0 #0f0a15;
+  --shadow: 0 4px 0 #0f0a15;
+  --shadow-lg: 0 6px 0 #0f0a15, 0 18px 40px rgba(0, 0, 0, 0.45);
+  --scroll-thumb: rgba(255, 241, 220, 0.16);
+  --scroll-thumb-hover: rgba(255, 241, 220, 0.28);
+}
+
+/*
+ * A look named on an element inside the page, as the look picker's small previews do: the
+ * names above change there, and so must what the page set from them once on <html>.
+ */
+[data-theme]:not(:root) {
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-weight: var(--weight-body);
+}

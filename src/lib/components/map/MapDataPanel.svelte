@@ -95,7 +95,7 @@
   .action.primary {
     border-color: var(--accent);
     background: var(--accent);
-    color: var(--bg);
+    color: var(--accent-ink);
     font-weight: 600;
   }
 

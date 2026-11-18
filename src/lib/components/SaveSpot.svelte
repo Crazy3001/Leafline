@@ -84,12 +84,12 @@
   }
 
   .save:hover {
-    background: rgba(255, 255, 255, 0.07);
+    background: var(--hover);
     color: var(--text);
   }
 
   .save.on {
-    color: var(--accent);
+    color: var(--accent-text);
   }
 
   .save:focus-visible {

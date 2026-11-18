@@ -1,5 +1,6 @@
 //! Tauri wiring: windows, tray, hotkeys and commands.
 
+mod bag;
 mod builds;
 mod cards;
 mod commands;
@@ -13,6 +14,7 @@ mod nav;
 mod overlay;
 mod pictures;
 mod pins;
+mod questlog;
 mod readings;
 mod recovery;
 mod records;
@@ -61,6 +63,7 @@ pub fn run() {
         .manage(OverlayState::default())
         .manage(cards::CardState::default())
         .manage(LiveState::default())
+        .manage(bag::BagState::default())
         .manage(Readings::default())
         .manage(Bindings::default())
         .manage(UpdateState::default())
@@ -114,6 +117,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             live::live_status,
+            bag::bag_look_further,
+            bag::last_bag,
             live::start_live,
             live::stop_live,
             live::live_windows,
@@ -170,6 +175,7 @@ pub fn run() {
             records::saved_spots,
             records::set_spot_saved,
             records::potion_slots,
+            records::loot_prices,
             records::set_potion_slots,
             records::session_potions,
             records::set_session_potion,
@@ -232,6 +238,9 @@ pub fn run() {
             mapdata::item_origin,
             mapdata::search_quests,
             mapdata::quest_regions,
+            questlog::quest_log,
+            questlog::forget_quest_log,
+            questlog::quest_region_totals,
             mapdata::quest_sheet,
             mapdata::show_quest,
             mapdata::search_monsters,
@@ -240,6 +249,8 @@ pub fn run() {
             mapdata::monster_sheet,
             mapdata::show_monster,
             mapdata::browse_maps,
+            mapdata::monster_fight,
+            mapdata::shop_prices,
             mapdata::map_regions,
             mapdata::map_areas,
             mapdata::search_npcs,

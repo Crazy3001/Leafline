@@ -50,14 +50,16 @@ export function formatDuration(seconds: number | null | undefined): string {
 
 /**
  * The clock time `seconds` from now, as the PC shows times: `9:42 PM`, with the day in front
- * when it isn't today (`Sat 1:05 AM`). Empty past a week, where a time of day means nothing.
+ * when it is more than most of a day away (`Sat 1:05 AM`). Empty past a week, where a time of day
+ * means nothing.
  */
 export function formatClockIn(seconds: number | null | undefined, now = Date.now()): string {
   if (seconds == null || !Number.isFinite(seconds) || seconds < 0 || seconds > 7 * 86400) return "";
   const at = new Date(now + seconds * 1000);
   const time = at.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-  const today = new Date(now).toDateString() === at.toDateString();
-  return today ? time : `${at.toLocaleDateString([], { weekday: "short" })} ${time}`;
+  // Within the next day the time alone is clear, even past midnight.
+  const soon = seconds < 20 * 3600 || new Date(now).toDateString() === at.toDateString();
+  return soon ? time : `${at.toLocaleDateString([], { weekday: "short" })} ${time}`;
 }
 
 /** How long ago something was, roughly: `just now`, `12m ago`, `3h ago`, `2d ago`. */

@@ -1,54 +1,93 @@
 /* Design tokens and base styles shared by every window. */
 
-:root {
+@import "./lib/ui/fonts.css";
+@import "./lib/ui/themes.css";
+
+:root,
+[data-theme="ember-dark"] {
   color-scheme: dark;
 
-  --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
-  --font-display: "Segoe UI Variable Display", Bahnschrift, "Segoe UI", system-ui, sans-serif;
+  /*
+   * Everything below is the Ember Dark look, the default. The other three looks (Ember Light, Sprout
+   * Light, Sprout Dark) change these same names in ui/themes.css; the layout never changes with a look.
+   */
+  --font-sans: "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-display: "Space Grotesk", "Inter", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
   --font-mono: "Cascadia Mono", "Cascadia Code", Consolas, ui-monospace, monospace;
+  /* Running text, and the weight of a name or a heading. */
+  --weight-body: 450;
+  --weight-strong: 600;
+  /* Small labels over a number: sentence case here, and no tracking. */
+  --label-case: none;
+  --label-tracking: 0;
 
   /*
-   * Surfaces, darkest first: the window, a panel, a band or field inside it, a control on that.
+   * Surfaces, darkest first: the window, a card, a band or field inside it, a control on that.
    * A cool graphite with a trace of warmth, so the amber accent and the game's colours stand out.
    */
-  --bg: #0f1013;
-  --surface: #15171b;
-  --surface-2: #1c1f24;
-  --surface-3: #262a31;
-  /* A card that floats over the rest: link cards, menus. */
-  --surface-raised: #181b20;
-  --glass: rgba(15, 16, 19, 0.94);
+  --bg: #0e0f12;
+  --surface: #16181c;
+  --surface-2: #1d2025;
+  --surface-3: #272a31;
+  /* A card that floats over the rest: link cards, menus, sheets. */
+  --surface-raised: #1a1c21;
+  --glass: rgba(14, 15, 18, 0.94);
+  /* The groove of a gauge or a bar. */
+  --track: #272a31;
   /* Rules between rows: strong enough to show over a bright game scene behind a see-through overlay. */
   --border: rgba(214, 222, 240, 0.08);
   --border-strong: rgba(214, 222, 240, 0.15);
+  /* The outline of a card or a control: a hairline here, thick ink in Sprout. */
+  --line: rgba(214, 222, 240, 0.08);
+  --line-w: 1px;
+  /* A button or a chip: a little stronger than a card's, so it reads as pressable. */
+  --control-line: rgba(214, 222, 240, 0.15);
+  /* A sunken well: a list's background, the groove tabs sat in. */
+  --well: rgba(0, 0, 0, 0.28);
   /* A soft top light on raised things. */
   --highlight: rgba(255, 255, 255, 0.04);
+  /* What a row or a quiet button gains under the pointer, and when pressed. */
+  --hover: rgba(255, 255, 255, 0.06);
+  --press: rgba(255, 255, 255, 0.1);
+  /* The dimmed game behind a sheet. */
+  --scrim: rgba(6, 7, 9, 0.6);
 
-  --text: #eceef2;
-  --muted: #a3a8b3;
+  --text: #eef0f3;
+  --muted: #a2a7b1;
   /* 5.3:1 on the surface, the dimmest text that stays readable at 11 px. */
-  --faint: #8a909b;
+  --faint: #8b919c;
 
-  --accent: #f0a83a;
+  /*
+   * The accent comes as a fill and as text. They are one colour here; on a light look the fill
+   * stays bright amber and the text turns dark enough to read.
+   */
+  --accent: #f4a93b;
   --accent-strong: #ffc062;
-  --accent-soft: rgba(240, 168, 58, 0.14);
+  --accent-soft: rgba(244, 169, 59, 0.14);
+  /* What is written on the accent fill, and the quieter line under it. */
   --accent-ink: #1a1206;
+  --accent-sub: #4a3208;
+  --accent-text: #f4a93b;
+  --accent-text-strong: #ffc062;
 
   --hp: #e0524d;
   --mp: #4f98e8;
-  --exp: #e2c53c;
+  /* EXP as a fill (the ring, a bar) and as text. */
+  --exp: #e8c840;
+  --exp-text: #e8c840;
   --map: #f0a83a;
   /* Rides and return scrolls in routes, apart from portal steps. */
   --travel: #4fc0ae;
   --good: #6cc77a;
   --good-soft: rgba(108, 199, 122, 0.14);
+  --good-ink: #0e2412;
   --warn: #ee9244;
   --warn-soft: rgba(238, 146, 68, 0.14);
   /* Lighter than the HP red, so it reads as text on the dark surface (5.4:1). */
   --bad: #ec6f6a;
   --bad-soft: rgba(236, 111, 106, 0.13);
   /* Mesos match the coin. */
-  --mesos: #f0a83a;
+  --mesos: #f4a93b;
 
   /* Names that open a card, coloured by what they name. All read 6:1 or better on the surface. */
   --ref-item: #8cbcf0;
@@ -56,6 +95,8 @@
   --ref-npc: #6fd0bd;
   --ref-map: #e7b45a;
   --ref-skill: #c3a6f5;
+  /* Worn gear: the look's own green, so it reads in every look. */
+  --ref-worn: var(--good);
 
   /*
    * Marks on a map's picture: their own vivid set, apart from the link colours, so they stand out
@@ -65,12 +106,52 @@
   --marker-portal: #2e8cff;
   --marker-npc: #30d660;
 
+  /*
+   * The window's own furniture. The header (level ring, name, EXP line) and the tab bar have
+   * their own colours because Ember Light keeps both dark while the body turns light.
+   */
+  --header-bg: #0e0f12;
+  --header-text: #eef0f3;
+  --header-muted: #a2a7b1;
+  --header-faint: #8b919c;
+  --header-track: #272a31;
+  --header-hover: #1d2025;
+  --header-good: #6cc77a;
+  --header-exp: #e8c840;
+  --header-accent: #f4a93b;
+  /* The header's lower corners, and the space under it before the first card. */
+  --header-radius: 0;
+  --header-gap: 0px;
+  --nav-bg: #121316;
+  --nav-text: #8b919c;
+  --nav-line: rgba(214, 222, 240, 0.08);
+
+  /* Number tiles: two fills that alternate in Sprout, one quiet fill elsewhere. */
+  --tile-1: #1d2025;
+  --tile-2: #1d2025;
+  --tile-text: #eef0f3;
+  --tile-label: #8b919c;
+  --tile-border: transparent;
+  /* On a tile: the good-news line, the meso figure, and the two small lines. */
+  --tile-good: #6cc77a;
+  --tile-mesos: #f4a93b;
+  --tile-exp-line: #e8c840;
+  --tile-mesos-line: #f4a93b;
+  /* The window's own edge, which has to show over a bright game scene. */
+  --window-line: rgba(214, 222, 240, 0.15);
+
   --radius-sm: 6px;
   --radius: 10px;
   --radius-lg: 14px;
   --radius-pill: 999px;
+  /* What a card and a pressable thing sit on: nothing here, a soft drop in Ember Light, a sticker edge in Sprout. */
+  --card-shadow: none;
+  --control-shadow: none;
+  --go-shadow: none;
   --shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
   --shadow-lg: 0 18px 48px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.35);
+  --scroll-thumb: rgba(255, 255, 255, 0.09);
+  --scroll-thumb-hover: rgba(255, 255, 255, 0.18);
 
   /* Type scale: seven sizes and no others. */
   --text-xs: 11px;
@@ -96,6 +177,7 @@
 
   font-family: var(--font-sans);
   font-size: var(--text-md);
+  font-weight: var(--weight-body);
   line-height: 1.45;
   color: var(--text);
   -webkit-font-smoothing: antialiased;
@@ -136,33 +218,47 @@ button {
   color: var(--faint);
 }
 
+/* A small label over a number or a group. */
+.label {
+  color: var(--faint);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: var(--label-tracking);
+  text-transform: var(--label-case);
+}
+
+/*
+ * The one card: a surface with the look's outline, corners and edge. A hairline in Ember Dark, a top
+ * light and soft drop in Ember Light, thick ink and a sticker edge in Sprout.
+ */
+.card {
+  border: var(--line-w) solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--card-shadow);
+}
+
 .num {
   font-family: var(--font-display);
   font-variant-numeric: tabular-nums;
 }
 
 /*
- * The band that opens each section of a panel (Card, Block, the map card's parts, the build):
- * a soft rounded band set in from the panel's edges, its title in full text colour, so one
- * section reads as ending before the next begins even over a busy game scene.
+ * The heading of a section inside a card (Card, Block, the map card's parts, the build): its
+ * title in the display face, and whatever sits beside it pushed to the right.
  */
 .strip {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 32px;
-  padding: 4px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: linear-gradient(180deg, var(--surface-3), var(--surface-2));
-  box-shadow: inset 0 1px 0 var(--highlight);
+  min-height: 24px;
 }
 
 .strip-title {
   font-family: var(--font-display);
-  font-size: var(--text-md);
-  font-weight: 600;
-  letter-spacing: 0.01em;
+  font-size: 14px;
+  font-weight: var(--weight-strong);
+  line-height: 1.3;
   color: var(--text);
 }
 
@@ -303,7 +399,7 @@ button {
 
 .ref-quest:hover,
 .ref-quest:focus-visible {
-  color: var(--accent-strong);
+  color: var(--accent-text-strong);
 }
 
 /* Emphasis a list asks of the names in it. */
@@ -316,7 +412,12 @@ button {
 
 .ref.upgraded,
 .ref.goal {
-  color: var(--accent-strong);
+  color: var(--accent-text-strong);
+}
+
+/* Gear the character wears, wherever its name shows: a colour of its own. */
+.ref.ref-item.worn {
+  color: var(--ref-worn);
 }
 
 .ref.more {
@@ -374,14 +475,14 @@ button {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.09);
+  background: var(--scroll-thumb);
   border: 3px solid transparent;
   border-radius: var(--radius-pill);
   background-clip: padding-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(255, 255, 255, 0.18);
+  background-color: var(--scroll-thumb-hover);
 }
 
 ::-webkit-scrollbar-corner {

@@ -29,58 +29,69 @@
 </div>
 
 <style>
+  /* Chips: each choice its own rounded button, the picked one filled with the accent. */
   .seg {
     display: inline-flex;
     flex: none;
-    gap: 2px;
-    padding: 2px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    background: var(--bg);
+    flex-wrap: wrap;
+    gap: 6px;
   }
 
   .stretch {
     display: flex;
     flex: 1;
+    flex-wrap: nowrap;
+    gap: 4px;
   }
 
   .stretch button {
     flex: 1;
+    min-width: 0;
+    padding: 0 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   button {
-    height: calc(var(--control-h) - 6px);
-    padding: 0 10px;
-    border: 0;
-    border-radius: 4px;
-    background: transparent;
+    height: calc(var(--control-h) - 2px);
+    padding: 0 12px;
+    border: var(--line-w) solid var(--control-line);
+    border-radius: var(--radius-pill);
+    background: var(--surface);
     color: var(--muted);
     font-size: var(--text-sm);
+    font-weight: 500;
     white-space: nowrap;
     cursor: pointer;
+    transition:
+      background 0.12s ease,
+      color 0.12s ease;
   }
 
   .sm button {
-    height: calc(var(--control-h-sm) - 6px);
-    padding: 0 8px;
+    height: var(--control-h-sm);
+    padding: 0 9px;
     font-size: var(--text-xs);
   }
 
-  button:hover {
+  button:hover:not([aria-pressed="true"]) {
+    background: var(--surface-2);
     color: var(--text);
   }
 
   button:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: -2px;
+    outline: 2px solid var(--accent-text);
+    outline-offset: 1px;
   }
 
   button[aria-pressed="true"] {
-    background: var(--surface-3);
-    box-shadow:
-      inset 0 1px 0 var(--highlight),
-      0 1px 3px rgba(0, 0, 0, 0.35);
-    color: var(--text);
-    font-weight: 600;
+    border-color: var(--control-line);
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-weight: var(--weight-strong);
+  }
+
+  :global(:root:not([data-theme^="sprout"])) button[aria-pressed="true"] {
+    border-color: transparent;
   }
 </style>

@@ -1,0 +1,192 @@
+<script lang="ts">
+  // The Tools list: everything that isn't a tab, as a grid of named tiles, and the window's own
+  // controls under it. Search finds the same tools by name.
+  import { Camera, EyeOff, Minimize2, MonitorUp, Settings } from "@lucide/svelte";
+
+  import { hotkey } from "$lib/settings.svelte";
+
+  import { TOOLS, type ToolInfo } from "./tabs";
+
+  let {
+    canSaveFrame,
+    ontool,
+    onwindow,
+  }: {
+    /** Live reading is on, so there is a picture to save. */
+    canSaveFrame: boolean;
+    ontool: (tool: ToolInfo) => void;
+    onwindow: (action: "desk" | "compact" | "frame" | "settings" | "hide") => void;
+  } = $props();
+
+  const WINDOW = $derived([
+    { id: "desk" as const, title: "Desk view", icon: MonitorUp, key: "" },
+    { id: "compact" as const, title: "Compact", icon: Minimize2, key: hotkey("ToggleCompact") },
+    ...(canSaveFrame ? [{ id: "frame" as const, title: "Save frame", icon: Camera, key: hotkey("SaveFrame") }] : []),
+    { id: "settings" as const, title: "Settings", icon: Settings, key: "" },
+    { id: "hide" as const, title: "Hide", icon: EyeOff, key: hotkey("ToggleOverlay") },
+  ]);
+</script>
+
+<div class="tools">
+  <ul class="grid">
+    {#each TOOLS as tool (tool.id)}
+      {@const Icon = tool.icon}
+      <li>
+        <button class="tile" onclick={() => ontool(tool)}>
+          <span class="glyph"><Icon size={18} /></span>
+          <span class="words">
+            <span class="title">{tool.title}</span>
+            <span class="line">{tool.line}</span>
+          </span>
+        </button>
+      </li>
+    {/each}
+  </ul>
+
+  <h3>Leafline</h3>
+  <ul class="row">
+    {#each WINDOW as w (w.id)}
+      {@const Icon = w.icon}
+      <li>
+        <button class="win" onclick={() => onwindow(w.id)}>
+          <Icon size={17} />
+          <span>{w.title}</span>
+          {#if w.key}<kbd>{w.key}</kbd>{/if}
+        </button>
+      </li>
+    {/each}
+  </ul>
+</div>
+
+<style>
+  .tools {
+    padding: var(--space-3);
+  }
+
+  ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .tile {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px;
+    border: var(--line-w) solid var(--line);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    box-shadow: var(--card-shadow);
+    color: var(--text);
+    text-align: left;
+    cursor: pointer;
+    transition:
+      background 0.12s ease,
+      transform 0.08s ease;
+  }
+
+  .tile:hover {
+    background: var(--surface-2);
+  }
+
+  .tile:active {
+    transform: translateY(1px);
+  }
+
+  .tile:focus-visible,
+  .win:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+
+  .glyph {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius);
+    background: var(--accent-soft);
+    color: var(--accent-text);
+  }
+
+  .words {
+    display: grid;
+    min-width: 0;
+  }
+
+  .title {
+    font-weight: var(--weight-strong);
+    line-height: 1.25;
+  }
+
+  .line {
+    overflow: hidden;
+    color: var(--faint);
+    font-size: var(--text-xs);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  h3 {
+    margin: var(--space-4) 2px var(--space-2);
+    color: var(--faint);
+    font-family: var(--font-display);
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+
+  .row {
+    display: flex;
+    gap: 6px;
+  }
+
+  .row li {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .win {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+    padding: 9px 2px 7px;
+    border: var(--line-w) solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--muted);
+    font-size: var(--text-xs);
+    cursor: pointer;
+    transition:
+      background 0.12s ease,
+      color 0.12s ease;
+  }
+
+  .win:hover {
+    background: var(--surface-2);
+    color: var(--text);
+  }
+
+  .win span {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  kbd {
+    color: var(--faint);
+    font-family: var(--font-sans);
+    font-size: 10px;
+  }
+</style>

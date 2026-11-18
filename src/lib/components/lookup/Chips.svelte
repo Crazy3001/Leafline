@@ -62,6 +62,6 @@
   [aria-checked="true"] {
     border-color: color-mix(in srgb, var(--accent) 45%, transparent);
     background: var(--accent-soft);
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 </style>

@@ -31,15 +31,15 @@
 {/if}
 
 <style>
+  /* The frame itself is the shared .card in app.css. */
   .card {
-    background: transparent;
-    border-radius: 0;
-    padding: 10px 10px 14px;
+    margin: 0 10px 10px;
+    padding: 11px 14px 14px;
   }
 
   header {
     justify-content: space-between;
-    margin: 0 0 12px;
+    margin: 0 0 10px;
   }
 
   .plain-aside {

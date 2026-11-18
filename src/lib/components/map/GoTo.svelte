@@ -133,7 +133,7 @@
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--surface);
-    color: var(--accent);
+    color: var(--accent-text);
   }
 
   .field:focus-within {
@@ -185,7 +185,7 @@
 
   .results button.active,
   .results button:hover {
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--hover);
   }
 
   .name {
@@ -258,7 +258,7 @@
 
   .chip :global(svg) {
     flex: none;
-    color: var(--accent);
+    color: var(--accent-text);
   }
 
   .chip:hover {

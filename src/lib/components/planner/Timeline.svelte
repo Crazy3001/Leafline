@@ -2,6 +2,7 @@
   // The plan level by level, beside every tab. Short folds runs of levels that spend points the
   // same way into one line; job advancements, gear and the character's own level keep their own.
   import { Check, ChevronDown, ChevronRight, TriangleAlert } from "@lucide/svelte";
+  import type { Snippet } from "svelte";
 
   import IconRef from "$lib/components/IconRef.svelte";
   import Ref from "$lib/components/Ref.svelte";
@@ -16,11 +17,22 @@
     expansion,
     goals,
     level,
+    selected = null,
+    onselect,
+    top,
+    showProblems = true,
   }: {
     expansion: Expansion | null;
     goals: SkillLevel[];
     /** The character's level, read from the game. */
     level: number | null;
+    /** The level picked on the Plan tab's chart, and how to pick another. */
+    selected?: number | null;
+    onselect?: (level: number) => void;
+    /** Shown above the list: the picked level, on the Plan tab. */
+    top?: Snippet;
+    /** The Plan tab lists the problems itself. */
+    showProblems?: boolean;
   } = $props();
 
   type Mode = "short" | "every";
@@ -35,6 +47,7 @@
   const notes = $derived(expansion?.problems.filter((p) => p.severity === "note") ?? []);
 
   const here = (row: TimelineRow) => level != null && row.from <= level && level <= row.to;
+  const picked = (row: TimelineRow) => selected != null && row.from <= selected && selected <= row.to;
   const span = (row: TimelineRow) => (row.from === row.to ? `Lv ${row.from}` : `Lv ${row.from}–${row.to}`);
 
   function storedMode(): Mode {
@@ -80,8 +93,17 @@
   {/each}
 {/snippet}
 
+{#snippet at(row: TimelineRow, text: string)}
+  {#if onselect}
+    <button class="at tabular pick" use:tip={`Show Lv ${row.from} beside the chart`} onclick={() => onselect(row.from)}>{text}</button>
+  {:else}
+    <span class="at tabular">{text}</span>
+  {/if}
+{/snippet}
+
 <aside aria-label="The plan level by level">
-  {#if warnings.length || notes.length}
+  {@render top?.()}
+  {#if showProblems && (warnings.length || notes.length)}
     <div class="problems">
       {#each warnings as problem (problem.message)}
         <p class="warning"><TriangleAlert size={12} /><span>{problem.message}</span></p>
@@ -109,7 +131,7 @@
       {#each rows as row (row.from)}
         {@const folded = row.from !== row.to}
         {@const open = opened.includes(row.from)}
-        <li class:here={here(row)} class:advance={row.lines.some((l) => l.kind === "advance")}>
+        <li class:here={here(row)} class:picked={picked(row)} class:advance={row.lines.some((l) => l.kind === "advance")}>
           {#if folded}
             <button class="row" aria-expanded={open} onclick={() => toggle(row)}>
               <span class="at tabular">{span(row)}</span>
@@ -122,8 +144,8 @@
             {#if open}
               <ol class="inner">
                 {#each timeline(row.steps, goals, level, false) as one (one.from)}
-                  <li class:here={here(one)}>
-                    <span class="at tabular">Lv {one.from}</span>
+                  <li class:here={here(one)} class:picked={selected === one.from}>
+                    {@render at(one, `Lv ${one.from}`)}
                     <span class="what">{@render lines(one)}</span>
                   </li>
                 {/each}
@@ -131,7 +153,7 @@
             {/if}
           {:else}
             <div class="row">
-              <span class="at tabular">{span(row)}</span>
+              {@render at(row, span(row))}
               <span class="what">
                 {#if here(row)}<span class="line you">You are here</span>{/if}
                 {@render lines(row)}
@@ -217,6 +239,11 @@
     background: var(--surface-2);
   }
 
+  .rows > li.picked,
+  .inner li.picked {
+    box-shadow: inset 2px 0 0 var(--accent-text);
+  }
+
   .rows > li.here {
     background: var(--accent-soft);
     box-shadow: inset 2px 0 0 var(--accent);
@@ -240,7 +267,7 @@
   }
 
   button.row:hover {
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--hover);
   }
 
   .at {
@@ -248,9 +275,31 @@
     font-family: var(--font-display);
   }
 
+  button.at {
+    justify-self: start;
+    align-self: start;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    font-size: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  button.at:hover {
+    color: var(--accent-text);
+    text-decoration: underline;
+  }
+
+  .picked > .row .at,
+  li.picked > .at {
+    color: var(--accent-text-strong);
+    font-weight: 600;
+  }
+
   .here .at,
   .advance .at {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
   .what {
@@ -264,7 +313,7 @@
 
   .line.advance,
   .line.you {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
     font-weight: 600;
   }
 
@@ -311,7 +360,7 @@
   }
 
   .inner li.here .at {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
   .key {

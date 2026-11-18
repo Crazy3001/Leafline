@@ -510,6 +510,24 @@ impl Atlas {
         scored.into_iter().take(limit).map(|(_, id)| self.map_ref(id)).collect()
     }
 
+    /// One monster as a map's list shows it, counted once.
+    pub fn mob_row(&self, id: u32) -> Option<MobRow> {
+        let m = self.monsters.get(&id)?;
+        Some(MobRow {
+            id: m.id,
+            name: m.name.clone(),
+            level: m.level,
+            hp: m.hp,
+            exp: m.exp,
+            count: 1,
+            boss: m.is_boss,
+            undead: m.undead,
+            weapon_def: m.details.weapon_def.map(|d| d.max(0) as u32),
+            magic_def: m.details.magic_def.map(|d| d.max(0) as u32),
+            evasion: m.details.evasion.map(|d| d.max(0) as u32),
+        })
+    }
+
     pub fn card(&self, id: u32) -> Option<MapCard> {
         let map = self.maps.get(&id)?;
         let mut mobs: Vec<MobRow> = self
@@ -518,20 +536,7 @@ impl Atlas {
             .into_iter()
             .flatten()
             .filter_map(|&(mob_id, count)| {
-                let m = self.monsters.get(&mob_id)?;
-                Some(MobRow {
-                    id: m.id,
-                    name: m.name.clone(),
-                    level: m.level,
-                    hp: m.hp,
-                    exp: m.exp,
-                    count,
-                    boss: m.is_boss,
-                    undead: m.undead,
-                    weapon_def: m.details.weapon_def.map(|d| d.max(0) as u32),
-                    magic_def: m.details.magic_def.map(|d| d.max(0) as u32),
-                    evasion: m.details.evasion.map(|d| d.max(0) as u32),
-                })
+                self.mob_row(mob_id).map(|row| MobRow { count, ..row })
             })
             .collect();
         mobs.sort_by(|a, b| (a.level, &a.name, a.id).cmp(&(b.level, &b.name, b.id)));

@@ -1,6 +1,6 @@
 // The overlay's panels: one tab each, and each can be pinned into a window of its own.
 
-import { Map as MapIcon, Navigation, ScrollText, Search, Swords, UserRound } from "@lucide/svelte";
+import { House, Map as MapIcon, Navigation, ScrollText, Search, Swords, UserRound } from "@lucide/svelte";
 
 import { mapLabel } from "./format";
 import type { Analysis, Panel, PinId, SessionSummary } from "./types";
@@ -22,6 +22,7 @@ export const PIN_WIDTH = 340;
  * drop-down instead of going past this.
  */
 export const PIN_MAX_HEIGHT: Record<PinId, number> = {
+  now: 360,
   character: 520,
   map: 480,
   train: 400,
@@ -43,6 +44,7 @@ export function pinInfo(id: PinId): PanelInfo<PinId> {
 }
 
 export const PANELS: PanelInfo[] = [
+  { id: "now", title: "Now", icon: House },
   { id: "character", title: "Character", icon: UserRound },
   { id: "map", title: "Map", icon: MapIcon },
   { id: "train", title: "Train", icon: Swords },
@@ -71,6 +73,9 @@ export function panelInfo(id: Panel): PanelInfo {
  */
 export function signature(panel: Panel, analysis: Analysis | null, session: SessionSummary | null): string | null {
   switch (panel) {
+    case "now":
+      // Its numbers change every second, so it never gets a dot.
+      return null;
     case "character":
       // Changes with the character's level, which moves the build plan on too.
       return analysis?.hud || session ? `${analysis?.hud?.level ?? session?.level}` : null;

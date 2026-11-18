@@ -7,7 +7,8 @@
   // The wheel zooms in on the pointer and dragging moves around; the marks stay the same size,
   // so a crowded town spreads out. Zoomed all the way out, the wheel scrolls the panel as usual,
   // so the picture never traps it. The portal the trip takes next, and portals pointed at in the
-  // Portals section, stand out.
+  // Portals section, stand out. Spawn points show the monster's own picture, growing a little as
+  // the zoom goes in; a dot stands in when pictures are off or missing.
   import { LoaderCircle, Minus, Plus, Scan } from "@lucide/svelte";
 
   import { openPeek } from "$lib/peek.svelte";
@@ -214,6 +215,9 @@
   }
 
   const pairedEnds = $derived(paired == null ? new Set<number>() : endsOf(paired));
+
+  /** A spawn point's monster picture: small enough that a crowded map stays readable, bigger zoomed in. */
+  const mobSize = $derived(Math.round(Math.min(34, 18 + (zoom - 1) * 6)));
 </script>
 
 {#if picture && src && !failed}
@@ -262,7 +266,13 @@
             onmouseenter={out ? () => onhoverportal?.(point.id) : undefined}
             onmouseleave={out ? () => onhoverportal?.(null) : undefined}
           >
-            <span class="shape"></span>
+            {#if point.kind === "mob"}
+              <Pic kind="mob" id={point.id} name={point.name} size={mobSize} class="mob-pic">
+                {#snippet fallback()}<span class="shape"></span>{/snippet}
+              </Pic>
+            {:else}
+              <span class="shape"></span>
+            {/if}
             {#if nextMarks.has(point)}<span class="flag">Next</span>{/if}
           </button>
           {#snippet markTip()}
@@ -434,7 +444,7 @@
 
   .zoom button:hover:not(:disabled),
   .zoom button:focus-visible {
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--hover);
     color: var(--text);
     outline: none;
   }
@@ -514,6 +524,28 @@
   .mob.lit .shape,
   .mob:hover .shape {
     box-shadow: 0 0 0 6px color-mix(in srgb, var(--marker-mob) 35%, transparent);
+  }
+
+  /* A monster's own picture on its spawn point, outlined so it stands off the map behind it. */
+  .mob :global(.mob-pic) {
+    max-width: none;
+    filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.9)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
+    transition:
+      transform 0.14s ease,
+      opacity 0.14s ease,
+      filter 0.14s ease;
+    pointer-events: none;
+  }
+
+  .mob.dim :global(.mob-pic) {
+    opacity: 0.45;
+    transform: scale(0.8);
+  }
+
+  .mob.lit :global(.mob-pic),
+  .mob:hover :global(.mob-pic) {
+    transform: scale(1.25);
+    filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.9)) drop-shadow(0 0 6px var(--marker-mob));
   }
 
   /* NPCs: green rounded squares. */

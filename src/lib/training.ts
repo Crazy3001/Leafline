@@ -8,6 +8,15 @@ import type { LevelExp, SavedSession, SessionEvent, SessionLine, SessionSummary,
 /** Less time than this on a map makes its rate a rough guess. */
 export const SHORT_SECONDS = 30 * 60;
 
+/**
+ * Sessions, and maps within them, with less play than this stay out of lists, rankings and
+ * charts: a few seconds on a map gives rates that mean nothing. The training log can show them.
+ */
+export const MIN_SHOWN_SECONDS = 10 * 60;
+
+/** Enough play to list. */
+export const longEnough = (s: { activeSeconds: number }) => s.activeSeconds >= MIN_SHOWN_SECONDS;
+
 /** The graph skips the first stretch of a session, where a rate rests on too little play. */
 export const GRAPH_WARMUP_SECONDS = 150;
 
@@ -56,6 +65,29 @@ export function mesosReminder(s: SessionSummary): string | null {
   return s.town
     ? `${counted} Open your inventory before you spend, or give a shop a moment before buying.`
     : `${counted} Open your inventory to count it.`;
+}
+
+/**
+ * What deaths cost: the EXP lost (or the share of a level, on a HUD that shows only a percentage)
+ * and about how much play that undoes at the rate given. Null with no deaths.
+ */
+export function deathCost(o: {
+  deaths: number;
+  expLost: number;
+  percentLost: number;
+  expPerHour: number | null;
+  percentPerHour: number | null;
+}): { lost: string | null; play: string | null; seconds: number | null } | null {
+  if (o.deaths <= 0) return null;
+  const byExp = o.expLost > 0;
+  const lost = byExp ? `${formatCompact(o.expLost)} EXP` : o.percentLost > 0 ? `${o.percentLost.toFixed(2)}% of a level` : null;
+  const seconds =
+    byExp && o.expPerHour && o.expPerHour > 0
+      ? (o.expLost / o.expPerHour) * 3600
+      : !byExp && o.percentLost > 0 && o.percentPerHour && o.percentPerHour > 0
+        ? (o.percentLost / o.percentPerHour) * 3600
+        : null;
+  return { lost, seconds, play: seconds != null && seconds >= 30 ? `about ${formatDuration(seconds)} of play` : null };
 }
 
 export type Metric = "exp" | "mesos";
@@ -125,11 +157,14 @@ export interface LineFilter {
   job?: string | null;
 }
 
+/** A stretch played alone. No party read counts as solo, as the filters take it. */
+export const isSolo = (line: { party: number | null }) => (line.party ?? 1) <= 1;
+
 function keep(session: SavedSession, line: SessionLine, filter: LineFilter) {
   if (filter.character && session.character && session.character !== filter.character) return false;
   if (filter.since && (session.startedAt ?? session.savedAt) < filter.since) return false;
   if (filter.levels && (line.level == null || line.level < filter.levels[0] || line.level > filter.levels[1])) return false;
-  const solo = (line.party ?? 1) <= 1;
+  const solo = isSolo(line);
   if (filter.party === "solo" && !solo) return false;
   if (filter.party === "party" && solo) return false;
   if (filter.job && line.job !== filter.job) return false;
@@ -201,6 +236,12 @@ export interface MapRecord extends RecordRates {
   name: string;
   street: string | null;
   rows: RecordRow[];
+  /** The same rates over solo play only and party play only; null where there was none. A
+   *  party's EXP is the player's own share, so the two rarely compare like for like. */
+  solo: RecordRates | null;
+  party: RecordRates | null;
+  /** The party sizes played here, smallest first. */
+  partySizes: number[];
 }
 
 /**
@@ -212,14 +253,25 @@ export function mapRecords(
   filter: LineFilter = {},
   by: "exp" | "mesos" | "time" = "exp",
 ): MapRecord[] {
-  const maps = new Map<string, { total: Tally; rows: Map<string, { row: Omit<RecordRow, keyof RecordRates>; tally: Tally }> }>();
+  const maps = new Map<
+    string,
+    {
+      total: Tally;
+      solo: Tally;
+      party: Tally;
+      sizes: Set<number>;
+      rows: Map<string, { row: Omit<RecordRow, keyof RecordRates>; tally: Tally }>;
+    }
+  >();
   for (const session of sessions) {
     for (const line of session.lines) {
       if (!keep(session, line, filter) || line.town) continue;
-      const entry = maps.get(line.map!) ?? { total: tally(), rows: new Map() };
+      const entry = maps.get(line.map!) ?? { total: tally(), solo: tally(), party: tally(), sizes: new Set(), rows: new Map() };
       add(entry.total, session, line);
+      add(isSolo(line) ? entry.solo : entry.party, session, line);
+      if (!isSolo(line)) entry.sizes.add(line.party!);
       // No party read counts as solo, as the filters take it.
-      const party = (line.party ?? 1) <= 1 ? 1 : line.party;
+      const party = isSolo(line) ? 1 : line.party;
       const key = `${line.level ?? "?"}|${party ?? "?"}|${line.job ?? "?"}`;
       const row = entry.rows.get(key) ?? { row: { key, level: line.level, party, job: line.job }, tally: tally() };
       add(row.tally, session, line);
@@ -234,6 +286,9 @@ export function mapRecords(
       map,
       ...splitMapLabel(map),
       ...rates(e.total),
+      solo: e.solo.seconds > 0 ? rates(e.solo) : null,
+      party: e.party.seconds > 0 ? rates(e.party) : null,
+      partySizes: [...e.sizes].sort((a, b) => a - b),
       rows: [...e.rows.values()]
         .map(({ row, tally }) => ({ ...row, ...rates(tally) }))
         .filter((row) => row.activeSeconds >= MIN_RECORD_SECONDS)
@@ -242,12 +297,25 @@ export function mapRecords(
     .sort((a, b) => value(b) - value(a));
 }
 
+/** One kind of play on a map, solo or in a party. */
+export interface PlayRate {
+  activeSeconds: number;
+  expPerHour: number;
+  /** The best single session of this kind on the map, as in [`MapStats.best`]. */
+  best: MapStats["best"];
+}
+
 export interface MapStats {
   map: string;
   name: string;
   sessions: number;
   activeSeconds: number;
   expPerHour: number;
+  /** Solo play and party play apart; null where there was none of that kind. */
+  solo: PlayRate | null;
+  party: PlayRate | null;
+  /** The party sizes played here, smallest first. */
+  partySizes: number[];
   /** Null when the mesos were never looked at twice there, which isn't the same as earning none. */
   mesosPerHour: number | null;
   /** The best single session's rate on the map, with when and at what level. */
@@ -262,15 +330,47 @@ export interface MapStats {
 export function mapStats(sessions: SavedSession[], filter: LineFilter = {}): MapStats[] {
   const maps = new Map<
     string,
-    { ids: Set<number>; seconds: number; exp: number; mesos: number; mesosSeconds: number; best: MapStats["best"]; bestMesos: MapStats["bestMesos"]; levels: Map<number | null, { seconds: number; exp: number; mesos: number; mesosSeconds: number }> }
+    {
+      ids: Set<number>;
+      seconds: number;
+      exp: number;
+      mesos: number;
+      mesosSeconds: number;
+      best: MapStats["best"];
+      bestMesos: MapStats["bestMesos"];
+      levels: Map<number | null, { seconds: number; exp: number; mesos: number; mesosSeconds: number }>;
+      kinds: Record<"solo" | "party", Kind>;
+      sizes: Set<number>;
+    }
   >();
+  const kind = (): Kind => ({ seconds: 0, exp: 0, best: null });
   for (const session of sessions) {
     // A session's lines on one map, summed, give its rate there.
-    const perMap = new Map<string, { seconds: number; exp: number; mesos: number; mesosSeconds: number; level: number | null; party: number | null }>();
+    // Solo and party runs are kept apart, so a best says which it was.
+    const perMap = new Map<
+      string,
+      { map: string; solo: boolean; seconds: number; exp: number; mesos: number; mesosSeconds: number; level: number | null; party: number | null }
+    >();
     for (const line of session.lines) {
       if (!keep(session, line, filter)) continue;
       const map = line.map!;
-      const entry = maps.get(map) ?? { ids: new Set(), seconds: 0, exp: 0, mesos: 0, mesosSeconds: 0, best: null, bestMesos: null, levels: new Map() };
+      const solo = isSolo(line);
+      const entry = maps.get(map) ?? {
+        ids: new Set(),
+        seconds: 0,
+        exp: 0,
+        mesos: 0,
+        mesosSeconds: 0,
+        best: null,
+        bestMesos: null,
+        levels: new Map(),
+        kinds: { solo: kind(), party: kind() },
+        sizes: new Set(),
+      };
+      const k = entry.kinds[solo ? "solo" : "party"];
+      k.seconds += line.activeSeconds;
+      k.exp += line.expGained;
+      if (!solo) entry.sizes.add(line.party!);
       entry.ids.add(session.id);
       entry.seconds += line.activeSeconds;
       entry.exp += line.expGained;
@@ -283,20 +383,23 @@ export function mapStats(sessions: SavedSession[], filter: LineFilter = {}): Map
       level.mesosSeconds += line.mesosSeconds;
       entry.levels.set(line.level, level);
       maps.set(map, entry);
-      const run = perMap.get(map) ?? { seconds: 0, exp: 0, mesos: 0, mesosSeconds: 0, level: line.level, party: line.party };
+      const runKey = `${solo ? "s" : "p"}|${map}`;
+      const run = perMap.get(runKey) ?? { map, solo, seconds: 0, exp: 0, mesos: 0, mesosSeconds: 0, level: line.level, party: line.party };
       run.seconds += line.activeSeconds;
       run.exp += line.expGained;
       run.mesos += line.mesosGained;
       run.mesosSeconds += line.mesosSeconds;
-      perMap.set(map, run);
+      perMap.set(runKey, run);
     }
-    for (const [map, run] of perMap) {
+    for (const run of perMap.values()) {
       // A run under ten minutes is too short to call a best.
       if (run.seconds < 600) continue;
       const rate = (run.exp * 3600) / run.seconds;
-      const entry = maps.get(map)!;
-      if (!entry.best || rate > entry.best.expPerHour)
-        entry.best = { sessionId: session.id, expPerHour: rate, at: session.startedAt ?? session.savedAt, level: run.level, party: run.party };
+      const entry = maps.get(run.map)!;
+      const best = { sessionId: session.id, expPerHour: rate, at: session.startedAt ?? session.savedAt, level: run.level, party: run.party };
+      if (!entry.best || rate > entry.best.expPerHour) entry.best = best;
+      const k = entry.kinds[run.solo ? "solo" : "party"];
+      if (!k.best || rate > k.best.expPerHour) k.best = best;
       // A mesos best needs the mesos in view for most of the run.
       if (run.mesosSeconds >= Math.max(600, run.seconds * 0.5)) {
         const mesos = (run.mesos * 3600) / run.mesosSeconds;
@@ -315,6 +418,9 @@ export function mapStats(sessions: SavedSession[], filter: LineFilter = {}): Map
       mesosPerHour: e.mesosSeconds > 0 ? (e.mesos * 3600) / e.mesosSeconds : null,
       best: e.best,
       bestMesos: e.bestMesos,
+      solo: playRate(e.kinds.solo),
+      party: playRate(e.kinds.party),
+      partySizes: [...e.sizes].sort((a, b) => a - b),
       byLevel: [...e.levels]
         .map(([level, l]) => ({
           level,
@@ -326,6 +432,25 @@ export function mapStats(sessions: SavedSession[], filter: LineFilter = {}): Map
     }))
     .filter((m) => m.activeSeconds > 0)
     .sort((a, b) => b.expPerHour - a.expPerHour);
+}
+
+/** Solo or party play on a map, summed. */
+interface Kind {
+  seconds: number;
+  exp: number;
+  best: MapStats["best"];
+}
+
+function playRate(k: Kind): PlayRate | null {
+  return k.seconds > 0 ? { activeSeconds: k.seconds, expPerHour: (k.exp * 3600) / k.seconds, best: k.best } : null;
+}
+
+/** Party sizes, for after "parties of": `2`, `2–4`. */
+export function partySizes(sizes: number[]): string {
+  if (!sizes.length) return "";
+  const low = sizes[0];
+  const high = sizes[sizes.length - 1];
+  return low === high ? `${low}` : `${low}–${high}`;
 }
 
 export function mapBars(stats: MapStats[], metric: Metric): Bar[] {

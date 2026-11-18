@@ -5,7 +5,7 @@
 [**Download the latest release**](https://github.com/Crazy3001/Leafline/releases/latest) · Windows 10 and 11 · [FAQ](#faq) · [Known limitations](#known-limitations) · [Changelog](CHANGELOG.md) · [Code signing policy](#code-signing-policy)
 
 > [!WARNING]
-> **Leafline is unofficial, and you use it at your own risk.** Nexon has not said whether read-only overlays are allowed. [More on the risk](#is-it-allowed-can-i-get-banned)
+> **Leafline is unofficial, and you use it at your own risk.** Nexon says it has zero tolerance for third-party tools and bans for them permanently, and it has never said whether a read-only overlay counts. [More on the risk](#is-it-allowed-can-i-get-banned)
 
 > [!NOTE]
 > **Leafline is a work in progress.** This is an early version: some readings still slip, and plenty is still to come. It will keep growing and getting better with the community's help, so every bug report, misread picture and idea makes a difference. [How to help](#how-to-help)
@@ -18,7 +18,7 @@
 ## What it does
 
 ### Training
-- **EXP and meso rates as you play:** EXP gained, EXP/hour from your second kill, kills per hour, time to level with a likely range, mesos/hour (after potions, if you set their cost), overall, per map and over the last five minutes, with a trend graph.
+- **EXP and meso rates as you play:** EXP gained, EXP/hour from your second kill, kills per hour, time to level with a likely range, mesos/hour (after potions, counted from your quick slots once you set their cost), the loot you pick up with what it's worth, solo and party apart, overall, per map and over the last five minutes, with a trend graph.
 - **Readings are checked, not trusted:** EXP points and percent have to agree, a level-up has to show twice, and big meso jumps need several readings. Time in town, deaths, quest rewards and shop trades are kept out of the rates.
 - **Sessions save themselves** as you go, with a line for each map, level, party size and job, and carry on after a crash or restart. The **training log** compares sessions and maps, keeps your records per map, and lists the drops you logged. Export it all to CSV. Each character keeps its own numbers.
 - **Where to train:** the Train tab ranks maps by a forecast worked out from your character's stats, gear and buffs and from how you really play, with a likely range and plain reasons for each. A check shows how close the estimates have been. Bookmark the spots you like, and set a level goal.
@@ -29,6 +29,7 @@
 ### Items
 - **Item check:** hover an item in game and press your hotkey. Leafline reads the tooltip and shows its stats with the base and bonus, its requirements, whether it's clean or scrolled (and how many scrolls failed), and whether your build can wear it.
 - **Where to get it:** every monster players have seen drop it, each with the maps it lives on and a route there, the NPC shops that sell it, the quests that give it, and the recipe that crafts it.
+- **Sell or keep:** open an inventory tab and press your hotkey. Leafline names each item by its picture, says which to keep (a quest you're doing needs it, crafting uses it, your build will wear it, you're tracking it) and which to sell, and what the bag fetches from an NPC.
 - **Tracked items:** star an item to keep it listed with who drops it, the best map to hunt it and a shop when one sells it.
 - **Drop log:** log an item as a drop from a monster on your map, and send it on to MeowDB's community drop lists with one click if you like.
 - **Your own notes** on any item, kept on your PC.
@@ -42,12 +43,13 @@
 
 ### Quests
 - **Quest Helper, read live:** your tracked quests with their counters and rewards. Open one for its steps, directions to each monster, and who takes it in.
+- **Quest log, read from the Quest window** while you have it open: which quests you've done, which are in progress with their counts, and which you can take, kept for each character. The quests to take at your level leave out what you've done, and quests ready to hand in say who takes them.
 - **Quest search** across every quest by name, NPC, monster or region, the quests your level can take now, and the rest of each quest's chain.
 
 ![The desk view with Quests, Map and Lookup: each quest's steps with directions, the map's exits and NPCs, and where a monster lives and what it drops](.github/screenshots/desk-questing.png)
 
 ### Your character
-- **Character tab:** level, job, HP, MP, EXP and mesos at a glance, with what your build plan says to do at this level.
+- **Me tab:** level, job, HP, MP, EXP and mesos at a glance, with what your build plan says to do at this level.
 - **Stats and buffs:** every number your Character Stat window shows, read from the game, and switches for the buffs you have running, counted in the stats and the training estimates.
 - **Build planner:** a job and a list of goals in order ("this skill to 20, DEX to 25, the rest into LUK"), laid out level by level. It warns when a goal comes too late or SP would be lost at a job advancement. Ready-made plans for each 2nd job, each following one credited guide.
 - **Follows your real character:** open your Stat or Skill window in game and the plan picks up from where you really are.
@@ -57,9 +59,10 @@
 ![The desk view with the build planner and the Character panel: skill goals in order, the plan level by level, and gear to wear now and next](.github/screenshots/desk-planner.png)
 
 ### Fits around the game
-- **A small overlay** over the game, or shrink it to a **compact HUD**. Lock it so clicks pass through.
-- **Pin** any tab into its own small window, including a Route pin for Go here.
-- **Desk view:** every panel side by side in one big window, in tabs you can rename and rearrange (the training log and build planner have their own), remembering its size and tabs.
+- **A small overlay** over the game with five tabs (Now, Quests, Map, Train and Me), one search box for everything, and a Tools list for the rest. Shrink it to a **compact HUD**, one strip with your level, EXP bar, rates and time to level. Lock it so clicks pass through.
+- **Four looks:** Ember Dark, Ember Light, Sprout Light and Sprout Dark.
+- **Pin** any tab into its own small window, including Now (your session and quests) and a Route pin for Go here.
+- **Desk view** for a big window or a second screen: a sidebar of views (Now, Quests, Map, Train, Me, Look up, the training log, the build planner and the tools), each laid out across the width, or **My layout** with panels in columns you arrange yourself.
 - **Hotkeys** that work while the game is in front, without sending the game any input. Setup tests each key with the game in front.
 - **Countdown timers** for anything you want to keep time on.
 
@@ -98,13 +101,14 @@ You need Windows 10 or 11 (64-bit) and the **English** MapleStory Classic World 
 
 ## Getting started
 
-Setup walks you through five short steps:
+Setup walks you through six short steps:
 
 1. **Welcome:** turn live reading and the update check on or off.
-2. **Hotkeys:** nothing is bound until you choose. It suggests `Win+F8` to read an item, `Win+F9` to show or hide the overlay and `Win+F7` to lock it, then asks you to press each one with the game in front to be sure it gets through.
-3. **Game settings** that help Leafline read (below).
-4. **How to show Leafline:** the overlay, the desk view, or both.
-5. **Map data:** the one-time download of community data.
+2. **Look:** pick one of the four looks.
+3. **Hotkeys:** nothing is bound until you choose. It suggests `Win+F8` to read an item, `Win+F9` to show or hide the overlay and `Win+F7` to lock it, then asks you to press each one with the game in front to be sure it gets through.
+4. **Game settings** that help Leafline read (below).
+5. **Views:** the overlay, the desk view, or both.
+6. **Map data:** the one-time download of community data.
 
 Then play. Leafline finds the game window by itself and starts reading. Closing a window hides it; Leafline keeps running in the tray until you choose **Quit**. Run setup again any time from **Settings → About**.
 
@@ -124,7 +128,7 @@ Add **Win** to every hotkey. While the game is in front it keeps plain keys to i
 ## FAQ
 
 ### Is it allowed? Can I get banned?
-Nobody knows for sure. Nexon hasn't said either way: support replies to similar questions quote the rule against unauthorised third-party software and say they can't comment on specific programs. A support ticket asking whether read-only overlays are allowed has had no answer yet. Leafline is built to stay on the safe side of every line we know of (see [What it never does](#what-it-never-does)), but passive doesn't mean approved. Penalties carry across Nexon games on one account, so think about using a separate account.
+You could. On 17 November 2026 Nexon announced a ban wave and said it has "zero tolerance" for cheating, botting and third-party tools, with a permanent ban for using any of them. It didn't say whether a read-only overlay like Leafline counts, and support replies to similar questions only quote the rule against unauthorised third-party software and say they can't comment on specific programs. A support ticket asking whether read-only overlays are allowed has had no answer yet. Nexon also hasn't said what its anti-cheat looks for. Leafline is built to stay on the safe side of every line we know of (see [What it never does](#what-it-never-does)), but passive doesn't mean approved, and nobody can promise it won't get an account banned. Penalties carry across both MapleStory games on one Nexon account, so think about using a separate account.
 
 ### Is it free?
 Yes, and it stays free: no ads, no paid features, no account. The code is open source under the MIT licence.
@@ -208,3 +212,5 @@ See [DEVELOPMENT.md](DEVELOPMENT.md) for building, testing the readers, and how 
 ## Licence
 
 Leafline's code is under the [MIT licence](LICENSE). It doesn't cover game content or the downloaded data above, which keep their own terms.
+
+If you publish a fork or your own build, please give it a different name, so players don't mistake it for Leafline or download it thinking it's the real thing.

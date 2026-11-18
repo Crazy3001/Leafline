@@ -9,6 +9,10 @@
   import MapCard from "./MapCard.svelte";
   import QuestPanel from "./QuestPanel.svelte";
   import TrainPanel from "./TrainPanel.svelte";
+  import NowPin from "$lib/shell/NowPin.svelte";
+  import NowScreen from "$lib/shell/NowScreen.svelte";
+  import { tabInfo } from "$lib/shell/tabs";
+  import { openPanel } from "$lib/nav.svelte";
   import type { Analysis, Panel, SessionSummary } from "$lib/types";
 
   let {
@@ -16,17 +20,37 @@
     analysis,
     session,
     pinned = false,
-  }: { panel: Panel; analysis: Analysis | null; session: SessionSummary | null; pinned?: boolean } = $props();
+    roomy = false,
+    shelled = false,
+    wide = false,
+  }: {
+    panel: Panel;
+    analysis: Analysis | null;
+    session: SessionSummary | null;
+    pinned?: boolean;
+    /** A tall column with room, as in the desk view: panels that split into views show them all. */
+    roomy?: boolean;
+    /** Under the main window's header, which shows the level, name, job and EXP: panels leave those out. */
+    shelled?: boolean;
+    /** A whole wide window, as a desk view: parts that take turns elsewhere sit side by side. */
+    wide?: boolean;
+  } = $props();
 </script>
 
 {#snippet empty(text: string)}
   <p class="empty">{text}</p>
 {/snippet}
 
-{#if panel === "character"}
+{#if panel === "now"}
+  {#if pinned}
+    <NowPin {analysis} {session} />
+  {:else}
+    <NowScreen {analysis} {session} ongo={(t) => openPanel(tabInfo(t).panel)} />
+  {/if}
+{:else if panel === "character"}
   <!-- One card for who the character is and where the build plan has them, so the level shows once. -->
-  <CharacterCard hud={analysis?.hud ?? null} mesos={analysis?.mesos ?? null} {session} remember plain={pinned} linkTrain={!pinned}>
-    <BuildSection level={analysis?.hud?.level ?? session?.level ?? null} character={analysis?.hud?.name ?? null} glance={pinned} />
+  <CharacterCard hud={analysis?.hud ?? null} mesos={analysis?.mesos ?? null} {session} remember plain={pinned} linkTrain={!pinned} trim={shelled}>
+    <BuildSection level={analysis?.hud?.level ?? session?.level ?? null} character={analysis?.hud?.name ?? null} glance={pinned} whole={wide && !pinned} />
   </CharacterCard>
 {:else if panel === "map"}
   {#if analysis?.map}
@@ -35,7 +59,7 @@
     {@render empty("The minimap isn't in view. Its map's details show here when it is.")}
   {/if}
 {:else if panel === "train"}
-  <TrainPanel level={analysis?.hud?.level ?? session?.level ?? null} map={analysis?.map ?? null} {session} glance={pinned} />
+  <TrainPanel level={analysis?.hud?.level ?? session?.level ?? null} map={analysis?.map ?? null} {session} glance={pinned} whole={roomy} />
 {:else if panel === "quests"}
   <QuestPanel
     quest={analysis?.quest ?? null}

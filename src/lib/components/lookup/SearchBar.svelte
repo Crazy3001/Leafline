@@ -1,6 +1,22 @@
+<script lang="ts" module>
+  /** A list's words, handed to a search box that stands above it. */
+  export interface FoldedField {
+    readonly value: string;
+    readonly placeholder: string;
+    input: (text: string) => void;
+  }
+  /** Set by the search sheet: its one box types into the list, whose own field folds away. */
+  export interface SearchFold {
+    attach: (field: FoldedField) => () => void;
+  }
+  export const SEARCH_FOLD = Symbol("search fold");
+</script>
+
 <script lang="ts">
   // The search box each half of the Lookup tab opens with, and its filter and clear buttons.
+  // Inside the search sheet the sheet's own box does the typing, so only the buttons stay.
   import { tip } from "$lib/tip.svelte";
+  import { getContext } from "svelte";
   import { Search, SlidersHorizontal, X } from "@lucide/svelte";
 
   let {
@@ -26,13 +42,30 @@
     oninput: (text: string) => void;
     onclear: () => void;
   } = $props();
+
+  const fold = getContext<SearchFold | undefined>(SEARCH_FOLD);
+  $effect(() => {
+    if (!fold) return;
+    return fold.attach({
+      get value() {
+        return value;
+      },
+      get placeholder() {
+        return placeholder;
+      },
+      input: (text) => oninput(text),
+    });
+  });
 </script>
 
-<div class="search">
-  <label class="field">
-    <Search size={13} />
-    <input type="search" {placeholder} aria-label={label} {value} oninput={(e) => oninput(e.currentTarget.value)} />
-  </label>
+{#if !fold || filterable || clearable}
+<div class="search" class:folded={!!fold}>
+  {#if !fold}
+    <label class="field">
+      <Search size={13} />
+      <input type="search" {placeholder} aria-label={label} {value} oninput={(e) => oninput(e.currentTarget.value)} />
+    </label>
+  {/if}
   {#if filterable}
     <button
       class="tool"
@@ -42,19 +75,33 @@
       aria-expanded={filters}
       onclick={() => (filters = !filters)}
     >
-      <SlidersHorizontal size={13} />{#if narrowed}<span class="tabular">{narrowed}</span>{/if}
+      <SlidersHorizontal size={13} />{#if fold}<span>Filters</span>{/if}{#if narrowed}<span class="tabular">{narrowed}</span>{/if}
     </button>
   {/if}
   {#if clearable}
-    <button class="tool" use:tip={"Clear the search"} aria-label="Clear the search" onclick={onclear}><X size={13} /></button>
+    <button class="tool" use:tip={fold ? null : "Clear the search"} aria-label="Clear the search" onclick={onclear}
+      ><X size={13} />{#if fold}<span>Clear</span>{/if}</button
+    >
   {/if}
 </div>
+{/if}
 
 <style>
   .search {
     display: flex;
     gap: 4px;
     margin-bottom: 6px;
+  }
+
+  /* Only the buttons, at the right: the sheet's box above does the typing. */
+  .folded {
+    justify-content: flex-end;
+  }
+
+  .folded .tool {
+    gap: 5px;
+    padding: 0 9px;
+    border-radius: var(--radius-pill);
   }
 
   .field {
@@ -115,6 +162,6 @@
 
   .tool.active {
     border-color: color-mix(in srgb, var(--accent) 45%, transparent);
-    color: var(--accent);
+    color: var(--accent-text);
   }
 </style>

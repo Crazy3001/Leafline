@@ -499,7 +499,19 @@ export function sampleMaps(query: MapQuery): MapPage {
         (query.levelMin == null || (card.levelRange != null && card.levelRange[1] >= query.levelMin)) &&
         (query.levelMax == null || (card.levelRange != null && card.levelRange[0] <= query.levelMax)),
     )
-    .map((card) => ({ map: card.map, region: card.region, isTown: card.isTown, levelRange: card.levelRange, note: null }));
+    .map((card) => ({
+      map: card.map,
+      region: card.region,
+      isTown: card.isTown,
+      levelRange: card.levelRange,
+      note: null,
+      mobs: [...card.mobs]
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 4)
+        .map((m) => ({ id: m.id, name: m.name, share: card.mobTotal ? m.count / card.mobTotal : 0 })),
+      spawns: card.mobTotal,
+      density: card.mobTotal ? (card.mobTotal * 1000) / 9000 : null,
+    }));
   return { maps: maps.slice(query.offset, query.offset + 40), total: maps.length, closest: false };
 }
 

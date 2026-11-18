@@ -212,7 +212,7 @@
     padding: 0;
     border: 0;
     background: transparent;
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
     font-size: var(--text-sm);
     cursor: pointer;
   }
@@ -234,7 +234,7 @@
     padding: 0 8px;
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
-    background: rgba(0, 0, 0, 0.25);
+    background: var(--well);
     color: var(--text);
     font: inherit;
     font-size: var(--text-sm);

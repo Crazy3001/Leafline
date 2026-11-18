@@ -1,5 +1,6 @@
 //! Looking quests up: a search of every quest in the data, and all it says about one of them.
-//! Nothing here says which quests the character has done: the game keeps that to itself.
+//! Which quests the character has done comes from their quest log, read from the game's Quest
+//! window (see `crate::questlog`); a search is told which, and leaves them out when asked.
 
 use serde::{Deserialize, Serialize};
 
@@ -23,8 +24,12 @@ pub struct QuestSearch {
     pub repeat: Option<String>,
     /// Only quests a character of this level can start.
     pub at_level: Option<u32>,
-    /// Only quests that need no other quest finished first.
+    /// Only quests that need no other quest finished first, or none but those in `done`.
     pub no_prior: bool,
+    /// Quests the character has done, as their quest log last showed it.
+    pub done: Vec<u32>,
+    /// Leave out the quests in `done`, unless they can be done again.
+    pub hide_done: bool,
     pub offset: usize,
 }
 
@@ -142,7 +147,8 @@ impl Atlas {
             search.region.as_ref().is_none_or(|r| q.region.as_ref() == Some(r))
                 && search.repeat.as_ref().is_none_or(|r| q.repeat.as_ref() == Some(r))
                 && search.at_level.is_none_or(|level| q.level_min.unwrap_or(0) <= level)
-                && (!search.no_prior || q.follows.is_empty())
+                && (!search.no_prior || q.follows.iter().all(|f| search.done.contains(f)))
+                && !(search.hide_done && q.repeat.is_none() && search.done.contains(&q.id))
         };
         let mut found: Vec<(u8, &QuestRecord)> =
             self.quests.values().filter(fits).filter_map(|q| Some((self.quest_rank(q, &words)?, q))).collect();
@@ -273,6 +279,14 @@ mod tests {
         let starts = QuestSearch { no_prior: true, ..QuestSearch::default() };
         let names: Vec<String> = atlas.search_quests(&starts).quests.into_iter().map(|q| q.name).collect();
         assert_eq!(names, ["Part 1"], "the others need the one before them");
+
+        // With Part 1 done, Part 2 can start, and Part 1 can be left out.
+        let after = QuestSearch { no_prior: true, done: vec![1], ..QuestSearch::default() };
+        let names: Vec<String> = atlas.search_quests(&after).quests.into_iter().map(|q| q.name).collect();
+        assert_eq!(names, ["Part 1", "Part 2"]);
+        let hidden = QuestSearch { hide_done: true, ..after };
+        let names: Vec<String> = atlas.search_quests(&hidden).quests.into_iter().map(|q| q.name).collect();
+        assert_eq!(names, ["Part 2"]);
     }
 
     #[test]

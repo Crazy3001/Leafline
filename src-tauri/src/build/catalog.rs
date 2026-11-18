@@ -360,6 +360,10 @@ impl Catalog {
         &self.skills
     }
 
+    pub fn items(&self) -> &[ItemRecord] {
+        &self.items
+    }
+
     /// The skill called `name` in one of `jobs`. Several jobs have a skill of the same name.
     pub fn skill_named(&self, name: &str, jobs: &[u32]) -> Option<&SkillRecord> {
         self.skills.iter().find(|s| s.name == name && jobs.contains(&s.job_id))

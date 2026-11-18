@@ -4,6 +4,7 @@
 import type { Backend } from "../api";
 import type {
   Analysis,
+  BagCheck,
   BaseStats,
   ItemNote,
   LoggedDrop,
@@ -45,6 +46,7 @@ import type {
   DeskStatus,
   Trip,
   TripMessage,
+  QuestLog,
   QuestRow,
   SessionSummary,
 } from "../types";
@@ -147,6 +149,25 @@ const slotsFor = (character: string | null) => {
   return own.length || !character ? own : (potionSlotSets.get("") ?? []);
 };
 const sessionPotions = new Map<number, SessionPotion[]>();
+const bagHandlers: ((check: BagCheck) => void)[] = [];
+/** A made-up Etc tab: names and prices are invented for the preview. */
+const sampleBag: BagCheck = {
+  busy: false,
+  at: Math.floor(Date.now() / 1000),
+  tab: "etc",
+  character: "Leafling",
+  wide: false,
+  more: 312,
+  problem: null,
+  unknown: [9],
+  items: [
+    { slot: 0, count: 27, ids: [9001], name: "Fern Leaf", price: 8, priceRange: null, untradable: false, keep: [], wantedBy: [] },
+    { slot: 1, count: 70, ids: [9002], name: "Moss Ribbon", price: 10, priceRange: null, untradable: false, keep: [], wantedBy: [{ id: 1, name: "A Ribbon for Mai" }] },
+    { slot: 2, count: 13, ids: [9003], name: "Copper Ore", price: 12, priceRange: null, untradable: false, keep: [{ kind: "recipe" }], wantedBy: [] },
+    { slot: 3, count: 109, ids: [9004], name: "Burrow Fur", price: 6, priceRange: null, untradable: false, keep: [], wantedBy: [] },
+    { slot: 4, count: 1, ids: [9005, 9006, 9007], name: "Hat Scroll: Greater", price: null, priceRange: [50, 80], untradable: false, keep: [{ kind: "scroll" }], wantedBy: [] },
+  ],
+};
 const potionHandlers: (() => void)[] = [];
 
 function mockHistory(): History {
@@ -216,11 +237,12 @@ let displaySettings: DisplaySettings = {
   compactShape: "card",
   hotkeys: { enabled: true, keys: {} },
   travel: { enabled: false, cabs: true, vipCabs: false, scrolls: true },
-  live: { enabled: true, interval: 2, pauseAfter: 15, window: null },
+  live: { enabled: true, interval: 2, pauseAfter: 15, window: null, pickupLog: true },
   framesFolder: null,
   setupDone: true,
   updateCheck: false,
   showPictures: true,
+  theme: "ember-dark",
   buildRules: { apPerLevel: 5, spPerLevel: 3, beginnerSpPerLevel: 1, advancementSp: 1, firstJobLevel: 10, secondJobLevel: 30 },
 };
 
@@ -332,6 +354,57 @@ const mockQuests: QuestRow[] = [
 ];
 const characterHandlers: ((read: CharacterRead) => void)[] = [];
 
+/** A made-up quest log, as if the Quest window had been looked through an hour ago. */
+const hourAgo = () => Math.floor(Date.now() / 1000) - 3600;
+const loggedQuest = (q: Partial<QuestLog["quests"][number]> & { title: string }): QuestLog["quests"][number] => ({
+  key: q.questId != null ? `#${q.questId}` : `t:${q.title.toLowerCase()}`,
+  cut: false,
+  questId: null,
+  region: null,
+  state: "none",
+  stateSeenAt: hourAgo(),
+  done: false,
+  doneOn: null,
+  doneSeenAt: null,
+  onHelper: null,
+  icon: null,
+  level: null,
+  counters: [],
+  talkTo: null,
+  rewards: [],
+  rewardExp: null,
+  rewardMesos: null,
+  detailSeenAt: null,
+  ...q,
+});
+const mockQuestLog = (): QuestLog => ({
+  character: "Mossbank",
+  looks: [
+    { tab: "inProgress", seenAt: hourAgo(), wholeAt: hourAgo() },
+    { tab: "completed", seenAt: hourAgo(), wholeAt: null },
+  ],
+  quests: [
+    loggedQuest({ title: "Shell Sorting", questId: 70, region: "Mossbank", done: true, doneOn: "2026-10-25", doneSeenAt: hourAgo() }),
+    loggedQuest({
+      title: "Slime Samples",
+      questId: 71,
+      region: "Fern Isle",
+      state: "inProgress",
+      icon: "ring",
+      level: 2,
+      counters: [{ name: "Moss Slime", have: 5, need: 5 }],
+      rewards: [{ name: "Berry Tonic", count: 5 }],
+      detailSeenAt: hourAgo(),
+    }),
+    loggedQuest({ title: "Finding the Instructor", questId: 91, region: "Mossbank", state: "available" }),
+    loggedQuest({ title: "A Lantern for the Ferry", region: "Fern Isle", state: "inProgress", icon: "arrow" }),
+  ],
+  regions: [
+    { tab: "completed", region: "Mossbank", count: 1, seenAt: hourAgo() },
+    { tab: "inProgress", region: "Fern Isle", count: 2, seenAt: hourAgo() },
+  ],
+});
+
 /** Made-up builds kept in this browser tab. */
 let mockBuilds: (Build & { usedAt: number })[] = [
   {
@@ -339,7 +412,16 @@ let mockBuilds: (Build & { usedAt: number })[] = [
     name: "Fernblade, LUK heavy",
     character: null,
     guide: "",
-    start: { level: 29, stats: { str: 4, dex: 60, int: 4, luk: 92 }, ap: 0, sp: 0, skills: [{ skillId: 10, level: 20 }, { skillId: 11, level: 17 }] },
+    start: {
+      level: 29,
+      stats: { str: 4, dex: 60, int: 4, luk: 92 },
+      ap: 0,
+      sp: 0,
+      skills: [{ skillId: 10, level: 20 }, { skillId: 11, level: 17 }],
+      pieces: [
+        { id: 1, item: 501, name: "Mossy Cap", itemType: "Hat", level: 15, stats: [{ label: "Weapon Def.", value: 13 }], upgrades: 1, slotsLeft: 6, slots: 7 },
+      ],
+    },
     plan: {
       job: 420,
       skills: [{ skillId: 11, level: 20 }, { skillId: 20, level: 20 }, { skillId: 21, level: 10 }, { skillId: 12, level: 10 }],
@@ -494,6 +576,7 @@ export const mockBackend: Backend = {
     { action: "ToggleLive", keys: "", suggestedKeys: "", label: "Start or stop live reading", inSetup: false, taken: false },
     { action: "ReadItem", keys: "F10", suggestedKeys: "Super+Numpad1", label: "Read the item you're hovering", inSetup: true, taken: true },
     { action: "ReadCharacter", keys: "", suggestedKeys: "", label: "Read your stat and skill windows, to update your build", inSetup: true, taken: false },
+    { action: "CheckBag", keys: "", suggestedKeys: "", label: "Sell or keep: check the inventory tab that's open", inSetup: false, taken: false },
     { action: "PauseTracking", keys: "", suggestedKeys: "", label: "Pause or resume tracking", inSetup: false, taken: false },
     { action: "NewSession", keys: "", suggestedKeys: "", label: "Start a new session", inSetup: false, taken: false },
     { action: "SaveFrame", keys: "", suggestedKeys: "", label: "Save the picture last read", inSetup: true, taken: false },
@@ -513,7 +596,7 @@ export const mockBackend: Backend = {
     clearInterval(liveTimer);
     liveTimer = setInterval(() => {
       frames += 1;
-      setLive({ state: "reading", window: "MapleStory", width: 2560, height: 1440, frames, readMs: 412, hdr: false, held: false });
+      setLive({ state: "reading", window: "MapleStory", width: 2560, height: 1440, frames, readMs: 412, hdr: false, smoothedUi: false, held: false });
       analysisHandlers.forEach((h) => h(sampleAnalysis));
     }, displaySettings.live.interval * 1000);
   },
@@ -622,6 +705,17 @@ export const mockBackend: Backend = {
     if (!mapStatus.ready) return null;
     return preview?.spots ?? sampleSpots(2, measured, level, assumptions);
   },
+  async monsterFight(id, character, level) {
+    // A made-up fight, so the monster page's Your fight section shows in the browser preview.
+    if (!character && level == null) return null;
+    return {
+      fighter: { level: level ?? 30, low: 180, high: 420, lines: 1, targets: 1, accuracy: 60, magic: false, critRate: 0.05, critBonus: 0.35, attackSeconds: 0.9 },
+      fight: { hit: 0.93, attacks: 2.3, spread: [[1, 0.12], [2, 0.5], [3, 0.31], [4, 0.07]], blowLow: 95, blowHigh: 230, levelFactor: id % 2 ? 0.92 : 1, defenceDivisor: 1.6 },
+      attackSecondsPerKill: 2.07,
+      defenceK: 100,
+      fitted: false,
+    };
+  },
   async checkEstimates() {
     await delay(300);
     return { maps: [], modelTypicalMiss: null, modelWithin20: null, olderTypicalMiss: null, olderWithin20: null };
@@ -635,6 +729,7 @@ export const mockBackend: Backend = {
   },
   savedSpots: async () => [...savedSpots],
   potionSlots: async (character) => [...slotsFor(character)],
+  lootPrices: async (ids) => ids.map((id) => ({ id, npc: id % 7 === 0 ? null : 5 + (id % 40), own: id % 5 === 0 ? 300 : null })),
   async setPotionSlots(character, slots) {
     const taken = new Set(slots.map((s) => s.slot).filter((n) => n > 0));
     const kept = slots
@@ -656,7 +751,7 @@ export const mockBackend: Backend = {
     const def = slotsFor(character).find((p) => p.slot === slot);
     if ((start != null || now != null) && def) {
       const used = start != null && now != null ? Math.max(0, start - now) : 0;
-      rows.push({ slot, name: def.name, price: def.price, start, now, used });
+      rows.push({ slot, name: def.name, price: def.price, start, now, read: null, used });
     }
     sessionPotions.set(startedAt, rows.sort((a, b) => a.slot - b.slot));
     potionHandlers.forEach((h) => h());
@@ -709,6 +804,11 @@ export const mockBackend: Backend = {
   },
   async popOutCard(path) {
     window.open(`/${path}`, "_blank", "width=380,height=540");
+  },
+  async shopPrices(ids) {
+    // Made-up shop prices for two of the sample ingredients.
+    const known: Record<number, number> = { 900101: 12, 900103: 8 };
+    return ids.filter((id) => id in known).map((id) => [id, known[id]] as [number, number]);
   },
   async craftingRecipes(query) {
     // A few made-up recipes, enough to lay the Crafting tab out.
@@ -1030,11 +1130,19 @@ export const mockBackend: Backend = {
       (q) =>
         q.name.toLowerCase().includes(search.text.toLowerCase()) &&
         (!search.region || q.region === search.region) &&
-        (search.atLevel == null || (q.levelMin ?? 0) <= search.atLevel),
+        (search.atLevel == null || (q.levelMin ?? 0) <= search.atLevel) &&
+        !(search.hideDone && !q.repeat && search.done?.includes(q.id)),
     );
     return { quests, total: quests.length };
   },
   questRegions: async () => ["Fern Isle", "Mossbank"],
+  questLog: async () => mockQuestLog(),
+  forgetQuestLog: async () => {},
+  questRegionTotals: async () => [
+    { region: "Fern Isle", quests: 1 },
+    { region: "Mossbank", quests: 3 },
+  ],
+  onQuestLog: async () => () => {},
   async questSheet(id) {
     const row = mockQuests.find((q) => q.id === id);
     if (!row) return null;
@@ -1106,6 +1214,15 @@ export const mockBackend: Backend = {
   },
   async onCharacterRead(handler) {
     characterHandlers.push(handler);
+    return () => {};
+  },
+  async bagLookFurther() {
+    const wide = { ...sampleBag, wide: true, more: 0, unknown: [] };
+    bagHandlers.forEach((h) => h(wide));
+  },
+  lastBag: async () => sampleBag,
+  async onBag(handler) {
+    bagHandlers.push(handler);
     return () => {};
   },
   async findGear(who) {

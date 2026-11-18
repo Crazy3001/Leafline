@@ -13,12 +13,11 @@ sends input, and stays free.
 - Better reading over bright, busy maps, for the Quest Helper and for item pickups
 - More tested screen sizes and UI sizes
 - Every reading says how sure it is, and a doubtful one is left out instead of guessed
+- Clear readings with Windows HDR on, by correcting the washed-out picture instead of only warning
 - Installers signed, so Windows stops warning about them
 
 **Loot and profit**
-- Recording what you pick up automatically, with the count for each session
 - A guess at which monster dropped each item, labelled as confirmed, likely or unknown
-- Loot value at NPC prices, and mesos per hour with loot and potions both counted
 - Drop rates per kill, built from your own kills
 
 **Your characters**
@@ -26,9 +25,6 @@ sends input, and stays free.
 - Compare two characters, or this week with last
 
 **Training**
-- Party and solo EXP shown apart, so you can see whether a party is worth it
-- EXP lost to deaths shown on each session
-- A nudge when a different map becomes better as you level
 - Exact EXP across a jump of several levels
 
 **Items, quests and shops**
@@ -46,7 +42,7 @@ sends input, and stays free.
 
 **Timers and alerts**
 - Timers you start yourself, for bosses and buffs
-- Field boss spawn times
+- Field boss timers by channel, with respawn times you can correct
 - Level-up and rare-drop alerts, plus a daily and weekly summary
 
 **Training details**
@@ -54,6 +50,7 @@ sends input, and stays free.
 - A mode that keeps one session going across maps
 - Party quest mode: completion times and rewards
 - A count of kills per monster
+- A one-line compact bar to sit under the game's own EXP bar
 - Training estimates that look ahead: how many levels a map stays good for
 
 **Party and social**

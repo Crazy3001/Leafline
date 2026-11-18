@@ -1,9 +1,14 @@
+<script lang="ts" module>
+  /** Set to "cards" by a page whose sections each stand as a card of their own: the Map tab. */
+  export const SECTION_LOOK = Symbol("section look");
+</script>
+
 <script lang="ts">
   // A collapsible part of the map card. Opening or closing one is remembered by its title;
   // until then `open` decides. Inside a link card every section starts folded, so the card opens
   // as a short list of headings, every time: nothing opened in a card is remembered.
   import { ChevronRight } from "@lucide/svelte";
-  import { getContext, type Snippet } from "svelte";
+  import { getContext, setContext, type Snippet } from "svelte";
 
   import { SECTION_SCOPE } from "$lib/peek.svelte";
 
@@ -12,6 +17,7 @@
     count,
     open: startOpen = true,
     memory,
+    anchor,
     aside,
     children,
   }: {
@@ -20,11 +26,16 @@
     open?: boolean;
     /** What the open state is remembered by, when the title alone would share it too widely. */
     memory?: string;
+    /** An id to jump to, where a row of chips leads to the sections. */
+    anchor?: string;
     aside?: Snippet;
     children: Snippet;
   } = $props();
 
   const inCard = getContext(SECTION_SCOPE) === "card";
+  /** A card of its own, not a band inside one. Sections inside it are its parts again. */
+  const own = !inCard && getContext(SECTION_LOOK) === "cards";
+  if (own) setContext(SECTION_LOOK, "parts");
   // svelte-ignore state_referenced_locally
   const key = `leafline.section.${memory ?? title}`;
 
@@ -51,7 +62,7 @@
   }
 </script>
 
-<section class="section">
+<section class="section" class:card={own} class:own id={anchor}>
   <button class="head" aria-expanded={open} onclick={toggle}>
     <span class="chevron" class:open><ChevronRight size={12} /></span>
     <span class="title">{title}</span>
@@ -108,7 +119,7 @@
 
   .head:hover .title,
   .head:focus-visible .title {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
   .head:focus-visible {
@@ -119,7 +130,7 @@
   .count {
     padding: 0 7px;
     border-radius: var(--radius-pill);
-    background: rgba(255, 255, 255, 0.07);
+    background: var(--hover);
     font-size: var(--text-xs);
     color: var(--faint);
   }
@@ -132,5 +143,33 @@
 
   .body {
     margin-top: 8px;
+  }
+
+  /* Standing as its own card: the heading is the card's title row, with no band around it. */
+  .own {
+    margin: 0 10px 10px;
+    scroll-margin-top: 50px;
+  }
+
+  .own > .head {
+    min-height: 42px;
+    padding: 8px 14px 8px 10px;
+    border: 0;
+    border-radius: calc(var(--radius-lg) - var(--line-w));
+    background: none;
+  }
+
+  .own > .head:hover {
+    background: var(--hover);
+  }
+
+  .own > .head .title {
+    font-size: 14px;
+    font-weight: var(--weight-strong);
+  }
+
+  .own > .body {
+    margin: 0;
+    padding: 2px 14px 14px;
   }
 </style>

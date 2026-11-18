@@ -36,9 +36,11 @@ use std::collections::VecDeque;
 
 use serde::{Deserialize, Serialize};
 
+use crate::loot::{LootSummary, LootTally, Pickup};
 use crate::pipeline::Analysis;
 use crate::readers::hud::{self, Exp};
 use crate::readers::map::MapReading;
+use crate::readers::quickslot;
 
 /// What one frame says, at one moment.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -64,6 +66,8 @@ pub struct Sample {
     /// The base EXP of each monster on the map, when the map data knows it. Gains are matched
     /// against these to count kills and to tell quest EXP from hunting.
     pub kill_exp: Vec<u32>,
+    /// The count on each quick slot, when the bar was found: `None` for a slot with no count.
+    pub quick_slots: Option<[Option<u32>; quickslot::SLOTS]>,
 }
 
 /// A quest counter as read: what it counts and how far along it is.
@@ -100,6 +104,7 @@ impl Sample {
                 .map(|o| Counter { target: o.target.clone(), current: o.current, required: o.required })
                 .collect(),
             kill_exp: Vec::new(),
+            quick_slots: analysis.quick_slots.as_ref().map(|q| q.counts),
         }
     }
 }
@@ -306,10 +311,14 @@ pub struct SessionSummary {
     pub maps: Vec<MapSummary>,
     /// Per map, level, party size and job, most active time first.
     pub lines: Vec<SessionLine>,
+    /// The quick slots that showed a count, with how many were used from each.
+    pub quick_slots: Vec<QuickSlotUse>,
     /// Quest counter gains per objective and map, most active time first.
     pub counters: Vec<CounterRate>,
     /// Readings dropped as misreads.
     pub rejected: Rejected,
+    /// What the Pickup Log showed picked up.
+    pub loot: LootSummary,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
@@ -323,6 +332,71 @@ pub struct MapSummary {
     pub exp_per_hour: Option<f64>,
     pub mesos_gained: i64,
     pub mesos_per_hour: Option<f64>,
+}
+
+/// One quick slot over the session: the count it shows now, and how many went from it.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QuickSlotUse {
+    /// 0 to 7: the top row left to right, then the bottom row.
+    pub slot: u32,
+    pub count: Option<u32>,
+    pub used: u32,
+}
+
+/// A drop bigger than this, plus [`SLOT_USE_PER_SECOND`] for each second since the last count,
+/// is another item put on the slot, not potions drunk.
+const SLOT_USE_ALLOWANCE: f64 = 5.0;
+const SLOT_USE_PER_SECOND: f64 = 3.0;
+
+/// Follows one quick slot's count. Only drops are use: a count that goes up is a restock (or
+/// another item), and the count carries on from there.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+struct SlotTrack {
+    count: Option<u32>,
+    /// When the count was last confirmed.
+    at: f64,
+    /// A new count and how many readings in a row have shown it.
+    pending: Option<(u32, usize)>,
+    used: u32,
+}
+
+impl SlotTrack {
+    fn see(&mut self, count: Option<u32>, at: f64, confirmations: usize) {
+        // A slot showing no count may be one emptied or one with a skill: neither is counted.
+        let Some(count) = count else {
+            self.pending = None;
+            return;
+        };
+        let Some(last) = self.count else {
+            self.count = Some(count);
+            self.at = at;
+            return;
+        };
+        if count == last {
+            self.pending = None;
+            self.at = at;
+            return;
+        }
+        let seen = match self.pending {
+            Some((value, n)) if value == count => n + 1,
+            _ => 1,
+        };
+        if seen < confirmations.max(1) {
+            self.pending = Some((count, seen));
+            return;
+        }
+        self.pending = None;
+        if count < last {
+            let drop = last - count;
+            let allowed = SLOT_USE_ALLOWANCE + SLOT_USE_PER_SECOND * (at - self.at).max(0.0);
+            if f64::from(drop) <= allowed {
+                self.used += drop;
+            }
+        }
+        self.count = Some(count);
+        self.at = at;
+    }
 }
 
 /// A stretch of play on one map at one level, party size and job.
@@ -345,6 +419,8 @@ pub struct SessionLine {
     pub other_exp: i64,
     pub deaths: u32,
     pub exp_lost: u64,
+    /// Percent of a level lost to deaths, for a HUD that shows only a percentage.
+    pub percent_lost: f64,
     /// Hunting gains on a map the data knows that matched no sum of its monsters' EXP, so the
     /// kills are short by about that many.
     pub gains_missed: u32,
@@ -711,12 +787,35 @@ pub struct SessionTracker {
 
     maps: Vec<MapTotals>,
     lines: Vec<SessionLine>,
+    /// Each quick slot's count and what has been used from it.
+    #[serde(default)]
+    quick_slots: [SlotTrack; quickslot::SLOTS],
     counters: Vec<CounterTrack>,
     counter_totals: Vec<CounterRate>,
     rejected: Rejected,
+    /// What the Pickup Log showed picked up.
+    #[serde(default)]
+    loot: LootTally,
 }
 
 impl SessionTracker {
+    /// The Pickup Log was seen: its totals count from now.
+    pub fn watching_loot(&mut self) {
+        if !self.held {
+            self.loot.watching(self.clock);
+        }
+    }
+
+    /// Adds lines the Pickup Log showed. None count while tracking is paused by hand.
+    pub fn push_pickups(&mut self, pickups: &[Pickup]) {
+        if self.held {
+            return;
+        }
+        for pickup in pickups {
+            self.loot.add(pickup, self.clock);
+        }
+    }
+
     pub fn new(config: TrackerConfig) -> Self {
         Self { config, ..Self::default() }
     }
@@ -773,6 +872,12 @@ impl SessionTracker {
         }
         self.exchange_seen |= sample.exchange;
         self.push_counters(sample);
+        if let Some(slots) = sample.quick_slots {
+            let confirmations = self.config.confirmations;
+            for (track, count) in self.quick_slots.iter_mut().zip(slots) {
+                track.see(count, sample.at, confirmations);
+            }
+        }
     }
 
     /// Notes a shop, storage or trade window opening or closing.
@@ -1069,13 +1174,15 @@ impl SessionTracker {
         self.event(EventKind::Death, None);
         let lost = last.exp.points.saturating_sub(next.exp.points);
         self.exp_lost += lost;
-        self.percent_lost += f64::from(last.exp.percent - next.exp.percent).max(0.0);
+        let percent = f64::from(last.exp.percent - next.exp.percent).max(0.0);
+        self.percent_lost += percent;
         let map = last.map.clone();
         self.totals(map.clone()).exp_lost += lost;
         let level = self.level_known.then_some(last.level);
         let line = self.line(map, level);
         line.deaths += 1;
         line.exp_lost += lost;
+        line.percent_lost += percent;
         self.exp = Some(next);
     }
 
@@ -1190,9 +1297,14 @@ impl SessionTracker {
             self.percent_pending = None;
             if point.level == last.level && percent < last.percent {
                 self.deaths += 1;
-                self.percent_lost += f64::from(last.percent - percent);
+                let lost = f64::from(last.percent - percent);
+                self.percent_lost += lost;
                 self.run_clock(Some(false), (point.at - last.at).max(0.0), false);
                 self.event(EventKind::Death, None);
+                let level = self.level_known.then_some(last.level);
+                let line = self.line(last.map.clone(), level);
+                line.deaths += 1;
+                line.percent_lost += lost;
                 self.percent_point = Some(point);
             } else {
                 self.advance_percent(&last, point);
@@ -1712,8 +1824,16 @@ impl SessionTracker {
             party: self.party.value,
             maps,
             lines,
+            quick_slots: self
+                .quick_slots
+                .iter()
+                .enumerate()
+                .filter(|(_, t)| t.count.is_some() || t.used > 0)
+                .map(|(slot, t)| QuickSlotUse { slot: slot as u32, count: t.count, used: t.used })
+                .collect(),
             counters,
             rejected: self.rejected,
+            loot: self.loot.summary(self.clock, self.config.min_rate_seconds),
         }
     }
 }
@@ -1906,6 +2026,45 @@ mod tests {
     }
 
     #[test]
+    fn potions_drunk_are_counted_from_the_quick_slots() {
+        let slots = |at: f64, del: u32, end: Option<u32>| Sample {
+            quick_slots: Some([None, Some(3), None, None, None, Some(del), end, None]),
+            ..sample(at, 30, 1_000, 1.0)
+        };
+        // One reading is enough here, as for a folder of screenshots.
+        let mut tracker = SessionTracker::new(TrackerConfig { confirmations: 1, ..TrackerConfig::default() });
+        let samples = [
+            slots(0.0, 161, Some(156)),
+            slots(1.0, 160, Some(156)),
+            slots(2.0, 159, Some(155)),
+            // Restocked in town: the count goes up and carries on from there.
+            slots(60.0, 300, Some(155)),
+            slots(61.0, 298, Some(154)),
+            // Another item put on the slot: far more gone than could be drunk in a second.
+            slots(62.0, 40, Some(154)),
+            slots(63.0, 39, None),
+        ];
+        samples.iter().for_each(|s| tracker.push(s));
+        let summary = tracker.summary();
+        let used: Vec<(u32, u32)> = summary.quick_slots.iter().map(|s| (s.slot, s.used)).collect();
+        assert_eq!(used, [(1, 0), (5, 5), (6, 2)]);
+        assert_eq!(summary.quick_slots[1].count, Some(39));
+    }
+
+    #[test]
+    fn a_misread_slot_count_needs_a_second_look_live() {
+        let mut tracker = SessionTracker::new(TrackerConfig::default());
+        let at = |t: f64, del: u32| Sample {
+            quick_slots: Some([None, None, None, None, None, Some(del), None, None]),
+            ..sample(t, 30, 1_000, 1.0)
+        };
+        for s in [at(0.0, 161), at(1.0, 16), at(2.0, 161), at(3.0, 160), at(4.0, 160)] {
+            tracker.push(&s);
+        }
+        assert_eq!(tracker.summary().quick_slots[0].used, 1);
+    }
+
+    #[test]
     fn a_percent_only_hud_counts_level_ups_and_deaths() {
         let summary = track(&[
             percent_sample(0.0, 60, 95.0),
@@ -1918,6 +2077,11 @@ mod tests {
         assert_eq!(summary.level_ups, 1);
         assert_eq!(summary.deaths, 1);
         assert!((summary.percent_lost - 2.0).abs() < 0.01, "{}", summary.percent_lost);
+        // The death is on the map's line too, so the training log can show it per map.
+        let deaths: u32 = summary.lines.iter().map(|l| l.deaths).sum();
+        let lost: f64 = summary.lines.iter().map(|l| l.percent_lost).sum();
+        assert_eq!(deaths, 1);
+        assert!((lost - 2.0).abs() < 0.01, "{lost}");
     }
 
     #[test]

@@ -31,6 +31,7 @@
   import { changeSettings, display, hotkey, keyHint, keyName, usesNumpad, watchSettings } from "$lib/settings.svelte";
   import { watchTyping } from "$lib/typing";
   import Segmented from "$lib/ui/Segmented.svelte";
+  import ThemePicker from "$lib/ui/ThemePicker.svelte";
   import type {
     GameWindow,
     HotkeyChoice,
@@ -44,6 +45,7 @@
 
   const SECTIONS = [
     { id: "live", title: "Live reading" },
+    { id: "look", title: "Look" },
     { id: "overlay", title: "Overlay" },
     { id: "routes", title: "Routes" },
     { id: "hotkeys", title: "Hotkeys" },
@@ -344,6 +346,20 @@
     { what: "App framework", who: "Tauri", licence: "MIT / Apache-2.0", url: "https://tauri.app" },
     { what: "Interface", who: "Svelte", licence: "MIT", url: "https://svelte.dev" },
   ];
+
+  /** The section at the top of the page, lit in the menu. */
+  let reading = $state<string>(SECTIONS[0].id);
+  function follow(main: HTMLElement) {
+    const top = main.getBoundingClientRect().top + 60;
+    let id = SECTIONS[0].id;
+    for (const section of SECTIONS) {
+      const el = document.getElementById(section.id);
+      if (el && el.getBoundingClientRect().top <= top) id = section.id;
+    }
+    // At the bottom, the last section is the one being read even when it is short.
+    if (main.scrollTop + main.clientHeight >= main.scrollHeight - 4) id = SECTIONS[SECTIONS.length - 1].id;
+    reading = id;
+  }
 </script>
 
 <svelte:head><title>Leafline — Settings</title></svelte:head>
@@ -352,11 +368,13 @@
   <nav class="nav" aria-label="Settings sections">
     <div class="brand"><Logo size={18} /><span>Settings</span></div>
     {#each SECTIONS as section (section.id)}
-      <a href="#{section.id}">{section.title}</a>
+      <a href="#{section.id}" class:on={reading === section.id} aria-current={reading === section.id ? "true" : undefined}
+        >{section.title}</a
+      >
     {/each}
   </nav>
 
-  <main>
+  <main onscroll={(e) => follow(e.currentTarget)}>
     <section id="live">
       <h2>Live reading</h2>
       <p class="lead">
@@ -455,6 +473,26 @@
         <details class="advanced">
           <summary>Advanced</summary>
         <div class="row">
+          <label for="pickup-log">
+            <span class="name">Count loot</span>
+            <span class="help"
+              >Reads the lines at the bottom right that say what you picked up, four times a second, for the Train tab's
+              loot and profit. Off uses less CPU.</span
+            >
+          </label>
+          <div class="control">
+            <input
+              id="pickup-log"
+              class="switch"
+              type="checkbox"
+              role="switch"
+              checked={display.live.pickupLog}
+              onchange={(e) => setLive({ pickupLog: e.currentTarget.checked })}
+            />
+          </div>
+        </div>
+
+        <div class="row">
           <div class="label" id="interval-label">
             <span class="name">Read every</span>
             <span class="help">Shorter catches quick changes; longer uses less CPU.</span>
@@ -489,6 +527,12 @@
         </details>
       </fieldset>
       {#if liveError}<p class="note warn">{liveError}</p>{/if}
+      {#if live.liveStatus.state === "reading" && live.liveStatus.smoothedUi}
+        <p class="note">
+          The game's UI Size is Default Ratio, which smooths its text: some readings, such as loot names, may be missed.
+          UI Size: Ideal Ratio, in the game's Graphics options, reads best.
+        </p>
+      {/if}
       {#if live.liveStatus.state === "reading" && live.liveStatus.hdr}
         <p class="note warn">
           Windows HDR is on for the game's display, which washes the picture out and spoils readings. Turn HDR off in
@@ -498,6 +542,12 @@
       <p class="note">
         Works windowed and in Full Screen. Pictures stay in memory unless you save one{keyHint("SaveFrame")}.
       </p>
+    </section>
+
+    <section id="look">
+      <h2>Look</h2>
+      <p class="lead">Four looks over the same layout. Pick one; every Leafline window changes at once.</p>
+      <ThemePicker />
     </section>
 
     <section id="overlay">
@@ -1024,13 +1074,15 @@
     height: 100vh;
   }
 
+  /* The menu in the windows' header colours, as setup's steps are. */
   .nav {
     display: flex;
     flex-direction: column;
     gap: 2px;
     padding: 18px 10px;
     border-right: 1px solid var(--border);
-    background: var(--surface);
+    background: var(--header-bg);
+    color: var(--header-text);
   }
 
   .brand {
@@ -1039,21 +1091,27 @@
     gap: 8px;
     margin: 0 8px 14px;
     font-family: var(--font-display);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .nav a {
     padding: 6px 10px;
-    border-radius: var(--radius-sm);
-    color: var(--muted);
+    border-radius: var(--radius-pill);
+    color: var(--header-muted);
     text-decoration: none;
   }
 
   .nav a:hover,
   .nav a:focus-visible {
-    background: rgba(255, 255, 255, 0.05);
-    color: var(--text);
+    background: var(--header-hover);
+    color: var(--header-text);
     outline: none;
+  }
+
+  .nav a.on {
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-weight: var(--weight-strong);
   }
 
   main {
@@ -1141,7 +1199,7 @@
     display: flex;
     padding: 2px;
     border-radius: var(--radius-sm);
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--hover);
   }
 
   .segmented button {
@@ -1515,7 +1573,7 @@
     margin-right: 6px;
     padding: 0 7px;
     border-radius: var(--radius-sm);
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--hover);
     color: var(--muted);
     font-size: var(--text-xs);
     font-weight: 600;
@@ -1609,7 +1667,7 @@
   }
 
   .link:hover {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
   @media (max-width: 600px) {

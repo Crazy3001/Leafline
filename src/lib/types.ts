@@ -169,7 +169,7 @@ export interface ItemRead {
 }
 
 /** The overlay's tabs, each of which can be pinned into a window of its own. */
-export type Panel = "character" | "map" | "train" | "quests" | "item";
+export type Panel = "now" | "character" | "map" | "train" | "quests" | "item";
 
 /** What can be pinned: any tab, and the "Go here" route, which is not a tab. */
 export type PinId = Panel | "route";
@@ -209,6 +209,8 @@ export type LiveStatus =
       readMs: number;
       /** Windows HDR is on for the game's display, which washes the picture out. */
       hdr: boolean;
+      /** The game's UI Size draws its text smoothed (Default Ratio), which reads less well. */
+      smoothedUi?: boolean;
       /** Tracking is paused by hand. */
       held: boolean;
     }
@@ -236,6 +238,8 @@ export interface LiveChoice {
   /** Seconds without EXP before the clock pauses, 5 to 300. */
   pauseAfter: number;
   window: WindowChoice | null;
+  /** The Pickup Log is read between readings, for the loot picked up. */
+  pickupLog: boolean;
 }
 
 export interface ShortcutInfo {
@@ -269,6 +273,8 @@ export interface SessionLine {
   otherExp?: number;
   deaths?: number;
   expLost?: number;
+  /** Percent of a level lost to deaths, for a HUD that shows only a percentage. */
+  percentLost?: number;
   /** Hunting gains that matched no sum of the map's monsters' EXP. */
   gainsMissed?: number;
   /** The character as the estimates saw them when the stretch began. */
@@ -374,9 +380,13 @@ export interface SessionSummary {
   maps: MapSummary[];
   /** Per map, level, party size and job, most active time first. */
   lines: SessionLine[];
+  /** The quick slots that showed a count, with how many went from each. */
+  quickSlots?: QuickSlotUse[];
   /** Quest counter gains per objective and map, most active time first. */
   counters: CounterRate[];
   rejected: { exp: number; mesos: number };
+  /** What the Pickup Log showed picked up. */
+  loot?: LootSummary;
 }
 
 /** The recent rates at one moment of a session (see src-tauri/src/session.rs). */
@@ -825,6 +835,24 @@ export interface Fighter {
   attackSeconds: number;
 }
 
+/** One monster against the player's character, from the combat model (see src-tauri/src/mapdata/combat.rs). */
+export interface MonsterFight {
+  fighter: Fighter;
+  fight: {
+    hit: number;
+    attacks: number;
+    /** Kills by the attacks they took: [attacks, share of kills], fewest first. */
+    spread: [number, number][];
+    blowLow: number;
+    blowHigh: number;
+    levelFactor: number;
+    defenceDivisor: number;
+  };
+  attackSecondsPerKill: number;
+  defenceK: number;
+  fitted: boolean;
+}
+
 /** What the rules leave open, as fitted to the player's play. */
 export interface Tuning {
   efficiency: number;
@@ -1154,6 +1182,9 @@ export interface LoggedDrop extends NewDrop {
 
 export type CompactShape = "card" | "wide" | "bar";
 
+/** The look every window is drawn in (src/lib/ui/themes.css). */
+export type Theme = "ember-dark" | "ember-light" | "sprout-light" | "sprout-dark";
+
 export interface HotkeyChoice {
   enabled: boolean;
   /** Keys the player changed, by action. Empty turns that hotkey off. */
@@ -1185,6 +1216,8 @@ export interface DisplaySettings {
   updateCheck: boolean;
   /** Item, monster, NPC and map pictures, downloaded from OSMS the first time each is shown. */
   showPictures: boolean;
+  /** The look every window is drawn in. */
+  theme: Theme;
 }
 
 /** The optional update check (src-tauri/src/app/update.rs). */
@@ -1228,6 +1261,10 @@ export interface SavedSession {
   /** The character's name, when the tracker read it. */
   character: string | null;
   deaths: number;
+  /** EXP lost to those deaths, left out of the rates. */
+  expLost: number;
+  /** Percent of a level lost to them, for a HUD that shows only a percentage. */
+  percentLost: number;
   /** The player's own note. It stays on this PC. */
   note: string;
   /** Per map, level, party size and job, most active time first. */
@@ -1238,6 +1275,8 @@ export interface SavedSession {
   potions: SessionPotion[];
   /** What the potions used cost, in mesos. */
   potionCost: number;
+  /** What the Pickup Log showed picked up, when it was read. */
+  loot?: SessionLoot | null;
 }
 
 // Crafting (see src-tauri/src/build/crafting.rs): recipes from the map data.
@@ -1289,6 +1328,104 @@ export interface PotionSlot {
   name: string;
   /** What one costs the player, in mesos. */
   price: number;
+  /** The quick slot it sits on, 0 to 7 (top row left to right, then the bottom row), to read
+   *  its count from the game; null to type the counts. */
+  quickSlot?: number | null;
+}
+
+// Sell or keep (see src-tauri/src/app/bag.rs).
+
+export type BagTab = "equip" | "use" | "setup" | "etc" | "cash" | "deco";
+
+/** What the data or the build says to keep an item for. */
+export type BagKeep = { kind: "recipe" } | { kind: "plan" } | { kind: "quest" } | { kind: "scroll" };
+
+export interface BagItem {
+  slot: number;
+  count: number;
+  /** Every item drawn the same, best first. More than one when the picture can't tell them apart. */
+  ids: number[];
+  name: string;
+  /** What an NPC pays for one, from the item data (not confirmed in Classic). */
+  price: number | null;
+  /** The lowest and highest when the items drawn alike differ. */
+  priceRange: [number, number] | null;
+  untradable: boolean;
+  keep: BagKeep[];
+  /** Quests that ask for it. */
+  wantedBy: { id: number; name: string }[];
+}
+
+export interface BagCheck {
+  /** A check is under way; the rest is from the one before. */
+  busy: boolean;
+  /** Unix seconds. */
+  at: number;
+  tab: BagTab | null;
+  character: string | null;
+  items: BagItem[];
+  /** Slots holding something no picture matched. */
+  unknown: number[];
+  /** Every item of the tab was tried. */
+  wide: boolean;
+  /** Pictures "Look further" would still download. */
+  more: number;
+  problem: string | null;
+}
+
+/** One item and how many of it the Pickup Log showed picked up. */
+export interface LootItem {
+  id: number;
+  name: string;
+  count: number;
+}
+
+/** A session's loot as it goes (see src-tauri/src/loot.rs). */
+export interface LootSummary {
+  /** The log has been seen this session, so the totals mean something. */
+  watched: boolean;
+  /** Active seconds since it was first seen: what the rates are over. */
+  seconds: number;
+  mesos: number;
+  mesosPerHour: number | null;
+  /** Most picked up first. */
+  items: LootItem[];
+  /** Lines counted, read or not. */
+  lines: number;
+  unread: number;
+  /** Items whose name matched nothing in the item data. */
+  unnamed: number;
+  ownExp: number;
+  partyExp: number;
+  partyBonus: number;
+  /** A partymate's share or party bonus showed in the last five minutes of play. */
+  partyNow: boolean;
+}
+
+/** A saved session's loot. */
+export interface SessionLoot {
+  mesos: number;
+  seconds: number;
+  lines: number;
+  unread: number;
+  unnamed: number;
+  items: LootItem[];
+}
+
+/** What one of an item is worth. */
+export interface LootPrice {
+  id: number;
+  /** The NPC price the item data lists. */
+  npc: number | null;
+  /** The middle of the prices the player logged for it. */
+  own: number | null;
+}
+
+/** One quick slot over a session: the count it shows now and how many went from it. */
+export interface QuickSlotUse {
+  slot: number;
+  count: number | null;
+  used: number;
 }
 
 /** A slot's counts for a session, with the name and price as they were when typed. */
@@ -1298,7 +1435,9 @@ export interface SessionPotion {
   price: number;
   start: number | null;
   now: number | null;
-  /** Start minus now once both are typed, never below zero. */
+  /** How many went, as counted from the quick slot. */
+  read?: number | null;
+  /** What was read, or else start minus now once both are typed; never below zero. */
   used: number;
 }
 
@@ -1704,6 +1843,12 @@ export interface MapRow {
   levelRange: [number, number] | null;
   /** Why a search found it, when that isn't its name. */
   note: string | null;
+  /** Its monsters, the most first, each with its share (0 to 1) of the spawns; a few at most. */
+  mobs?: { id: number; name: string; share: number }[];
+  /** How many monsters of any kind the map spawns. */
+  spawns?: number;
+  /** Spawns per 1,000 px of floor, when the map's layout is known. */
+  density?: number | null;
 }
 
 export interface MapPage {
@@ -1777,9 +1922,77 @@ export interface QuestSearch {
   repeat: string | null;
   /** Only quests a character of this level can start. */
   atLevel: number | null;
-  /** Only quests that need no other quest finished first. */
+  /** Only quests that need no other quest finished first, or none but those in `done`. */
   noPrior?: boolean;
+  /** Quests the character has done, as their quest log last showed it. */
+  done?: number[];
+  /** Leave out the quests in `done`, unless they can be done again. */
+  hideDone?: boolean;
   offset: number;
+}
+
+/** A tab of the game's Quest window. */
+export type QuestTab = "available" | "inProgress" | "completed";
+
+/**
+ * A quest's place in the log as last seen: on the Available or In Progress tab, gone from In
+ * Progress (handed in or dropped), or none of these.
+ */
+export type LogState = "available" | "inProgress" | "gone" | "none";
+
+/** The mark the game draws before a row. A ring stood by a quest whose counter was full. */
+export type RowIcon = "bang" | "arrow" | "ring" | "greyRing" | "unknown";
+
+export interface DetailCounter {
+  name: string;
+  have: number;
+  need: number;
+}
+
+export interface DetailReward {
+  name: string;
+  count: number;
+}
+
+/** What Leafline knows of one quest in a character's log, as the Quest window last showed it. */
+export interface LoggedQuest {
+  key: string;
+  title: string;
+  /** The game cut the title short and the data has no quest it fits. */
+  cut: boolean;
+  questId: number | null;
+  region: string | null;
+  state: LogState;
+  /** Unix seconds. */
+  stateSeenAt: number | null;
+  done: boolean;
+  /** `2026-10-25`, from the detail pane. */
+  doneOn: string | null;
+  doneSeenAt: number | null;
+  onHelper: boolean | null;
+  icon: RowIcon | null;
+  /** From the detail pane, when it was open on this quest. */
+  level: number | null;
+  counters: DetailCounter[];
+  talkTo: string | null;
+  rewards: DetailReward[];
+  rewardExp: number | null;
+  rewardMesos: number | null;
+  detailSeenAt: number | null;
+}
+
+export interface QuestLog {
+  character: string | null;
+  /** When each tab was last looked at, and last looked through from top to end. */
+  looks: { tab: QuestTab; seenAt: number; wholeAt: number | null }[];
+  quests: LoggedQuest[];
+  /** The region bars' counts as each tab last showed them. */
+  regions: { tab: QuestTab; region: string; count: number; seenAt: number }[];
+}
+
+export interface RegionTotal {
+  region: string;
+  quests: number;
 }
 
 export interface QuestRow {

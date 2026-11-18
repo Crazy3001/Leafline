@@ -191,7 +191,7 @@
   .track {
     height: 3px;
     border-radius: var(--radius-sm);
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--hover);
     overflow: hidden;
   }
 
@@ -215,7 +215,7 @@
   }
 
   .icon:hover {
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--hover);
     color: var(--text);
   }
 
@@ -239,7 +239,7 @@
   }
 
   .add:hover {
-    background: rgba(255, 255, 255, 0.07);
+    background: var(--hover);
     color: var(--text);
   }
 
@@ -310,7 +310,7 @@
     border: 0;
     border-radius: var(--radius-sm);
     background: var(--accent);
-    color: #1a1204;
+    color: var(--accent-ink);
     font-size: var(--text-sm);
     font-weight: 600;
     cursor: pointer;

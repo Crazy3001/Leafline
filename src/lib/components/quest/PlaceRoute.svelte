@@ -90,14 +90,14 @@
     padding: 0;
     border: 0;
     background: transparent;
-    color: var(--accent);
+    color: var(--accent-text);
     font-size: var(--text-xs);
     cursor: pointer;
   }
 
   .toggle:hover,
   .toggle:focus-visible {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
     outline: none;
   }
 

@@ -91,6 +91,35 @@ pub fn set_spot_saved(
 const POTIONS_EVENT: &str = "potions";
 
 /// The potion slots the player set up, in slot order.
+/// What one of an item picked up is worth: the player's own logged price when there is one,
+/// else what an NPC pays going by the item data.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LootPrice {
+    pub id: u32,
+    /// The NPC price the item data lists. What it means in Classic isn't confirmed.
+    pub npc: Option<i64>,
+    /// The middle of the prices the player logged for it.
+    pub own: Option<u64>,
+}
+
+#[tauri::command]
+pub fn loot_prices(app: AppHandle, state: State<UserDataState>, ids: Vec<u32>) -> Result<Vec<LootPrice>> {
+    let catalog = app.state::<super::mapdata::MapDataState>().catalog();
+    state.with(|db| {
+        ids.iter()
+            .map(|&id| {
+                let item = catalog.as_ref().and_then(|c| c.item(id));
+                let own = match item {
+                    Some(item) => db.price_log(&item.name, None, None)?.all.map(|s| s.median),
+                    None => None,
+                };
+                Ok(LootPrice { id, npc: item.and_then(|i| i.price), own })
+            })
+            .collect()
+    })
+}
+
 #[tauri::command]
 pub fn potion_slots(state: State<UserDataState>, character: Option<String>) -> Result<Vec<PotionSlot>> {
     state.with(|db| db.potion_slots(character.as_deref()))
@@ -257,6 +286,7 @@ pub enum Export {
     Prices,
     Sessions,
     Drops,
+    Loot,
 }
 
 /// Writes the price log, the session history or the drop log as CSV to `path`, which the user picked in a
@@ -268,6 +298,7 @@ pub fn export_csv(state: State<UserDataState>, what: Export, path: std::path::Pa
             Export::Prices => (PRICE_COLUMNS, db.all_prices()?.into_iter().map(price_row).collect::<Vec<_>>()),
             Export::Sessions => (SESSION_COLUMNS, db.sessions()?.into_iter().flat_map(session_rows).collect()),
             Export::Drops => (DROP_COLUMNS, db.drops()?.into_iter().map(drop_row).collect()),
+            Export::Loot => (LOOT_COLUMNS, db.sessions()?.into_iter().flat_map(loot_rows).collect()),
         })
     })?;
     let mut csv = header.join(",") + "\r\n";
@@ -293,6 +324,8 @@ const SESSION_COLUMNS: &[&str] = &[
     "percent_gained",
     "mesos_gained",
     "mesos_per_hour",
+    "deaths",
+    "exp_lost",
     "note",
 ];
 
@@ -314,6 +347,20 @@ pub fn save_image(path: std::path::PathBuf, png: Vec<u8>) -> Result<()> {
 }
 
 const DROP_COLUMNS: &[&str] = &["date", "item", "monster", "map", "character"];
+
+const LOOT_COLUMNS: &[&str] = &["started", "character", "item", "item_id", "count", "watched_minutes"];
+
+/// One row per item a session picked up, and one for its mesos, oldest session last.
+fn loot_rows(s: SavedSession) -> Vec<Vec<String>> {
+    let Some(loot) = s.loot else { return Vec::new() };
+    let started = s.started_at.map(date).unwrap_or_default();
+    let character = s.character.unwrap_or_default();
+    let minutes = format!("{:.1}", loot.seconds / 60.0);
+    let row = |item: &str, id: String, count: u64| vec![started.clone(), character.clone(), item.to_string(), id, count.to_string(), minutes.clone()];
+    std::iter::once(row("Mesos", String::new(), loot.mesos))
+        .chain(loot.items.iter().map(|i| row(&i.name, i.id.to_string(), i.count)))
+        .collect()
+}
 
 fn drop_row(d: LoggedDrop) -> Vec<String> {
     vec![
@@ -355,6 +402,8 @@ fn session_rows(s: SavedSession) -> Vec<Vec<String>> {
         String::new(),
         s.mesos_gained.to_string(),
         rate(s.mesos_per_hour),
+        s.deaths.to_string(),
+        s.exp_lost.to_string(),
         s.note.clone(),
     ]];
     for line in s.lines {
@@ -373,6 +422,8 @@ fn session_rows(s: SavedSession) -> Vec<Vec<String>> {
             format!("{:.2}", line.percent_gained),
             line.mesos_gained.to_string(),
             if mesos_hours > 0.0 { format!("{:.0}", line.mesos_gained as f64 / mesos_hours) } else { String::new() },
+            line.deaths.to_string(),
+            line.exp_lost.to_string(),
             String::new(),
         ]);
     }

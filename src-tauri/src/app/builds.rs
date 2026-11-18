@@ -53,6 +53,22 @@ fn planned(app: &AppHandle, build: Build) -> Result<BuildPlan> {
     Ok(BuildPlan { build, expansion })
 }
 
+/// Items the character's build will wear from `level` on: its own goals and each slot's way up.
+/// Empty without a build or the map data.
+pub(super) fn planned_gear(app: &AppHandle, character: Option<&str>, level: u32) -> std::collections::HashSet<u32> {
+    let mut ids = std::collections::HashSet::new();
+    let Some(catalog) = app.state::<MapDataState>().catalog() else { return ids };
+    let Ok(Some(build)) = app.state::<UserDataState>().with(|db| db.active_build(character)) else { return ids };
+    let rules = rules(app);
+    let expansion = expand(&build, &rules, &catalog);
+    let worn = outfit(&build, &expansion, &rules, &catalog, level.clamp(1, MAX_LEVEL));
+    ids.extend(build.plan.gear.iter().copied());
+    for path in &worn.paths {
+        ids.extend(path.now.iter().chain(&path.steps).map(|step| step.item.id));
+    }
+    ids
+}
+
 fn changed(app: &AppHandle) -> Result<()> {
     Ok(app.emit(BUILDS_EVENT, ())?)
 }

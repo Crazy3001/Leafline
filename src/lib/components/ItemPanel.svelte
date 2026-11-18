@@ -15,6 +15,7 @@
   import Chips from "./lookup/Chips.svelte";
   import MapDataPanel from "./map/MapDataPanel.svelte";
   import TrackedItems from "./item/TrackedItems.svelte";
+  import BagCheck from "./item/BagCheck.svelte";
   import { backend } from "$lib/api";
   import Pic from "$lib/ui/Pic.svelte";
   import { JOBS, blankQuery, gearView, gives, itemSlot, itemView, lastLine, watchItems } from "$lib/items.svelte";
@@ -310,6 +311,7 @@
         Star an item with <strong>Track it</strong> to keep it in a list here, with who drops it and where.
       </p>
     {/each}
+    {#if ready}<BagCheck plain={pinned} />{/if}
     {#if ready}<TrackedItems {map} plain={pinned} />{/if}
   {/if}
 {/if}
@@ -340,7 +342,7 @@
     padding: 0;
     border: 0;
     background: transparent;
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
     font-size: var(--text-sm);
     cursor: pointer;
   }

@@ -177,7 +177,7 @@
   </div>
 {:else if destination}
   {@const Turn = step ? turnIcon(step) : Navigation}
-  <div class="bar trip" class:hud class:pin class:lost={trip.lost}>
+  <div class="bar trip" class:hud class:pin class:lost={trip.lost} class:go={!hud && !trip.lost}>
     <!-- Which way to go, big enough to take in at a glance, as a sat-nav shows the next turn. -->
     <span class="turn" class:ride={step?.travel}><Turn size={hud ? 13 : 18} strokeWidth={2.25} /></span>
     <div class="body">
@@ -380,7 +380,7 @@
     border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
     border-radius: var(--radius-sm);
     background: var(--accent-soft);
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
   .turn.ride {
@@ -482,7 +482,7 @@
   }
 
   .tool.square.lit {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
   .tool.open {
@@ -596,7 +596,7 @@
     border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
     border-radius: var(--radius-sm);
     background: var(--accent-soft);
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
     font-size: var(--text-xs);
     cursor: pointer;
   }
@@ -647,7 +647,7 @@
     display: inline-grid;
     flex: none;
     margin-top: 3px;
-    color: var(--accent);
+    color: var(--accent-text);
   }
 
   .icon.good {
@@ -679,7 +679,7 @@
   }
 
   .label {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
     font-family: var(--font-display);
     font-weight: 400;
   }
@@ -693,7 +693,7 @@
   }
 
   .arrow {
-    color: var(--accent);
+    color: var(--accent-text);
     font-weight: 400;
   }
 
@@ -769,8 +769,178 @@
 
   .close:hover,
   .close:focus-visible {
-    background: rgba(255, 255, 255, 0.07);
+    background: var(--hover);
     color: var(--text);
     outline: none;
+  }
+
+  /*
+   * Outside the compact HUD each bar is a card of its own under the header. The trip's card is
+   * filled with the accent while there is a way to go, so the next step is the boldest thing in
+   * the window; with no known way it falls back to a plain card with a warning edge.
+   */
+  .bar:not(.hud) {
+    margin: 0 10px 10px;
+    border: var(--line-w) solid var(--line);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--card-shadow);
+  }
+
+  .bar.pin {
+    margin: 0;
+  }
+
+  .trip:not(.hud) {
+    gap: 12px;
+    padding: 11px 8px 11px 12px;
+  }
+
+  .trip.lost:not(.hud) {
+    border-left: 3px solid var(--warn);
+    background: var(--surface);
+  }
+
+  .go {
+    border-color: var(--tile-border);
+    background: var(--accent);
+    box-shadow: var(--go-shadow);
+    color: var(--accent-ink);
+  }
+
+  .go .turn,
+  .go .turn.ride {
+    width: 40px;
+    height: 40px;
+    border: 0;
+    border-radius: 50%;
+    background: var(--accent-ink);
+    color: var(--accent);
+  }
+
+  .go .head {
+    align-items: center;
+    justify-content: flex-start;
+    gap: 5px;
+    margin-bottom: 2px;
+    color: var(--accent-sub);
+    font-weight: 600;
+  }
+
+  .go .head .label {
+    font-family: var(--font-sans);
+    font-weight: 600;
+  }
+
+  .go .head .faint::before {
+    content: "· ";
+  }
+
+  .go .head .label,
+  .go .head .faint,
+  .go .next .label,
+  .go .next .faint,
+  .go .next .arrow,
+  .go .next .hidden-hint,
+  .go .rest,
+  .go .rest .faint,
+  .go .rest .warn {
+    color: var(--accent-sub);
+  }
+
+  .go .next {
+    font-family: var(--font-display);
+    font-size: var(--text-lg);
+    font-weight: var(--weight-strong);
+    line-height: 20px;
+  }
+
+  .go .next .verb,
+  .go .next .map,
+  .go .next .ride,
+  .go .next :global(.ref),
+  .go .rest :global(.ref) {
+    color: var(--accent-ink);
+  }
+
+  .go .rest {
+    margin-top: 2px;
+    font-size: 11.5px;
+  }
+
+  .go .rest :global(.ref) {
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+    text-underline-offset: 2px;
+  }
+
+  .go .progress {
+    gap: 3px;
+    margin-top: 7px;
+  }
+
+  .go .progress span {
+    height: 4px;
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--accent-ink) 22%, transparent);
+  }
+
+  .go .progress .done {
+    background: color-mix(in srgb, var(--accent-ink) 48%, transparent);
+  }
+
+  .go .progress .now,
+  .go .progress.whole .fill {
+    background: var(--accent-ink);
+  }
+
+  .go .progress.whole {
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--accent-ink) 22%, transparent);
+  }
+
+  .go .tool {
+    border-color: color-mix(in srgb, var(--accent-ink) 38%, transparent);
+    background: color-mix(in srgb, var(--accent-ink) 8%, transparent);
+    color: var(--accent-ink);
+  }
+
+  .go .tool:hover,
+  .go .tool:focus-visible {
+    border-color: var(--accent-ink);
+    color: var(--accent-ink);
+  }
+
+  .go .tool.lit,
+  .go .tool.square.lit {
+    color: var(--accent-ink);
+    font-weight: 600;
+  }
+
+  .go .tool.open {
+    border-color: var(--accent-ink);
+    background: var(--accent-ink);
+    color: var(--accent);
+  }
+
+  .go .chev {
+    color: inherit;
+  }
+
+  /* What a tool opens is a small card on the fill, in the window's usual colours. */
+  .go .drawer {
+    border: var(--line-w) solid var(--tile-border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--text);
+  }
+
+  .go > .close {
+    color: var(--accent-sub);
+  }
+
+  .go > .close:hover,
+  .go > .close:focus-visible {
+    background: color-mix(in srgb, var(--accent-ink) 14%, transparent);
+    color: var(--accent-ink);
   }
 </style>

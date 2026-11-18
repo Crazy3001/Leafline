@@ -10,7 +10,9 @@ import { availableMonitors, getCurrentWindow } from "@tauri-apps/api/window";
 import { open, save } from "@tauri-apps/plugin-dialog";
 
 import type {
+  MonsterFight,
   Analysis,
+  BagCheck,
   EstimateCheck,
   Build,
   BuildCatalog,
@@ -57,6 +59,7 @@ import type {
   StatsView,
   SavedSpot,
   PotionSlot,
+  LootPrice,
   SessionPotion,
   LevelExp,
   ItemCrafting,
@@ -82,6 +85,8 @@ import type {
   Trip,
   TripMessage,
   PlaceLink,
+  QuestLog,
+  RegionTotal,
   QuestPage,
   QuestQuery,
   QuestSearch,
@@ -177,6 +182,15 @@ export interface Backend {
     character: string | null,
     skill: string | null,
   ): Promise<TrainingSpots | null>;
+  /** How a fight with one monster goes for the character, from the combat model. Null until their attack is known. */
+  monsterFight(
+    id: number,
+    character: string | null,
+    level: number | null,
+    measured: MeasuredRate[],
+    assumptions: Assumptions,
+    skill: string | null,
+  ): Promise<MonsterFight | null>;
   /** How close the estimates come on the player's own maps, each hidden in turn. */
   checkEstimates(
     measured: MeasuredRate[],
@@ -188,6 +202,13 @@ export interface Backend {
   /** One page of the quest search. */
   searchQuests(search: QuestSearch): Promise<QuestPage>;
   questRegions(): Promise<string[]>;
+  /** A character's quest log as the game's Quest window last showed it, or the last one read's. */
+  questLog(name: string | null): Promise<QuestLog>;
+  forgetQuestLog(name: string): Promise<void>;
+  /** How many quests the data files under each region. */
+  questRegionTotals(): Promise<RegionTotal[]>;
+  /** A character's quest log changed; with their name. */
+  onQuestLog(handler: (name: string) => void): Promise<UnlistenFn>;
   /** All the data says about a quest. */
   questSheet(id: number, mapName: string | null, mapStreet: string | null, mapTwin: number | null): Promise<QuestWhere | null>;
   /** Brings a quest up in the Quests tab from any window. */
@@ -242,6 +263,8 @@ export interface Backend {
   setBuff(name: string, skill: number, on: boolean): Promise<void>;
   /** A character's potion slots, in slot order; the shared ones until it sets its own. */
   potionSlots(character: string | null): Promise<PotionSlot[]>;
+  /** What one of each item is worth: the player's own logged price, else the NPC price. */
+  lootPrices(ids: number[]): Promise<LootPrice[]>;
   /** Replaces a character's potion slots; a new slot has number 0. Returns them numbered. */
   setPotionSlots(character: string | null, slots: PotionSlot[]): Promise<PotionSlot[]>;
   /** The potion counts typed for the session that started at `startedAt`. */
@@ -286,6 +309,8 @@ export interface Backend {
   itemCrafting(id: number): Promise<ItemCrafting | null>;
   /** The Crafting section's recipes. */
   craftingRecipes(query: CraftingQuery): Promise<CraftingPage>;
+  /** The lowest NPC shop price of each item a shop sells, as [id, price]; the rest are left out. */
+  shopPrices(ids: number[]): Promise<[number, number][]>;
   /** How a saved session's rates moved over time. */
   sessionTimeline(id: number): Promise<SessionTimeline>;
   /** Opens the desk view on its Training log tab, or brings it forward there. */
@@ -317,7 +342,7 @@ export interface Backend {
   diagnostics(): Promise<string>;
   onHistory(handler: () => void): Promise<UnlistenFn>;
   /** Asks where to save, then writes the price log or session history as CSV. Null if cancelled. */
-  exportCsv(what: "sessions" | "drops"): Promise<number | null>;
+  exportCsv(what: "sessions" | "drops" | "loot"): Promise<number | null>;
 
   /** The jobs and skills to plan with. Null until map data is downloaded. */
   buildCatalog(): Promise<BuildCatalog | null>;
@@ -349,6 +374,11 @@ export interface Backend {
   fillGear(build: number, level: number): Promise<number>;
   /** Reads the open stat and skill windows once and moves the build to match. */
   readCharacter(): Promise<void>;
+  /** Sell or keep: tries every item of the tab last checked, downloading their pictures. */
+  bagLookFurther(): Promise<void>;
+  /** The last bag check, if any. */
+  lastBag(): Promise<BagCheck | null>;
+  onBag(handler: (check: BagCheck) => void): Promise<UnlistenFn>;
   onCharacterRead(handler: (read: CharacterRead) => void): Promise<UnlistenFn>;
   /** Gear for a character. `seenJob` is the job the HUD shows. Null until map data is downloaded. */
   findGear(who: GearFor, character: string | null, seenJob: string | null): Promise<GearFound | null>;
@@ -476,10 +506,16 @@ const tauriBackend: Backend = {
   dropsFetchedAt: () => invoke("drops_fetched_at"),
   trainingSpots: (mapName, mapStreet, mapTwin, measured, level, assumptions, character, skill) =>
     invoke("training_spots", { mapName, mapStreet, mapTwin, measured, level, assumptions, character, skill }),
+  monsterFight: (id, character, level, measured, assumptions, skill) =>
+    invoke("monster_fight", { id, character, level, measured, assumptions, skill }),
   checkEstimates: (measured, level, assumptions, character, skill) =>
     invoke("check_estimates", { measured, level, assumptions, character, skill }),
   searchQuests: (search) => invoke("search_quests", { search }),
   questRegions: () => invoke("quest_regions"),
+  questLog: (name) => invoke("quest_log", { name }),
+  forgetQuestLog: (name) => invoke("forget_quest_log", { name }),
+  questRegionTotals: () => invoke("quest_region_totals"),
+  onQuestLog: (handler) => listen<string>("quest-log", (e) => handler(e.payload)),
   questSheet: (id, mapName, mapStreet, mapTwin) => invoke("quest_sheet", { id, mapName, mapStreet, mapTwin }),
   showQuest: (id) => invoke("show_quest", { id }),
   onShowQuest: (handler) => listen<number>("show-quest", (e) => handler(e.payload)),
@@ -508,6 +544,7 @@ const tauriBackend: Backend = {
   characterStats: (name) => invoke("character_stats", { name }),
   setBuff: (name, skill, on) => invoke("set_buff", { name, skill, on }),
   potionSlots: (character) => invoke("potion_slots", { character }),
+  lootPrices: (ids) => invoke("loot_prices", { ids }),
   setPotionSlots: (character, slots) => invoke("set_potion_slots", { character, slots }),
   sessionPotions: (startedAt) => invoke("session_potions", { startedAt }),
   setSessionPotion: (character, startedAt, slot, start, now) =>
@@ -540,6 +577,7 @@ const tauriBackend: Backend = {
   levelExp: () => invoke("level_exp"),
   itemCrafting: (id) => invoke("item_crafting", { id }),
   craftingRecipes: (query) => invoke("crafting_recipes", { query }),
+  shopPrices: (ids) => invoke("shop_prices", { ids }),
   sessionTimeline: (id) => invoke("session_timeline", { id }),
   showTraining: () => invoke("show_training"),
   showDesk: () => invoke("show_desk"),
@@ -555,7 +593,7 @@ const tauriBackend: Backend = {
   async exportCsv(what) {
     const stamp = new Date().toISOString().slice(0, 10);
     const path = await save({
-      defaultPath: `leafline-${what === "drops" ? "drop-log" : "sessions"}-${stamp}.csv`,
+      defaultPath: `leafline-${what === "drops" ? "drop-log" : what === "loot" ? "loot" : "sessions"}-${stamp}.csv`,
       filters: [{ name: "CSV", extensions: ["csv"] }],
     });
     return path ? invoke<number>("export_csv", { what, path }) : null;
@@ -579,6 +617,9 @@ const tauriBackend: Backend = {
   gearSuggestions: (build, level) => invoke("gear_suggestions", { id: build, level }),
   findGear: (who, character, seenJob) => invoke("find_gear", { who, character, seenJob }),
   readCharacter: () => invoke("read_character_windows"),
+  bagLookFurther: () => invoke("bag_look_further"),
+  lastBag: () => invoke("last_bag"),
+  onBag: (handler) => listen<BagCheck>("bag", (e) => handler(e.payload)),
   onCharacterRead: (handler) => listen<CharacterRead>("character-read", (e) => handler(e.payload)),
   starterPlans: () => invoke("starter_plans"),
   listBuilds: () => invoke("list_builds"),

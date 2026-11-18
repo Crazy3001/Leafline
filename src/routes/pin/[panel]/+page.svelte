@@ -176,10 +176,8 @@
     display: flex;
     flex-direction: column;
     max-height: 100vh;
-    background:
-      radial-gradient(120% 60% at 0% 0%, color-mix(in srgb, var(--accent) 6%, transparent), transparent 60%),
-      var(--glass);
-    border: 1px solid var(--border-strong);
+    background: var(--bg);
+    border: var(--line-w) solid var(--window-line);
     border-radius: var(--radius);
     overflow: hidden;
     transition: opacity 0.2s ease;
@@ -236,7 +234,7 @@
   }
 
   .action:hover {
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--hover);
     color: var(--text);
   }
 
@@ -248,6 +246,16 @@
     min-height: 0;
     padding: 2px 10px 10px;
     overflow-y: hidden;
+  }
+
+  /* A pinned window is the card, so the sections inside it stay flat. */
+  .body :global(.block.card) {
+    margin: 0;
+    padding: 8px 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
   }
 
   .body.scrolls,

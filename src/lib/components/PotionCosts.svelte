@@ -1,13 +1,13 @@
 <script lang="ts">
-  // Potions for one session: how many of each the player had at the start and has now, what that
-  // cost, and mesos per hour once it is taken out. The player names the slots and sets prices;
-  // Leafline reads nothing about potions from the game.
+  // Potions for one session: how many of each went, what that cost, and mesos per hour once it is
+  // taken out. The player names the slots and sets prices. A potion put on a quick slot is
+  // counted from the number the game shows there; any other is typed, start and now.
   import { ChevronRight, Plus, X } from "@lucide/svelte";
 
   import { backend } from "$lib/api";
   import { formatCompact, formatNumber } from "$lib/format";
-  import { MAX_SLOTS, netMesosPerHour } from "$lib/potions.svelte";
-  import type { PotionSlot, SessionPotion } from "$lib/types";
+  import { MAX_SLOTS, netMesosPerHour, QUICK_SLOTS } from "$lib/potions.svelte";
+  import type { PotionSlot, QuickSlotUse, SessionPotion } from "$lib/types";
   import Button from "$lib/ui/Button.svelte";
 
   let {
@@ -16,6 +16,8 @@
     mesosPerHour,
     character = null,
     collapsible = true,
+    quickSlots = null,
+    lootPerHour = null,
   }: {
     /** The session's start, which its counts are kept by. */
     startedAt: number | null;
@@ -25,6 +27,10 @@
     character?: string | null;
     /** Folds behind a one-line summary, as on the Train tab. */
     collapsible?: boolean;
+    /** The running session's quick-slot counts, newer than what was last saved. */
+    quickSlots?: QuickSlotUse[] | null;
+    /** What the loot picked up is worth an hour, added in before potions come off. */
+    lootPerHour?: number | null;
   } = $props();
 
   const OPEN_KEY = "leafline.train.potionsOpen";
@@ -34,7 +40,7 @@
   let opened = $state(stored(OPEN_KEY) === "true");
   const open = $derived(!collapsible || opened);
   let editing = $state(false);
-  let draft = $state<{ slot: number; name: string; price: string }[]>([]);
+  let draft = $state<{ slot: number; name: string; price: string; quickSlot: string }[]>([]);
   let problem = $state<string | null>(null);
 
   function stored(key: string) {
@@ -89,17 +95,38 @@
     };
   });
 
-  /** Every slot set up now, plus counts typed under a slot since removed. */
+  interface Row {
+    slot: number;
+    name: string;
+    price: number;
+    quickSlot: number | null;
+    typed: SessionPotion | null;
+    gone: boolean;
+    /** The count on its quick slot now, while a session reads it. */
+    reading: number | null;
+    /** How many went, counted from the quick slot; null when nothing was read. */
+    read: number | null;
+    /** What counts: read, else typed. */
+    used: number | null;
+  }
+
+  /** Every slot set up now, plus counts kept under a slot since removed. */
   const rows = $derived.by(() => {
-    const out: { slot: number; name: string; price: number; typed: SessionPotion | null; gone: boolean }[] =
-      slots.map((s) => ({ ...s, typed: counts.find((c) => c.slot === s.slot) ?? null, gone: false }));
-    for (const c of counts)
-      if (!slots.some((s) => s.slot === c.slot)) out.push({ slot: c.slot, name: c.name, price: c.price, typed: c, gone: true });
+    const row = (s: { slot: number; name: string; price: number; quickSlot?: number | null }, typed: SessionPotion | null, gone: boolean): Row => {
+      const quick = s.quickSlot ?? null;
+      const live = quick != null ? (quickSlots?.find((q) => q.slot === quick) ?? null) : null;
+      const read = live?.used ?? typed?.read ?? null;
+      const typedUsed = typed && typed.start != null && typed.now != null ? typed.used : null;
+      return { slot: s.slot, name: s.name, price: s.price, quickSlot: quick, typed, gone, reading: live?.count ?? null, read, used: read ?? typedUsed };
+    };
+    const out = slots.map((s) => row(s, counts.find((c) => c.slot === s.slot) ?? null, false));
+    for (const c of counts) if (!slots.some((s) => s.slot === c.slot)) out.push(row(c, c, true));
     return out.sort((a, b) => a.slot - b.slot);
   });
-  const cost = $derived(counts.reduce((a, c) => a + c.used * c.price, 0));
-  const net = $derived(netMesosPerHour(mesosPerHour, cost, activeSeconds));
-  const anyUsed = $derived(counts.some((c) => c.start != null && c.now != null));
+  const cost = $derived(rows.reduce((a, r) => a + (r.used ?? 0) * (r.typed?.price ?? r.price), 0));
+  const net = $derived(netMesosPerHour(mesosPerHour, cost, activeSeconds, lootPerHour));
+  const anyUsed = $derived(rows.some((r) => r.used != null));
+  const anyRead = $derived(slots.some((s) => s.quickSlot != null));
 
   function toggle() {
     opened = !opened;
@@ -129,8 +156,8 @@
   }
 
   function startEditing() {
-    draft = slots.map((s) => ({ slot: s.slot, name: s.name, price: String(s.price) }));
-    if (!draft.length) draft = [{ slot: 0, name: "", price: "" }];
+    draft = slots.map((s) => ({ slot: s.slot, name: s.name, price: String(s.price), quickSlot: s.quickSlot != null ? String(s.quickSlot) : "" }));
+    if (!draft.length) draft = [{ slot: 0, name: "", price: "", quickSlot: "" }];
     problem = null;
     editing = true;
   }
@@ -138,7 +165,17 @@
   async function saveSlots() {
     const next: PotionSlot[] = draft
       .filter((d) => d.name.trim() || d.price.trim())
-      .map((d) => ({ slot: d.slot, name: d.name.trim(), price: Math.round(Number(d.price)) }));
+      .map((d) => ({
+        slot: d.slot,
+        name: d.name.trim(),
+        price: Math.round(Number(d.price)),
+        quickSlot: d.quickSlot === "" ? null : Number(d.quickSlot),
+      }));
+    const doubled = next.find((s, i) => s.quickSlot != null && next.findIndex((o) => o.quickSlot === s.quickSlot) !== i);
+    if (doubled) {
+      problem = `Two potions are on ${QUICK_SLOTS[doubled.quickSlot!]}.`;
+      return;
+    }
     const bad = next.find((s) => !s.name || !Number.isFinite(s.price) || s.price < 0);
     if (bad) {
       problem = bad.name ? `${bad.name}: set a price of 0 or more.` : "Each potion needs a name.";
@@ -161,7 +198,10 @@
       <span class="title">Potions</span>
       <span class="grow"></span>
       {#if anyUsed && net != null}
-        <span class="sum tabular"><span class="muted">after potions</span> {formatCompact(net)} mesos / hr</span>
+        <span class="sum tabular"
+          ><span class="muted">{lootPerHour != null ? "with loot, after potions" : "after potions"}</span>
+          {formatCompact(net)} mesos / hr</span
+        >
       {:else if !slots.length}
         <span class="muted">Not set up</span>
       {/if}
@@ -171,12 +211,19 @@
   {#if open}
     <div class="body">
       {#if editing}
-        <p class="muted">Name the potions you hunt with and what one costs you. Prices are yours; nothing is filled in for you.</p>
+        <p class="muted">
+          Name the potions you hunt with and what one costs you. Prices are yours; nothing is filled in for you. Pick the
+          quick slot a potion sits on and Leafline counts what you drink from the number the game shows there.
+        </p>
         <div class="edit">
           {#each draft as d, i (i)}
             <div class="edit-row">
               <input class="name" placeholder="Potion" aria-label="Potion name" bind:value={d.name} />
               <input class="price" placeholder="Price" inputmode="numeric" aria-label="Price in mesos" bind:value={d.price} />
+              <select class="where" aria-label="Quick slot for {d.name || 'this potion'}" bind:value={d.quickSlot}>
+                <option value="">Type counts</option>
+                {#each QUICK_SLOTS as label, q (q)}<option value={String(q)}>{label}</option>{/each}
+              </select>
               <button class="icon" aria-label="Remove {d.name || 'this potion'}" onclick={() => (draft = draft.filter((_, j) => j !== i))}>
                 <X size={12} />
               </button>
@@ -185,7 +232,7 @@
         </div>
         <div class="actions">
           {#if draft.length < MAX_SLOTS}
-            <Button variant="ghost" size="sm" onclick={() => (draft = [...draft, { slot: 0, name: "", price: "" }])}>
+            <Button variant="ghost" size="sm" onclick={() => (draft = [...draft, { slot: 0, name: "", price: "", quickSlot: "" }])}>
               <Plus size={12} />Add potion
             </Button>
           {/if}
@@ -209,26 +256,36 @@
                     <span class="pname">{row.name}</span>
                     <span class="muted tabular">{formatNumber(row.price)}</span>
                   </td>
-                  <td>
-                    <input
-                      class="count"
-                      inputmode="numeric"
-                      aria-label="{row.name} at the start"
-                      value={row.typed?.start ?? ""}
-                      onchange={(e) => setCount(row.slot, "start", e.currentTarget.value)}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      class="count"
-                      inputmode="numeric"
-                      aria-label="{row.name} now"
-                      value={row.typed?.now ?? ""}
-                      onchange={(e) => setCount(row.slot, "now", e.currentTarget.value)}
-                    />
-                  </td>
-                  <td class="tabular">{row.typed && row.typed.start != null && row.typed.now != null ? formatNumber(row.typed.used) : "—"}</td>
-                  <td class="tabular">{row.typed?.used ? formatNumber(row.typed.used * row.typed.price) : "—"}</td>
+                  {#if row.read != null}
+                    <td class="read muted" colspan="2">
+                      {row.quickSlot != null ? QUICK_SLOTS[row.quickSlot].split(" · ")[1] : "Quick slot"}{row.reading != null
+                        ? `, ${formatNumber(row.reading)} left`
+                        : ""}
+                    </td>
+                  {:else}
+                    <td>
+                      <input
+                        class="count"
+                        inputmode="numeric"
+                        aria-label="{row.name} at the start"
+                        placeholder={row.quickSlot != null ? "read" : ""}
+                        value={row.typed?.start ?? ""}
+                        onchange={(e) => setCount(row.slot, "start", e.currentTarget.value)}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        class="count"
+                        inputmode="numeric"
+                        aria-label="{row.name} now"
+                        placeholder={row.quickSlot != null ? "read" : ""}
+                        value={row.typed?.now ?? ""}
+                        onchange={(e) => setCount(row.slot, "now", e.currentTarget.value)}
+                      />
+                    </td>
+                  {/if}
+                  <td class="tabular">{row.used != null ? formatNumber(row.used) : "—"}</td>
+                  <td class="tabular">{row.used ? formatNumber(row.used * (row.typed?.price ?? row.price)) : "—"}</td>
                 </tr>
               {/each}
             </tbody>
@@ -240,7 +297,11 @@
               <strong>{net != null ? formatCompact(net) : "—"}</strong>
             </span>
           </div>
-          <p class="muted small">Type your count when you start and again when you check. Bought more while hunting? Add them to Start.</p>
+          <p class="muted small">
+            {#if anyRead}Potions on a quick slot are counted as you drink them; buying more doesn't count as drunk. Keep the
+              quick-slot bar in view. For the rest, type{:else}Type{/if} your count when you start and again when you check. Bought more
+            while hunting? Add them to Start.
+          </p>
         {/if}
         <div class="actions"><Button variant="ghost" size="sm" onclick={startEditing}>Edit potions</Button></div>
       {/if}
@@ -272,7 +333,7 @@
   }
 
   .head:hover .title {
-    color: var(--accent-strong);
+    color: var(--accent-text-strong);
   }
 
   .title {
@@ -318,6 +379,21 @@
 
   .warn {
     color: var(--warn);
+  }
+
+  .read {
+    font-size: var(--text-xs);
+  }
+
+  select.where {
+    height: var(--control-h);
+    padding: 0 4px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    color: var(--text);
+    font: inherit;
+    font-size: var(--text-xs);
   }
 
   table {
@@ -418,7 +494,7 @@
   }
 
   .icon:hover {
-    background: rgba(255, 255, 255, 0.07);
+    background: var(--hover);
     color: var(--text);
   }
 
