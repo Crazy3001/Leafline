@@ -2,6 +2,7 @@
 
 mod bag;
 mod builds;
+mod capturetest;
 mod cards;
 mod commands;
 mod damage;
@@ -62,6 +63,7 @@ pub fn run() {
         .manage(OverlayState::default())
         .manage(cards::CardState::default())
         .manage(LiveState::default())
+        .manage(capturetest::RecorderState::default())
         .manage(bag::BagState::default())
         .manage(Readings::default())
         .manage(Bindings::default())
@@ -119,6 +121,14 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             live::live_status,
+            capturetest::open_capture_test,
+            capturetest::open_capture_pattern,
+            capturetest::capture_pattern,
+            capturetest::check_capture_pattern,
+            capturetest::start_capture_recording,
+            capturetest::stop_capture_recording,
+            capturetest::capture_recording_status,
+            capturetest::compare_capture_frames,
             bag::bag_look_further,
             bag::last_bag,
             live::start_live,

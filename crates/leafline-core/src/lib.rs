@@ -6,6 +6,7 @@
 
 pub mod build;
 pub mod capture;
+pub mod capturetest;
 pub mod clock;
 pub mod error;
 pub mod loot;

@@ -1,7 +1,7 @@
 # Leafline: the Windows program (src-tauri), the website's WebAssembly worker (crates/leafline-web)
 # and the code they share (crates/leafline-core).
 [workspace]
-members = ["src-tauri", "crates/leafline-core", "crates/leafline-web"]
+members = ["src-tauri", "crates/leafline-core", "crates/leafline-web", "crates/leafline-capture"]
 resolver = "3"
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration

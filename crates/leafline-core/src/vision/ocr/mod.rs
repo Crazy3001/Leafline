@@ -15,12 +15,19 @@ use super::{Frame, Rect, Word, preprocess};
 use crate::error::Result;
 
 pub struct Ocr {
-    engine: platform::Engine,
+    /// `None` for [`Ocr::none`].
+    engine: Option<platform::Engine>,
 }
 
 impl Ocr {
     pub fn new() -> Result<Self> {
-        Ok(Self { engine: platform::Engine::new()? })
+        Ok(Self { engine: Some(platform::Engine::new()?) })
+    }
+
+    /// No text recognition at all: every picture reads as no words. For timing the readers that
+    /// need none, as the website must until it has an OCR of its own.
+    pub fn none() -> Self {
+        Self { engine: None }
     }
 
     /// The largest width or height the engine accepts; larger images are shrunk to fit.
@@ -30,13 +37,14 @@ impl Ocr {
 
     /// Recognises words in `image`, with rectangles in `image` pixels.
     pub fn words(&self, image: &Frame) -> Result<Vec<Word>> {
+        let Some(engine) = &self.engine else { return Ok(Vec::new()) };
         let limit = Self::max_dimension() as f32;
         let longest = image.width().max(image.height()) as f32;
         if longest <= limit {
-            return self.engine.recognize(image);
+            return engine.recognize(image);
         }
         let factor = limit / longest;
-        let words = self.engine.recognize(&preprocess::upscale(image, factor))?;
+        let words = engine.recognize(&preprocess::upscale(image, factor))?;
         Ok(words.into_iter().map(|word| Word { rect: word.rect.scaled(1.0 / factor), ..word }).collect())
     }
 
