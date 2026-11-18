@@ -17,12 +17,12 @@
     RotateCcw,
     ShieldCheck,
     Square,
+    Upload,
     X,
   } from "@lucide/svelte";
   import { onMount } from "svelte";
 
   import { backend } from "$lib/api";
-  import RecordsFile from "$lib/components/RecordsFile.svelte";
   import { can, isWeb } from "$lib/platform";
   import { base } from "$app/paths";
   import HotkeyButton from "$lib/components/HotkeyButton.svelte";
@@ -36,6 +36,7 @@
   import Segmented from "$lib/ui/Segmented.svelte";
   import ThemePicker from "$lib/ui/ThemePicker.svelte";
   import type {
+    RecordsSummary,
     GameWindow,
     HotkeyChoice,
     LiveChoice,
@@ -164,6 +165,56 @@
     }
     return [...groups].map(([from, to]) => ({ from, to: to.join(", ") }));
   }
+
+  // Your records as one file: a backup, or a way between the program, the website and another
+  // computer. Opening one shows what it holds before anything changes; the records it replaces
+  // are kept aside. Every window reloads once they're replaced (see the root layout).
+  let recordsNote = $state<string | null>(null);
+  let recordsWarn = $state(false);
+  let pickedRecords = $state<RecordsSummary | null>(null);
+  let recordsBusy = $state(false);
+
+  function describeRecords(s: RecordsSummary): string {
+    const parts = [
+      [s.sessions, "session"],
+      [s.drops, "drop"],
+      [s.builds, "build"],
+      [s.notes, "note"],
+      [s.spots, "saved spot"],
+      [s.prices, "price"],
+    ] as const;
+    const said = parts.filter(([n]) => n > 0).map(([n, what]) => `${n} ${what}${n === 1 ? "" : "s"}`);
+    return said.length ? said.join(", ") : "nothing yet";
+  }
+
+  async function recordsWork(work: () => Promise<void>) {
+    recordsBusy = true;
+    recordsNote = null;
+    recordsWarn = false;
+    try {
+      await work();
+    } catch (err) {
+      recordsNote = err instanceof Error ? err.message : String(err);
+      recordsWarn = true;
+    } finally {
+      recordsBusy = false;
+    }
+  }
+
+  const saveRecords = () =>
+    recordsWork(async () => {
+      const saved = await backend.saveRecords();
+      if (saved) recordsNote = `Saved ${describeRecords(saved)}${isWeb ? " to your downloads" : ""}.`;
+    });
+  const pickRecords = () =>
+    recordsWork(async () => {
+      pickedRecords = await backend.pickRecords();
+    });
+  const useRecords = () =>
+    recordsWork(async () => {
+      await backend.useRecords();
+      pickedRecords = null;
+    });
 
   async function exportCsv(what: "sessions") {
     try {
@@ -844,7 +895,30 @@
       </div>
       {#if exported}<p class="note">{exported}</p>{/if}
 
-      <RecordsFile />
+      <div class="row">
+        <div class="label">
+          <span class="name">Records file</span>
+          <span class="help">
+            Everything you recorded in one file: sessions, drops, builds, notes, spots and prices. Keep it as a backup,
+            or open it in the {isWeb ? "Windows program" : "website"} or on another computer. Map data isn't in it.
+          </span>
+        </div>
+        <div class="control exports">
+          <button class="button" onclick={saveRecords} disabled={recordsBusy}><Download size={13} />Save</button>
+          <button class="button" onclick={pickRecords} disabled={recordsBusy}><Upload size={13} />Open…</button>
+        </div>
+      </div>
+      {#if pickedRecords}
+        <div class="note confirm" role="alertdialog" aria-label="Replace your records">
+          <span>
+            That file holds {describeRecords(pickedRecords)}. Use it in place of the records here? The ones here now are
+            kept aside, not deleted.
+          </span>
+          <button class="button" onclick={useRecords} disabled={recordsBusy}>Use these records</button>
+          <button class="button" onclick={() => (pickedRecords = null)} disabled={recordsBusy}>Cancel</button>
+        </div>
+      {/if}
+      {#if recordsNote}<p class="note" class:warn={recordsWarn}>{recordsNote}</p>{/if}
 
       {#if can.dataFolder}
       <div class="row">
@@ -1468,6 +1542,13 @@
   .exports {
     display: flex;
     gap: 6px;
+  }
+
+  .confirm {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
   }
 
   .button {
