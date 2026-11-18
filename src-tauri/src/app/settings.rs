@@ -431,7 +431,8 @@ pub fn open_setup(app: &AppHandle) -> Result<()> {
     let keep = keeps_game_focus(app);
     WebviewWindowBuilder::new(app, SETUP, WebviewUrl::App("setup".into()))
         .title("Leafline — Setup")
-        .inner_size(600.0, 640.0)
+        // Wide enough for the steps' rail beside the step; narrower, they run across the top.
+        .inner_size(820.0, 640.0)
         .min_inner_size(520.0, 520.0)
         .center()
         .focusable(!keep)

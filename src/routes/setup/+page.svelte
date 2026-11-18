@@ -165,10 +165,11 @@
 <div class="page">
   <header>
     <div class="brand"><Logo size={20} /><span>Leafline</span></div>
+    <p class="about">Setup · about 2 minutes</p>
     <ol class="steps" aria-label="Setup steps">
       {#each STEPS as title, i (title)}
         <li class:current={i === step} class:done={i < step} aria-current={i === step ? "step" : undefined}>
-          <span class="num tabular">{#if i < step}<Check size={11} />{:else}{i + 1}{/if}</span>{title}
+          <span class="num tabular">{#if i < step}<Check size={11} strokeWidth={3} />{:else}{i + 1}{/if}</span><span class="title">{title}</span>
         </li>
       {/each}
     </ol>
@@ -454,63 +455,132 @@
     height: 100vh;
   }
 
+  /* Narrow: the steps run across the top. */
   header {
-    padding: 18px 28px 14px;
+    padding: 16px 28px 14px;
     border-bottom: 1px solid var(--border);
-    background: var(--surface);
+    background: var(--header-bg);
+    color: var(--header-text);
   }
 
   .brand {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 14px;
     font-family: var(--font-display);
     font-size: var(--text-lg);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
+  }
+
+  .about {
+    margin: 2px 0 12px;
+    color: var(--header-faint);
+    font-size: var(--text-xs);
   }
 
   .steps {
     display: flex;
-    gap: 18px;
+    flex-wrap: wrap;
+    gap: 8px 16px;
     margin: 0;
     padding: 0;
     list-style: none;
-    color: var(--faint);
+    color: var(--header-faint);
     font-size: var(--text-sm);
   }
 
   .steps li {
+    position: relative;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
   }
 
   .steps li.current {
-    color: var(--text);
+    color: var(--header-text);
+    font-weight: var(--weight-strong);
   }
 
   .steps li.done {
-    color: var(--muted);
+    color: var(--header-muted);
   }
 
   .num {
+    position: relative;
+    z-index: 1;
     display: inline-grid;
+    flex: none;
     place-items: center;
-    width: 18px;
-    height: 18px;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--header-track);
+    color: var(--header-muted);
     font-size: var(--text-xs);
+    font-weight: 600;
   }
 
   .current .num {
-    border-color: var(--accent);
-    color: var(--accent-text-strong);
+    background: var(--accent);
+    color: var(--accent-ink);
   }
 
   .done .num {
-    color: var(--good);
+    background: color-mix(in srgb, var(--header-good) 22%, var(--header-bg));
+    color: var(--header-good);
+  }
+
+  /* Wide: a rail down the left, the steps joined by a line that fills as you go. */
+  @media (min-width: 720px) {
+    .page {
+      grid-template-columns: 220px minmax(0, 1fr);
+      grid-template-rows: 1fr auto;
+    }
+
+    header {
+      grid-row: 1 / 3;
+      padding: 22px 18px;
+      border-right: 1px solid var(--border);
+      border-bottom: 0;
+    }
+
+    .about {
+      margin-bottom: 20px;
+    }
+
+    .steps {
+      flex-direction: column;
+      flex-wrap: nowrap;
+      gap: 0;
+    }
+
+    .steps li {
+      padding: 8px 0;
+    }
+
+    .num {
+      width: 26px;
+      height: 26px;
+    }
+
+    .steps li + li::before {
+      content: "";
+      position: absolute;
+      left: 12px;
+      bottom: 50%;
+      width: 2px;
+      height: 100%;
+      background: var(--header-track);
+    }
+
+    .steps li.done + li::before {
+      background: color-mix(in srgb, var(--header-good) 45%, var(--header-bg));
+    }
+
+    main,
+    footer {
+      grid-column: 2;
+    }
   }
 
   main {
