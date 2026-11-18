@@ -7,11 +7,9 @@
 //! so the buffs marked on at that moment are taken back out before the ones on now are added.
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager, State};
 
-use super::damage::{DamageState, PlayerDamage};
-use super::mapdata::MapDataState;
-use super::records::UserDataState;
+use super::damage::PlayerDamage;
+use super::host::Host;
 use crate::build::{Build, Catalog};
 use crate::mapdata::osms::{Effects, SkillRecord};
 use crate::readers::character::{DetailBonus, DetailWindow, StatWindow};
@@ -322,12 +320,12 @@ pub fn seen_buffs(rows: &[BuffRow]) -> Vec<u32> {
 }
 
 /// The character's buffs and the gear's Attack, from their build and what was read.
-pub fn buffs_of(app: &AppHandle, name: &str, stored: &PlayerDamage) -> (Vec<BuffRow>, Option<u32>) {
-    let build = app.state::<UserDataState>().with(|db| db.active_build(Some(name))).ok().flatten();
+pub fn buffs_of(h: &dyn Host, name: &str, stored: &PlayerDamage) -> (Vec<BuffRow>, Option<u32>) {
+    let build = h.records().with(|db| db.active_build(Some(name))).ok().flatten();
     // A build tied to someone else isn't this character's.
     let build = build.filter(|b| b.character.as_deref().is_none_or(|owner| owner.eq_ignore_ascii_case(name)));
-    let buffs = app
-        .state::<MapDataState>()
+    let buffs = h
+        .map()
         .catalog()
         .map(|catalog| buff_rows(&catalog, build.as_ref(), &stored.skill_levels, &stored.buffs_on, &stored.read_with))
         .unwrap_or_default();
@@ -335,10 +333,10 @@ pub fn buffs_of(app: &AppHandle, name: &str, stored: &PlayerDamage) -> (Vec<Buff
 }
 
 /// The view of `name`'s stats from what is stored.
-pub fn view(app: &AppHandle, name: &str, stored: Option<&PlayerDamage>) -> StatsView {
+pub fn view(h: &dyn Host, name: &str, stored: Option<&PlayerDamage>) -> StatsView {
     let empty = PlayerDamage::default();
     let stored = stored.unwrap_or(&empty);
-    let (buffs, weapon_attack) = buffs_of(app, name, stored);
+    let (buffs, weapon_attack) = buffs_of(h, name, stored);
     let base = stored.sheet.as_ref().map(|sheet| without_buffs(sheet, &buffs, weapon_attack));
     let buffed = base.as_ref().and_then(|base| with_buffs(base, &buffs, weapon_attack));
     StatsView {
@@ -353,16 +351,14 @@ pub fn view(app: &AppHandle, name: &str, stored: Option<&PlayerDamage>) -> Stats
 }
 
 /// What the Character tab shows of `name`'s stats and buffs.
-#[tauri::command]
-pub fn character_stats(app: AppHandle, state: State<DamageState>, name: String) -> StatsView {
-    let stored = state.get(&name);
-    view(&app, &name, stored.as_ref())
+pub fn character_stats(h: &dyn Host, name: String) -> StatsView {
+    let stored = h.damage().get(&name);
+    view(h, &name, stored.as_ref())
 }
 
 /// Marks one of `name`'s buffs as on or off.
-#[tauri::command]
-pub fn set_buff(app: AppHandle, name: String, skill: u32, on: bool) -> crate::error::Result<()> {
-    super::damage::set_buff(&app, &name, skill, on)
+pub fn set_buff(h: &dyn Host, name: String, skill: u32, on: bool) -> crate::error::Result<()> {
+    super::damage::set_buff_of(h, &name, skill, on)
 }
 
 #[cfg(test)]

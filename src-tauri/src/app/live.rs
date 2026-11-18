@@ -14,6 +14,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
 
+use super::host::AppHost;
 use super::mapdata::MapDataState;
 use super::records::{self, HISTORY_EVENT, MESOS_EVENT, UserDataState};
 use super::builds;
@@ -242,7 +243,7 @@ pub fn read_character(app: &AppHandle) -> Result<()> {
     std::thread::Builder::new().name("character-read".into()).spawn(move || {
         let read = one_picture(&handle).and_then(|frame| {
             let scan = pipeline::read_character(&frame, &Ocr::new()?)?;
-            builds::catch_up(&handle, scan)
+            builds::catch_up(&AppHost::new(&handle), scan)
         });
         handle.state::<LiveState>().reading_character.store(false, Ordering::SeqCst);
         let outcome = read.unwrap_or_else(|err| {
@@ -282,7 +283,7 @@ fn follow_windows(app: &AppHandle, watch: &mut Watch, frame: &Frame, analysis: &
         return;
     }
     let read = character::read(frame, Some(layout), ocr).and_then(|windows| {
-        builds::catch_up(app, pipeline::CharacterScan { name, level: hud.and_then(|h| h.level), windows })
+        builds::catch_up(&AppHost::new(app), pipeline::CharacterScan { name, level: hud.and_then(|h| h.level), windows })
     });
     match read {
         Ok(read) if read.changed() => {
@@ -445,7 +446,7 @@ impl Estimates {
         let due = |at: Option<Instant>, every: Duration| at.is_none_or(|t| t.elapsed() >= every);
         if due(self.fighter_at, FIGHTER_EVERY) {
             self.fighter_at = Some(Instant::now());
-            let fighter = fighter::fighter(app, &name, session.level, &fighter::Choice::default());
+            let fighter = fighter::fighter(&AppHost::new(app), &name, session.level, &fighter::Choice::default());
             tracker.set_fighter(fighter.and_then(|f| serde_json::to_value(f).ok()));
         }
         let Some(map) = tracker.current_map().map(str::to_string).filter(|_| !session.town) else { return };
@@ -453,7 +454,7 @@ impl Estimates {
         if self.prior_for.as_ref() != Some(&here) || due(self.prior_at, PRIOR_EVERY) {
             self.prior_for = Some(here);
             self.prior_at = Some(Instant::now());
-            let prior = fighter::prior(app, &name, session.level, &map, session.started_at);
+            let prior = fighter::prior(&AppHost::new(app), &name, session.level, &map, session.started_at);
             tracker.set_prior(&map, prior);
         }
     }
