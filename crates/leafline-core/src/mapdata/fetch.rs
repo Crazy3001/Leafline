@@ -88,9 +88,25 @@ pub struct RefreshReport {
 /// before any of them is stored. If OSMS fails, the same files are read from Leafline's mirror;
 /// if that fails too, OSMS's error is the one reported.
 pub fn refresh(store: &mut Store, source: &dyn Source, force: bool, now: i64) -> Result<RefreshReport> {
+    refresh_in_order(store, source, force, now, false)
+}
+
+/// [`refresh`], asking Leafline's mirror first when `mirror_first`: the website does, since every
+/// visitor's browser downloads its own copy and GitHub takes that load better than OSMS. OSMS is
+/// then the fallback, and its error the one reported.
+pub fn refresh_in_order(store: &mut Store, source: &dyn Source, force: bool, now: i64, mirror_first: bool) -> Result<RefreshReport> {
     let ready = store.status()?.ready;
     if !force && ready && store.checked_at()?.is_some_and(|at| now - at < CHECK_INTERVAL) {
         return Ok(RefreshReport::default());
+    }
+    if mirror_first {
+        return match refresh_from(store, source, MIRROR_BASE, now) {
+            Ok(report) => Ok(report),
+            Err(err) => {
+                eprintln!("mirror update failed ({err}); trying OSMS");
+                refresh_from(store, source, OSMS_BASE, now)
+            }
+        };
     }
     match refresh_from(store, source, OSMS_BASE, now) {
         Ok(report) => Ok(report),
@@ -326,6 +342,19 @@ pub(crate) mod tests {
         let mut store = Store::open_in_memory().unwrap();
         refresh(&mut store, &source, false, 1000).unwrap();
         assert!(source.requests.borrow().iter().all(|u| u.starts_with(OSMS_BASE)));
+    }
+
+    #[test]
+    fn the_website_asks_the_mirror_first() {
+        let source = mirror_only(fake_osms(MAPS));
+        let mut store = Store::open_in_memory().unwrap();
+        refresh_in_order(&mut store, &source, false, 1000, true).unwrap();
+        assert!(source.requests.borrow().iter().all(|u| u.starts_with(MIRROR_BASE)));
+        // And falls back to OSMS when the mirror can't answer.
+        let source = fake_osms(MAPS);
+        let mut store = Store::open_in_memory().unwrap();
+        refresh_in_order(&mut store, &source, false, 1000, true).unwrap();
+        assert!(store.status().unwrap().ready);
     }
 
     #[test]

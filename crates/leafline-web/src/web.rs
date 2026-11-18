@@ -118,7 +118,8 @@ fn reopen() -> std::result::Result<(), JsValue> {
             MAP_DATA.into(),
             Box::new(Xhr::new(Duration::from_millis(250))),
             Box::new(Xhr::new(Duration::from_secs(1))),
-        ),
+        )
+        .mirror_first(),
         records: UserDataState::load(Path::new(RECORDS), None),
         damage: DamageState::load(&files),
         settings: SettingsState::load(&files),
@@ -185,6 +186,7 @@ fn own(host: &WebHost, name: &str, args: serde_json::Value) -> Option<Reply> {
     let place = |args: serde_json::Value| parse::<Place>(args);
     Some(match name {
         "version" => reply(version()),
+        "picture_index" => reply(host.map.pictures().table()),
         "destination" => reply(host.nav.get()),
         "set_destination" => match place(args) {
             Ok(p) => told(host.nav.set_destination(&host.files, p.destination)),

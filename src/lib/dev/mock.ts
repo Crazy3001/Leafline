@@ -1372,6 +1372,10 @@ export const mockBackend: Backend = {
   },
   async finishSetup() {},
   version: async () => "dev",
+  saveRecords: async () => null,
+  pickRecords: async () => null,
+  useRecords: async () => ({ sessions: 0, drops: 0, builds: 0, notes: 0, characters: 0, spots: 0, prices: 0 }),
+  onRecordsReplaced: async () => () => {},
   updateStatus: async () => updateStatus,
   async checkForUpdate() {
     if (!displaySettings.updateCheck) throw "Turn on the update check first.";

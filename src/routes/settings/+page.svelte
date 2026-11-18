@@ -22,6 +22,9 @@
   import { onMount } from "svelte";
 
   import { backend } from "$lib/api";
+  import RecordsFile from "$lib/components/RecordsFile.svelte";
+  import { can, isWeb } from "$lib/platform";
+  import { base } from "$app/paths";
   import HotkeyButton from "$lib/components/HotkeyButton.svelte";
   import Logo from "$lib/components/Logo.svelte";
   import DataSources from "$lib/components/DataSources.svelte";
@@ -52,7 +55,13 @@
     { id: "data", title: "Data" },
     { id: "feedback", title: "Feedback" },
     { id: "about", title: "About" },
-  ];
+  ].filter((section) => {
+    // The website doesn't read the game, float over it or take hotkeys.
+    if (section.id === "live") return can.liveReading;
+    if (section.id === "overlay") return can.pins;
+    if (section.id === "hotkeys") return can.hotkeys;
+    return true;
+  });
   const PAUSE_AFTER = [10, 15, 30, 60, 120];
 
   let shortcuts = $state<ShortcutInfo[]>([]);
@@ -367,6 +376,7 @@
 <div class="page">
   <nav class="nav" aria-label="Settings sections">
     <div class="brand"><Logo size={18} /><span>Settings</span></div>
+    {#if isWeb}<a href="{base}/">← Back to Leafline</a>{/if}
     {#each SECTIONS as section (section.id)}
       <a href="#{section.id}" class:on={reading === section.id} aria-current={reading === section.id ? "true" : undefined}
         >{section.title}</a
@@ -375,6 +385,7 @@
   </nav>
 
   <main onscroll={(e) => follow(e.currentTarget)}>
+    {#if can.liveReading}
     <section id="live">
       <h2>Live reading</h2>
       <p class="lead">
@@ -543,6 +554,7 @@
         Works windowed and in Full Screen. Pictures stay in memory unless you save one{keyHint("SaveFrame")}.
       </p>
     </section>
+    {/if}
 
     <section id="look">
       <h2>Look</h2>
@@ -550,6 +562,7 @@
       <ThemePicker />
     </section>
 
+    {#if can.pins}
     <section id="overlay">
       <h2>Overlay</h2>
       <p class="lead">How the overlay and pinned panels look over the game.</p>
@@ -627,6 +640,7 @@
         <span class="sample">Lv 30 · 22.6k EXP / hr</span>
       </div>
     </section>
+    {/if}
 
     <section id="routes">
       <h2>Routes</h2>
@@ -712,6 +726,7 @@
         {#if travel.error}
           <p class="note warn">Your travel file couldn't be read, so it isn't used: {travel.error}</p>
         {/if}
+        {#if can.dataFolder}
         <div class="row">
           <div class="label">
             <span class="name">Edit the connections</span>
@@ -724,6 +739,7 @@
             <button class="button" onclick={editTravel}><FilePenLine size={13} />Edit file</button>
           </div>
         </div>
+        {/if}
         <p class="note">
           Taxi routes, fares and scrolls are what players recorded on mapleclassic.wiki (CC BY-NC-SA 4.0), not the game's
           data, and may change. Check them in game.
@@ -731,6 +747,7 @@
       {/if}
     </section>
 
+    {#if can.hotkeys}
     <section id="hotkeys">
       <h2>Hotkeys</h2>
       <p class="lead">
@@ -810,6 +827,7 @@
         {/if}
       </div>
     </section>
+    {/if}
 
     <section id="data">
       <h2>Data</h2>
@@ -826,6 +844,9 @@
       </div>
       {#if exported}<p class="note">{exported}</p>{/if}
 
+      <RecordsFile />
+
+      {#if can.dataFolder}
       <div class="row">
         <div class="label">
           <span class="name">Data folder</span>
@@ -862,6 +883,7 @@
           This folder looks like it syncs to the cloud, so saved pictures of your game would leave this PC.
         </p>
       {/if}
+      {/if}
     </section>
 
     <section id="feedback">
@@ -896,6 +918,7 @@
       </div>
       {#if copiedReport}<p class="note">{copiedReport}</p>{/if}
 
+{#if can.dataFolder}
       <div class="row">
         <div class="label">
           <span class="name">A picture of the misread</span>
@@ -908,6 +931,7 @@
           <button class="button" onclick={() => backend.openFramesFolder()}><FolderOpen size={13} />Open</button>
         </div>
       </div>
+      {/if}
 
       <div class="row">
         <div class="label">
@@ -963,8 +987,15 @@
       <div class="policy">
         <ShieldCheck size={16} />
         <p>
-          <strong>Read-only.</strong> Leafline reads the game window while live reading is on, and nothing else of the game.
-          Nexon hasn't said whether read-only overlays are allowed; use Leafline at your own risk.
+          {#if isWeb}
+            <strong>Nothing read from the game.</strong> The website doesn't read your game at all: you type what it
+            needs. Your records stay in this browser on this computer and are never sent anywhere; save them to a file
+            now and then, since a browser can clear a site's storage. Leafline is unofficial and Nexon hasn't approved
+            it; use it at your own risk.
+          {:else}
+            <strong>Read-only.</strong> Leafline reads the game window while live reading is on, and nothing else of the
+            game. Nexon hasn't said whether read-only overlays are allowed; use Leafline at your own risk.
+          {/if}
         </p>
       </div>
 
@@ -983,6 +1014,7 @@
         </div>
       </div>
 
+{#if !isWeb}
       <div class="row">
         <label for="update-check">
           <span class="name">Check for updates</span>
@@ -1017,6 +1049,7 @@
           <button class="button" onclick={() => backend.showSetup()}>Run setup again</button>
         </div>
       </div>
+      {/if}
 
       <h3>Credits and licences</h3>
       <table class="credits">

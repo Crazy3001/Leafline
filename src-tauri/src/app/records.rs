@@ -10,9 +10,57 @@ use tauri::AppHandle;
 use super::host::AppHost;
 pub use leafline_core::service::records::*;
 
-use tauri::Manager;
+use std::path::{Path, PathBuf};
+
+use tauri::{Emitter, Manager, State};
 
 use crate::error::{Error, Result};
+use crate::userdata::{RecordsSummary, UserData};
+
+/// A records file the player picked, copied into the data folder to be checked and brought in.
+const INCOMING: &str = "import.leafline";
+/// The records as they were before a records file replaced them.
+const BEFORE_IMPORT: &str = "leafline-before-import.sqlite3";
+
+fn data_dir(app: &AppHandle) -> Result<PathBuf> {
+    Ok(app.path().app_data_dir()?)
+}
+
+fn remove(path: &Path) -> Result<()> {
+    match std::fs::remove_file(path) {
+        Err(err) if err.kind() != std::io::ErrorKind::NotFound => Err(err.into()),
+        _ => Ok(()),
+    }
+}
+
+/// Saves every record to `path`, a `.leafline` file the player picked in a save dialog.
+#[tauri::command]
+pub fn export_records(state: State<UserDataState>, path: PathBuf) -> Result<RecordsSummary> {
+    // The save dialog has already asked about replacing a file of that name.
+    remove(&path)?;
+    state.export_to(&path)
+}
+
+/// Says what the records file at `path` holds, changing nothing: it is copied first, since
+/// checking brings an older file up to date.
+#[tauri::command]
+pub fn check_records(app: AppHandle, path: PathBuf) -> Result<RecordsSummary> {
+    let incoming = data_dir(&app)?.join(INCOMING);
+    remove(&incoming)?;
+    std::fs::copy(&path, &incoming)?;
+    UserData::open_file(&incoming)?.summary()
+}
+
+/// Replaces the records with the file `check_records` took in, keeping the ones before aside,
+/// and tells every window to start afresh.
+#[tauri::command]
+pub fn import_records(app: AppHandle, state: State<UserDataState>) -> Result<RecordsSummary> {
+    let dir = data_dir(&app)?;
+    let summary = state.replace_from(&dir.join(FILE_NAME), &dir.join(INCOMING), &dir.join(BEFORE_IMPORT), &remove)?;
+    let _ = remove(&dir.join(INCOMING));
+    app.emit(RECORDS_REPLACED_EVENT, &summary)?;
+    Ok(summary)
+}
 
 /// Opens the player's records in the app's data folder, with a copy a day in its backups folder.
 pub fn load(app: &AppHandle) -> Result<UserDataState> {

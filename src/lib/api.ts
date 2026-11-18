@@ -94,6 +94,7 @@ import type {
   ShortcutInfo,
   StarterPlan,
   TrainingSpots,
+  RecordsSummary,
 } from "./types";
 
 export interface Backend {
@@ -455,6 +456,15 @@ export interface Backend {
   editTravelFile(): Promise<void>;
   /** Sizes the calling window to its content. */
   fitWindow(width: number, height: number): Promise<void>;
+
+  /** Saves every record to a `.leafline` file: where the player picks (program) or to Downloads (website). Null if cancelled. */
+  saveRecords(): Promise<RecordsSummary | null>;
+  /** Picks a records file and says what it holds, changing nothing yet. Null if cancelled. */
+  pickRecords(): Promise<RecordsSummary | null>;
+  /** Replaces the records with the picked file's. The ones before are kept aside. */
+  useRecords(): Promise<RecordsSummary>;
+  /** The records were replaced from a file, in any window: what they show is out of date. */
+  onRecordsReplaced(handler: () => void): Promise<UnlistenFn>;
 }
 
 

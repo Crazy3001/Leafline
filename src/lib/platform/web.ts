@@ -10,8 +10,21 @@ import type { Backend } from "../api";
 import type { DeskStatus, PinStatus } from "../types";
 import { emit, listen } from "./bus";
 import { commandBackend } from "./commands";
+import { setPictureTable } from "./pictures.svelte";
 import { closePip, openPip, pipOpen } from "./pip";
-import { invoke } from "./storage.svelte";
+import { checkRecords, exportRecords, importRecords, invoke, recordsSummary } from "./storage.svelte";
+
+/** Asks the player for a file, the way a page does. Null if they close the picker. */
+function chooseFile(accept: string): Promise<File | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = accept;
+    input.onchange = () => resolve(input.files?.[0] ?? null);
+    input.oncancel = () => resolve(null);
+    input.click();
+  });
+}
 
 const notHere = (what: string) => () =>
   Promise.reject(new Error(`${what} is in the Windows program only.`));
@@ -40,6 +53,13 @@ function pins(): PinStatus {
 }
 
 const shared = commandBackend(invoke, listen, emit);
+
+/** Picture addresses come with the map data: fetched now, and again when it changes. */
+function loadPictures() {
+  invoke<Parameters<typeof setPictureTable>[0]>("picture_index").then(setPictureTable, () => {});
+}
+loadPictures();
+void listen("map-data", loadPictures);
 
 export const webBackend: Backend = {
   ...shared,
@@ -125,4 +145,15 @@ export const webBackend: Backend = {
   editTravelFile: notHere("Editing the travel file"),
   version: () => invoke<string>("version"),
   fitWindow: async () => {},
+  async saveRecords() {
+    const bytes = await exportRecords();
+    const stamp = new Date().toISOString().slice(0, 10);
+    download(bytes as BlobPart, `leafline-records-${stamp}.leafline`, "application/octet-stream");
+    return recordsSummary();
+  },
+  async pickRecords() {
+    const file = await chooseFile(".leafline,.sqlite3");
+    return file ? checkRecords(new Uint8Array(await file.arrayBuffer())) : null;
+  },
+  useRecords: () => importRecords(),
 };

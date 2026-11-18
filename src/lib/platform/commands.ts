@@ -99,6 +99,7 @@ import type {
   ShortcutInfo,
   StarterPlan,
   TrainingSpots,
+  RecordsSummary,
 } from "../types";
 
 /** Runs a command by name with camelCase arguments, as Tauri's `invoke` does. */
@@ -316,5 +317,19 @@ export function commandBackend(invoke: Invoke, listen: Listen, emit: Emit): Back
     editTravelFile: () => invoke("edit_travel_file"),
     version: () => getVersion(),
     fitWindow: (width, height) => getCurrentWindow().setSize(new LogicalSize(width, height)),
+    async saveRecords() {
+      const stamp = new Date().toISOString().slice(0, 10);
+      const path = await save({
+        defaultPath: `leafline-records-${stamp}.leafline`,
+        filters: [{ name: "Leafline records", extensions: ["leafline"] }],
+      });
+      return path ? invoke<RecordsSummary>("export_records", { path }) : null;
+    },
+    async pickRecords() {
+      const path = await open({ multiple: false, filters: [{ name: "Leafline records", extensions: ["leafline"] }] });
+      return typeof path === "string" ? invoke<RecordsSummary>("check_records", { path }) : null;
+    },
+    useRecords: () => invoke("import_records"),
+    onRecordsReplaced: (handler) => listen("records-replaced", () => handler()),
   };
 }

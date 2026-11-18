@@ -70,6 +70,8 @@ pub struct MapDataState {
     wiki: Box<dyn Source + Send + Sync>,
     /// One drop table download at a time; whoever waits then finds the table fresh.
     drops_refresh: Mutex<()>,
+    /// Ask Leafline's mirror before OSMS (the website).
+    mirror_first: bool,
 }
 
 impl MapDataState {
@@ -101,7 +103,13 @@ impl MapDataState {
             osms,
             wiki,
             drops_refresh: Mutex::new(()),
+            mirror_first: false,
         }
+    }
+
+    /// Downloads OSMS's files from Leafline's mirror first, OSMS after (see [`fetch::refresh_in_order`]).
+    pub fn mirror_first(self) -> Self {
+        Self { mirror_first: true, ..self }
     }
 
     /// The cache file.
@@ -157,7 +165,7 @@ impl MapDataState {
         }
         let result = (|| {
             let mut store = Store::open(&self.path)?;
-            let report = fetch::refresh(&mut store, &*self.osms, force, now())?;
+            let report = fetch::refresh_in_order(&mut store, &*self.osms, force, now(), self.mirror_first)?;
             if !report.downloaded.is_empty() || self.atlas().is_none() {
                 let data = store.load()?;
                 if let Some(data) = &data {

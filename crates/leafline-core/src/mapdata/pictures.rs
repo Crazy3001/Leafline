@@ -133,6 +133,26 @@ impl PictureKind {
             _ => return None,
         })
     }
+
+    fn name(self) -> &'static str {
+        match self {
+            Self::Item => "item",
+            Self::Mob => "mob",
+            Self::Npc => "npc",
+            Self::Skill => "skill",
+            Self::Map => "map",
+            Self::Minimap => "minimap",
+            Self::Mark => "mark",
+        }
+    }
+}
+
+/// Every picture's address by kind and id, and the id each name stands for: the website's page
+/// asks the browser for the pictures itself, which keeps them in its cache.
+#[derive(Debug, Default, Serialize)]
+pub struct PictureTable {
+    pub urls: HashMap<&'static str, HashMap<u32, String>>,
+    pub names: HashMap<&'static str, HashMap<String, u32>>,
 }
 
 /// The address of every picture the data names, by what it shows, and the ids of names, for
@@ -192,6 +212,17 @@ impl PictureIndex {
             _ => return None,
         };
         self.urls.get(&(kind, id)).map(String::as_str)
+    }
+
+    pub fn table(&self) -> PictureTable {
+        let mut table = PictureTable::default();
+        for ((kind, id), url) in &self.urls {
+            table.urls.entry(kind.name()).or_default().insert(*id, url.clone());
+        }
+        for ((kind, name), id) in &self.names {
+            table.names.entry(kind.name()).or_default().insert(name.clone(), *id);
+        }
+        table
     }
 }
 
@@ -608,6 +639,9 @@ mod tests {
         assert_eq!(index.resolve("/item/2"), None, "no picture in the data");
         assert_eq!(index.resolve("/npc/7"), None, "only OSMS addresses are kept");
         assert_eq!(index.resolve("/map/5"), Some("https://osmsdataexplorer.com/data/maps/abc.webp"));
+        let table = index.table();
+        assert_eq!(table.urls["skill"][&1000], "https://osmsdataexplorer.com/data/current/images/skills/0001000.png");
+        assert_eq!(table.urls["map"][&5], "https://osmsdataexplorer.com/data/maps/abc.webp");
         assert_eq!(index.resolve("/minimap/5"), None);
         assert_eq!(index.resolve("/hat/1"), None);
         assert_eq!(index.resolve("/item/1/extra"), None);

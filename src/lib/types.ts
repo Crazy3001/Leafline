@@ -2212,3 +2212,14 @@ export interface ItemFit {
   /** A requirement could not be read. */
   unread: boolean;
 }
+
+/** How much a records file holds. */
+export interface RecordsSummary {
+  sessions: number;
+  drops: number;
+  builds: number;
+  notes: number;
+  characters: number;
+  spots: number;
+  prices: number;
+}
