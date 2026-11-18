@@ -346,6 +346,20 @@
     { what: "App framework", who: "Tauri", licence: "MIT / Apache-2.0", url: "https://tauri.app" },
     { what: "Interface", who: "Svelte", licence: "MIT", url: "https://svelte.dev" },
   ];
+
+  /** The section at the top of the page, lit in the menu. */
+  let reading = $state<string>(SECTIONS[0].id);
+  function follow(main: HTMLElement) {
+    const top = main.getBoundingClientRect().top + 60;
+    let id = SECTIONS[0].id;
+    for (const section of SECTIONS) {
+      const el = document.getElementById(section.id);
+      if (el && el.getBoundingClientRect().top <= top) id = section.id;
+    }
+    // At the bottom, the last section is the one being read even when it is short.
+    if (main.scrollTop + main.clientHeight >= main.scrollHeight - 4) id = SECTIONS[SECTIONS.length - 1].id;
+    reading = id;
+  }
 </script>
 
 <svelte:head><title>Leafline — Settings</title></svelte:head>
@@ -354,11 +368,13 @@
   <nav class="nav" aria-label="Settings sections">
     <div class="brand"><Logo size={18} /><span>Settings</span></div>
     {#each SECTIONS as section (section.id)}
-      <a href="#{section.id}">{section.title}</a>
+      <a href="#{section.id}" class:on={reading === section.id} aria-current={reading === section.id ? "true" : undefined}
+        >{section.title}</a
+      >
     {/each}
   </nav>
 
-  <main>
+  <main onscroll={(e) => follow(e.currentTarget)}>
     <section id="live">
       <h2>Live reading</h2>
       <p class="lead">
@@ -1058,13 +1074,15 @@
     height: 100vh;
   }
 
+  /* The menu in the windows' header colours, as setup's steps are. */
   .nav {
     display: flex;
     flex-direction: column;
     gap: 2px;
     padding: 18px 10px;
     border-right: 1px solid var(--border);
-    background: var(--surface);
+    background: var(--header-bg);
+    color: var(--header-text);
   }
 
   .brand {
@@ -1073,21 +1091,27 @@
     gap: 8px;
     margin: 0 8px 14px;
     font-family: var(--font-display);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .nav a {
     padding: 6px 10px;
-    border-radius: var(--radius-sm);
-    color: var(--muted);
+    border-radius: var(--radius-pill);
+    color: var(--header-muted);
     text-decoration: none;
   }
 
   .nav a:hover,
   .nav a:focus-visible {
-    background: var(--hover);
-    color: var(--text);
+    background: var(--header-hover);
+    color: var(--header-text);
     outline: none;
+  }
+
+  .nav a.on {
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-weight: var(--weight-strong);
   }
 
   main {
