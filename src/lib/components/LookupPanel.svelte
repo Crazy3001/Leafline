@@ -26,6 +26,7 @@
     quest = null,
     session = null,
     pinned = false,
+    onmode,
   }: {
     tooltips: ItemTooltip[];
     level?: number | null;
@@ -36,6 +37,8 @@
     quest?: QuestReading | null;
     session?: SessionSummary | null;
     pinned?: boolean;
+    /** Told when the player picks a kind, as the search sheet is, to search that kind alone. */
+    onmode?: () => void;
   } = $props();
 
   const MODES = [
@@ -71,7 +74,10 @@
 </script>
 
 <div class="modes" class:pinned>
-  <Segmented label="What to look up" options={[...MODES]} value={lookup.mode} stretch onchange={(mode) => (lookup.mode = mode)} />
+  <Segmented label="What to look up" options={[...MODES]} value={lookup.mode} size="sm" onchange={(mode) => {
+      lookup.mode = mode;
+      onmode?.();
+    }} />
 </div>
 
 {#if lookup.mode === "monsters"}

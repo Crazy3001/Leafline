@@ -4,11 +4,12 @@
   // own list, with its filters. With nothing typed the lists are there to browse, and that is also
   // where an item check or a link from elsewhere lands.
   import { ArrowLeft, LoaderCircle, Search, X } from "@lucide/svelte";
-  import { onMount, untrack } from "svelte";
+  import { onMount, setContext, untrack } from "svelte";
 
   import { backend } from "$lib/api";
   import LookupRow from "$lib/components/lookup/LookupRow.svelte";
   import LookupPanel from "$lib/components/LookupPanel.svelte";
+  import { SEARCH_FOLD, type FoldedField, type SearchFold } from "$lib/components/lookup/SearchBar.svelte";
   import { blankQuery, itemSlot, itemView, lookup } from "$lib/items.svelte";
   import { mapData, watchMapData } from "$lib/mapdata.svelte";
   import { blankMonsterQuery, monsterView } from "$lib/monsters.svelte";
@@ -51,6 +52,17 @@
   let asked = 0;
 
   const words = $derived(text.trim());
+
+  // A kind's list shows its filters under this box and takes its words from it; see SearchBar.
+  let field = $state<FoldedField | null>(null);
+  setContext<SearchFold>(SEARCH_FOLD, {
+    attach(next) {
+      field = next;
+      return () => {
+        if (field === next) field = null;
+      };
+    },
+  });
   const ready = $derived(mapData.status?.ready ?? false);
   const level = $derived(live.analysis?.hud?.level ?? live.session?.level ?? null);
   const character = $derived(live.analysis?.hud?.name ?? null);
@@ -133,11 +145,20 @@
 
   function type(value: string) {
     text = value;
-    browsing = false;
+    if (listing && field) field.input(value);
+    else browsing = false;
   }
 
   function clear() {
     text = "";
+    if (listing && field) field.input("");
+    else browsing = false;
+    box?.focus();
+  }
+
+  /** Back to searching every kind at once, with what the list had. */
+  function everything() {
+    if (field) text = field.value;
     browsing = false;
     box?.focus();
   }
@@ -193,6 +214,11 @@
               : false,
   );
 
+  /** One kind's list is showing, picked by its chip or See all: the box searches that kind alone. */
+  const listing = $derived(browsing && !onPage && field != null);
+  const shownText = $derived(listing && field ? field.value : text);
+  const placeholder = $derived(listing && field ? field.placeholder : "Items, monsters, maps, NPCs, skills, tools");
+
   const npcLine = (n: NpcRow) => [n.map, n.maps > 1 ? `+${n.maps - 1} more` : null].filter(Boolean).join(" · ") || null;
   const skillLine = (s: SkillInfo) => `${s.className}${s.jobTier && s.jobTier !== s.className ? ` · ${s.jobTier}` : ""}${s.passive ? " · passive" : ""}`;
 </script>
@@ -212,14 +238,14 @@
     <input
       bind:this={box}
       type="search"
-      placeholder="Items, monsters, maps, NPCs, skills, tools"
-      aria-label="Search everything"
-      value={text}
+      {placeholder}
+      aria-label={listing ? placeholder : "Search everything"}
+      value={shownText}
       oninput={(e) => type(e.currentTarget.value)}
     />
     {#if searching}<span class="spin" aria-hidden="true"><LoaderCircle size={14} /></span>{/if}
   </label>
-  {#if text}
+  {#if shownText}
     <button class="clear" aria-label="Clear the search" onclick={clear}><X size={14} /></button>
   {/if}
 </div>
@@ -325,7 +351,9 @@
     {/if}
   </div>
 {:else}
-  {#if words}
+  {#if listing}
+    <button class="back" onclick={everything}><ArrowLeft size={13} />{field?.value.trim() ? `Every kind for “${field.value.trim()}”` : "Search every kind"}</button>
+  {:else if words && browsing}
     <button class="back" onclick={() => (browsing = false)}><ArrowLeft size={13} />Results for “{words}”</button>
   {/if}
   <div class="lookup" class:page={onPage}>
@@ -337,6 +365,7 @@
     map={live.analysis?.map ?? null}
     quest={live.analysis?.quest ?? null}
     session={live.session}
+    onmode={() => (browsing = true)}
   />
   </div>
 {/if}
