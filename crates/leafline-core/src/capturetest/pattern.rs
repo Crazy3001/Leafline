@@ -80,7 +80,7 @@ pub fn encode(info: WindowInfo) -> u64 {
 
 /// The window's description, when `bits` are a pattern's code.
 pub fn decode(bits: u64) -> Option<WindowInfo> {
-    (bits >> 52 == MAGIC && (bits >> 48) & 0xF == VERSION).then(|| WindowInfo {
+    (bits >> 52 == MAGIC && (bits >> 48) & 0xF == VERSION).then_some(WindowInfo {
         width: ((bits >> 32) & 0xFFFF) as u32,
         height: ((bits >> 16) & 0xFFFF) as u32,
         scale_milli: (bits & 0xFFFF) as u32,
@@ -551,12 +551,12 @@ mod tests {
         for b in &LINE_BOXES {
             assert!(line_at(b, LINE_COLOURS.len() - 1) + 7 < if b.vertical { b.area.x + b.area.w } else { b.area.y + b.area.h });
         }
-        for i in 0..STRIPS.len() {
+        for (i, strip) in STRIPS.iter().enumerate() {
             let (area, laid) = (strip_area(i), laid(i));
             assert!(fits(area));
             let right = laid.x + laid.columns() as u32 * FONT_SCALE + FONT_SCALE;
             let bottom = laid.y + laid.ink.len() as u32 * FONT_SCALE + FONT_SCALE;
-            assert!(laid.x >= area.x + FONT_SCALE && right <= area.x + area.w && bottom <= area.y + area.h, "{}", STRIPS[i].name);
+            assert!(laid.x >= area.x + FONT_SCALE && right <= area.x + area.w && bottom <= area.y + area.h, "{}", strip.name);
         }
     }
 

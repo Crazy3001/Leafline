@@ -32,7 +32,7 @@ fn main() {
     );
     for r in &report.readers {
         println!(
-            "{:<14} {:>7}  agree {:>4}  differ {:>4}  only program {:>4}  only website {:>4}  neither {:>4}{}",
+            "{:<18} {:>7}  agree {:>4}  differ {:>4}  only program {:>4}  only website {:>4}  neither {:>4}{}",
             r.reader,
             r.share.map_or("-".into(), |s| format!("{:.1}%", s * 100.0)),
             r.agree,
@@ -45,7 +45,7 @@ fn main() {
     }
     let p = &report.pickup;
     println!(
-        "Pickup Log     {:>7}  program {} lines, website {}, matched {}",
+        "Pickup Log         {:>7}  program {} lines, website {}, matched {}",
         p.share.map_or("-".into(), |s| format!("{:.1}%", s * 100.0)),
         p.program_lines,
         p.website_lines,

@@ -2,7 +2,7 @@
 //! delivered frame measured against it, and the readers the website could run, timed. Frames
 //! come in as RGBA bytes from the page's worker and never leave it.
 
-use leafline_core::capturetest::{measure, pattern, readers};
+use leafline_core::capturetest::{measure, pattern};
 use leafline_core::vision::Frame;
 
 /// The pattern for a window `width` x `height` screen pixels at `scale_milli` thousandths, as
@@ -28,6 +28,7 @@ mod web {
     use wasm_bindgen::prelude::*;
 
     use super::*;
+    use leafline_core::capturetest::readers;
 
     #[wasm_bindgen(start)]
     pub fn start() {

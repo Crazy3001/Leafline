@@ -93,12 +93,15 @@ struct Readings {
 
 /// The readers compared frame by frame, the four the pass bar needs first. The Pickup Log is
 /// compared as a stream instead (see [`PickupScore`]).
-const READERS: [(&str, bool); 7] = [
+/// The Quest Helper is judged on its counters and targets, which the session uses; the titles as
+/// OCR reads them are listed apart, since the program matches them to known quests afterwards.
+const READERS: [(&str, bool); 8] = [
     ("Level", true),
     ("EXP", true),
     ("Mesos", true),
     ("Map name", true),
     ("Quest Helper", false),
+    ("Quest titles (raw)", false),
     ("Item tooltip", false),
     ("Minimap", false),
 ];
@@ -108,17 +111,15 @@ fn readings(analysis: &Analysis) -> Readings {
     let exp = hud.and_then(|h| {
         h.exp.map(|e| format!("{} ({:.2}%)", e.points, e.percent)).or(h.exp_percent.map(|p| format!("{p:.2}%")))
     });
-    let quest = analysis.quest.as_ref().filter(|q| !q.quests.is_empty()).map(|q| {
+    let quests = analysis.quest.as_ref().filter(|q| !q.quests.is_empty());
+    let objectives = quests.map(|q| {
         q.quests
             .iter()
-            .map(|quest| {
-                let objectives: Vec<String> =
-                    quest.objectives.iter().map(|o| format!("{}/{} {}", o.current, o.required, o.target)).collect();
-                format!("{}: {}", quest.title, objectives.join(", "))
-            })
+            .flat_map(|quest| quest.objectives.iter().map(|o| format!("{}/{} {}", o.current, o.required, o.target)))
             .collect::<Vec<_>>()
             .join(" | ")
     });
+    let titles = quests.map(|q| q.quests.iter().map(|quest| quest.title.as_str()).collect::<Vec<_>>().join(" | "));
     let mut names: Vec<String> = analysis.tooltips.iter().map(|t| t.name.clone()).collect();
     names.sort();
     let minimap = analysis.map.as_ref().map(|m| {
@@ -131,7 +132,8 @@ fn readings(analysis: &Analysis) -> Readings {
             exp,
             analysis.mesos.map(|m| m.mesos.to_string()),
             analysis.map.as_ref().map(|m| m.label()),
-            quest,
+            objectives,
+            titles,
             (!names.is_empty()).then(|| names.join(" | ")),
             minimap,
         ],
@@ -236,6 +238,9 @@ fn fitted(web: Frame, size: (u32, u32), offset: Option<(u32, u32)>) -> Frame {
     }
 }
 
+/// One side read: the paired frames' readings by index, and the Pickup Log's lines with their times.
+type Side = (HashMap<usize, Readings>, Vec<(f64, Gain)>);
+
 /// Reads one side's frames in order: each paired frame in full, every frame's Pickup Log.
 /// Returns the paired frames' readings by index and the Pickup Log's lines.
 fn read_side(
@@ -244,7 +249,7 @@ fn read_side(
     ocr: &Ocr,
     mut load: impl FnMut(&Saved) -> Result<Frame>,
     mut done: impl FnMut(),
-) -> Result<(HashMap<usize, Readings>, Vec<(f64, Gain)>)> {
+) -> Result<Side> {
     let mut readings = HashMap::new();
     let mut pickup = PickupReader::default();
     let mut lines = Vec::new();
