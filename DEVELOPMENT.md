@@ -16,6 +16,19 @@ npm run tauri build    # installers in target/release/bundle/
 
 Releases are built by `.github/workflows/release.yml`: bump the version in `tauri.conf.json`, `Cargo.toml` and `package.json` on main, then run the workflow by hand from the Actions tab. It attaches both installers and `SHA256SUMS.txt` to a draft release tagged `v<version>`; check the draft's tag before publishing it.
 
+## The website
+
+The website is the same pages and Rust, built for the browser. `crates/leafline-core` holds everything the program and the website share; `src-tauri` adds the program's windows, tray, hotkeys and live reading; `crates/leafline-web` runs core in a Web Worker, with the records in the browser's storage for the site (OPFS). Commands are plain functions in `crates/leafline-core/src/service/`; after changing one's arguments, run `python tools/gen-commands.py`, which rewrites the program's Tauri wrappers and the website's dispatcher.
+
+Prerequisites: `rustup target add wasm32-unknown-unknown`, `cargo install wasm-bindgen-cli --version 0.2.130` (the same version as the crate), and a clang that can build C for WebAssembly (SQLite is C). On Windows, `tools/build-wasm.mjs` finds the one in .NET's WebAssembly tools; otherwise set `CC_wasm32_unknown_unknown`.
+
+```bash
+npm run build:web      # the site in build-web/, served from /Leafline
+npm run dev:web        # the site at http://localhost:1433/Leafline/ (run npm run build:wasm after changing Rust)
+```
+
+`.github/workflows/pages.yml` publishes it to GitHub Pages; it is run by hand from the Actions tab.
+
 ## Testing the readers
 
 Put screenshots in `test-screenshots/`. It's git-ignored: game screenshots are Nexon's images and must never be committed or shipped. Then:
