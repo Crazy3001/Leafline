@@ -3,6 +3,9 @@
 import { statLabel } from "$lib/builds.svelte";
 import type { BaseStat, BaseStats, LevelStep, SkillLevel, StatGoal } from "$lib/types";
 
+/** Each stat's colour wherever the planner draws AP. */
+export const STAT_COLOURS: Record<BaseStat, string> = { str: "var(--hp)", dex: "var(--travel)", int: "var(--mp)", luk: "var(--accent)" };
+
 /** One line of a timeline row, and what it marks. */
 export interface TimelineLine {
   text: string;
@@ -120,6 +123,78 @@ export function statReached(goal: StatGoal, start: BaseStats | null, steps: Leve
   if ((start?.[goal.stat] ?? 0) >= goal.target) return { kind: "already" };
   const step = steps.find((s) => s.stats[goal.stat] >= goal.target!);
   return step ? { kind: "at", level: step.level } : { kind: "never", end: steps.at(-1)?.level ?? 0 };
+}
+
+/** One skill goal on the chart: the levels whose SP goes into it, and when it is met. */
+export interface GoalLane {
+  /** The goal's place in the plan's list. */
+  index: number;
+  skillId: number;
+  name: string;
+  target: number;
+  /** The skill's level when this goal starts: what the character had, or an earlier goal's target. */
+  floor: number;
+  /** Each level that puts SP into this goal, and how much. */
+  spends: { level: number; amount: number }[];
+  reached: Reached;
+}
+
+/**
+ * The plan's skill goals as lanes. A skill named twice (Nimble Body to 3, later to 20) gets two
+ * lanes; each level's SP counts toward the goal it fills.
+ */
+export function goalLanes(goals: SkillLevel[], start: SkillLevel[], steps: LevelStep[], nameOf: (id: number) => string | undefined): GoalLane[] {
+  return goals.map((goal, index) => {
+    const had = start.find((s) => s.skillId === goal.skillId)?.level ?? 0;
+    const earlier = goals.slice(0, index).filter((g) => g.skillId === goal.skillId).map((g) => g.level);
+    const floor = Math.max(had, ...earlier);
+    const spends: GoalLane["spends"] = [];
+    for (const step of steps) {
+      for (const gain of step.sp) {
+        if (gain.skillId !== goal.skillId) continue;
+        const amount = Math.min(gain.to, goal.level) - Math.max(gain.from, floor);
+        if (amount > 0) spends.push({ level: step.level, amount });
+      }
+    }
+    const name = nameOf(goal.skillId) ?? steps.flatMap((s) => s.sp).find((g) => g.skillId === goal.skillId)?.name ?? `Skill ${goal.skillId}`;
+    return { index, skillId: goal.skillId, name, target: goal.level, floor, spends, reached: skillReached(goal, start, steps) };
+  });
+}
+
+/** Where a goal stands for a character at a level: met, taking the next level's SP, or ahead. */
+export type LaneState = "done" | "now" | "later" | "short";
+
+export function laneState(lane: GoalLane, level: number | null): LaneState {
+  const { reached } = lane;
+  if (reached.kind === "already" || (reached.kind === "at" && level != null && reached.level <= level)) return "done";
+  if (level != null && lane.spends.some((s) => s.level === level + 1)) return "now";
+  return reached.kind === "never" ? "short" : "later";
+}
+
+/** A run of levels whose AP goes mostly into one stat. */
+export interface ApRun {
+  from: number;
+  to: number;
+  stat: BaseStat;
+  /** The stat's total at the end of the run. */
+  total: number;
+  amount: number;
+}
+
+/** The AP row of the chart: runs of levels by the stat that gets most of each level's AP. */
+export function apRuns(steps: LevelStep[]): ApRun[] {
+  const runs: ApRun[] = [];
+  for (const step of steps) {
+    if (!step.ap.length) continue;
+    const main = step.ap.reduce((a, b) => (b.amount > a.amount ? b : a));
+    const last = runs.at(-1);
+    if (last && last.stat === main.stat && last.to === step.level - 1) {
+      last.to = step.level;
+      last.total = step.stats[main.stat];
+      last.amount += main.amount;
+    } else runs.push({ from: step.level, to: step.level, stat: main.stat, total: step.stats[main.stat], amount: main.amount });
+  }
+  return runs;
 }
 
 /** The step in force at a level: the last one at or before it. */

@@ -1,26 +1,55 @@
 <script lang="ts">
   // The build planner. A build is ordered goals, the way guides put them, whether copied from one
   // or the player's own. A new build starts with three choices; after that the plan is split into
-  // Skills, Stats, Gear and Settings, with the levels beside every tab. Changes save themselves.
+  // Plan (the chart), Skills, Stats, Gear and Settings, with the levels beside every tab. Changes
+  // save themselves.
   // It is its own window, and a column of the desk view (embedded), where a menu stands in for
   // the list of builds.
   import { tip } from "$lib/tip.svelte";
   import Pic from "$lib/ui/Pic.svelte";
   import Ref from "$lib/components/Ref.svelte";
-  import { ArrowDown, ArrowUp, ClipboardCopy, ClipboardPaste, ExternalLink, Milestone, Plus, RotateCcw, Search, Trash2, X } from "@lucide/svelte";
-  import { onMount, untrack } from "svelte";
+  import {
+    ArrowDown,
+    ArrowUp,
+    ClipboardCopy,
+    ClipboardPaste,
+    ExternalLink,
+    GripVertical,
+    Milestone,
+    Plus,
+    RotateCcw,
+    Search,
+    Trash2,
+    TriangleAlert,
+    X,
+  } from "@lucide/svelte";
+  import { onMount, tick, untrack } from "svelte";
 
   import { backend } from "$lib/api";
   import { STATS, buildState, statLabel, watchBuilds } from "$lib/builds.svelte";
   import GearPicks from "$lib/components/GearPicks.svelte";
   import MapDataPanel from "$lib/components/map/MapDataPanel.svelte";
+  import LevelInspector from "$lib/components/planner/LevelInspector.svelte";
   import NewBuild from "$lib/components/planner/NewBuild.svelte";
+  import PlanChart from "$lib/components/planner/PlanChart.svelte";
   import Timeline from "$lib/components/planner/Timeline.svelte";
   import Segmented from "$lib/ui/Segmented.svelte";
   import { guideLinks } from "$lib/guides";
   import { gives } from "$lib/items.svelte";
   import { mapData, watchMapData } from "$lib/mapdata.svelte";
-  import { apSplit, skillReached, statReached, stepAt, type Reached } from "$lib/planner";
+  import {
+    STAT_COLOURS,
+    apRuns,
+    apSplit,
+    goalLanes,
+    laneState,
+    skillReached,
+    statReached,
+    stepAt,
+    type GoalLane,
+    type LaneState,
+    type Reached,
+  } from "$lib/planner";
   import { live, watchLive } from "$lib/readings.svelte";
   import { DEFAULT_RULES, changeSettings, display, keyHint, watchSettings } from "$lib/settings.svelte";
   import { watchTyping } from "$lib/typing";
@@ -149,6 +178,7 @@
     copied = false;
     adding = null;
     gearText = "";
+    picked = null;
   }
 
   async function save(snapshot: string) {
@@ -239,9 +269,10 @@
   }
 
   // Tabs: the one last picked is remembered.
-  type Tab = "skills" | "stats" | "gear" | "settings";
+  type Tab = "plan" | "skills" | "stats" | "gear" | "settings";
   const TAB_KEY = "leafline.planner.tab";
   const TABS: { id: Tab; label: string }[] = [
+    { id: "plan", label: "Plan" },
     { id: "skills", label: "Skills" },
     { id: "stats", label: "Stats" },
     { id: "gear", label: "Gear" },
@@ -252,9 +283,9 @@
   function storedTab(): Tab {
     try {
       const saved = localStorage.getItem(TAB_KEY);
-      return TABS.some((t) => t.id === saved) ? (saved as Tab) : "skills";
+      return TABS.some((t) => t.id === saved) ? (saved as Tab) : "plan";
     } catch {
-      return "skills";
+      return "plan";
     }
   }
 
@@ -361,14 +392,51 @@
   }
 
   /** Moves a skill goal past the next one of its own tier: its place decides what gets SP first. */
-  function moveSkill(index: number, by: number) {
-    if (!draft) return;
+  function moveSkill(index: number, by: number): number | null {
+    if (!draft) return null;
     const list = draft.plan.skills;
     const tier = tierOf(list[index].skillId);
     let to = index + by;
     while (to >= 0 && to < list.length && tierOf(list[to].skillId) !== tier) to += by;
-    if (to < 0 || to >= list.length) return;
+    if (to < 0 || to >= list.length) return null;
     [list[index], list[to]] = [list[to], list[index]];
+    return to;
+  }
+
+  // Dragging a goal by its grip, among the goals of its own tier. Pointer events, since the app
+  // window takes the browser's own drag and drop for files.
+  let drag = $state<{ from: number; over: number } | null>(null);
+
+  function grab(e: PointerEvent, index: number) {
+    if (e.button !== 0) return;
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    drag = { from: index, over: index };
+  }
+
+  function dragMove(e: PointerEvent) {
+    if (!drag || !draft) return;
+    const row = document.elementFromPoint(e.clientX, e.clientY)?.closest<HTMLElement>("[data-goal]");
+    if (!row) return;
+    const i = Number(row.dataset.goal);
+    if (draft.plan.skills[i] && tierOf(draft.plan.skills[i].skillId) === tierOf(draft.plan.skills[drag.from].skillId)) drag.over = i;
+  }
+
+  function dragEnd() {
+    if (drag && draft && drag.over !== drag.from) {
+      const [goal] = draft.plan.skills.splice(drag.from, 1);
+      draft.plan.skills.splice(drag.over, 0, goal);
+    }
+    drag = null;
+  }
+
+  async function gripKey(e: KeyboardEvent, index: number) {
+    const by = e.key === "ArrowUp" ? -1 : e.key === "ArrowDown" ? 1 : 0;
+    if (!by) return;
+    e.preventDefault();
+    const to = moveSkill(index, by);
+    if (to == null) return;
+    await tick();
+    document.querySelector<HTMLElement>(`[data-grip="${to}"]`)?.focus();
   }
 
   function move<T>(list: T[], i: number, by: number) {
@@ -384,6 +452,50 @@
   const steps = $derived(expansion?.steps ?? []);
   const endLevel = $derived(steps.at(-1)?.level ?? draft?.plan.planTo ?? 70);
 
+  // The Plan tab: the chart, the goals in order, and the level picked on either.
+  const planStart = $derived(steps[0]?.level ?? draft?.start.level ?? 1);
+  let picked = $state<number | null>(null);
+  /** The level shown beside the chart: the one picked, or the character's next. */
+  const selected = $derived(Math.max(planStart, Math.min(endLevel, picked ?? (level != null ? level + 1 : planStart + 1))));
+  const pick = (at: number) => (picked = at);
+  const lanes = $derived(draft ? goalLanes(draft.plan.skills, draft.start.skills, steps, (id) => skillOf(id)?.name) : []);
+  const apRows = $derived(apRuns(steps));
+  const bands = $derived(
+    [
+      { tier: 0, from: 1, to: rules.firstJobLevel - 1, label: "Beginner" },
+      { tier: 1, from: rules.firstJobLevel, to: rules.secondJobLevel - 1, label: `1st job · ${jobName(firstJob) || "not chosen"}` },
+      { tier: 2, from: rules.secondJobLevel, to: endLevel, label: `2nd job · ${jobName(secondJob) || "not chosen"}` },
+    ]
+      .map((b) => ({ ...b, from: Math.max(b.from, planStart), to: Math.min(b.to, endLevel) }))
+      .filter((b) => b.from <= b.to),
+  );
+  const planProblems = $derived([
+    ...(expansion?.problems.filter((p) => p.severity === "warning") ?? []),
+    ...(expansion?.problems.filter((p) => p.severity === "note") ?? []),
+  ]);
+  /** The goal that starts taking SP after the ones going now. */
+  const nextLane = $derived(
+    lanes
+      .filter((l) => laneState(l, level) === "later" && l.spends.length)
+      .sort((a, b) => a.spends[0].level - b.spends[0].level)[0]?.index ?? null,
+  );
+
+  function laneTag(lane: GoalLane, state: LaneState): string {
+    if (state === "done") return "Done";
+    if (state === "now") return "Now";
+    if (state === "short") return "Short";
+    return lane.index === nextLane ? "Next" : "";
+  }
+
+  function laneSpan(lane: GoalLane): string {
+    const first = lane.spends[0]?.level;
+    const last = lane.spends.at(-1)?.level;
+    if (lane.reached.kind === "already") return "had it";
+    if (first == null) return lane.reached.kind === "at" ? "covered" : "no SP";
+    const span = first === last ? `Lv ${first}` : `Lv ${first}–${last}`;
+    return lane.reached.kind === "never" ? `${span}, not all` : span;
+  }
+
   function reachedText(reached: Reached, verb = "by"): { text: string; tone: "good" | "normal" | "warn" } {
     if (reached.kind === "already") return { text: "done", tone: "good" };
     if (reached.kind === "at") return { text: `${verb} Lv ${reached.level}`, tone: level != null && reached.level <= level ? "good" : "normal" };
@@ -391,7 +503,6 @@
   }
 
   // Stats.
-  const STAT_COLOURS: Record<BaseStat, string> = { str: "var(--hp)", dex: "var(--travel)", int: "var(--mp)", luk: "var(--accent)" };
   const split = $derived(apSplit(steps));
   const splitTotal = $derived(split.reduce((sum, s) => sum + s.amount, 0));
   const milestones = $derived.by(() => {
@@ -528,6 +639,20 @@
   </span>
 {/snippet}
 
+{#snippet inspector()}
+  <LevelInspector
+    {steps}
+    {selected}
+    start={planStart}
+    end={endLevel}
+    {level}
+    startStats={draft?.start.stats ?? null}
+    problems={expansion?.problems ?? []}
+    {skillOf}
+    onselect={pick}
+  />
+{/snippet}
+
 {#snippet reachedBadge(reached: Reached, verb?: string)}
   {@const r = reachedText(reached, verb)}
   <span class="reached tabular {r.tone}">{r.text}</span>
@@ -615,7 +740,93 @@
       {#if error}<p class="error" role="alert">{error}</p>{/if}
 
       <div class="content">
-        {#if tab === "skills"}
+        {#if tab === "plan"}
+          {#if planProblems.length}
+            <ul class="plan-problems">
+              {#each planProblems as problem (problem.message)}
+                <li class={problem.severity}>
+                  {#if problem.severity === "warning"}<TriangleAlert size={13} />{/if}
+                  <span>{problem.message}</span>
+                  {#if problem.level != null}
+                    <button class="plain small" onclick={() => pick(problem.level!)}>Show Lv {problem.level}</button>
+                  {/if}
+                </li>
+              {/each}
+            </ul>
+          {/if}
+
+          <div class="card plan-card">
+            <PlanChart
+              {lanes}
+              ap={apRows}
+              {steps}
+              start={planStart}
+              end={endLevel}
+              {level}
+              {bands}
+              problems={expansion?.problems ?? []}
+              {selected}
+              onselect={pick}
+            />
+          </div>
+
+          <div class="card plan-card">
+            <div class="order-head">
+              <h2>Skill goals, in order</h2>
+              <span class="help">SP goes to the first goal that can take it. Drag a goal by its grip to change the order.</span>
+            </div>
+            {#each tiers as group (group.tier)}
+              <h3 class="order-group">{group.name} <span class="faint">· {group.span}</span></h3>
+              <ol class="order">
+                {#each group.goals as { goal, index }, k (index)}
+                  {@const lane = lanes[index]}
+                  {@const skill = skillOf(goal.skillId)}
+                  {@const state = lane ? laneState(lane, level) : "later"}
+                  {@const had = haveLevel(goal.skillId)}
+                  {@const first = lane?.spends[0]?.level ?? null}
+                  <li
+                    data-goal={index}
+                    class={state}
+                    class:dragging={drag?.from === index}
+                    class:drop-before={drag != null && drag.over === index && drag.over < drag.from}
+                    class:drop-after={drag != null && drag.over === index && drag.over > drag.from}
+                  >
+                    <button
+                      class="grip"
+                      data-grip={index}
+                      aria-label="Move {skill?.name ?? 'this goal'}: drag it, or press the up and down arrow keys"
+                      use:tip={"Drag to change the order"}
+                      onpointerdown={(e) => grab(e, index)}
+                      onpointermove={dragMove}
+                      onpointerup={dragEnd}
+                      onpointercancel={() => (drag = null)}
+                      onkeydown={(e) => gripKey(e, index)}><GripVertical size={14} /></button
+                    >
+                    <span class="num tabular">{k + 1}</span>
+                    <span class="goal-name">
+                      <span class="with-icon"
+                        >{#if skill}<Ref kind="skill" id={goal.skillId} name={skill.name} />{:else}Unknown skill {goal.skillId}{/if}{#if had && state !== "done"}<small
+                            >you have {had}</small
+                          >{/if}</span
+                      >
+                    </span>
+                    <span class="to tabular">to {goal.level} of {skill?.maxLevel ?? "?"}</span>
+                    <button class="when tabular" disabled={first == null} use:tip={first == null ? undefined : `Show Lv ${first}`} onclick={() => first != null && pick(first)}
+                      >{lane ? laneSpan(lane) : ""}</button
+                    >
+                    <span class="tag {state}">{lane ? laneTag(lane, state) : ""}</span>
+                  </li>
+                {/each}
+              </ol>
+            {:else}
+              <p class="quiet">No skill goals yet.</p>
+            {/each}
+            <p class="order-foot">
+              <button class="plain" onclick={() => pickTab("skills")}><Plus size={13} />Add or change goals in Skills</button>
+              <button class="plain" onclick={() => pickTab("stats")}>Stat goals in Stats</button>
+            </p>
+          </div>
+        {:else if tab === "skills"}
           <p class="help">SP goes to the first goal that can take it. A skill can come back later in the list.</p>
           {#each tiers as group (group.tier)}
             <h2 class="group">{group.name} <span class="faint">· {group.span}</span></h2>
@@ -1016,7 +1227,18 @@
       </div>
     </main>
 
-    <Timeline {expansion} goals={draft.plan.skills} {level} />
+    <Timeline
+      {expansion}
+      goals={draft.plan.skills}
+      {level}
+      selected={tab === "plan" ? selected : null}
+      onselect={(at) => {
+        pick(at);
+        pickTab("plan");
+      }}
+      top={tab === "plan" ? inspector : undefined}
+      showProblems={tab !== "plan"}
+    />
   {/if}
 </div>
 </div>
@@ -1793,6 +2015,228 @@
     background: var(--bad-soft);
     color: var(--bad);
     font-size: var(--text-sm);
+  }
+
+  /* The Plan tab. */
+  .plan-problems {
+    display: grid;
+    gap: 6px;
+    margin: 0 0 12px;
+    padding: 0;
+    list-style: none;
+    font-size: var(--text-sm);
+  }
+
+  .plan-problems li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    color: var(--muted);
+  }
+
+  .plan-problems li.warning {
+    background: var(--warn-soft);
+    color: var(--warn);
+  }
+
+  .plan-problems li > span {
+    flex: 1;
+  }
+
+  .plan-problems :global(svg) {
+    flex: none;
+  }
+
+  .plain.small {
+    padding: 2px 8px;
+    font-size: var(--text-xs);
+  }
+
+  .plan-card {
+    margin-bottom: 12px;
+    padding: 14px 16px 12px;
+  }
+
+  .order-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 4px 12px;
+    margin-bottom: 4px;
+  }
+
+  .order-head h2 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: var(--text-md);
+    font-weight: 600;
+  }
+
+  .order-head .help {
+    margin: 0;
+    font-size: var(--text-xs);
+  }
+
+  .order-group {
+    margin: 10px 0 2px;
+    color: var(--muted);
+    font-family: var(--font-display);
+    font-size: var(--text-sm);
+    font-weight: 400;
+  }
+
+  .order {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .order li {
+    display: grid;
+    grid-template-columns: 22px 20px minmax(0, 1fr) auto 84px 56px;
+    align-items: center;
+    gap: 8px;
+    min-height: 34px;
+    padding: 0 6px;
+    border-top: 1px solid var(--border);
+  }
+
+  .order li.now {
+    background: var(--accent-soft);
+  }
+
+  .order li.done .goal-name,
+  .order li.done .num {
+    opacity: 0.7;
+  }
+
+  .order li.dragging {
+    opacity: 0.45;
+  }
+
+  .order li.drop-before {
+    box-shadow: inset 0 2px 0 var(--accent);
+  }
+
+  .order li.drop-after {
+    box-shadow: inset 0 -2px 0 var(--accent);
+  }
+
+  .grip {
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 26px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--faint);
+    cursor: grab;
+    touch-action: none;
+  }
+
+  .grip:hover,
+  .grip:focus-visible {
+    background: var(--hover);
+    color: var(--text);
+  }
+
+  .dragging .grip {
+    cursor: grabbing;
+  }
+
+  .num {
+    color: var(--faint);
+    font-family: var(--font-display);
+    text-align: right;
+  }
+
+  .goal-name small {
+    margin-left: 6px;
+  }
+
+  .to {
+    color: var(--muted);
+    font-size: var(--text-sm);
+    white-space: nowrap;
+  }
+
+  .when {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    font-family: var(--font-display);
+    font-size: var(--text-sm);
+    text-align: right;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .when:hover:not(:disabled) {
+    color: var(--accent-text);
+    text-decoration: underline;
+  }
+
+  .when:disabled {
+    color: var(--faint);
+    cursor: default;
+  }
+
+  .tag {
+    justify-self: end;
+    padding: 1px 8px;
+    border-radius: 6px;
+    font-size: var(--text-xs);
+    font-weight: 600;
+  }
+
+  .tag:empty {
+    display: none;
+  }
+
+  .tag.done {
+    background: var(--good-soft);
+    color: var(--good);
+  }
+
+  .tag.now {
+    background: var(--accent);
+    color: var(--accent-ink);
+  }
+
+  .tag.later {
+    background: var(--surface-2);
+    color: var(--muted);
+  }
+
+  .tag.short {
+    background: var(--warn-soft);
+    color: var(--warn);
+  }
+
+  .order-foot {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 12px 0 0;
+  }
+
+  @container planner (max-width: 640px) {
+    .order li {
+      grid-template-columns: 22px minmax(0, 1fr) auto 50px;
+    }
+
+    .order .num,
+    .order .to {
+      display: none;
+    }
   }
 
   .credit {
