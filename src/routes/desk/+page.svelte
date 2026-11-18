@@ -12,6 +12,7 @@
   import DeskColumns from "$lib/components/desk/DeskColumns.svelte";
   import DeskGlance from "$lib/components/desk/DeskGlance.svelte";
   import DeskSidebar from "$lib/components/desk/DeskSidebar.svelte";
+  import CharacterPicker from "$lib/components/CharacterPicker.svelte";
   import DropLogView from "$lib/components/DropLogView.svelte";
   import BagCheck from "$lib/components/item/BagCheck.svelte";
   import CraftingPanel from "$lib/components/item/CraftingPanel.svelte";
@@ -274,6 +275,7 @@
       {#key view}
         {#if view === "now"}
           <DeskGlance />
+          <CharacterPicker />
           <div class="flow">
             {#if (live.analysis?.quest?.quests ?? []).some((q) => q.objectives.length)}
               <section class="block card quests-glance">
@@ -487,6 +489,12 @@
 
   .flow :global(.block) {
     margin: 0 0 12px;
+  }
+
+  /* The character switch for Now's cards, under the strip. */
+  .view > :global(.picker) {
+    margin: 0;
+    padding: 0 4px;
   }
 
   /* One card under another, as wide as the window: Quests, whose cards sit side by side inside. */

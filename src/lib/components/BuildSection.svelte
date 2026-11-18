@@ -777,6 +777,59 @@
     align-content: start;
   }
 
+  /*
+   * Gear with room to spare: each slot's name beside its rows, the stat details quieter and on one
+   * line, and the edit and remove buttons only on the row you point at.
+   */
+  .parts .outfit li {
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr);
+    column-gap: 8px;
+    row-gap: 1px;
+    padding: 9px 0;
+  }
+
+  .parts .outfit li > :global(*) {
+    grid-column: 2;
+  }
+
+  .parts .outfit .slot-name {
+    grid-column: 1;
+    grid-row: 1 / span 12;
+    margin: 1px 0 0;
+    color: var(--faint);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .parts .outfit .line {
+    grid-template-columns: 62px minmax(0, 1fr) auto;
+  }
+
+  .parts .outfit .line .label {
+    color: var(--faint);
+    font-size: var(--text-xs);
+  }
+
+  .parts .outfit .piece-line {
+    margin: 0 0 3px 68px;
+    overflow: hidden;
+    color: var(--faint);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .parts .outfit .remove {
+    opacity: 0;
+    transition: opacity 0.12s ease;
+  }
+
+  .parts .outfit li:hover .remove,
+  .parts .outfit li:focus-within .remove {
+    opacity: 1;
+  }
+
   .part-title {
     margin: 0 0 2px;
     padding-bottom: 6px;

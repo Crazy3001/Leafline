@@ -11,7 +11,7 @@
   import { formatCompact, formatDuration, splitMapLabel } from "$lib/format";
   import { history, watchHistory } from "$lib/history.svelte";
   import { openTrainingLog } from "$lib/nav.svelte";
-  import { shortDay } from "$lib/training";
+  import { longEnough, shortDay } from "$lib/training";
   import type { LoggedDrop, SavedSession, SessionTimeline } from "$lib/types";
 
   onMount(() => {
@@ -20,7 +20,7 @@
   });
 
   const SHOWN = 8;
-  const sessions = $derived(characters.sessions(history.value?.sessions ?? []).slice(0, SHOWN));
+  const sessions = $derived(characters.sessions(history.value?.sessions ?? []).filter(longEnough).slice(0, SHOWN));
 
   let open = $state<{ session: SavedSession; timeline: SessionTimeline | null; drops: LoggedDrop[] } | null>(null);
 

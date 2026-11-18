@@ -8,6 +8,15 @@ import type { LevelExp, SavedSession, SessionEvent, SessionLine, SessionSummary,
 /** Less time than this on a map makes its rate a rough guess. */
 export const SHORT_SECONDS = 30 * 60;
 
+/**
+ * Sessions, and maps within them, with less play than this stay out of lists, rankings and
+ * charts: a few seconds on a map gives rates that mean nothing. The training log can show them.
+ */
+export const MIN_SHOWN_SECONDS = 10 * 60;
+
+/** Enough play to list. */
+export const longEnough = (s: { activeSeconds: number }) => s.activeSeconds >= MIN_SHOWN_SECONDS;
+
 /** The graph skips the first stretch of a session, where a rate rests on too little play. */
 export const GRAPH_WARMUP_SECONDS = 150;
 

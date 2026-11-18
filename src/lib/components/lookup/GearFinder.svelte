@@ -2,7 +2,6 @@
   // Equipment for one character, slot by slot, the best first: what their job can use at their
   // level, going by their build where they have one. Anything it assumes can be changed here.
   import LookupRow from "./LookupRow.svelte";
-  import { tip } from "$lib/tip.svelte";
   import Chips from "./Chips.svelte";
   import Section from "../map/Section.svelte";
   import { backend } from "$lib/api";
@@ -41,7 +40,8 @@
   let found = $state<GearFound | null>(null);
 
   const jobs = $derived(catalog?.jobs ?? []);
-  const baseLevel = $derived(gearView.level ?? level);
+  /** The level to look from: typed here, read from the game, or the one the last answer used. */
+  const baseLevel = $derived(gearView.level ?? level ?? found?.level ?? null);
   const allLevels = $derived(gearView.ahead === "all");
   const asked = $derived(baseLevel == null ? null : gearView.ahead === "all" ? TOP_LEVEL : baseLevel + gearView.ahead);
   const key = $derived(JSON.stringify([asked, gearView.job, gearView.gender, character, job, buildState.version, display.buildRules]));
@@ -64,6 +64,13 @@
   });
 
   const number = (value: string) => (value === "" ? null : Math.max(1, Math.floor(Number(value) || 1)));
+  /** "All jobs" leaves the finder for the whole equipment list, which any job's gear is in. */
+  const ALL_JOBS = -1;
+
+  function pickJob(value: number) {
+    if (value === ALL_JOBS) gearView.forMe = false;
+    else gearView.job = value;
+  }
 
   function line(item: ItemRecord) {
     return [item.weaponType, item.reqLevel ? `Lv ${item.reqLevel}` : "No level needed", gives(item, 3)].filter(Boolean).join(" · ");
@@ -89,11 +96,16 @@
       type="number"
       min="1"
       aria-label="Level to find gear for"
-      value={baseLevel ?? found?.level ?? ""}
-      oninput={(e) => (gearView.level = number(e.currentTarget.value))}
+      placeholder={allLevels ? "All" : ""}
+      value={allLevels ? "" : (baseLevel ?? "")}
+      oninput={(e) => {
+        gearView.level = number(e.currentTarget.value);
+        if (allLevels) gearView.ahead = 0;
+      }}
     />
   </label>
-  <select aria-label="Job" value={gearView.job ?? found?.job ?? 0} onchange={(e) => (gearView.job = Number(e.currentTarget.value))}>
+  <select aria-label="Job" value={gearView.job ?? found?.job ?? 0} onchange={(e) => pickJob(Number(e.currentTarget.value))}>
+    <option value={ALL_JOBS}>All jobs</option>
     <option value={0}>Beginner</option>
     {#each jobs as choice (choice.id)}
       <option value={choice.id}>{choice.parent ? `  ${choice.name}` : choice.name}</option>
@@ -117,7 +129,6 @@
     </div>
   {/if}
   {#if changed}<button class="plain" onclick={reset}>Reset</button>{/if}
-  <button class="plain everything" use:tip={"Every piece of equipment, for any job, in the item search"} onclick={() => (gearView.forMe = false)}>Any job</button>
 </div>
 
 <Chips label="Slot" options={offered} value={slot} onselect={onslot} />
@@ -236,10 +247,6 @@
   .ahead .plain {
     padding: 0 2px;
     border: 0;
-  }
-
-  .ahead .everything {
-    margin-left: auto;
   }
 
   .rows {

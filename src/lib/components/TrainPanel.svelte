@@ -28,6 +28,7 @@
     eventMarkers,
     mapBands,
     mapStats,
+    longEnough,
     mesosCoverage,
     mesosReminder,
     pointDetail,
@@ -240,7 +241,7 @@
   );
 
   // Before a session: the last few saved ones.
-  const lastSessions = $derived(characters.sessions(history.value?.sessions ?? []).slice(0, 3));
+  const lastSessions = $derived(characters.sessions(history.value?.sessions ?? []).filter(longEnough).slice(0, 3));
   const lastOne = $derived(lastSessions[0] ?? null);
 
   const liveState = $derived(live.liveStatus.state);
@@ -292,7 +293,7 @@
   </Button>
 {/snippet}
 
-{#if !glance}<CharacterPicker />{/if}
+{#if !glance && !glanced}<CharacterPicker />{/if}
 {#if !glance && !whole}
   <div class="views"><Segmented label="Train shows" options={VIEWS} value={view} onchange={setView} /></div>
 {/if}

@@ -38,6 +38,7 @@
     levelBands,
     bandRange,
     mapStats,
+    longEnough,
     pointDetail,
     rateFormat,
     shortDay,
@@ -137,11 +138,15 @@
     if (!characterChosen && characters.length > 1) character = activeCharacter.viewing ?? (activeCharacter.all ? "" : (all[0]?.character ?? ""));
   });
   const since = $derived(range === "all" ? null : Date.now() / 1000 - Number(range) * 86400);
-  const sessions = $derived(
+  /** Sessions under ten minutes stay out unless asked for. */
+  let showShort = $state(false);
+  const inRange = $derived(
     all.filter(
       (s) => (!character || s.character === character) && (since == null || (s.startedAt ?? s.savedAt) >= since),
     ),
   );
+  const shortCount = $derived(inRange.filter((s) => !longEnough(s)).length);
+  const sessions = $derived(showShort ? inRange : inRange.filter(longEnough));
   const totalSeconds = $derived(sessions.reduce((a, s) => a + s.activeSeconds, 0));
   const selected = $derived(sessions.find((s) => s.id === selectedId) ?? sessions[0] ?? null);
   /** Drops logged while the session shown was running. */
@@ -249,7 +254,7 @@
     levels: bandRange(band),
     party,
   });
-  const stats = $derived(mapStats(sessions, filter));
+  const stats = $derived(mapStats(sessions, filter).filter((m) => showShort || longEnough(m)));
   /** Both kinds of play in view: EXP / hr is shown solo and in a party apart. */
   const splitParty = $derived(party === "any" && stats.some((m) => m.solo) && stats.some((m) => m.party));
   const kindRate = (k: { expPerHour: number } | null) => (k ? formatCompact(k.expPerHour) : "—");
@@ -342,7 +347,7 @@
   const BEST_MAPS = 4;
   const bestMaps = $derived(
     mapStats(sessions)
-      .filter((m) => m.best)
+      .filter((m) => m.best && (showShort || longEnough(m)))
       .sort((a, b) => b.best!.expPerHour - a.best!.expPerHour)
       .slice(0, BEST_MAPS),
   );
@@ -384,6 +389,12 @@
       ]}
       onchange={(r) => (range = r)}
     />
+    {#if shortCount}
+      <label class="short" title="Sessions with under 10 minutes of play, and maps you spent under 10 minutes on">
+        <input type="checkbox" bind:checked={showShort} />
+        {showShort ? "Showing" : "Show"} {shortCount} short session{shortCount === 1 ? "" : "s"}
+      </label>
+    {/if}
     <span class="grow"></span>
     {#if exported}<span class="quiet">{exported}</span>{/if}
     <Button onclick={exportCsv}><Download size={13} />Export CSV</Button>
@@ -1001,6 +1012,15 @@
     color: var(--text);
     font: inherit;
     font-size: var(--text-sm);
+  }
+
+  .short {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--muted);
+    font-size: var(--text-sm);
+    cursor: pointer;
   }
 
   .who {
