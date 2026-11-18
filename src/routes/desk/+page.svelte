@@ -22,6 +22,7 @@
   import TimersCard from "$lib/components/TimersCard.svelte";
   import TrainingLog from "$lib/components/TrainingLog.svelte";
   import TrainPanel from "$lib/components/TrainPanel.svelte";
+  import TypedSessionCard from "$lib/components/TypedSessionCard.svelte";
   import BuildPlanner from "$lib/components/planner/BuildPlanner.svelte";
   import PotionPage from "$lib/shell/PotionPage.svelte";
   import RoutePage from "$lib/shell/RoutePage.svelte";
@@ -278,6 +279,9 @@
           <DeskGlance />
           <CharacterPicker />
           <div class="flow">
+            {#if !can.liveReading || live.liveStatus.state === "off"}
+              <div class="block"><TypedSessionCard /></div>
+            {/if}
             {#if (live.analysis?.quest?.quests ?? []).some((q) => q.objectives.length)}
               <section class="block card quests-glance">
                 <PanelView panel="quests" analysis={live.analysis} session={live.session} pinned />

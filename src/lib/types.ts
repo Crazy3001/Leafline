@@ -2223,3 +2223,35 @@ export interface RecordsSummary {
   spots: number;
   prices: number;
 }
+
+/** What the HUD showed at one moment, typed in. */
+export interface HudAt {
+  level: number;
+  percent: number;
+  points: number | null;
+  mesos: number | null;
+}
+
+/** A session the player types in: where the EXP bar was at the start and the end. */
+export interface TypedSession {
+  character: string | null;
+  /** `Street : Name` when the street is known, as live sessions save it. */
+  map: string | null;
+  start: HudAt;
+  end: HudAt;
+  minutes: number;
+  /** Unix seconds; without it the session ended now. */
+  startedAt: number | null;
+  note: string | null;
+}
+
+export interface TypedOutcome {
+  percentGained: number;
+  percentPerHour: number;
+  expGained: number | null;
+  expPerHour: number | null;
+  mesosGained: number | null;
+  mesosPerHour: number | null;
+  minutesToLevel: number | null;
+  levelUps: number;
+}

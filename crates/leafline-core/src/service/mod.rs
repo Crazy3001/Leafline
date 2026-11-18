@@ -13,3 +13,4 @@ pub mod quests;
 pub mod records;
 pub mod settings;
 pub mod sheet;
+pub mod typed;

@@ -202,6 +202,8 @@ pub fn run() {
             generated::records::rename_map,
             records::export_csv,
             records::export_records,
+            generated::typed::typed_session_outcome,
+            generated::typed::save_typed_session,
             records::check_records,
             records::import_records,
             generated::builds::build_catalog,

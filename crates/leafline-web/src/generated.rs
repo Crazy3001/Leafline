@@ -15,6 +15,7 @@ pub fn dispatch(host: &dyn Host, name: &str, args: serde_json::Value) -> Option<
         .or_else(|| quests::dispatch(host, name, args.clone()))
         .or_else(|| records::dispatch(host, name, args.clone()))
         .or_else(|| sheet::dispatch(host, name, args.clone()))
+        .or_else(|| typed::dispatch(host, name, args.clone()))
 }
 
 mod builds {
@@ -1054,6 +1055,49 @@ mod sheet {
                     Err(err) => return Some(Err(err)),
                 };
                 reply_result(service::sheet::set_buff(host, name, skill, on))
+            }
+            _ => return None,
+        })
+    }
+}
+
+mod typed {
+    use leafline_core::service;
+    use leafline_core::service::typed::*;
+    use serde::{Deserialize, Serialize};
+    use leafline_core::service::host::{Host, emit};
+    use leafline_core::service::records::HISTORY_EVENT;
+    use leafline_core::clock::now_f64;
+    use leafline_core::error::{Error, Result};
+    use leafline_core::session::{MapSummary, SessionLine, SessionSummary};
+
+    use crate::reply::{Reply, parse, reply, reply_result};
+
+    pub fn dispatch(host: &dyn Host, name: &str, args: serde_json::Value) -> Option<Reply> {
+        Some(match name {
+            "typed_session_outcome" => {
+                #[derive(serde::Deserialize)]
+                #[serde(rename_all = "camelCase")]
+                struct Args {
+                session: TypedSession,
+                }
+                let Args { session } = match parse(args) {
+                    Ok(args) => args,
+                    Err(err) => return Some(Err(err)),
+                };
+                reply_result(service::typed::typed_session_outcome(host, session))
+            }
+            "save_typed_session" => {
+                #[derive(serde::Deserialize)]
+                #[serde(rename_all = "camelCase")]
+                struct Args {
+                session: TypedSession,
+                }
+                let Args { session } = match parse(args) {
+                    Ok(args) => args,
+                    Err(err) => return Some(Err(err)),
+                };
+                reply_result(service::typed::save_typed_session(host, session))
             }
             _ => return None,
         })
