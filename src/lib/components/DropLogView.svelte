@@ -99,8 +99,15 @@
               <td><Ref kind="mob" name={d.monster} /></td>
               <td>{#if d.map}<Ref kind="map" name={d.map} />{:else}<span class="muted">—</span>{/if}</td>
               <td class="nowrap r">
-                <button class="report" use:tip={"Copies the item's name too, to paste into MeowDB's search"} onclick={() => report(d)}>
-                  {#if copiedId === d.id}<Check size={12} />Name copied{:else}<ExternalLink size={12} />Report on MeowDB{/if}
+                <button
+                  class="report"
+                  aria-label={copiedId === d.id ? "Name copied" : "Report on MeowDB"}
+                  use:tip={"Copies the item's name too, to paste into MeowDB's search"}
+                  onclick={() => report(d)}
+                >
+                  {#if copiedId === d.id}<Check size={12} /><span class="words">Name copied</span>{:else}<ExternalLink size={12} /><span
+                      class="words">Report on MeowDB</span
+                    >{/if}
                 </button>
                 <button class="icon" use:tip={"Delete this drop"} aria-label="Delete this drop" onclick={() => remove(d.id)}><Trash2 size={12} /></button>
               </td>
@@ -120,14 +127,76 @@
     align-items: start;
   }
 
-  /* In a narrow window (the Tools sheet) the two panels stack, and the wide table scrolls sideways. */
+  /* In a narrow window (the Tools sheet) the two panels stack, and each drop stacks too: the item,
+     then its monster and map, then when, with its buttons as icons at the right. */
   @media (max-width: 560px) {
     .split {
       grid-template-columns: minmax(0, 1fr);
     }
 
-    .panel.list {
-      overflow-x: auto;
+    thead {
+      display: none;
+    }
+
+    table,
+    tbody {
+      display: block;
+    }
+
+    tr {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      grid-template-areas:
+        "item item act"
+        "mob map act"
+        "when when act";
+      gap: 1px 6px;
+      align-items: center;
+      padding: 7px 0;
+      border-top: 1px solid var(--border);
+    }
+
+    tr:first-child {
+      border-top: 0;
+    }
+
+    tr > td {
+      padding: 0;
+      border-top: 0;
+    }
+
+    td:nth-child(1) {
+      grid-area: when;
+      font-size: var(--text-xs);
+    }
+
+    td:nth-child(2) {
+      grid-area: item;
+      font-weight: 600;
+    }
+
+    td:nth-child(3) {
+      grid-area: mob;
+    }
+
+    td:nth-child(4) {
+      grid-area: map;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    td:nth-child(4)::before {
+      content: "· ";
+      color: var(--faint);
+    }
+
+    td:nth-child(5) {
+      grid-area: act;
+    }
+
+    .report .words {
+      display: none;
     }
   }
 
