@@ -18,7 +18,7 @@
   import PanelView from "$lib/components/PanelView.svelte";
   import TimersCard from "$lib/components/TimersCard.svelte";
   import { reportUrl } from "$lib/feedback";
-  import { itemView, lookup, watchItems } from "$lib/items.svelte";
+  import { blankQuery, gearView, itemView, lookup, watchItems } from "$lib/items.svelte";
   import { monsterView, watchMonsters } from "$lib/monsters.svelte";
   import { tabRequest } from "$lib/nav.svelte";
   import { signature } from "$lib/panels";
@@ -32,6 +32,9 @@
   import ShellHeader from "$lib/shell/ShellHeader.svelte";
   import { TABS, tabId, tabInfo, tabOfPanel, toolPageTitle, type Tab, type ToolInfo, type ToolPage } from "$lib/shell/tabs";
   import ToolsList from "$lib/shell/ToolsList.svelte";
+  import PotionPage from "$lib/shell/PotionPage.svelte";
+  import RoutePage from "$lib/shell/RoutePage.svelte";
+  import SharePage from "$lib/shell/SharePage.svelte";
   import Welcome from "$lib/shell/Welcome.svelte";
   import { tip } from "$lib/tip.svelte";
   import { watchTyping } from "$lib/typing";
@@ -242,7 +245,13 @@
     const action = tool.action;
     if ("page" in action) over = { kind: "tool", page: action.page };
     else if ("tab" in action) select(action.tab);
-    else if ("search" in action) search(action.search);
+    else if ("search" in action && action.search === "gear") {
+      // Straight to the best gear for your level, not the item list.
+      itemView.id = null;
+      itemView.query = { ...blankQuery(), kind: "equip" };
+      gearView.forMe = true;
+      search("items");
+    } else if ("search" in action) search("items");
     else {
       over = null;
       if (action.window === "training") void backend.showTraining();
@@ -337,6 +346,12 @@
               <DropLogView character={characters.viewing ?? ""} />
             {:else if over.page === "tracked"}
               <TrackedItems map={live.analysis?.map ?? null} />
+            {:else if over.page === "potions"}
+              <PotionPage />
+            {:else if over.page === "route"}
+              <RoutePage />
+            {:else if over.page === "share"}
+              <SharePage />
             {:else if over.page === "characters"}
               {#if characters.known.length > 1}
                 <CharacterPicker />

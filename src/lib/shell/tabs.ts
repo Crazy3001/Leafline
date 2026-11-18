@@ -68,13 +68,13 @@ export function tabOfPanel(panel: Panel): Tab | "search" {
 }
 
 /** A tool that opens as a page over the tab. */
-export type ToolPage = "crafting" | "sell" | "timers" | "drops" | "tracked" | "characters";
+export type ToolPage = "crafting" | "sell" | "timers" | "drops" | "tracked" | "potions" | "route" | "share" | "characters";
 
 /** What picking a tool does: open its page, jump to where it lives, or open its own window. */
 export type ToolAction =
   | { page: ToolPage }
   | { tab: Tab }
-  | { search: "items" }
+  | { search: "items" | "gear" }
   | { window: "training" | "build" };
 
 export interface ToolInfo {
@@ -92,12 +92,12 @@ export const TOOLS: ToolInfo[] = [
   { id: "timers", title: "Timers", line: "Ones you start yourself", icon: Timer, action: { page: "timers" } },
   { id: "drops", title: "Drop log", line: "Drops you've logged", icon: Gem, action: { page: "drops" } },
   { id: "tracked", title: "Tracked items", line: "Items you're after", icon: PackageSearch, action: { page: "tracked" } },
-  { id: "potions", title: "Potion costs", line: "In the Train tab", icon: FlaskConical, action: { tab: "train" } },
-  { id: "gear", title: "Gear finder", line: "Best gear for your level", icon: Shirt, action: { search: "items" } },
+  { id: "potions", title: "Potion costs", line: "What this session's potions cost", icon: FlaskConical, action: { page: "potions" } },
+  { id: "gear", title: "Gear finder", line: "Best gear for your level", icon: Shirt, action: { search: "gear" } },
   { id: "log", title: "Training log", line: "Past sessions, records", icon: ChartColumn, action: { window: "training" } },
   { id: "build", title: "Build planner", line: "Skills, stats and gear", icon: ListTree, action: { window: "build" } },
-  { id: "share", title: "Share card", line: "In the training log", icon: Share2, action: { window: "training" } },
-  { id: "route", title: "Route planner", line: "Any map to any map", icon: Route, action: { tab: "map" } },
+  { id: "share", title: "Share card", line: "A session's card to post", icon: Share2, action: { page: "share" } },
+  { id: "route", title: "Route planner", line: "Any map to any map", icon: Route, action: { page: "route" } },
   { id: "characters", title: "Characters", line: "Switch character", icon: Users, action: { page: "characters" } },
 ];
 
