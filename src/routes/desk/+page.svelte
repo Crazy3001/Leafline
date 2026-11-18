@@ -41,6 +41,8 @@
   import { watchSettings } from "$lib/settings.svelte";
   import { watchTyping } from "$lib/typing";
   import Segmented from "$lib/ui/Segmented.svelte";
+  import LevelRing from "$lib/ui/LevelRing.svelte";
+  import Logo from "$lib/components/Logo.svelte";
   import { followTrip } from "$lib/wayfinder.svelte";
 
   // Links to the training log open it in a column here, not in its own window.
@@ -241,6 +243,10 @@
   const template = $derived(columns.map((c) => `minmax(0, ${weight(c)}fr)`).join(" "));
 
   const hud = $derived(live.analysis?.hud ?? null);
+  const level = $derived(hud?.level ?? live.session?.level ?? null);
+  const percent = $derived(hud?.exp?.percent ?? hud?.expPercent ?? live.session?.percent ?? null);
+  const name = $derived(hud?.name ?? live.session?.name ?? null);
+  const job = $derived(hud?.job ?? live.session?.job ?? null);
   const liveText = $derived.by(() => {
     const s = live.liveStatus;
     if (s.state === "reading") return { tone: "good", text: `Reading ${s.window}` };
@@ -260,13 +266,15 @@
 <div class="desk">
   <header>
     <div class="who">
-      <span class="brand">Leafline</span>
-      {#if hud?.name || hud?.level}
-        <span class="sep" aria-hidden="true"></span>
-        {#if hud?.name}<span class="name">{hud.name}</span>{/if}
-        {#if hud?.level}<span class="num muted">Lv {hud.level}{hud.job ? ` ${hud.job}` : ""}</span>{/if}
-      {/if}
-      <span class="status {liveText.tone}"><span class="dot" aria-hidden="true"></span>{liveText.text}</span>
+      <LevelRing {level} {percent} size={42}><Logo size={18} /></LevelRing>
+      <div class="id">
+        <span class="name">{name ?? "Leafline"}</span>
+        <span class="sub">
+          {#if level != null}<span class="num">Lv {level}{job ? ` ${job}` : ""}</span>{/if}
+          {#if percent != null}<span class="num exp">{percent.toFixed(1)}%</span>{/if}
+          <span class="status {liveText.tone}"><span class="dot" aria-hidden="true"></span>{liveText.text}</span>
+        </span>
+      </div>
     </div>
     <div class="controls">
       <span class="field">
@@ -339,7 +347,7 @@
           {@const info = deskInfo(panel)}
           {@const Icon = info.icon}
           {@const visiting = visit?.column === c && visit?.slot === s}
-          <section class="panel" aria-label={info.title}>
+          <section class="panel pane" aria-label={info.title}>
             <div class="panel-head">
               <h2><Icon size={14} />{info.title}</h2>
               <span class="actions">
@@ -418,14 +426,18 @@
     background: var(--bg);
   }
 
+  /* The window's own header colours, as the overlay's: dark in every look but Sprout Dark's plum. */
   header {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     gap: var(--space-2) var(--space-4);
-    padding: 10px var(--space-4);
-    background: transparent;
+    margin-bottom: 12px;
+    padding: 10px var(--space-4) 10px 12px;
+    border-radius: var(--header-radius);
+    background: var(--header-bg);
+    color: var(--header-text);
   }
 
   .who,
@@ -437,21 +449,27 @@
     min-width: 0;
   }
 
-  .brand {
-    font-family: var(--font-display);
-    font-size: var(--text-xl);
-    font-weight: 600;
-    color: var(--accent-text);
-  }
-
-  .sep {
-    width: 1px;
-    height: 20px;
-    background: var(--border);
+  .id {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
   }
 
   .name {
-    font-weight: 600;
+    font-family: var(--font-display);
+    font-size: var(--text-lg);
+    font-weight: var(--weight-strong);
+    line-height: 1.2;
+  }
+
+  .sub {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 10px;
+    color: var(--header-muted);
+    font-size: var(--text-sm);
   }
 
   .num {
@@ -459,12 +477,13 @@
     font-variant-numeric: tabular-nums;
   }
 
-  .muted {
-    color: var(--muted);
+  .exp {
+    color: var(--header-exp);
+    font-weight: 600;
   }
 
   .faint {
-    color: var(--faint);
+    color: var(--header-faint);
     font-size: var(--text-sm);
   }
 
@@ -472,28 +491,27 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    font-size: var(--text-sm);
-    color: var(--faint);
+    color: var(--header-muted);
+    --dot: var(--header-faint);
   }
 
   .status .dot {
     width: 7px;
     height: 7px;
     border-radius: 50%;
-    background: currentColor;
-    box-shadow: 0 0 6px currentColor;
+    background: var(--dot);
   }
 
   .status.good {
-    color: var(--good);
+    --dot: var(--header-good);
   }
 
   .status.warn {
-    color: var(--warn);
+    --dot: var(--header-accent);
   }
 
   .status.bad {
-    color: var(--bad);
+    --dot: var(--hp);
   }
 
   .field {
@@ -502,17 +520,17 @@
     gap: var(--space-2);
   }
 
+  /* Flat, as the shared Button is. */
   button.ontop,
   button.small {
     display: inline-flex;
     align-items: center;
     gap: 5px;
     height: var(--control-h);
-    padding: 0 10px;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
-    background: linear-gradient(180deg, var(--surface-3), var(--surface-2));
-    box-shadow: inset 0 1px 0 var(--highlight);
+    padding: 0 12px;
+    border: var(--line-w) solid var(--control-line);
+    border-radius: var(--radius-pill);
+    background: var(--surface);
     color: var(--text);
     font-size: var(--text-sm);
     white-space: nowrap;
@@ -521,19 +539,33 @@
 
   button.small {
     height: var(--control-h-sm);
-    padding: 0 8px;
+    padding: 0 10px;
     font-size: var(--text-xs);
   }
 
   button.ontop:hover,
   button.small:hover {
-    background: var(--surface-3);
+    background: var(--surface-2);
+  }
+
+  header button.ontop {
+    border-color: var(--header-track);
+    background: transparent;
+    color: var(--header-text);
+  }
+
+  header button.ontop:hover {
+    background: var(--header-hover);
   }
 
   button.ontop[aria-pressed="true"] {
-    border-color: color-mix(in srgb, var(--accent) 60%, transparent);
-    background: var(--accent-soft);
-    color: var(--accent-text-strong);
+    border-color: var(--accent);
+    background: var(--accent);
+    color: var(--accent-ink);
+  }
+
+  header button.ontop[aria-pressed="true"]:hover {
+    background: var(--accent-strong);
   }
 
   button:focus-visible {
@@ -543,24 +575,56 @@
 
   .tabs {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: var(--space-3);
-    padding: 0 var(--space-4) 10px;
+    gap: var(--space-2) var(--space-3);
+    padding: 0 14px 12px;
   }
 
+  /* Layouts as chips, the open one filled. */
   .tablist {
     display: flex;
     flex-wrap: wrap;
-    gap: 2px;
+    gap: 6px;
     min-width: 0;
-    padding: 3px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--well);
   }
 
   .tab,
+  .rename {
+    height: calc(var(--control-h) - 2px);
+    padding: 0 14px;
+    border: var(--line-w) solid var(--control-line);
+    border-radius: var(--radius-pill);
+    font-size: var(--text-sm);
+    white-space: nowrap;
+  }
+
+  .tab {
+    background: var(--surface);
+    color: var(--muted);
+    font-weight: 500;
+    cursor: pointer;
+    transition:
+      background 0.12s ease,
+      color 0.12s ease;
+  }
+
+  .tab:hover {
+    background: var(--surface-2);
+    color: var(--text);
+  }
+
+  .tab[aria-selected="true"] {
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-weight: var(--weight-strong);
+  }
+
+  :global(:root:not([data-theme^="sprout"])) .tab[aria-selected="true"] {
+    border-color: transparent;
+  }
+
   .rename {
     height: 32px;
     padding: 0 var(--space-4);
@@ -595,9 +659,10 @@
 
   .rename {
     width: 150px;
-    background: var(--surface-2);
+    background: var(--surface);
     border-color: var(--accent);
     color: var(--text);
+    outline: none;
   }
 
   .tab-actions {
@@ -605,24 +670,23 @@
     gap: var(--space-2);
   }
 
-  /* The Go here bar runs the window's width, under the header. */
+  /* The Go here bar sits under the tabs, as wide as the columns. */
   .desk > :global(.bar) {
-    margin: 0;
-    border-radius: 0;
+    margin: 0 14px 12px;
   }
 
   main {
     flex: 1;
     min-height: 0;
     display: grid;
-    gap: 10px;
-    padding: 0 10px 10px;
+    gap: 12px;
+    padding: 0 14px 14px;
   }
 
   .column {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
     min-width: 0;
     min-height: 0;
   }
@@ -633,12 +697,14 @@
     flex-direction: column;
     min-height: 0;
     overflow: hidden;
-    border: 1px solid var(--border);
+  }
+
+  /* A column: the look's outline and edge, a step darker than the cards inside it. */
+  .pane {
+    border: var(--line-w) solid var(--line);
     border-radius: var(--radius-lg);
-    background: var(--surface);
-    box-shadow:
-      inset 0 1px 0 var(--highlight),
-      var(--shadow);
+    background: color-mix(in srgb, var(--surface) 45%, var(--bg));
+    box-shadow: var(--card-shadow);
   }
 
   .panel-head {
@@ -650,8 +716,6 @@
     height: 44px;
     flex: none;
     padding: 0 var(--space-3) 0 var(--space-4);
-    border-bottom: 1px solid var(--border);
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent);
   }
 
   h2 {
@@ -660,8 +724,12 @@
     gap: 7px;
     margin: 0;
     font-family: var(--font-display);
-    font-size: var(--text-lg);
-    font-weight: 600;
+    font-size: 15px;
+    font-weight: var(--weight-strong);
+  }
+
+  h2 :global(svg) {
+    color: var(--accent-text);
   }
 
   .actions {
@@ -738,6 +806,6 @@
     flex: 1;
     min-height: 0;
     overflow-y: auto;
-    padding: var(--space-2) var(--space-2) var(--space-4);
+    padding: 0 0 var(--space-4);
   }
 </style>
