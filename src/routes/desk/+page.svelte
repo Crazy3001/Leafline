@@ -41,6 +41,7 @@
   import { watchTyping } from "$lib/typing";
   import { followTrip } from "$lib/wayfinder.svelte";
   import type { PinStatus } from "$lib/types";
+  import { can, isWeb } from "$lib/platform";
 
   // Links to the training log and the planner open here, not in windows of their own.
   deskWindow.active = true;
@@ -226,7 +227,7 @@
   const narrowViews: DeskView[] = ["lookup", "crafting", "drops", "timers", "sell", "tracked", "potions", "route", "share"];
 </script>
 
-<svelte:head><title>Leafline — Desk view</title></svelte:head>
+<svelte:head><title>{isWeb ? "Leafline" : "Leafline — Desk view"}</title></svelte:head>
 <svelte:window onkeydown={keys} />
 
 <div class="desk">
@@ -256,19 +257,19 @@
         </button>
       {/if}
       <div class="step"><NextStep /></div>
-      <button
+      {#if can.popOut}<button
         class="pill"
         aria-pressed={poppedOut}
         use:tip={poppedOut ? "Close the small Now window" : "A small window of Now's numbers, kept over the game"}
         onclick={togglePopOut}><PictureInPicture2 size={14} />{poppedOut ? "Popped out" : "Pop out"}</button
-      >
-      <button
+      >{/if}
+      {#if can.onTop}<button
         class="pill icon"
         aria-pressed={onTop}
         aria-label={onTop ? "Stop keeping this window on top" : "Keep this window on top"}
         use:tip={onTop ? "Stop keeping on top" : "Keep this window on top"}
         onclick={toggleOnTop}>{#if onTop}<PinOff size={14} />{:else}<Pin size={14} />{/if}</button
-      >
+      >{/if}
     </div>
 
     <div class="view" class:narrow={narrowViews.includes(view)} class:full={view === "planner" || view === "layout"} aria-label={viewName(view)}>

@@ -3,24 +3,21 @@
 
 use std::collections::HashMap;
 
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Emitter, Manager};
 
 use super::mapdata::MapDataState;
 use super::records::{self, UserDataState};
 use super::report;
-use crate::error::Result;
 use crate::mapdata::Atlas;
-use crate::mapdata::questlog::RegionTotal;
 use crate::pipeline::Analysis;
 use crate::questlog::Gathered;
 use crate::readers::questlog::{self, LogItem, LogQuest, QuestDetail, QuestLogReading, QuestTab, Watch};
 use crate::readers::text::squash;
 use crate::readers::ui;
-use crate::userdata::questlog::{QuestLog, SeenQuest};
+use crate::userdata::questlog::SeenQuest;
 use crate::vision::{Frame, Ocr};
 
-/// Emitted to every window when a character's quest log changes, with the character's name.
-pub const QUEST_LOG_EVENT: &str = "quest-log";
+pub use leafline_core::service::quests::QUEST_LOG_EVENT;
 
 /// Pictures in a row without the window before it counts as closed, and the next opening as a
 /// fresh look. One missed picture doesn't close it.
@@ -136,24 +133,4 @@ fn detail_quest(atlas: Option<&Atlas>, reading: &QuestLogReading, seen: &[SeenQu
         icon: questlog::RowIcon::Unknown,
         on_helper: None,
     })
-}
-
-/// A character's quest log as last seen, or the last one read's.
-#[tauri::command]
-pub fn quest_log(state: State<UserDataState>, name: Option<String>) -> Result<QuestLog> {
-    state.with(|db| db.quest_log(name.as_deref()))
-}
-
-/// Forgets a character's quest log; the next look at the Quest window starts it again.
-#[tauri::command]
-pub fn forget_quest_log(app: AppHandle, name: String) -> Result<()> {
-    app.state::<UserDataState>().with(|db| db.forget_quest_log(&name))?;
-    let _ = app.emit(QUEST_LOG_EVENT, &name);
-    Ok(())
-}
-
-/// How many quests the data files under each region.
-#[tauri::command]
-pub fn quest_region_totals(state: State<MapDataState>) -> Vec<RegionTotal> {
-    state.atlas().map(|atlas| atlas.quest_region_totals()).unwrap_or_default()
 }

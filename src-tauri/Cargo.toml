@@ -23,24 +23,12 @@ tauri-plugin-global-shortcut = "2.4.1"
 tauri-plugin-window-state = "2.5.0"
 tauri-plugin-dialog = "2.8.4"
 tauri-plugin-single-instance = "2.5.5"
-thiserror = "2.0.21"
+leafline-core = { path = "../crates/leafline-core", features = ["tauri"] }
 image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "webp"] }
-regex = "1.13.1"
 strsim = "0.11.1"
-rusqlite = { version = "0.41.1", features = ["bundled"] }
 ureq = "2.12.1"
 sha2 = "0.11.1"
 tauri-plugin-opener = "2.7.2"
-base64 = "0.22.1"
-
-
-# Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
-[profile.release]
-codegen-units = 1
-lto = true
-opt-level = 3
-panic = "abort"
-strip = true
 
 [target."cfg(windows)".dependencies]
 windows = { version = "0.62.2", features = [
@@ -68,11 +56,5 @@ windows = { version = "0.62.2", features = [
     "Win32_UI_WindowsAndMessaging",
 ] }
 
-# Image processing is far too slow unoptimised; keep dependencies fast in dev builds, and the
-# readers fast enough that a dev build keeps up with the game (unoptimised, a frame at UI Size
-# Default took seconds).
-[profile.dev]
-opt-level = 1
-
-[profile.dev.package."*"]
-opt-level = 3
+[dev-dependencies]
+leafline-core = { path = "../crates/leafline-core", features = ["tauri", "test-helpers"] }

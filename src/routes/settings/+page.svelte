@@ -17,11 +17,14 @@
     RotateCcw,
     ShieldCheck,
     Square,
+    Upload,
     X,
   } from "@lucide/svelte";
   import { onMount } from "svelte";
 
   import { backend } from "$lib/api";
+  import { can, isWeb } from "$lib/platform";
+  import { base } from "$app/paths";
   import HotkeyButton from "$lib/components/HotkeyButton.svelte";
   import Logo from "$lib/components/Logo.svelte";
   import DataSources from "$lib/components/DataSources.svelte";
@@ -33,6 +36,7 @@
   import Segmented from "$lib/ui/Segmented.svelte";
   import ThemePicker from "$lib/ui/ThemePicker.svelte";
   import type {
+    RecordsSummary,
     GameWindow,
     HotkeyChoice,
     LiveChoice,
@@ -52,7 +56,13 @@
     { id: "data", title: "Data" },
     { id: "feedback", title: "Feedback" },
     { id: "about", title: "About" },
-  ];
+  ].filter((section) => {
+    // The website doesn't read the game, float over it or take hotkeys.
+    if (section.id === "live") return can.liveReading;
+    if (section.id === "overlay") return can.pins;
+    if (section.id === "hotkeys") return can.hotkeys;
+    return true;
+  });
   const PAUSE_AFTER = [10, 15, 30, 60, 120];
 
   let shortcuts = $state<ShortcutInfo[]>([]);
@@ -155,6 +165,56 @@
     }
     return [...groups].map(([from, to]) => ({ from, to: to.join(", ") }));
   }
+
+  // Your records as one file: a backup, or a way between the program, the website and another
+  // computer. Opening one shows what it holds before anything changes; the records it replaces
+  // are kept aside. Every window reloads once they're replaced (see the root layout).
+  let recordsNote = $state<string | null>(null);
+  let recordsWarn = $state(false);
+  let pickedRecords = $state<RecordsSummary | null>(null);
+  let recordsBusy = $state(false);
+
+  function describeRecords(s: RecordsSummary): string {
+    const parts = [
+      [s.sessions, "session"],
+      [s.drops, "drop"],
+      [s.builds, "build"],
+      [s.notes, "note"],
+      [s.spots, "saved spot"],
+      [s.prices, "price"],
+    ] as const;
+    const said = parts.filter(([n]) => n > 0).map(([n, what]) => `${n} ${what}${n === 1 ? "" : "s"}`);
+    return said.length ? said.join(", ") : "nothing yet";
+  }
+
+  async function recordsWork(work: () => Promise<void>) {
+    recordsBusy = true;
+    recordsNote = null;
+    recordsWarn = false;
+    try {
+      await work();
+    } catch (err) {
+      recordsNote = err instanceof Error ? err.message : String(err);
+      recordsWarn = true;
+    } finally {
+      recordsBusy = false;
+    }
+  }
+
+  const saveRecords = () =>
+    recordsWork(async () => {
+      const saved = await backend.saveRecords();
+      if (saved) recordsNote = `Saved ${describeRecords(saved)}${isWeb ? " to your downloads" : ""}.`;
+    });
+  const pickRecords = () =>
+    recordsWork(async () => {
+      pickedRecords = await backend.pickRecords();
+    });
+  const useRecords = () =>
+    recordsWork(async () => {
+      await backend.useRecords();
+      pickedRecords = null;
+    });
 
   async function exportCsv(what: "sessions") {
     try {
@@ -367,6 +427,7 @@
 <div class="page">
   <nav class="nav" aria-label="Settings sections">
     <div class="brand"><Logo size={18} /><span>Settings</span></div>
+    {#if isWeb}<a href="{base}/">← Back to Leafline</a>{/if}
     {#each SECTIONS as section (section.id)}
       <a href="#{section.id}" class:on={reading === section.id} aria-current={reading === section.id ? "true" : undefined}
         >{section.title}</a
@@ -375,6 +436,7 @@
   </nav>
 
   <main onscroll={(e) => follow(e.currentTarget)}>
+    {#if can.liveReading}
     <section id="live">
       <h2>Live reading</h2>
       <p class="lead">
@@ -543,6 +605,7 @@
         Works windowed and in Full Screen. Pictures stay in memory unless you save one{keyHint("SaveFrame")}.
       </p>
     </section>
+    {/if}
 
     <section id="look">
       <h2>Look</h2>
@@ -550,6 +613,7 @@
       <ThemePicker />
     </section>
 
+    {#if can.pins}
     <section id="overlay">
       <h2>Overlay</h2>
       <p class="lead">How the overlay and pinned panels look over the game.</p>
@@ -627,6 +691,7 @@
         <span class="sample">Lv 30 · 22.6k EXP / hr</span>
       </div>
     </section>
+    {/if}
 
     <section id="routes">
       <h2>Routes</h2>
@@ -712,6 +777,7 @@
         {#if travel.error}
           <p class="note warn">Your travel file couldn't be read, so it isn't used: {travel.error}</p>
         {/if}
+        {#if can.dataFolder}
         <div class="row">
           <div class="label">
             <span class="name">Edit the connections</span>
@@ -724,6 +790,7 @@
             <button class="button" onclick={editTravel}><FilePenLine size={13} />Edit file</button>
           </div>
         </div>
+        {/if}
         <p class="note">
           Taxi routes, fares and scrolls are what players recorded on mapleclassic.wiki (CC BY-NC-SA 4.0), not the game's
           data, and may change. Check them in game.
@@ -731,6 +798,7 @@
       {/if}
     </section>
 
+    {#if can.hotkeys}
     <section id="hotkeys">
       <h2>Hotkeys</h2>
       <p class="lead">
@@ -810,6 +878,7 @@
         {/if}
       </div>
     </section>
+    {/if}
 
     <section id="data">
       <h2>Data</h2>
@@ -826,6 +895,32 @@
       </div>
       {#if exported}<p class="note">{exported}</p>{/if}
 
+      <div class="row">
+        <div class="label">
+          <span class="name">Records file</span>
+          <span class="help">
+            Everything you recorded in one file: sessions, drops, builds, notes, spots and prices. Keep it as a backup,
+            or open it in the {isWeb ? "Windows program" : "website"} or on another computer. Map data isn't in it.
+          </span>
+        </div>
+        <div class="control exports">
+          <button class="button" onclick={saveRecords} disabled={recordsBusy}><Download size={13} />Save</button>
+          <button class="button" onclick={pickRecords} disabled={recordsBusy}><Upload size={13} />Open…</button>
+        </div>
+      </div>
+      {#if pickedRecords}
+        <div class="note confirm" role="alertdialog" aria-label="Replace your records">
+          <span>
+            That file holds {describeRecords(pickedRecords)}. Use it in place of the records here? The ones here now are
+            kept aside, not deleted.
+          </span>
+          <button class="button" onclick={useRecords} disabled={recordsBusy}>Use these records</button>
+          <button class="button" onclick={() => (pickedRecords = null)} disabled={recordsBusy}>Cancel</button>
+        </div>
+      {/if}
+      {#if recordsNote}<p class="note" class:warn={recordsWarn}>{recordsNote}</p>{/if}
+
+      {#if can.dataFolder}
       <div class="row">
         <div class="label">
           <span class="name">Data folder</span>
@@ -862,6 +957,7 @@
           This folder looks like it syncs to the cloud, so saved pictures of your game would leave this PC.
         </p>
       {/if}
+      {/if}
     </section>
 
     <section id="feedback">
@@ -896,6 +992,7 @@
       </div>
       {#if copiedReport}<p class="note">{copiedReport}</p>{/if}
 
+{#if can.dataFolder}
       <div class="row">
         <div class="label">
           <span class="name">A picture of the misread</span>
@@ -908,6 +1005,7 @@
           <button class="button" onclick={() => backend.openFramesFolder()}><FolderOpen size={13} />Open</button>
         </div>
       </div>
+      {/if}
 
       <div class="row">
         <div class="label">
@@ -963,8 +1061,15 @@
       <div class="policy">
         <ShieldCheck size={16} />
         <p>
-          <strong>Read-only.</strong> Leafline reads the game window while live reading is on, and nothing else of the game.
-          Nexon hasn't said whether read-only overlays are allowed; use Leafline at your own risk.
+          {#if isWeb}
+            <strong>Nothing read from the game.</strong> The website doesn't read your game at all: you type what it
+            needs. Your records stay in this browser on this computer and are never sent anywhere; save them to a file
+            now and then, since a browser can clear a site's storage. Leafline is unofficial and Nexon hasn't approved
+            it; use it at your own risk.
+          {:else}
+            <strong>Read-only.</strong> Leafline reads the game window while live reading is on, and nothing else of the
+            game. Nexon hasn't said whether read-only overlays are allowed; use Leafline at your own risk.
+          {/if}
         </p>
       </div>
 
@@ -983,6 +1088,7 @@
         </div>
       </div>
 
+{#if !isWeb}
       <div class="row">
         <label for="update-check">
           <span class="name">Check for updates</span>
@@ -1017,6 +1123,7 @@
           <button class="button" onclick={() => backend.showSetup()}>Run setup again</button>
         </div>
       </div>
+      {/if}
 
       <h3>Credits and licences</h3>
       <table class="credits">
@@ -1435,6 +1542,13 @@
   .exports {
     display: flex;
     gap: 6px;
+  }
+
+  .confirm {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
   }
 
   .button {

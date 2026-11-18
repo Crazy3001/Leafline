@@ -88,6 +88,19 @@ Nothing read from the game leaves your PC. Leafline only goes online to:
 
 Your sessions, notes, drop log, builds and settings stay in `%APPDATA%\app.leafline.overlay`, with a daily backup of the last 7 days. **Settings → Data** opens the folder.
 
+## Website
+
+Leafline also runs in a browser at **[crazy3001.github.io/Leafline](https://crazy3001.github.io/Leafline/)**, with nothing to install, on Windows, Mac, Linux and phones. It is the same Leafline, built from the same code, without the parts that need the game window:
+
+- look up items, monsters, maps, NPCs, quests and skills, with who drops what and where to find it
+- Go here routes to any map or NPC you pick
+- where to train, with the assumptions you set
+- the build planner, scroll odds, Your fight and craft levelling
+- the drop log, timers and the training log
+- the four looks, a desk layout on a computer and the overlay's tabs on a phone
+
+**It doesn't read the game at all.** Your records stay in that browser on that computer and are never sent anywhere. A browser can clear a site's storage, so use **Settings → Data → Save my records** now and then; the same file opens in the program or another browser. One tab at a time can use your records.
+
 ## Install
 
 1. Download `Leafline_x.y.z_x64-setup.exe` from the [latest release](https://github.com/Crazy3001/Leafline/releases/latest). The `.msi` works too. Only download Leafline from this repository: copies elsewhere may have been changed.
@@ -140,7 +153,7 @@ The installer isn't code-signed yet, and SmartScreen warns about any new unsigne
 Yes. Leafline is built with Claude, Anthropic's AI coding assistant. I decide what it does, test it in game and send back what goes wrong; Claude writes the code. All of it is open source here, so anyone can read exactly what it does and how.
 
 ### Does it work on Mac or Linux?
-Not yet. Windows only for now; a macOS version is planned.
+The [website](#website) does, in any current browser, without reading the game. The program is Windows only for now; a macOS version is planned.
 
 ### Does it need the game's files, or log in to anything?
 No. It only looks at the game window. It has no login and never asks for your Nexon account.

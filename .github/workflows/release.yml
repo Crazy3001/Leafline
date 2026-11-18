@@ -39,7 +39,6 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: src-tauri
           shared-key: release
 
       - name: Build and upload to a draft release

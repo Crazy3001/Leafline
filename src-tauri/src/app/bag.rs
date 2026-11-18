@@ -14,6 +14,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
 
+use super::host::AppHost;
 use super::mapdata::MapDataState;
 use super::pictures::PictureState;
 use super::readings;
@@ -211,7 +212,7 @@ fn name_items(app: &AppHandle, read: &Read, wide: bool) -> Result<BagCheck> {
     let index = data.pictures();
     let pictures = app.state::<PictureState>();
     let url = |id: u32| index.resolve(&format!("/item/{id}")).map(str::to_string);
-    let planned = read.level.map_or_else(HashSet::new, |level| builds::planned_gear(app, read.character.as_deref(), level));
+    let planned = read.level.map_or_else(HashSet::new, |level| builds::planned_gear(&AppHost::new(app), read.character.as_deref(), level));
     let every = bag::every(&catalog, tab);
     let mut ids: BTreeSet<u32> = if wide {
         every.iter().copied().collect()

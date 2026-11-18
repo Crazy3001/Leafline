@@ -7,6 +7,8 @@ mod commands;
 mod damage;
 mod desk;
 mod fighter;
+mod generated;
+mod host;
 mod layout;
 mod live;
 mod mapdata;
@@ -20,7 +22,6 @@ mod recovery;
 mod records;
 mod report;
 mod settings;
-mod sheet;
 mod shortcuts;
 mod snap;
 mod tray;
@@ -38,12 +39,10 @@ pub const BROWSER_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartSc
 
 use desk::DeskState;
 use live::LiveState;
-use mapdata::MapDataState;
 use nav::NavState;
 use overlay::{OVERLAY, OverlayState};
 use pins::PinState;
 use readings::Readings;
-use records::UserDataState;
 use settings::SettingsState;
 use shortcuts::Bindings;
 use update::UpdateState;
@@ -69,18 +68,21 @@ pub fn run() {
         .manage(UpdateState::default())
         .register_asynchronous_uri_scheme_protocol(pictures::SCHEME, pictures::handle)
         .setup(|app| {
-            app.manage(MapDataState::load(app.handle())?);
+            let dir = app.path().app_data_dir()?;
+            let folder = leafline_core::service::files::Folder(dir);
+            app.manage(damage::DamageState::load(&folder));
+            app.manage(SettingsState::load(&folder));
+            app.manage(NavState::load(&folder));
+            app.manage(host::DataFolder(folder));
+            app.manage(mapdata::load(app.handle())?);
             app.manage(pictures::PictureState::load(app.handle())?);
-            app.manage(UserDataState::load(app.handle())?);
-            app.manage(damage::DamageState::load(app.handle())?);
+            app.manage(records::load(app.handle())?);
             mapdata::check_for_updates(app.handle());
-            app.manage(SettingsState::load(app.handle())?);
             settings::apply(app.handle())?;
             overlay::restore_mode(app.handle())?;
             if let Some(overlay) = app.get_webview_window(OVERLAY) {
                 snap::attach(&overlay)?;
             }
-            app.manage(NavState::load(app.handle())?);
             app.manage(PinState::load(app.handle())?);
             pins::restore(app.handle())?;
             app.manage(DeskState::load(app.handle())?);
@@ -148,84 +150,87 @@ pub fn run() {
             pins::unpin_panel,
             pins::toggle_pins,
             pins::show_panel,
-            damage::player_damage,
-            sheet::character_stats,
-            sheet::set_buff,
+            generated::damage::player_damage,
+            generated::sheet::character_stats,
+            generated::sheet::set_buff,
             desk::desk_status,
             desk::desk_take_tab,
             desk::show_desk,
             desk::set_desk_on_top,
-            mapdata::map_data_status,
-            mapdata::download_map_data,
-            mapdata::find_map,
-            mapdata::map_card,
-            mapdata::search_maps,
-            mapdata::map_route,
-            mapdata::travel_info,
-            mapdata::download_travel,
+            generated::mapdata::map_data_status,
+            generated::mapdata::download_map_data,
+            generated::mapdata::find_map,
+            generated::mapdata::map_card,
+            generated::mapdata::search_maps,
+            generated::mapdata::map_route,
+            generated::mapdata::travel_info,
+            generated::mapdata::download_travel,
             mapdata::edit_travel_file,
-            mapdata::monster_drops,
-            mapdata::quest_guide,
-            mapdata::download_drops,
-            mapdata::drops_fetched_at,
-            mapdata::training_spots,
-            mapdata::check_estimates,
-            records::known_mesos,
-            records::item_note,
-            records::saved_spots,
-            records::set_spot_saved,
-            records::potion_slots,
-            records::loot_prices,
-            records::set_potion_slots,
-            records::session_potions,
-            records::set_session_potion,
+            generated::mapdata::monster_drops,
+            generated::mapdata::quest_guide,
+            generated::mapdata::download_drops,
+            generated::mapdata::drops_fetched_at,
+            generated::mapdata::training_spots,
+            generated::mapdata::check_estimates,
+            generated::records::known_mesos,
+            generated::records::item_note,
+            generated::records::saved_spots,
+            generated::records::set_spot_saved,
+            generated::records::potion_slots,
+            generated::records::loot_prices,
+            generated::records::set_potion_slots,
+            generated::records::session_potions,
+            generated::records::set_session_potion,
             update::update_status,
             update::check_for_update,
             update::install_update,
-            records::set_item_note,
-            records::map_note,
-            records::set_map_note,
-            records::drop_log,
-            records::log_drop,
-            records::delete_drop,
+            generated::records::set_item_note,
+            generated::records::map_note,
+            generated::records::set_map_note,
+            generated::records::drop_log,
+            generated::records::log_drop,
+            generated::records::delete_drop,
             records::save_image,
-            records::session_history,
-            records::level_exp,
-            builds::item_crafting,
-            builds::crafting_recipes,
-            records::session_timeline,
+            generated::records::session_history,
+            generated::records::level_exp,
+            generated::builds::item_crafting,
+            generated::builds::crafting_recipes,
+            generated::records::session_timeline,
             records::show_training,
-            records::delete_session,
-            records::set_session_note,
-            records::rename_map,
+            generated::records::delete_session,
+            generated::records::set_session_note,
+            generated::records::rename_map,
             records::export_csv,
-            builds::build_catalog,
-            builds::starter_plans,
-            builds::search_gear,
-            builds::search_items,
-            builds::item_filters,
-            builds::item_record,
-            builds::find_item,
+            records::export_records,
+            records::check_records,
+            records::import_records,
+            generated::builds::build_catalog,
+            generated::builds::starter_plans,
+            generated::builds::search_gear,
+            generated::builds::search_items,
+            generated::builds::item_filters,
+            generated::builds::item_record,
+            generated::builds::find_item,
             builds::show_item,
-            builds::set_gear_goal,
-            builds::add_piece,
-            builds::remove_piece,
-            builds::update_piece,
-            builds::wear_item,
-            builds::build_outfit,
-            builds::fill_gear,
-            builds::gear_suggestions,
-            builds::find_gear,
+            generated::builds::set_gear_goal,
+            generated::builds::add_piece,
+            generated::builds::remove_piece,
+            generated::builds::update_piece,
+            generated::builds::wear_item,
+            generated::builds::build_outfit,
+            generated::builds::fill_gear,
+            generated::builds::gear_suggestions,
+            generated::builds::find_gear,
             live::read_character_windows,
-            builds::list_builds,
-            builds::build_plan,
-            builds::active_build,
-            builds::save_build,
-            builds::use_build,
-            builds::delete_build,
-            builds::export_build,
-            builds::import_build,
-            builds::build_item_fit,
+            generated::builds::list_builds,
+            generated::builds::build_plan,
+            generated::builds::active_build,
+            generated::builds::save_build,
+            generated::builds::use_build,
+            generated::builds::delete_build,
+            generated::builds::export_build,
+            generated::builds::import_build,
+            generated::builds::build_item_fit,
             builds::open_guide,
             builds::show_build,
             settings::get_settings,
@@ -235,27 +240,27 @@ pub fn run() {
             settings::show_setup,
             settings::finish_setup,
             mapdata::open_link,
-            mapdata::item_origin,
-            mapdata::search_quests,
-            mapdata::quest_regions,
-            questlog::quest_log,
-            questlog::forget_quest_log,
-            questlog::quest_region_totals,
-            mapdata::quest_sheet,
+            generated::mapdata::item_origin,
+            generated::mapdata::search_quests,
+            generated::mapdata::quest_regions,
+            generated::questlog::quest_log,
+            generated::questlog::forget_quest_log,
+            generated::questlog::quest_region_totals,
+            generated::mapdata::quest_sheet,
             mapdata::show_quest,
-            mapdata::search_monsters,
-            mapdata::monster_filters,
-            mapdata::find_monster,
-            mapdata::monster_sheet,
+            generated::mapdata::search_monsters,
+            generated::mapdata::monster_filters,
+            generated::mapdata::find_monster,
+            generated::mapdata::monster_sheet,
             mapdata::show_monster,
-            mapdata::browse_maps,
-            mapdata::monster_fight,
-            mapdata::shop_prices,
-            mapdata::map_regions,
-            mapdata::map_areas,
-            mapdata::search_npcs,
-            mapdata::find_npc,
-            mapdata::npc_sheet,
+            generated::mapdata::browse_maps,
+            generated::mapdata::monster_fight,
+            generated::mapdata::shop_prices,
+            generated::mapdata::map_regions,
+            generated::mapdata::map_areas,
+            generated::mapdata::search_npcs,
+            generated::mapdata::find_npc,
+            generated::mapdata::npc_sheet,
             mapdata::show_place,
             pictures::map_picture,
             nav::destination,

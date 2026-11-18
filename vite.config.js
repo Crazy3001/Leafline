@@ -5,11 +5,16 @@ import process from "node:process";
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vite.dev/config/
-export default defineConfig(() => ({
+export default defineConfig(({ mode }) => ({
   plugins: [sveltekit()],
+
+  // The website is Vite's "web" mode. A constant, so the program's build drops the website's code.
+  define: { __LEAFLINE_WEB__: JSON.stringify(mode === "web") },
 
   // WebView2 and WKWebView both support top-level await, used to pick the backend.
   build: { target: "es2022" },
+  // The website's worker imports its WebAssembly glue as a module.
+  worker: { format: "es" },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
@@ -28,8 +33,8 @@ export default defineConfig(() => ({
         }
       : undefined,
     watch: {
-      // 3. tell Vite to ignore watching `src-tauri`
-      ignored: ["**/src-tauri/**"],
+      // 3. tell Vite to ignore watching the Rust code and the build folders
+      ignored: ["**/src-tauri/**", "**/crates/**", "**/target/**", "**/build-web/**"],
     },
   },
 }));
