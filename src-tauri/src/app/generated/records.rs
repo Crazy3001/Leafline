@@ -12,7 +12,7 @@ use std::sync::{Mutex, MutexGuard};
 use serde::{Deserialize, Serialize};
 use leafline_core::service::host::{Host, emit};
 use leafline_core::error::{Error, Result};
-use leafline_core::userdata::UserData;
+use leafline_core::userdata::{RecordsSummary, UserData};
 use leafline_core::userdata::characters::KnownMesos;
 use leafline_core::userdata::drops::{LoggedDrop, NewDrop};
 use leafline_core::userdata::notes::{ItemNote, MapNote};
