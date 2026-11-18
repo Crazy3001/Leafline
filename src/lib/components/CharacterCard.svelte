@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { can } from "$lib/platform";
   import { onMount, type Snippet } from "svelte";
 
   import { ChevronRight } from "@lucide/svelte";
@@ -103,13 +104,14 @@
 {/snippet}
 
 {#if trim}
-  <section class="card vitals" aria-label="Mesos, HP and MP">
+  <!-- HP, MP and mesos come from reading the HUD, which the website doesn't. -->
+  {#if can.liveReading}<section class="card vitals" aria-label="Mesos, HP and MP">
     <div class="gauges two">
       <Gauge label="HP" color="var(--hp)" fraction={fraction(hud?.hp)} value={gaugeText(hud?.hp)} />
       <Gauge label="MP" color="var(--mp)" fraction={fraction(hud?.mp)} value={gaugeText(hud?.mp)} />
     </div>
     {@render purse()}
-  </section>
+  </section>{/if}
   {#if children}<section class="card more">{@render children()}</section>{/if}
 {:else}
 <Card title="Character" {plain}>

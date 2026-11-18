@@ -8,6 +8,12 @@ interface PictureTable {
 }
 
 let table = $state.raw<PictureTable | null>(null);
+/** Map pictures the worker cut, by map id, as data addresses. */
+const mapViews = $state<Record<number, string>>({});
+
+export function setMapView(id: number, url: string) {
+  mapViews[id] = url;
+}
 
 export function setPictureTable(next: PictureTable | null) {
   table = next;
@@ -15,6 +21,7 @@ export function setPictureTable(next: PictureTable | null) {
 
 /** The address of a picture by id, or by name; null when it isn't known (yet). */
 export function webPictureUrl(kind: string, key: number | string): string | null {
+  if (kind === "mapview") return typeof key === "number" ? (mapViews[key] ?? null) : null;
   if (!table) return null;
   const id = typeof key === "number" ? key : table.names[kind]?.[key.trim().toLowerCase()];
   return id == null ? null : (table.urls[kind]?.[String(id)] ?? null);

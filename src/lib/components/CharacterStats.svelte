@@ -2,6 +2,7 @@
   // Character → Stats: every number the game's Character Stat window and its detail pane showed at
   // the last read, and the buffs the player says are on. With buffs on, each number they change
   // shows as it is with them, the number read beside it. The training estimates use the same.
+  import { can } from "$lib/platform";
   import { RefreshCw } from "@lucide/svelte";
   import { onMount, untrack } from "svelte";
 
@@ -129,7 +130,7 @@
     <span class="when">
       {#if readAgo}Read {readAgo}{:else}Not read yet{/if}
     </span>
-    {#if showRead}<button
+    {#if showRead && can.liveReading}<button
       class="link"
       disabled={reading}
       use:tip={`Reads your Character Stat window, with Detail open, and your Skill window${keyHint("ReadCharacter")}`}
@@ -140,7 +141,11 @@
 
   {#if !sheet}
     <p class="quiet-line">
-      Open your Character Stat window in the game and press Detail, then Read. Leafline also reads it by itself while it is open.
+      {#if can.liveReading}
+        Open your Character Stat window in the game and press Detail, then Read. Leafline also reads it by itself while it is open.
+      {:else}
+        The website doesn't read the game. Stats the Windows program read come along in a records file (Settings, Data).
+      {/if}
     </p>
   {:else}
     {#if anyOn && buffed}

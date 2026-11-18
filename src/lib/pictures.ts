@@ -24,8 +24,8 @@ const missing = new Set<string>();
 /** The address of a picture by id, or by name when that is all a link knows; null when off. */
 export function pictureUrl(kind: PictureKind, key: number | string | null | undefined): string | null {
   if (!display.showPictures || key == null) return null;
-  // The website lets the browser fetch and keep pictures; map views cut by the program aren't there.
-  if (isWeb) return kind === "mapview" ? null : webPictureUrl(kind, key);
+  // The website lets the browser fetch and keep pictures; its worker cuts the map views.
+  if (isWeb) return webPictureUrl(kind, key);
   if (typeof key === "number") return `${BASE}${kind}/${key}`;
   const name = key.trim();
   return name ? `${BASE}${kind}/name/${encodeURIComponent(name)}` : null;

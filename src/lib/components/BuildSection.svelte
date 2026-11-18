@@ -2,6 +2,7 @@
   // The build plan's part of the Character tab: what the plan says at the character's level. It
   // moves on with the level, and catches up with what was really spent whenever the stat and
   // skill windows are read. The level itself is shown once, in the character's header above.
+  import { can } from "$lib/platform";
   import { clipped, tip } from "$lib/tip.svelte";
   import Pic from "$lib/ui/Pic.svelte";
   import Ref from "$lib/components/Ref.svelte";
@@ -518,11 +519,11 @@
     {#if plan && step}<span class="plan" use:clipped>{plan.build.name}</span>{/if}
     {#if plan && step}
       <span class="tools">
-        <button
+{#if can.liveReading}<button
           class="link"
           use:tip={`Read your Character Stat and Skill windows${keyHint('ReadCharacter')}`}
           onclick={() => backend.readCharacter()}><RefreshCw size={12} />Read stats</button
-        >
+        >{/if}
         <button class="link" onclick={() => openPlanner()}><Pencil size={12} />Edit</button>
       </span>
     {/if}

@@ -1,6 +1,7 @@
 <script lang="ts">
   // Tools → Route planner: the fewest portals from one map to another. It starts from the map
   // you're on; you can start from any other. "Go" follows the route in the Go here bar.
+  import { can } from "$lib/platform";
   import { MapPin } from "@lucide/svelte";
   import { untrack } from "svelte";
 
@@ -47,7 +48,7 @@
         <span>From <strong>{from.name}</strong>{#if !picked && here}<span class="quiet"> · where you are</span>{/if}</span>
         {#if picked && here}<button class="link" onclick={() => (picked = null)}>From where you are</button>{/if}
       {:else}
-        <span class="quiet">The minimap isn't in view. Pick where you start.</span>
+        <span class="quiet">{can.liveReading ? "The minimap isn't in view. Pick where you start." : "Pick where you start."}</span>
       {/if}
     </div>
     <MapPicker label="Start from another map" placeholder={from ? "Start somewhere else…" : "Where you start…"} onpick={(m) => (picked = m)} />

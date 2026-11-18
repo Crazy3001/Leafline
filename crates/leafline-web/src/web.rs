@@ -1,6 +1,7 @@
 //! The worker's side: opening storage, running commands, records files.
 
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::path::Path;
 use std::rc::Rc;
 
@@ -70,6 +71,8 @@ impl Host for WebHost {
 }
 
 thread_local! {
+    /// Map pictures cut this visit, by map id: the page asks again each time a map card opens.
+    static MAP_VIEWS: RefCell<HashMap<u32, serde_json::Value>> = RefCell::new(HashMap::new());
     static HOST: RefCell<Option<Rc<WebHost>>> = const { RefCell::new(None) };
     static POOL: RefCell<Option<OpfsSAHPoolUtil>> = const { RefCell::new(None) };
 }
@@ -175,6 +178,10 @@ fn own(host: &WebHost, name: &str, args: serde_json::Value) -> Option<Reply> {
     struct What {
         what: Export,
     }
+    #[derive(Deserialize)]
+    struct MapId {
+        id: u32,
+    }
     let told = |result: Result<(Nav, bool)>| {
         reply_result(result.map(|(nav, changed)| {
             if changed {
@@ -187,6 +194,10 @@ fn own(host: &WebHost, name: &str, args: serde_json::Value) -> Option<Reply> {
     Some(match name {
         "version" => reply(version()),
         "picture_index" => reply(host.map.pictures().table()),
+        "map_picture" => match parse::<MapId>(args) {
+            Ok(MapId { id }) => reply_result(map_picture(host, id)),
+            Err(err) => Err(err),
+        },
         "destination" => reply(host.nav.get()),
         "set_destination" => match place(args) {
             Ok(p) => told(host.nav.set_destination(&host.files, p.destination)),
@@ -222,6 +233,34 @@ fn own(host: &WebHost, name: &str, args: serde_json::Value) -> Option<Reply> {
         }
         _ => return None,
     })
+}
+
+/// A map's picture cut to what is drawn, as the program's map cards show it, with its portals, NPCs
+/// and spawns placed on it: downloaded from OSMS (the browser keeps it in its cache), cut by the
+/// shared code, and handed to the page as a JPEG. `None` with pictures off or none in the data.
+fn map_picture(host: &WebHost, id: u32) -> Result<Option<serde_json::Value>> {
+    use base64::Engine;
+    use leafline_core::mapdata::fetch::Source;
+    if !host.settings.get().show_pictures {
+        return Ok(None);
+    }
+    if let Some(done) = MAP_VIEWS.with(|v| v.borrow().get(&id).cloned()) {
+        return Ok(Some(done));
+    }
+    let Some(url) = host.map.pictures().resolve(&format!("/map/{id}")).map(str::to_string) else { return Ok(None) };
+    let Some(atlas) = host.map.atlas() else { return Ok(None) };
+    let points = host.map.map_points(id)?;
+    let spots: Vec<(i32, i32)> = points.iter().map(|p| (p.x, p.y)).collect();
+    let bytes = Xhr::new(Duration::ZERO).get(&url)?;
+    let (jpeg, view) = leafline_core::mapdata::pictures::cut_map(&bytes, &spots)?;
+    let done = serde_json::json!({
+        "width": view.out_width,
+        "height": view.out_height,
+        "points": atlas.view_points(id, &points, &view),
+        "jpeg": base64::engine::general_purpose::STANDARD.encode(jpeg),
+    });
+    MAP_VIEWS.with(|v| v.borrow_mut().insert(id, done.clone()));
+    Ok(Some(done))
 }
 
 fn remove(path: &Path) -> Result<()> {

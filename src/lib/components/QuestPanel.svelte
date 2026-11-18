@@ -2,6 +2,7 @@
   // The Quests tab: what the Quest Helper is tracking, the character's quest log as the game's
   // Quest window last showed it, and a book of every quest in the map data. The book needs nothing
   // from the game, so it works with live reading off.
+  import { can } from "$lib/platform";
   import { clipped, tip } from "$lib/tip.svelte";
   import { FilterBoxState } from "$lib/filterbox.svelte";
   import { ArrowLeft, LoaderCircle, Search, SlidersHorizontal, X } from "@lucide/svelte";
@@ -288,7 +289,11 @@
     <QuestCard {quest} {map} {session} plain={pinned} />
   {:else if !(ready && (followedQuests().length || questLog.log?.quests.some((q) => q.state === "inProgress")))}
     <p class="empty">
-      Open the Quest Helper in game to track quest counters here, or search for a quest and follow it.
+      {#if can.liveReading}
+        Open the Quest Helper in game to track quest counters here, or search for a quest and follow it.
+      {:else}
+        Search for a quest and follow it: its steps and where to go show here.
+      {/if}
     </p>
   {/if}
   {#if ready && showing === "now"}<FollowedQuests tracked={quest} {map} {session} plain={pinned} />{/if}

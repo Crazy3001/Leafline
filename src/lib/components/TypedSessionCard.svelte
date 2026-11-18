@@ -2,148 +2,55 @@
   // A session typed in: what the EXP bar showed when you started and when you stopped. The website
   // reads nothing from the game, so this is how it learns your pace; the program offers it while
   // live reading is off. Start now keeps the start and the time in this browser; or type the
-  // minutes you already played. Saved, it joins the training log like any session.
+  // minutes you already played. Saved, it joins the training log like any session. The website's
+  // pop-out shows the same session (see typed.svelte.ts).
   import { Play, RotateCcw } from "@lucide/svelte";
-  import { onMount } from "svelte";
 
   import { backend } from "$lib/api";
-  import { characters } from "$lib/characters.svelte";
   import { formatCompact, formatDuration } from "$lib/format";
-  import type { HudAt, MapRef, TypedOutcome } from "$lib/types";
+  import { followTyped, resetTyped, saveTyped, typed } from "$lib/typed.svelte";
+  import type { MapRef } from "$lib/types";
 
   import Card from "./Card.svelte";
 
-  const KEY = "leafline.typed-session";
+  followTyped();
 
-  interface Side {
-    level: string;
-    percent: string;
-    points: string;
-    mesos: string;
-  }
-
-  interface Draft {
-    start: Side;
-    end: Side;
-    /** When Start now was pressed, in ms. */
-    startedAt: number | null;
-    minutes: string;
-    map: string;
-  }
-
-  const blank = (): Side => ({ level: "", percent: "", points: "", mesos: "" });
-
-  function load(): Draft {
-    try {
-      const saved = JSON.parse(localStorage.getItem(KEY) ?? "null");
-      if (saved?.start && saved?.end) return saved;
-    } catch {
-      // A missing or unreadable draft starts empty.
-    }
-    return { start: blank(), end: blank(), startedAt: null, minutes: "", map: "" };
-  }
-
-  let draft = $state<Draft>(load());
-  let now = $state(Date.now());
-  let outcome = $state<TypedOutcome | null>(null);
-  let problem = $state<string | null>(null);
+  const draft = $derived(typed.draft);
+  const outcome = $derived(typed.outcome);
   let saved = $state<string | null>(null);
+  let failed = $state<string | null>(null);
   let maps = $state<MapRef[]>([]);
 
-  onMount(() => {
-    const tick = setInterval(() => (now = Date.now()), 1000);
-    return () => clearInterval(tick);
-  });
-
-  $effect(() => {
-    try {
-      localStorage.setItem(KEY, JSON.stringify($state.snapshot(draft)));
-    } catch {
-      // The draft is a convenience; without storage it lasts as long as the page.
-    }
-  });
-
-  const number = (text: string): number | null => {
-    const n = Number(text.replace(/[,\s]/g, ""));
-    return text.trim() === "" || !Number.isFinite(n) ? null : n;
-  };
-
-  function hud(side: Side): HudAt | null {
-    const level = number(side.level);
-    const percent = number(side.percent.replace("%", ""));
-    if (level == null || percent == null) return null;
-    return { level, percent, points: number(side.points), mesos: number(side.mesos) };
-  }
-
-  const timedMinutes = $derived(draft.startedAt ? (now - draft.startedAt) / 60_000 : null);
-  const minutes = $derived(timedMinutes ?? number(draft.minutes));
-
-  function session() {
-    const start = hud(draft.start);
-    const end = hud(draft.end);
-    if (!start || !end || minutes == null) return null;
-    return {
-      character: characters.viewing,
-      map: draft.map.trim() || null,
-      start,
-      end,
-      minutes,
-      startedAt: draft.startedAt ? draft.startedAt / 1000 : null,
-      note: null,
-    };
-  }
-
-  // What it works out to, as you type. Asked again only when an input changes, not every tick.
-  let asked = 0;
-  $effect(() => {
-    const s = session();
-    const ask = ++asked;
-    saved = null;
-    if (!s) {
-      outcome = null;
-      problem = null;
-      return;
-    }
-    // The running clock only changes the rates, not whether it adds up: round it to the minute.
-    s.minutes = Math.max(1, Math.round(s.minutes));
-    backend.typedSessionOutcome(s).then(
-      (o) => ask === asked && ((outcome = o), (problem = null)),
-      (e) => ask === asked && ((outcome = null), (problem = e instanceof Error ? e.message : String(e))),
-    );
-  });
+  const problem = $derived(failed ?? typed.problem);
 
   function startNow() {
-    draft.startedAt = Date.now();
-    draft.minutes = "";
+    typed.draft.startedAt = Date.now();
+    typed.draft.minutes = "";
   }
 
   function reset() {
-    draft = { start: blank(), end: blank(), startedAt: null, minutes: "", map: "" };
-    outcome = null;
-    problem = null;
+    resetTyped();
+    saved = null;
+    failed = null;
   }
 
   async function save() {
-    const s = session();
-    if (!s) return;
-    s.minutes = Math.max(1, Math.round(s.minutes * 10) / 10);
+    failed = null;
     try {
-      await backend.saveTypedSession(s);
-      const kept = { ...draft.end };
-      reset();
-      // The next session starts where this one ended.
-      draft.start = { ...kept, points: kept.points, mesos: kept.mesos };
+      await saveTyped();
       saved = "Saved to the training log.";
     } catch (e) {
-      problem = e instanceof Error ? e.message : String(e);
+      failed = e instanceof Error ? e.message : String(e);
     }
   }
 
   async function findMaps(text: string) {
+    saved = null;
     maps = text.trim().length >= 2 ? await backend.searchMaps(text).catch(() => []) : [];
   }
 
   const mapLabel = (m: MapRef) => (m.street ? `${m.street} : ${m.name}` : m.name);
+  const now = $derived(typed.now);
 </script>
 
 <Card title="Session">
@@ -167,7 +74,7 @@
   <div class="time">
     {#if draft.startedAt}
       <span class="clock tabular">Playing for {formatDuration((now - draft.startedAt) / 1000)}</span>
-      <button class="link" onclick={() => (draft.startedAt = null)}>Type the minutes instead</button>
+      <button class="link" onclick={() => (typed.draft.startedAt = null)}>Type the minutes instead</button>
     {:else}
       <label><span>Minutes played</span><input inputmode="numeric" bind:value={draft.minutes} placeholder="60" /></label>
       <span class="or">or</span>
@@ -225,7 +132,7 @@
 
   .sides {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
     gap: 10px;
   }
 

@@ -3,6 +3,7 @@
   // sits over the game and is glanced at mid-fight, so it shows the part that follows the game by
   // itself and leaves searching and browsing to the tab (Lookup, a tool more than a readout, stays
   // whole). It names the panel itself, so single cards drop their frame there.
+  import { can } from "$lib/platform";
   import BuildSection from "./BuildSection.svelte";
   import CharacterCard from "./CharacterCard.svelte";
   import LookupPanel from "./LookupPanel.svelte";
@@ -56,7 +57,11 @@
   {#if analysis?.map}
     <MapCard map={analysis.map} {session} variant={pinned ? "glance" : "compact"} plain={pinned} />
   {:else}
-    {@render empty("The minimap isn't in view. Its map's details show here when it is.")}
+    {@render empty(
+      can.liveReading
+        ? "The minimap isn't in view. Its map's details show here when it is."
+        : "Search for a map to see its portals, monsters and drops.",
+    )}
   {/if}
 {:else if panel === "train"}
   <TrainPanel level={analysis?.hud?.level ?? session?.level ?? null} map={analysis?.map ?? null} {session} glance={pinned} whole={roomy} />

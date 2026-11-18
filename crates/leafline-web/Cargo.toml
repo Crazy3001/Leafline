@@ -25,3 +25,4 @@ js-sys = "0.3"
 web-sys = { version = "0.3", features = ["XmlHttpRequest", "XmlHttpRequestResponseType"] }
 web-time = "1"
 console_error_panic_hook = "0.1"
+base64 = "0.22.1"

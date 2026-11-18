@@ -2,6 +2,7 @@
   // The main window. A header that says who you are and how far through the level; the next step
   // of a route when one is set; one of five tabs; and the tab bar. Search, an item check, the Tools
   // list and each tool rise as a sheet over the tab, so the tab is still there when they close.
+  import { isWeb } from "$lib/platform";
   import { X } from "@lucide/svelte";
   import { onMount } from "svelte";
 
@@ -316,8 +317,8 @@
         {#key tab}
           {#if tab === "now"}
             <NowScreen analysis={live.analysis} session={live.session} ongo={select} />
-          {:else if live.analysis || live.session || tab === "me" || tab === "quests"}
-            <!-- A build can be planned and quests looked up with nothing read yet. -->
+          {:else if live.analysis || live.session || tab === "me" || tab === "quests" || isWeb}
+            <!-- A build can be planned and quests looked up with nothing read yet; the website reads nothing, so it always shows the panels. -->
             <div class="panel"><PanelView panel={tabInfo(tab).panel} analysis={live.analysis} session={live.session} shelled /></div>
           {:else}
             <Welcome />
