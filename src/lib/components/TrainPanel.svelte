@@ -52,6 +52,7 @@
     session = null,
     glance = false,
     whole = false,
+    glanced = false,
   }: {
     level: number | null;
     map?: MapReading | null;
@@ -61,6 +62,8 @@
     glance?: boolean;
     /** Where there is room, as in the desk view: every view stacked, with no chips. */
     whole?: boolean;
+    /** The desk view's Now strip shows the big rate, the level line and the session buttons. */
+    glanced?: boolean;
   } = $props();
 
   watchHistory();
@@ -293,7 +296,7 @@
 {#if !glance && !whole}
   <div class="views"><Segmented label="Train shows" options={VIEWS} value={view} onchange={setView} /></div>
 {/if}
-{#if onSession}
+{#if onSession && !(glanced && tracking)}
 <Block title="Session">
   {#snippet aside()}
     {#if session?.held}
@@ -308,7 +311,7 @@
     {/if}
   {/snippet}
 
-  <SessionControls trailing={tracking && whole && !glance ? jump : undefined} />
+  {#if !glanced}<SessionControls trailing={tracking && whole && !glance ? jump : undefined} />{/if}
 
   {#if !tracking && glance}
     <p class="caption">Starts with your first EXP.</p>
@@ -331,6 +334,7 @@
 
 {#if tracking && session && headline && onSession}
   <Block>
+    {#if !glanced}
     <div class="headline">
       <div class="big">
         <span class="label"
@@ -367,6 +371,7 @@
           {#if toLevel?.breaks}<span class="muted tabular">{toLevel.breaks}</span>{/if}
         {/if}
       </div>
+    {/if}
     {/if}
 
     {#if !glance}

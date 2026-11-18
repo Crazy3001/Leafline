@@ -4,7 +4,69 @@
 // the player sets is saved for the next session. A tab can go back to how it started.
 
 import { PANELS } from "./panels";
+import type { ToolPage } from "./shell/tabs";
 import type { Panel } from "./types";
+
+/**
+ * What the desk view shows: one view at a time, picked in its sidebar. The overlay's five tabs
+ * (laid out for a wide window), Look up, the build planner, a tool's page, or the player's own
+ * columns of panels ("layout", the desk view as it was before views).
+ */
+export type DeskView = "now" | "quests" | "map" | "train" | "me" | "lookup" | "planner" | "layout" | ToolPage;
+
+const VIEW_KEY = "leafline.desk.view";
+const FOLD_KEY = "leafline.desk.folded";
+
+/** Tool pages the desk view shows as views of their own. */
+export const DESK_TOOL_PAGES: ToolPage[] = ["crafting", "drops", "timers", "sell", "tracked", "potions", "route", "share"];
+
+export function loadView(): DeskView {
+  try {
+    const saved = localStorage.getItem(VIEW_KEY);
+    const views: string[] = ["now", "quests", "map", "train", "me", "lookup", "planner", "layout", ...DESK_TOOL_PAGES];
+    return saved && views.includes(saved) ? (saved as DeskView) : "now";
+  } catch {
+    return "now";
+  }
+}
+
+export function saveView(view: DeskView) {
+  try {
+    localStorage.setItem(VIEW_KEY, view);
+  } catch {
+    // A convenience only.
+  }
+}
+
+export function loadFolded(): boolean {
+  try {
+    return localStorage.getItem(FOLD_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function saveFolded(folded: boolean) {
+  try {
+    localStorage.setItem(FOLD_KEY, folded ? "1" : "0");
+  } catch {
+    // A convenience only.
+  }
+}
+
+/** The view a link to one of the overlay's panels opens. */
+export function viewOfPanel(panel: DeskPanel): DeskView {
+  switch (panel) {
+    case "character":
+      return "me";
+    case "item":
+      return "lookup";
+    case "log":
+      return "train";
+    default:
+      return panel;
+  }
+}
 
 /** What a desk view column can show: the overlay's panels, the training log and the build planner. */
 export type DeskPanel = Panel | "log" | "planner";

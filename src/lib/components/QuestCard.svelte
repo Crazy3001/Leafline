@@ -177,6 +177,8 @@
     {#if note}<span>{note}</span>{:else if followed}<span>No counts</span>{:else if quest.page}<span class="tabular">{quest.page[0]} tracked</span>{/if}
   {/snippet}
 
+  <!-- Where the card is wide, as in the desk view, the quests sit two across. -->
+  <div class="quest-area"><div class="quests">
   {#each quest.quests as { title, objectives }, i}
     {@const info = guide?.quests[i]}
     {@const finished = objectives.length > 0 && objectives.every((o) => objectiveProgress(o) >= 1 && !o.unread)}
@@ -282,6 +284,7 @@
       {quest.page?.[0] === 0 ? "No quests tracked." : "The Quest Helper was found, but its text could not be read."}
     </p>
   {/each}
+  </div></div>
 
   {#if quest.quests.length}
     {#if !followed && quest.quests.some((q) => !q.title)}
@@ -426,8 +429,26 @@
     border-left-color: var(--good);
   }
 
-  .quest + .quest {
-    margin-top: 10px;
+  .quest-area {
+    container: quest-list / inline-size;
+  }
+
+  .quests {
+    display: grid;
+    gap: 10px;
+    align-items: start;
+  }
+
+  @container quest-list (min-width: 720px) {
+    .quests {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @container quest-list (min-width: 1150px) {
+    .quests {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
   }
 
   .title {

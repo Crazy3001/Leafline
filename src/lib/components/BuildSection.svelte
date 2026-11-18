@@ -24,12 +24,15 @@
     level,
     character = null,
     glance = false,
+    whole = false,
   }: {
     /** Read from the HUD or the session. */
     level: number | null;
     character?: string | null;
     /** A pinned window's short form: this level's to-do and the next advancement, nothing to browse. */
     glance?: boolean;
+    /** Room for every part at once, as in the desk view: no chips, the parts side by side. */
+    whole?: boolean;
   } = $props();
 
   /** How many later levels with something to do are shown. */
@@ -541,8 +544,7 @@
     <h4 class="sub">Stats</h4>
     <CharacterStats {character} />
   {:else if plan && step}
-    <div class="views"><Segmented label="Build view" options={views} value={shown} stretch size="sm" onchange={pickView} /></div>
-    {#if shown === "plan"}
+    {#snippet planPart()}
     {@render todo(step)}
 
     <h4 class="sub">Your stats by the plan</h4>
@@ -616,7 +618,9 @@
       </ul>
       {#if warnings.length > 3}<button class="link" onclick={() => openPlanner()}>See all in the editor</button>{/if}
     {/if}
-    {:else if shown === "advance" && nextAdvance?.advance && plan.build.plan.job}
+    {/snippet}
+    {#snippet advancePart()}
+      {#if plan && nextAdvance?.advance && plan.build.plan.job}
       <p class="next">
         <strong>{nextAdvance.advance}</strong> at Lv {nextAdvance.level}
       </p>
@@ -627,18 +631,19 @@
         {level}
         {character}
       />
-    {:else if shown === "skills"}
-    {@render skillsView()}
-    {:else if shown === "stats"}
-    <CharacterStats character={character ?? plan.build.character ?? null} showRead={false} />
-    {:else}
+      {/if}
+    {/snippet}
+    {#snippet statsPart()}
+    <CharacterStats character={character ?? plan?.build.character ?? null} showRead={false} />
+    {/snippet}
+    {#snippet gearPart()}
     <!--
       Gear slot by slot, as the equip window has it: what you wear (its own stats, scrolls and all,
       which can be put right here), the plan's next goal for the slot, and the best you can wear
       now when it beats what you wear.
     -->
     {#if outfit}
-      {#if !plan.build.start.pieces?.length}
+      {#if !plan?.build.start.pieces?.length}
         <p class="quiet-line">
           Check what you wear in game{keyHint("ReadItem")} and press <strong>I'm wearing this</strong>, or put it on by name below.
         </p>
@@ -723,6 +728,29 @@
       {/if}
     {/if}
     {@render putOn()}
+    {/snippet}
+    {#if whole}
+      <!-- Room for every part at once, as in the desk view: side by side where it fits. -->
+      <div class="parts">
+        <div class="part"><h4 class="part-title">Level up</h4>{@render planPart()}</div>
+        <div class="part"><h4 class="part-title">Gear</h4>{@render gearPart()}</div>
+        <div class="part"><h4 class="part-title">Stats</h4>{@render statsPart()}</div>
+        <div class="part"><h4 class="part-title">Skills</h4>{@render skillsView()}</div>
+        {#if canAdvance && nextAdvance?.advance && plan.build.plan.job}<div class="part"><h4 class="part-title">Job advance</h4>{@render advancePart()}</div>{/if}
+      </div>
+    {:else}
+    <div class="views"><Segmented label="Build view" options={views} value={shown} stretch size="sm" onchange={pickView} /></div>
+    {#if shown === "plan"}
+      {@render planPart()}
+    {:else if shown === "advance" && nextAdvance?.advance && plan.build.plan.job}
+      {@render advancePart()}
+    {:else if shown === "skills"}
+    {@render skillsView()}
+    {:else if shown === "stats"}
+      {@render statsPart()}
+    {:else}
+      {@render gearPart()}
+    {/if}
     {/if}
 
     <footer>
@@ -735,6 +763,29 @@
 {/if}
 
 <style>
+  .parts {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 18px 24px;
+    align-items: start;
+  }
+
+  .part {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+    align-content: start;
+  }
+
+  .part-title {
+    margin: 0 0 2px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--font-display);
+    font-size: var(--text-md);
+    font-weight: 600;
+  }
+
   .link.warn-line {
     margin-top: 8px;
     color: var(--warn);
