@@ -259,8 +259,66 @@ pub struct UserData {
     conn: Connection,
 }
 
+/// How much a records file holds.
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecordsSummary {
+    pub sessions: i64,
+    pub drops: i64,
+    pub builds: i64,
+    pub notes: i64,
+    pub characters: i64,
+    pub spots: i64,
+    pub prices: i64,
+}
+
 impl UserData {
+    /// Opens a records file the player picked, to bring in. Refuses a file that isn't Leafline's
+    /// or comes from a newer Leafline; brings an older one up to date. Open a copy: this changes
+    /// the file it opens.
+    pub fn open_file(path: &Path) -> Result<Self> {
+        let conn = Connection::open(path)?;
+        let version = conn
+            .query_row("PRAGMA user_version", [], |row| row.get::<_, i64>(0))
+            .map_err(|_| crate::error::Error::Invalid("That file isn't a Leafline records file.".into()))?;
+        let has_sessions: bool = conn
+            .query_row("SELECT EXISTS (SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'sessions')", [], |row| {
+                row.get(0)
+            })
+            .unwrap_or(false);
+        if version < 2 || !has_sessions {
+            return Err(crate::error::Error::Invalid("That file isn't a Leafline records file.".into()));
+        }
+        Self::init(conn)
+    }
+
+    /// Writes a copy of every record to `path`, a `.leafline` file the player keeps or moves to
+    /// the website or another PC. Map data is never in it: each side downloads its own. `path`
+    /// must not exist yet.
+    pub fn export_to(&self, path: &Path) -> Result<()> {
+        self.conn.execute("VACUUM INTO ?1", [path.to_string_lossy()])?;
+        Ok(())
+    }
+
+    /// What the records hold, for the player to check before replacing theirs with a file.
+    pub fn summary(&self) -> Result<RecordsSummary> {
+        let count = |table: &str| -> Result<i64> {
+            Ok(self.conn.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| row.get(0))?)
+        };
+        Ok(RecordsSummary {
+            sessions: count("sessions")?,
+            drops: count("drops")?,
+            builds: count("builds")?,
+            notes: count("item_notes")? + count("map_notes")?,
+            characters: count("characters")?,
+            spots: count("saved_spots")?,
+            prices: count("prices")?,
+        })
+    }
+
     pub fn open(path: &Path) -> Result<Self> {
+        // The website's files live in its browser storage, which has no folders to make.
+        #[cfg(not(target_arch = "wasm32"))]
         if let Some(dir) = path.parent() {
             std::fs::create_dir_all(dir)?;
         }

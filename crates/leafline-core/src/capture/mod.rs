@@ -15,7 +15,7 @@ mod unsupported;
 #[cfg(not(windows))]
 use self::unsupported as platform;
 
-use std::time::{Duration, Instant};
+use crate::clock::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 

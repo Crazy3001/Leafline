@@ -20,13 +20,16 @@ image = { version = "0.25.10", default-features = false, features = ["png", "jpe
 regex = "1.13.1"
 strsim = "0.11.1"
 rusqlite = { version = "0.41.1", features = ["bundled"] }
-ureq = "2.12.1"
 sha2 = "0.11.1"
 base64 = "0.22.1"
 url = "2"
 # std's clock on the program, the browser's on the website (std's panics on wasm32).
 web-time = "1"
 tauri = { version = "2", optional = true, default-features = false }
+
+# The program downloads with ureq; the website through the browser.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+ureq = "2.12.1"
 
 [target."cfg(windows)".dependencies]
 windows = { version = "0.62.2", features = [

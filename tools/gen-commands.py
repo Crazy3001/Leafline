@@ -129,38 +129,48 @@ def web():
     out = ROOT / 'crates/leafline-web/src'
     if not out.exists():
         return
-    arms, uses = [], set()
+    parts, tries = [], []
     for module in MODULES:
-        uses.add(f'use leafline_core::service::{module}::*;')
-        for line in imports(module):
-            uses.add(line)
+        arms = []
         for name, args, ret in commands(module):
-            fields = ''.join(f'            {a}: {t},\n' for a, t in args)
-            names = ', '.join(a for a, _ in args)
-            call = ', '.join(['host'] + [a for a, _ in args])
+            send = 'reply_result' if ret.startswith(('Result<', 'crate::error::Result<')) else 'reply'
             if args:
+                fields = ''.join(f'                {a}: {t},\n' for a, t in args)
+                names = ', '.join(a for a, _ in args)
+                call = ', '.join(['host'] + [a for a, _ in args])
                 arms.append(
-                    f'        "{name}" => {{\n'
-                    f'            #[derive(serde::Deserialize)]\n'
-                    f'            #[serde(rename_all = "camelCase")]\n'
-                    f'            struct Args {{\n{fields}            }}\n'
-                    f'            let Args {{ {names} }} = parse(args)?;\n'
-                    f'            reply(service::{module}::{name}({call}))\n'
-                    f'        }}\n')
+                    f'            "{name}" => {{\n'
+                    f'                #[derive(serde::Deserialize)]\n'
+                    f'                #[serde(rename_all = "camelCase")]\n'
+                    f'                struct Args {{\n{fields}                }}\n'
+                    f'                let Args {{ {names} }} = match parse(args) {{\n'
+                    f'                    Ok(args) => args,\n'
+                    f'                    Err(err) => return Some(Err(err)),\n'
+                    f'                }};\n'
+                    f'                {send}(service::{module}::{name}({call}))\n'
+                    f'            }}\n')
             else:
-                arms.append(f'        "{name}" => reply(service::{module}::{name}(host)),\n')
+                arms.append(f'            "{name}" => {send}(service::{module}::{name}(host)),\n')
+        uses = '\n'.join('    ' + line.replace('\n', '\n    ') for line in imports(module))
+        parts.append(
+            f'mod {module} {{\n'
+            f'    use leafline_core::service;\n'
+            f'    use leafline_core::service::{module}::*;\n'
+            f'{uses}\n\n'
+            f'    use crate::reply::{{Reply, parse, reply, reply_result}};\n\n'
+            f'    pub fn dispatch(host: &dyn Host, name: &str, args: serde_json::Value) -> Option<Reply> {{\n'
+            f'        Some(match name {{\n' + ''.join(arms) + '            _ => return None,\n        })\n    }\n}\n')
+        tries.append(f'        .or_else(|| {module}::dispatch(host, name, args.clone()))\n')
     text = (
         '//! The website\'s command dispatcher. Written by tools/gen-commands.py; change the service\n'
         '//! function, then run the script again.\n'
         '#![allow(unused_imports, clippy::too_many_lines)]\n\n'
-        'use leafline_core::service;\n'
-        'use leafline_core::service::host::Host;\n'
-        + '\n'.join(sorted(uses)) + '\n\n'
-        'use crate::reply::{Reply, parse, reply};\n\n'
+        'use leafline_core::service::host::Host;\n\n'
+        'use crate::reply::Reply;\n\n'
         '/// Runs a shared command by the name the program\'s frontend invokes it by. `None` when the\n'
         '/// name isn\'t one of them.\n'
         'pub fn dispatch(host: &dyn Host, name: &str, args: serde_json::Value) -> Option<Reply> {\n'
-        '    Some(match name {\n' + ''.join(arms) + '        _ => return None,\n    })\n}\n')
+        '    None' + ''.join(tries) + '}\n\n' + '\n'.join(parts))
     (out / 'generated.rs').write_text(text, encoding='utf-8', newline='\n')
 
 

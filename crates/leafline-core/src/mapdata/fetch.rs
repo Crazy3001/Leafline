@@ -1,9 +1,12 @@
 //! Downloading OSMS files, as its README recommends: read `meta.json`, then fetch only the
 //! files whose checksum differs from the cached copy.
 
+#[cfg(not(target_arch = "wasm32"))]
 use std::io::Read;
+#[cfg(not(target_arch = "wasm32"))]
 use std::sync::Mutex;
-use std::time::{Duration, Instant};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::clock::{Duration, Instant};
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -28,20 +31,23 @@ pub const USER_AGENT: &str = concat!(
 );
 
 /// The largest file Leafline will download. OSMS's files are well under 1 MB.
-const MAX_BYTES: u64 = 32 * 1024 * 1024;
+pub const MAX_BYTES: u64 = 32 * 1024 * 1024;
 
 /// Somewhere to GET from. Tests stand in a fake.
 pub trait Source {
     fn get(&self, url: &str) -> Result<Vec<u8>>;
 }
 
-/// HTTPS with Leafline's User-Agent, at most one request per `min_interval`.
+/// HTTPS with Leafline's User-Agent, at most one request per `min_interval`. The program's; the
+/// website fetches through the browser.
+#[cfg(not(target_arch = "wasm32"))]
 pub struct Http {
     agent: ureq::Agent,
     min_interval: Duration,
     last: Mutex<Option<Instant>>,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl Http {
     pub fn new(min_interval: Duration) -> Self {
         let agent = ureq::AgentBuilder::new().user_agent(USER_AGENT).timeout(Duration::from_secs(30)).build();
@@ -49,6 +55,7 @@ impl Http {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl Source for Http {
     fn get(&self, url: &str) -> Result<Vec<u8>> {
         {

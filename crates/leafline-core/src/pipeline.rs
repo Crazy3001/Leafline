@@ -1,6 +1,6 @@
 //! Frame → readings. The same pipeline runs on live captures and on saved screenshots.
 
-use std::time::Instant;
+use crate::clock::Instant;
 
 use serde::Serialize;
 

@@ -9,10 +9,11 @@
 //! hand-made fake bytes.
 
 use std::collections::{HashMap, HashSet};
+#[cfg(not(target_arch = "wasm32"))]
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::{Condvar, Mutex};
-use std::time::{Duration, Instant};
+use crate::clock::{Duration, Instant};
 
 use image::imageops::FilterType;
 use serde::{Deserialize, Serialize};
@@ -388,11 +389,14 @@ impl<S: Source> PictureCache<S> {
 }
 
 /// Plain HTTPS GETs with a bare `Leafline/<version>` User-Agent. Redirects are not followed, so
-/// a request can't be sent on to another host.
+/// a request can't be sent on to another host. The program's; the website lets the browser fetch
+/// pictures itself.
+#[cfg(not(target_arch = "wasm32"))]
 pub struct PictureHttp {
     agent: ureq::Agent,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl Default for PictureHttp {
     fn default() -> Self {
         let agent = ureq::AgentBuilder::new()
@@ -404,6 +408,7 @@ impl Default for PictureHttp {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl Source for PictureHttp {
     fn get(&self, url: &str) -> Result<Vec<u8>> {
         let response = self.agent.get(url).call().map_err(|err| Error::Download(format!("{url}: {err}")))?;

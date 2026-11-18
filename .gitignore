@@ -2,6 +2,7 @@ node_modules
 # Cargo builds, for the whole workspace.
 /target/
 /build
+/build-web
 /.svelte-kit
 /package
 .DS_Store
@@ -32,3 +33,6 @@ travel-wiki.json
 .vscode/
 Thumbs.db
 *.log
+
+# The website's WebAssembly and its glue, built by tools/build-wasm.mjs.
+/src/lib/platform/wasm/

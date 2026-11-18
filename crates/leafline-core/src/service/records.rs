@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use super::host::{Host, emit};
 
 use crate::error::{Error, Result};
-use crate::userdata::UserData;
+use crate::userdata::{RecordsSummary, UserData};
 use crate::userdata::characters::KnownMesos;
 use crate::userdata::drops::{LoggedDrop, NewDrop};
 use crate::userdata::notes::{ItemNote, MapNote};
@@ -60,7 +60,58 @@ impl UserDataState {
             Err(message) => Err(Error::Invalid(message.clone())),
         }
     }
+
+    /// Replaces the records at `path` with those in the records file at `incoming` (a copy the
+    /// player picked, already checked with [`UserData::open_file`]). The records as they were
+    /// are kept at `previous` first. `remove` deletes a file, the program's or the website's way.
+    /// If the new records can't be put in place, the previous ones are.
+    pub fn replace_from(
+        &self,
+        path: &Path,
+        incoming: &Path,
+        previous: &Path,
+        remove: &dyn Fn(&Path) -> Result<()>,
+    ) -> Result<RecordsSummary> {
+        let mut guard = self.0.lock().expect("user data lock");
+        let incoming = UserData::open_file(incoming)?;
+        let summary = incoming.summary()?;
+        if let Ok(db) = guard.as_ref() {
+            let _ = remove(previous);
+            db.export_to(previous)?;
+        }
+        // Close the records before their file goes.
+        *guard = Err("Your records are being replaced.".into());
+        let journal = path.with_file_name(format!(
+            "{}-journal",
+            path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()
+        ));
+        let _ = remove(&journal);
+        let put = remove(path).and_then(|()| incoming.export_to(path));
+        drop(incoming);
+        if let Err(err) = put {
+            let _ = remove(path);
+            if let Ok(before) = UserData::open(previous) {
+                let _ = before.export_to(path);
+            }
+            *guard = UserData::open(path).map_err(|e| e.to_string());
+            return Err(err);
+        }
+        *guard = UserData::open(path).map_err(|err| format!("Your records could not be opened: {err}"));
+        Ok(summary)
+    }
+
+    /// Writes a copy of the records to `path`, which must not exist yet.
+    pub fn export_to(&self, path: &Path) -> Result<RecordsSummary> {
+        self.with(|db| {
+            db.export_to(path)?;
+            db.summary()
+        })
+    }
 }
+
+/// Emitted to every window when the records were replaced from a file: everything shown from
+/// them is out of date.
+pub const RECORDS_REPLACED_EVENT: &str = "records-replaced";
 
 /// The mesos last read for a character, or with no name, for the one seen last.
 pub fn known_mesos(h: &dyn Host, name: Option<String>) -> Result<Option<KnownMesos>> {
@@ -431,6 +482,52 @@ mod tests {
         assert_eq!(csv_field("say \"hi\""), "\"say \"\"hi\"\"\"");
         assert_eq!(csv_field("=SUM(A1)"), "'=SUM(A1)");
         assert_eq!(csv_field("-5"), "-5");
+    }
+
+    fn drop_of(item: &str) -> NewDrop {
+        NewDrop {
+            item: item.into(),
+            item_id: None,
+            monster: "Pebble Snail".into(),
+            monster_id: None,
+            map: None,
+            map_id: None,
+            character: None,
+        }
+    }
+
+    #[test]
+    fn a_records_file_replaces_the_records_and_keeps_the_old_ones() {
+        let dir = std::env::temp_dir().join(format!("leafline-records-swap-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let (path, file, previous) = (dir.join("leafline.sqlite3"), dir.join("in.leafline"), dir.join("before.sqlite3"));
+        let remove = |p: &Path| -> Result<()> {
+            match std::fs::remove_file(p) {
+                Err(err) if err.kind() != std::io::ErrorKind::NotFound => Err(err.into()),
+                _ => Ok(()),
+            }
+        };
+
+        // The file to bring in: two drops, written by another copy of Leafline.
+        let other = UserDataState::load(&dir.join("other.sqlite3"), None);
+        other.with(|db| db.log_drop(&drop_of("Moss Scroll"), 1)).unwrap();
+        other.with(|db| db.log_drop(&drop_of("Twig Wand"), 2)).unwrap();
+        other.export_to(&file).unwrap();
+
+        let mine = UserDataState::load(&path, None);
+        mine.with(|db| db.log_drop(&drop_of("Shell"), 3)).unwrap();
+        let summary = mine.replace_from(&path, &file, &previous, &remove).unwrap();
+        assert_eq!(summary.drops, 2);
+        assert_eq!(mine.with(|db| db.drops()).unwrap().len(), 2);
+        // The records as they were are kept.
+        assert_eq!(UserData::open(&previous).unwrap().summary().unwrap().drops, 1);
+        // Something that isn't a records file is refused, and nothing changes.
+        std::fs::write(dir.join("junk.leafline"), b"not a database").unwrap();
+        assert!(mine.replace_from(&path, &dir.join("junk.leafline"), &previous, &remove).is_err());
+        assert_eq!(mine.with(|db| db.drops()).unwrap().len(), 2);
+        drop((other, mine));
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

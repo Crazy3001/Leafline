@@ -172,6 +172,8 @@ pub struct Store {
 
 impl Store {
     pub fn open(path: &Path) -> Result<Self> {
+        // The website's files live in its browser storage, which has no folders to make.
+        #[cfg(not(target_arch = "wasm32"))]
         if let Some(dir) = path.parent() {
             std::fs::create_dir_all(dir)?;
         }

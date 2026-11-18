@@ -1,7 +1,7 @@
 # Leafline: the Windows program (src-tauri), the website's WebAssembly worker (crates/leafline-web)
 # and the code they share (crates/leafline-core).
 [workspace]
-members = ["src-tauri", "crates/leafline-core"]
+members = ["src-tauri", "crates/leafline-core", "crates/leafline-web"]
 resolver = "3"
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
@@ -20,3 +20,10 @@ opt-level = 1
 
 [profile.dev.package."*"]
 opt-level = 3
+
+# The website's WebAssembly: built for download size, not speed. The program's release build is
+# unchanged. wasm-bindgen needs the sections `strip` would remove.
+[profile.web]
+inherits = "release"
+opt-level = "z"
+strip = false

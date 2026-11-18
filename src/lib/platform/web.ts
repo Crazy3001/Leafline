@@ -1,0 +1,128 @@
+// The website's backend: the program's command table, run by the same Rust in a worker (see
+// storage.svelte.ts), with the members that move windows, read the game or touch files replaced
+// by what a web page does instead. Nothing here sends anything anywhere: downloads are the
+// reference data the worker fetches, and saved files go to the player's own Downloads.
+
+import { goto } from "$app/navigation";
+import { base } from "$app/paths";
+
+import type { Backend } from "../api";
+import type { DeskStatus, PinStatus } from "../types";
+import { emit, listen } from "./bus";
+import { commandBackend } from "./commands";
+import { closePip, openPip, pipOpen } from "./pip";
+import { invoke } from "./storage.svelte";
+
+const notHere = (what: string) => () =>
+  Promise.reject(new Error(`${what} is in the Windows program only.`));
+
+/** Saves bytes as a file in the player's Downloads, the way a site does. */
+export function download(bytes: BlobPart, name: string, type: string) {
+  const url = URL.createObjectURL(new Blob([bytes], { type }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = name;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
+/** Opens a link in a new tab, without telling it where it came from. */
+function openTab(url: string) {
+  const parsed = new URL(url.trim());
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") throw new Error("Only web addresses open.");
+  window.open(parsed.href, "_blank", "noopener,noreferrer");
+}
+
+const desk: DeskStatus = { open: true, onTop: false };
+
+function pins(): PinStatus {
+  return { pinned: pipOpen() ? ["now"] : [], hidden: false };
+}
+
+const shared = commandBackend(invoke, listen, emit);
+
+export const webBackend: Backend = {
+  ...shared,
+  pickFolder: async () => null,
+  overlayStatus: async () => ({ visible: true, clickThrough: false, compact: false }),
+  setClickThrough: async () => {},
+  hideOverlay: async () => {},
+  setCompact: async () => {},
+  toggleOverlay: async () => {},
+  shortcuts: async () => [],
+  setHotkeysQuiet: async () => {},
+  liveStatus: async () => ({ state: "off" }),
+  setLiveHeld: async () => {},
+  resetSession: async () => {},
+  startLive: notHere("Reading the game"),
+  stopLive: async () => {},
+  liveWindows: async () => [],
+  saveLiveFrame: notHere("Saving game pictures"),
+  saveItemPicture: notHere("Saving game pictures"),
+  // Map pictures with their portals and spawns are drawn by the program from downloaded pictures.
+  mapPicture: async () => null,
+  showQuest: (id) => emit("show-quest", id),
+  showMonster: (id, text) => emit("show-monster", { id, text }),
+  showPlace: (mode, id) => emit("show-place", { mode, id }),
+  showItem: (id, text) => emit("show-item", { id, text }),
+  openLink: async (url) => openTab(url),
+  openGuide: async (url) => openTab(url),
+  async saveImage(png, name) {
+    download(png as BlobPart, name, "image/png");
+    return true;
+  },
+  openDataFolder: async () => {},
+  framesFolder: async () => "",
+  openFramesFolder: async () => {},
+  diagnostics: async () =>
+    [`Leafline website ${await invoke<string>("version")}`, `Browser: ${navigator.userAgent}`].join("\n"),
+  showTraining: () => emit("desk-tab", "log"),
+  showBuild: () => emit("desk-tab", "planner"),
+  showDesk: async () => desk,
+  deskStatus: async () => desk,
+  deskTakeTab: async () => null,
+  setDeskOnTop: async () => desk,
+  async setPageZoom(zoom) {
+    document.documentElement.style.setProperty("zoom", String(zoom));
+  },
+  monitorCount: async () => 1,
+  setTyping: async () => {},
+  async exportCsv(what) {
+    const { text, rows } = await invoke<{ text: string; rows: number }>("export_csv", { what });
+    const stamp = new Date().toISOString().slice(0, 10);
+    download(text, `leafline-${what === "drops" ? "drop-log" : what === "loot" ? "loot" : "sessions"}-${stamp}.csv`, "text/csv");
+    return rows;
+  },
+  readCharacter: notHere("Reading the character's windows"),
+  bagLookFurther: async () => {},
+  lastBag: async () => null,
+  currentReadings: async () => ({ analysis: null, session: null }),
+  pinStatus: async () => pins(),
+  async pinPanel(panel) {
+    if (panel === "now") await openPip(() => void emit("pins", pins()));
+    const status = pins();
+    void emit("pins", status);
+    return status;
+  },
+  async unpinPanel(panel) {
+    if (panel === "now") closePip();
+    const status = pins();
+    void emit("pins", status);
+    return status;
+  },
+  popOutCard: async () => {},
+  showCard: async () => {},
+  cardIsLive: async () => false,
+  pinCard: async () => {},
+  onPinResized: async () => () => {},
+  showPanel: (panel) => emit("show-panel", panel),
+  updateStatus: async () => ({ state: "off" }),
+  checkForUpdate: async () => ({ state: "off" }),
+  installUpdate: notHere("Updating"),
+  showSettings: () => goto(`${base}/settings`),
+  showSetup: () => goto(`${base}/settings`),
+  finishSetup: async () => {},
+  editTravelFile: notHere("Editing the travel file"),
+  version: () => invoke<string>("version"),
+  fitWindow: async () => {},
+};

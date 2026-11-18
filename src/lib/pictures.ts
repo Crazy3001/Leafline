@@ -5,6 +5,7 @@
 
 import { isTauri } from "@tauri-apps/api/core";
 
+import { isWeb } from "./platform";
 import { display } from "./settings.svelte";
 
 /** `mapview` is a map's picture cut to what is drawn and made smaller, for the map section. */
@@ -21,7 +22,8 @@ const missing = new Set<string>();
 
 /** The address of a picture by id, or by name when that is all a link knows; null when off. */
 export function pictureUrl(kind: PictureKind, key: number | string | null | undefined): string | null {
-  if (!display.showPictures || key == null) return null;
+  // The website shows names alone for now: the program's picture cache isn't there.
+  if (isWeb || !display.showPictures || key == null) return null;
   if (typeof key === "number") return `${BASE}${kind}/${key}`;
   const name = key.trim();
   return name ? `${BASE}${kind}/name/${encodeURIComponent(name)}` : null;
