@@ -412,7 +412,16 @@ let mockBuilds: (Build & { usedAt: number })[] = [
     name: "Fernblade, LUK heavy",
     character: null,
     guide: "",
-    start: { level: 29, stats: { str: 4, dex: 60, int: 4, luk: 92 }, ap: 0, sp: 0, skills: [{ skillId: 10, level: 20 }, { skillId: 11, level: 17 }] },
+    start: {
+      level: 29,
+      stats: { str: 4, dex: 60, int: 4, luk: 92 },
+      ap: 0,
+      sp: 0,
+      skills: [{ skillId: 10, level: 20 }, { skillId: 11, level: 17 }],
+      pieces: [
+        { id: 1, item: 501, name: "Mossy Cap", itemType: "Hat", level: 15, stats: [{ label: "Weapon Def.", value: 13 }], upgrades: 1, slotsLeft: 6, slots: 7 },
+      ],
+    },
     plan: {
       job: 420,
       skills: [{ skillId: 11, level: 20 }, { skillId: 20, level: 20 }, { skillId: 21, level: 10 }, { skillId: 12, level: 10 }],

@@ -186,8 +186,9 @@
    *  so their own rate there is weighed against the estimates. */
   const PLAYED_WELL = 10 * 60;
   const FAR_BELOW = 15;
-  const playedWell = (s: TrainingSpot) =>
-    s.measured != null && s.measured.activeSeconds >= PLAYED_WELL && (level == null || s.averageLevel >= level - FAR_BELOW);
+  /** Your own rate on a map, once there are ten minutes of it: seconds of play there say nothing. */
+  const ownRate = (s: TrainingSpot) => (s.measured != null && s.measured.activeSeconds >= PLAYED_WELL ? s.measured : null);
+  const playedWell = (s: TrainingSpot) => ownRate(s) != null && (level == null || s.averageLevel >= level - FAR_BELOW);
   const near = (s: TrainingSpot) => level == null || (s.averageLevel >= level - BELOW && s.averageLevel <= level + ABOVE);
   const savedIds = $derived(new Set(saved.map((s) => s.mapId)));
   const sorts = $derived<{ id: Sort; label: string; title: string }[]>([
@@ -204,7 +205,7 @@
   const speed = $derived(data?.speed ?? null);
   const fit = $derived(data?.fit ?? null);
   /** The older estimate, for a map the player hasn't measured, when there is no forecast. */
-  const estimate = (s: TrainingSpot) => (s.forecast || s.measured ? null : s.estimate);
+  const estimate = (s: TrainingSpot) => (s.forecast || ownRate(s) ? null : s.estimate);
   const forecast = (s: TrainingSpot): Forecast | null => s.forecast ?? null;
   /** Hours a training session runs, for weighing a long trip against a better map. */
   const SESSION_HOURS = 1;
@@ -214,7 +215,7 @@
   const DEATH_COST = 0.1;
   /** EXP an hour of a session spent here: the trip there takes from the hour, deaths take EXP. */
   function forYou(s: TrainingSpot) {
-    const rate = forecast(s)?.expPerHour ?? s.measured?.expPerHour ?? estimate(s)?.expPerHour;
+    const rate = forecast(s)?.expPerHour ?? ownRate(s)?.expPerHour ?? estimate(s)?.expPerHour;
     if (rate == null) return -1;
     const trip = ((steps(s) ?? 0) * SECONDS_PER_HOP) / 3600;
     const deaths = (forecast(s)?.deathsPerHour ?? 0) * DEATH_COST * (session?.expNeeded ?? 0);
@@ -229,15 +230,15 @@
       sort === "saved"
         ? savedIds.has(s.map.id)
         : sort === "played"
-          ? s.measured != null && s.measured.activeSeconds >= 60
+          ? ownRate(s) != null
           : s.reachable && (allLevels || (near(s) && !tooHard(s)) || savedIds.has(s.map.id) || playedWell(s)),
     );
     // With no estimate at all, maps not tried fall back to base EXP, below every measured one.
     const you = (s: TrainingSpot) =>
-      !s.forecast && speed == null && !s.measured ? s.expPerClear / 1e6 - 1 : forYou(s);
+      !s.forecast && speed == null && !ownRate(s) ? s.expPerClear / 1e6 - 1 : forYou(s);
     const by: Record<Sort, (s: TrainingSpot) => number> = {
       you,
-      played: (s) => s.measured?.expPerHour ?? -1,
+      played: (s) => ownRate(s)?.expPerHour ?? -1,
       near: (s) => -(steps(s) ?? 9999),
       saved: you,
     };
@@ -409,7 +410,8 @@
         range: `Likely ${formatCompact(f.low)}–${formatCompact(f.high)} EXP an hour`,
       };
     }
-    if (spot.measured) return { value: formatCompact(spot.measured.expPerHour), unit: "your EXP / hr", quiet: false };
+    const own = ownRate(spot);
+    if (own) return { value: formatCompact(own.expPerHour), unit: "your EXP / hr", quiet: false };
     const guess = estimate(spot);
     if (guess) return { value: `≈${formatCompact(guess.expPerHour)}`, unit: "est. EXP / hr", quiet: true, sure: guess.sureness };
     return { value: formatCompact(spot.expPerClear), unit: "EXP / clear", quiet: true };
@@ -514,7 +516,8 @@
   }
 
   function why(spot: TrainingSpot) {
-    if (spot.measured) return `Your rate over ${formatDuration(spot.measured.activeSeconds)} of play here.`;
+    const own = ownRate(spot);
+    if (own) return `Your rate over ${formatDuration(own.activeSeconds)} of play here.`;
     if (estimate(spot)) return null;
     return "Not tried yet. Play ten minutes solo on any map and Leafline can estimate this one from your kill speed.";
   }
@@ -582,7 +585,7 @@
                       class="try"
                       use:tip={"Not played yet, and its range reaches past your best map. Trying it teaches Leafline more."}
                       >Worth a try</span
-                    >{" · "}{/if}{#if steps(spot) === 0}<span class="here">You're here</span>{" · "}{/if}{#if sort === "played" && spot.measured}{formatDuration(spot.measured.activeSeconds)} played · {/if}{line.levels}{#each line.mobs as mob, n (mob.id)}{n === 0 ? " · " : ", "}<Ref kind="mob" id={mob.id} name={monsterLabel(mob.name)} icon={false} />{/each}
+                    >{" · "}{/if}{#if steps(spot) === 0}<span class="here">You're here</span>{" · "}{/if}{#if sort === "played" && ownRate(spot)}{formatDuration(ownRate(spot)!.activeSeconds)} played · {/if}{line.levels}{#each line.mobs as mob, n (mob.id)}{n === 0 ? " · " : ", "}<Ref kind="mob" id={mob.id} name={monsterLabel(mob.name)} icon={false} />{/each}
                 </span>
               </span>
               <span class="metric" use:tip={m.range ?? ""}>
@@ -648,7 +651,7 @@
         </li>
       {:else}
         {#if sort === "played"}
-          <li class="quiet empty">No maps played yet. Maps you train on show here with your own rate.</li>
+          <li class="quiet empty">No maps played for 10 minutes or more yet. Maps you train on show here with your own rate.</li>
         {:else if sort !== "saved"}
           <li class="quiet empty">
             {level != null ? `No maps with monsters near Lv ${level}. Tick Every level to see the rest.` : "Set your level to see maps that suit it."}

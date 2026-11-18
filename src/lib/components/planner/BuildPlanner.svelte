@@ -1850,7 +1850,7 @@
     color: var(--text);
   }
 
-  .chip :global(.ref.upgraded) {
+  .chip :global(.ref.upgraded:not(.worn)) {
     color: var(--accent-text-strong);
   }
 

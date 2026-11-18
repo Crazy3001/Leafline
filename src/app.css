@@ -95,6 +95,8 @@
   --ref-npc: #6fd0bd;
   --ref-map: #e7b45a;
   --ref-skill: #c3a6f5;
+  /* Worn gear: the look's own green, so it reads in every look. */
+  --ref-worn: var(--good);
 
   /*
    * Marks on a map's picture: their own vivid set, apart from the link colours, so they stand out
@@ -411,6 +413,11 @@ button {
 .ref.upgraded,
 .ref.goal {
   color: var(--accent-text-strong);
+}
+
+/* Gear the character wears, wherever its name shows: a colour of its own. */
+.ref.ref-item.worn {
+  color: var(--ref-worn);
 }
 
 .ref.more {

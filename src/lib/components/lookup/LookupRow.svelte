@@ -2,6 +2,7 @@
   // One result of a lookup: a name with its picture, a line under it, and a short fact at the right.
   import type { Snippet } from "svelte";
   import { clipped } from "$lib/tip.svelte";
+  import { isWorn } from "$lib/builds.svelte";
   import Pic from "$lib/ui/Pic.svelte";
   import type { PictureKind } from "$lib/pictures";
 
@@ -28,11 +29,14 @@
     below?: Snippet;
     onclick: () => void;
   } = $props();
+
+  /** Gear the character wears shows in its own colour here too. */
+  const wearing = $derived(picture?.kind === "item" && isWorn(picture.id, name));
 </script>
 
 <button class="row nav-row" {onclick}>
-  <span use:clipped class="name" class:goal
-    >{#if picture}<Pic kind={picture.kind} id={picture.id} size={18} class="row-pic" />{/if}{name}{#if small}<small>{small}</small>{/if}</span
+  <span use:clipped class="name" class:goal class:wearing
+    >{#if picture}<Pic kind={picture.kind} id={picture.id} size={18} class="row-pic" />{/if}{name}{#if small}<small>{small}</small>{/if}{#if wearing}<small class="worn-tag">Wearing</small>{/if}</span
   >
   {#if aside}<span class="aside tabular">{aside}</span>{/if}
   {#if line}<span class="line">{line}</span>{/if}
@@ -74,6 +78,14 @@
 
   .name.goal {
     color: var(--accent-text-strong);
+  }
+
+  .name.wearing {
+    color: var(--ref-worn);
+  }
+
+  small.worn-tag {
+    color: var(--ref-worn);
   }
 
   small {

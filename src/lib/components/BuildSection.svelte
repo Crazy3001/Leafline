@@ -1157,7 +1157,7 @@
   }
 
   /* Scrolled, in the game's amber, as the item check shows it. */
-  .line :global(.ref.upgraded) {
+  .line :global(.ref.upgraded:not(.worn)) {
     color: var(--accent-text-strong);
   }
 

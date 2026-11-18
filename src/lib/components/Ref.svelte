@@ -8,6 +8,7 @@
 
   import { openPeek, type PeekKind } from "$lib/peek.svelte";
   import { splitMapLabel } from "$lib/format";
+  import { isWorn } from "$lib/builds.svelte";
   import Pic from "$lib/ui/Pic.svelte";
   import QuestMark from "./quest/QuestMark.svelte";
   import type { PictureKind } from "$lib/pictures";
@@ -38,12 +39,15 @@
   const picture = $derived(icon ? PICTURE[kind] : null);
   /** A map's label names the map after its street. */
   const pictureName = $derived(kind === "map" && name ? splitMapLabel(name).name : name);
+  /** Gear the character wears has a colour of its own, wherever its name shows. */
+  const wearing = $derived(kind === "item" && isWorn(id, name));
 </script>
 
 <button
   class="ref ref-{kind} {extra}"
   class:with-pic={!!picture}
-  use:tip={title}
+  class:worn={wearing}
+  use:tip={title ?? (wearing ? "You're wearing this" : undefined)}
   onclick={(e) => {
     e.stopPropagation();
     openPeek({ kind, id, name }, e.currentTarget);
