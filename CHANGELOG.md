@@ -3,7 +3,42 @@
 What changed in each release of Leafline. Leafline is a work in progress: if something reads
 wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?template=bug_report.yml).
 
-## Unreleased
+## 0.4.0 (2026-11-18)
+
+### A new look
+Every screen is redrawn. Everything Leafline did before is still there, reached from a tab, the
+Tools list or search.
+
+- **Four looks:** Ember Dark (the default), Ember Light, Sprout Light and Sprout Dark. Pick one in
+  setup or in **Settings → Look**.
+- **Five tabs:** **Now**, **Quests**, **Map**, **Train** and **Me**. Now shows the session at a
+  glance with the quest you're on. The header carries your level, name, job, EXP and time to level.
+- **Views by chips.** Quests has **On now**, **Quest log** and **To take**; Train has **Session**,
+  **Where to train** and **History**. The Map tab puts the map's own facts first, then its parts as
+  cards you can jump to.
+- **One search box** for items, monsters, maps, NPCs, skills and tools. Picking a kind's list keeps
+  typing in the same box.
+- **A Tools list** for everything that isn't a tab: Crafting, Sell or keep, Timers, Drop log,
+  Tracked items, Potion costs, Gear finder, Training log, Build planner, Share card, Route planner
+  and Characters.
+- **Go here** sits under the header as one solid card.
+- **The compact HUD is one strip:** level, an EXP bar, EXP and mesos per hour with how the last five
+  minutes compare, time to level and session time, with the next step and quest counters under it.
+- **A Now pin:** pin the session and your quests into their own small window.
+- **The desk view is rebuilt** for a wide window: a sidebar of views (Now, Quests, Map, Train, Me,
+  Look up, the training log, the build planner and the tools) with one search and the Go here bar on
+  top, each view laid out across the width. **My layout** keeps the old columns you arranged
+  yourself. **Pop out** pins Now beside the game.
+- **The build planner opens on a Plan tab:** a chart of your levels with job bands, when each goal
+  is reached, where the AP goes, new gear and advancements, and where you are now. Pick a level for
+  everything that happens at it. Goals are listed in order with done, now, next and short tags, and
+  can be dragged into a new order.
+- **The training log opens on an Overview:** six tiles, EXP per day, your best maps, recent
+  sessions, the next level and the time spent at each level.
+- **Setup** has a Look step, and its steps run down the side. **Settings** has a side menu that
+  follows where you are.
+- **Sessions under 10 minutes** of play aren't listed, ranked or used as your rate, so a few seconds
+  on a map can't top Where to train.
 
 ### Added
 - **Your fight.** Every monster's page shows how a fight with it goes for your character: how
@@ -25,8 +60,6 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
   spawns, how many spawn and how thickly (spawns per 1,000 px of floor), and sort by either.
 
 ### Changed
-- **A cleaner compact HUD**, with your level, an EXP bar like the game's, how the last five
-  minutes compare, when you'll level, and quest counters under each quest's name.
 - **The Train tab's EXP bar** looks like the game's, with your EXP and percent written on it.
 
 **Training**

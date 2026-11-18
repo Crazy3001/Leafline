@@ -34,8 +34,6 @@ sends input, and stays free.
 - A before-and-after look at a gear change: stats, damage and EXP per hour
 - Is this upgrade worth it: what a piece of gear gains you for what it costs
 - NPC shop prices kept up to date as they change
-- Knowing which quests you've done, by reading the game's quest log when you open it, so quest
-  lists leave them out
 
 **Maps and getting around**
 - Hidden portals checked in game on every map, with ones the data misses added
