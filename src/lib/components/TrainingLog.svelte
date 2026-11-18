@@ -59,7 +59,14 @@
   /** In a desk view column: no title of its own, and the views in a row above. */
   let { embedded = false }: { embedded?: boolean } = $props();
 
-  type View = "sessions" | "maps" | "records" | "progress" | "drops";
+  type View = "overview" | "sessions" | "maps" | "records" | "drops";
+  const VIEWS: [View, string][] = [
+    ["overview", "Overview"],
+    ["sessions", "Sessions"],
+    ["maps", "Maps"],
+    ["records", "Records"],
+    ["drops", "Drops"],
+  ];
   type Range = "7" | "30" | "all";
 
   const VIEW_KEY = "leafline.training.view";
@@ -72,7 +79,13 @@
     watchSettings();
   });
 
-  let view = $state<View>(stored(VIEW_KEY, "sessions") as View);
+  /** The Overview was called Progress, and came fourth, until the 0.4 look. */
+  function storedView(): View {
+    const saved = stored(VIEW_KEY, "overview");
+    if (saved === "progress") return "overview";
+    return VIEWS.some(([id]) => id === saved) ? (saved as View) : "overview";
+  }
+  let view = $state<View>(storedView());
   let range = $state<Range>("30");
   let character = $state<string>("");
   /** Once the player has picked a character (or All), their pick stands. */
@@ -317,6 +330,29 @@
       }));
   });
   const current = $derived(live.session && live.session.activeSeconds > 0 ? live.session : null);
+
+  // Overview: what the deaths and potions cost over the range, the best single session, the maps
+  // with the best runs, and the last few sessions.
+  const deaths = $derived(sessions.reduce((a, s) => a + s.deaths, 0));
+  const deathSeconds = $derived(sessions.reduce((a, s) => a + (deathCost(s)?.seconds ?? 0), 0));
+  const potionCost = $derived(sessions.reduce((a, s) => a + s.potionCost, 0));
+  const bestSession = $derived(
+    sessions.reduce<SavedSession | null>((b, s) => (s.expPerHour != null && (b?.expPerHour ?? -1) < s.expPerHour ? s : b), null),
+  );
+  const BEST_MAPS = 4;
+  const bestMaps = $derived(
+    mapStats(sessions)
+      .filter((m) => m.best)
+      .sort((a, b) => b.best!.expPerHour - a.best!.expPerHour)
+      .slice(0, BEST_MAPS),
+  );
+  const bestTop = $derived(Math.max(1, ...bestMaps.map((m) => m.best!.expPerHour)));
+  const RECENT = 5;
+
+  function openSession(id: number) {
+    selectedId = id;
+    pickView("sessions");
+  }
   const paceSeconds = $derived(totals.days > 0 ? totalSeconds / totals.days : null);
 </script>
 
@@ -355,8 +391,8 @@
 
   <div class="body">
     <nav aria-label="Training log">
-      {#each [["sessions", "Sessions"], ["maps", "Maps"], ["records", "Records"], ["progress", "Progress"], ["drops", "Drops"]] as [id, name] (id)}
-        <button class="nav" aria-current={view === id ? "page" : undefined} onclick={() => pickView(id as View)}>{name}</button>
+      {#each VIEWS as [id, name] (id)}
+        <button class="nav" aria-current={view === id ? "page" : undefined} onclick={() => pickView(id)}>{name}</button>
       {/each}
     </nav>
 
@@ -730,16 +766,33 @@
           </section>
         {/if}
       {:else}
-        <div class="tiles four">
-          <Stat size="lg" label="Played" value={dur(totalSeconds)} sub="{totals.days} day{totals.days === 1 ? '' : 's'}{paceSeconds ? `, ${dur(paceSeconds)} a day` : ''}" />
+        <div class="tiles six">
+          <Stat size="lg" label="EXP gained" value={formatNumber(totals.exp)} sub="{sessions.length} session{sessions.length === 1 ? '' : 's'}" />
+          <Stat size="lg" label="Time trained" value={dur(totalSeconds)} sub="{totals.days} day{totals.days === 1 ? '' : 's'}{paceSeconds ? `, ${dur(paceSeconds)} a day` : ''}" />
+          <Stat
+            size="lg"
+            label="Average EXP / hr"
+            value={totals.expPerHour ? formatCompact(totals.expPerHour) : "—"}
+            sub={bestSession?.expPerHour ? `best session ${formatCompact(bestSession.expPerHour)}` : null}
+          />
+          <Stat
+            size="lg"
+            label={potionCost > 0 ? "Mesos, after potions" : "Mesos gained"}
+            value={formatNumber(totals.mesos - potionCost)}
+            sub={potionCost > 0 ? `potions cost ${formatCompact(potionCost)}` : totals.mesosPerHour ? `${formatCompact(totals.mesosPerHour)} an hour` : null}
+          />
           <Stat
             size="lg"
             label="Levels"
             value={totals.from != null && totals.to != null && totals.to !== totals.from ? `${totals.from} → ${totals.to}` : String(totals.ups)}
             sub="{totals.ups} level-up{totals.ups === 1 ? '' : 's'}"
           />
-          <Stat size="lg" label="EXP gained" value={formatNumber(totals.exp)} sub={totals.expPerHour ? `${formatCompact(totals.expPerHour)} an hour` : null} />
-          <Stat size="lg" label="Mesos gained" value={formatNumber(totals.mesos)} sub={totals.mesosPerHour ? `${formatCompact(totals.mesosPerHour)} an hour` : null} />
+          <Stat
+            size="lg"
+            label="Deaths"
+            value={String(deaths)}
+            sub={deathSeconds >= 30 ? `cost about ${dur(deathSeconds)} of play` : deaths ? null : "none"}
+          />
         </div>
 
         <div class="split">
@@ -764,6 +817,54 @@
               format={(v) => (dayMetric === "time" ? dur(v) : formatCompact(v))}
               label="Play per day"
             />
+          </section>
+
+          {#if bestMaps.length}
+            <section class="panel grow2">
+              <div class="list-head">
+                <h2>Your best maps</h2>
+                <span class="quiet">EXP / hr · the mark is your best run</span>
+              </div>
+              <ul class="bests">
+                {#each bestMaps as m (m.map)}
+                  <li>
+                    <span class="best-name"
+                      ><Ref kind="map" name={m.map}>{m.name}</Ref> <span class="quiet">· {dur(m.activeSeconds)}</span></span
+                    >
+                    <span class="num best-rate">{formatCompact(m.expPerHour)}</span>
+                    <span class="best-bar" aria-hidden="true"
+                      ><span style:width="{(m.expPerHour / bestTop) * 100}%"></span><i style:left="{(m.best!.expPerHour / bestTop) * 100}%"
+                      ></i></span
+                    >
+                  </li>
+                {/each}
+              </ul>
+              <button class="link" onclick={() => pickView("maps")}>Every map you trained on</button>
+            </section>
+          {/if}
+        </div>
+
+        <div class="split">
+          <section class="panel grow3">
+            <div class="list-head">
+              <h2>Recent sessions</h2>
+              <span class="quiet">They save themselves as you play</span>
+            </div>
+            <ul class="recent">
+              {#each sessions.slice(0, RECENT) as s (s.id)}
+                <li>
+                  <button onclick={() => openSession(s.id)}>
+                    <span class="tabular muted">{shortDay(s.startedAt ?? s.savedAt)}</span>
+                    <span class="what"><span use:clipped class="ellipsis">{title(s)}</span>{#if levelText(s)}<span class="small">{levelText(s)}</span>{/if}</span>
+                    <span class="tabular r">{dur(s.activeSeconds)}</span>
+                    <span class="tabular r strong">{expRate(s)}</span>
+                  </button>
+                </li>
+              {/each}
+            </ul>
+            {#if sessions.length > RECENT}
+              <button class="link" onclick={() => pickView("sessions")}>All {sessions.length} sessions</button>
+            {/if}
           </section>
 
           {#if current && current.level != null && current.percent != null}
@@ -965,14 +1066,16 @@
     align-items: flex-start;
   }
 
+  /* The shared card: the look's outline, corners and edge. */
   .panel {
     display: flex;
     flex-direction: column;
     gap: 10px;
     padding: var(--space-3);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
+    border: var(--line-w) solid var(--line);
+    border-radius: var(--radius-lg);
     background: var(--surface);
+    box-shadow: var(--card-shadow);
   }
 
   .list {
@@ -1099,8 +1202,108 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .tiles.four {
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  .tiles.six {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  }
+
+  /* Overview: best maps, each run's average as a bar with a mark at its best. */
+  .bests {
+    display: grid;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .bests li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 4px 10px;
+    align-items: baseline;
+  }
+
+  .best-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .best-rate {
+    font-weight: 600;
+  }
+
+  .best-bar {
+    position: relative;
+    grid-column: 1 / -1;
+    height: 6px;
+    border-radius: var(--radius-pill);
+    background: var(--track);
+  }
+
+  .best-bar span {
+    position: absolute;
+    inset: 0 auto 0 0;
+    border-radius: inherit;
+    background: var(--exp);
+  }
+
+  .best-bar i {
+    position: absolute;
+    top: -3px;
+    width: 2px;
+    height: 12px;
+    margin-left: -1px;
+    border-radius: 1px;
+    background: var(--text);
+  }
+
+  .recent {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .recent button {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr) 70px 60px;
+    gap: 10px;
+    align-items: center;
+    width: 100%;
+    padding: 8px 4px;
+    border: 0;
+    border-top: 1px solid var(--border);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .recent li:first-child button {
+    border-top: 0;
+  }
+
+  .recent button:hover {
+    background: var(--hover);
+  }
+
+  .link {
+    align-self: flex-start;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--accent-text);
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .link:hover {
+    color: var(--accent-text-strong);
+    text-decoration: underline;
+    text-underline-offset: 2px;
   }
 
   .caption {
