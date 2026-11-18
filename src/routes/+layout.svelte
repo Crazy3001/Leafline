@@ -4,12 +4,14 @@
   import { backend } from "$lib/api";
   import PeekHost from "$lib/components/peek/PeekHost.svelte";
   import TipHost from "$lib/ui/TipHost.svelte";
-  import WebStorageNotice from "$lib/components/WebStorageNotice.svelte";
-  import { isWeb } from "$lib/platform";
   import { followTheme } from "$lib/ui/theme.svelte";
   import { watchWorn } from "$lib/builds.svelte";
 
   let { children } = $props();
+
+  // The website's notice about which tab holds the records. Loaded only in the website's build:
+  // it brings in the worker, which the program must not carry.
+  const webNotice = __LEAFLINE_WEB__ ? import("$lib/components/WebStorageNotice.svelte") : null;
 
   followTheme();
   watchWorn();
@@ -23,5 +25,5 @@
 
 {@render children()}
 <PeekHost />
-{#if isWeb}<WebStorageNotice />{/if}
+{#if webNotice}{#await webNotice then notice}<notice.default />{/await}{/if}
 <TipHost />
