@@ -6,3 +6,4 @@ pub mod mapdata;
 pub mod questlog;
 pub mod records;
 pub mod sheet;
+pub mod typed;

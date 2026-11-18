@@ -29,6 +29,7 @@ MODULES = {
     'quests': 'questlog',
     'records': 'records',
     'sheet': 'sheet',
+    'typed': 'typed',
 }
 
 # Commands that download, which the program runs off its UI thread.

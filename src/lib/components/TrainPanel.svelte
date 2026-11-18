@@ -3,6 +3,8 @@
   // played (rates, the level goal, how this map compares with your bests on it, the maps played, a
   // graph of the whole session), or before one starts, how it starts and the goal. Where to
   // train: the maps for your level. History: your best maps and the last sessions.
+  import { can } from "$lib/platform";
+  import TypedSessionCard from "./TypedSessionCard.svelte";
   import { tip } from "$lib/tip.svelte";
   import Ref from "$lib/components/Ref.svelte";
   import SessionControls from "./SessionControls.svelte";
@@ -316,6 +318,9 @@
 
   {#if !tracking && glance}
     <p class="caption">Starts with your first EXP.</p>
+  {:else if !tracking && !can.liveReading}
+    <!-- The website reads nothing: a session is typed in. -->
+    {#if !glanced}<TypedSessionCard />{/if}
   {:else if !tracking}
     <div class="empty">
       <strong>Starts with your first EXP</strong>

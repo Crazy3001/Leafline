@@ -1376,6 +1376,17 @@ export const mockBackend: Backend = {
   pickRecords: async () => null,
   useRecords: async () => ({ sessions: 0, drops: 0, builds: 0, notes: 0, characters: 0, spots: 0, prices: 0 }),
   onRecordsReplaced: async () => () => {},
+  typedSessionOutcome: async (s) => ({
+    percentGained: (s.end.level - s.start.level) * 100 + s.end.percent - s.start.percent,
+    percentPerHour: 0,
+    expGained: null,
+    expPerHour: null,
+    mesosGained: null,
+    mesosPerHour: null,
+    minutesToLevel: null,
+    levelUps: s.end.level - s.start.level,
+  }),
+  saveTypedSession: async () => 1,
   updateStatus: async () => updateStatus,
   async checkForUpdate() {
     if (!displaySettings.updateCheck) throw "Turn on the update check first.";

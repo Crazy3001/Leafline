@@ -7,10 +7,10 @@ import { goto } from "$app/navigation";
 import { base } from "$app/paths";
 
 import type { Backend } from "../api";
-import type { DeskStatus, PinStatus } from "../types";
+import type { DeskStatus, MapPicture, PinStatus } from "../types";
 import { emit, listen } from "./bus";
 import { commandBackend } from "./commands";
-import { setPictureTable } from "./pictures.svelte";
+import { setMapView, setPictureTable } from "./pictures.svelte";
 import { closePip, openPip, pipOpen } from "./pip";
 import { checkRecords, exportRecords, importRecords, invoke, recordsSummary } from "./storage.svelte";
 
@@ -79,8 +79,16 @@ export const webBackend: Backend = {
   liveWindows: async () => [],
   saveLiveFrame: notHere("Saving game pictures"),
   saveItemPicture: notHere("Saving game pictures"),
-  // Map pictures with their portals and spawns are drawn by the program from downloaded pictures.
-  mapPicture: async () => null,
+  // The worker cuts the map's picture with the shared code; the page shows it as a data address.
+  async mapPicture(id) {
+    const cut = await invoke<{ width: number; height: number; points: MapPicture["points"]; jpeg: string } | null>(
+      "map_picture",
+      { id },
+    );
+    if (!cut) return null;
+    setMapView(id, `data:image/jpeg;base64,${cut.jpeg}`);
+    return { width: cut.width, height: cut.height, points: cut.points };
+  },
   showQuest: (id) => emit("show-quest", id),
   showMonster: (id, text) => emit("show-monster", { id, text }),
   showPlace: (mode, id) => emit("show-place", { mode, id }),

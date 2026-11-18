@@ -2,6 +2,7 @@
   // The window's header: who you are and how far through the level, with four actions. The level
   // sits in a ring that fills with EXP; under it one quiet line gives the exact numbers and when
   // the level comes. The whole header drags the window.
+  import { can } from "$lib/platform";
   import { LayoutGrid, Lock, LockOpen, Pin, PinOff, Search } from "@lucide/svelte";
 
   import Logo from "$lib/components/Logo.svelte";
@@ -68,19 +69,19 @@
       <div class="name" data-tauri-drag-region>{name ?? "Leafline"}</div>
       <div class="under" data-tauri-drag-region>
         {#if job}<span data-tauri-drag-region>{job}</span>{/if}
-        <button class="live" class:on={state === "reading"} class:waiting={state === "waiting"} use:tip={liveTitle} onclick={onlive}>
+        {#if can.liveReading}<button class="live" class:on={state === "reading"} class:waiting={state === "waiting"} use:tip={liveTitle} onclick={onlive}>
           <span class="dot" aria-hidden="true"></span>{liveOn ? "Live" : "Offline"}
-        </button>
+        </button>{/if}
       </div>
     </div>
     <div class="actions">
       <IconButton tone="header" label="Search everything" active={searching} onclick={onsearch}><Search size={17} /></IconButton>
-      <IconButton tone="header" label={pinTitle} active={pinned} onclick={onpin}>
+      {#if can.pins}<IconButton tone="header" label={pinTitle} active={pinned} onclick={onpin}>
         {#if pinned}<PinOff size={17} />{:else}<Pin size={17} />{/if}
-      </IconButton>
-      <IconButton tone="header" label={locked ? "Unlock" : "Lock"} title={lockTitle} active={locked} onclick={onlock}>
+      </IconButton>{/if}
+      {#if can.clickThrough}<IconButton tone="header" label={locked ? "Unlock" : "Lock"} title={lockTitle} active={locked} onclick={onlock}>
         {#if locked}<Lock size={17} />{:else}<LockOpen size={17} />{/if}
-      </IconButton>
+      </IconButton>{/if}
       <IconButton tone="header" label="Tools" title="Tools, and Leafline's windows and settings" active={tooling} onclick={ontools}>
         <LayoutGrid size={17} />
       </IconButton>

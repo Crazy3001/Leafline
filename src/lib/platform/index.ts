@@ -19,10 +19,10 @@ export const can = {
   updates: !isWeb,
   dataFolder: !isWeb,
   /**
-   * A small window of Now's numbers that stays over the game. On the website it will be the browser's
-   * picture-in-picture window (platform/pip.ts), once a session typed in gives it numbers to show.
+   * A small window of Now's numbers that stays over the game: a pinned panel in the program, the
+   * browser's picture-in-picture window on the website (Chrome and Edge; see platform/pip.ts).
    */
-  popOut: !isWeb,
+  popOut: !isWeb || (typeof window !== "undefined" && "documentPictureInPicture" in window),
 };
 
 export async function pickBackend(): Promise<Backend> {

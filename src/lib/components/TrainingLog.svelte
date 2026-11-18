@@ -2,6 +2,7 @@
   // The training log: every saved session with its graph, rates per map by level and party, the
   // player's records per map by level, party size and job, and progress over days. Its own window opens from the Train tab, and the desk view can show it
   // in a column (embedded). Everything here stays on this PC.
+  import { isWeb } from "$lib/platform";
   import { clipped, tip } from "$lib/tip.svelte";
   import Ref from "$lib/components/Ref.svelte";
   import { Download, PenLine, Share2 } from "@lucide/svelte";
@@ -859,7 +860,7 @@
           <section class="panel grow3">
             <div class="list-head">
               <h2>Recent sessions</h2>
-              <span class="quiet">They save themselves as you play</span>
+              <span class="quiet">{isWeb ? "Saved from Session on Now" : "They save themselves as you play"}</span>
             </div>
             <ul class="recent">
               {#each sessions.slice(0, RECENT) as s (s.id)}

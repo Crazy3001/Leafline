@@ -184,7 +184,7 @@
       [s.prices, "price"],
     ] as const;
     const said = parts.filter(([n]) => n > 0).map(([n, what]) => `${n} ${what}${n === 1 ? "" : "s"}`);
-    return said.length ? said.join(", ") : "nothing yet";
+    return said.length ? said.join(", ") : "no records yet";
   }
 
   async function recordsWork(work: () => Promise<void>) {
@@ -204,7 +204,7 @@
   const saveRecords = () =>
     recordsWork(async () => {
       const saved = await backend.saveRecords();
-      if (saved) recordsNote = `Saved ${describeRecords(saved)}${isWeb ? " to your downloads" : ""}.`;
+      if (saved) recordsNote = `Saved your records (${describeRecords(saved)})${isWeb ? " to your downloads" : ""}.`;
     });
   const pickRecords = () =>
     recordsWork(async () => {

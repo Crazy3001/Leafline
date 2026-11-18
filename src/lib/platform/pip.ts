@@ -1,6 +1,6 @@
 // The website's pop-out: Chrome and Edge's Document Picture-in-Picture window, which stays over
-// other windows (the game included) like the program's pinned Now panel. It shows the compact HUD,
-// drawn by this page, so it follows the same numbers.
+// other windows (the game included) like the program's pinned Now panel. It shows the session
+// being typed in, drawn by this page, so it follows the same numbers.
 
 import { mount, unmount } from "svelte";
 
@@ -45,11 +45,11 @@ export async function openPip(onclose: () => void): Promise<boolean> {
   if (open) return true;
   const api = (window as unknown as { documentPictureInPicture?: DocumentPictureInPicture }).documentPictureInPicture;
   if (!api) return false;
-  const target = await api.requestWindow({ width: 460, height: 150 });
+  const target = await api.requestWindow({ width: 520, height: 110 });
   dress(target);
   // Loaded here, not at the top: the HUD imports the backend, which this module is part of.
-  const { default: CompactHud } = await import("../components/CompactHud.svelte");
-  const app = mount(CompactHud, { target: target.document.body });
+  const { default: Hud } = await import("../components/TypedSessionHud.svelte");
+  const app = mount(Hud, { target: target.document.body });
   open = { window: target, app };
   target.addEventListener("pagehide", () => {
     if (open?.window === target) {

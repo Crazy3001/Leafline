@@ -11,6 +11,9 @@
 
   import type { Tab } from "./tabs";
   import Welcome from "./Welcome.svelte";
+  import TypedSessionCard from "$lib/components/TypedSessionCard.svelte";
+  import { can } from "$lib/platform";
+  import { live } from "$lib/readings.svelte";
 
   let {
     analysis,
@@ -62,7 +65,9 @@
 
 <div class="now">
   {#if !analysis && !session}
-    <Welcome />
+    <!-- The website reads nothing from the game: you type the session in. So can the program, with live reading off. -->
+    {#if can.liveReading}<Welcome />{/if}
+    {#if !can.liveReading || live.liveStatus.state === "off"}<TypedSessionCard />{/if}
   {:else}
     <section class="card session" aria-label="This session">
       <div class="head">

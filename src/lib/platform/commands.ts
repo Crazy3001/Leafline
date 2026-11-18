@@ -330,6 +330,8 @@ export function commandBackend(invoke: Invoke, listen: Listen, emit: Emit): Back
       return typeof path === "string" ? invoke<RecordsSummary>("check_records", { path }) : null;
     },
     useRecords: () => invoke("import_records"),
+    typedSessionOutcome: (session) => invoke("typed_session_outcome", { session }),
+    saveTypedSession: (session) => invoke("save_typed_session", { session }),
     onRecordsReplaced: (handler) => listen("records-replaced", () => handler()),
   };
 }

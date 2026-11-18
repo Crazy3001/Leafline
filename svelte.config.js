@@ -20,6 +20,9 @@ const config = {
       web ? { pages: "build-web", assets: "build-web", fallback: "404.html" } : { fallback: "index.html" },
     ),
     paths: { base: web ? "/Leafline" : "" },
+    // The website writes a page per route (see routes/+layout.ts). The program's own windows with
+    // a parameter in the address (a card, a pinned panel) aren't linked on the website.
+    prerender: { handleUnseenRoutes: "ignore" },
   },
 };
 

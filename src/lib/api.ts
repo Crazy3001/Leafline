@@ -95,6 +95,8 @@ import type {
   StarterPlan,
   TrainingSpots,
   RecordsSummary,
+  TypedOutcome,
+  TypedSession,
 } from "./types";
 
 export interface Backend {
@@ -463,6 +465,10 @@ export interface Backend {
   pickRecords(): Promise<RecordsSummary | null>;
   /** Replaces the records with the picked file's. The ones before are kept aside. */
   useRecords(): Promise<RecordsSummary>;
+  /** What a typed-in session works out to, before it is saved. */
+  typedSessionOutcome(session: TypedSession): Promise<TypedOutcome>;
+  /** Saves a typed-in session in the training log; returns its id. */
+  saveTypedSession(session: TypedSession): Promise<number>;
   /** The records were replaced from a file, in any window: what they show is out of date. */
   onRecordsReplaced(handler: () => void): Promise<UnlistenFn>;
 }
