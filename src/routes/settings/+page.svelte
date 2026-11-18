@@ -1007,6 +1007,23 @@
       </div>
       {/if}
 
+      {#if can.liveReading && import.meta.env.DEV}
+      <div class="row">
+        <div class="label">
+          <span class="name">Capture test</span>
+          <span class="help">
+            For developers, in dev builds only: the website's screen-reading check. A test pattern window, saving the
+            game's frames beside the website's, and comparing them.
+          </span>
+        </div>
+        <div class="control">
+          <button class="button" onclick={() => import("$lib/capture/program").then((p) => p.openCaptureTest())}>
+            Open
+          </button>
+        </div>
+      </div>
+      {/if}
+
       <div class="row">
         <div class="label">
           <span class="name">Suggest an idea</span>

@@ -37,12 +37,20 @@ if (!env.CC_wasm32_unknown_unknown && process.platform === "win32") {
 }
 
 const run = (cmd, args) => execFileSync(cmd, args, { cwd: root, env, stdio: "inherit" });
-run("cargo", ["build", "--profile", "web", "--target", "wasm32-unknown-unknown", "-p", "leafline-web", "-p", "leafline-capture"]);
+// The storage worker is built small; the capture test's readers fast (see Cargo.toml's profiles).
+const builds = [
+  ["leafline-web", "web", "src/lib/platform/wasm"],
+  ["leafline-capture", "web-fast", "src/lib/capture/wasm"],
+];
+for (const [crate, profile] of builds) {
+  run("cargo", ["build", "--profile", profile, "--target", "wasm32-unknown-unknown", "-p", crate]);
+}
 
-for (const [crate, folder] of [["leafline_web", "src/lib/platform/wasm"], ["leafline_capture", "src/lib/capture/wasm"]]) {
+for (const [name, profile, folder] of builds) {
+  const crate = name.replace("-", "_");
   const out = join(root, folder);
   mkdirSync(out, { recursive: true });
-  const wasm = join(root, `target/wasm32-unknown-unknown/web/${crate}.wasm`);
+  const wasm = join(root, `target/wasm32-unknown-unknown/${profile}/${crate}.wasm`);
   run("wasm-bindgen", ["--target", "web", "--remove-name-section", "--remove-producers-section", "--out-dir", out, "--out-name", crate, wasm]);
   const built = join(out, `${crate}_bg.wasm`);
   const size = statSync(built).size;

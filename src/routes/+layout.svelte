@@ -1,6 +1,7 @@
 <script lang="ts">
   import "../app.css";
   import { onMount } from "svelte";
+  import { page } from "$app/state";
   import { backend } from "$lib/api";
   import PeekHost from "$lib/components/peek/PeekHost.svelte";
   import TipHost from "$lib/ui/TipHost.svelte";
@@ -12,6 +13,8 @@
   // The website's notice about which tab holds the records. Loaded only in the website's build:
   // it brings in the worker, which the program must not carry.
   const webNotice = __LEAFLINE_WEB__ ? import("$lib/components/WebStorageNotice.svelte") : null;
+  // The capture test's pages use no records, and the notice would cover the test pattern.
+  const testPage = $derived(page.route.id?.startsWith("/test/") ?? false);
 
   followTheme();
   watchWorn();
@@ -25,5 +28,5 @@
 
 {@render children()}
 <PeekHost />
-{#if webNotice}{#await webNotice then notice}<notice.default />{/await}{/if}
+{#if webNotice && !testPage}{#await webNotice then notice}<notice.default />{/await}{/if}
 <TipHost />

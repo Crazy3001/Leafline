@@ -2091,6 +2091,7 @@ dependencies = [
  "console_error_panic_hook",
  "leafline-core",
  "serde_json",
+ "sqlite-wasm-rs",
  "wasm-bindgen",
 ]
 

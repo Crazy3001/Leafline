@@ -27,3 +27,10 @@ opt-level = 3
 inherits = "release"
 opt-level = "z"
 strip = false
+
+# The capture test page's WebAssembly (crates/leafline-capture): the readers run on every frame,
+# so it is built for speed. Only that page downloads it.
+[profile.web-fast]
+inherits = "release"
+opt-level = 3
+strip = false
