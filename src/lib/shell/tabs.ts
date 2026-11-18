@@ -30,8 +30,7 @@ export interface TabInfo {
   title: string;
   icon: typeof House;
   /**
-   * The panel this tab pins into its own window, and whose changes put a dot on the tab. Now
-   * pins the session numbers, which is the Train panel's short form.
+   * The panel this tab pins into its own window, and whose changes put a dot on the tab.
    */
   panel: Panel;
   /** What the pin button says it pins. */
@@ -39,7 +38,7 @@ export interface TabInfo {
 }
 
 export const TABS: TabInfo[] = [
-  { id: "now", title: "Now", icon: House, panel: "train", pinName: "the session numbers" },
+  { id: "now", title: "Now", icon: House, panel: "now", pinName: "the session and quest" },
   { id: "quests", title: "Quests", icon: ListChecks, panel: "quests", pinName: "Quests" },
   { id: "map", title: "Map", icon: MapIcon, panel: "map", pinName: "Map" },
   { id: "train", title: "Train", icon: ChartLine, panel: "train", pinName: "Train" },

@@ -30,6 +30,8 @@ const SHOW_PANEL_EVENT: &str = "show-panel";
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Panel {
+    /// The Now tab's short form: this session's rates and the tracked quest.
+    Now,
     /// The character, this session and the build plan. Stats and Build were two tabs until
     /// 2026-11-04, so either old id still opens this one.
     #[serde(alias = "stats", alias = "build")]
@@ -44,10 +46,12 @@ pub enum Panel {
 }
 
 impl Panel {
-    const ALL: [Panel; 6] = [Panel::Character, Panel::Map, Panel::Train, Panel::Quests, Panel::Item, Panel::Route];
+    const ALL: [Panel; 7] =
+        [Panel::Now, Panel::Character, Panel::Map, Panel::Train, Panel::Quests, Panel::Item, Panel::Route];
 
     fn id(self) -> &'static str {
         match self {
+            Panel::Now => "now",
             Panel::Character => "character",
             Panel::Map => "map",
             Panel::Train => "train",
@@ -59,6 +63,7 @@ impl Panel {
 
     fn title(self) -> &'static str {
         match self {
+            Panel::Now => "Now",
             Panel::Character => "Character",
             Panel::Map => "Map",
             Panel::Train => "Train",
@@ -321,6 +326,7 @@ mod tests {
         assert_eq!(parse(r#"["character","item"]"#), vec![Panel::Character, Panel::Item]);
         assert_eq!(parse("not json"), Vec::<Panel>::new());
         assert_eq!(parse(r#"["map","route"]"#), vec![Panel::Map, Panel::Route]);
+        assert_eq!(parse(r#"["now","train"]"#), vec![Panel::Now, Panel::Train]);
     }
 
     #[test]

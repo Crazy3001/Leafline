@@ -9,6 +9,10 @@
   import MapCard from "./MapCard.svelte";
   import QuestPanel from "./QuestPanel.svelte";
   import TrainPanel from "./TrainPanel.svelte";
+  import NowPin from "$lib/shell/NowPin.svelte";
+  import NowScreen from "$lib/shell/NowScreen.svelte";
+  import { tabInfo } from "$lib/shell/tabs";
+  import { openPanel } from "$lib/nav.svelte";
   import type { Analysis, Panel, SessionSummary } from "$lib/types";
 
   let {
@@ -34,7 +38,13 @@
   <p class="empty">{text}</p>
 {/snippet}
 
-{#if panel === "character"}
+{#if panel === "now"}
+  {#if pinned}
+    <NowPin {analysis} {session} />
+  {:else}
+    <NowScreen {analysis} {session} ongo={(t) => openPanel(tabInfo(t).panel)} />
+  {/if}
+{:else if panel === "character"}
   <!-- One card for who the character is and where the build plan has them, so the level shows once. -->
   <CharacterCard hud={analysis?.hud ?? null} mesos={analysis?.mesos ?? null} {session} remember plain={pinned} linkTrain={!pinned} trim={shelled}>
     <BuildSection level={analysis?.hud?.level ?? session?.level ?? null} character={analysis?.hud?.name ?? null} glance={pinned} />

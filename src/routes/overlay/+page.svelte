@@ -70,7 +70,7 @@
   // Now's numbers change every second, so it never gets a dot; the others follow their panel.
   const signatures = $derived(
     Object.fromEntries(
-      TABS.map((t) => [t.id, t.id === "now" ? null : signature(t.panel, live.analysis, live.session)]),
+      TABS.map((t) => [t.id, signature(t.panel, live.analysis, live.session)]),
     ) as Record<Tab, string | null>,
   );
 
