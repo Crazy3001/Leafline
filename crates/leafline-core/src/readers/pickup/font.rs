@@ -63,7 +63,7 @@ pub const UNKNOWN: char = '?';
 const MOST_UNKNOWN: f32 = 0.25;
 
 /// Every glyph the reader knows: the letters and the figure's glyphs.
-pub(super) fn all_glyphs() -> impl Iterator<Item = (char, &'static [&'static str; 11])> {
+pub(crate) fn all_glyphs() -> impl Iterator<Item = (char, &'static [&'static str; 11])> {
     glyphs()
 }
 

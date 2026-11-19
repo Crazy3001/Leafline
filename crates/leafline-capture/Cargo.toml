@@ -1,0 +1,24 @@
+[package]
+name = "leafline-capture"
+version = "0.4.0"
+description = "Leafline's capture test page: the shared readers and test pattern, run in the browser"
+license = "MIT"
+edition = "2024"
+publish = false
+
+# Its own WebAssembly, apart from the website's storage worker (leafline-web), so the site's main
+# download doesn't carry the readers until a page needs them.
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+leafline-core = { path = "../leafline-core" }
+serde_json = "1"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+# Must match the wasm-bindgen CLI that writes the JavaScript side (see tools/build-wasm.mjs).
+wasm-bindgen = "=0.2.130"
+console_error_panic_hook = "0.1"
+# The shared code links SQLite in; this gives it the browser's clock and randomness, as it has in
+# the storage worker. The capture test opens no database.
+sqlite-wasm-rs = { version = "0.6", features = ["wasm-bindgen"] }

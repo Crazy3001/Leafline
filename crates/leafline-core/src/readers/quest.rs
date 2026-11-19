@@ -176,7 +176,7 @@ pub fn read_with_digits(frame: &Frame, digits: &Frame, overview: &[Line], ocr: &
 }
 
 /// The panel's text is pure black, a shade the scenery seen through the panel never reaches.
-fn is_text(px: &Rgba<u8>) -> bool {
+pub(crate) fn is_text(px: &Rgba<u8>) -> bool {
     px.0[..3].iter().all(|&c| c <= 8)
 }
 

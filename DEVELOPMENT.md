@@ -29,6 +29,16 @@ npm run dev:web        # the site at http://localhost:1433/Leafline/ (run npm ru
 
 `.github/workflows/pages.yml` publishes it to GitHub Pages; it is run by hand from the Actions tab.
 
+### Capture test (website stage 2)
+
+Whether the website may read the game from a window shared to Chrome or Edge, decided by a test rather than a guess. The shared parts are in `crates/leafline-core/src/capturetest/`; `crates/leafline-capture` carries them to the browser as a separate WebAssembly (built for speed, loaded only by the test pages), and `src-tauri/src/app/capturetest.rs` is the program's half.
+
+- **Program:** a dev build's Settings › Feedback › Capture test opens a window with the steps. It shows the test pattern (`/test/pattern`, pixel for pixel), checks it with the program's own capture, saves the game's frames as `app-<unix ms>.png` into a folder you pick, and compares them with the website's.
+- **Website:** `/test/capture` shares a window and measures it against the pattern (pixel format, size, error per channel, colour bleed beside 1-px lines, the game fonts read back), saves frames as `web-<unix ms>.png` on the same clock ticks, and logs a 15-minute endurance run minute by minute. Frames come from the stream, not timers; nothing is uploaded.
+- **Comparison from a terminal:** `cargo run --release --example capturecompare -- <folder>` reads both sides' frames with the same readers, pairs them within 0.1 s and prints each reader's agreement; the report is written into the folder as `leafline-capture-report.json`.
+
+Frames are pictures of the game: keep the folder outside OneDrive and never commit them.
+
 ## Testing the readers
 
 Put screenshots in `test-screenshots/`. It's git-ignored: game screenshots are Nexon's images and must never be committed or shipped. Then:
@@ -98,7 +108,8 @@ Live sessions save themselves every 30 seconds once they have a minute of active
 src/                     Svelte frontend
   lib/components/          cards shared by the windows
   lib/ui/                  shared UI pieces
-  routes/                  one route per window: overlay, desk (tabs, with the training log and build planner), pin, settings, setup
+  routes/                  one route per window: overlay, desk (tabs, with the training log and build planner), pin, settings, setup; test/ holds the capture test's pages
+  lib/capture/             the capture test's pages and worker
 src-tauri/src/
   app/                     Tauri wiring: windows, tray, hotkeys, commands
   capture/                 live pictures of the game window (Windows Graphics Capture)

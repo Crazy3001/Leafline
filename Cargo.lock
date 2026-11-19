@@ -2085,6 +2085,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "leafline-capture"
+version = "0.4.0"
+dependencies = [
+ "console_error_panic_hook",
+ "leafline-core",
+ "serde_json",
+ "sqlite-wasm-rs",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "leafline-core"
 version = "0.4.0"
 dependencies = [

@@ -36,3 +36,4 @@ Thumbs.db
 
 # The website's WebAssembly and its glue, built by tools/build-wasm.mjs.
 /src/lib/platform/wasm/
+/src/lib/capture/wasm/

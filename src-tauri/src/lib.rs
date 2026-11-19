@@ -9,7 +9,7 @@
 mod app;
 
 pub use leafline_core::{
-    build, capture, clock, error, loot, mapdata, pipeline, questlog, readers, replay, service, session, userdata,
+    build, capture, capturetest, clock, error, loot, mapdata, pipeline, questlog, readers, replay, service, session, userdata,
     vision,
 };
 

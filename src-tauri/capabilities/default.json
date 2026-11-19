@@ -1,8 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Permissions for the overlay, settings, setup, desk view (training log and build planner included) pinned panel windows, and cards popped out into windows of their own (pin-card-*)",
-  "windows": ["overlay", "settings", "setup", "desk", "pin-*"],
+  "description": "Permissions for the overlay, settings, setup, desk view (training log and build planner included) pinned panel windows, cards popped out into windows of their own (pin-card-*), and the capture test's windows (dev builds)",
+  "windows": ["overlay", "settings", "setup", "desk", "pin-*", "capture-test", "capture-pattern"],
   "permissions": [
     "core:default",
     "core:window:allow-start-dragging",

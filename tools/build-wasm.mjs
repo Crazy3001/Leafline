@@ -1,5 +1,6 @@
-// Builds the website's WebAssembly (crates/leafline-web) and its JavaScript glue into
-// src/lib/platform/wasm/, which the website's worker loads. Run by `npm run build:web`.
+// Builds the website's WebAssembly and its JavaScript glue: crates/leafline-web into
+// src/lib/platform/wasm/, which the website's storage worker loads, and crates/leafline-capture
+// into src/lib/capture/wasm/, which only the capture test page loads. Run by `npm run build:web`.
 //
 // Needs: the wasm32-unknown-unknown Rust target, wasm-bindgen-cli at the same version as the
 // wasm-bindgen crate (0.2.130), and a clang that can build C for wasm32 (SQLite is C). Set
@@ -13,7 +14,6 @@ import { gzipSync } from "node:zlib";
 import { readFileSync } from "node:fs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const out = join(root, "src/lib/platform/wasm");
 const env = { ...process.env };
 
 function dotnetClang() {
@@ -37,11 +37,23 @@ if (!env.CC_wasm32_unknown_unknown && process.platform === "win32") {
 }
 
 const run = (cmd, args) => execFileSync(cmd, args, { cwd: root, env, stdio: "inherit" });
-run("cargo", ["build", "--profile", "web", "--target", "wasm32-unknown-unknown", "-p", "leafline-web"]);
-mkdirSync(out, { recursive: true });
-const wasm = join(root, "target/wasm32-unknown-unknown/web/leafline_web.wasm");
-run("wasm-bindgen", ["--target", "web", "--remove-name-section", "--remove-producers-section", "--out-dir", out, "--out-name", "leafline_web", wasm]);
-const built = join(out, "leafline_web_bg.wasm");
-const size = statSync(built).size;
-const gzip = gzipSync(readFileSync(built), { level: 9 }).length;
-console.log(`leafline_web_bg.wasm: ${(size / 1024).toFixed(0)} KB, ${(gzip / 1024).toFixed(0)} KB gzipped`);
+// The storage worker is built small; the capture test's readers fast (see Cargo.toml's profiles).
+const builds = [
+  ["leafline-web", "web", "src/lib/platform/wasm"],
+  ["leafline-capture", "web-fast", "src/lib/capture/wasm"],
+];
+for (const [crate, profile] of builds) {
+  run("cargo", ["build", "--profile", profile, "--target", "wasm32-unknown-unknown", "-p", crate]);
+}
+
+for (const [name, profile, folder] of builds) {
+  const crate = name.replace("-", "_");
+  const out = join(root, folder);
+  mkdirSync(out, { recursive: true });
+  const wasm = join(root, `target/wasm32-unknown-unknown/${profile}/${crate}.wasm`);
+  run("wasm-bindgen", ["--target", "web", "--remove-name-section", "--remove-producers-section", "--out-dir", out, "--out-name", crate, wasm]);
+  const built = join(out, `${crate}_bg.wasm`);
+  const size = statSync(built).size;
+  const gzip = gzipSync(readFileSync(built), { level: 9 }).length;
+  console.log(`${crate}_bg.wasm: ${(size / 1024).toFixed(0)} KB, ${(gzip / 1024).toFixed(0)} KB gzipped`);
+}

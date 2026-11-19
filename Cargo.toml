@@ -1,7 +1,7 @@
 # Leafline: the Windows program (src-tauri), the website's WebAssembly worker (crates/leafline-web)
 # and the code they share (crates/leafline-core).
 [workspace]
-members = ["src-tauri", "crates/leafline-core", "crates/leafline-web"]
+members = ["src-tauri", "crates/leafline-core", "crates/leafline-web", "crates/leafline-capture"]
 resolver = "3"
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
@@ -26,4 +26,11 @@ opt-level = 3
 [profile.web]
 inherits = "release"
 opt-level = "z"
+strip = false
+
+# The capture test page's WebAssembly (crates/leafline-capture): the readers run on every frame,
+# so it is built for speed. Only that page downloads it.
+[profile.web-fast]
+inherits = "release"
+opt-level = 3
 strip = false
