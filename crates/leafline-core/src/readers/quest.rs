@@ -61,6 +61,8 @@ const WIDTH_IN_LINES: f32 = 21.0;
 const HEIGHT_IN_LINES: f32 = 26.0;
 /// Distance between lines, in header text heights.
 const PITCH: f32 = 1.6;
+/// How far `Helper` starts right of `Quest` in the header, in line heights (66 px at 20).
+const QUEST_WIDTH: f32 = 3.3;
 /// Lines further apart than this (in pitches) are no longer part of the panel.
 const MAX_GAP: f32 = 2.6;
 /// Brightness (of a pixel's strongest channel) that the contrast-stretched passes turn
@@ -73,8 +75,20 @@ static OBJECTIVE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^((?:[0-9OoIlSB$!|\\/r ]|C[lI])*(?:[0-9OoIlSB]|C[lI]))\s+([A-Za-z].*)$").unwrap());
 
 /// The Quest Helper's header line and the panel under it, if the overview found the header.
-pub fn panel(overview: &[Line]) -> Option<(&Line, Rect)> {
-    let header = overview.iter().find(|l| is_header(&l.text))?;
+pub fn panel(overview: &[Line]) -> Option<(Line, Rect)> {
+    let header = match overview.iter().find(|l| is_header(&l.text)) {
+        Some(header) => header.clone(),
+        // OCR can drop `Quest` and read the rest, `Helper (2151`: on every frame of a window
+        // shared to Edge where the header was read at all, though the picture differs from the
+        // program's only in faint colour. The header then starts that word earlier.
+        None => {
+            let helper = overview.iter().find(|l| is_bare_helper(&l.text))?;
+            let mut header = helper.clone();
+            let shift = QUEST_WIDTH * helper.rect.h;
+            header.rect = Rect::new(helper.rect.x - shift, helper.rect.y, helper.rect.w + shift, helper.rect.h);
+            header
+        }
+    };
     let h = header.rect.h;
     let panel = Rect::from_edges(
         header.rect.x - 0.8 * h,
@@ -176,8 +190,12 @@ pub fn read_with_digits(frame: &Frame, digits: &Frame, overview: &[Line], ocr: &
 }
 
 /// The panel's text is pure black, a shade the scenery seen through the panel never reaches.
+/// Judged by brightness, which a browser's window share keeps for every pixel: it spreads colour
+/// over 2 x 2 blocks and beyond, so about a fifth of the black text arrives tinted, as red as
+/// (20, 0, 0), while its brightness stays this low.
 pub(crate) fn is_text(px: &Rgba<u8>) -> bool {
-    px.0[..3].iter().all(|&c| c <= 8)
+    let [r, g, b, _] = px.0;
+    preprocess::luminance(px) <= 8 && r.max(g).max(b) <= 24
 }
 
 /// Text and its edges. Screenshots scaled even slightly blend each stroke's edge with the
@@ -243,6 +261,16 @@ fn is_header(text: &str) -> bool {
     }
     let joined: String = squash(text).chars().take(11).collect();
     joined.len() == 11 && similarity(&joined, "questhelper") >= 0.65
+}
+
+/// A header read without its first word: `Helper` and the page, `(2/5)`, however mangled
+/// (`(2151`, `13.iE.l`).
+fn is_bare_helper(text: &str) -> bool {
+    let mut words = text.split_whitespace();
+    let (first, page) = (words.next().unwrap_or_default(), words.next().unwrap_or_default());
+    words.next().is_none()
+        && similarity(first, "Helper") >= 0.8
+        && (page.starts_with('(') || page.chars().any(|c| c.is_ascii_digit()))
 }
 
 /// One row of the panel as OCR read it.
@@ -814,6 +842,29 @@ mod tests {
         assert!(is_header("Ouest Helpor (1/5)"));
         assert!(is_header("QuasVHelpar (5E)"));
         assert!(!is_header("Questionable things"));
+    }
+
+    #[test]
+    fn a_header_read_without_quest_still_places_the_panel() {
+        let whole = Line { text: "Quest Helper (2/5)".into(), rect: Rect::new(2124.0, 98.0, 178.0, 20.0), words: vec![] };
+        let bare = Line { text: "Helper (2151".into(), rect: Rect::new(2190.0, 98.0, 112.0, 20.0), words: vec![] };
+        let (_, from_whole) = panel(&[whole]).unwrap();
+        let (header, from_bare) = panel(&[bare]).unwrap();
+        let close = |a: Rect, b: Rect| [a.x - b.x, a.y - b.y, a.w - b.w, a.h - b.h].iter().all(|d| d.abs() < 0.01);
+        assert!(close(header.rect, Rect::new(2124.0, 98.0, 178.0, 20.0)), "{:?}", header.rect);
+        assert!(close(from_bare, from_whole), "{from_bare:?} vs {from_whole:?}");
+        assert!(is_bare_helper("Helper 13.iE.l"));
+        assert!(panel(&[line("Helper", 10.0), line("The Helper (2/5) said", 40.0), line("Helpless (2/5)", 70.0)]).is_none());
+    }
+
+    #[test]
+    fn video_tinted_black_is_text_but_dark_colours_are_not() {
+        for black in [[0, 0, 0], [8, 8, 8], [18, 0, 2], [20, 3, 0]] {
+            assert!(is_text(&Rgba([black[0], black[1], black[2], 255])), "{black:?}");
+        }
+        for other in [[12, 12, 12], [0, 0, 40], [40, 0, 0], [9, 9, 9]] {
+            assert!(!is_text(&Rgba([other[0], other[1], other[2], 255])), "{other:?}");
+        }
     }
 
     const BLACK: Rgba<u8> = Rgba([0, 0, 0, 255]);
