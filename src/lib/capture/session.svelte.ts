@@ -62,6 +62,10 @@ export const capture = $state({
   folderIsOwn: false,
   /** Frames downloaded so far out of those saved in the browser's own storage. */
   downloading: null as { done: number; total: number } | null,
+  /** Frames from an earlier test still kept in the browser's own storage, found on opening. */
+  leftover: 0,
+  /** The frames were downloaded and then removed from the browser's own storage. */
+  cleared: false,
   perSecond: 2,
   savingOn: false,
   endurance: null as { startedAt: number } | null,
@@ -299,6 +303,7 @@ export async function downloadOwnFrames() {
   if (!dir) return;
   const names = await ownNames(dir);
   capture.downloading = { done: 0, total: names.length };
+  capture.cleared = false;
   for (const name of names) {
     const file = await (await dir.getFileHandle(name)).getFile();
     const url = URL.createObjectURL(file);
@@ -307,6 +312,31 @@ export async function downloadOwnFrames() {
     await new Promise((resolve) => setTimeout(resolve, 250));
     URL.revokeObjectURL(url);
     capture.downloading = { done: capture.downloading.done + 1, total: names.length };
+  }
+  // Gigabytes of frames shouldn't stay in the browser once they are in Downloads. The last
+  // downloads are given time to finish reading their files first.
+  await new Promise((resolve) => setTimeout(resolve, CLEAR_AFTER_MS));
+  await clearOwnFrames();
+  capture.cleared = true;
+}
+
+/** How long after the last download starts the kept frames are removed. */
+const CLEAR_AFTER_MS = 10_000;
+
+/** Frames an earlier test left in the browser's own storage (a tab closed before downloading),
+ * offered for download or deletion when the page opens. */
+export async function findLeftoverFrames() {
+  if (support.folder || !support.ownStorage) return;
+  try {
+    const dir = await (await navigator.storage.getDirectory()).getDirectoryHandle(OWN_FOLDER);
+    const count = (await ownNames(dir)).length;
+    if (count && !capture.folder) {
+      capture.folder = dir;
+      capture.folderIsOwn = true;
+      capture.leftover = count;
+    }
+  } catch {
+    // None kept.
   }
 }
 
@@ -321,6 +351,7 @@ export async function clearOwnFrames() {
   capture.folder = null;
   capture.folderIsOwn = false;
   capture.downloading = null;
+  capture.leftover = 0;
 }
 
 export function setSaving(on: boolean, folder?: FileSystemDirectoryHandle) {

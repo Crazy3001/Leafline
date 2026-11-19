@@ -12,6 +12,7 @@
     clearOwnFrames,
     downloadOwnFrames,
     enduranceCsv,
+    findLeftoverFrames,
     pickFolder,
     useOwnStorage,
     sendJobs,
@@ -30,6 +31,7 @@
 
   onMount(() => {
     const timer = setInterval(() => (clock = Date.now()), 1000);
+    void findLeftoverFrames();
     // For checking the page by script: `?debug` lets a test hand over a folder without the picker.
     if (new URLSearchParams(location.search).has("debug")) {
       (window as unknown as Record<string, unknown>).leaflineCaptureTest = { capture, setSaving, setEndurance, sharedTrack };
@@ -79,6 +81,12 @@
     a.click();
     URL.revokeObjectURL(url);
   }
+
+  /** Frames of a 2560 x 1440 window are about 6.5 MB each. */
+  const leftoverSize = $derived.by(() => {
+    const mb = capture.leftover * 6.5;
+    return mb >= 1000 ? `${(mb / 1000).toFixed(1)} GB` : `${Math.max(1, Math.round(mb))} MB`;
+  });
 
   const format = $derived(stats?.format ? `${stats.format}${stats.colorSpace ? ` (${stats.colorSpace})` : ""}` : null);
 </script>
@@ -189,7 +197,13 @@
       </button>
     {/if}
   </div>
-  {#if capture.folderIsOwn && !capture.savingOn && stats?.saved}
+  {#if capture.leftover && !stats?.saved}
+    <p class="status warn">
+      {capture.leftover} frames from an earlier test are still kept in this browser (about {leftoverSize}). Download
+      them, or delete them here.
+    </p>
+  {/if}
+  {#if capture.folderIsOwn && !capture.savingOn && (stats?.saved || capture.leftover)}
     <div class="controls">
       <button class="button" onclick={downloadOwnFrames} disabled={!!capture.downloading && capture.downloading.done < capture.downloading.total}>
         Download the frames
@@ -199,6 +213,9 @@
         <span class="muted">{capture.downloading.done} of {capture.downloading.total} downloaded</span>
       {/if}
     </div>
+  {/if}
+  {#if capture.cleared}
+    <p class="status good">Downloaded, and removed from the browser's storage.</p>
   {/if}
   {#if !support.folder && !support.ownStorage}
     <p class="status bad">This browser can't save frames. Use Chrome, Edge or Firefox.</p>
