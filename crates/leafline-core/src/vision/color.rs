@@ -77,9 +77,53 @@ impl Block {
     }
 }
 
+/// Brightness and the two colour-difference channels (BT.601, full range): `(y, cb, cr)`.
+fn ycbcr([r, g, b]: [f32; 3]) -> (f32, f32, f32) {
+    (
+        0.299 * r + 0.587 * g + 0.114 * b,
+        -0.168_736 * r - 0.331_264 * g + 0.5 * b,
+        0.5 * r - 0.418_688 * g - 0.081_312 * b,
+    )
+}
+
+/// Whether `px` is `target` as a browser's window share delivers it. Browsers send a shared window
+/// as video (Edge: I420, BT.601), which keeps brightness for every pixel but colour only for each
+/// 2 x 2 block, and smooths it into the next ones: beside white lettering, the WORLD button's
+/// (221, 153, 17) arrives as (205, 155, 52). So brightness must match within `brightness`, while the
+/// colour may be weakened down to 45% (or strengthened to 125%) of the target's, but not turned.
+/// Measured on Edge 157 over 237 frames: 99% of the button's pixels pass, 60% pass a plain match.
+pub fn like_through_video(px: &Rgba<u8>, target: [u8; 3], brightness: f32) -> bool {
+    let [r, g, b, _] = px.0;
+    let (y, cb, cr) = ycbcr([r, g, b].map(f32::from));
+    let (ty, tcb, tcr) = ycbcr(target.map(f32::from));
+    if (y - ty).abs() > brightness {
+        return false;
+    }
+    let strength = tcb * tcb + tcr * tcr;
+    if strength < 1.0 {
+        // A grey: some colour bleeds in from its neighbours.
+        return cb.hypot(cr) <= 12.0;
+    }
+    let along = (cb * tcb + cr * tcr) / strength;
+    let across = (cb - along * tcb).hypot(cr - along * tcr);
+    (0.45..=1.25).contains(&along) && across <= 0.35 * strength.sqrt() + 6.0
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_colour_weakened_by_video_still_matches_but_another_does_not() {
+        let orange = [221, 153, 17];
+        for seen in [[221, 153, 17], [205, 155, 52], [211, 155, 39], [208, 154, 47]] {
+            assert!(like_through_video(&Rgba([seen[0], seen[1], seen[2], 255]), orange, 12.0), "{seen:?}");
+        }
+        // Too bright (a letter's edge), grey, and a red of the same brightness.
+        for other in [[255, 220, 141], [158, 158, 158], [255, 120, 120]] {
+            assert!(!like_through_video(&Rgba([other[0], other[1], other[2], 255]), orange, 12.0), "{other:?}");
+        }
+    }
 
     #[test]
     fn finds_a_red_block() {

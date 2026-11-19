@@ -177,7 +177,15 @@ impl Glyphs {
 
 /// The level digits, white on orange tiles.
 fn level_glyphs(frame: &Frame, layout: &HudLayout) -> Vec<Mask> {
-    layout.level.map_or_else(Vec::new, |area| glyphs_in(frame, area, is_level_digit))
+    let Some(area) = layout.level else { return Vec::new() };
+    let plain = glyphs_in(frame, area, is_level_digit);
+    if digits::number(&plain).is_some_and(|t| !t.is_empty()) {
+        return plain;
+    }
+    // A window shared to a browser tints the thin white digits with the tiles' orange; only when
+    // the plain test reads nothing, so a frame it reads is read as before.
+    let tinted = glyphs_in(frame, area, is_level_digit_through_video);
+    if digits::number(&tinted).is_some_and(|t| !t.is_empty()) { tinted } else { plain }
 }
 
 /// One mask per run of inked columns, all spanning the inked rows of `area`.
@@ -321,6 +329,12 @@ fn is_level_tile(px: &Rgba<u8>) -> bool {
 
 fn is_level_digit(px: &Rgba<u8>) -> bool {
     preprocess::luminance(px) >= 200 && preprocess::saturation(px) <= 60
+}
+
+/// [`is_level_digit`] in a browser's window share, which keeps each pixel's brightness but spreads
+/// colour over 2 x 2 blocks and beyond: white beside orange arrives as about (255, 252, 184).
+fn is_level_digit_through_video(px: &Rgba<u8>) -> bool {
+    preprocess::luminance(px) >= 200 && preprocess::saturation(px) <= 120
 }
 
 /// The light grey of HUD text.
