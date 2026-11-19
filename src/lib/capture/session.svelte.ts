@@ -4,36 +4,25 @@
 
 import type { FromWorker, MinuteRow, Stats, ToWorker } from "./capture.worker";
 import type { Measure, ReaderRead } from "./types";
+import { canRead, shareWindow, support as shareSupport, type SharedWindow } from "../platform/capture";
 
-declare class MediaStreamTrackProcessor {
-  constructor(init: { track: MediaStreamTrack });
-  readable: ReadableStream<VideoFrame>;
-}
 declare class PressureObserver {
   constructor(callback: (records: { state: string }[]) => void);
   observe(source: "cpu", options?: { sampleInterval?: number }): Promise<void>;
   disconnect(): void;
 }
 
-/** What the browser offers that the test needs, checked by feature rather than by name. Chrome and
- * Edge on a computer have all of it; Firefox can share and read a window, by another route. */
+/** What the browser offers that the test needs, checked by feature rather than by name: reading a
+ * shared window (see platform/capture.ts), and saving frames. */
 export const support = {
-  share: typeof navigator !== "undefined" && !!navigator.mediaDevices?.getDisplayMedia,
-  /** Each frame handed over as the stream delivers it: Chrome and Edge. */
-  trackFrames: typeof window !== "undefined" && "MediaStreamTrackProcessor" in window,
-  /** Each frame taken from the shared window playing in a video as it arrives: Firefox. */
-  videoFrames:
-    typeof window !== "undefined" &&
-    "VideoFrame" in window &&
-    "requestVideoFrameCallback" in HTMLVideoElement.prototype,
+  ...shareSupport,
   folder: typeof window !== "undefined" && "showDirectoryPicker" in window,
   /** Somewhere to save frames when there is no folder to pick: the browser's own storage. */
   ownStorage: typeof navigator !== "undefined" && !!navigator.storage?.getDirectory,
   pressure: typeof window !== "undefined" && "PressureObserver" in window,
 };
 
-/** Whether this browser can read a shared window at all. */
-export const canRead = support.share && (support.trackFrames || support.videoFrames);
+export { canRead };
 
 /** The folder in the browser's own storage that frames go to without a folder picker. */
 const OWN_FOLDER = "leafline-capture-frames";
@@ -74,51 +63,10 @@ export const capture = $state({
 });
 
 let worker: Worker | null = null;
-let track: MediaStreamTrack | null = null;
-let pageReader: ReadableStreamDefaultReader<VideoFrame> | null = null;
-let video: HTMLVideoElement | null = null;
-let ticker: Worker | null = null;
+let shared: SharedWindow | null = null;
 let pressure: PressureObserver | null = null;
-
-/** How often a hidden page looks for a new frame, where it gets no frame callbacks. */
-const HIDDEN_LOOK_MS = 40;
-
-/** Firefox's route: the shared window plays in a video that is never shown, and each new frame
- * becomes a VideoFrame for the worker. The video's frame callback drives it while the page is
- * drawn; a page the browser counts as hidden (minimised, or covered by the game) gets none, so
- * ticks from a worker, which browsers don't slow like a hidden page's timers, keep it going. */
-function readFromVideo(stream: MediaStream) {
-  const v = document.createElement("video");
-  v.muted = true;
-  v.playsInline = true;
-  v.srcObject = stream;
-  video = v;
-  let last = -1;
-  const take = (mediaTime: number) => {
-    if (video !== v || v.readyState < 2 || mediaTime === last) return;
-    last = mediaTime;
-    let frame: VideoFrame;
-    try {
-      frame = new VideoFrame(v, { timestamp: Math.round(mediaTime * 1e6) });
-    } catch {
-      return;
-    }
-    capture.delivered++;
-    send({ op: "frame", frame }, [frame as unknown as Transferable]);
-  };
-  const onFrame = (_now: number, meta: { mediaTime: number }) => {
-    take(meta.mediaTime);
-    if (video === v) v.requestVideoFrameCallback(onFrame);
-  };
-  v.play()
-    .then(() => v.requestVideoFrameCallback(onFrame))
-    .catch((err) => (capture.error = `The shared window wouldn't play: ${err}`));
-  const tick = `setInterval(() => postMessage(0), ${HIDDEN_LOOK_MS});`;
-  ticker = new Worker(URL.createObjectURL(new Blob([tick], { type: "text/javascript" })));
-  ticker.onmessage = () => {
-    if (document.visibilityState === "hidden") take(v.currentTime);
-  };
-}
+/** Counts the frames the page hands over, for the page to show. */
+let counting: ReturnType<typeof setInterval> | undefined;
 
 const send = (message: ToWorker, transfer: Transferable[] = []) => worker?.postMessage(message, transfer);
 
@@ -158,60 +106,34 @@ function startWorker(): Worker {
 export async function share() {
   capture.error = null;
   stopSharing();
-  let stream: MediaStream;
+  const w = startWorker();
+  worker = w;
+  let got: SharedWindow | null;
   try {
-    stream = await navigator.mediaDevices.getDisplayMedia({
-      // The window's own size: no scaling to a default resolution.
-      video: { displaySurface: "window", frameRate: { ideal: 60 }, width: { ideal: 4096 }, height: { ideal: 2304 } },
-      audio: false,
-      // Chrome's options for what the picker offers.
-      ...({ selfBrowserSurface: "exclude", surfaceSwitching: "include", preferCurrentTab: false } as object),
-    });
+    got = await shareWindow((message, transfer) => w.postMessage(message, transfer), stopSharing);
   } catch (err) {
-    capture.error = err instanceof Error && err.name === "NotAllowedError" ? null : String(err);
+    capture.error = String(err);
+    got = null;
+  }
+  if (!got) {
+    w.terminate();
+    if (worker === w) worker = null;
     return;
   }
-  track = stream.getVideoTracks()[0];
-  capture.label = track.label;
-  capture.surface = String((track.getSettings() as { displaySurface?: string }).displaySurface ?? "");
+  shared = got;
+  capture.label = got.label;
+  capture.surface = got.surface;
+  capture.readIn = got.readIn;
+  capture.readInWhy = got.readInWhy;
   capture.sharing = true;
   capture.measure = null;
   capture.read = null;
   capture.stats = null;
-  worker = startWorker();
+  capture.delivered = 0;
+  counting = setInterval(() => (capture.delivered = shared?.delivered() ?? capture.delivered), 500);
   sendJobs();
   sendSave();
   sendPage();
-  track.addEventListener("ended", stopSharing);
-
-  // The stream itself handed to the worker where the browser allows it, else read here and each
-  // frame handed over. Either way the frames come as the stream delivers them, not on a timer.
-  if (!support.trackFrames) {
-    // Firefox: no stream reader at all, so the frames come from a video playing the stream.
-    capture.readIn = "video";
-    capture.readInWhy = null;
-    readFromVideo(stream);
-  } else {
-    try {
-      send({ op: "track", track }, [track as unknown as Transferable]);
-      capture.readIn = "worker";
-      capture.readInWhy = null;
-    } catch (err) {
-      capture.readIn = "page";
-      capture.readInWhy = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
-      const reader = new MediaStreamTrackProcessor({ track }).readable.getReader();
-      pageReader = reader;
-      void (async () => {
-        for (;;) {
-          const { value, done } = await reader.read();
-          if (done || !value) break;
-          capture.delivered++;
-          send({ op: "frame", frame: value }, [value as unknown as Transferable]);
-        }
-        stopSharing();
-      })();
-    }
-  }
   await startPressure();
 }
 
@@ -229,23 +151,12 @@ async function startPressure() {
   }
 }
 
-/** The shared track, for checking the page by script. */
-export const sharedTrack = () => track;
-
 export function stopSharing() {
   if (!capture.sharing && !worker) return;
   send({ op: "stop" });
-  void pageReader?.cancel();
-  pageReader = null;
-  ticker?.terminate();
-  ticker = null;
-  if (video) {
-    video.pause();
-    video.srcObject = null;
-    video = null;
-  }
-  track?.stop();
-  track = null;
+  shared?.stop();
+  shared = null;
+  clearInterval(counting);
   worker?.terminate();
   worker = null;
   pressure?.disconnect();

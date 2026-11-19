@@ -9,6 +9,7 @@
   import { onMount } from "svelte";
 
   import { backend } from "$lib/api";
+  import { isWeb } from "$lib/platform";
   import Pic from "$lib/ui/Pic.svelte";
   import NextStep from "$lib/components/NextStep.svelte";
   import { formatClockIn, formatCompact, formatDuration, objectiveProgress } from "$lib/format";
@@ -135,9 +136,9 @@
           {#if reading.held}<Play size={12} />{:else}<Pause size={12} />{/if}
         </button>
       {/if}
-      <button class="icon" use:tip={`Full overlay${keyHint("ToggleCompact")}`} aria-label="Full overlay" onclick={() => backend.setCompact(false)}>
+      {#if !isWeb}<button class="icon" use:tip={`Full overlay${keyHint("ToggleCompact")}`} aria-label="Full overlay" onclick={() => backend.setCompact(false)}>
         <Maximize2 size={12} />
-      </button>
+      </button>{/if}
     </span>
   </div>
 

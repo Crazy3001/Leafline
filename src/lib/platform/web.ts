@@ -11,6 +11,7 @@ import type { DeskStatus, MapPicture, PinStatus } from "../types";
 import { emit, listen } from "./bus";
 import { commandBackend } from "./commands";
 import { setMapView, setPictureTable } from "./pictures.svelte";
+import { liveReadings, liveStatus, resetLiveSession, setLiveHeld, startLive, stopLive } from "./live";
 import { closePip, openPip, pipOpen } from "./pip";
 import { checkRecords, exportRecords, importRecords, invoke, recordsSummary } from "./storage.svelte";
 
@@ -71,11 +72,12 @@ export const webBackend: Backend = {
   toggleOverlay: async () => {},
   shortcuts: async () => [],
   setHotkeysQuiet: async () => {},
-  liveStatus: async () => ({ state: "off" }),
-  setLiveHeld: async () => {},
-  resetSession: async () => {},
-  startLive: notHere("Reading the game"),
-  stopLive: async () => {},
+  // Reading a shared game window, where the browser can (see live.ts).
+  liveStatus: async () => liveStatus(),
+  setLiveHeld: async (held) => setLiveHeld(held),
+  resetSession: () => resetLiveSession(),
+  startLive: () => startLive(),
+  stopLive: () => stopLive(),
   liveWindows: async () => [],
   saveLiveFrame: notHere("Saving game pictures"),
   saveItemPicture: notHere("Saving game pictures"),
@@ -124,7 +126,7 @@ export const webBackend: Backend = {
   readCharacter: notHere("Reading the character's windows"),
   bagLookFurther: async () => {},
   lastBag: async () => null,
-  currentReadings: async () => ({ analysis: null, session: null }),
+  currentReadings: async () => liveReadings(),
   pinStatus: async () => pins(),
   async pinPanel(panel) {
     if (panel === "now") await openPip(() => void emit("pins", pins()));

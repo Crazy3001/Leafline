@@ -47,8 +47,8 @@ pub struct LootItem {
 }
 
 /// What the session shows of its loot.
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
 pub struct LootSummary {
     /// The log has been seen this session, so the totals mean something.
     pub watched: bool,

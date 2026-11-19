@@ -19,7 +19,6 @@
     setEndurance,
     setPerSecond,
     setSaving,
-    sharedTrack,
     share,
     stopSharing,
     support,
@@ -34,7 +33,7 @@
     void findLeftoverFrames();
     // For checking the page by script: `?debug` lets a test hand over a folder without the picker.
     if (new URLSearchParams(location.search).has("debug")) {
-      (window as unknown as Record<string, unknown>).leaflineCaptureTest = { capture, setSaving, setEndurance, sharedTrack };
+      (window as unknown as Record<string, unknown>).leaflineCaptureTest = { capture, setSaving, setEndurance };
     }
     return () => {
       clearInterval(timer);

@@ -182,6 +182,11 @@ fn own(host: &WebHost, name: &str, args: serde_json::Value) -> Option<Reply> {
     struct MapId {
         id: u32,
     }
+    #[derive(Deserialize)]
+    struct LiveSession {
+        id: Option<i64>,
+        session: leafline_core::session::SessionSummary,
+    }
     let told = |result: Result<(Nav, bool)>| {
         reply_result(result.map(|(nav, changed)| {
             if changed {
@@ -222,6 +227,12 @@ fn own(host: &WebHost, name: &str, args: serde_json::Value) -> Option<Reply> {
             Ok(What { what }) => reply_result(records::csv(host, what).map(|(text, rows)| serde_json::json!({ "text": text, "rows": rows }))),
             Err(err) => Err(err),
         },
+        // A session read from a shared game window (platform/live.svelte.ts), saved as it goes
+        // the way the program's live loop saves its own: first as a new log entry, then over it.
+        "save_live_session" => match parse::<LiveSession>(args) {
+            Ok(LiveSession { id, session }) => reply_result(save_live_session(host, id, &session)),
+            Err(err) => Err(err),
+        },
         // Map data's daily check, which the program runs in the background at start.
         "update_map_data" => {
             if mapdata::wants_updates(&host.map)
@@ -233,6 +244,17 @@ fn own(host: &WebHost, name: &str, args: serde_json::Value) -> Option<Reply> {
         }
         _ => return None,
     })
+}
+
+/// Saves or updates a live session; its log id.
+fn save_live_session(host: &WebHost, id: Option<i64>, session: &leafline_core::session::SessionSummary) -> Result<i64> {
+    let now = leafline_core::clock::now();
+    let id = host.records.with(|db| match id {
+        Some(id) => db.update_session(id, session, now).map(|()| id),
+        None => db.save_session(session, "", now),
+    })?;
+    emit(host, records::HISTORY_EVENT, &());
+    Ok(id)
 }
 
 /// A map's picture cut to what is drawn, as the program's map cards show it, with its portals, NPCs

@@ -5,6 +5,8 @@
 use leafline_core::capturetest::{measure, pattern};
 use leafline_core::vision::Frame;
 
+pub mod live;
+
 /// The pattern for a window `width` x `height` screen pixels at `scale_milli` thousandths, as
 /// RGBA bytes, [`pattern::WIDTH`] x [`pattern::HEIGHT`].
 pub fn pattern_rgba(width: u32, height: u32, scale_milli: u32) -> Vec<u8> {
@@ -75,6 +77,52 @@ mod web {
     impl Default for Readers {
         fn default() -> Self {
             Self::new()
+        }
+    }
+
+    /// The website's live reading: readers and the session tracker (see `live::LiveReader`).
+    #[wasm_bindgen]
+    pub struct Live(super::live::LiveReader);
+
+    #[wasm_bindgen]
+    impl Live {
+        /// A new session, or the one in `saved` (a snapshot's JSON) when it can be carried on.
+        #[wasm_bindgen(constructor)]
+        pub fn new(idle_after: f64, saved: Option<String>) -> Live {
+            let restored = saved
+                .and_then(|text| serde_json::from_str(&text).ok())
+                .and_then(|value| super::live::LiveReader::restore(idle_after, value));
+            Live(restored.unwrap_or_else(|| super::live::LiveReader::new(idle_after)))
+        }
+
+        /// Reads a frame taken at `at` Unix seconds, as JSON: `{read, other}`, or `null` when the
+        /// bytes don't make a frame.
+        pub fn read(&mut self, rgba: &[u8], width: u32, height: u32, at: f64) -> String {
+            let Some(frame) = frame(rgba, width, height) else { return "null".into() };
+            match self.0.read(&frame, at) {
+                Some((read, other)) => serde_json::json!({ "read": read, "other": other }).to_string(),
+                None => "null".into(),
+            }
+        }
+
+        pub fn summary(&self) -> String {
+            serde_json::to_string(&self.0.summary()).unwrap_or_default()
+        }
+
+        pub fn snapshot(&self) -> String {
+            self.0.snapshot().to_string()
+        }
+
+        pub fn set_held(&mut self, held: bool) {
+            self.0.set_held(held);
+        }
+
+        pub fn set_idle_after(&mut self, seconds: f64) {
+            self.0.set_idle_after(seconds);
+        }
+
+        pub fn reset(&mut self) {
+            self.0.reset();
         }
     }
 }
