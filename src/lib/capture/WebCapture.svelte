@@ -7,9 +7,13 @@
 
   import MeasureView from "./MeasureView.svelte";
   import {
+    canRead,
     capture,
+    clearOwnFrames,
+    downloadOwnFrames,
     enduranceCsv,
     pickFolder,
+    useOwnStorage,
     sendJobs,
     setEndurance,
     setPerSecond,
@@ -85,8 +89,12 @@
   Leafline's developers, not a player feature. Frames stay in this tab: nothing is uploaded, and frames are written only
   to a folder you pick.
 </p>
-{#if !support.share}
-  <p class="status bad">This browser can't share a window. Use Chrome or Edge on a computer.</p>
+{#if !canRead}
+  <p class="status bad">
+    {support.share
+      ? "This browser can share a window but can't hand its frames to the page."
+      : "This browser can't share a window."} Reading the game needs Chrome, Edge or Firefox on a computer.
+  </p>
 {/if}
 
 <section>
@@ -95,7 +103,7 @@
     {#if capture.sharing}
       <button class="button" onclick={stopSharing}>Stop sharing</button>
     {:else}
-      <button class="button primary" onclick={share} disabled={!support.share}>Share a window…</button>
+      <button class="button primary" onclick={share} disabled={!canRead}>Share a window…</button>
     {/if}
     <span class="muted">{capture.sharing ? capture.label || "Shared" : "Nothing shared"}</span>
   </div>
@@ -103,7 +111,7 @@
     <p class="status">
       {#if stats}
         {stats.fps.toFixed(0)} frames a second · {stats.frames} so far · {format ?? "format not given"} · coded {stats.codedWidth}
-        x {stats.codedHeight}, shown {stats.displayWidth} x {stats.displayHeight} · read in the {capture.readIn}{capture.readInWhy
+        x {stats.codedHeight}, shown {stats.displayWidth} x {stats.displayHeight} · {capture.readIn === "video" ? "taken from a video of the stream" : `read in the ${capture.readIn}`}{capture.readInWhy
           ? ` (the browser wouldn't hand the stream to the worker: ${capture.readInWhy})`
           : ""}
         {#if quiet > 3}<span class="warn"> · no frame for {quiet} s</span>{/if}
@@ -149,10 +157,23 @@
     clock ticks as the program, named <code>web-&lt;time&gt;.png</code>. The program's Capture test window then compares
     the two sets. Pick a folder outside OneDrive: these are pictures of your game.
   </p>
+  {#if !support.folder && support.ownStorage}
+    <p class="lead">
+      This browser can't write to a folder you pick, so frames are kept in its own storage for this site, then
+      downloaded into your Downloads folder (about 6 MB each). Move them into the program's folder to compare, and delete
+      them here afterwards.
+    </p>
+  {/if}
   <div class="controls">
-    <button class="button" onclick={pickFolder} disabled={!support.folder}>
-      {capture.folder ? `Folder: ${capture.folder.name}` : "Pick a folder…"}
-    </button>
+    {#if support.folder}
+      <button class="button" onclick={pickFolder}>
+        {capture.folder ? `Folder: ${capture.folder.name}` : "Pick a folder…"}
+      </button>
+    {:else if support.ownStorage}
+      <button class="button" onclick={useOwnStorage} disabled={capture.folderIsOwn}>
+        {capture.folderIsOwn ? "Saving in this browser" : "Save in this browser"}
+      </button>
+    {/if}
     <label>
       <select value={capture.perSecond} onchange={(e) => setPerSecond(Number(e.currentTarget.value))}>
         <option value={1}>1 a second</option>
@@ -168,7 +189,20 @@
       </button>
     {/if}
   </div>
-  {#if !support.folder}<p class="status bad">This browser can't write to a folder. Use Chrome or Edge.</p>{/if}
+  {#if capture.folderIsOwn && !capture.savingOn && stats?.saved}
+    <div class="controls">
+      <button class="button" onclick={downloadOwnFrames} disabled={!!capture.downloading && capture.downloading.done < capture.downloading.total}>
+        Download the frames
+      </button>
+      <button class="button" onclick={clearOwnFrames}>Delete them here</button>
+      {#if capture.downloading}
+        <span class="muted">{capture.downloading.done} of {capture.downloading.total} downloaded</span>
+      {/if}
+    </div>
+  {/if}
+  {#if !support.folder && !support.ownStorage}
+    <p class="status bad">This browser can't save frames. Use Chrome, Edge or Firefox.</p>
+  {/if}
   {#if stats && (capture.savingOn || stats.saved)}
     <p class="status">
       {stats.saved} saved{stats.dropped ? `, ${stats.dropped} skipped (saving fell behind)` : ""}{stats.saving

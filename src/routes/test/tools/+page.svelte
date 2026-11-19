@@ -145,7 +145,7 @@
     <ol>
       <li>Make an empty folder outside OneDrive, such as <code>C:\LeaflineCaptureTest</code>.</li>
       <li>
-        Open the website's test page in Chrome or Edge: <code>http://localhost:1433/Leafline/test/capture</code> after
+        Open the website's test page in Chrome, Edge or Firefox: <code>http://localhost:1433/Leafline/test/capture</code> after
         <code>npm.cmd run build:wasm</code> and <code>npm.cmd run dev:web</code> in a second terminal, or the live
         site's <code>/test/capture</code> once it is published.
       </li>
@@ -157,15 +157,16 @@
         On the test page: Share a window… and pick “Leafline capture test pattern”. Leave it uncovered for a few
         seconds, then Copy results and send them to Claude.
       </li>
-      <li>If you have time, do the same in the other browser (Chrome and Edge).</li>
+      <li>If you have time, do the same in another browser (Chrome, Edge, Firefox).</li>
     </ol>
     <h3>B. Real game (about 15 minutes)</h3>
     <ol>
       <li>Log in on the alt. Live reading can stay on.</li>
       <li>Here: pick the folder, 2 a second, Start saving.</li>
       <li>
-        Test page: Share a window… and pick the MapleStory window. Pick the same folder (allow Chrome to edit it), 2 a
-        second, Start saving.
+        Test page: Share a window… and pick the MapleStory window. Pick the same folder (allow the browser to edit it), 2 a
+        second, Start saving. In Firefox, which can't pick a folder: Save in this browser, and after stopping,
+        Download the frames and move them from Downloads into the folder.
       </li>
       <li>
         Play these scenes for a minute or two each: standing in town; fighting on a hunting map; walking through two or

@@ -15,20 +15,37 @@ declare class PressureObserver {
   disconnect(): void;
 }
 
-/** What the browser offers that the test needs: Chrome and Edge on a computer have all of it. */
+/** What the browser offers that the test needs, checked by feature rather than by name. Chrome and
+ * Edge on a computer have all of it; Firefox can share and read a window, by another route. */
 export const support = {
   share: typeof navigator !== "undefined" && !!navigator.mediaDevices?.getDisplayMedia,
+  /** Each frame handed over as the stream delivers it: Chrome and Edge. */
+  trackFrames: typeof window !== "undefined" && "MediaStreamTrackProcessor" in window,
+  /** Each frame taken from the shared window playing in a video as it arrives: Firefox. */
+  videoFrames:
+    typeof window !== "undefined" &&
+    "VideoFrame" in window &&
+    "requestVideoFrameCallback" in HTMLVideoElement.prototype,
   folder: typeof window !== "undefined" && "showDirectoryPicker" in window,
+  /** Somewhere to save frames when there is no folder to pick: the browser's own storage. */
+  ownStorage: typeof navigator !== "undefined" && !!navigator.storage?.getDirectory,
   pressure: typeof window !== "undefined" && "PressureObserver" in window,
 };
+
+/** Whether this browser can read a shared window at all. */
+export const canRead = support.share && (support.trackFrames || support.videoFrames);
+
+/** The folder in the browser's own storage that frames go to without a folder picker. */
+const OWN_FOLDER = "leafline-capture-frames";
 
 export const capture = $state({
   sharing: false,
   /** The shared surface's name, as the browser gives it. */
   label: "",
   surface: "",
-  /** Where frames are read: in the worker (the stream handed over) or on the page. */
-  readIn: "" as "" | "worker" | "page",
+  /** Where frames are read: in the worker (the stream handed over), on the page, or from a
+   * video playing the stream (Firefox). */
+  readIn: "" as "" | "worker" | "page" | "video",
   /** Why the stream couldn't be handed to the worker, when it couldn't. */
   readInWhy: null as string | null,
   /** Frames the browser delivered to the page, where the page reads them. */
@@ -41,6 +58,10 @@ export const capture = $state({
   measuring: true,
   reading: false,
   folder: null as FileSystemDirectoryHandle | null,
+  /** The folder is the browser's own storage (no folder picker), to be downloaded afterwards. */
+  folderIsOwn: false,
+  /** Frames downloaded so far out of those saved in the browser's own storage. */
+  downloading: null as { done: number; total: number } | null,
   perSecond: 2,
   savingOn: false,
   endurance: null as { startedAt: number } | null,
@@ -51,7 +72,49 @@ export const capture = $state({
 let worker: Worker | null = null;
 let track: MediaStreamTrack | null = null;
 let pageReader: ReadableStreamDefaultReader<VideoFrame> | null = null;
+let video: HTMLVideoElement | null = null;
+let ticker: Worker | null = null;
 let pressure: PressureObserver | null = null;
+
+/** How often a hidden page looks for a new frame, where it gets no frame callbacks. */
+const HIDDEN_LOOK_MS = 40;
+
+/** Firefox's route: the shared window plays in a video that is never shown, and each new frame
+ * becomes a VideoFrame for the worker. The video's frame callback drives it while the page is
+ * drawn; a page the browser counts as hidden (minimised, or covered by the game) gets none, so
+ * ticks from a worker, which browsers don't slow like a hidden page's timers, keep it going. */
+function readFromVideo(stream: MediaStream) {
+  const v = document.createElement("video");
+  v.muted = true;
+  v.playsInline = true;
+  v.srcObject = stream;
+  video = v;
+  let last = -1;
+  const take = (mediaTime: number) => {
+    if (video !== v || v.readyState < 2 || mediaTime === last) return;
+    last = mediaTime;
+    let frame: VideoFrame;
+    try {
+      frame = new VideoFrame(v, { timestamp: Math.round(mediaTime * 1e6) });
+    } catch {
+      return;
+    }
+    capture.delivered++;
+    send({ op: "frame", frame }, [frame as unknown as Transferable]);
+  };
+  const onFrame = (_now: number, meta: { mediaTime: number }) => {
+    take(meta.mediaTime);
+    if (video === v) v.requestVideoFrameCallback(onFrame);
+  };
+  v.play()
+    .then(() => v.requestVideoFrameCallback(onFrame))
+    .catch((err) => (capture.error = `The shared window wouldn't play: ${err}`));
+  const tick = `setInterval(() => postMessage(0), ${HIDDEN_LOOK_MS});`;
+  ticker = new Worker(URL.createObjectURL(new Blob([tick], { type: "text/javascript" })));
+  ticker.onmessage = () => {
+    if (document.visibilityState === "hidden") take(v.currentTime);
+  };
+}
 
 const send = (message: ToWorker, transfer: Transferable[] = []) => worker?.postMessage(message, transfer);
 
@@ -119,26 +182,36 @@ export async function share() {
 
   // The stream itself handed to the worker where the browser allows it, else read here and each
   // frame handed over. Either way the frames come as the stream delivers them, not on a timer.
-  try {
-    send({ op: "track", track }, [track as unknown as Transferable]);
-    capture.readIn = "worker";
+  if (!support.trackFrames) {
+    // Firefox: no stream reader at all, so the frames come from a video playing the stream.
+    capture.readIn = "video";
     capture.readInWhy = null;
-  } catch (err) {
-    capture.readIn = "page";
-    capture.readInWhy = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
-    const reader = new MediaStreamTrackProcessor({ track }).readable.getReader();
-    pageReader = reader;
-    void (async () => {
-      for (;;) {
-        const { value, done } = await reader.read();
-        if (done || !value) break;
-        capture.delivered++;
-        send({ op: "frame", frame: value }, [value as unknown as Transferable]);
-      }
-      stopSharing();
-    })();
+    readFromVideo(stream);
+  } else {
+    try {
+      send({ op: "track", track }, [track as unknown as Transferable]);
+      capture.readIn = "worker";
+      capture.readInWhy = null;
+    } catch (err) {
+      capture.readIn = "page";
+      capture.readInWhy = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+      const reader = new MediaStreamTrackProcessor({ track }).readable.getReader();
+      pageReader = reader;
+      void (async () => {
+        for (;;) {
+          const { value, done } = await reader.read();
+          if (done || !value) break;
+          capture.delivered++;
+          send({ op: "frame", frame: value }, [value as unknown as Transferable]);
+        }
+        stopSharing();
+      })();
+    }
   }
+  await startPressure();
+}
 
+async function startPressure() {
   if (support.pressure && !pressure) {
     try {
       pressure = new PressureObserver((records) => {
@@ -160,6 +233,13 @@ export function stopSharing() {
   send({ op: "stop" });
   void pageReader?.cancel();
   pageReader = null;
+  ticker?.terminate();
+  ticker = null;
+  if (video) {
+    video.pause();
+    video.srcObject = null;
+    video = null;
+  }
   track?.stop();
   track = null;
   worker?.terminate();
@@ -187,9 +267,60 @@ export async function pickFolder() {
       showDirectoryPicker(options: object): Promise<FileSystemDirectoryHandle>;
     }).showDirectoryPicker;
     capture.folder = await picker.call(window, { id: "leafline-capture-test", mode: "readwrite" });
+    capture.folderIsOwn = false;
   } catch (err) {
     if (!(err instanceof Error && err.name === "AbortError")) capture.error = String(err);
   }
+}
+
+/** Where there is no folder picker (Firefox): frames are kept in the browser's own storage for
+ * this site, then downloaded one by one into the Downloads folder. */
+export async function useOwnStorage() {
+  try {
+    const root = await navigator.storage.getDirectory();
+    capture.folder = await root.getDirectoryHandle(OWN_FOLDER, { create: true });
+    capture.folderIsOwn = true;
+  } catch (err) {
+    capture.error = `This browser wouldn't keep frames for the site: ${err}`;
+  }
+}
+
+async function ownNames(dir: FileSystemDirectoryHandle): Promise<string[]> {
+  const names: string[] = [];
+  for await (const name of (dir as unknown as { keys(): AsyncIterable<string> }).keys()) {
+    if (name.startsWith("web-") && name.endsWith(".png")) names.push(name);
+  }
+  return names.sort();
+}
+
+/** Downloads the frames kept in the browser's own storage, oldest first. */
+export async function downloadOwnFrames() {
+  const dir = capture.folderIsOwn ? capture.folder : null;
+  if (!dir) return;
+  const names = await ownNames(dir);
+  capture.downloading = { done: 0, total: names.length };
+  for (const name of names) {
+    const file = await (await dir.getFileHandle(name)).getFile();
+    const url = URL.createObjectURL(file);
+    Object.assign(document.createElement("a"), { href: url, download: name }).click();
+    // The browser starts each download from the link before it is let go.
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    URL.revokeObjectURL(url);
+    capture.downloading = { done: capture.downloading.done + 1, total: names.length };
+  }
+}
+
+/** Deletes the frames kept in the browser's own storage. */
+export async function clearOwnFrames() {
+  if (capture.savingOn) setSaving(false);
+  try {
+    await (await navigator.storage.getDirectory()).removeEntry(OWN_FOLDER, { recursive: true });
+  } catch {
+    // Already gone.
+  }
+  capture.folder = null;
+  capture.folderIsOwn = false;
+  capture.downloading = null;
 }
 
 export function setSaving(on: boolean, folder?: FileSystemDirectoryHandle) {
