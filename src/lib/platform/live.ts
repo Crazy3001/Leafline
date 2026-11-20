@@ -7,6 +7,7 @@
 // tracker's state is kept in this browser so a reload carries on with it. Nothing read leaves
 // this PC.
 
+import { base } from "$app/paths";
 import type { Analysis, LiveStatus, SessionSummary } from "../types";
 import { emit } from "./bus";
 import { canRead, cantRead, shareWindow, type SharedWindow } from "./capture";
@@ -18,6 +19,12 @@ const SAVE_AFTER_ACTIVE = 300;
 const SAVE_EVERY_MS = 30_000;
 /** A break this long with no EXP ends the session; the next gain starts a new one. */
 const BREAK_ENDS_SESSION_MS = 30 * 60_000;
+/** The known maps, for settling the minimap title: Leafline's mirror of OSMS first, OSMS second,
+ *  as the site's own data download goes (crates/leafline-core/src/mapdata/fetch.rs). */
+const MAP_LIST_URLS = [
+  "https://raw.githubusercontent.com/Crazy3001/Leafline-data/main/osms/v1/maps.json",
+  "https://osmsdataexplorer.com/data/api/v1/maps.json",
+];
 /** Where the tracker's state is kept between visits, in this site's own browser storage. */
 const RECOVERY_FILE = "live-session.json";
 const RECOVERY_VERSION = 1;
@@ -216,7 +223,14 @@ export async function startLive(): Promise<void> {
   keeper = { id: recovered?.id ?? null, savedAt: 0 };
   lastActive = { seconds: 0, at: Date.now() };
   const choice = await settings();
-  send({ op: "start", idleAfter: choice.idleAfter, interval: choice.interval, saved: recovered?.tracker ?? null });
+  send({
+    op: "start",
+    idleAfter: choice.idleAfter,
+    interval: choice.interval,
+    saved: recovered?.tracker ?? null,
+    titleModel: `${base}/ocr/text-recognition.onnx`,
+    maps: MAP_LIST_URLS,
+  });
   setStatus({ state: "waiting", reason: "Waiting for the first picture of the game." });
 }
 

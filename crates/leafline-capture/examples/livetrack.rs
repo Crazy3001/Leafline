@@ -15,6 +15,12 @@ fn main() {
     let idle_after: f64 = args.next().map(|a| a.parse().expect("idle_after")).unwrap_or(15.0);
     let text = std::fs::read_to_string(&list).expect("read the list");
     let mut live = LiveReader::new(idle_after);
+    // The minimap title, as on the website: LIVETRACK_MODEL (text-recognition.onnx) and
+    // LIVETRACK_MAPS (maps.json) when set.
+    if let (Ok(model), Ok(maps)) = (std::env::var("LIVETRACK_MODEL"), std::env::var("LIVETRACK_MAPS")) {
+        live.set_title_model(std::fs::read(model).expect("model")).expect("load the model");
+        live.set_maps(&std::fs::read(maps).expect("maps")).expect("load the maps");
+    }
     let mut cache: Option<(String, Frame)> = None;
     for line in text.lines().filter(|l| !l.trim().is_empty() && !l.starts_with("seconds")) {
         let (at, path) = line.split_once(',').expect("seconds,path");
@@ -39,6 +45,7 @@ fn main() {
                 "points": hud.and_then(|h| h.exp.map(|e| e.points)),
                 "percent": hud.and_then(|h| h.exp.map(|e| e.percent).or(h.exp_percent)),
                 "mesos": read.analysis.mesos.map(|m| m.mesos),
+                "map": read.analysis.map.as_ref().map(|m| m.label()),
                 "other": other,
                 "ms": read.ms,
                 "timings": read.analysis.timings,
