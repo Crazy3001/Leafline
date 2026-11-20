@@ -64,10 +64,7 @@ pub fn read_with(frame: &Frame, ocr: &Ocr, ink: Ink) -> Result<(Option<MesoReadi
     let boxes = locate(frame);
     let mut readings = Vec::new();
     for &rect in &boxes {
-        // The amount is right-aligned; the empty left of the box and its border only confuse OCR.
-        // Redrawn from UI Size Default Ratio, the box can take in its dark right border too.
-        let amount = Rect::from_edges(rect.x + 0.4 * rect.w, rect.y, rect.right() - BORDER * rect.h, rect.bottom());
-        if let Some(mesos) = read_amount(frame, amount, ocr, ink)? {
+        if let Some(mesos) = read_amount(frame, amount_area(rect), ocr, ink, whole_box(frame, rect))? {
             readings.push(MesoReading { mesos, rect });
         }
     }
@@ -82,12 +79,84 @@ pub fn read_with(frame: &Frame, ocr: &Ocr, ink: Ink) -> Result<(Option<MesoReadi
     Ok((best.map(|(reading, _)| reading), boxes.len()))
 }
 
+/// Where the amount is in a meso box. It is right-aligned; the empty left of the box and its
+/// border only confuse OCR. Redrawn from UI Size Default Ratio, the box can take in its dark
+/// right border too.
+fn amount_area(rect: Rect) -> Rect {
+    Rect::from_edges(rect.x + 0.4 * rect.w, rect.y, rect.right() - BORDER * rect.h, rect.bottom())
+}
+
+/// The amount's glyphs in each meso box, for building the digit table from frames.
+pub fn box_glyphs(frame: &Frame, ink: Ink) -> Vec<Vec<Mask>> {
+    locate(frame).into_iter().map(|rect| glyphs(frame, amount_area(rect), ink.shape)).collect()
+}
+
+/// Whether each box ends at its own border rather than under an item's tooltip: just past a
+/// box's thin border the window's frame shows no tooltip blue, while just past a box a tooltip
+/// cuts short most of it is (measured on 2026-11-20 frames: none against 60-100% from the fifth
+/// column on). A tooltip further right, over the MESOS label, leaves the amount whole.
+pub fn whole_boxes(frame: &Frame) -> Vec<bool> {
+    locate(frame).into_iter().map(|rect| whole_box(frame, rect)).collect()
+}
+
+/// Above this share of tooltip blue just right of a box, the box is taken as cut short.
+const COVERED: f32 = 0.3;
+
+fn whole_box(frame: &Frame, rect: Rect) -> bool {
+    let (x0, y0, w, h) = rect.to_pixels(frame.width(), frame.height());
+    // Past the border (two pixels at Ideal Ratio, less than 0.15 box heights), short of the label.
+    let from = x0 + w + (0.15 * h as f32).ceil() as u32;
+    let to = (x0 + w + (0.4 * h as f32).ceil() as u32).min(frame.width());
+    if from >= to {
+        return true;
+    }
+    let mut blue = 0;
+    for x in from..to {
+        for y in y0..y0 + h {
+            blue += usize::from(is_tooltip_blue(frame.get_pixel(x, y)));
+        }
+    }
+    (blue as f32) < COVERED * ((to - from) * h) as f32
+}
+
+/// An item tooltip's dark, see-through blue.
+fn is_tooltip_blue(px: &Rgba<u8>) -> bool {
+    let luma = preprocess::luminance(px);
+    (40..=130).contains(&luma) && i32::from(px.0[2]) - i32::from(px.0[0]) >= 30
+}
+
+/// How far each box's amount stops short of its right end, in box heights.
+pub fn right_gaps(frame: &Frame, ink: Ink) -> Vec<Option<f32>> {
+    locate(frame).into_iter().map(|rect| right_gap(frame, amount_area(rect), ink)).collect()
+}
+
+/// The most room, in box heights, between an amount's last digit and the right end of
+/// [`amount_area`]: the game leaves about 0.2.
+const RIGHT_GAP: f32 = 0.45;
+
+/// The blank between the amount's last ink and `rect`'s right end, in box heights.
+fn right_gap(frame: &Frame, rect: Rect, ink: Ink) -> Option<f32> {
+    let (_, end) = *ink_columns(frame, rect, |px| is_digit(px, ink.shape)).last()?;
+    Some((rect.right() - end as f32) / rect.h)
+}
+
 /// OCR of the box's dark digits at several sizes. The pixel font's 6 and 8 are easily
 /// confused, so an amount counts only when at least two readings agree on it, no other
 /// amount is read as often, and it fits the digits' shapes.
-fn read_amount(frame: &Frame, rect: Rect, ocr: &Ocr, ink: Ink) -> Result<Option<u64>> {
+///
+/// The game's own digit shapes come first: when every glyph is one of them, that is the amount,
+/// and OCR (which the website doesn't have) is only asked when one isn't known.
+fn read_amount(frame: &Frame, rect: Rect, ocr: &Ocr, ink: Ink, whole: bool) -> Result<Option<u64>> {
     use imageops::FilterType::{CatmullRom, Triangle};
     let glyphs = glyphs(frame, rect, ink.shape);
+    // The amount is right-aligned, so one that stops short of the right end is partly covered
+    // (an item's tooltip over the inventory) and its digits so far aren't the amount.
+    if whole
+        && right_gap(frame, rect, ink).is_some_and(|gap| gap <= RIGHT_GAP)
+        && let Some(amount) = read_shapes(&glyphs)
+    {
+        return Ok(Some(amount));
+    }
     let mut readings = Vec::new();
     for (scale, filter) in [(1, Triangle), (2, Triangle), (2, CatmullRom), (3, Triangle), (3, CatmullRom)] {
         let words = ocr.words_in(frame, rect, scale as f32, |crop| {
@@ -111,6 +180,80 @@ fn read_amount(frame: &Frame, rect: Rect, ocr: &Ocr, ink: Ink) -> Result<Option<
     let most = readings.iter().map(|&r| votes(r)).max().unwrap_or(0);
     let winners: Vec<u64> = readings.iter().copied().filter(|&r| votes(r) == most).collect();
     Ok((most >= 2 && winners.iter().all(|&w| w == winners[0])).then(|| winners[0]))
+}
+
+/// The amount's characters in the game's pixel fonts, a row of font pixels per string and `#`
+/// for ink: the inventory's digits are 8 font pixels tall, the shop window's 9. Taken on
+/// 2026-11-20 from about 190 amounts on frames at Ideal Ratio (1x and 2x, the program's and a
+/// browser's window share alike), labelled by the program's OCR; every copy of a character was
+/// drawn the same. Characters not seen yet are left out (most of the shop's digits), so an amount
+/// holding one goes to OCR. The comma keeps the blank rows above it, down from the digits' top.
+const SHAPES: &[(char, &[&str])] = &[
+    ('0', &[".###.", "#...#", "#...#", "#...#", "#...#", "#...#", "#...#", ".###."]),
+    ('1', &[".#.", "##.", ".#.", ".#.", ".#.", ".#.", ".#.", "###"]),
+    ('2', &[".###.", "#...#", "....#", "...#.", "..#..", ".#...", "#....", "#####"]),
+    ('3', &[".###.", "#...#", "....#", "..##.", "....#", "....#", "#...#", ".###."]),
+    ('4', &["...#.", "..##.", ".#.#.", "#..#.", "#####", "...#.", "...#.", "...#."]),
+    ('5', &["#####", "#....", "#....", "####.", "....#", "....#", "#...#", ".###."]),
+    ('6', &["..##.", ".#...", "#....", "####.", "#...#", "#...#", "#...#", ".###."]),
+    ('7', &["#####", "....#", "...#.", "...#.", "..#..", "..#..", ".#...", ".#..."]),
+    ('8', &[".###.", "#...#", "#...#", ".###.", "#...#", "#...#", "#...#", ".###."]),
+    ('9', &[".###.", "#...#", "#...#", "#...#", ".####", "....#", "...#.", ".##.."]),
+    (',', &["..", "..", "..", "..", "..", "..", ".#", ".#", ".#", "#."]),
+    ('4', &["...#.", "..##.", "..##.", ".#.#.", ".#.#.", "#..#.", "#####", "...#.", "...#."]),
+    ('5', &[".####", ".#...", "#....", "####.", "#...#", "....#", "....#", "#...#", ".###."]),
+    ('8', &[".###.", "#...#", "#...#", "#...#", ".###.", "#...#", "#...#", "#...#", ".###."]),
+];
+
+/// How much of a glyph must agree with a known shape for it to count as that character.
+const SHAPE_FITS: f32 = 0.9;
+/// Screen pixels per font pixel tried: UI sizes that keep the fonts crisp draw them whole.
+const FONT_SCALES: [u32; 3] = [1, 2, 3];
+
+/// The amount when every glyph is a known shape and together they make one.
+fn read_shapes(glyphs: &[Mask]) -> Option<u64> {
+    if glyphs.is_empty() {
+        return None;
+    }
+    let text: String = glyphs.iter().map(known_shape).collect::<Option<_>>()?;
+    (AMOUNT.is_match(&text) && fits_shapes(&text, glyphs)).then(|| parse_grouped(&text)).flatten()
+}
+
+/// The character a glyph is drawn as, when it fits one known shape well and no other character
+/// nearly as well.
+fn known_shape(glyph: &Mask) -> Option<char> {
+    let glyph = without_blank_bottom(glyph);
+    let mut best: Option<(f32, char)> = None;
+    let mut runner_up = 0.0f32;
+    for (c, rows) in SHAPES {
+        for scale in FONT_SCALES {
+            let (w, h) = (rows[0].len() as u32 * scale, rows.len() as u32 * scale);
+            if w != glyph.width() || h.abs_diff(glyph.height()) > scale {
+                continue;
+            }
+            let shape = Mask::from_fn(w, h, |x, y| rows[(y / scale) as usize].as_bytes()[(x / scale) as usize] == b'#');
+            let score = shape.similarity(&glyph);
+            match best {
+                Some((top, top_char)) if score > top => {
+                    if top_char != *c {
+                        runner_up = runner_up.max(top);
+                    }
+                    best = Some((score, *c));
+                }
+                Some((_, top_char)) if top_char != *c => runner_up = runner_up.max(score),
+                None => best = Some((score, *c)),
+                _ => {}
+            }
+        }
+    }
+    let (score, c) = best?;
+    (score >= SHAPE_FITS && score - runner_up >= 0.1).then_some(c)
+}
+
+/// The glyph without the blank rows under it: the amount's rows reach down to the comma's tail.
+fn without_blank_bottom(glyph: &Mask) -> Mask {
+    let height = (0..glyph.height()).rev().find(|&y| (0..glyph.width()).any(|x| glyph.get(x, y))).map_or(0, |y| y + 1);
+    Mask::from_fn(glyph.width(), height, |x, y| glyph.get(x, y))
 }
 
 /// OCR of a short amount drawn several times over, since OCR skips a lone digit as not being
@@ -296,6 +439,43 @@ mod tests {
         assert_eq!(settle_sixes("66", &[six]), "66");
     }
 
+    /// `text` drawn in [`SHAPES`]' first (inventory) font at `scale`, dark on white, a font
+    /// pixel apart, and the glyphs cut from it.
+    fn drawn(text: &str, scale: u32) -> Vec<Mask> {
+        let shape = |c: char| SHAPES.iter().find(|(s, _)| *s == c).map(|(_, rows)| *rows);
+        let mut columns: Vec<Vec<bool>> = Vec::new();
+        for c in text.chars() {
+            // Anything else is a made-up glyph no known shape fits.
+            let rows = shape(c).unwrap_or(&["#...#", ".#.#.", "..#..", ".#.#.", "#...#", "#...#", ".#.#.", "#...#"]);
+            for x in 0..rows[0].len() {
+                let column: Vec<bool> = (0..10).map(|y| rows.get(y).is_some_and(|r| r.as_bytes()[x] == b'#')).collect();
+                columns.extend(std::iter::repeat_n(column, scale as usize));
+            }
+            columns.extend(std::iter::repeat_n(vec![false; 10], scale as usize));
+        }
+        let (w, h) = (columns.len() as u32 + 4, 10 * scale + 4);
+        let frame = Frame::from_fn(w, h, |x, y| {
+            let (col, row) = ((x as usize).wrapping_sub(2), (y.wrapping_sub(2) / scale) as usize);
+            let ink = col < columns.len() && y >= 2 && row < 10 && columns[col][row];
+            if ink { Rgba([0, 0, 0, 255]) } else { Rgba([255; 4]) }
+        });
+        glyphs(&frame, Rect::new(0.0, 0.0, w as f32, h as f32), Ink::CRISP.shape)
+    }
+
+    #[test]
+    fn reads_amounts_by_the_games_digit_shapes() {
+        assert_eq!(read_shapes(&drawn("28,640", 2)), Some(28_640));
+        assert_eq!(read_shapes(&drawn("153,814", 2)), Some(153_814));
+        assert_eq!(read_shapes(&drawn("458", 2)), Some(458));
+        assert_eq!(read_shapes(&drawn("1,234,569", 1)), Some(1_234_569));
+        assert_eq!(read_shapes(&drawn("157,262", 2)), Some(157_262));
+        assert_eq!(read_shapes(&drawn("90", 3)), Some(90));
+        // A character not in the table leaves the amount to OCR, as does one that isn't an amount.
+        assert_eq!(read_shapes(&drawn("1,2x4", 2)), None);
+        assert_eq!(read_shapes(&drawn("1234", 2)), None);
+        assert_eq!(read_shapes(&[]), None);
+    }
+
     #[test]
     fn repeated_amounts_must_agree_in_every_copy() {
         assert_eq!(one_copy("00000"), Some("0".into()));
@@ -337,5 +517,23 @@ mod tests {
             }
         });
         assert_eq!(locate(&frame), vec![Rect::new(60.0, 100.0, 240.0, 12.0)]);
+        assert_eq!(whole_boxes(&frame), vec![true]);
+    }
+
+    #[test]
+    fn a_box_a_tooltip_cuts_short_is_not_whole() {
+        // The box's white ends at x 200, where a see-through blue tooltip begins.
+        let frame = Frame::from_fn(400, 600, |x, y| {
+            if (44..56).contains(&x) && (100..112).contains(&y) {
+                Rgba([255, 200, 0, 255])
+            } else if (60..200).contains(&x) && (100..112).contains(&y) {
+                Rgba([255, 255, 255, 255])
+            } else if (200..380).contains(&x) && (60..300).contains(&y) {
+                Rgba([83, 85, 132, 255])
+            } else {
+                Rgba([200, 205, 215, 255])
+            }
+        });
+        assert_eq!(whole_boxes(&frame), vec![false]);
     }
 }
