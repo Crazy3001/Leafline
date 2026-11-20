@@ -174,7 +174,7 @@
 
 <style>
   .hud {
-    max-height: 100vh;
+    max-height: calc(100vh / var(--page-zoom, 1));
     overflow-y: auto;
     user-select: none;
   }

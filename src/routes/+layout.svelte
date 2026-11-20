@@ -7,6 +7,7 @@
   import TipHost from "$lib/ui/TipHost.svelte";
   import { followTheme } from "$lib/ui/theme.svelte";
   import { watchWorn } from "$lib/builds.svelte";
+  import { watchMapData } from "$lib/mapdata.svelte";
 
   let { children } = $props();
 
@@ -18,6 +19,8 @@
 
   followTheme();
   watchWorn();
+  // The website fetches the community data on a first visit (see mapdata.svelte.ts).
+  if (__LEAFLINE_WEB__ && !page.route.id?.startsWith("/test/")) watchMapData();
 
   // Records replaced from a file, from this window or another: everything shown is out of date.
   onMount(() => {

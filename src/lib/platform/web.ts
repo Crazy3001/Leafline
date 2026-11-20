@@ -114,6 +114,9 @@ export const webBackend: Backend = {
   setDeskOnTop: async () => desk,
   async setPageZoom(zoom) {
     document.documentElement.style.setProperty("zoom", String(zoom));
+    // Zoom scales viewport units too, so full-height pages divide it back out (or at 150% the
+    // page is half again as tall as the window, and the sidebar's foot can't be reached).
+    document.documentElement.style.setProperty("--page-zoom", String(zoom));
   },
   monitorCount: async () => 1,
   setTyping: async () => {},

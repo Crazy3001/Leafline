@@ -118,7 +118,7 @@
   .frame {
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    height: calc(100vh / var(--page-zoom, 1));
     overflow: hidden;
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-lg);

@@ -452,7 +452,7 @@
   .page {
     display: grid;
     grid-template-rows: auto 1fr auto;
-    height: 100vh;
+    height: calc(100vh / var(--page-zoom, 1));
   }
 
   /* Narrow: the steps run across the top. */
