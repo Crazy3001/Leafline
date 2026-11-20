@@ -383,6 +383,17 @@
     "Press keys or click for you. Nothing is automated: no botting, macros or auto-potions.",
     "Save pictures of your game unless you press Save frame, or upload screenshots, readings or records anywhere.",
   ];
+  // The website's own lists: it reads only a window the player shares, in the browser.
+  const webDoes = [
+    "Reads your level and EXP from the game window, only after you share it on Now (Read the game) and only until you stop. The picture is read in this browser and never leaves this computer.",
+    "Shows map, monster, quest, skill and equipment facts from community data, downloaded to this browser on your first visit.",
+    "Keeps your settings, sessions, notes, drop log and builds in this browser on this computer.",
+  ];
+  const webDoesNot = [
+    "Read or change the game's memory, files or network traffic.",
+    "Press keys or click for you. Nothing is automated: no botting, macros or auto-potions.",
+    "Keep pictures of your game, or send anything it reads, or your records, anywhere. No accounts, no analytics.",
+  ];
   const credits = [
     {
       what: "Map, monster, NPC, quest, skill and equipment data",
@@ -1079,10 +1090,10 @@
         <ShieldCheck size={16} />
         <p>
           {#if isWeb}
-            <strong>Nothing read from the game.</strong> The website doesn't read your game at all: you type what it
-            needs. Your records stay in this browser on this computer and are never sent anywhere; save them to a file
-            now and then, since a browser can clear a site's storage. Leafline is unofficial and Nexon hasn't approved
-            it; use it at your own risk.
+            <strong>Reads only a window you share.</strong> Share the game window on Now and the page reads your level
+            and EXP from it, in this browser; otherwise you type what it needs. Nothing read and none of your records
+            are ever sent anywhere; save your records to a file now and then, since a browser can clear a site's
+            storage. Leafline is unofficial and Nexon hasn't approved it; use it at your own risk.
           {:else}
             <strong>Read-only.</strong> Leafline reads the game window while live reading is on, and nothing else of the
             game. Nexon hasn't said whether read-only overlays are allowed; use Leafline at your own risk.
@@ -1094,13 +1105,13 @@
         <div>
           <h3>What it does</h3>
           <ul>
-            {#each does as item}<li><span class="mark good"><Check size={12} /></span>{item}</li>{/each}
+            {#each isWeb ? webDoes : does as item}<li><span class="mark good"><Check size={12} /></span>{item}</li>{/each}
           </ul>
         </div>
         <div>
           <h3>What it never does</h3>
           <ul>
-            {#each doesNot as item}<li><span class="mark bad"><X size={12} /></span>{item}</li>{/each}
+            {#each isWeb ? webDoesNot : doesNot as item}<li><span class="mark bad"><X size={12} /></span>{item}</li>{/each}
           </ul>
         </div>
       </div>
