@@ -104,7 +104,7 @@ Leafline also runs in a browser at **[crazy3001.github.io/Leafline](https://craz
 ## Install
 
 1. Download `Leafline_x.y.z_x64-setup.exe` from the [latest release](https://github.com/Crazy3001/Leafline/releases/latest). The `.msi` works too. Only download Leafline from this repository: copies elsewhere may have been changed.
-2. Run it. The installer isn't code-signed yet, so Windows SmartScreen may say it "protected your PC". Choose **More info → Run anyway**.
+2. Run it. The installer isn't code-signed, so Windows SmartScreen may say it "protected your PC". Choose **More info → Run anyway**.
 3. Leafline opens a short **setup** the first time.
 
 You need Windows 10 or 11 (64-bit) and the **English** MapleStory Classic World client. WebView2 comes with Windows 11; the installer adds it on Windows 10 if it's missing.
@@ -147,7 +147,7 @@ You could. On 17 November 2026 Nexon announced a ban wave and said it has "zero 
 Yes, and it stays free: no ads, no paid features, no account. The code is open source under the MIT licence.
 
 ### Why does Windows warn me when I install it?
-The installer isn't code-signed yet, and SmartScreen warns about any new unsigned program. Code signing is planned. Until then, **More info → Run anyway**, or build it yourself from this code.
+The installer isn't code-signed, and SmartScreen warns about unsigned programs it hasn't seen often. Choose **More info → Run anyway**, or build it yourself from this code. To check a download, compare its SHA-256 with the release's `SHA256SUMS.txt` ([Code signing policy](#code-signing-policy)).
 
 ### Was it made with AI?
 Yes. Leafline is built with Claude, Anthropic's AI coding assistant. I decide what it does, test it in game and send back what goes wrong; Claude writes the code. All of it is open source here, so anyone can read exactly what it does and how.
@@ -177,7 +177,7 @@ Leafline is built in the open, and what players send in decides what gets fixed 
 - **Report what reads wrong.** [Open a bug report](https://github.com/Crazy3001/Leafline/issues/new?template=bug_report.yml) with **Settings → Feedback → Bug report details → Copy**. A saved frame of the misread (**Save frame**) is the single most useful thing you can send, since every reading fix so far started from one.
 - **Suggest what it should do.** [Share an idea](https://github.com/Crazy3001/Leafline/issues/new?template=idea.yml): something you look up mid-game, or a number you wish you could see.
 - **Send in the drops you see.** [Share them as an idea](https://github.com/Crazy3001/Leafline/issues/new?template=idea.yml) ("Ribbon Pig: Leather"). Leafline's drop list is partly built from players' reports, so every drop you send shows up for every player.
-- **Tell other players about it,** and star the repository if it helps you. That also helps Leafline qualify for free code signing, which gets rid of the Windows warning.
+- **Tell other players about it,** and star the repository if it helps you.
 - **Write code.** [DEVELOPMENT.md](DEVELOPMENT.md) explains how to build it and how it works inside.
 
 ## Known limitations
@@ -209,9 +209,9 @@ Game content belongs to Nexon. Leafline is unofficial and not affiliated with or
 
 ## Code signing policy
 
-Releases aren't code-signed yet. Free signing through [SignPath Foundation](https://signpath.org) is planned once Leafline qualifies for it.
+Releases aren't code-signed, and there are no plans to sign them.
 
-Until then, a download is genuine if it comes from this repository's [Releases](https://github.com/Crazy3001/Leafline/releases) page. Every release is built from this repository's source by its [release workflow](.github/workflows/release.yml) on GitHub Actions, not on anyone's PC.
+A download is genuine if it comes from this repository's [Releases](https://github.com/Crazy3001/Leafline/releases) page. Every release is built from this repository's source by its [release workflow](.github/workflows/release.yml) on GitHub Actions, not on anyone's PC, and lists each installer's SHA-256 in `SHA256SUMS.txt`. In PowerShell, `Get-FileHash .\Leafline_x.y.z_x64-setup.exe` shows a download's hash to compare. Leafline's own **Download and install** does that check for you.
 
 - Committers and reviewers: [Crazy3001](https://github.com/Crazy3001)
 - Release approvers: [Crazy3001](https://github.com/Crazy3001)
