@@ -79,6 +79,12 @@ pub fn read_items(frame: &Frame, ocr: &Ocr) -> Result<Vec<ItemTooltip>> {
     tooltip::read_all(frame, &overview(frame, ocr)?, ocr)
 }
 
+/// [`read_items`] without the pass of OCR over the whole frame that finds the tooltips (the
+/// website's, whose OCR reads a line at a time): see `tooltip::read_all_drawn`.
+pub fn read_items_drawn(frame: &Frame, ocr: &Ocr) -> Result<Vec<ItemTooltip>> {
+    tooltip::read_all_drawn(frame, ocr)
+}
+
 /// What the character's windows show, with the name and level from the HUD.
 #[derive(Debug, Clone, Default)]
 pub struct CharacterScan {

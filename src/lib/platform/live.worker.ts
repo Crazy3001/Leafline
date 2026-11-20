@@ -20,17 +20,26 @@ interface Live {
   set_text_model(recognition: Uint8Array): void;
   set_data(file: string, json: Uint8Array): void;
   set_idle_after(seconds: number): void;
+  set_pickup_log(on: boolean): void;
   reset(): void;
 }
 const wasm = built as { Live: new (idleAfter: number, saved?: string | null) => Live };
 
 export type ToLive =
   | FrameMessage
-  | { op: "start"; idleAfter: number; interval: number; saved: string | null; textModel: string; dataSources: string[] }
-  | { op: "settings"; idleAfter: number; interval: number }
+  | ({ op: "start"; saved: string | null; textModel: string; dataSources: string[] } & ReadingChoice)
+  | ({ op: "settings" } & ReadingChoice)
   | { op: "held"; held: boolean }
   | { op: "reset" }
   | { op: "stop" };
+
+/** What the player chose in Settings about reading. */
+export interface ReadingChoice {
+  interval: number;
+  idleAfter: number;
+  /** Count the Pickup Log's lines. */
+  pickupLog: boolean;
+}
 
 export interface LiveRead {
   analysis: Analysis;
@@ -107,12 +116,14 @@ self.onmessage = async ({ data }: MessageEvent<ToLive>) => {
       await ready;
       interval = data.interval * 1000;
       live = new wasm.Live(data.idleAfter, data.saved);
+      live.set_pickup_log(data.pickupLog);
       post({ type: "summary", session: JSON.parse(live.summary()) as SessionSummary });
       void loadTextReading(live, data.textModel, data.dataSources);
       break;
     case "settings":
       interval = data.interval * 1000;
       live?.set_idle_after(data.idleAfter);
+      live?.set_pickup_log(data.pickupLog);
       break;
     case "track":
       reading = followTrack(data.track, handle);

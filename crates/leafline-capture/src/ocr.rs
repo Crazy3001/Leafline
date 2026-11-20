@@ -4,7 +4,7 @@
 
 use image::{Rgba, RgbImage, imageops};
 use leafline_core::vision::{Frame, Rect};
-use ocrs::{ImageSource, OcrEngine, OcrEngineParams};
+use ocrs::{ImageSource, OcrEngine, OcrEngineParams, TextItem, TextLine};
 use rten::Model;
 use rten_imageproc::{RectF, RotatedRect};
 
@@ -46,6 +46,36 @@ impl Recogniser {
     /// read). The picture is read as drawn, on a margin of its own top-left colour: the model
     /// reads pictures, not cut-outs.
     pub fn read_lines(&self, picture: &Frame, lines: &[InkLine]) -> Vec<String> {
+        self.recognise(picture, lines)
+            .into_iter()
+            .map(|line| line.map(|l| l.to_string().trim().to_string()).unwrap_or_default())
+            .collect()
+    }
+
+    /// The words of each of `lines` in `picture`, each with its box in `picture`'s pixels.
+    pub fn read_words(&self, picture: &Frame, lines: &[InkLine]) -> Vec<Vec<(String, Rect)>> {
+        let margin = MARGIN as f32;
+        self.recognise(picture, lines)
+            .into_iter()
+            .map(|line| {
+                let Some(line) = line else { return Vec::new() };
+                line.words()
+                    .map(|word| {
+                        let b = word.bounding_rect();
+                        let rect = Rect::from_edges(
+                            b.left() as f32 - margin,
+                            b.top() as f32 - margin,
+                            b.right() as f32 - margin,
+                            b.bottom() as f32 - margin,
+                        );
+                        (word.to_string(), rect)
+                    })
+                    .collect()
+            })
+            .collect()
+    }
+
+    fn recognise(&self, picture: &Frame, lines: &[InkLine]) -> Vec<Option<TextLine>> {
         if lines.is_empty() {
             return Vec::new();
         }
@@ -68,13 +98,12 @@ impl Recogniser {
                 vec![RotatedRect::from_rect(rect)]
             })
             .collect();
-        let read = || -> Option<Vec<String>> {
+        let read = || -> Option<Vec<Option<TextLine>>> {
             let source = ImageSource::from_bytes(padded.as_raw(), padded.dimensions()).ok()?;
             let input = self.engine.prepare_input(source).ok()?;
-            let texts = self.engine.recognize_text(&input, &rects).ok()?;
-            Some(texts.into_iter().map(|t| t.map(|l| l.to_string().trim().to_string()).unwrap_or_default()).collect())
+            self.engine.recognize_text(&input, &rects).ok()
         };
-        read().unwrap_or_else(|| vec![String::new(); lines.len()])
+        read().unwrap_or_else(|| vec![None; lines.len()])
     }
 }
 

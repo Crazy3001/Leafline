@@ -5,6 +5,7 @@
 use leafline_core::capturetest::{measure, pattern};
 use leafline_core::vision::Frame;
 
+pub mod engine;
 pub mod identity;
 pub mod live;
 pub mod ocr;
@@ -118,6 +119,11 @@ mod web {
 
         pub fn summary(&self) -> String {
             serde_json::to_string(&self.0.summary()).unwrap_or_default()
+        }
+
+        /// The player's switch: count the Pickup Log.
+        pub fn set_pickup_log(&mut self, on: bool) {
+            self.0.set_pickup_log(on);
         }
 
         /// ocrs's text recognition model, for the minimap title and the HUD's name and job.

@@ -9,9 +9,9 @@
 
 import { base } from "$app/paths";
 import type { Analysis, LiveStatus, SessionSummary } from "../types";
-import { emit } from "./bus";
+import { emit, listen } from "./bus";
 import { canRead, cantRead, shareWindow, type SharedWindow } from "./capture";
-import type { FromLive, ToLive } from "./live.worker";
+import type { FromLive, ReadingChoice, ToLive } from "./live.worker";
 import { invoke } from "./storage.svelte";
 
 /** Active seconds before a session is worth keeping (a quick login to sell isn't training). */
@@ -37,6 +37,8 @@ let session: SessionSummary | null = null;
 let worker: Worker | null = null;
 let shared: SharedWindow | null = null;
 let held = false;
+/** Stops following the player's settings once reading stops. */
+let unlistenSettings: (() => void) | null = null;
 /** The session's log id once saved, and when it was last saved. */
 let keeper: { id: number | null; savedAt: number } = { id: null, savedAt: 0 };
 /** The session's active time when it last grew, and when that was. */
@@ -65,12 +67,21 @@ function publishSession(next: SessionSummary) {
   void emit("session", next);
 }
 
-async function settings(): Promise<{ interval: number; idleAfter: number }> {
+type LiveSettings = { live?: { interval?: number; pauseAfter?: number; pickupLog?: boolean } };
+
+function choiceOf(s: LiveSettings): ReadingChoice {
+  return {
+    interval: s.live?.interval ?? 2,
+    idleAfter: s.live?.pauseAfter ?? 15,
+    pickupLog: s.live?.pickupLog ?? true,
+  };
+}
+
+async function settings(): Promise<ReadingChoice> {
   try {
-    const s = await invoke<{ live?: { interval?: number; pauseAfter?: number } }>("get_settings");
-    return { interval: s.live?.interval ?? 2, idleAfter: s.live?.pauseAfter ?? 15 };
+    return choiceOf(await invoke<LiveSettings>("get_settings"));
   } catch {
-    return { interval: 2, idleAfter: 15 };
+    return choiceOf({});
   }
 }
 
@@ -227,13 +238,14 @@ export async function startLive(): Promise<void> {
   const choice = await settings();
   send({
     op: "start",
-    idleAfter: choice.idleAfter,
-    interval: choice.interval,
+    ...choice,
     saved: recovered?.tracker ?? null,
     textModel: `${base}/ocr/text-recognition.onnx`,
     dataSources: DATA_SOURCES,
   });
   setStatus({ state: "waiting", reason: "Waiting for the first picture of the game." });
+  unlistenSettings?.();
+  unlistenSettings = await listen<LiveSettings>("settings", (e) => send({ op: "settings", ...choiceOf(e.payload) }));
 }
 
 /** Stops reading. The session stays on Now, saved, and carries on if reading starts again soon. */
@@ -241,6 +253,8 @@ export async function stopLive(): Promise<void> {
   if (!worker) return;
   const w = worker;
   worker = null;
+  unlistenSettings?.();
+  unlistenSettings = null;
   shared?.stop();
   shared = null;
   // The worker's last snapshot, then let it go.

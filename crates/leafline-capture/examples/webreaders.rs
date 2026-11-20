@@ -120,7 +120,9 @@ fn main() {
     let mut counts: HashMap<&str, [u32; 4]> = HashMap::new();
     for path in &paths {
         let Ok(image) = image::open(path) else { continue };
-        let Some((analysis, _)) = live.analyze(&image.to_rgba8()) else { continue };
+        let frame = image.to_rgba8();
+        let Some((mut analysis, _)) = live.analyze(&frame) else { continue };
+        analysis.tooltips = live.read_items(&frame);
         let mut web = parts(&analysis);
         let mut prog = program.get(path).cloned().unwrap_or(Value::Null);
         if !prog.is_null() {

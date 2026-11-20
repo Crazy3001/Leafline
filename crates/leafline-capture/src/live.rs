@@ -21,6 +21,11 @@ use leafline_core::readers::ui;
 use leafline_core::session::{Sample, SessionSummary, SessionTracker, TrackerConfig};
 use leafline_core::vision::{Frame, Ocr};
 
+use std::sync::Arc;
+
+use leafline_core::readers::tooltip::ItemTooltip;
+
+use crate::engine::OcrsEngine;
 use crate::identity::IdentityReader;
 use crate::ocr::Recogniser;
 use crate::title::{self, Settled, TitleReader};
@@ -28,6 +33,7 @@ use crate::words::DarkText;
 
 /// Live frames are plentiful, so a reading must agree twice before it counts, as in the program.
 const CONFIRMATIONS: usize = 2;
+
 
 /// What one frame gave: the readings for the page to show, and the session so far.
 #[derive(Debug, Clone, Serialize)]
@@ -45,7 +51,10 @@ pub struct LiveReader {
     ocr: Ocr,
     /// ocrs, once the page has handed over its model; until then no text is read (the map, the
     /// character's name and job).
-    recogniser: Option<Recogniser>,
+    recogniser: Option<Arc<Recogniser>>,
+    /// The same, as an OCR engine for the program's item tooltip reader. Not used live: measured
+    /// on saved frames it named the right item on too few (see `read_items`).
+    items_ocr: Option<Ocr>,
     title: TitleReader,
     identity: IdentityReader,
     /// The Quest Helper's titles and header.
@@ -62,6 +71,8 @@ pub struct LiveReader {
     catalog: Option<Catalog>,
     /// The UI size the HUD was last drawn at, which the log's font follows.
     ui_scale: Option<f32>,
+    /// The player's switch: count the Pickup Log.
+    pickup_log: bool,
     tracker: SessionTracker,
     idle_after: f64,
     held: bool,
@@ -87,6 +98,7 @@ impl LiveReader {
         Self {
             ocr: Ocr::none(),
             recogniser: None,
+            items_ocr: None,
             title: TitleReader::default(),
             identity: IdentityReader::default(),
             words: DarkText::default(),
@@ -96,6 +108,7 @@ impl LiveReader {
             pickups: PickupReader::default(),
             catalog: None,
             ui_scale: None,
+            pickup_log: true,
             tracker,
             idle_after,
             held: false,
@@ -104,7 +117,9 @@ impl LiveReader {
 
     /// ocrs's text recognition model, for the minimap title and the HUD's name and job.
     pub fn set_text_model(&mut self, recognition: Vec<u8>) -> Result<(), String> {
-        self.recogniser = Some(Recogniser::new(recognition)?);
+        let recogniser = Arc::new(Recogniser::new(recognition)?);
+        self.items_ocr = Some(Ocr::with(Box::new(OcrsEngine::new(recogniser.clone()))));
+        self.recogniser = Some(recogniser);
         Ok(())
     }
 
@@ -167,7 +182,7 @@ impl LiveReader {
         if let Some(layout) = &analysis.hud_layout {
             self.ui_scale = Some(ui::hud_scale(frame, layout));
         }
-        let Some(recogniser) = self.recogniser.as_ref() else { return Some((analysis, None)) };
+        let Some(recogniser) = self.recogniser.as_deref() else { return Some((analysis, None)) };
         if let (Some(hud), Some(layout)) = (analysis.hud.as_mut(), analysis.hud_layout.as_ref()) {
             let identity = self.identity.read(recogniser, frame, layout);
             hud.job = identity.job;
@@ -228,6 +243,9 @@ impl LiveReader {
     /// Returns whether a line arrived. The website has no OCR for the lines its font can't finish;
     /// their unknown glyphs stand as gaps that item names fill in.
     pub fn look(&mut self, frame: &Frame, at: f64) -> bool {
+        if !self.pickup_log {
+            return false;
+        }
         let read = self.pickups.read(at, frame, self.ui_scale, &self.ocr);
         if read.layout.is_some() {
             self.tracker.watching_loot();
@@ -238,6 +256,21 @@ impl LiveReader {
         let lines: Vec<Pickup> = read.arrivals.iter().map(|a| as_pickup(self.catalog.as_ref(), a)).collect();
         self.tracker.push_pickups(&lines);
         true
+    }
+
+    /// The player's switch: count the Pickup Log.
+    pub fn set_pickup_log(&mut self, on: bool) {
+        self.pickup_log = on;
+    }
+
+    /// The item tooltips in `frame` as the website could read them: found without the program's
+    /// whole-frame OCR, read by ocrs. Not part of live reading. Measured 2026-11-20 on 204 saved
+    /// frames with a tooltip, against the program's readings: the first item named the same on
+    /// 83, another item on 19, none on 95, so an item card from it would too often be wrong or
+    /// missing. Kept for measuring whatever reads them better.
+    pub fn read_items(&self, frame: &Frame) -> Vec<ItemTooltip> {
+        let Some(ocr) = &self.items_ocr else { return Vec::new() };
+        pipeline::read_items_drawn(frame, ocr).unwrap_or_default()
     }
 }
 
