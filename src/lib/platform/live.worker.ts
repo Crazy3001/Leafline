@@ -13,23 +13,33 @@ import { followTrack, frameRgba, type FrameMessage } from "./capture";
 
 interface Live {
   read(rgba: Uint8Array, width: number, height: number, at: number): string;
+  look(rgba: Uint8Array, width: number, height: number, at: number): string;
   summary(): string;
   snapshot(): string;
   set_held(held: boolean): void;
-  set_title_model(recognition: Uint8Array): void;
-  set_maps(mapsJson: Uint8Array): void;
+  set_text_model(recognition: Uint8Array): void;
+  set_data(file: string, json: Uint8Array): void;
   set_idle_after(seconds: number): void;
+  set_pickup_log(on: boolean): void;
   reset(): void;
 }
 const wasm = built as { Live: new (idleAfter: number, saved?: string | null) => Live };
 
 export type ToLive =
   | FrameMessage
-  | { op: "start"; idleAfter: number; interval: number; saved: string | null; titleModel: string; maps: string[] }
-  | { op: "settings"; idleAfter: number; interval: number }
+  | ({ op: "start"; saved: string | null; textModel: string; dataSources: string[] } & ReadingChoice)
+  | ({ op: "settings" } & ReadingChoice)
   | { op: "held"; held: boolean }
   | { op: "reset" }
   | { op: "stop" };
+
+/** What the player chose in Settings about reading. */
+export interface ReadingChoice {
+  interval: number;
+  idleAfter: number;
+  /** Count the Pickup Log's lines. */
+  pickupLog: boolean;
+}
 
 export interface LiveRead {
   analysis: Analysis;
@@ -53,6 +63,10 @@ const ready = (init as () => Promise<unknown>)();
 let live: Live | null = null;
 let interval = 2000;
 let nextRead = 0;
+/** Between full reads the Pickup Log alone is looked at this often, as the program does
+ *  (src-tauri/src/app/live.rs, PICKUP_EVERY): a line stays readable for only a second or two. */
+const LOOK_EVERY = 250;
+let nextLook = 0;
 let reads = 0;
 let busy = false;
 let reading: ReturnType<typeof followTrack> | null = null;
@@ -64,12 +78,21 @@ async function handle(frame: VideoFrame) {
   try {
     const at = now();
     // One frame at a time: a frame arriving while one is read is let go.
-    if (!live || busy || at < nextRead) return;
+    if (!live || busy) return;
+    const full = at >= nextRead;
+    if (!full && at < nextLook) return;
     busy = true;
-    // On a fixed grid, so uneven frame times don't drift the rate down.
-    nextRead = nextRead + interval > at ? nextRead + interval : at + interval;
+    // On fixed grids, so uneven frame times don't drift the rates down.
+    nextLook = nextLook + LOOK_EVERY > at ? nextLook + LOOK_EVERY : at + LOOK_EVERY;
+    if (full) nextRead = nextRead + interval > at ? nextRead + interval : at + interval;
     const { data, width, height } = frameRgba(frame);
     frame.close();
+    if (!full) {
+      const looked = live.look(data, width, height, at / 1000);
+      busy = false;
+      if (looked) post({ type: "summary", session: JSON.parse(looked) as SessionSummary });
+      return;
+    }
     const before = live.summary();
     const text = live.read(data, width, height, at / 1000);
     busy = false;
@@ -93,12 +116,14 @@ self.onmessage = async ({ data }: MessageEvent<ToLive>) => {
       await ready;
       interval = data.interval * 1000;
       live = new wasm.Live(data.idleAfter, data.saved);
+      live.set_pickup_log(data.pickupLog);
       post({ type: "summary", session: JSON.parse(live.summary()) as SessionSummary });
-      void loadTitleReader(live, data.titleModel, data.maps);
+      void loadTextReading(live, data.textModel, data.dataSources);
       break;
     case "settings":
       interval = data.interval * 1000;
       live?.set_idle_after(data.idleAfter);
+      live?.set_pickup_log(data.pickupLog);
       break;
     case "track":
       reading = followTrack(data.track, handle);
@@ -138,19 +163,32 @@ async function download(urls: string[]): Promise<Uint8Array> {
   throw last;
 }
 
+/** The reference data files the readers settle against, the maps first: without them no map is
+ *  read, while the others only steady the Quest Helper's titles and name the Pickup Log's items. */
+const DATA_FILES = ["maps.json", "quests.json", "items.json", "monsters.json"];
+
 /**
- * The minimap title's reader: ocrs's recognition model (this site's own copy, about 10 MB, kept by
- * the browser's cache after the first time) and the known maps (the same community data the rest
- * of the site uses). Until both are in, and if either fails, reading goes on without the map.
+ * What reading text needs: ocrs's recognition model (this site's own copy, about 10 MB, kept by the
+ * browser's cache after the first time) for the map, the character's name and job and the Quest
+ * Helper, and the reference data (the same community data the rest of the site uses). Until they
+ * are in, and if one fails, reading goes on without what it serves.
  */
-async function loadTitleReader(target: Live, modelUrl: string, mapUrls: string[]) {
+async function loadTextReading(target: Live, modelUrl: string, sources: string[]) {
+  const files = DATA_FILES.map((file) => download(sources.map((source) => source + file)));
   try {
-    const [model, maps] = await Promise.all([download([modelUrl]), download(mapUrls)]);
-    if (live !== target) return;
-    target.set_maps(maps);
-    target.set_title_model(model);
+    target.set_text_model(await download([modelUrl]));
   } catch (err) {
-    post({ type: "error", message: `The map name can't be read: ${err instanceof Error ? err.message : String(err)}` });
+    post({ type: "error", message: `Text in the game can't be read: ${err instanceof Error ? err.message : String(err)}` });
+  }
+  for (const [i, file] of DATA_FILES.entries()) {
+    try {
+      const bytes = await files[i];
+      if (live !== target) return;
+      target.set_data(file, bytes);
+    } catch (err) {
+      const what = file === "maps.json" ? "The map name" : "Quest and item names";
+      post({ type: "error", message: `${what} can't be settled: ${err instanceof Error ? err.message : String(err)}` });
+    }
   }
 }
 

@@ -5,8 +5,12 @@
 use leafline_core::capturetest::{measure, pattern};
 use leafline_core::vision::Frame;
 
+pub mod engine;
+pub mod identity;
 pub mod live;
+pub mod ocr;
 pub mod title;
+pub mod words;
 
 /// The pattern for a window `width` x `height` screen pixels at `scale_milli` thousandths, as
 /// RGBA bytes, [`pattern::WIDTH`] x [`pattern::HEIGHT`].
@@ -106,18 +110,31 @@ mod web {
             }
         }
 
+        /// Looks at the Pickup Log alone in a frame taken at `at` Unix seconds: the session's
+        /// JSON when a line arrived, else an empty string.
+        pub fn look(&mut self, rgba: &[u8], width: u32, height: u32, at: f64) -> String {
+            let Some(frame) = frame(rgba, width, height) else { return String::new() };
+            if self.0.look(&frame, at) { serde_json::to_string(&self.0.summary()).unwrap_or_default() } else { String::new() }
+        }
+
         pub fn summary(&self) -> String {
             serde_json::to_string(&self.0.summary()).unwrap_or_default()
         }
 
-        /// ocrs's text recognition model, for reading the minimap title.
-        pub fn set_title_model(&mut self, recognition: Vec<u8>) -> Result<(), String> {
-            self.0.set_title_model(recognition)
+        /// The player's switch: count the Pickup Log.
+        pub fn set_pickup_log(&mut self, on: bool) {
+            self.0.set_pickup_log(on);
         }
 
-        /// The known maps (OSMS `maps.json`).
-        pub fn set_maps(&mut self, maps_json: &[u8]) -> Result<(), String> {
-            self.0.set_maps(maps_json)
+        /// ocrs's text recognition model, for the minimap title and the HUD's name and job.
+        pub fn set_text_model(&mut self, recognition: Vec<u8>) -> Result<(), String> {
+            self.0.set_text_model(recognition)
+        }
+
+        /// A reference data file by its name (`maps.json`, `quests.json`, `items.json`,
+        /// `monsters.json`).
+        pub fn set_data(&mut self, file: &str, json: &[u8]) -> Result<(), String> {
+            self.0.set_data(file, json)
         }
 
         pub fn snapshot(&self) -> String {

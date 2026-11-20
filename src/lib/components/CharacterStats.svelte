@@ -144,7 +144,7 @@
       {#if can.liveReading}
         Open your Character Stat window in the game and press Detail, then Read. Leafline also reads it by itself while it is open.
       {:else}
-        The website reads only your level, EXP, mesos and map for now. Stats the Windows program read come along in a records file (Settings, Data).
+        The website doesn't read the Character Stat window yet. Stats the Windows program read come along in a records file (Settings, Data).
       {/if}
     </p>
   {:else}
