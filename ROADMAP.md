@@ -13,14 +13,13 @@ sends input, and stays free.
 - Type in a session (level and EXP at the start and end) for EXP per hour, time to level and the training log
 - A pop-out window of Now's numbers that stays over the game
 - Map pictures with their portals and spawns, as in the program
-- Reading the game from a shared window in Chrome and Edge, one reader at a time, each only once it reads as well as the program's
+- Reading the game from a shared window in Firefox, Chrome and Edge, one reader at a time, each only once it reads as well as the program's
 
 **Reading you can trust**
 - Better reading over bright, busy maps, for the Quest Helper and for item pickups
 - More tested screen sizes and UI sizes
 - Every reading says how sure it is, and a doubtful one is left out instead of guessed
 - Clear readings with Windows HDR on, by correcting the washed-out picture instead of only warning
-- Installers signed, so Windows stops warning about them
 
 **Loot and profit**
 - A guess at which monster dropped each item, labelled as confirmed, likely or unknown
