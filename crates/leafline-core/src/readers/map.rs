@@ -58,7 +58,11 @@ const BAND_GAP: f32 = 0.75;
 const DIMMED: f32 = 0.84;
 
 pub fn read(frame: &Frame, ocr: &Ocr) -> Result<Option<MapReading>> {
-    if world_buttons(frame).is_empty() {
+    if !world_buttons(frame, is_button_orange).is_empty() {
+        if let Some(reading) = read_with(frame, ocr, is_button_orange)? {
+            return Ok(Some(reading));
+        }
+    } else {
         // A dimmed game window has every colour about 16% darker, so no button matches; look
         // again with the brightness put back.
         let lifted = Frame::from_fn(frame.width(), frame.height(), |x, y| {
@@ -66,16 +70,18 @@ pub fn read(frame: &Frame, ocr: &Ocr) -> Result<Option<MapReading>> {
             let lift = |c: u8| (c as f32 / DIMMED).round().min(255.0) as u8;
             Rgba([lift(p.0[0]), lift(p.0[1]), lift(p.0[2]), 255])
         });
-        if world_buttons(&lifted).is_empty() {
-            return Ok(None);
+        if !world_buttons(&lifted, is_button_orange).is_empty() {
+            return read_with(&lifted, ocr, is_button_orange);
         }
-        return read_with(&lifted, ocr);
     }
-    read_with(frame, ocr)
+    // A window shared to a browser: the button's colour, though not its brightness, has bled
+    // into its white letters, so the plain test finds no button, or only part of one, which
+    // places the title bar wrong. Last, so a frame the plain test reads is read as before.
+    read_with(frame, ocr, is_button_orange_through_video)
 }
 
-fn read_with(frame: &Frame, ocr: &Ocr) -> Result<Option<MapReading>> {
-    for button in world_buttons(frame) {
+fn read_with(frame: &Frame, ocr: &Ocr, is_orange: fn(&Rgba<u8>) -> bool) -> Result<Option<MapReading>> {
+    for button in world_buttons(frame, is_orange) {
         if let Some(band) = expanded_band(frame, button) {
             if let Some(reading) = read_expanded(frame, ocr, band)? {
                 return Ok(Some(reading));
@@ -90,13 +96,13 @@ fn read_with(frame: &Frame, ocr: &Ocr) -> Result<Option<MapReading>> {
 }
 
 /// Orange blocks shaped like the WORLD button, largest first.
-fn world_buttons(frame: &Frame) -> Vec<Rect> {
+fn world_buttons(frame: &Frame, is_orange: fn(&Rgba<u8>) -> bool) -> Vec<Rect> {
     let whole = Rect::new(0.0, 0.0, frame.width() as f32, frame.height() as f32);
     let min_height = frame.height() as f32 * 0.006;
-    let mut buttons: Vec<Rect> = color::find_blocks(frame, whole, 2, is_button_orange)
+    let mut buttons: Vec<Rect> = color::find_blocks(frame, whole, 2, is_orange)
         .into_iter()
         .filter(|b| b.h >= min_height && BUTTON_ASPECT.contains(&(b.w / b.h)))
-        .filter(|b| share(frame, *b, is_button_orange) >= BUTTON_FILL)
+        .filter(|b| share(frame, *b, is_orange) >= BUTTON_FILL)
         .collect();
     buttons.sort_by(|a, b| (b.w * b.h).total_cmp(&(a.w * a.h)));
     buttons
@@ -304,6 +310,12 @@ fn is_button_orange(px: &Rgba<u8>) -> bool {
     near(px, [221, 153, 17], 16) || near(px, [216, 141, 2], 8)
 }
 
+/// The WORLD button's orange in a browser's window share, where only about 60% of its pixels
+/// stay within [`is_button_orange`].
+fn is_button_orange_through_video(px: &Rgba<u8>) -> bool {
+    color::like_through_video(px, [221, 153, 17], 14.0)
+}
+
 /// The expanded name band, (153, 187, 204).
 fn is_panel_blue(px: &Rgba<u8>) -> bool {
     near(px, [153, 187, 204], 12)
@@ -377,7 +389,7 @@ mod tests {
     #[test]
     fn finds_the_expanded_band() {
         let frame = minimap(false);
-        let buttons = world_buttons(&frame);
+        let buttons = world_buttons(&frame, is_button_orange);
         assert_eq!(buttons, vec![Rect::new(300.0, 20.0, 68.0, 20.0)]);
         assert_eq!(expanded_band(&frame, buttons[0]), Some(Rect::from_edges(6.0, 46.0, 368.0, 130.0)));
         assert_eq!(collapsed_bar(&frame, buttons[0]), None);
@@ -392,14 +404,14 @@ mod tests {
                 frame.put_pixel(x, y, Rgba([255, 255, 255, 255]));
             }
         }
-        let button = world_buttons(&frame)[0];
+        let button = world_buttons(&frame, is_button_orange)[0];
         assert_eq!(expanded_band(&frame, button), Some(Rect::from_edges(6.0, 46.0, 368.0, 130.0)));
     }
 
     #[test]
     fn finds_the_collapsed_bar() {
         let frame = minimap(true);
-        let button = world_buttons(&frame)[0];
+        let button = world_buttons(&frame, is_button_orange)[0];
         assert_eq!(expanded_band(&frame, button), None);
         assert_eq!(collapsed_bar(&frame, button), Some(Rect::from_edges(0.0, 12.0, 242.0, 48.0)));
     }
