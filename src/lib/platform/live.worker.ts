@@ -16,6 +16,8 @@ interface Live {
   summary(): string;
   snapshot(): string;
   set_held(held: boolean): void;
+  set_title_model(recognition: Uint8Array): void;
+  set_maps(mapsJson: Uint8Array): void;
   set_idle_after(seconds: number): void;
   reset(): void;
 }
@@ -23,7 +25,7 @@ const wasm = built as { Live: new (idleAfter: number, saved?: string | null) => 
 
 export type ToLive =
   | FrameMessage
-  | { op: "start"; idleAfter: number; interval: number; saved: string | null }
+  | { op: "start"; idleAfter: number; interval: number; saved: string | null; titleModel: string; maps: string[] }
   | { op: "settings"; idleAfter: number; interval: number }
   | { op: "held"; held: boolean }
   | { op: "reset" }
@@ -92,6 +94,7 @@ self.onmessage = async ({ data }: MessageEvent<ToLive>) => {
       interval = data.interval * 1000;
       live = new wasm.Live(data.idleAfter, data.saved);
       post({ type: "summary", session: JSON.parse(live.summary()) as SessionSummary });
+      void loadTitleReader(live, data.titleModel, data.maps);
       break;
     case "settings":
       interval = data.interval * 1000;
@@ -119,6 +122,37 @@ self.onmessage = async ({ data }: MessageEvent<ToLive>) => {
       break;
   }
 };
+
+/** The bytes at the first of `urls` that answers. */
+async function download(urls: string[]): Promise<Uint8Array> {
+  let last: unknown = null;
+  for (const url of urls) {
+    try {
+      const response = await fetch(url);
+      if (response.ok) return new Uint8Array(await response.arrayBuffer());
+      last = new Error(`${url}: ${response.status}`);
+    } catch (err) {
+      last = err;
+    }
+  }
+  throw last;
+}
+
+/**
+ * The minimap title's reader: ocrs's recognition model (this site's own copy, about 10 MB, kept by
+ * the browser's cache after the first time) and the known maps (the same community data the rest
+ * of the site uses). Until both are in, and if either fails, reading goes on without the map.
+ */
+async function loadTitleReader(target: Live, modelUrl: string, mapUrls: string[]) {
+  try {
+    const [model, maps] = await Promise.all([download([modelUrl]), download(mapUrls)]);
+    if (live !== target) return;
+    target.set_maps(maps);
+    target.set_title_model(model);
+  } catch (err) {
+    post({ type: "error", message: `The map name can't be read: ${err instanceof Error ? err.message : String(err)}` });
+  }
+}
 
 /** The tracker's state every half minute, so a reload carries on with the session. */
 setInterval(() => {

@@ -385,7 +385,8 @@
   ];
   // The website's own lists: it reads only a window the player shares, in the browser.
   const webDoes = [
-    "Reads your level and EXP from the game window, only after you share it on Now (Read the game) and only until you stop. The picture is read in this browser and never leaves this computer.",
+    "Reads your level, EXP, mesos and map from the game window, only after you share it on Now (Read the game) and only until you stop. The picture is read in this browser and never leaves this computer.",
+    "Downloads a text-reading model (about 10 MB, from this site, kept by your browser) the first time you share the game, to read the map's name.",
     "Shows map, monster, quest, skill and equipment facts from community data, downloaded to this browser on your first visit.",
     "Keeps your settings, sessions, notes, drop log and builds in this browser on this computer.",
   ];
@@ -416,6 +417,17 @@
     { what: "Icons", who: "Lucide", licence: "ISC", url: "https://lucide.dev" },
     { what: "App framework", who: "Tauri", licence: "MIT / Apache-2.0", url: "https://tauri.app" },
     { what: "Interface", who: "Svelte", licence: "MIT", url: "https://svelte.dev" },
+    // The website reads the minimap title with ocrs; the program uses Windows' own OCR.
+    ...(isWeb
+      ? [
+          {
+            what: "Reading the map's name (website)",
+            who: "ocrs by Robert Knight, model trained on HierText",
+            licence: "MIT / Apache-2.0; model data CC BY-SA 4.0",
+            url: "https://github.com/robertknight/ocrs",
+          },
+        ]
+      : []),
   ];
 
   /** The section at the top of the page, lit in the menu. */

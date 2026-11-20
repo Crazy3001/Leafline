@@ -42,18 +42,18 @@
   {:else if on}
     <p class="lead">
       {#if status.state === "reading"}
-        Reading level and EXP from <strong>{status.window || "the shared window"}</strong>{status.held ? ", paused" : ""}.
+        Reading level, EXP, mesos and map from <strong>{status.window || "the shared window"}</strong>{status.held ? ", paused" : ""}.
       {:else if status.state === "waiting"}
         {status.reason}
       {/if}
     </p>
-    {#if !compact}<p class="hint">Mesos, the map and quests aren't read on the website yet. The session saves itself to your training log after 5 minutes.</p>{/if}
+    {#if !compact}<p class="hint">Mesos are read while your inventory is open, and the map from the minimap. Quests aren't read on the website yet. The session saves itself to your training log after 5 minutes.</p>{/if}
     <div class="actions">
       <Button onclick={() => backend.stopLive()}><Square size={12} />Stop reading</Button>
     </div>
   {:else}
     <p class="lead">
-      Share the MapleStory window with this page and Leafline reads your level and EXP as you play, the way the
+      Share the MapleStory window with this page and Leafline reads your level, EXP, mesos and map as you play, the way the
       program does. The picture stays on this computer.
     </p>
     <div class="actions">
