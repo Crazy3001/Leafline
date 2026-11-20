@@ -1,8 +1,8 @@
 //! The website's live reading: a shared game window's frames read by the program's own readers
 //! and fed to the program's own session tracker, as `src-tauri`'s live loop does. Only what reads
-//! without Windows OCR runs here for now (level and EXP from the HUD's digits); mesos, the map's
-//! name and the Quest Helper's titles need the game-font readers still to come, and read nothing
-//! until then. Frames come in as RGBA bytes from the page's worker and never leave it.
+//! without Windows OCR runs here for now: level and EXP from the HUD's digits, and mesos from the
+//! game's digit shapes. The map's name and the Quest Helper's titles need the game-font readers
+//! still to come, and read nothing until then. Frames come in as RGBA bytes from the page's worker and never leave it.
 
 use serde::Serialize;
 use serde_json::Value;

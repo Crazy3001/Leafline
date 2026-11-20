@@ -385,7 +385,7 @@
   ];
   // The website's own lists: it reads only a window the player shares, in the browser.
   const webDoes = [
-    "Reads your level and EXP from the game window, only after you share it on Now (Read the game) and only until you stop. The picture is read in this browser and never leaves this computer.",
+    "Reads your level, EXP and mesos from the game window, only after you share it on Now (Read the game) and only until you stop. The picture is read in this browser and never leaves this computer.",
     "Shows map, monster, quest, skill and equipment facts from community data, downloaded to this browser on your first visit.",
     "Keeps your settings, sessions, notes, drop log and builds in this browser on this computer.",
   ];

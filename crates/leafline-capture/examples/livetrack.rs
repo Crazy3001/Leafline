@@ -1,7 +1,7 @@
 //! Runs the website's live reader (`live::LiveReader`) natively over saved frames, to check the
 //! website's reading of a shared window against the same readers and tracker on the original
 //! pictures. Input: a CSV of `seconds,path` lines (when each frame was read, and the picture);
-//! output: one JSON line per read (`level`, `points`, `percent`), then the session summary.
+//! output: one JSON line per read (`level`, `points`, `percent`, `mesos`), then the session summary.
 //! Frames stay on this PC; nothing is written but standard output.
 //!
 //!     cargo run --release -p leafline-capture --example livetrack -- reads.csv [idle_after]
@@ -38,6 +38,7 @@ fn main() {
                 "level": hud.and_then(|h| h.level),
                 "points": hud.and_then(|h| h.exp.map(|e| e.points)),
                 "percent": hud.and_then(|h| h.exp.map(|e| e.percent).or(h.exp_percent)),
+                "mesos": read.analysis.mesos.map(|m| m.mesos),
                 "other": other,
                 "ms": read.ms,
                 "timings": read.analysis.timings,
