@@ -90,7 +90,7 @@ Your sessions, notes, drop log, builds and settings stay in `%APPDATA%\app.leafl
 
 ## Website
 
-Leafline also runs in a browser at **[crazy3001.github.io/Leafline](https://crazy3001.github.io/Leafline/)**, with nothing to install, on Windows, Mac, Linux and phones. It is the same Leafline, built from the same code, without the parts that need the game window:
+Leafline also runs in a browser at **[crazy3001.github.io/Leafline](https://crazy3001.github.io/Leafline/)**, with nothing to install, on Windows, Mac, Linux and phones. It is the same Leafline, built from the same code:
 
 - look up items, monsters, maps, NPCs, quests and skills, with who drops what and where to find it
 - Go here routes to any map or NPC you pick
@@ -98,8 +98,9 @@ Leafline also runs in a browser at **[crazy3001.github.io/Leafline](https://craz
 - the build planner, scroll odds, Your fight and craft levelling
 - the drop log, timers and the training log
 - the four looks, a desk layout on a computer and the overlay's tabs on a phone
+- on a computer, in Firefox, Chrome or Edge: share the game window and it reads your level and EXP as you play and tracks the session, the way the program does (mesos, the map and quests are still to come)
 
-**It doesn't read the game at all.** Your records stay in that browser on that computer and are never sent anywhere. A browser can clear a site's storage, so use **Settings → Data → Save my records** now and then; the same file opens in the program or another browser. One tab at a time can use your records.
+**It reads only a window you share,** in the browser, and the picture never leaves your computer. It carries the same ban risk as the program. Your records stay in that browser on that computer and are never sent anywhere. A browser can clear a site's storage, so use **Settings → Data → Save my records** now and then; the same file opens in the program or another browser. One tab at a time can use your records.
 
 ## Install
 

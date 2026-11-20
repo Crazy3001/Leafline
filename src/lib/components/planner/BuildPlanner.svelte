@@ -1247,7 +1247,7 @@
   .page {
     display: grid;
     grid-template-columns: 176px minmax(0, 1fr) 320px;
-    height: 100vh;
+    height: calc(100vh / var(--page-zoom, 1));
     overflow: hidden;
   }
 

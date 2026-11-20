@@ -929,7 +929,7 @@
   .page {
     display: flex;
     flex-direction: column;
-    min-height: 100vh;
+    min-height: calc(100vh / var(--page-zoom, 1));
   }
 
   /* In a desk view column, which scrolls and names it already. */

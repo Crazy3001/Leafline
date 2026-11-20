@@ -12,6 +12,7 @@
   import type { Tab } from "./tabs";
   import Welcome from "./Welcome.svelte";
   import TypedSessionCard from "$lib/components/TypedSessionCard.svelte";
+  import ReadWindowCard from "$lib/components/ReadWindowCard.svelte";
   import { can } from "$lib/platform";
   import { live } from "$lib/readings.svelte";
 
@@ -64,10 +65,12 @@
 </script>
 
 <div class="now">
+  <!-- The website reads the game only from a window the player shares with it. -->
+  {#if can.readWindow}<ReadWindowCard compact />{/if}
   {#if !analysis && !session}
-    <!-- The website reads nothing from the game: you type the session in. So can the program, with live reading off. -->
+    <!-- Without reading, you type the session in. So can the program, with live reading off. -->
     {#if can.liveReading}<Welcome />{/if}
-    {#if !can.liveReading || live.liveStatus.state === "off"}<TypedSessionCard />{/if}
+    {#if can.liveReading ? live.liveStatus.state === "off" : live.liveStatus.state !== "reading" && live.liveStatus.state !== "waiting"}<TypedSessionCard />{/if}
   {:else}
     <section class="card session" aria-label="This session">
       <div class="head">

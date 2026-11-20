@@ -1,5 +1,7 @@
 // The map data cache's state, shared by the map card and Settings.
-// Data is only ever downloaded when the user presses the button.
+// The program downloads data only when the player presses the button (setup offers it). The
+// website, itself just fetched from the web, gets it on the first visit without asking, so its
+// maps, quests and look-ups work straight away; updates are still checked only on request.
 
 import { backend } from "./api";
 import type { MapDataStatus } from "./types";
@@ -30,6 +32,7 @@ export function watchMapData() {
     .mapDataStatus()
     .then((s) => {
       mapData.status = s;
+      if (__LEAFLINE_WEB__ && !s.ready) void downloadMapData(false);
     })
     .catch((e) => {
       mapData.error = String(e);
