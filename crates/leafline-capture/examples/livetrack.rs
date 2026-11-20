@@ -18,8 +18,8 @@ fn main() {
     // The minimap title, as on the website: LIVETRACK_MODEL (text-recognition.onnx) and
     // LIVETRACK_MAPS (maps.json) when set.
     if let (Ok(model), Ok(maps)) = (std::env::var("LIVETRACK_MODEL"), std::env::var("LIVETRACK_MAPS")) {
-        live.set_title_model(std::fs::read(model).expect("model")).expect("load the model");
-        live.set_maps(&std::fs::read(maps).expect("maps")).expect("load the maps");
+        live.set_text_model(std::fs::read(model).expect("model")).expect("load the model");
+        live.set_data("maps.json", &std::fs::read(maps).expect("maps")).expect("load the maps");
     }
     let mut cache: Option<(String, Frame)> = None;
     for line in text.lines().filter(|l| !l.trim().is_empty() && !l.starts_with("seconds")) {

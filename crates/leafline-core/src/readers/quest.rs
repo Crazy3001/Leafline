@@ -14,6 +14,8 @@
 //! [`questfont`](super::questfont)): at Ideal Ratio every glyph is drawn the same, so a row read
 //! whole gives its counter and target exactly as drawn, and OCR is left the rows it can't read.
 
+pub mod drawn;
+
 use std::sync::LazyLock;
 
 use image::{Rgba, imageops};
@@ -491,6 +493,8 @@ const ONE_GAP: u32 = 3;
 struct CounterGlyphs {
     current: Vec<Mask>,
     required: Vec<Mask>,
+    /// The column just right of the counter's last digit.
+    end: u32,
 }
 
 impl CounterGlyphs {
@@ -541,12 +545,17 @@ impl CounterGlyphs {
         // At Default Ratio the target's first letter can stand as close to the last digit as
         // digits stand to each other (`10Slime`), so the count ends at the first shape that is
         // no digit.
+        let required_runs = required.clone();
         let mut required: Vec<Mask> = required.iter().map(mask).collect();
         let digits = required.iter().take_while(|m| digits::quest_number(std::slice::from_ref(*m)).is_some()).count();
+        let end = match digits {
+            0 => required_runs.last().map_or(0, |r| r.1),
+            n => required_runs[n - 1].1,
+        };
         if digits > 0 {
             required.truncate(digits);
         }
-        Some(Self { current: current.iter().map(mask).collect(), required })
+        Some(Self { current: current.iter().map(mask).collect(), required, end })
     }
 
     fn fits(&self, (current, required): (u32, u32)) -> bool {

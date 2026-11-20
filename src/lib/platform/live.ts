@@ -19,11 +19,13 @@ const SAVE_AFTER_ACTIVE = 300;
 const SAVE_EVERY_MS = 30_000;
 /** A break this long with no EXP ends the session; the next gain starts a new one. */
 const BREAK_ENDS_SESSION_MS = 30 * 60_000;
-/** The known maps, for settling the minimap title: Leafline's mirror of OSMS first, OSMS second,
- *  as the site's own data download goes (crates/leafline-core/src/mapdata/fetch.rs). */
-const MAP_LIST_URLS = [
-  "https://raw.githubusercontent.com/Crazy3001/Leafline-data/main/osms/v1/maps.json",
-  "https://osmsdataexplorer.com/data/api/v1/maps.json",
+/** Where the reference data the readers settle against comes from (the known maps for the minimap
+ *  title; quests, items and monsters for the Quest Helper's titles and the Pickup Log's items):
+ *  Leafline's mirror of OSMS first, OSMS second, as the site's own data download goes
+ *  (crates/leafline-core/src/mapdata/fetch.rs). */
+const DATA_SOURCES = [
+  "https://raw.githubusercontent.com/Crazy3001/Leafline-data/main/osms/v1/",
+  "https://osmsdataexplorer.com/data/api/v1/",
 ];
 /** Where the tracker's state is kept between visits, in this site's own browser storage. */
 const RECOVERY_FILE = "live-session.json";
@@ -39,7 +41,7 @@ let held = false;
 let keeper: { id: number | null; savedAt: number } = { id: null, savedAt: 0 };
 /** The session's active time when it last grew, and when that was. */
 let lastActive = { seconds: 0, at: Date.now() };
-/** The name to save sessions under: the website can't read the HUD's name yet. */
+/** The name to save sessions under while the HUD's name hasn't been read yet. */
 let character: () => string | null = () => null;
 
 export const liveCanRead = canRead;
@@ -228,8 +230,8 @@ export async function startLive(): Promise<void> {
     idleAfter: choice.idleAfter,
     interval: choice.interval,
     saved: recovered?.tracker ?? null,
-    titleModel: `${base}/ocr/text-recognition.onnx`,
-    maps: MAP_LIST_URLS,
+    textModel: `${base}/ocr/text-recognition.onnx`,
+    dataSources: DATA_SOURCES,
   });
   setStatus({ state: "waiting", reason: "Waiting for the first picture of the game." });
 }

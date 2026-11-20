@@ -13,7 +13,7 @@ use image::Rgba;
 use regex::Regex;
 use serde::Serialize;
 
-use super::digits;
+use super::{digits, gamefont, pickup};
 use super::text::{best_match, digitize, parse_grouped};
 use super::ui::{self, CANONICAL_SCALE, Canonical};
 use crate::error::Result;
@@ -127,6 +127,66 @@ pub fn settle_name(reading: &mut HudReading, layout: &HudLayout, overview: &[Lin
         reading.name = Some(line.text.replace(' ', ""));
     }
 }
+
+/// The job and name lines read by the game's own font, unknown glyphs as `?`, for readers without
+/// Windows OCR. The HUD draws them in the Pickup Log's font; at a UI size that isn't
+/// 2x they are read from the HUD redrawn on the design grid. Each line comes with its font pixels,
+/// for learning glyphs. Empty when no line is on the font's grid.
+pub fn identity_lines(frame: &Frame, layout: &HudLayout) -> Vec<(String, Vec<Vec<bool>>)> {
+    let scale = ui::hud_scale(frame, layout);
+    let margin = 0.5 * layout.hp.h;
+    let area = Rect::from_edges(
+        layout.identity.x - margin,
+        layout.identity.y - margin,
+        layout.identity.right() + margin,
+        layout.identity.bottom() + margin,
+    );
+    if (scale - CANONICAL_SCALE).abs() <= 0.005 {
+        return identity_lines_in(frame, layout.identity);
+    }
+    // Redrawn, each design pixel as the brightest window pixel in it (which keeps strokes one
+    // window pixel wide), or as its middle; whichever leaves fewer glyphs unknown.
+    let unknown = |lines: &[(String, Vec<Vec<bool>>)]| -> usize {
+        lines.iter().map(|(t, _)| t.matches(pickup::font::UNKNOWN).count()).sum::<usize>() + 100 * 2usize.saturating_sub(lines.len())
+    };
+    let bright = Canonical::brightest(frame, scale, area);
+    let bright = identity_lines_in(&bright.frame, bright.to_view(layout.identity));
+    if unknown(&bright) == 0 {
+        return bright;
+    }
+    let middle = Canonical::within(frame, scale, area);
+    let middle = identity_lines_in(&middle.frame, middle.to_view(layout.identity));
+    if unknown(&middle) < unknown(&bright) { middle } else { bright }
+}
+
+fn identity_lines_in(picture: &Frame, rect: Rect) -> Vec<(String, Vec<Vec<bool>>)> {
+    let (x0, y0, w, h) = rect.to_pixels(picture.width(), picture.height());
+    let inked = |y: u32| (x0..x0 + w).any(|x| is_light_text(picture.get_pixel(x, y)));
+    let mut runs: Vec<(u32, u32)> = Vec::new();
+    for y in y0..y0 + h {
+        if !inked(y) {
+            continue;
+        }
+        match runs.last_mut() {
+            Some(run) if y - run.1 <= 2 => run.1 = y + 1,
+            _ => runs.push((y, y + 1)),
+        }
+    }
+    let tallest = runs.iter().map(|(t, b)| b - t).max().unwrap_or(0);
+    runs.into_iter()
+        .filter(|(t, b)| (b - t) * 2 >= tallest)
+        .filter_map(|(top, bottom)| {
+            let band = Rect::from_edges(rect.x, top as f32 - 6.0, rect.right(), bottom as f32 + 6.0);
+            let grid = gamefont::ink_grid(picture, band, 2, is_light_text)?;
+            let rows = gamefont::line_rows(&LOG_FONT_ROWS, &grid, grid.len() / 2)?;
+            let rows = gamefont::first_stretch(&rows, 12);
+            Some((pickup::font::read_glyphs(&rows), rows))
+        })
+        .collect()
+}
+
+/// The Pickup Log font's rows, for lining a line up with its glyphs.
+const LOG_FONT_ROWS: gamefont::Font = gamefont::Font { glyphs: &[], rows: 11, baseline: 8, space: 4, narrow: &[] };
 
 /// The value glyphs around the gauges, split into fields.
 struct Glyphs {
@@ -338,7 +398,7 @@ fn is_level_digit_through_video(px: &Rgba<u8>) -> bool {
 }
 
 /// The light grey of HUD text.
-fn is_light_text(px: &Rgba<u8>) -> bool {
+pub fn is_light_text(px: &Rgba<u8>) -> bool {
     preprocess::luminance(px) >= 150 && preprocess::saturation(px) <= 60
 }
 
@@ -346,6 +406,11 @@ fn is_light_text(px: &Rgba<u8>) -> bool {
 fn is_bracket(px: &Rgba<u8>) -> bool {
     let [r, g, b, _] = px.0.map(i16::from);
     g >= 130 && g >= b + 70 && r < g
+}
+
+/// The job `text` names, read with a letter or two wrong, as the HUD's own reading matches it.
+pub fn job_named(text: &str) -> Option<&'static str> {
+    best_match(text, &JOBS, 0.6)
 }
 
 /// Whether `job` is a job the game has, not a misread.

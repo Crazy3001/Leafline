@@ -1,19 +1,25 @@
 //! The website's live reading: a shared game window's frames read by the program's own readers
 //! and fed to the program's own session tracker, as `src-tauri`'s live loop does. Only what reads
 //! without Windows OCR runs here: level and EXP from the HUD's digits, mesos from the game's digit
-//! shapes, and the map from the minimap title by ocrs once the page hands over its model and the
-//! map list (see `title`). The Quest Helper's titles read nothing yet. Frames come in as RGBA bytes from the page's worker and never leave it.
+//! shapes, the character's name and job and the Quest Helper's objectives by the game's fonts, and
+//! once the page hands over ocrs's model and the reference data, the map from the minimap title
+//! (see `title`) and the Quest Helper's titles (see `words`). Frames come in as RGBA bytes from the
+//! page's worker and never leave it.
 
 use serde::Serialize;
 use serde_json::Value;
 
+use leafline_core::mapdata::QuestTitles;
 use leafline_core::mapdata::atlas::Atlas;
 use leafline_core::mapdata::osms::{Dataset, Records};
 use leafline_core::pipeline::{self, Analysis};
 use leafline_core::session::{Sample, SessionSummary, SessionTracker, TrackerConfig};
 use leafline_core::vision::{Frame, Ocr};
 
-use crate::title::{self, TitleReader};
+use crate::identity::IdentityReader;
+use crate::ocr::Recogniser;
+use crate::title::{self, Settled, TitleReader};
+use crate::words::DarkText;
 
 /// Live frames are plentiful, so a reading must agree twice before it counts, as in the program.
 const CONFIRMATIONS: usize = 2;
@@ -32,10 +38,19 @@ pub struct LiveRead {
 
 pub struct LiveReader {
     ocr: Ocr,
-    /// The minimap title's reader and the known maps it is settled against, once the page has
-    /// handed over the model and the map data; until then no map is read.
-    title: Option<TitleReader>,
+    /// ocrs, once the page has handed over its model; until then no text is read (the map, the
+    /// character's name and job).
+    recogniser: Option<Recogniser>,
+    title: TitleReader,
+    identity: IdentityReader,
+    /// The Quest Helper's titles and header.
+    words: DarkText,
+    /// The reference data handed over so far (maps, quests, items, monsters), and the atlas made
+    /// of it that minimap and quest titles are settled against.
+    dataset: Dataset,
     atlas: Option<Atlas>,
+    /// The Quest Helper's quests held steady from one reading to the next, as the program does.
+    quests: QuestTitles,
     tracker: SessionTracker,
     idle_after: f64,
     held: bool,
@@ -48,27 +63,52 @@ fn config(idle_after: f64) -> TrackerConfig {
 impl LiveReader {
     /// `idle_after`: seconds without EXP before the clock pauses (the player's setting).
     pub fn new(idle_after: f64) -> Self {
-        Self { ocr: Ocr::none(), title: None, atlas: None, tracker: SessionTracker::new(config(idle_after)), idle_after, held: false }
+        Self::with(SessionTracker::new(config(idle_after)), idle_after)
     }
 
     /// Carries on with a session saved by [`LiveReader::snapshot`]; `None` if it can't be read.
     pub fn restore(idle_after: f64, saved: Value) -> Option<Self> {
         let tracker = SessionTracker::restore(config(idle_after), saved)?;
-        Some(Self { ocr: Ocr::none(), title: None, atlas: None, tracker, idle_after, held: false })
+        Some(Self::with(tracker, idle_after))
     }
 
-    /// ocrs's text recognition model, for the minimap title.
-    pub fn set_title_model(&mut self, recognition: Vec<u8>) -> Result<(), String> {
-        self.title = Some(TitleReader::new(recognition)?);
+    fn with(tracker: SessionTracker, idle_after: f64) -> Self {
+        Self {
+            ocr: Ocr::none(),
+            recogniser: None,
+            title: TitleReader::default(),
+            identity: IdentityReader::default(),
+            words: DarkText::default(),
+            dataset: Dataset::default(),
+            atlas: None,
+            quests: QuestTitles::default(),
+            tracker,
+            idle_after,
+            held: false,
+        }
+    }
+
+    /// ocrs's text recognition model, for the minimap title and the HUD's name and job.
+    pub fn set_text_model(&mut self, recognition: Vec<u8>) -> Result<(), String> {
+        self.recogniser = Some(Recogniser::new(recognition)?);
         Ok(())
     }
 
-    /// The known maps (OSMS `maps.json`), to settle titles against.
-    pub fn set_maps(&mut self, maps_json: &[u8]) -> Result<(), String> {
-        let Records::Maps(maps) = Records::parse("maps.json", maps_json).map_err(|e| e.to_string())? else {
-            return Err("not a map list".into());
-        };
-        self.atlas = Some(Atlas::new(Dataset { maps, ..Dataset::default() }));
+    /// One of the reference data files (OSMS `maps.json`, `quests.json`, `items.json` or
+    /// `monsters.json`), to settle titles against. Maps are needed for the minimap; quests (with
+    /// items and monsters) steady the Quest Helper's titles.
+    pub fn set_data(&mut self, file: &str, json: &[u8]) -> Result<(), String> {
+        if !["maps.json", "quests.json", "items.json", "monsters.json"].contains(&file) {
+            return Err(format!("not a data file the reader uses: {file}"));
+        }
+        match Records::parse(file, json).map_err(|e| e.to_string())? {
+            Records::Maps(maps) => self.dataset.maps = maps,
+            Records::Quests(quests) => self.dataset.quests = quests,
+            Records::Items(items) => self.dataset.items = items,
+            Records::Monsters(monsters) => self.dataset.monsters = monsters,
+            _ => {}
+        }
+        self.atlas = Some(Atlas::new(self.dataset.clone()));
         Ok(())
     }
 
@@ -90,6 +130,7 @@ impl LiveReader {
 
     /// Starts a new session.
     pub fn reset(&mut self) {
+        self.quests = QuestTitles::default();
         self.tracker = SessionTracker::new(config(self.idle_after));
         self.tracker.set_held(self.held);
     }
@@ -101,19 +142,44 @@ impl LiveReader {
     /// Reads `frame`, taken at `at` Unix seconds. `other` is set when it shows another character
     /// than the session's, which then starts afresh (the caller saves the old one first, from the
     /// summary it had).
-    pub fn read(&mut self, frame: &Frame, at: f64) -> Option<(LiveRead, bool)> {
-        let started = leafline_core::clock::Instant::now();
+    /// What the readers make of `frame`, without the session: the program's readers that need no
+    /// OCR, then the parts read by ocrs. `None` when the frame can't be read at all.
+    pub fn analyze(&mut self, frame: &Frame) -> Option<(Analysis, Option<Settled>)> {
         let mut analysis = pipeline::analyze_live(frame, &self.ocr).ok()?;
+        let Some(recogniser) = self.recogniser.as_ref() else { return Some((analysis, None)) };
+        if let (Some(hud), Some(layout)) = (analysis.hud.as_mut(), analysis.hud_layout.as_ref()) {
+            let identity = self.identity.read(recogniser, frame, layout);
+            hud.job = identity.job;
+            hud.name = identity.name;
+        }
+        if analysis.quest.is_none() {
+            let words = &mut self.words;
+            analysis.quest = pipeline::read_quests_drawn(frame, analysis.hud_layout.as_ref(), &mut |picture, area| {
+                words.read(recogniser, picture, area)
+            });
+        }
         let mut settled = None;
         if analysis.map.is_none()
-            && let (Some(reader), Some(atlas)) = (self.title.as_mut(), self.atlas.as_ref())
-            && let Some(raw) = reader.read(frame)
+            && let Some(atlas) = self.atlas.as_ref()
+            && let Some(raw) = self.title.read(recogniser, frame)
             && let Some((area, _)) = leafline_core::readers::map::title_area(frame)
         {
             settled = title::settle(atlas, &raw, area);
         }
         if let Some(found) = &settled {
             analysis.map = Some(found.reading.clone());
+        }
+        Some((analysis, settled))
+    }
+
+    /// Reads `frame`, taken at `at` Unix seconds. `other` is set when it shows another character
+    /// than the session's, which then starts afresh (the caller saves the old one first, from the
+    /// summary it had).
+    pub fn read(&mut self, frame: &Frame, at: f64) -> Option<(LiveRead, bool)> {
+        let started = leafline_core::clock::Instant::now();
+        let (mut analysis, settled) = self.analyze(frame)?;
+        if let Some(atlas) = self.atlas.as_ref().filter(|_| !self.dataset.quests.is_empty()) {
+            self.quests.hold(atlas, &mut analysis.quest);
         }
         let mut sample = Sample::from_analysis(at, &analysis);
         if let Some(found) = settled {
