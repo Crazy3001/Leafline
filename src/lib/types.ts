@@ -240,6 +240,8 @@ export interface LiveChoice {
   window: WindowChoice | null;
   /** The Pickup Log is read between readings, for the loot picked up. */
   pickupLog: boolean;
+  /** The website reads an item tooltip the mouse rests on and shows its card. */
+  itemTooltips: boolean;
 }
 
 export interface ShortcutInfo {

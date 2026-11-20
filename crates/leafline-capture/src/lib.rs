@@ -5,8 +5,8 @@
 use leafline_core::capturetest::{measure, pattern};
 use leafline_core::vision::Frame;
 
-pub mod engine;
 pub mod identity;
+pub mod items;
 pub mod live;
 pub mod ocr;
 pub mod title;
@@ -124,6 +124,17 @@ mod web {
         /// The player's switch: count the Pickup Log.
         pub fn set_pickup_log(&mut self, on: bool) {
             self.0.set_pickup_log(on);
+        }
+
+        /// The player's switch: read a tooltip the mouse rests on.
+        pub fn set_item_tooltips(&mut self, on: bool) {
+            self.0.set_item_tooltips(on);
+        }
+
+        /// The item tooltips last read, as JSON, if they changed since this was last asked; else
+        /// an empty string.
+        pub fn take_items(&mut self) -> String {
+            self.0.take_items().map(|items| serde_json::to_string(&items).unwrap_or_default()).unwrap_or_default()
         }
 
         /// ocrs's text recognition model, for the minimap title and the HUD's name and job.

@@ -12,7 +12,10 @@ use std::collections::HashMap;
 use std::io::Write;
 
 use leafline_capture::live::LiveReader;
+use leafline_core::build::catalog::Catalog;
 use leafline_core::mapdata::QuestTitles;
+use leafline_core::mapdata::loot::name_tooltip;
+use leafline_core::readers::tooltip::split_name;
 use leafline_core::mapdata::atlas::Atlas;
 use leafline_core::mapdata::osms::{Dataset, Records};
 use leafline_core::pipeline::{self, Analysis};
@@ -115,7 +118,12 @@ fn main() {
             }
         }
     }
+    let catalog = Catalog::new(Vec::new(), dataset.items.clone());
     let atlas = Atlas::new(dataset);
+    // Item tooltips alone, per tooltip: WEBREADERS_TOOLTIPS.
+    if std::env::var("WEBREADERS_TOOLTIPS").is_ok() {
+        return tooltips(&paths, &program, &mut live, &catalog);
+    }
     // field -> (agree, differ, program only, website only)
     let mut counts: HashMap<&str, [u32; 4]> = HashMap::new();
     for path in &paths {
@@ -147,4 +155,47 @@ fn main() {
         let [agree, differ, program_only, web_only] = counts.get(field).copied().unwrap_or_default();
         eprintln!("{field}: agree {agree}, differ {differ}, program only {program_only}, website only {web_only}");
     }
+}
+
+/// The item each of the program's tooltip names settles on, by the same rule as the website's.
+fn program_items(catalog: &Catalog, read: &Value) -> Vec<String> {
+    read["tooltips"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|t| name_tooltip(catalog, &split_name(t.as_str()?).0).map(|i| i.name.clone()))
+        .collect()
+}
+
+/// Item tooltips only: per frame, whether every item the website names is one the program's
+/// reading settles on (right), any is not (wrong), or it names none where the program named one.
+fn tooltips(paths: &[String], program: &HashMap<String, Value>, live: &mut LiveReader, catalog: &Catalog) {
+    let [mut right, mut wrong, mut none, mut unsettled, mut extra] = [0u32; 5];
+    for path in paths {
+        let Some(prog) = program.get(path) else { continue };
+        let raw = prog["tooltips"].as_array().map_or(0, |a| a.len());
+        let Ok(image) = image::open(path) else { continue };
+        let frame = image.to_rgba8();
+        let names = live.read_item_names(&frame);
+        let web: Vec<String> = live.read_items(&frame).into_iter().map(|t| t.name).collect();
+        let truth = program_items(catalog, prog);
+        let verdict = if web.is_empty() {
+            if truth.is_empty() { if raw > 0 { unsettled += 1; "unsettled" } else { "neither" } } else { none += 1; "none" }
+        } else if truth.is_empty() {
+            extra += 1;
+            "extra"
+        } else if web.iter().all(|w| truth.contains(w)) {
+            right += 1;
+            "right"
+        } else {
+            wrong += 1;
+            "wrong"
+        };
+        let read: Vec<Value> = names
+            .iter()
+            .map(|n| json!({ "lines": n.lines, "amber": n.drawn.amber, "unit": n.drawn.unit, "at": [n.drawn.bullet.x, n.drawn.bullet.y] }))
+            .collect();
+        println!("{}", json!({ "path": path, "verdict": verdict, "program": prog["tooltips"], "truth": truth, "web": web, "read": read }));
+    }
+    eprintln!("tooltips: right {right}, wrong {wrong}, none {none}; program unsettled {unsettled}, website only {extra}");
 }

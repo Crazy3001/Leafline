@@ -23,16 +23,22 @@ use leafline_core::vision::{Frame, Ocr};
 
 use std::sync::Arc;
 
-use leafline_core::readers::tooltip::ItemTooltip;
+use leafline_core::readers::tooltip::{self, ItemTooltip};
+use leafline_core::vision::Rect;
 
-use crate::engine::OcrsEngine;
 use crate::identity::IdentityReader;
+use crate::items::{ReadName, TooltipReader};
 use crate::ocr::Recogniser;
 use crate::title::{self, Settled, TitleReader};
 use crate::words::DarkText;
 
 /// Live frames are plentiful, so a reading must agree twice before it counts, as in the program.
 const CONFIRMATIONS: usize = 2;
+/// How long a tooltip must stay in one place (the mouse resting on an item) before it is read, in
+/// seconds: long enough to pass over items on the way to another, short enough to feel prompt.
+const HOLD: f64 = 0.6;
+/// How far a tooltip may move, in pixels, and still be the same one held.
+const HELD_WITHIN: f32 = 3.0;
 
 
 /// What one frame gave: the readings for the page to show, and the session so far.
@@ -52,9 +58,15 @@ pub struct LiveReader {
     /// ocrs, once the page has handed over its model; until then no text is read (the map, the
     /// character's name and job).
     recogniser: Option<Arc<Recogniser>>,
-    /// The same, as an OCR engine for the program's item tooltip reader. Not used live: measured
-    /// on saved frames it named the right item on too few (see `read_items`).
-    items_ocr: Option<Ocr>,
+    /// Item tooltips' names, settled against the item data.
+    tooltips: TooltipReader,
+    /// The player's switch: read a tooltip the mouse rests on.
+    item_tooltips: bool,
+    /// The item tooltips last read, shown until others are; whether they changed since asked.
+    items: Vec<ItemTooltip>,
+    items_changed: bool,
+    /// Where tooltips stood at the last looks, and since when, so a held hover is read once.
+    hover: Option<Hover>,
     title: TitleReader,
     identity: IdentityReader,
     /// The Quest Helper's titles and header.
@@ -98,7 +110,11 @@ impl LiveReader {
         Self {
             ocr: Ocr::none(),
             recogniser: None,
-            items_ocr: None,
+            tooltips: TooltipReader::default(),
+            item_tooltips: true,
+            items: Vec::new(),
+            items_changed: false,
+            hover: None,
             title: TitleReader::default(),
             identity: IdentityReader::default(),
             words: DarkText::default(),
@@ -117,9 +133,7 @@ impl LiveReader {
 
     /// ocrs's text recognition model, for the minimap title and the HUD's name and job.
     pub fn set_text_model(&mut self, recognition: Vec<u8>) -> Result<(), String> {
-        let recogniser = Arc::new(Recogniser::new(recognition)?);
-        self.items_ocr = Some(Ocr::with(Box::new(OcrsEngine::new(recogniser.clone()))));
-        self.recogniser = Some(recogniser);
+        self.recogniser = Some(Arc::new(Recogniser::new(recognition)?));
         Ok(())
     }
 
@@ -231,6 +245,7 @@ impl LiveReader {
             self.tracker.push(&sample);
         }
         self.look(frame, at);
+        analysis.tooltips.clone_from(&self.items);
         let hud = analysis.hud.is_some();
         let ms = started.elapsed().as_secs_f32() * 1000.0;
         Some((LiveRead { analysis, session: self.tracker.summary(), hud, ms }, other))
@@ -243,6 +258,7 @@ impl LiveReader {
     /// Returns whether a line arrived. The website has no OCR for the lines its font can't finish;
     /// their unknown glyphs stand as gaps that item names fill in.
     pub fn look(&mut self, frame: &Frame, at: f64) -> bool {
+        self.hover(frame, at);
         if !self.pickup_log {
             return false;
         }
@@ -263,15 +279,80 @@ impl LiveReader {
         self.pickup_log = on;
     }
 
-    /// The item tooltips in `frame` as the website could read them: found without the program's
-    /// whole-frame OCR, read by ocrs. Not part of live reading. Measured 2026-11-20 on 204 saved
-    /// frames with a tooltip, against the program's readings: the first item named the same on
-    /// 83, another item on 19, none on 95, so an item card from it would too often be wrong or
-    /// missing. Kept for measuring whatever reads them better.
-    pub fn read_items(&self, frame: &Frame) -> Vec<ItemTooltip> {
-        let Some(ocr) = &self.items_ocr else { return Vec::new() };
-        pipeline::read_items_drawn(frame, ocr).unwrap_or_default()
+    /// The player's switch: read a tooltip the mouse rests on. Off forgets the last items.
+    pub fn set_item_tooltips(&mut self, on: bool) {
+        self.item_tooltips = on;
+        if !on {
+            self.hover = None;
+            self.items_changed = !self.items.is_empty();
+            self.items.clear();
+        }
     }
+
+    /// The item tooltips last read, if they changed since this was last asked.
+    pub fn take_items(&mut self) -> Option<Vec<ItemTooltip>> {
+        std::mem::take(&mut self.items_changed).then(|| self.items.clone())
+    }
+
+    /// Reads the tooltips in `frame` once they have stood in the same place for [`HOLD`] seconds:
+    /// the mouse resting on an item, not passing over it. Each resting place is read once, and
+    /// what it names stays until another is read: a tooltip that doesn't settle on an item
+    /// leaves the last card as it was.
+    fn hover(&mut self, frame: &Frame, at: f64) {
+        if !self.item_tooltips || self.recogniser.is_none() || self.catalog.is_none() {
+            return;
+        }
+        let found = tooltip::name_lines(frame);
+        if found.is_empty() {
+            self.hover = None;
+            return;
+        }
+        let places: Vec<Rect> = found.iter().map(|n| n.bullet).collect();
+        match &mut self.hover {
+            Some(hover) if same_places(&hover.places, &places) => {
+                if hover.read || at - hover.since < HOLD {
+                    return;
+                }
+                hover.read = true;
+            }
+            _ => {
+                self.hover = Some(Hover { places, since: at, read: false });
+                return;
+            }
+        }
+        let (Some(recogniser), Some(catalog)) = (self.recogniser.as_deref(), self.catalog.as_ref()) else { return };
+        let items = self.tooltips.settled(recogniser, catalog, frame, found);
+        let names = |items: &[ItemTooltip]| items.iter().map(|t| (t.name.clone(), t.upgrades, t.upgraded)).collect::<Vec<_>>();
+        if !items.is_empty() && names(&items) != names(&self.items) {
+            self.items = items;
+            self.items_changed = true;
+        }
+    }
+
+    /// The item tooltips in `frame` whose names settle on one item in the data: nothing until
+    /// the page has handed over ocrs's model and `items.json`.
+    pub fn read_items(&mut self, frame: &Frame) -> Vec<ItemTooltip> {
+        let (Some(recogniser), Some(catalog)) = (self.recogniser.as_deref(), self.catalog.as_ref()) else { return Vec::new() };
+        self.tooltips.read(recogniser, catalog, frame)
+    }
+
+    /// The tooltips' names in `frame` as read, before settling (for measuring).
+    pub fn read_item_names(&mut self, frame: &Frame) -> Vec<ReadName> {
+        let Some(recogniser) = self.recogniser.as_deref() else { return Vec::new() };
+        self.tooltips.read_names(recogniser, frame)
+    }
+}
+
+/// Tooltips found at the last looks: where (their bullets), since when, and whether read.
+struct Hover {
+    places: Vec<Rect>,
+    since: f64,
+    read: bool,
+}
+
+/// Whether two looks found tooltips in the same places, give or take a few pixels.
+fn same_places(a: &[Rect], b: &[Rect]) -> bool {
+    a.len() == b.len() && a.iter().zip(b).all(|(a, b)| (a.x - b.x).abs() <= HELD_WITHIN && (a.y - b.y).abs() <= HELD_WITHIN)
 }
 
 /// A settled log line as the session counts it, as the program's live loop takes it

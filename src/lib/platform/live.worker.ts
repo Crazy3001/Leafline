@@ -8,7 +8,7 @@
 // @ts-ignore
 import init, * as built from "../capture/wasm/leafline_capture.js";
 
-import type { Analysis, SessionSummary } from "../types";
+import type { Analysis, ItemTooltip, SessionSummary } from "../types";
 import { followTrack, frameRgba, type FrameMessage } from "./capture";
 
 interface Live {
@@ -21,6 +21,8 @@ interface Live {
   set_data(file: string, json: Uint8Array): void;
   set_idle_after(seconds: number): void;
   set_pickup_log(on: boolean): void;
+  set_item_tooltips(on: boolean): void;
+  take_items(): string;
   reset(): void;
 }
 const wasm = built as { Live: new (idleAfter: number, saved?: string | null) => Live };
@@ -39,6 +41,8 @@ export interface ReadingChoice {
   idleAfter: number;
   /** Count the Pickup Log's lines. */
   pickupLog: boolean;
+  /** Read an item tooltip the mouse rests on. */
+  itemTooltips: boolean;
 }
 
 export interface LiveRead {
@@ -53,6 +57,8 @@ export type FromLive =
   /** The session as it was before another character's frames started a new one. */
   | { type: "other"; before: SessionSummary }
   | { type: "summary"; session: SessionSummary }
+  /** The item tooltips read from a held hover, when they change: the last ones stay until then. */
+  | { type: "items"; tooltips: ItemTooltip[] }
   | { type: "snapshot"; tracker: string }
   | { type: "ended" }
   | { type: "error"; message: string };
@@ -89,13 +95,17 @@ async function handle(frame: VideoFrame) {
     frame.close();
     if (!full) {
       const looked = live.look(data, width, height, at / 1000);
+      const items = live.take_items();
       busy = false;
       if (looked) post({ type: "summary", session: JSON.parse(looked) as SessionSummary });
+      if (items) post({ type: "items", tooltips: JSON.parse(items) as ItemTooltip[] });
       return;
     }
     const before = live.summary();
     const text = live.read(data, width, height, at / 1000);
+    const items = live.take_items();
     busy = false;
+    if (items) post({ type: "items", tooltips: JSON.parse(items) as ItemTooltip[] });
     if (text === "null") return;
     const { read, other } = JSON.parse(text) as { read: LiveRead; other: boolean };
     reads++;
@@ -117,6 +127,7 @@ self.onmessage = async ({ data }: MessageEvent<ToLive>) => {
       interval = data.interval * 1000;
       live = new wasm.Live(data.idleAfter, data.saved);
       live.set_pickup_log(data.pickupLog);
+      live.set_item_tooltips(data.itemTooltips);
       post({ type: "summary", session: JSON.parse(live.summary()) as SessionSummary });
       void loadTextReading(live, data.textModel, data.dataSources);
       break;
@@ -124,6 +135,11 @@ self.onmessage = async ({ data }: MessageEvent<ToLive>) => {
       interval = data.interval * 1000;
       live?.set_idle_after(data.idleAfter);
       live?.set_pickup_log(data.pickupLog);
+      live?.set_item_tooltips(data.itemTooltips);
+      if (live) {
+        const items = live.take_items();
+        if (items) post({ type: "items", tooltips: JSON.parse(items) as ItemTooltip[] });
+      }
       break;
     case "track":
       reading = followTrack(data.track, handle);

@@ -49,6 +49,7 @@
 
   const SECTIONS = [
     { id: "live", title: "Live reading" },
+    { id: "reading", title: "Reading" },
     { id: "look", title: "Look" },
     { id: "overlay", title: "Overlay" },
     { id: "routes", title: "Routes" },
@@ -59,6 +60,8 @@
   ].filter((section) => {
     // The website doesn't read the game, float over it or take hotkeys.
     if (section.id === "live") return can.liveReading;
+    // The website's reading of a shared window, which has its own switches.
+    if (section.id === "reading") return can.readWindow;
     if (section.id === "overlay") return can.pins;
     if (section.id === "hotkeys") return can.hotkeys;
     return true;
@@ -627,6 +630,51 @@
       <p class="note">
         Works windowed and in Full Screen. Pictures stay in memory unless you save one{keyHint("SaveFrame")}.
       </p>
+    </section>
+    {/if}
+
+    {#if can.readWindow}
+    <section id="reading">
+      <h2>Reading</h2>
+      <p class="lead">What Leafline reads from the game window you share with this page. It only looks at the picture, which stays on this computer.</p>
+      <div class="row">
+        <label for="web-pickup-log">
+          <span class="name">Count loot</span>
+          <span class="help"
+            >Reads the lines at the bottom right that say what you picked up, four times a second, for the Train tab's loot
+            and profit. Off uses less CPU.</span
+          >
+        </label>
+        <div class="control">
+          <input
+            id="web-pickup-log"
+            class="switch"
+            type="checkbox"
+            role="switch"
+            checked={display.live.pickupLog}
+            onchange={(e) => setLive({ pickupLog: e.currentTarget.checked })}
+          />
+        </div>
+      </div>
+      <div class="row">
+        <label for="web-item-tooltips">
+          <span class="name">Item cards</span>
+          <span class="help"
+            >Rest the mouse on an item in game and its card comes up in Look up, with its stats from the item data. Only
+            the name is read; an item it can't name for sure shows no card.</span
+          >
+        </label>
+        <div class="control">
+          <input
+            id="web-item-tooltips"
+            class="switch"
+            type="checkbox"
+            role="switch"
+            checked={display.live.itemTooltips}
+            onchange={(e) => setLive({ itemTooltips: e.currentTarget.checked })}
+          />
+        </div>
+      </div>
     </section>
     {/if}
 
