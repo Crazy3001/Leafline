@@ -7,9 +7,10 @@
 //   stream delivers it. The stream itself goes to the worker where the browser allows that (Edge
 //   refuses), else it is read on the page and each frame handed over.
 // - Firefox: no stream reader, so the shared window plays in a video that is never shown and each
-//   new frame becomes a VideoFrame. A page the browser counts as hidden (minimised, or covered by
-//   the game) gets no frame callbacks, so ticks from a small worker, which browsers don't slow
-//   like a hidden page's timers, keep it going.
+//   new frame becomes a VideoFrame. Each frame callback is a new frame: Firefox gives a live
+//   share's every frame the same media time, so that can't tell them apart. A page the browser
+//   counts as hidden gets no callbacks, so ticks from a small worker, which browsers don't slow
+//   like a hidden page's timers, take the video's picture whenever the callbacks go quiet.
 
 declare class MediaStreamTrackProcessor {
   constructor(init: { track: MediaStreamTrack });
@@ -55,8 +56,13 @@ export interface SharedWindow {
   stop(): void;
 }
 
-/** How often a hidden page looks for a new frame, where it gets no frame callbacks. */
+/** How often the Firefox route looks for a new frame when frame callbacks aren't coming. */
 const HIDDEN_LOOK_MS = 40;
+/** Frame callbacks count as quiet after this long without one. */
+const QUIET_MS = 250;
+/** The Firefox route hands over at most one frame this often: reads are seconds apart, and each
+ *  frame copied out of the video costs time. */
+const VIDEO_FRAME_MS = 100;
 
 /**
  * Asks the browser for a window to share and starts handing its frames to `send` (a worker's
@@ -144,20 +150,23 @@ function readFromVideo(stream: MediaStream, handOver: (frame: VideoFrame) => voi
   v.playsInline = true;
   v.srcObject = stream;
   let running = true;
-  let last = -1;
-  const take = (mediaTime: number) => {
-    if (!running || v.readyState < 2 || mediaTime === last) return;
-    last = mediaTime;
+  let lastTime = -1;
+  let lastCallback = -Infinity;
+  let lastTaken = -Infinity;
+  const take = () => {
+    if (!running || v.readyState < 2 || performance.now() - lastTaken < VIDEO_FRAME_MS) return;
+    lastTaken = performance.now();
     let frame: VideoFrame;
     try {
-      frame = new VideoFrame(v, { timestamp: Math.round(mediaTime * 1e6) });
+      frame = new VideoFrame(v, { timestamp: Math.round(performance.now() * 1000) });
     } catch {
       return;
     }
     handOver(frame);
   };
-  const onFrame = (_now: number, meta: { mediaTime: number }) => {
-    take(meta.mediaTime);
+  const onFrame = () => {
+    lastCallback = performance.now();
+    take();
     if (running) v.requestVideoFrameCallback(onFrame);
   };
   v.play()
@@ -167,7 +176,11 @@ function readFromVideo(stream: MediaStream, handOver: (frame: VideoFrame) => voi
   const url = URL.createObjectURL(new Blob([tick], { type: "text/javascript" }));
   const ticker = new Worker(url);
   ticker.onmessage = () => {
-    if (document.visibilityState === "hidden") take(v.currentTime);
+    if (document.visibilityState !== "hidden" && performance.now() - lastCallback <= QUIET_MS) return;
+    // The video's clock moves on with each new frame, so a tick between frames takes nothing.
+    if (v.currentTime === lastTime) return;
+    lastTime = v.currentTime;
+    take();
   };
   return () => {
     running = false;

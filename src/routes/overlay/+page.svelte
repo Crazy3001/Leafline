@@ -382,7 +382,7 @@
   .shell {
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    height: calc(100vh / var(--page-zoom, 1));
     border: var(--line-w) solid var(--window-line);
     border-radius: var(--radius-lg);
     background: var(--bg);
@@ -392,7 +392,7 @@
 
   .shell.compact {
     height: auto;
-    max-height: 100vh;
+    max-height: calc(100vh / var(--page-zoom, 1));
     border-radius: var(--radius);
   }
 

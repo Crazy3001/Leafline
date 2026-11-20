@@ -1195,7 +1195,7 @@
   .page {
     display: grid;
     grid-template-columns: 150px 1fr;
-    height: 100vh;
+    height: calc(100vh / var(--page-zoom, 1));
   }
 
   /* The menu in the windows' header colours, as setup's steps are. */

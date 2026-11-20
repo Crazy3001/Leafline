@@ -175,7 +175,7 @@
   .frame {
     display: flex;
     flex-direction: column;
-    max-height: 100vh;
+    max-height: calc(100vh / var(--page-zoom, 1));
     background: var(--bg);
     border: var(--line-w) solid var(--window-line);
     border-radius: var(--radius);
@@ -184,7 +184,7 @@
   }
 
   .frame.sized {
-    height: 100vh;
+    height: calc(100vh / var(--page-zoom, 1));
   }
 
   .sized .body {
