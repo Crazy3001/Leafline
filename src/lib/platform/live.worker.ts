@@ -13,6 +13,7 @@ import { followTrack, frameRgba, type FrameMessage } from "./capture";
 
 interface Live {
   read(rgba: Uint8Array, width: number, height: number, at: number): string;
+  look(rgba: Uint8Array, width: number, height: number, at: number): string;
   summary(): string;
   snapshot(): string;
   set_held(held: boolean): void;
@@ -53,6 +54,10 @@ const ready = (init as () => Promise<unknown>)();
 let live: Live | null = null;
 let interval = 2000;
 let nextRead = 0;
+/** Between full reads the Pickup Log alone is looked at this often, as the program does
+ *  (src-tauri/src/app/live.rs, PICKUP_EVERY): a line stays readable for only a second or two. */
+const LOOK_EVERY = 250;
+let nextLook = 0;
 let reads = 0;
 let busy = false;
 let reading: ReturnType<typeof followTrack> | null = null;
@@ -64,12 +69,21 @@ async function handle(frame: VideoFrame) {
   try {
     const at = now();
     // One frame at a time: a frame arriving while one is read is let go.
-    if (!live || busy || at < nextRead) return;
+    if (!live || busy) return;
+    const full = at >= nextRead;
+    if (!full && at < nextLook) return;
     busy = true;
-    // On a fixed grid, so uneven frame times don't drift the rate down.
-    nextRead = nextRead + interval > at ? nextRead + interval : at + interval;
+    // On fixed grids, so uneven frame times don't drift the rates down.
+    nextLook = nextLook + LOOK_EVERY > at ? nextLook + LOOK_EVERY : at + LOOK_EVERY;
+    if (full) nextRead = nextRead + interval > at ? nextRead + interval : at + interval;
     const { data, width, height } = frameRgba(frame);
     frame.close();
+    if (!full) {
+      const looked = live.look(data, width, height, at / 1000);
+      busy = false;
+      if (looked) post({ type: "summary", session: JSON.parse(looked) as SessionSummary });
+      return;
+    }
     const before = live.summary();
     const text = live.read(data, width, height, at / 1000);
     busy = false;

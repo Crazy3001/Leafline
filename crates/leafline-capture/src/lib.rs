@@ -109,6 +109,13 @@ mod web {
             }
         }
 
+        /// Looks at the Pickup Log alone in a frame taken at `at` Unix seconds: the session's
+        /// JSON when a line arrived, else an empty string.
+        pub fn look(&mut self, rgba: &[u8], width: u32, height: u32, at: f64) -> String {
+            let Some(frame) = frame(rgba, width, height) else { return String::new() };
+            if self.0.look(&frame, at) { serde_json::to_string(&self.0.summary()).unwrap_or_default() } else { String::new() }
+        }
+
         pub fn summary(&self) -> String {
             serde_json::to_string(&self.0.summary()).unwrap_or_default()
         }
