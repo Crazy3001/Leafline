@@ -81,6 +81,115 @@ pub fn name_lines(frame: &Frame) -> Vec<NameLines> {
     found
 }
 
+/// Game pixels, for the lines under an equipment tooltip's separator (`Type:`, the stats,
+/// `Remaining Enhancements:`): each starts with a small orange plus, three game pixels across, in
+/// line with the name's bullet.
+/// How far below the name's bullet the first line can be, and the last.
+const STATS_FROM: f32 = 40.0;
+const STATS_TO: f32 = 340.0;
+/// How far the plus can sit left or right of the name's bullet.
+const STAT_BULLET_LEFT: f32 = 5.0;
+const STAT_BULLET_RIGHT: f32 = 8.0;
+/// The distance between the lines: 16 at 2x, but 32 screen pixels at 1.6x too (20 game pixels
+/// by the bullet's size).
+const STAT_PITCH: std::ops::RangeInclusive<f32> = 12.0..=23.0;
+/// How far a line's letters reach above and below the plus's middle.
+const STAT_ABOVE: f32 = 7.0;
+const STAT_BELOW: f32 = 7.0;
+/// How far right of the name's bullet the panel's text can reach.
+const PANEL_TEXT: f32 = 232.0;
+/// A gap this wide ends a line (the spaces in `+56 (52 +4)` are narrower).
+const STAT_END_GAP: f32 = 10.0;
+
+/// The lines under the separator of the equipment tooltip whose name is `name`, top to bottom,
+/// each tight around its text (the plus left out). Empty when it shows none (a plain item).
+pub fn stat_lines(frame: &Frame, name: &NameLines) -> Vec<Rect> {
+    let unit = name.unit;
+    let b = name.bullet;
+    let (width, height) = (frame.width(), frame.height());
+    let left = (b.x - STAT_BULLET_LEFT * unit).max(0.0) as u32;
+    let right = ((b.x + STAT_BULLET_RIGHT * unit) as u32).min(width);
+    let top = ((b.y + STATS_FROM * unit) as u32).min(height);
+    let bottom = ((b.y + STATS_TO * unit) as u32).min(height);
+    if left >= right || top >= bottom {
+        return Vec::new();
+    }
+    // Runs of rows with the plus's orange, each one plus if it is the size of one.
+    let count = |y: u32| (left..right).filter(|&x| is_stat_bullet(frame.get_pixel(x, y))).count();
+    let mut runs: Vec<(u32, u32, usize)> = Vec::new();
+    for y in top..bottom {
+        let n = count(y);
+        if n == 0 {
+            continue;
+        }
+        match runs.last_mut() {
+            Some(run) if run.1 == y => {
+                run.1 = y + 1;
+                run.2 += n;
+            }
+            _ => runs.push((y, y + 1, n)),
+        }
+    }
+    let side = |run: &(u32, u32, usize)| (run.1 - run.0) as f32 / unit;
+    let area = |run: &(u32, u32, usize)| run.2 as f32 / (unit * unit);
+    let pluses: Vec<f32> = runs
+        .iter()
+        .filter(|run| (2.0..=4.0).contains(&side(run)) && (3.0..=7.5).contains(&area(run)))
+        .map(|run| (run.0 + run.1) as f32 / 2.0)
+        .collect();
+    // The lines follow each other evenly from the first; anything after a gap is something else.
+    let mut middles: Vec<f32> = Vec::new();
+    for middle in pluses {
+        match middles.last() {
+            None => middles.push(middle),
+            Some(&last) if STAT_PITCH.contains(&((middle - last) / unit)) => middles.push(middle),
+            Some(_) => break,
+        }
+    }
+    let text_right = ((b.x + PANEL_TEXT * unit) as u32).min(width);
+    middles.into_iter().filter_map(|middle| stat_line(frame, (left, right), text_right, middle, unit)).collect()
+}
+
+/// The text of the line whose plus is at `middle` (somewhere in the columns `zone`), from just
+/// right of the plus to the first wide gap, no further right than `right`.
+fn stat_line(frame: &Frame, zone: (u32, u32), right: u32, middle: f32, unit: f32) -> Option<Rect> {
+    let top = (middle - STAT_ABOVE * unit).max(0.0) as u32;
+    let bottom = ((middle + STAT_BELOW * unit) as u32).min(frame.height());
+    let plus_row = (middle as u32).saturating_sub(unit as u32)..(middle + unit + 1.0) as u32;
+    let plus_end = (zone.0..zone.1).filter(|&x| plus_row.clone().any(|y| is_stat_bullet(frame.get_pixel(x, y)))).max()? + 1;
+    let column = |x: u32| (top..bottom).any(|y| is_stat_text(frame.get_pixel(x, y)));
+    // The text keeps its own scale at 1.6x (as the pitch does), so this is generous.
+    let first = (plus_end..right.min(plus_end + (10.0 * unit) as u32)).find(|&x| column(x))?;
+    let gap = (STAT_END_GAP * unit).ceil() as u32;
+    let (mut last, mut x) = (first, first);
+    while x < right && x - last <= gap {
+        if column(x) {
+            last = x;
+        }
+        x += 1;
+    }
+    let inked_row = |y: u32| (first..=last).any(|x| is_stat_text(frame.get_pixel(x, y)));
+    let row_top = (top..bottom).find(|&y| inked_row(y))?;
+    let row_bottom = (top..bottom).rev().find(|&y| inked_row(y))? + 1;
+    Some(Rect::from_edges(first as f32, row_top as f32, (last + 1) as f32, row_bottom as f32))
+}
+
+/// The orange plus before each line, solid (255, 102, 0).
+fn is_stat_bullet(px: &Rgba<u8>) -> bool {
+    let [r, g, b, _] = px.0.map(i16::from);
+    r >= 215 && (60..=140).contains(&g) && b <= 60
+}
+
+/// The lines' text: a cream label, a white value, a bonus in lavender, and a loss (`-1`) in
+/// magenta (255, 0, 102).
+pub fn is_stat_text(px: &Rgba<u8>) -> bool {
+    let [r, g, b, _] = px.0.map(i16::from);
+    let light = preprocess::luminance(px) >= 150 && preprocess::saturation(px) <= 70;
+    let lavender = b >= 215 && b >= r + 40 && r >= 130 && g >= 130;
+    let magenta = r >= 200 && g <= 70 && (60..=170).contains(&b);
+    light || lavender || magenta
+}
+
 fn name_height(height: f32, unit: f32) -> bool {
     NAME_HEIGHTS.contains(&(height / unit))
 }

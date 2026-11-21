@@ -23,7 +23,7 @@ use leafline_core::vision::{Frame, Ocr};
 
 use std::sync::Arc;
 
-use leafline_core::readers::tooltip::{self, ItemTooltip};
+use leafline_core::readers::tooltip::{self, ItemTooltip, NameLines};
 use leafline_core::vision::Rect;
 
 use crate::identity::IdentityReader;
@@ -297,7 +297,8 @@ impl LiveReader {
     /// Reads the tooltips in `frame` once they have stood in the same place for [`HOLD`] seconds:
     /// the mouse resting on an item, not passing over it. Each resting place is read once, and
     /// what it names stays until another is read: a tooltip that doesn't settle on an item
-    /// leaves the last card as it was.
+    /// leaves the last card as it was. The names go out first; the stats, slower to read, at the
+    /// next look while the tooltips are still there.
     fn hover(&mut self, frame: &Frame, at: f64) {
         if !self.item_tooltips || self.recogniser.is_none() || self.catalog.is_none() {
             return;
@@ -308,22 +309,50 @@ impl LiveReader {
             return;
         }
         let places: Vec<Rect> = found.iter().map(|n| n.bullet).collect();
-        match &mut self.hover {
-            Some(hover) if same_places(&hover.places, &places) => {
-                if hover.read || at - hover.since < HOLD {
-                    return;
-                }
-                hover.read = true;
-            }
+        let (Some(recogniser), Some(catalog)) = (self.recogniser.as_deref(), self.catalog.as_ref()) else { return };
+        let hover = match &mut self.hover {
+            Some(hover) if same_places(&hover.places, &places) => hover,
             _ => {
-                self.hover = Some(Hover { places, since: at, read: false });
+                self.hover = Some(Hover { places, since: at, read: false, stats_for: Vec::new() });
                 return;
             }
+        };
+        if !hover.read {
+            if at - hover.since < HOLD {
+                return;
+            }
+            hover.read = true;
+            let named = self.tooltips.named(recogniser, catalog, frame, found);
+            if named.is_empty() {
+                return;
+            }
+            // A new copy of the same item may differ, so its card starts again from the name.
+            let items: Vec<ItemTooltip> = named.iter().map(|(item, _)| item.clone()).collect();
+            hover.stats_for = named.into_iter().filter(|(item, _)| !item.plain).map(|(_, drawn)| drawn).collect();
+            if !same_items(&items, &self.items) {
+                self.items = items;
+                self.items_changed = true;
+            }
+            return;
         }
-        let (Some(recogniser), Some(catalog)) = (self.recogniser.as_deref(), self.catalog.as_ref()) else { return };
-        let items = self.tooltips.settled(recogniser, catalog, frame, found);
-        let names = |items: &[ItemTooltip]| items.iter().map(|t| (t.name.clone(), t.upgrades, t.upgraded)).collect::<Vec<_>>();
-        if !items.is_empty() && names(&items) != names(&self.items) {
+        if hover.stats_for.is_empty() {
+            return;
+        }
+        let pending = std::mem::take(&mut hover.stats_for);
+        // Each pending name with its item, as shown now (they are matched by where they stand).
+        let at = |drawn: &NameLines| drawn.bullet.x - 4.0 * drawn.unit;
+        let mut pairs: Vec<(ItemTooltip, NameLines)> = pending
+            .into_iter()
+            .filter_map(|drawn| Some((self.items.iter().find(|t| (t.panel.x - at(&drawn)).abs() < 1.0)?.clone(), drawn)))
+            .collect();
+        self.tooltips.fill_stats(recogniser, catalog, frame, &mut pairs);
+        let mut items = self.items.clone();
+        for (read, _) in pairs {
+            if let Some(item) = items.iter_mut().find(|t| t.panel.x == read.panel.x) {
+                *item = read;
+            }
+        }
+        if !same_items(&items, &self.items) {
             self.items = items;
             self.items_changed = true;
         }
@@ -348,6 +377,16 @@ struct Hover {
     places: Vec<Rect>,
     since: f64,
     read: bool,
+    /// The equipment names read whose stats are still to be read.
+    stats_for: Vec<NameLines>,
+}
+
+/// Whether two sets of item tooltips would show the same cards.
+fn same_items(a: &[ItemTooltip], b: &[ItemTooltip]) -> bool {
+    let key = |items: &[ItemTooltip]| {
+        items.iter().map(|t| (t.name.clone(), t.upgrades, t.upgraded, t.stats.clone(), t.remaining_enhancements)).collect::<Vec<_>>()
+    };
+    key(a) == key(b)
 }
 
 /// Whether two looks found tooltips in the same places, give or take a few pixels.

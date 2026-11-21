@@ -660,8 +660,9 @@
         <label for="web-item-tooltips">
           <span class="name">Item cards</span>
           <span class="help"
-            >Rest the mouse on an item in game and its card comes up in Look up, with its stats from the item data. Only
-            the name is read; an item it can't name for sure shows no card.</span
+            >Rest the mouse on an item in game and its card comes up in Look up. Its name and stats are read from the
+            tooltip; a stat that can't be read for sure shows the item's usual value instead, and an item it can't name
+            for sure shows no card.</span
           >
         </label>
         <div class="control">

@@ -22,8 +22,8 @@ use image::{Rgba, imageops};
 use regex::Regex;
 use serde::Serialize;
 
-pub use names::{NameLines, name_lines};
-pub use parse::{ItemTooltip, JOBS, JobFlag, Property, Requirements, Stat, split_name};
+pub use names::{NameLines, name_lines, stat_lines};
+pub use parse::{ItemTooltip, JOBS, JobFlag, Property, Requirements, Stat, is_stat_label, parse_below, split_name};
 
 use super::digits::number;
 use super::text::{best_match, starts_like, trim_noise};

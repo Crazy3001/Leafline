@@ -177,7 +177,12 @@ fn tooltips(paths: &[String], program: &HashMap<String, Value>, live: &mut LiveR
         let Ok(image) = image::open(path) else { continue };
         let frame = image.to_rgba8();
         let names = live.read_item_names(&frame);
-        let web: Vec<String> = live.read_items(&frame).into_iter().map(|t| t.name).collect();
+        let items = live.read_items(&frame);
+        let web: Vec<String> = items.iter().map(|t| t.name.clone()).collect();
+        let cards: Vec<Value> = items
+            .iter()
+            .map(|t| json!({ "name": t.name, "upgrades": t.upgrades, "stats": t.stats.iter().map(|s| json!([s.label, s.value, s.base, s.bonus])).collect::<Vec<_>>(), "left": t.remaining_enhancements }))
+            .collect();
         let truth = program_items(catalog, prog);
         let verdict = if web.is_empty() {
             if truth.is_empty() { if raw > 0 { unsettled += 1; "unsettled" } else { "neither" } } else { none += 1; "none" }
@@ -195,7 +200,7 @@ fn tooltips(paths: &[String], program: &HashMap<String, Value>, live: &mut LiveR
             .iter()
             .map(|n| json!({ "lines": n.lines, "amber": n.drawn.amber, "unit": n.drawn.unit, "at": [n.drawn.bullet.x, n.drawn.bullet.y] }))
             .collect();
-        println!("{}", json!({ "path": path, "verdict": verdict, "program": prog["tooltips"], "truth": truth, "web": web, "read": read }));
+        println!("{}", json!({ "path": path, "verdict": verdict, "program": prog["tooltips"], "truth": truth, "web": web, "cards": cards, "read": read }));
     }
     eprintln!("tooltips: right {right}, wrong {wrong}, none {none}; program unsettled {unsettled}, website only {extra}");
 }
