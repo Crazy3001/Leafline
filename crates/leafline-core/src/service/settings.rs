@@ -129,11 +129,14 @@ pub struct LiveChoice {
     pub window: Option<WindowChoice>,
     /// The Pickup Log is read between readings, for the loot picked up.
     pub pickup_log: bool,
+    /// The website reads an item tooltip the mouse rests on and shows its card (the program reads
+    /// them on its hotkey instead).
+    pub item_tooltips: bool,
 }
 
 impl Default for LiveChoice {
     fn default() -> Self {
-        Self { enabled: true, interval: 2.0, pause_after: 15.0, window: None, pickup_log: true }
+        Self { enabled: true, interval: 2.0, pause_after: 15.0, window: None, pickup_log: true, item_tooltips: true }
     }
 }
 

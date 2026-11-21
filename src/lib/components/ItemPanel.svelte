@@ -307,7 +307,11 @@
       <ItemCard {item} {map} title={i === 0 ? "Item check" : "Compared item"} plain={pinned && i === 0} />
     {:else}
       <p class="empty">
-        Search above, or hover an item in game and {hotkey("ReadItem") ? `press ${hotkey("ReadItem")}` : "use the Read item hotkey"} to check that copy.
+        {#if __LEAFLINE_WEB__}
+          Search above, or while Leafline reads the game, rest the mouse on an item in game to bring up its card.
+        {:else}
+          Search above, or hover an item in game and {hotkey("ReadItem") ? `press ${hotkey("ReadItem")}` : "use the Read item hotkey"} to check that copy.
+        {/if}
         Star an item with <strong>Track it</strong> to keep it in a list here, with who drops it and where.
       </p>
     {/each}

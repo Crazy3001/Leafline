@@ -126,6 +126,13 @@ pub fn read_all(frame: &Frame, overview: &[Line], panels: &[Panel], ocr: &Ocr) -
 /// Where a tooltip's name would be, for each bullet in the frame with the icon box under it, as
 /// a line of the name's height starting at the bullet, the way OCR reports one.
 fn bullet_names(frame: &Frame) -> Vec<Line> {
+    bullets(frame).into_iter().map(|(_, line)| line).collect()
+}
+
+/// Each bullet in the frame with the icon box under it, with where its name would be (a line of
+/// the name's height starting at the bullet, the way OCR reports one). Equipment tooltips have
+/// the bullet and the box too.
+pub(super) fn bullets(frame: &Frame) -> Vec<(Rect, Line)> {
     blobs(frame, is_bullet)
         .into_iter()
         .filter_map(|(rect, area)| {
@@ -135,10 +142,12 @@ fn bullet_names(frame: &Frame) -> Vec<Line> {
             let sized = (0.8..=3.5).contains(&unit) && area >= 0.6 * expected && area <= 1.6 * expected;
             (square && sized).then(|| {
                 let top = rect.center_y() - NAME_HEIGHT * unit / 2.0;
-                Line { text: String::new(), rect: Rect::new(rect.x, top, 60.0 * unit, NAME_HEIGHT * unit), words: vec![] }
+                let line =
+                    Line { text: String::new(), rect: Rect::new(rect.x, top, 60.0 * unit, NAME_HEIGHT * unit), words: vec![] };
+                (rect, line)
             })
         })
-        .filter(|line| is_name(frame, line))
+        .filter(|(_, line)| is_name(frame, line))
         .collect()
 }
 

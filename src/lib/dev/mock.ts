@@ -237,7 +237,7 @@ let displaySettings: DisplaySettings = {
   compactShape: "card",
   hotkeys: { enabled: true, keys: {} },
   travel: { enabled: false, cabs: true, vipCabs: false, scrolls: true },
-  live: { enabled: true, interval: 2, pauseAfter: 15, window: null, pickupLog: true },
+  live: { enabled: true, interval: 2, pauseAfter: 15, window: null, pickupLog: true, itemTooltips: true },
   framesFolder: null,
   setupDone: true,
   updateCheck: false,

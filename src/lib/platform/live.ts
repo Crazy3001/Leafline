@@ -67,13 +67,14 @@ function publishSession(next: SessionSummary) {
   void emit("session", next);
 }
 
-type LiveSettings = { live?: { interval?: number; pauseAfter?: number; pickupLog?: boolean } };
+type LiveSettings = { live?: { interval?: number; pauseAfter?: number; pickupLog?: boolean; itemTooltips?: boolean } };
 
 function choiceOf(s: LiveSettings): ReadingChoice {
   return {
     interval: s.live?.interval ?? 2,
     idleAfter: s.live?.pauseAfter ?? 15,
     pickupLog: s.live?.pickupLog ?? true,
+    itemTooltips: s.live?.itemTooltips ?? true,
   };
 }
 
@@ -194,6 +195,15 @@ function onWorker({ data }: MessageEvent<FromLive>) {
       break;
     case "summary":
       publishSession(data.session);
+      break;
+    case "items":
+      // In place on the card, between full reads; a new item brings the item check up, as the
+      // program's Read item hotkey does.
+      if (analysis) {
+        analysis = { ...analysis, tooltips: data.tooltips };
+        void emit("analysis", analysis);
+      }
+      if (data.tooltips.length) void emit("item-read", { found: data.tooltips.length, problem: null });
       break;
     case "snapshot":
       void writeRecovery(data.tracker);

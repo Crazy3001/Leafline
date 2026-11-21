@@ -98,10 +98,13 @@ const STAT_LABELS: &[&str] = &[
     "Magic Def.",
     "Accuracy",
     "Avoidability",
+    "Evasion",
     "Speed",
     "Jump",
     "Hands",
     "Critical Rate",
+    // Without it, `Critical Damage` was snapped to `Critical Rate`.
+    "Critical Damage",
 ];
 
 const REQ_KEYS: [&str; 6] = ["LEV", "STR", "DEX", "INT", "LUK", "FAM"];
@@ -210,6 +213,22 @@ pub fn parse(lines: &[Line], separator_y: f32) -> ItemTooltip {
         (item.name, item.upgrades) = split_name(&text);
     }
     item
+}
+
+/// The lines under the separator (`Type:`, stats, other `Label: value` lines, `Remaining
+/// Enhancements:`), read one by one, as [`parse`] reads them.
+pub fn parse_below(texts: &[String]) -> ItemTooltip {
+    let lines: Vec<Line> = texts
+        .iter()
+        .enumerate()
+        .map(|(i, text)| Line { text: text.clone(), rect: Rect::new(0.0, 10.0 + 20.0 * i as f32, 100.0, 12.0), words: Vec::new() })
+        .collect();
+    parse(&lines, 0.0)
+}
+
+/// Whether `label` is one of the stats tooltips print.
+pub fn is_stat_label(label: &str) -> bool {
+    STAT_LABELS.contains(&label)
 }
 
 /// The count in a `(+N)` anywhere in `text`.

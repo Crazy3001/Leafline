@@ -15,6 +15,7 @@ crate-type = ["cdylib", "rlib"]
 leafline-core = { path = "../leafline-core" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+regex = "1.13.1"
 image = { version = "0.25.10", default-features = false }
 # The minimap title on the website, which has no Windows OCR (see src/title.rs). Only the
 # recognition model is used; the page downloads it once.

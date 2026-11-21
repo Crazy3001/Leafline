@@ -47,7 +47,7 @@
         {status.reason}
       {/if}
     </p>
-    {#if !compact}<p class="hint">Mesos are read while your inventory is open, the map from the minimap, quests from the Quest Helper and loot from the lines at the bottom right. Item tooltips aren't read on the website yet. The session saves itself to your training log after 5 minutes.</p>{/if}
+    {#if !compact}<p class="hint">Mesos are read while your inventory is open, the map from the minimap, quests from the Quest Helper and loot from the lines at the bottom right. Rest the mouse on an item and its card comes up in Look up. The session saves itself to your training log after 5 minutes.</p>{/if}
     <div class="actions">
       <Button onclick={() => backend.stopLive()}><Square size={12} />Stop reading</Button>
     </div>

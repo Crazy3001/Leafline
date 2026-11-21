@@ -140,6 +140,41 @@ fn by_start<'a>(items: &[&'a ItemRecord], start: &str) -> Option<&'a ItemRecord>
     one_name(fits)
 }
 
+/// The item a tooltip's name, read on its own, is: its name exactly, or one name clearly the
+/// closest (stricter than the Pickup Log's, since a card for the wrong item is worse than none).
+/// The `(M)` or `(F)` clothes end with isn't in the data, and items sharing a name count as one.
+/// A name with a number in it (`Scroll for Gloves for ATT 60%`) must be read exactly: its
+/// neighbours differ by the number alone.
+pub fn name_tooltip<'a>(catalog: &'a Catalog, read: &str) -> Option<&'a ItemRecord> {
+    let key = read_key(&SIZE_SUFFIX.replace(read, ""));
+    if key.chars().filter(char::is_ascii_alphabetic).count() < SHORTEST_TOOLTIP {
+        return None;
+    }
+    let exact: Vec<&ItemRecord> = catalog.items().iter().filter(|i| item_key(&i.name) == key).collect();
+    if !exact.is_empty() {
+        return one_name(exact);
+    }
+    let numbered = |key: &str| key.chars().any(|c| c.is_ascii_digit());
+    if numbered(&key) {
+        return None;
+    }
+    let mut scored: Vec<(f64, &ItemRecord)> =
+        catalog.items().iter().map(|item| (like(&item_key(&item.name), &key), item)).collect();
+    scored.sort_by(|a, b| b.0.total_cmp(&a.0));
+    let (best, item) = *scored.first()?;
+    let runner_up = scored.iter().find(|(_, other)| other.name != item.name).map_or(0.0, |(score, _)| *score);
+    (best >= TOOLTIP_LIKE && best - runner_up >= TOOLTIP_LEAD && !numbered(&item_key(&item.name))).then_some(item)
+}
+
+/// `(M)`, `(F)` or `(U)` at a name's end, as clothes show.
+static SIZE_SUFFIX: std::sync::LazyLock<regex::Regex> =
+    std::sync::LazyLock::new(|| regex::Regex::new(r"\s*\(\s*[MFU]\s*\)\s*$").unwrap());
+/// A tooltip name must be this alike to an item's, and lead the next by this much.
+const TOOLTIP_LIKE: f64 = 0.86;
+const TOOLTIP_LEAD: f64 = 0.12;
+/// Fewer letters than this say too little (`Egg` and `Apple` are read exactly or not at all).
+const SHORTEST_TOOLTIP: usize = 3;
+
 /// The item whose name is like `key` and clearly closer to it than any other name.
 fn closest<'a>(items: &[&'a ItemRecord], key: &str) -> Option<&'a ItemRecord> {
     let mut scored: Vec<(f64, &ItemRecord)> =
@@ -243,6 +278,32 @@ mod tests {
         assert_eq!(named("Blue Sn?il Shell", Some(Tab::Etc), false), Some(2));
         assert_eq!(named("?ed Snail Shell", Some(Tab::Etc), false), Some(3));
         assert_eq!(named("??d Snail Shell", Some(Tab::Etc), false), Some(3), "Red is the one that fits");
+    }
+
+    fn tooltip(read: &str) -> Option<u32> {
+        name_tooltip(&catalog(), read).map(|i| i.id)
+    }
+
+    #[test]
+    fn a_tooltip_name_is_the_item_it_spells_or_is_clearly_closest_to() {
+        assert_eq!(tooltip("Eagle Crow"), Some(12));
+        assert_eq!(tooltip("Eagle cCrow"), Some(12), "a stray letter");
+        assert_eq!(tooltip("Black Split Pants (M)"), Some(15), "the size tag isn't in the data");
+        assert_eq!(tooltip("Leaf"), Some(4), "two items of one name count as one");
+        assert_eq!(tooltip("Loosecap"), None, "Brown or Black");
+        assert_eq!(tooltip("Red Snail"), None, "not a whole name");
+        assert_eq!(tooltip("Ow"), None, "too short to say");
+    }
+
+    #[test]
+    fn a_tooltip_name_with_a_number_must_be_exact() {
+        let catalog = Catalog::new(
+            Vec::new(),
+            vec![of(1, "Scroll for Gloves for ATT 60%", ItemKind::Scroll), of(2, "Scroll for Gloves for ATT 10%", ItemKind::Scroll)],
+        );
+        assert_eq!(name_tooltip(&catalog, "Scroll for Gloves for ATT 60%").map(|i| i.id), Some(1));
+        assert_eq!(name_tooltip(&catalog, "Scroll for Gloves for ATT 6O%").map(|i| i.id), None);
+        assert_eq!(name_tooltip(&catalog, "Scroll for Gloves for ATI 60%").map(|i| i.id), None);
     }
 
     #[test]
