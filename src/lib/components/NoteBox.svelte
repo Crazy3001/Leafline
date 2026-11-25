@@ -96,7 +96,7 @@
     <div class="head">
       <span class="eyebrow">{title}</span>
       {#if loaded && !editing}
-        <button class="add" onclick={edit}>
+        <button class="btn sm" onclick={edit}>
           {#if note}<PenLine size={12} /> Edit{:else}<Plus size={12} /> Add a note{/if}
         </button>
       {/if}
@@ -144,26 +144,6 @@
     align-items: center;
     justify-content: space-between;
     margin-bottom: var(--space-1);
-  }
-
-  .add {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-1);
-    padding: var(--space-0-5) var(--space-2);
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--muted);
-    font-size: var(--text-md);
-    cursor: pointer;
-  }
-
-  .add:hover,
-  .add:focus-visible {
-    background: var(--surface-2);
-    color: var(--text);
-    outline: none;
   }
 
   .text {

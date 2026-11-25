@@ -108,10 +108,10 @@
     {#if logged}
       <p class="done"><Check size={13} /> Logged from <b>{logged.monster}</b>{card ? ` on ${card.map.name}` : ""}.</p>
       <div class="row">
-        <button class="act" onclick={report} use:tip={"Copies the item's name too, to paste into MeowDB's search"}
+        <button class="btn sm" onclick={report} use:tip={"Copies the item's name too, to paste into MeowDB's search"}
           ><ExternalLink size={12} />Report on MeowDB</button
         >
-        <button class="act ghost" onclick={undo}><Undo2 size={12} />Undo</button>
+        <button class="btn sm ghost" onclick={undo}><Undo2 size={12} />Undo</button>
       </div>
       {#if copied != null}
         <p class="hint">
@@ -123,9 +123,9 @@
         <p class="lead">Which monster dropped it{card ? ` on ${card.map.name}` : ""}?</p>
         <div class="row">
           {#each monsters as mob (mob.id)}
-            <button class="mob" onclick={() => log(mob.name, mob.id)}>{mob.name}<small class="tabular">Lv {mob.level}</small></button>
+            <button class="btn sm mob" onclick={() => log(mob.name, mob.id)}>{mob.name}<small class="tabular">Lv {mob.level}</small></button>
           {/each}
-          {#if !other}<button class="mob ghost" onclick={() => (other = true)}>Another…</button>{/if}
+          {#if !other}<button class="btn sm mob ghost" onclick={() => (other = true)}>Another…</button>{/if}
         </div>
       {:else if !other}
         <p class="lead">{map ? "No monsters known for this map." : "Your map isn't read yet."}
@@ -135,7 +135,7 @@
       {#if other}
         <form class="other" onsubmit={submitOther}>
           <input bind:this={box} bind:value={typed} onkeydown={(e) => e.key === "Escape" && (other = false)} placeholder="Monster's name" aria-label="Monster that dropped it" maxlength="60" />
-          <button class="act" type="submit" disabled={!typed.trim()}>Log</button>
+          <button class="btn sm" type="submit" disabled={!typed.trim()}>Log</button>
         </form>
       {/if}
     {/if}
@@ -169,43 +169,9 @@
     gap: var(--space-1);
   }
 
-  .mob,
-  .act {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-1);
-    height: var(--control-h-sm);
-    padding: 0 var(--space-2);
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
-    background: var(--surface-2);
-    color: var(--text);
-    font-size: var(--text-md);
-    cursor: pointer;
-  }
-
   .mob small {
     color: var(--faint);
     font-size: var(--text-xs);
-  }
-
-  .mob:hover,
-  .act:hover:not(:disabled),
-  .mob:focus-visible,
-  .act:focus-visible {
-    background: var(--surface-3);
-    outline: none;
-  }
-
-  .ghost {
-    border-color: transparent;
-    background: transparent;
-    color: var(--muted);
-  }
-
-  .act:disabled {
-    opacity: 0.5;
-    cursor: default;
   }
 
   .link {

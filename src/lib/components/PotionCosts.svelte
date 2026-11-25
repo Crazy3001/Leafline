@@ -224,7 +224,7 @@
                 <option value="">Type counts</option>
                 {#each QUICK_SLOTS as label, q (q)}<option value={String(q)}>{label}</option>{/each}
               </select>
-              <button class="icon" aria-label="Remove {d.name || 'this potion'}" onclick={() => (draft = draft.filter((_, j) => j !== i))}>
+              <button class="icon-btn xs icon" aria-label="Remove {d.name || 'this potion'}" onclick={() => (draft = draft.filter((_, j) => j !== i))}>
                 <X size={12} />
               </button>
             </div>
@@ -478,24 +478,6 @@
   .edit-row .price {
     width: 70px;
     text-align: right;
-  }
-
-  .icon {
-    display: grid;
-    place-items: center;
-    width: 22px;
-    height: 22px;
-    padding: 0;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--muted);
-    cursor: pointer;
-  }
-
-  .icon:hover {
-    background: var(--hover);
-    color: var(--text);
   }
 
   .actions {

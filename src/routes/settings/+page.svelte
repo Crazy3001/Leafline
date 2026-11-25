@@ -515,7 +515,7 @@
               {/each}
             </select>
             <button
-              class="button icon-only"
+              class="btn icon-only"
               use:tip={"Look for windows again"}
               aria-label="Look for windows again"
               onclick={loadWindows}
@@ -553,7 +553,7 @@
             </span>
           </div>
           <div class="control">
-            <button class="button" onclick={toggleLive}>
+            <button class="btn" onclick={toggleLive}>
               {#if liveRunning}<Square size={13} />Stop{:else}<Play size={13} />Start{/if}
             </button>
           </div>
@@ -956,7 +956,7 @@
       {#if travel?.file}
         <details class="connections">
           <summary>
-            The connections ({travel.file.services.length}){#if travel.origin === "custom"}<span class="tag">your copy</span>{/if}
+            The connections ({travel.file.services.length}){#if travel.origin === "custom"}<span class="badge travel tag">your copy</span>{/if}
           </summary>
           <ul>
             {#each travel.file.services as service (service.name)}
@@ -998,7 +998,7 @@
             </span>
           </div>
           <div class="control">
-            <button class="button" onclick={editTravel}><FilePenLine size={13} />Edit file</button>
+            <button class="btn" onclick={editTravel}><FilePenLine size={13} />Edit file</button>
           </div>
         </div>
         {/if}
@@ -1083,9 +1083,9 @@
         </p>
       {/if}
       <div class="reset-keys">
-        <button class="button" onclick={useSuggested}>Use the suggested keys</button>
+        <button class="btn" onclick={useSuggested}>Use the suggested keys</button>
         {#if Object.values(display.hotkeys.keys).some(Boolean)}
-          <button class="button" onclick={() => setHotkeys({ keys: {} })}>Clear all</button>
+          <button class="btn" onclick={() => setHotkeys({ keys: {} })}>Clear all</button>
         {/if}
       </div>
     </section>
@@ -1101,7 +1101,7 @@
           <span class="help">Your saved sessions, as CSV for a spreadsheet.</span>
         </div>
         <div class="control exports">
-          <button class="button" onclick={() => exportCsv("sessions")}><Download size={13} />Sessions</button>
+          <button class="btn" onclick={() => exportCsv("sessions")}><Download size={13} />Sessions</button>
         </div>
       </div>
       {#if exported}<p class="note">{exported}</p>{/if}
@@ -1115,8 +1115,8 @@
           </span>
         </div>
         <div class="control exports">
-          <button class="button" onclick={saveRecords} disabled={recordsBusy}><Download size={13} />Save</button>
-          <button class="button" onclick={pickRecords} disabled={recordsBusy}><Upload size={13} />Open…</button>
+          <button class="btn" onclick={saveRecords} disabled={recordsBusy}><Download size={13} />Save</button>
+          <button class="btn" onclick={pickRecords} disabled={recordsBusy}><Upload size={13} />Open…</button>
         </div>
       </div>
       {#if pickedRecords}
@@ -1125,8 +1125,8 @@
             That file holds {describeRecords(pickedRecords)}. Use it in place of the records here? The ones here now are
             kept aside, not deleted.
           </span>
-          <button class="button" onclick={useRecords} disabled={recordsBusy}>Use these records</button>
-          <button class="button" onclick={() => (pickedRecords = null)} disabled={recordsBusy}>Cancel</button>
+          <button class="btn" onclick={useRecords} disabled={recordsBusy}>Use these records</button>
+          <button class="btn" onclick={() => (pickedRecords = null)} disabled={recordsBusy}>Cancel</button>
         </div>
       {/if}
       {#if recordsNote}<p class="note" class:warn={recordsWarn}>{recordsNote}</p>{/if}
@@ -1138,7 +1138,7 @@
           <span class="help">Your records, settings and the last 7 daily backups of your records.</span>
         </div>
         <div class="control">
-          <button class="button" onclick={() => backend.openDataFolder()}><FolderOpen size={13} />Open</button>
+          <button class="btn" onclick={() => backend.openDataFolder()}><FolderOpen size={13} />Open</button>
         </div>
       </div>
 
@@ -1151,11 +1151,11 @@
           </span>
         </div>
         <div class="control exports">
-          <button class="button" onclick={() => backend.openFramesFolder()}><FolderOpen size={13} />Open</button>
-          <button class="button" onclick={pickFramesFolder}>Change…</button>
+          <button class="btn" onclick={() => backend.openFramesFolder()}><FolderOpen size={13} />Open</button>
+          <button class="btn" onclick={pickFramesFolder}>Change…</button>
           {#if display.framesFolder}
             <button
-              class="button icon-only"
+              class="btn icon-only"
               use:tip={"Back to the local folder"}
               aria-label="Back to the local folder"
               onclick={() => changeSettings({ framesFolder: null })}><RotateCcw size={13} /></button
@@ -1184,7 +1184,7 @@
           <span class="help">A misread, a crash, or something that doesn't do what it says.</span>
         </div>
         <div class="control">
-          <button class="button" onclick={() => backend.openLink(reportUrl(version))}>
+          <button class="btn" onclick={() => backend.openLink(reportUrl(version))}>
             Open the form<ExternalLink size={11} />
           </button>
         </div>
@@ -1198,7 +1198,7 @@
           </span>
         </div>
         <div class="control">
-          <button class="button" onclick={copyReport}><ClipboardCopy size={13} />Copy</button>
+          <button class="btn" onclick={copyReport}><ClipboardCopy size={13} />Copy</button>
         </div>
       </div>
       {#if copiedReport}<p class="note">{copiedReport}</p>{/if}
@@ -1213,7 +1213,7 @@
           </span>
         </div>
         <div class="control">
-          <button class="button" onclick={() => backend.openFramesFolder()}><FolderOpen size={13} />Open</button>
+          <button class="btn" onclick={() => backend.openFramesFolder()}><FolderOpen size={13} />Open</button>
         </div>
       </div>
       {/if}
@@ -1228,7 +1228,7 @@
           </span>
         </div>
         <div class="control">
-          <button class="button" onclick={() => import("$lib/capture/program").then((p) => p.openCaptureTest())}>
+          <button class="btn" onclick={() => import("$lib/capture/program").then((p) => p.openCaptureTest())}>
             Open
           </button>
         </div>
@@ -1241,7 +1241,7 @@
           <span class="help">Something you'd like Leafline to do.</span>
         </div>
         <div class="control">
-          <button class="button" onclick={() => backend.openLink(IDEA_URL)}>Open the form<ExternalLink size={11} /></button>
+          <button class="btn" onclick={() => backend.openLink(IDEA_URL)}>Open the form<ExternalLink size={11} /></button>
         </div>
       </div>
     </section>
@@ -1258,7 +1258,7 @@
         <div class="update" role="status">
           <span>Leafline {update.latest} is out. You have {update.current}.</span>
           {#if update.installable}
-            <button class="button" onclick={installNow}><Download size={12} />Download and install</button>
+            <button class="btn" onclick={installNow}><Download size={12} />Download and install</button>
           {/if}
           <button class="link" onclick={() => backend.openLink(notes)}>Release notes<ExternalLink size={11} /></button>
           <span class="update-note">
@@ -1329,7 +1329,7 @@
         </label>
         <div class="control">
           {#if display.updateCheck}
-            <button class="button" onclick={checkNow} disabled={update.state === "checking"}>Check now</button>
+            <button class="btn" onclick={checkNow} disabled={update.state === "checking"}>Check now</button>
           {/if}
           <input
             id="update-check"
@@ -1348,7 +1348,7 @@
           <span class="help">Hotkeys, game settings that help Leafline read, how to show it, and the map data.</span>
         </div>
         <div class="control">
-          <button class="button" onclick={() => backend.showSetup()}>Run setup again</button>
+          <button class="btn" onclick={() => backend.showSetup()}>Run setup again</button>
         </div>
       </div>
       {/if}
@@ -1736,11 +1736,6 @@
 
   .tag {
     margin-left: var(--space-2);
-    padding: 1px var(--space-1-5);
-    border-radius: var(--radius-sm);
-    background: color-mix(in srgb, var(--travel) 16%, transparent);
-    color: var(--travel);
-    font-size: var(--text-xs);
   }
 
   .note.warn {
@@ -1752,11 +1747,6 @@
     to {
       transform: rotate(360deg);
     }
-  }
-
-  .button:disabled {
-    opacity: 0.6;
-    cursor: default;
   }
 
   .sr-only {
@@ -1777,27 +1767,6 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--space-2);
-  }
-
-  .button {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-1-5);
-    padding: var(--space-1) var(--space-3);
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--text);
-    cursor: pointer;
-  }
-
-  .button:hover {
-    border-color: var(--accent);
-  }
-
-  .button:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 1px;
   }
 
   .preview {

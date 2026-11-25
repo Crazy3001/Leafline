@@ -61,7 +61,7 @@
             <span class="star"><Star size={11} /></span>
             <Pic kind="item" id={item.id} size={18} />
             <Ref kind="item" id={item.id} name={item.name} icon={false} />
-            <button class="remove" use:tip={"Stop tracking"} aria-label="Stop tracking {item.name}" onclick={() => untrack(item.id)}
+            <button class="icon-btn xs remove" use:tip={"Stop tracking"} aria-label="Stop tracking {item.name}" onclick={() => untrack(item.id)}
               ><X size={11} /></button
             >
           </div>
@@ -108,25 +108,6 @@
   .star {
     display: inline-grid;
     color: var(--mesos);
-  }
-
-  .remove {
-    display: inline-grid;
-    place-items: center;
-    width: 20px;
-    height: 20px;
-    padding: 0;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--faint);
-    cursor: pointer;
-  }
-
-  .remove:hover,
-  .remove:focus-visible {
-    background: var(--hover);
-    color: var(--text);
   }
 
   .note {

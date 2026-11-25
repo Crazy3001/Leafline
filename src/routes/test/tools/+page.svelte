@@ -87,8 +87,8 @@
       browser does to it. The check here reads it with the program's own capture first, which should be exact.
     </p>
     <div class="controls">
-      <button class="button primary" onclick={() => run((p) => p.openPattern())}>Show the pattern</button>
-      <button class="button" onclick={checkPattern} disabled={checking}>
+      <button class="btn primary" onclick={() => run((p) => p.openPattern())}>Show the pattern</button>
+      <button class="btn" onclick={checkPattern} disabled={checking}>
         {checking ? "Checking…" : "Check it with the program's capture"}
       </button>
     </div>
@@ -102,18 +102,18 @@
       page, into a folder you pick. Pick a folder outside OneDrive: these are pictures of your game.
     </p>
     <div class="controls">
-      <button class="button" onclick={pick}>{folder ? "Change folder…" : "Pick a folder…"}</button>
+      <button class="btn" onclick={pick}>{folder ? "Change folder…" : "Pick a folder…"}</button>
       <select bind:value={perSecond} disabled={recorder?.recording}>
         <option value={1}>1 a second</option>
         <option value={2}>2 a second</option>
         <option value={4}>4 a second (Pickup Log)</option>
       </select>
       {#if recorder?.recording}
-        <button class="button" onclick={() => record(false)}>Stop saving</button>
+        <button class="btn" onclick={() => record(false)}>Stop saving</button>
       {:else}
-        <button class="button primary" onclick={() => record(true)} disabled={!folder}>Start saving</button>
+        <button class="btn primary" onclick={() => record(true)} disabled={!folder}>Start saving</button>
       {/if}
-      <button class="button" onclick={compare} disabled={!folder || !!comparing || recorder?.recording}>
+      <button class="btn" onclick={compare} disabled={!folder || !!comparing || recorder?.recording}>
         {comparing ? "Comparing…" : "Compare the frames"}
       </button>
     </div>
