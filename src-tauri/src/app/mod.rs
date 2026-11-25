@@ -259,6 +259,7 @@ pub fn run() {
             generated::questlog::quest_log,
             generated::questlog::forget_quest_log,
             generated::questlog::quest_region_totals,
+            generated::questlog::whole_quest_log,
             generated::mapdata::quest_sheet,
             mapdata::show_quest,
             generated::mapdata::search_monsters,

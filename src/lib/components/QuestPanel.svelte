@@ -16,6 +16,7 @@
   import FollowedQuests from "./quest/FollowedQuests.svelte";
   import LoggedQuests from "./quest/LoggedQuests.svelte";
   import QuestLogCard from "./quest/QuestLogCard.svelte";
+  import WholeLogCard from "./quest/WholeLogCard.svelte";
   import QuestMark from "./quest/QuestMark.svelte";
   import { backend } from "$lib/api";
   import { formatCompact } from "$lib/format";
@@ -299,6 +300,7 @@
   {#if ready && showing === "now"}<FollowedQuests tracked={quest} {map} {session} plain={pinned} />{/if}
   {#if ready && showing === "now"}<LoggedQuests tracked={quest} {map} {session} plain={pinned} />{/if}
   {#if !pinned && (showing === "log" || !ready)}<QuestLogCard />{/if}
+  {#if ready && !pinned && showing === "log"}<WholeLogCard {level} helper={(quest?.quests ?? []).map((q) => q.title)} />{/if}
   {#if showing === "take" && (level == null || !toTake.length)}
     <p class="empty">
       {level == null ? "Leafline needs to read your level from the HUD to say which quests you can take." : `Nothing new to take at Lv ${level}.`}

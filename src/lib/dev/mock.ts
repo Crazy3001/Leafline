@@ -3,6 +3,7 @@
 
 import type { Backend } from "../api";
 import type {
+  WholeQuest,
   Analysis,
   BagCheck,
   BaseStats,
@@ -1142,6 +1143,37 @@ export const mockBackend: Backend = {
     { region: "Fern Isle", quests: 1 },
     { region: "Mossbank", quests: 3 },
   ],
+  async wholeQuestLog(_name, level) {
+    const row = (q: (typeof mockQuests)[number], stand: WholeQuest["stand"], extra: Partial<WholeQuest> = {}): WholeQuest => ({
+      questId: q.id,
+      title: q.name,
+      stand,
+      inferred: false,
+      series: null,
+      notYet: null,
+      levelMin: q.levelMin,
+      giver: q.giver,
+      repeat: q.repeat,
+      seenAt: Date.now() / 1000 - 600,
+      ...extra,
+    });
+    const [first, ...rest] = mockQuests;
+    const quests = rest.map((q, i) =>
+      i === 0
+        ? row(q, "inProgress", { series: "Moss Errands" })
+        : i === 1
+          ? row(q, "notYet", { notYet: { level: (level ?? 1) + 5, after: [{ id: first.id, name: first.name, levelMin: first.levelMin }], notOfferedAt: null } })
+          : row(q, "canTake", { seenAt: null }),
+    );
+    return {
+      seen: true,
+      level,
+      regions: [
+        { region: "Fern Isle", done: 1, total: 1, quests: [row(first, "done", { inferred: true })] },
+        { region: "Mossbank", done: 0, total: quests.length, quests },
+      ],
+    };
+  },
   onQuestLog: async () => () => {},
   async questSheet(id) {
     const row = mockQuests.find((q) => q.id === id);

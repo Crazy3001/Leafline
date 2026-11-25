@@ -3,6 +3,18 @@
 What changed in each release of Leafline. Leafline is a work in progress: if something reads
 wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?template=bug_report.yml).
 
+## Unreleased
+
+- **Every quest in one list.** Quests → Quest log now lists every quest by region, marked done,
+  in progress, ready to hand in, can take, or not yet with why (the level it needs, or the quest
+  to finish first). Quests before one you're on or have done count as done, and a quest the game
+  lists under its series' name shows as the step you're on. "Can take" comes from the quest data,
+  which doesn't know every condition; looking through your Available tab corrects it.
+- Quest window rows the game lists under a series' name, such as Collecting For Maya, are kept.
+- The Quest window is read even when the picture wobbles a little, as a shared window's does.
+- The website says why the game isn't being read: Firefox sharing a still picture of the game's
+  window (share the screen instead), a black picture, or Windows HDR.
+
 ## 0.5.0 (2026-11-24)
 
 ### The website
