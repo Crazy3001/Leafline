@@ -7,7 +7,7 @@
 
   import { backend } from "$lib/api";
   import Ref from "$lib/components/Ref.svelte";
-  import { formatCompact, formatNumber, groundDistance, mapLabel, monsterLabel, objectiveProgress, partyLabel } from "$lib/format";
+  import { formatCompact, formatNumber, groundDistance, mapLabel, monsterLabel, objectiveProgress, partyLabel, questTitle } from "$lib/format";
   import { mapData, watchMapData } from "$lib/mapdata.svelte";
   import { huntOrder, orderGrounds } from "$lib/quests.svelte";
   import { mesosCoverage } from "$lib/training";
@@ -63,6 +63,8 @@
 
   const quests = $derived((analysis?.quest?.quests ?? []).filter((q) => q.objectives.length));
   const quest = $derived(quests[0] ?? null);
+  /** Its name, with any bracketed series in front shown as a tag. */
+  const questName = $derived(quest ? questTitle(quest.title) : null);
   const map = $derived(analysis?.map ?? null);
 
   // With map data, each objective of the quest shown gets its best place, and the map you're in
@@ -182,7 +184,7 @@
     {#if quest}
       <section class="card quest" aria-label="Tracked quest">
         <button class="quest-head" onclick={() => ongo("quests")}>
-          <span class="quest-title">{quest.title}</span>
+          <span class="quest-title">{questName?.name}{#if questName?.tag}<span class="badge qtag">{questName.tag}</span>{/if}</span>
           <span class="label">{quests.length > 1 ? `1 of ${quests.length} tracked` : "Tracked"}<ChevronRight size={13} /></span>
         </button>
         {#each quest.objectives as o (o.target)}
@@ -387,6 +389,12 @@
     font-weight: var(--weight-strong);
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .qtag {
+    margin-left: var(--space-1-5);
+    font-family: var(--font-sans);
+    vertical-align: 2px;
   }
 
   .quest-head .label {

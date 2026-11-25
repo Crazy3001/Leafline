@@ -284,6 +284,8 @@
   {#if ready && !pinned}
     <div class="views"><Segmented label="Which quests" options={VIEWS} value={view} onchange={setView} /></div>
   {/if}
+  <!-- What can be handed in now comes first. -->
+  {#if ready && showing === "now"}<LoggedQuests handIn tracked={quest} {map} {session} plain={pinned} />{/if}
   {#if showing !== "now"}
     <!-- The log or the list to take, below. -->
   {:else if quest}
@@ -298,7 +300,7 @@
     </p>
   {/if}
   {#if ready && showing === "now"}<FollowedQuests tracked={quest} {map} {session} plain={pinned} />{/if}
-  {#if ready && showing === "now"}<LoggedQuests tracked={quest} {map} {session} plain={pinned} />{/if}
+  {#if ready && showing === "now"}<LoggedQuests handIn={false} tracked={quest} {map} {session} plain={pinned} />{/if}
   {#if !pinned && (showing === "log" || !ready)}<QuestLogCard />{/if}
   {#if ready && !pinned && showing === "log"}<WholeLogCard {level} helper={(quest?.quests ?? []).map((q) => q.title)} />{/if}
   {#if showing === "take" && (level == null || !toTake.length)}
