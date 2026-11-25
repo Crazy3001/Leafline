@@ -174,8 +174,10 @@ const send = (message: ToLive, transfer: Transferable[] = []) => worker?.postMes
  * then what to check, most likely first. The website can't ask Windows whether HDR is on for the
  * game's display, as the program does; the browser only knows about its own display.
  */
-function notFound(width: number, height: number): string {
+function notFound(width: number, height: number, dark: boolean): string {
   const size = width && height ? ` (${width}×${height})` : "";
+  if (dark)
+    return `The shared window${size} is coming through black. Some browsers can't capture the game in Full Screen: try Windowed in the game's Graphics options, then share it again.`;
   if (shared?.surface === "monitor")
     return `You shared a whole screen${size}. Stop reading, then share the MapleStory window itself.`;
   if (shared?.surface === "browser")
@@ -218,7 +220,7 @@ function onWorker({ data }: MessageEvent<FromLive>) {
               hdr: false,
               held,
             }
-          : { state: "waiting", reason: notFound(data.width, data.height) },
+          : { state: "waiting", reason: notFound(data.width, data.height, data.dark) },
       );
       break;
     }

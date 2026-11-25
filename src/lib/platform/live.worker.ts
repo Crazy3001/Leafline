@@ -69,7 +69,7 @@ export interface LiveRead {
 }
 
 export type FromLive =
-  | { type: "read"; read: LiveRead; width: number; height: number; frames: number; other: boolean }
+  | { type: "read"; read: LiveRead; width: number; height: number; frames: number; other: boolean; dark: boolean }
   /** The session as it was before another character's frames started a new one. */
   | { type: "other"; before: SessionSummary }
   | { type: "summary"; session: SessionSummary }
@@ -97,6 +97,21 @@ let reading: ReturnType<typeof followTrack> | null = null;
 
 /** Milliseconds since 1970, by this PC's clock. */
 const now = () => performance.timeOrigin + performance.now();
+
+/**
+ * Whether a picture is (nearly) all black: what some browsers send for a game in Full Screen.
+ * Looks at about 4,000 pixels spread over the frame.
+ */
+function isDark(rgba: Uint8Array): boolean {
+  const step = Math.max(4, Math.floor(rgba.length / 4 / 4000) * 4);
+  let sum = 0;
+  let n = 0;
+  for (let i = 0; i + 2 < rgba.length; i += step) {
+    sum += Math.max(rgba[i], rgba[i + 1], rgba[i + 2]);
+    n++;
+  }
+  return n > 0 && sum / n < 8;
+}
 
 async function handle(frame: VideoFrame) {
   try {
@@ -130,7 +145,7 @@ async function handle(frame: VideoFrame) {
     const { read, other } = JSON.parse(text) as { read: LiveRead; other: boolean };
     reads++;
     if (other) post({ type: "other", before: JSON.parse(before) as SessionSummary });
-    post({ type: "read", read, width, height, frames: reads, other });
+    post({ type: "read", read, width, height, frames: reads, other, dark: !read.hud && isDark(data) });
   } catch (err) {
     busy = false;
     post({ type: "error", message: err instanceof Error ? err.message : String(err) });
