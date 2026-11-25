@@ -1,6 +1,6 @@
 <script lang="ts">
-  // The desk view's sidebar: who you are and how the session goes, then every view and tool in
-  // one place. It folds to icons in a narrow window.
+  // The desk view's sidebar: every view and tool in one place. Who you are and how the session
+  // goes are in the player bar over the views. It folds to icons in a narrow window.
   import { tip } from "$lib/tip.svelte";
   import {
     ChartLine,
@@ -29,9 +29,7 @@
   import { backend } from "$lib/api";
   import Logo from "$lib/components/Logo.svelte";
   import { ZOOMS, type DeskView } from "$lib/desk";
-  import { formatCompact } from "$lib/format";
   import { live } from "$lib/readings.svelte";
-  import LevelRing from "$lib/ui/LevelRing.svelte";
   import Segmented from "$lib/ui/Segmented.svelte";
 
   let {
@@ -76,37 +74,6 @@
   let more = $state(false);
   const moreOpen = $derived(more || MORE.some((t) => t.id === view));
 
-  const hud = $derived(live.analysis?.hud ?? null);
-  const session = $derived(live.session);
-  const level = $derived(hud?.level ?? session?.level ?? null);
-  const percent = $derived(hud?.exp?.percent ?? hud?.expPercent ?? session?.percent ?? null);
-  const name = $derived(hud?.name ?? session?.name ?? null);
-  const job = $derived(hud?.job ?? session?.job ?? null);
-  const reading = $derived(live.liveStatus.state === "reading");
-  const status = $derived.by(() => {
-    const s = live.liveStatus;
-    if (s.state === "reading") return { tone: "good", text: "Reading" };
-    if (s.state === "waiting") return { tone: "warn", text: "Waiting" };
-    if (s.state === "failed") return { tone: "bad", text: "Stopped" };
-    return { tone: "quiet", text: "Not reading" };
-  });
-  const statusTip = $derived.by(() => {
-    const s = live.liveStatus;
-    if (s.state === "reading") return `Reading ${s.window}`;
-    if (s.state === "waiting") return s.reason;
-    if (s.state === "failed") return `Live reading stopped: ${s.message}`;
-    return "Not reading the game";
-  });
-  const expRate = $derived(
-    session?.percentOnly
-      ? session.percentPerHour != null
-        ? `${session.percentPerHour.toFixed(1)}% / hr`
-        : null
-      : session?.expPerHour != null
-        ? `${formatCompact(session.expPerHour)} EXP / hr`
-        : null,
-  );
-  const mesos = $derived(live.analysis?.mesos?.mesos ?? session?.mesos ?? null);
   const zoomOptions = ZOOMS.map((z) => ({ id: z, label: `${Math.round(z * 100)}%` }));
 </script>
 
@@ -132,31 +99,6 @@
       {#if folded}<PanelLeftOpen size={16} />{:else}<PanelLeftClose size={16} />{/if}
     </button>
   </div>
-
-  {#if folded}
-    <div class="ring" use:tip={`${name ?? "Your character"}${level != null ? `, Lv ${level}` : ""} · ${statusTip}`}>
-      <LevelRing {level} {percent} size={40}><span class="num small-lv">{level ?? "?"}</span></LevelRing>
-      <span class="dot {status.tone}" aria-hidden="true"></span>
-    </div>
-  {:else}
-    <div class="who">
-      <div class="who-top">
-        <b class="name">{name ?? "Your character"}</b>
-        <span class="status {status.tone}" use:tip={statusTip}><span class="dot" aria-hidden="true"></span>{status.text}</span>
-      </div>
-      <div class="sub">
-        {#if level != null}Lv {level}{job ? ` ${job}` : ""}{:else}Level not read yet{/if}
-        {#if percent != null}<span class="num exp" class:dim={!reading}> · {percent.toFixed(1)}%</span>{/if}
-      </div>
-      <div class="track" aria-hidden="true"><span class:dim={!reading} style:width="{Math.max(0, Math.min(100, percent ?? 0))}%"></span></div>
-      {#if expRate || mesos != null}
-        <div class="line">
-          <span>{expRate ?? ""}</span>
-          {#if mesos != null}<span class="num mesos">{mesos.toLocaleString()}</span>{/if}
-        </div>
-      {/if}
-    </div>
-  {/if}
 
   <nav aria-label="Views">
     {#if !folded}<p class="group">Views</p>{/if}
@@ -260,142 +202,9 @@
     color: var(--text);
   }
 
-  .who {
-    display: grid;
-    gap: var(--space-0-5);
-    margin-bottom: var(--space-2);
-    padding: var(--space-3) var(--space-3);
-    border: var(--line-w) solid var(--line);
-    border-radius: var(--radius);
-    background: var(--surface);
-    box-shadow: var(--card-shadow);
-  }
-
-  .who-top,
-  .line {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--space-2);
-  }
-
-  .name {
-    min-width: 0;
-    overflow: hidden;
-    font-weight: var(--weight-strong);
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .sub,
-  .line {
-    color: var(--muted);
-    font-size: var(--text-md);
-  }
-
-  .line {
-    margin-top: var(--space-1);
-    font-size: var(--text-xs);
-  }
-
   .num {
     font-family: var(--font-display);
     font-variant-numeric: tabular-nums;
-  }
-
-  .exp {
-    color: var(--exp-text);
-    font-weight: var(--weight-strong);
-  }
-
-  .exp.dim {
-    color: var(--muted);
-  }
-
-  .mesos {
-    color: var(--mesos);
-  }
-
-  .track {
-    height: 5px;
-    margin-top: var(--space-1);
-    border-radius: var(--radius-pill);
-    background: var(--track);
-    overflow: hidden;
-  }
-
-  .track span {
-    display: block;
-    height: 100%;
-    border-radius: var(--radius-pill);
-    background: var(--exp);
-  }
-
-  .track span.dim {
-    background: var(--faint);
-  }
-
-  .status {
-    display: inline-flex;
-    flex: none;
-    align-items: center;
-    gap: var(--space-1);
-    color: var(--faint);
-    font-size: var(--text-xs);
-    --dot: var(--faint);
-  }
-
-  .status.good {
-    color: var(--good);
-    --dot: var(--good);
-  }
-
-  .status.warn {
-    color: var(--warn);
-    --dot: var(--warn);
-  }
-
-  .status.bad {
-    color: var(--bad);
-    --dot: var(--bad);
-  }
-
-  .dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--dot, var(--faint));
-  }
-
-  .ring {
-    position: relative;
-    margin-bottom: var(--space-2);
-  }
-
-  .ring .dot {
-    position: absolute;
-    right: 0;
-    bottom: 2px;
-    width: 9px;
-    height: 9px;
-    border: 2px solid var(--bg);
-  }
-
-  .ring .dot.good {
-    --dot: var(--good);
-  }
-
-  .ring .dot.warn {
-    --dot: var(--warn);
-  }
-
-  .ring .dot.bad {
-    --dot: var(--bad);
-  }
-
-  .small-lv {
-    font-size: var(--text-md);
-    font-weight: var(--weight-strong);
   }
 
   nav {

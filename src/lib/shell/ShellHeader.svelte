@@ -1,12 +1,13 @@
 <script lang="ts">
   // The window's header: who you are and how far through the level, with four actions. The level
   // sits in a ring that fills with EXP; under it one quiet line gives the exact numbers and when
-  // the level comes. The whole header drags the window.
+  // the level comes. On tabs that don't show the session, that line gives the two rates in place
+  // of the exact EXP, so they're always in view. The whole header drags the window.
   import { can } from "$lib/platform";
   import { LayoutGrid, Lock, LockOpen, Pin, PinOff, Search } from "@lucide/svelte";
 
   import Logo from "$lib/components/Logo.svelte";
-  import { formatClockIn, formatDuration, formatNumber } from "$lib/format";
+  import { formatClockIn, formatCompact, formatDuration, formatNumber } from "$lib/format";
   import { live } from "$lib/readings.svelte";
   import { hotkey, keyHint } from "$lib/settings.svelte";
   import { tip } from "$lib/tip.svelte";
@@ -19,6 +20,7 @@
     pinTitle,
     searching,
     tooling,
+    rates = false,
     onlive,
     onsearch,
     onpin,
@@ -33,6 +35,8 @@
     searching: boolean;
     /** The Tools list is open. */
     tooling: boolean;
+    /** Show the session's two rates, for a tab that doesn't show them itself. */
+    rates?: boolean;
     onlive: () => void;
     onsearch: () => void;
     onpin: () => void;
@@ -53,6 +57,19 @@
 
   /** When the level comes at this pace; nothing while paused or before a pace is known. */
   const toLevel = $derived(session && !session.paused && session.secondsToLevel != null ? session.secondsToLevel : null);
+  /** The session's EXP and mesos an hour, short, once a session is under way. */
+  const rateLine = $derived.by(() => {
+    if (!rates || !session || session.activeSeconds <= 0) return null;
+    const exp = session.percentOnly
+      ? session.percentPerHour != null
+        ? `${session.percentPerHour.toFixed(1)}%`
+        : null
+      : session.expPerHour != null
+        ? formatCompact(session.expPerHour)
+        : null;
+    const mesos = session.mesosPerHour != null ? formatCompact(session.mesosPerHour) : null;
+    return exp || mesos ? { exp, mesos, levelRate: session.percentOnly } : null;
+  });
   const lockTitle = $derived(
     locked
       ? hotkey("ToggleClickThrough")
@@ -92,7 +109,12 @@
     <div class="exp" data-tauri-drag-region>
       <span class="amount" data-tauri-drag-region>
         <span class="pct">{percent.toFixed(percent >= 100 ? 0 : 1)}%</span>
-        {#if exp}
+        {#if rateLine}
+          <span class="points rates">
+            {#if rateLine.exp}<span><b>{rateLine.exp}</b> {rateLine.levelRate ? "a level" : "EXP"}/hr</span>{/if}
+            {#if rateLine.mesos}<span><b class="mesos">{rateLine.mesos}</b> mesos/hr</span>{/if}
+          </span>
+        {:else if exp}
           <span class="points">
             {formatNumber(exp.points)}{#if session?.expNeeded}{" "}/ {formatNumber(session.expNeeded)}{/if} EXP
           </span>
@@ -235,6 +257,23 @@
     color: var(--header-faint);
     font-variant-numeric: tabular-nums;
     text-overflow: ellipsis;
+  }
+
+  .rates {
+    display: flex;
+    gap: var(--space-3);
+    color: var(--header-muted);
+  }
+
+  .rates b {
+    color: var(--header-text);
+    font-family: var(--font-display);
+    font-weight: var(--weight-strong);
+  }
+
+  /* The header stays dark in the light looks, so the mesos take the header's own amber. */
+  .rates b.mesos {
+    color: var(--header-accent);
   }
 
   .when {

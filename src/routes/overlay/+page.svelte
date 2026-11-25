@@ -289,6 +289,7 @@
       {pinTitle}
       searching={over?.kind === "search"}
       tooling={over?.kind === "tools" || over?.kind === "tool"}
+      rates={tab !== "now" && tab !== "train"}
       onlive={toggleLive}
       onsearch={() => toggleOver("search")}
       onpin={togglePin}

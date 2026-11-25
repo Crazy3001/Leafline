@@ -10,7 +10,7 @@
 
   import { backend } from "$lib/api";
   import DeskColumns from "$lib/components/desk/DeskColumns.svelte";
-  import DeskGlance from "$lib/components/desk/DeskGlance.svelte";
+  import DeskBar from "$lib/components/desk/DeskBar.svelte";
   import DeskSidebar from "$lib/components/desk/DeskSidebar.svelte";
   import CharacterPicker from "$lib/components/CharacterPicker.svelte";
   import DropLogView from "$lib/components/DropLogView.svelte";
@@ -249,6 +249,7 @@
   />
 
   <div class="main">
+    <DeskBar />
     <div class="top">
       {#if from}
         <button class="pill" onclick={back}><ArrowLeft size={14} />Back to {viewName(from)}</button>
@@ -277,7 +278,6 @@
     <div class="view" class:narrow={narrowViews.includes(view)} class:full={view === "planner" || view === "layout"} aria-label={viewName(view)}>
       {#key view}
         {#if view === "now"}
-          <DeskGlance />
           <CharacterPicker />
           <div class="flow">
             {#if isWeb}<div class="block"><ReadWindowCard /></div>{/if}
