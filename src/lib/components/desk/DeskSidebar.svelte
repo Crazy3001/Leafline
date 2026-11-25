@@ -1,36 +1,27 @@
 <script lang="ts">
-  // The desk view's sidebar: every view and tool in one place. Who you are and how the session
-  // goes are in the player bar over the views. It folds to icons in a narrow window.
+  // The desk view's sidebar: the five tabs, then Look up, Tools (one page of every tool) and the
+  // player's own layout. Who you are and how the session goes are in the player bar over the
+  // views; the data's credits are in Settings. It folds to icons in a narrow window.
   import { tip } from "$lib/tip.svelte";
   import {
     ChartLine,
-    ChevronDown,
-    ChevronRight,
-    FlaskConical,
-    Gem,
-    Hammer,
     House,
     LayoutGrid,
     ListChecks,
-    ListTree,
     Map as MapIcon,
-    PackageSearch,
     PanelLeftClose,
     PanelLeftOpen,
-    Route,
-    Scale,
     Search,
     Settings,
-    Share2,
-    Timer,
+    Shapes,
+    Type,
     UserRound,
   } from "@lucide/svelte";
 
   import { backend } from "$lib/api";
   import Logo from "$lib/components/Logo.svelte";
-  import { ZOOMS, type DeskView } from "$lib/desk";
+  import { DESK_TOOL_PAGES, ZOOMS, type DeskView } from "$lib/desk";
   import { live } from "$lib/readings.svelte";
-  import Segmented from "$lib/ui/Segmented.svelte";
 
   let {
     view,
@@ -50,39 +41,31 @@
 
   const VIEWS: { id: DeskView; title: string; icon: typeof House }[] = [
     { id: "now", title: "Now", icon: House },
+    { id: "train", title: "Train", icon: ChartLine },
     { id: "quests", title: "Quests", icon: ListChecks },
     { id: "map", title: "Map", icon: MapIcon },
-    { id: "train", title: "Train", icon: ChartLine },
     { id: "me", title: "Me", icon: UserRound },
-    { id: "lookup", title: "Look up", icon: Search },
-  ];
-  const TOOLS: { id: DeskView; title: string; icon: typeof House }[] = [
-    { id: "planner", title: "Build planner", icon: ListTree },
-    { id: "crafting", title: "Crafting", icon: Hammer },
-    { id: "drops", title: "Drop log", icon: Gem },
-    { id: "timers", title: "Timers", icon: Timer },
   ];
   const MORE: { id: DeskView; title: string; icon: typeof House }[] = [
-    { id: "sell", title: "Sell or keep", icon: Scale },
-    { id: "tracked", title: "Tracked items", icon: PackageSearch },
-    { id: "potions", title: "Potion costs", icon: FlaskConical },
-    { id: "route", title: "Route planner", icon: Route },
-    { id: "share", title: "Share card", icon: Share2 },
+    { id: "lookup", title: "Look up", icon: Search },
+    { id: "tools", title: "Tools", icon: Shapes },
+    { id: "layout", title: "My layout", icon: LayoutGrid },
   ];
 
-  /** The less-used tools open under "More tools"; the one shown keeps them open. */
-  let more = $state(false);
-  const moreOpen = $derived(more || MORE.some((t) => t.id === view));
+  /** A tool's page or the build planner is under Tools. */
+  const current = $derived<DeskView>(view === "planner" || (DESK_TOOL_PAGES as string[]).includes(view) ? "tools" : view);
 
-  const zoomOptions = ZOOMS.map((z) => ({ id: z, label: `${Math.round(z * 100)}%` }));
+  /** The next text size, round and round. */
+  const nextZoom = $derived(ZOOMS[(ZOOMS.indexOf(zoom) + 1) % ZOOMS.length]);
+
 </script>
 
 {#snippet item(entry: { id: DeskView; title: string; icon: typeof House }, count?: string | null)}
   {@const Icon = entry.icon}
   <button
     class="nav"
-    class:on={view === entry.id}
-    aria-current={view === entry.id ? "page" : undefined}
+    class:on={current === entry.id}
+    aria-current={current === entry.id ? "page" : undefined}
     aria-label={folded ? entry.title : undefined}
     use:tip={folded ? entry.title : undefined}
     onclick={() => onview(entry.id)}
@@ -101,44 +84,27 @@
   </div>
 
   <nav aria-label="Views">
-    {#if !folded}<p class="group">Views</p>{/if}
     {#each VIEWS as v (v.id)}
       {@render item(v, v.id === "quests" ? String((live.analysis?.quest?.quests ?? []).length || "") || null : null)}
     {/each}
-
-    {#if !folded}<p class="group">Tools</p>{:else}<span class="rule"></span>{/if}
-    {#each TOOLS as t (t.id)}
-      {@render item(t)}
+    <span class="rule"></span>
+    {#each MORE as v (v.id)}
+      {@render item(v)}
     {/each}
-    {#if folded || moreOpen}
-      {#each MORE as t (t.id)}
-        {@render item(t)}
-      {/each}
-    {/if}
-    {#if !folded}
-      <button class="nav more" aria-expanded={moreOpen} onclick={() => (more = !moreOpen)}>
-        {#if moreOpen}<ChevronDown size={14} />{:else}<ChevronRight size={14} />{/if}<span class="label">{moreOpen ? "Fewer tools" : "More tools"}</span>
-      </button>
-    {/if}
-    {@render item({ id: "layout", title: "My layout", icon: LayoutGrid })}
   </nav>
 
   <div class="foot">
-    {#if !folded}
-      <div class="text-size">
-        <span class="faint">Text</span>
-        <Segmented label="Text size" size="sm" options={zoomOptions} value={zoom} onchange={onzoom} />
-      </div>
-    {/if}
-    <button class="nav" aria-label={folded ? "Settings" : undefined} use:tip={folded ? "Settings" : undefined} onclick={() => backend.showSettings()}>
-      <Settings size={16} />{#if !folded}<span class="label">Settings</span>{/if}
-    </button>
-    {#if !folded}
-      <p class="credits">
-        Unofficial: not made or approved by Nexon.<br />
-        Data: OSMS (CC BY 4.0), mapleclassic.wiki (CC BY-NC-SA 4.0).
-      </p>
-    {/if}
+    <div class="foot-row">
+      <button class="nav" aria-label={folded ? "Settings" : undefined} use:tip={folded ? "Settings" : undefined} onclick={() => backend.showSettings()}>
+        <Settings size={16} />{#if !folded}<span class="label">Settings</span>{/if}
+      </button>
+      {#if !folded}
+        <button class="icon-btn sm size" use:tip={`Text size ${Math.round(zoom * 100)}%. Click for ${Math.round(nextZoom * 100)}%`} aria-label="Text size {Math.round(zoom * 100)}%" onclick={() => onzoom(nextZoom)}>
+          <Type size={14} /><span class="num">{Math.round(zoom * 100)}</span>
+        </button>
+      {/if}
+    </div>
+    {#if !folded}<p class="credits">Unofficial, not approved by Nexon.</p>{/if}
   </div>
 </aside>
 
@@ -199,13 +165,6 @@
     width: 100%;
   }
 
-  .group {
-    margin: var(--space-2) 0 var(--space-0-5);
-    padding: 0 var(--space-3);
-    color: var(--faint);
-    font-size: var(--text-xs);
-    font-weight: var(--weight-body);
-  }
 
   .rule {
     display: block;
@@ -270,11 +229,6 @@
     color: inherit;
   }
 
-  .nav.more {
-    height: 28px;
-    color: var(--faint);
-    font-size: var(--text-md);
-  }
 
   .foot {
     display: grid;
@@ -284,19 +238,24 @@
     padding-top: var(--space-2);
   }
 
-  .text-size {
+  .foot-row {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    justify-content: space-between;
-    gap: var(--space-1) var(--space-1-5);
-    padding: 0 0 0 var(--space-3);
+    gap: var(--space-1);
   }
 
-  .faint {
-    color: var(--faint);
-    font-size: var(--text-xs);
+  .foot-row .nav {
+    flex: 1;
   }
+
+  .size {
+    width: auto;
+    gap: var(--space-1);
+    padding: 0 var(--space-1-5);
+    color: var(--faint);
+    font-size: var(--text-2xs);
+  }
+
 
   .credits {
     margin: var(--space-1-5) 0 0;

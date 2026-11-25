@@ -12,9 +12,30 @@ import type { Panel } from "./types";
  * (laid out for a wide window), Look up, the build planner, a tool's page, or the player's own
  * columns of panels ("layout", the desk view as it was before views).
  */
-export type DeskView = "now" | "quests" | "map" | "train" | "me" | "lookup" | "planner" | "layout" | ToolPage;
+export type DeskView = "now" | "quests" | "map" | "train" | "me" | "lookup" | "tools" | "planner" | "layout" | ToolPage;
 
 const VIEW_KEY = "leafline.desk.view";
+const TRAIN_KEY = "leafline.desk.train";
+
+/** The desk view's Train page: the session's details, where to train, or the training log. */
+export type DeskTrain = "session" | "where" | "log";
+
+export function loadTrain(): DeskTrain {
+  try {
+    const saved = localStorage.getItem(TRAIN_KEY);
+    return saved === "where" || saved === "log" ? saved : "session";
+  } catch {
+    return "session";
+  }
+}
+
+export function saveTrain(page: DeskTrain) {
+  try {
+    localStorage.setItem(TRAIN_KEY, page);
+  } catch {
+    // A convenience only.
+  }
+}
 const FOLD_KEY = "leafline.desk.folded";
 
 /** Tool pages the desk view shows as views of their own. */
@@ -23,7 +44,7 @@ export const DESK_TOOL_PAGES: ToolPage[] = ["crafting", "drops", "timers", "sell
 export function loadView(): DeskView {
   try {
     const saved = localStorage.getItem(VIEW_KEY);
-    const views: string[] = ["now", "quests", "map", "train", "me", "lookup", "planner", "layout", ...DESK_TOOL_PAGES];
+    const views: string[] = ["now", "quests", "map", "train", "me", "lookup", "tools", "planner", "layout", ...DESK_TOOL_PAGES];
     return saved && views.includes(saved) ? (saved as DeskView) : "now";
   } catch {
     return "now";

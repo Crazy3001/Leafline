@@ -26,7 +26,14 @@
     analysis,
     session,
     ongo,
-  }: { analysis: Analysis | null; session: SessionSummary | null; ongo: (tab: Tab) => void } = $props();
+    desk = false,
+  }: {
+    analysis: Analysis | null;
+    session: SessionSummary | null;
+    ongo: (tab: Tab) => void;
+    /** The desk view's form: the quest and this map, since its player bar and Train hold the rest. */
+    desk?: boolean;
+  } = $props();
 
   const percentOnly = $derived(session?.percentOnly ?? false);
   const tracking = $derived(session != null && session.frames > 0);
@@ -128,10 +135,12 @@
   }
 </script>
 
-<div class="now">
+<div class="now" class:desk>
   <!-- The website reads the game only from a window the player shares with it. -->
-  {#if can.readWindow}<ReadWindowCard compact />{/if}
-  {#if !analysis && !session}
+  {#if can.readWindow && !desk}<ReadWindowCard compact />{/if}
+  {#if desk}
+    <!-- The desk view: the quest and this map. Its page shows how to start a session. -->
+  {:else if !analysis && !session}
     <!-- Without reading, you type the session in. So can the program, with live reading off. -->
     {#if can.liveReading}<Welcome />{/if}
     {#if can.liveReading ? live.liveStatus.state === "off" : live.liveStatus.state !== "reading" && live.liveStatus.state !== "waiting"}<TypedSessionCard />{/if}
@@ -181,6 +190,8 @@
       <button class="more" onclick={() => ongo("train")}>Maps, goals, potions and loot<ChevronRight size={14} /></button>
     </section>
 
+  {/if}
+  {#if analysis || session}
     {#if quest}
       <section class="card quest" aria-label="Tracked quest">
         <button class="quest-head" onclick={() => ongo("quests")}>
@@ -236,6 +247,11 @@
     align-content: start;
     gap: var(--space-2);
     padding: 0 var(--space-3) var(--space-2);
+  }
+
+  .now.desk {
+    gap: var(--space-3);
+    padding: 0;
   }
 
   .head {
