@@ -12,6 +12,9 @@
   import DeskColumns from "$lib/components/desk/DeskColumns.svelte";
   import DeskBar from "$lib/components/desk/DeskBar.svelte";
   import DeskSidebar from "$lib/components/desk/DeskSidebar.svelte";
+  import DeskTools from "$lib/components/desk/DeskTools.svelte";
+  import NowScreen from "$lib/shell/NowScreen.svelte";
+  import Segmented from "$lib/ui/Segmented.svelte";
   import CharacterPicker from "$lib/components/CharacterPicker.svelte";
   import DropLogView from "$lib/components/DropLogView.svelte";
   import BagCheck from "$lib/components/item/BagCheck.svelte";
@@ -29,7 +32,20 @@
   import SearchSheet from "$lib/shell/SearchSheet.svelte";
   import SharePage from "$lib/shell/SharePage.svelte";
   import { toolPageTitle, type ToolInfo } from "$lib/shell/tabs";
-  import { DESK_TOOL_PAGES, loadFolded, loadPrefs, loadView, saveFolded, savePrefs, saveView, viewOfPanel, type DeskView } from "$lib/desk";
+  import {
+    DESK_TOOL_PAGES,
+    loadFolded,
+    loadPrefs,
+    loadTrain,
+    loadView,
+    saveFolded,
+    savePrefs,
+    saveTrain,
+    saveView,
+    viewOfPanel,
+    type DeskTrain,
+    type DeskView,
+  } from "$lib/desk";
   import { characters } from "$lib/characters.svelte";
   import { blankQuery, gearView, itemView, lookup, watchItems } from "$lib/items.svelte";
   import { monsterView, watchMonsters } from "$lib/monsters.svelte";
@@ -50,6 +66,22 @@
 
   let prefs = $state(loadPrefs());
   let view = $state<DeskView>(loadView());
+  /** Which page of Train shows. */
+  let trainPage = $state<DeskTrain>(loadTrain());
+  const TRAIN_PAGES: { id: DeskTrain; label: string }[] = [
+    { id: "session", label: "This session" },
+    { id: "where", label: "Where to train" },
+    { id: "log", label: "Training log" },
+  ];
+  function pickTrain(page: DeskTrain) {
+    trainPage = page;
+    saveTrain(page);
+  }
+  /** The training log, asked for by a link or a window. */
+  function openLog() {
+    pickTrain("log");
+    go("train");
+  }
   let folded = $state(loadFolded());
   /** Where a link took you from, for the Back button. */
   let from = $state<DeskView | null>(null);
@@ -67,6 +99,7 @@
     train: "Train",
     me: "Me",
     lookup: "Look up",
+    tools: "Tools",
     planner: "Build planner",
     layout: "My layout",
   };
@@ -151,7 +184,10 @@
     if ("page" in action) {
       if ((DESK_TOOL_PAGES as string[]).includes(action.page)) go(action.page);
     } else if ("tab" in action) go(action.tab);
-    else if ("window" in action) go(action.window === "build" ? "planner" : "train");
+    else if ("window" in action) {
+      if (action.window === "build") go("planner");
+      else openLog();
+    }
     else if (action.search === "gear") {
       itemView.id = null;
       itemView.query = { ...blankQuery(), kind: "equip" };
@@ -163,7 +199,7 @@
 
   /** A view the backend asked for when it opened or brought forward this window. */
   function openTab(name: string) {
-    if (name === "log") go("train");
+    if (name === "log") openLog();
     else if (name === "planner") go("planner");
   }
 
@@ -188,7 +224,7 @@
   });
 
   $effect(() => {
-    if (logRequest.seq) go("train");
+    if (logRequest.seq) untrack(openLog);
   });
 
   $effect(() => {
@@ -226,7 +262,7 @@
 
   const level = $derived(live.analysis?.hud?.level ?? live.session?.level ?? null);
   /** Views that are one page wide and read better not stretched across a big screen. */
-  const narrowViews: DeskView[] = ["lookup", "crafting", "drops", "timers", "sell", "tracked", "potions", "route", "share"];
+  const narrowViews: DeskView[] = ["lookup", "tools", "crafting", "drops", "timers", "sell", "tracked", "potions", "route", "share"];
 </script>
 
 <svelte:head><title>{isWeb ? "Leafline" : "Leafline — Desk view"}</title></svelte:head>
@@ -279,17 +315,19 @@
       {#key view}
         {#if view === "now"}
           <CharacterPicker />
-          <div class="flow">
-            {#if isWeb}<div class="block"><ReadWindowCard /></div>{/if}
-            {#if can.liveReading ? live.liveStatus.state === "off" : live.liveStatus.state !== "reading" && live.liveStatus.state !== "waiting"}
-              <div class="block"><TypedSessionCard /></div>
-            {/if}
-            {#if (live.analysis?.quest?.quests ?? []).some((q) => q.objectives.length)}
-              <section class="block card quests-glance">
-                <PanelView panel="quests" analysis={live.analysis} session={live.session} pinned />
-              </section>
-            {/if}
-            <TrainPanel {level} map={live.analysis?.map ?? null} session={live.session} whole glanced />
+          {#if isWeb}<ReadWindowCard />{/if}
+          {#if can.liveReading ? live.liveStatus.state === "off" : live.liveStatus.state !== "reading" && live.liveStatus.state !== "waiting"}
+            <div class="typed"><TypedSessionCard /></div>
+          {/if}
+          <!-- What you're doing on the left, how this map compares on the right. The player bar has the rates. -->
+          <div class="now-grid">
+            <div class="col">
+              <NowScreen analysis={live.analysis} session={live.session} ongo={(t) => go(t)} desk />
+              <TrainPanel {level} map={live.analysis?.map ?? null} session={live.session} only="chart" />
+            </div>
+            <div class="col">
+              <TrainPanel {level} map={live.analysis?.map ?? null} session={live.session} only="maps" />
+            </div>
           </div>
         {:else if view === "quests"}
           <div class="stack"><PanelView panel="quests" analysis={live.analysis} session={live.session} roomy /></div>
@@ -298,7 +336,17 @@
         {:else if view === "me"}
           <div class="stack"><PanelView panel="character" analysis={live.analysis} session={live.session} roomy shelled wide /></div>
         {:else if view === "train"}
-          <TrainingLog embedded />
+          <div class="train-pages"><Segmented label="Train shows" options={TRAIN_PAGES} value={trainPage} onchange={pickTrain} /></div>
+          {#if trainPage === "log"}
+            <TrainingLog embedded />
+          {:else if trainPage === "where"}
+            <div class="stack"><TrainPanel {level} map={live.analysis?.map ?? null} session={live.session} only="where" /></div>
+          {:else}
+            <CharacterPicker />
+            <div class="flow two"><TrainPanel {level} map={live.analysis?.map ?? null} session={live.session} only="session" glanced /></div>
+          {/if}
+        {:else if view === "tools"}
+          <DeskTools ontool={openTool} />
         {:else if view === "lookup"}
           <div class="lookup-view">
             {#key searchFocus}<SearchSheet focus={searchFocus > 0} {landed} ontool={openTool} />{/key}
@@ -510,17 +558,39 @@
     margin-right: 0;
   }
 
-  /* Quests in the Now view: the pinned window's short form, framed as a card. */
-  .quests-glance {
-    display: block;
-    padding: var(--space-3) var(--space-4);
+  /* Now: two columns, the wider one for what you're doing. Narrow windows stack them. */
+  .now-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    gap: var(--space-3);
+    align-items: start;
   }
 
-  .quests-glance :global(.card) {
-    margin: 0;
-    border: 0;
-    box-shadow: none;
-    background: none;
-    padding: 0;
+  .col {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    min-width: 0;
+  }
+
+  /* Panels' own side margins are for the overlay; the columns space them here. */
+  .col :global(.card) {
+    margin-left: 0;
+    margin-right: 0;
+    margin-bottom: 0;
+  }
+
+  @container desk-main (max-width: 900px) {
+    .now-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  .typed {
+    max-width: 640px;
+  }
+
+  .train-pages {
+    display: flex;
   }
 </style>

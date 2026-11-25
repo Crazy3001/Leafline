@@ -56,6 +56,7 @@
     glance = false,
     whole = false,
     glanced = false,
+    only = null,
   }: {
     level: number | null;
     map?: MapReading | null;
@@ -65,8 +66,13 @@
     glance?: boolean;
     /** Where there is room, as in the desk view: every view stacked, with no chips. */
     whole?: boolean;
-    /** The desk view's Now strip shows the big rate, the level line and the session buttons. */
+    /** The desk view's player bar shows the big rate, the level line and the session buttons. */
     glanced?: boolean;
+    /**
+     * One part alone, for the desk view, which lays the parts out itself: the session's details,
+     * where to train, this map against your bests with the maps played, or the session's graph.
+     */
+    only?: "session" | "where" | "maps" | "chart" | null;
   } = $props();
 
   watchHistory();
@@ -102,9 +108,12 @@
     }
   }
   /** What shows. A pinned window has only the session; the desk view stacks all of it. */
-  const onSession = $derived(glance || whole || view === "session");
-  const onWhere = $derived(!glance && (whole || view === "where"));
-  const onHistory = $derived(!glance && (whole ? !tracking : view === "history"));
+  const onSession = $derived(only ? only === "session" : glance || whole || view === "session");
+  const onWhere = $derived(only ? only === "where" : !glance && (whole || view === "where"));
+  const onHistory = $derived(!only && !glance && (whole ? !tracking : view === "history"));
+  /** This map against your bests, and the maps played. */
+  const onMaps = $derived(only ? only === "session" || only === "maps" : onSession);
+  const onChart = $derived(only ? only === "session" || only === "chart" : onSession);
   const percentOnly = $derived(session?.percentOnly ?? false);
   const signed = (value: number) => (value > 0 ? `+${formatNumber(value)}` : formatNumber(value));
 
@@ -284,8 +293,8 @@
   </Button>
 {/snippet}
 
-{#if !glance && !glanced}<CharacterPicker />{/if}
-{#if !glance && !whole}
+{#if !glance && !glanced && !only}<CharacterPicker />{/if}
+{#if !glance && !whole && !only}
   <div class="views"><Segmented label="Train shows" options={VIEWS} value={view} onchange={setView} /></div>
 {/if}
 {#snippet sessionState()}
@@ -423,7 +432,15 @@
     {/if}
   </Block>
 
-  {#if !glance}
+{:else if onSession && !glance}
+  <!-- No session yet: how it starts, above, then the goal. -->
+  <Block title="Level goal">
+    <LevelGoal {level} percent={session?.percent ?? null} character={session?.name ?? characters.active} />
+  </Block>
+{/if}
+
+<!-- This map against your bests, and every map this session. -->
+{#if tracking && session && onMaps && !glance}
   {#if better && !here}
     <Block title="This map">
       {@render nudge(better)}
@@ -518,22 +535,16 @@
       {/if}
     </Block>
   {/if}
-  {/if}
-{:else if onSession && !glance}
-  <!-- No session yet: how it starts, above, then the goal. -->
-  <Block title="Level goal">
-    <LevelGoal {level} percent={session?.percent ?? null} character={session?.name ?? characters.active} />
-  </Block>
 {/if}
 
-{#if !glance}
+{#if !glance && only !== "chart"}
   <!-- Stays in the page while another view shows: it works out the better-map line for This map. -->
   <div class="view" class:off={!onWhere}>
     <SpotList {level} {map} {session} bind:better bind:this={spotList} />
   </div>
 {/if}
 
-{#if tracking && session && headline && onSession && !glance}
+{#if tracking && session && headline && onChart && !glance}
   <Block title="This session">
     {#snippet aside()}
       <Segmented
@@ -627,7 +638,7 @@
   {/if}
 {/if}
 
-{#if onSession}<TimersCard />{/if}
+{#if onSession && !only}<TimersCard />{/if}
 
 <style>
   /* A block pads itself; the chips sit beside blocks, so they match it. */
