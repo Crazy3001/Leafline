@@ -91,8 +91,8 @@
 
   {#if !hasLog() && !can.liveReading}
     <p class="lead">
-      The Windows program reads your Quest window: what you've done, what's in progress and what you can take. Its log comes
-      along in a records file (Settings, Data); the website doesn't read the Quest window yet.
+      Share the game window on Now (Read the game), then open your Quest window and scroll each tab to its end: the
+      website keeps what it lists. A log the Windows program read also comes along in a records file (Settings, Data).
     </p>
   {:else if !hasLog()}
     <p class="lead">

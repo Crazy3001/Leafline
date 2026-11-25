@@ -29,7 +29,7 @@ export function walkTime(seconds: number): string {
 
 /**
  * A header this close to a map's name settles it, as `SETTLED_SCORE` does in
- * src-tauri/src/mapdata/atlas.rs. Below it a reading only counts for a map the route expects.
+ * crates/leafline-core/src/mapdata/atlas.rs. Below it a reading only counts for a map the route expects.
  */
 export const TRUSTED_SCORE = 0.85;
 

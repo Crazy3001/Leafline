@@ -144,7 +144,7 @@
       {#if can.liveReading}
         Open your Character Stat window in the game and press Detail, then Read. Leafline also reads it by itself while it is open.
       {:else}
-        The website doesn't read the Character Stat window yet. Stats the Windows program read come along in a records file (Settings, Data).
+        Share the game window on Now (Read the game), then open your Character Stat window and press Detail: the website reads it once it holds still. Stats the Windows program read also come along in a records file (Settings, Data).
       {/if}
     </p>
   {:else}

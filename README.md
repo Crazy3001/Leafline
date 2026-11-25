@@ -70,7 +70,7 @@
 
 ## What it never does
 
-Leafline only looks at the game window, the way OBS or Discord capture it, and reads the text with the OCR built into Windows.
+Leafline only looks at the game window, the way OBS or Discord capture it, and reads the text by the game's own letter shapes, with the OCR built into Windows for the rest.
 
 - It never reads or changes the game's memory, files or network traffic.
 - It never injects into the game or draws inside it. The overlay is its own window.
@@ -98,9 +98,9 @@ Leafline also runs in a browser at **[crazy3001.github.io/Leafline](https://craz
 - the build planner, scroll odds, Your fight and craft levelling
 - the drop log, timers and the training log
 - the four looks, a desk layout on a computer and the overlay's tabs on a phone
-- on a computer, in Firefox, Chrome or Edge: share the game window and it reads your level, EXP, mesos, map, Quest Helper and loot as you play and tracks the session, the way the program does (item tooltips are still to come)
+- on a computer, in Firefox, Chrome or Edge: share the game window and it reads your level, EXP, mesos, map, Quest Helper and loot as you play and tracks the session, the way the program does. Rest the mouse on an item for its card, and open your Stat, Skill, inventory or Quest window to have it read
 
-**It reads only a window you share,** in the browser, and the picture never leaves your computer. It carries the same ban risk as the program. Your records stay in that browser on that computer and are never sent anywhere. A browser can clear a site's storage, so use **Settings → Data → Save my records** now and then; the same file opens in the program or another browser. One tab at a time can use your records.
+**It reads only a window you share,** in the browser, and the picture never leaves your computer. It carries the same ban risk as the program. Your records stay in that browser on that computer and are never sent anywhere. A browser can clear a site's storage, so save them with **Settings → Data → Records file** now and then; the same file opens in the program or another browser. One tab at a time can use your records.
 
 ## Install
 
@@ -154,7 +154,7 @@ The installer isn't code-signed, and SmartScreen warns about unsigned programs i
 Yes. Leafline is built with Claude, Anthropic's AI coding assistant. I decide what it does, test it in game and send back what goes wrong; Claude writes the code. All of it is open source here, so anyone can read exactly what it does and how.
 
 ### Does it work on Mac or Linux?
-The [website](#website) does, in any current browser, without reading the game. The program is Windows only for now; a macOS version is planned.
+The [website](#website) runs in any current browser. The program is Windows only for now.
 
 ### Does it need the game's files, or log in to anything?
 No. It only looks at the game window. It has no login and never asks for your Nexon account.
@@ -195,6 +195,7 @@ This is an early release, and these are the rough edges known so far. Please [re
 - **Training forecasts** use community formulas for hit chance and damage and assume a respawn time, so treat them as a guide until you have played a few maps: they lean on your own play more as you go. Buffs are switched on by you, not read from the screen.
 - **Walking times** in routes are rough guesses for a character with no speed bonus.
 - **A jump of several levels** between two readings adds no EXP, since the levels in between were never measured.
+- **The website's reading** is newer than the program's and has had less play in game, most of it in Edge.
 - **Windows HDR** has to be off for reliable readings.
 - **Windows only**, English client only.
 
@@ -205,7 +206,7 @@ Leafline ships no game data. It downloads community data on your PC when you ask
 - Map, monster, NPC, quest, skill, crafting and equipment data, and the game pictures: [OSMS Data Explorer](https://osmsdataexplorer.com), CC BY 4.0.
 - Monster drops: built for Leafline from the game's item text, [StrategyWiki](https://strategywiki.org/wiki/MapleStory/Drops_(Victoria_Island)) contributors (CC BY-SA 4.0) and players' reports.
 - Taxi routes and return scrolls: [mapleclassic.wiki](https://mapleclassic.wiki) contributors, CC BY-NC-SA 4.0.
-- The website reads the map's name and the Quest Helper's titles with [ocrs](https://github.com/robertknight/ocrs) (MIT / Apache-2.0), whose model is trained on HierText (CC BY-SA 4.0).
+- The website reads the map's name, the Quest Helper's titles and item names with [ocrs](https://github.com/robertknight/ocrs) (MIT / Apache-2.0), whose model is trained on HierText (CC BY-SA 4.0).
 
 Game content belongs to Nexon. Leafline is unofficial and not affiliated with or endorsed by Nexon.
 

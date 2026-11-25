@@ -1,6 +1,6 @@
 [package]
 name = "leafline-capture"
-version = "0.4.0"
+version = "0.5.0"
 description = "Leafline's capture test page: the shared readers and test pattern, run in the browser"
 license = "MIT"
 edition = "2024"

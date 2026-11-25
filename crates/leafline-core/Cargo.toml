@@ -1,6 +1,6 @@
 [package]
 name = "leafline-core"
-version = "0.4.0"
+version = "0.5.0"
 description = "What Leafline's program and website share: map data, readers, records and plans"
 license = "MIT"
 edition = "2024"

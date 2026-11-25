@@ -3,7 +3,7 @@
 import { backend } from "./api";
 import type { BuildRules, DisplaySettings } from "./types";
 
-/** As in src-tauri/src/build/rules.rs, in the same order. */
+/** As in crates/leafline-core/src/build/rules.rs, in the same order. */
 export const DEFAULT_RULES: BuildRules = {
   apPerLevel: 5,
   spPerLevel: 3,

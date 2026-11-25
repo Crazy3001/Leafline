@@ -1,6 +1,6 @@
 //! Sell or keep: an Item Inventory tab as read from the game, each item named by its picture and
-//! given what says to keep it. The program checks on a hotkey; the website when the tab has been
-//! open and held still. Pictures come from OSMS through whatever cache the caller keeps.
+//! given what says to keep it. The program checks on a hotkey, and both it and the website once the
+//! tab has been open and held still. Pictures come from OSMS through whatever cache the caller keeps.
 //!
 //! A check tries the items a character near this level most likely carries, plus every item of
 //! the tab whose picture is kept already; "Look further" tries every item of the tab, which may

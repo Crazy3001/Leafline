@@ -1,6 +1,6 @@
 // Builds the website's WebAssembly and its JavaScript glue: crates/leafline-web into
 // src/lib/platform/wasm/, which the website's storage worker loads, and crates/leafline-capture
-// into src/lib/capture/wasm/, which only the capture test page loads. Run by `npm run build:web`.
+// into src/lib/capture/wasm/, which the live reading worker and the capture test pages load. Run by `npm run build:web`.
 //
 // Needs: the wasm32-unknown-unknown Rust target, wasm-bindgen-cli at the same version as the
 // wasm-bindgen crate (0.2.130), and a clang that can build C for wasm32 (SQLite is C). Set
@@ -37,7 +37,7 @@ if (!env.CC_wasm32_unknown_unknown && process.platform === "win32") {
 }
 
 const run = (cmd, args, extra = {}) => execFileSync(cmd, args, { cwd: root, env: { ...env, ...extra }, stdio: "inherit" });
-// The storage worker is built small; the capture test's readers fast (see Cargo.toml's profiles).
+// The storage worker is built small; the readers fast (see Cargo.toml's profiles).
 // The readers also use WebAssembly SIMD, which ocrs's text recognition is several times quicker
 // with: every browser that can share a window has it. They get a target folder of their own, so
 // the two builds' different flags don't rebuild each other's dependencies. The storage worker,

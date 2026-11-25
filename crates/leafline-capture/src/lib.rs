@@ -1,6 +1,6 @@
-//! The capture test page's WebAssembly (website plan, stage 2): the test pattern drawn again, a
-//! delivered frame measured against it, and the readers the website could run, timed. Frames
-//! come in as RGBA bytes from the page's worker and never leave it.
+//! The website's game readers as WebAssembly: live reading of a shared game window (`live`), and
+//! the capture test pages' pattern, measuring and timed readers. Frames come in as RGBA bytes from
+//! the page's worker and never leave it.
 
 use leafline_core::capturetest::{measure, pattern};
 use leafline_core::vision::Frame;
