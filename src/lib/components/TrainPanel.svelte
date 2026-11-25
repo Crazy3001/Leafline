@@ -8,7 +8,7 @@
   import { tip } from "$lib/tip.svelte";
   import Ref from "$lib/components/Ref.svelte";
   import SessionControls from "./SessionControls.svelte";
-  import { ArrowDown } from "@lucide/svelte";
+  import { ArrowDown, Info } from "@lucide/svelte";
 
   import CharacterPicker from "./CharacterPicker.svelte";
   import LevelGoal from "./LevelGoal.svelte";
@@ -206,26 +206,9 @@
   const lootValueRate = $derived(session?.loot?.watched ? lootRate(session.loot.items, session.loot.seconds) : null);
   const reminder = $derived(session ? mesosReminder(session) : null);
 
-  // How Mesos / hr works, said once until the player dismisses it.
-  const MESOS_HINT_KEY = "leafline.train.mesosHintSeen";
-  let mesosHintSeen = $state(storedFlag(MESOS_HINT_KEY));
-
-  function storedFlag(key: string): boolean {
-    try {
-      return localStorage.getItem(key) === "1";
-    } catch {
-      return false;
-    }
-  }
-
-  function dismissMesosHint() {
-    mesosHintSeen = true;
-    try {
-      localStorage.setItem(MESOS_HINT_KEY, "1");
-    } catch {
-      // A convenience only.
-    }
-  }
+  /** How Mesos / hr is counted, behind the tile's info mark. */
+  const MESOS_HELP =
+    "Counts your mesos when you start and again before you spend. Your inventory or a shop window both count, and you don't need to keep either open.";
 
   const dropped = $derived(session ? session.rejected.exp + session.rejected.mesos : 0);
   /** About how much play the deaths undid, at this map's pace. */
@@ -289,6 +272,12 @@
   </p>
 {/snippet}
 
+{#snippet mapsNote()}
+  <span class="info" use:tip={"Each map's rate counts only your time on it. The session rate counts all of it, towns too."}
+    ><Info size={13} aria-label="How these rates are counted" /></span
+  >
+{/snippet}
+
 {#snippet jump()}
   <Button variant="ghost" size="sm" onclick={jumpToSpots}>
     Where to train <ArrowDown size={12} />
@@ -299,22 +288,23 @@
 {#if !glance && !whole}
   <div class="views"><Segmented label="Train shows" options={VIEWS} value={view} onchange={setView} /></div>
 {/if}
-{#if onSession && !(glanced && tracking)}
-<Block title="Session">
-  {#snippet aside()}
-    {#if session?.held}
-      <span class="state paused">Paused</span>
-    {:else if tracking && session?.paused}
-      <span class="state idle">Idle</span>
-    {:else if tracking}
-      <span class="state running"><span class="square" aria-hidden="true"></span>Tracking</span>
-    {/if}
-    {#if tracking && session}
-      <span class="tabular">{formatDuration(session.activeSeconds)} active of {formatDuration(session.elapsedSeconds)}</span>
-    {/if}
-  {/snippet}
+{#snippet sessionState()}
+  {#if session?.held}
+    <span class="state paused">Paused</span>
+  {:else if tracking && session?.paused}
+    <span class="state idle">Idle</span>
+  {:else if tracking}
+    <span class="state running"><span class="square" aria-hidden="true"></span>Tracking</span>
+  {/if}
+  {#if tracking && session}
+    <span class="tabular">{formatDuration(session.activeSeconds)} active of {formatDuration(session.elapsedSeconds)}</span>
+  {/if}
+{/snippet}
 
-  {#if !glanced}<SessionControls trailing={tracking && whole && !glance ? jump : undefined} />{/if}
+<!-- Before a session: how it starts. Once one runs, its heading and buttons head the card below. -->
+{#if onSession && !(tracking && session && headline)}
+<Block title="Session" aside={sessionState}>
+  {#if !glanced}<SessionControls />{/if}
 
   {#if !tracking && glance}
     <p class="caption">Starts with your first EXP.</p>
@@ -339,8 +329,9 @@
 {/if}
 
 {#if tracking && session && headline && onSession}
-  <Block>
+  <Block title={glanced ? undefined : "Session"} aside={glanced ? undefined : sessionState}>
     {#if !glanced}
+    <SessionControls trailing={whole && !glance ? jump : undefined} />
     <div class="headline">
       <div class="big">
         <span class="label"
@@ -396,6 +387,7 @@
       <!-- On the desk, the player bar over the view has the rate. -->
       {#if !glanced}<Stat
         label="Mesos / hr"
+        help={MESOS_HELP}
         value={formatCompact(mesosRate)}
         sub={mesosSub}
         faint={session.mesosPerHour != null && coverage?.partial && coverage.thin}
@@ -428,15 +420,6 @@
     {/if}
     {#if glance && session.mapHidden}
       <p class="attention">Can't see the minimap's name, so new gains may go to the wrong map.</p>
-    {/if}
-    {#if !mesosHintSeen && !glance}
-      <div class="hint">
-        <span>
-          Mesos / hr needs a look at your mesos when you start and again before you spend. Your inventory or a shop window
-          both count, and you don't need to keep either open.
-        </span>
-        <Button size="sm" variant="ghost" onclick={dismissMesosHint}>Got it</Button>
-      </div>
     {/if}
   </Block>
 
@@ -495,7 +478,7 @@
   {/if}
 
   {#if sessionMaps.length}
-    <Block title="Maps this session">
+    <Block title="Maps this session" aside={sessionMaps.length > 1 ? mapsNote : undefined}>
       <table>
         <thead><tr><th>Map</th><th>Time</th><th>EXP / hr</th><th>Mesos / hr</th></tr></thead>
         <tbody>
@@ -517,9 +500,6 @@
           {/each}
         </tbody>
       </table>
-      {#if sessionMaps.length > 1}
-        <p class="caption">Each map's rate counts only your time on it. The session rate at the top counts all of it, towns too.</p>
-      {/if}
       {#if session.deaths > 0 || session.mapHidden || dropped > 0 || session.mesosExcluded !== 0}
         <ul class="notes">
           {#if session.mapHidden}<li class="attention">Can't see the minimap's name, so new gains may go to the wrong map.</li>{/if}
@@ -784,8 +764,30 @@
 
   .tiles {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--space-1-5);
+    grid-auto-columns: minmax(0, 1fr);
+    grid-auto-flow: column;
+    padding: var(--space-2) 0;
+    border-block: 1px solid var(--border);
+  }
+
+  /* Figures on the card itself, split by hairlines: no box inside the box. */
+  .tiles :global(.stat) {
+    padding: 0 var(--space-3);
+    border: 0;
+    border-left: 1px solid var(--border);
+    border-radius: 0;
+    background: none;
+  }
+
+  .tiles :global(.stat:first-child) {
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .info {
+    display: inline-flex;
+    color: var(--faint);
+    cursor: help;
   }
 
   .reminder {
@@ -797,18 +799,6 @@
     color: var(--text);
   }
 
-  .hint {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--space-2);
-    font-size: var(--text-xs);
-    color: var(--muted);
-  }
-
-  .hint span {
-    flex: 1;
-    min-width: 0;
-  }
 
   .caption {
     margin: 0;
