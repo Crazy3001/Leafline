@@ -128,7 +128,7 @@
 <aside class:folded aria-label="Desk view">
   <div class="brand">
     {#if !folded}<Logo size={18} /><span class="word">Leafline</span>{/if}
-    <button class="fold" aria-label={folded ? "Show the sidebar" : "Fold the sidebar"} use:tip={folded ? "Show the sidebar" : "Fold the sidebar"} onclick={onfold}>
+    <button class="icon-btn sm fold" aria-label={folded ? "Show the sidebar" : "Fold the sidebar"} use:tip={folded ? "Show the sidebar" : "Fold the sidebar"} onclick={onfold}>
       {#if folded}<PanelLeftOpen size={16} />{:else}<PanelLeftClose size={16} />{/if}
     </button>
   </div>
@@ -238,26 +238,11 @@
   }
 
   .fold {
-    display: grid;
-    place-items: center;
-    width: 28px;
-    height: 28px;
     margin-left: auto;
-    padding: 0;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--faint);
-    cursor: pointer;
   }
 
   .folded .fold {
     margin: 0;
-  }
-
-  .fold:hover {
-    background: var(--hover);
-    color: var(--text);
   }
 
   .who {

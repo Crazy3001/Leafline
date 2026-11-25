@@ -62,32 +62,6 @@
     margin: var(--space-2) 0;
   }
 
-  .test :global(.button) {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-1-5);
-    padding: var(--space-1) var(--space-3);
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm, 6px);
-    background: transparent;
-    color: var(--text);
-    cursor: pointer;
-  }
-
-  .test :global(.button.primary) {
-    border-color: var(--accent);
-    background: var(--accent-soft);
-  }
-
-  .test :global(.button:hover:not(:disabled)) {
-    border-color: var(--accent);
-  }
-
-  .test :global(.button:disabled) {
-    opacity: 0.5;
-    cursor: default;
-  }
-
   .test :global(select) {
     padding: var(--space-1) var(--space-1-5);
     border: 1px solid var(--border-strong);

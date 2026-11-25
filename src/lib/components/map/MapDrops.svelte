@@ -172,7 +172,7 @@
             <ul class="wrap">
               {#each entry.drops.filter((d) => !isMeso(d)) as drop (drop.item)}
                 <li>
-                  <Ref kind="item" name={drop.item} />{#if drop.quest}<span class="tag">quest</span>{/if}
+                  <Ref kind="item" name={drop.item} />{#if drop.quest}<span class="badge tag">quest</span>{/if}
                 </li>
               {/each}
             </ul>
@@ -195,7 +195,7 @@
         {#each group.items as item (item.name)}
           <li>
             <span class="item" use:tip={itemTip}
-              ><Ref kind="item" id={item.id} name={item.name} />{#if item.quest}<span class="tag">quest</span>{/if}</span
+              ><Ref kind="item" id={item.id} name={item.name} />{#if item.quest}<span class="badge tag">quest</span>{/if}</span
             >
             <span class="droppers">
               {#each item.sources as source (source.monster)}<IconRef kind="mob" name={source.monster} title={dropperTip(source)} />{/each}
@@ -227,7 +227,7 @@
 
 {:else if error}
   <p class="error">{error}</p>
-  <button class="load" onclick={load} disabled={loading}><RefreshCw size={13} />Try again</button>
+  <button class="btn" onclick={load} disabled={loading}><RefreshCw size={13} />Try again</button>
 {:else}
   <p class="note"><span class="spin"><LoaderCircle size={13} /></span> Loading drops…</p>
 {/if}
@@ -367,11 +367,6 @@
 
   .tag {
     margin-left: var(--space-1);
-    padding: 0 var(--space-1);
-    border-radius: var(--radius-sm);
-    background: var(--surface-3);
-    color: var(--muted);
-    font-size: var(--text-xs);
   }
 
 
@@ -383,28 +378,6 @@
 
   .none {
     margin-top: var(--space-2);
-  }
-
-  .load {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-1-5);
-    height: 28px;
-    padding: 0 var(--space-3);
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
-    background: transparent;
-    font-size: var(--text-md);
-    cursor: pointer;
-  }
-
-  .load:hover:not(:disabled) {
-    background: var(--surface-3);
-  }
-
-  .load:disabled {
-    color: var(--muted);
-    cursor: default;
   }
 
   .spin {

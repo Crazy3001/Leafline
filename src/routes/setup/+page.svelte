@@ -397,7 +397,7 @@
                 <Check size={12} /> The desk view is open. Put it wherever suits you; Leafline remembers where.
               </p>
             {:else}
-              <button class="button" onclick={tryDesk}><MonitorUp size={13} />Open it now</button>
+              <button class="btn" onclick={tryDesk}><MonitorUp size={13} />Open it now</button>
               <span class="help">Or it opens when you finish setup.</span>
             {/if}
           </div>
@@ -428,15 +428,15 @@
     {#if finishError}<p class="note warn">{finishError}</p>{/if}
     <div class="nav">
       {#if step > 0}
-        <button class="button" onclick={back}><ArrowLeft size={13} />{step === KEYS_STEP && testing ? "Change keys" : "Back"}</button>
+        <button class="btn" onclick={back}><ArrowLeft size={13} />{step === KEYS_STEP && testing ? "Change keys" : "Back"}</button>
       {/if}
       <span class="spacer"></span>
       {#if step < STEPS.length - 1}
-        <button class="button primary" onclick={next}>
+        <button class="btn primary" onclick={next}>
           {step === KEYS_STEP && !testing ? "Set and test" : "Next"}<ArrowRight size={13} />
         </button>
       {:else}
-        <button class="button primary" onclick={finish} disabled={finishing}>
+        <button class="btn primary" onclick={finish} disabled={finishing}>
           <Check size={13} />{display.live.enabled ? "Start Leafline" : "Finish"}
         </button>
       {/if}
@@ -822,39 +822,6 @@
     flex: 1;
   }
 
-  .button {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-1-5);
-    padding: var(--space-1-5) var(--space-4);
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--text);
-    cursor: pointer;
-  }
-
-  .button:hover:enabled {
-    border-color: var(--accent);
-  }
-
-  .button.primary {
-    border-color: var(--accent);
-    background: var(--accent);
-    color: var(--accent-ink);
-    font-weight: var(--weight-strong);
-  }
-
-  .button.primary:hover:enabled {
-    background: var(--accent-strong);
-  }
-
-  .button:disabled {
-    opacity: 0.6;
-    cursor: default;
-  }
-
-  .button:focus-visible,
   .link:focus-visible,
   .switch:focus-visible {
     outline: 2px solid var(--accent);

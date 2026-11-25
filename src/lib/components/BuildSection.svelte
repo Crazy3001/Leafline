@@ -348,10 +348,10 @@
                   {#if piece.level != null}<span class="lv tabular" class:good={row.wearingFit?.ok} class:bad={row.wearingFit && !row.wearingFit.ok} use:tip={fitTitle(row.wearingFit)}
                       >{piece.level ? `Lv ${piece.level}` : "Any level"}</span
                     >{/if}
-                  <button class="remove" use:tip={"Edit"} aria-label="Edit {piece.name}" onclick={() => startEdit(piece)}
+                  <button class="icon-btn xs remove" use:tip={"Edit"} aria-label="Edit {piece.name}" onclick={() => startEdit(piece)}
                     ><Pencil size={11} /></button
                   >
-                  <button class="remove" use:tip={"Take it off"} aria-label="Take off {piece.name}" onclick={() => removePiece(piece.id)}
+                  <button class="icon-btn xs remove" use:tip={"Take it off"} aria-label="Take off {piece.name}" onclick={() => removePiece(piece.id)}
                     ><X size={12} /></button
                   >
                 </span>
@@ -372,7 +372,7 @@
                       {#if !STAT_LABELS.includes(stat.label)}<option>{stat.label}</option>{/if}
                     </select>
                     <input type="number" bind:value={stat.value} aria-label="{stat.label} value" />
-                    <button class="remove" aria-label="Remove {stat.label}" onclick={() => editing?.stats.splice(k, 1)}
+                    <button class="icon-btn xs remove" aria-label="Remove {stat.label}" onclick={() => editing?.stats.splice(k, 1)}
                       ><X size={11} /></button
                     >
                   </div>
@@ -391,7 +391,7 @@
                   </label>
                 </div>
                 <div class="edit-actions">
-                  <button class="action small" onclick={saveEdit}>Save</button>
+                  <button class="btn primary sm" onclick={saveEdit}>Save</button>
                   <button class="link" onclick={() => (editing = null)}>Cancel</button>
                 </div>
               </div>
@@ -541,7 +541,7 @@
       No build yet. Choose a job and write your goals in order, from a guide or your own idea, and Leafline lays them out
       level by level.
     </p>
-    <button class="action" onclick={() => openPlanner()}><Pencil size={13} />Plan a build</button>
+    <button class="btn primary" onclick={() => openPlanner()}><Pencil size={13} />Plan a build</button>
     <h4 class="sub">Stats</h4>
     <CharacterStats {character} />
   {:else if plan && step}
@@ -666,13 +666,13 @@
                   >
                   {#if row.suggestedPlanned}
                     <button
-                      class="remove"
+                      class="icon-btn xs remove"
                       use:tip={"Remove goal"}
                       aria-label="Stop aiming for {pick.name}"
                       onclick={() => setGoal(pick.id, false)}><X size={12} /></button
                     >
                   {:else}
-                    <button class="remove" use:tip={"Aim for this"} aria-label="Aim for {pick.name}" onclick={() => setGoal(pick.id, true)}
+                    <button class="icon-btn xs remove" use:tip={"Aim for this"} aria-label="Aim for {pick.name}" onclick={() => setGoal(pick.id, true)}
                       ><Plus size={12} /></button
                     >
                   {/if}
@@ -698,13 +698,13 @@
                   </span>
                   {#if row.planned}
                     <button
-                      class="remove"
+                      class="icon-btn xs remove"
                       use:tip={"Remove goal"}
                       aria-label="Stop aiming for {next.item.name}"
                       onclick={() => setGoal(next.item.id, false)}><X size={12} /></button
                     >
                   {:else}
-                    <button class="remove" use:tip={"Aim for this"} aria-label="Aim for {next.item.name}" onclick={() => setGoal(next.item.id, true)}
+                    <button class="icon-btn xs remove" use:tip={"Aim for this"} aria-label="Aim for {next.item.name}" onclick={() => setGoal(next.item.id, true)}
                       ><Plus size={12} /></button
                     >
                   {/if}
@@ -919,25 +919,6 @@
     font-size: var(--text-md);
   }
 
-  .action {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-1-5);
-    height: var(--control-h);
-    padding: 0 var(--space-3);
-    border: 1px solid var(--accent);
-    border-radius: var(--radius-sm);
-    background: var(--accent);
-    color: var(--accent-ink);
-    font-size: var(--text-md);
-    font-weight: var(--weight-strong);
-    cursor: pointer;
-  }
-
-  .action:hover {
-    filter: brightness(1.2);
-  }
-
   .link {
     display: inline-flex;
     align-items: center;
@@ -1094,28 +1075,6 @@
     color: var(--muted);
   }
 
-  .remove {
-    display: grid;
-    flex: none;
-    place-items: center;
-    width: 20px;
-    height: 20px;
-    padding: 0;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--faint);
-    cursor: pointer;
-  }
-
-  .remove:hover,
-  .remove:focus-visible {
-    background: var(--hover);
-    color: var(--text);
-    text-decoration: none;
-    outline: none;
-  }
-
   .outfit li {
     padding: var(--space-1-5) 0 var(--space-2);
   }
@@ -1248,11 +1207,6 @@
     display: flex;
     align-items: center;
     gap: var(--space-3);
-  }
-
-  .action.small {
-    height: 24px;
-    padding: 0 var(--space-3);
   }
 
   .piece-line {

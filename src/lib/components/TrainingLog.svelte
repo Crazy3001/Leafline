@@ -582,7 +582,7 @@
                               {:else}Not placed on a map{/if}
                               {#if l.map}
                                 {@const map = l.map}
-                                <button class="pen" use:tip={"Rename"} aria-label="Rename map" onclick={() => startRename(map)}
+                                <button class="icon-btn xs pen" use:tip={"Rename"} aria-label="Rename map" onclick={() => startRename(map)}
                                   ><PenLine size={11} /></button
                                 >
                               {/if}
@@ -1433,28 +1433,14 @@
   }
 
   .pen {
-    display: inline-grid;
-    place-items: center;
-    width: 20px;
-    height: 20px;
     margin-left: var(--space-1);
-    padding: 0;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--faint);
     vertical-align: middle;
-    cursor: pointer;
     opacity: 0;
   }
 
   tr:hover .pen,
   .pen:focus-visible {
     opacity: 1;
-  }
-
-  .pen:hover {
-    color: var(--text);
   }
 
   .rename {

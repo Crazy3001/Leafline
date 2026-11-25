@@ -158,8 +158,8 @@
     <div class="row">
       <span class="target">Goal <span class="num">Lv {stored.target}</span></span>
       <span class="grow"></span>
-      <button class="icon" aria-label="Change the goal" use:tip={"Change the goal"} onclick={startEditing}><Pencil size={12} /></button>
-      <button class="icon" aria-label="Clear the goal" use:tip={"Clear the goal"} onclick={() => save(null)}><X size={12} /></button>
+      <button class="icon-btn xs icon" aria-label="Change the goal" use:tip={"Change the goal"} onclick={startEditing}><Pencil size={12} /></button>
+      <button class="icon-btn xs icon" aria-label="Clear the goal" use:tip={"Clear the goal"} onclick={() => save(null)}><X size={12} /></button>
     </div>
     {#if level == null}
       <p class="muted">Your level shows once the HUD is read.</p>
@@ -252,21 +252,4 @@
     text-align: right;
   }
 
-  .icon {
-    display: grid;
-    place-items: center;
-    width: 22px;
-    height: 22px;
-    padding: 0;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--muted);
-    cursor: pointer;
-  }
-
-  .icon:hover {
-    background: var(--hover);
-    color: var(--text);
-  }
 </style>

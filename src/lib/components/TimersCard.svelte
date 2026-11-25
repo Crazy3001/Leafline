@@ -88,7 +88,7 @@
   <Card title="Timers">
     {#snippet aside()}
       {#if !adding}
-        <button class="icon" use:tip={"Add a timer"} aria-label="Add a timer" onclick={() => (adding = true)}
+        <button class="icon-btn xs icon" use:tip={"Add a timer"} aria-label="Add a timer" onclick={() => (adding = true)}
           ><Plus size={13} /></button
         >
       {/if}
@@ -103,14 +103,14 @@
               <span use:clipped class="name">{timer.name}</span>
               <span class="time tabular">{remaining === 0 ? "Done" : clock(remaining)}</span>
               <button
-                class="icon"
+                class="icon-btn xs icon"
                 use:tip={"Start again"}
                 aria-label="Start {timer.name} again"
                 onclick={() => store(timers.map((t) => (t.id === timer.id ? { ...t, startedAt: Date.now() } : t)))}
                 ><RotateCcw size={11} /></button
               >
               <button
-                class="icon"
+                class="icon-btn xs icon"
                 use:tip={"Remove"}
                 aria-label="Remove {timer.name}"
                 onclick={() => store(timers.filter((t) => t.id !== timer.id))}><X size={12} /></button
@@ -148,7 +148,7 @@
     {/if}
   </Card>
 {:else}
-  <div class="add-row"><button class="add" onclick={() => (adding = true)}><Timer size={12} /> Start a timer</button></div>
+  <div class="add-row"><button class="btn ghost sm" onclick={() => (adding = true)}><Timer size={12} /> Start a timer</button></div>
 {/if}
 
 <style>
@@ -201,46 +201,9 @@
     transition: width 1s linear;
   }
 
-  .icon {
-    display: grid;
-    place-items: center;
-    width: 20px;
-    height: 20px;
-    padding: 0;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--faint);
-    cursor: pointer;
-  }
-
-  .icon:hover {
-    background: var(--hover);
-    color: var(--text);
-  }
-
   .add-row {
     padding: var(--space-2) var(--space-3) var(--space-3);
     border-top: 1px solid var(--border);
-  }
-
-  .add {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-1-5);
-    height: var(--control-h-sm);
-    padding: 0 var(--space-2);
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--muted);
-    font-size: var(--text-md);
-    cursor: pointer;
-  }
-
-  .add:hover {
-    background: var(--hover);
-    color: var(--text);
   }
 
   .form {
@@ -317,7 +280,6 @@
   }
 
   .icon:focus-visible,
-  .add:focus-visible,
   .presets button:focus-visible,
   .go:focus-visible,
   .link:focus-visible {

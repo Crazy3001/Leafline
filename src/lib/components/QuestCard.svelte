@@ -201,7 +201,7 @@
         {/if}
         {#if followed?.[i] != null}
           {@const followedId = followed[i]}
-          <button class="stop" aria-label="Stop following {title}" use:tip={"Stop following"} onclick={() => unfollow(followedId)}>
+          <button class="icon-btn xs stop" aria-label="Stop following {title}" use:tip={"Stop following"} onclick={() => unfollow(followedId)}>
             <X size={12} />
           </button>
         {/if}
@@ -308,25 +308,7 @@
 
 <style>
   .stop {
-    display: grid;
-    flex: none;
-    place-items: center;
-    width: 20px;
-    height: 20px;
     margin-left: auto;
-    padding: 0;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--faint);
-    cursor: pointer;
-  }
-
-  .stop:hover,
-  .stop:focus-visible {
-    background: var(--surface-3);
-    color: var(--text);
-    outline: none;
   }
 
   .open {

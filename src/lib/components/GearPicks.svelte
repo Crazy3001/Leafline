@@ -61,7 +61,7 @@
                 {#if full && pick.item.reqLevel}Lv {pick.item.reqLevel} · {/if}{gives(pick.item, full ? 3 : 2)}
               </span>
               {#if onAdd}
-                <button class="add" disabled={pick.goal} use:tip={pick.goal ? "Already a goal" : "Add as a gear goal"} aria-label="Add as a gear goal" onclick={() => onAdd?.(pick.item)}><Plus size={12} /></button>
+                <button class="icon-btn xs add" disabled={pick.goal} use:tip={pick.goal ? "Already a goal" : "Add as a gear goal"} aria-label="Add as a gear goal" onclick={() => onAdd?.(pick.item)}><Plus size={12} /></button>
               {/if}
             </div>
           {/each}
@@ -78,6 +78,10 @@
 {/if}
 
 <style>
+  .add {
+    margin-left: auto;
+  }
+
   .slots {
     margin: 0;
     padding: 0;
@@ -135,29 +139,6 @@
   .gives {
     color: var(--muted);
     font-size: var(--text-xs);
-  }
-
-  .add {
-    display: inline-grid;
-    place-items: center;
-    width: 20px;
-    height: 20px;
-    margin-left: auto;
-    padding: 0;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--muted);
-    cursor: pointer;
-  }
-
-  .add:hover:not(:disabled) {
-    color: var(--text);
-  }
-
-  .add:disabled {
-    opacity: 0.4;
-    cursor: default;
   }
 
   .how {

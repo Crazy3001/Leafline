@@ -25,7 +25,7 @@
         {:else}
           <Ref kind="item" name={drop.item} />
         {/if}
-        {#if drop.quest}<span class="tag">quest</span>{/if}
+        {#if drop.quest}<span class="badge tag">quest</span>{/if}
         {#if quantity(drop)}<span class="rate tabular">{quantity(drop)}</span>{/if}
       </li>
     {/each}
@@ -72,14 +72,6 @@
     font-size: var(--text-md);
     font-weight: var(--weight-strong);
     white-space: nowrap;
-  }
-
-  .tag {
-    padding: 0 var(--space-1);
-    border-radius: var(--radius-sm);
-    background: var(--surface-3);
-    color: var(--muted);
-    font-size: var(--text-xs);
   }
 
   .note {
