@@ -19,12 +19,12 @@
     display: grid;
     grid-template-columns: repeat(var(--count), auto);
     gap: 0;
-    margin-bottom: 8px;
+    margin-bottom: var(--space-2);
     border-bottom: 1px solid var(--border);
   }
 
   .kinds button {
-    padding: 3px 2px 5px;
+    padding: var(--space-0-5) var(--space-0-5) var(--space-1);
     border: 0;
     border-bottom: 2px solid transparent;
     background: transparent;

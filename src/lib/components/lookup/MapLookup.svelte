@@ -219,22 +219,22 @@
 
 <style>
   .save-row {
-    margin: 2px 0 8px;
+    margin: var(--space-0-5) 0 var(--space-2);
   }
 
   .lead {
-    margin: 0 0 10px;
+    margin: 0 0 var(--space-2);
     color: var(--muted);
     font-size: var(--text-md);
   }
 
   /* A card pads itself; these sit beside cards, so they match it. A pinned window pads its body. */
   .controls {
-    padding: 8px 12px 0;
+    padding: var(--space-2) var(--space-3) 0;
   }
 
   .list {
-    padding: 0 12px 10px;
+    padding: 0 var(--space-3) var(--space-2);
   }
 
   .controls.pinned,
@@ -243,7 +243,7 @@
   }
 
   .heading {
-    margin: 8px 0 3px;
+    margin: var(--space-2) 0 var(--space-0-5);
     color: var(--muted);
     font-family: var(--font-display);
     font-size: var(--text-md);
@@ -264,7 +264,7 @@
   }
 
   .count {
-    margin: 0 0 4px;
+    margin: 0 0 var(--space-1);
     color: var(--faint);
     font-size: var(--text-xs);
   }
@@ -282,8 +282,8 @@
   .back {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    margin: 2px 12px 6px;
+    gap: var(--space-1);
+    margin: var(--space-0-5) var(--space-3) var(--space-1-5);
     padding: 0;
     border: 0;
     background: transparent;
@@ -304,11 +304,11 @@
   }
 
   .back.inline {
-    margin-top: 6px;
+    margin-top: var(--space-1-5);
   }
 
   .quiet {
-    margin: 10px 0 6px;
+    margin: var(--space-2) 0 var(--space-1-5);
     color: var(--faint);
     font-size: var(--text-md);
   }

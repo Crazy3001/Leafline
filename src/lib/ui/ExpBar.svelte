@@ -69,7 +69,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 3px;
+    gap: var(--space-0-5);
     color: #fff;
     font-size: var(--text-2xs);
     font-weight: var(--weight-strong);

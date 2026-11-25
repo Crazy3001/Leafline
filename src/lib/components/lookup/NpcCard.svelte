@@ -127,8 +127,8 @@
   .title-row {
     display: flex;
     align-items: center;
-    gap: 12px;
-    margin-bottom: 10px;
+    gap: var(--space-3);
+    margin-bottom: var(--space-2);
   }
 
   .title-text {
@@ -136,7 +136,7 @@
   }
 
   .roles {
-    margin: 2px 0 0;
+    margin: var(--space-0-5) 0 0;
     color: var(--muted);
     font-size: var(--text-md);
   }
@@ -156,7 +156,7 @@
   }
 
   .quests li {
-    padding: 3px 0;
+    padding: var(--space-0-5) 0;
   }
 
   .quests li + li {

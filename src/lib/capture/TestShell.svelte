@@ -26,31 +26,31 @@
   main {
     max-width: 920px;
     margin: 0 auto;
-    padding: 24px 16px 64px;
+    padding: var(--space-6) var(--space-4) 64px;
   }
 
   .test :global(h1) {
-    margin: 0 0 6px;
+    margin: 0 0 var(--space-1-5);
     font-family: var(--font-display);
     font-size: 22px;
   }
 
   .test :global(h2) {
-    margin: 0 0 4px;
+    margin: 0 0 var(--space-1);
     font-family: var(--font-display);
     font-size: 16px;
   }
 
   .test :global(section) {
-    margin: 18px 0 0;
-    padding: 16px;
+    margin: var(--space-4) 0 0;
+    padding: var(--space-4);
     border: var(--line-w) solid var(--border);
     border-radius: var(--radius, 10px);
     background: var(--surface);
   }
 
   .test :global(.lead) {
-    margin: 0 0 10px;
+    margin: 0 0 var(--space-2);
     color: var(--muted);
   }
 
@@ -58,15 +58,15 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 8px;
-    margin: 10px 0;
+    gap: var(--space-2);
+    margin: var(--space-2) 0;
   }
 
   .test :global(.button) {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 5px 12px;
+    gap: var(--space-1-5);
+    padding: var(--space-1) var(--space-3);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm, 6px);
     background: transparent;
@@ -89,7 +89,7 @@
   }
 
   .test :global(select) {
-    padding: 4px 6px;
+    padding: var(--space-1) var(--space-1-5);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm, 6px);
     background: var(--surface-raised);
@@ -97,16 +97,16 @@
   }
 
   .test :global(ol) {
-    margin: 6px 0;
-    padding-left: 20px;
+    margin: var(--space-1-5) 0;
+    padding-left: var(--space-5);
   }
 
   .test :global(li) {
-    margin: 3px 0;
+    margin: var(--space-0-5) 0;
   }
 
   .test :global(.status) {
-    margin: 6px 0;
+    margin: var(--space-1-5) 0;
   }
 
   .test :global(.good) {

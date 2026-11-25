@@ -149,15 +149,15 @@
   .loot {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--space-1-5);
   }
 
   .head {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     width: 100%;
-    padding: 4px 0;
+    padding: var(--space-1) 0;
     border: 0;
     background: transparent;
     color: var(--text);
@@ -192,7 +192,7 @@
   .body {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--space-2);
   }
 
   .muted {
@@ -212,7 +212,7 @@
     display: flex;
     flex-wrap: wrap;
     justify-content: space-between;
-    gap: 8px;
+    gap: var(--space-2);
     font-size: var(--text-md);
   }
 
@@ -227,7 +227,7 @@
   }
 
   th {
-    padding: 0 0 4px;
+    padding: 0 0 var(--space-1);
     font-size: var(--text-xs);
     font-weight: var(--weight-body);
     color: var(--faint);
@@ -235,7 +235,7 @@
   }
 
   td {
-    padding: 3px 0;
+    padding: var(--space-0-5) 0;
     border-top: 1px solid var(--border);
     text-align: right;
   }
@@ -252,6 +252,6 @@
   .actions {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
   }
 </style>

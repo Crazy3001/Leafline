@@ -41,8 +41,8 @@
     flex-wrap: wrap;
     align-items: center;
     justify-content: center;
-    gap: 10px;
-    padding: 8px 16px;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-4);
     border-bottom: var(--line-w) solid var(--accent);
     background: var(--surface);
     color: var(--text);
@@ -51,7 +51,7 @@
 
   .button {
     height: var(--control-h);
-    padding: 0 12px;
+    padding: 0 var(--space-3);
     border: var(--line-w) solid var(--accent);
     border-radius: var(--radius);
     background: var(--accent);

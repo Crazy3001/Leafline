@@ -72,8 +72,8 @@
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
-    gap: 2px 8px;
-    margin: 2px 0 0;
+    gap: var(--space-0-5) var(--space-2);
+    margin: var(--space-0-5) 0 0;
     color: var(--muted);
     font-size: var(--text-md);
   }
@@ -86,7 +86,7 @@
   .toggle {
     display: inline-flex;
     align-items: center;
-    gap: 3px;
+    gap: var(--space-0-5);
     padding: 0;
     border: 0;
     background: transparent;
@@ -102,11 +102,11 @@
   }
 
   .route {
-    margin-top: 5px;
+    margin-top: var(--space-1);
   }
 
   .none {
-    margin: 4px 0 0;
+    margin: var(--space-1) 0 0;
     color: var(--faint);
     font-size: var(--text-xs);
   }

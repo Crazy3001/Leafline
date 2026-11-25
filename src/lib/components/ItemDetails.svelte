@@ -236,13 +236,13 @@
 
 <style>
   .piece-error {
-    margin: 4px 0 0;
+    margin: var(--space-1) 0 0;
     color: var(--bad);
     font-size: var(--text-md);
   }
 
   .about {
-    margin: 8px 0 0;
+    margin: var(--space-2) 0 0;
     color: var(--muted);
     font-size: var(--text-md);
     white-space: pre-line;
@@ -251,12 +251,12 @@
   .facts {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
-    gap: 6px;
-    margin: 10px 0 0;
+    gap: var(--space-1-5);
+    margin: var(--space-2) 0 0;
   }
 
   .facts div {
-    padding: 4px 7px;
+    padding: var(--space-1) var(--space-2);
     border-radius: var(--radius-sm);
     background: var(--hover);
   }
@@ -272,7 +272,7 @@
   }
 
   .tags {
-    margin: 6px 0 0;
+    margin: var(--space-1-5) 0 0;
     color: var(--warn);
     font-size: var(--text-md);
   }
@@ -280,15 +280,15 @@
   .actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px;
-    margin-top: 10px;
+    gap: var(--space-1);
+    margin-top: var(--space-2);
   }
 
   .actions button {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 3px 8px;
+    gap: var(--space-1);
+    padding: var(--space-0-5) var(--space-2);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: transparent;
@@ -310,7 +310,7 @@
   }
 
   .note {
-    margin: 4px 0 0;
+    margin: var(--space-1) 0 0;
     color: var(--faint);
     font-size: var(--text-md);
   }

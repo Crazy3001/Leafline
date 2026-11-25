@@ -156,7 +156,7 @@
   }
 
   .looks {
-    margin: 0 0 6px;
+    margin: 0 0 var(--space-1-5);
     color: var(--muted);
     font-size: var(--text-xs);
   }
@@ -172,8 +172,8 @@
   h4 {
     display: flex;
     align-items: center;
-    gap: 5px;
-    margin: 10px 0 4px;
+    gap: var(--space-1);
+    margin: var(--space-2) 0 var(--space-1);
     color: var(--muted);
     font-size: var(--text-xs);
     font-weight: var(--weight-strong);
@@ -190,7 +190,7 @@
   }
 
   .rows li {
-    padding: 4px 0;
+    padding: var(--space-1) 0;
   }
 
   .rows li + li {
@@ -206,7 +206,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0 4px;
+    gap: 0 var(--space-1);
     margin: 1px 0 0;
     color: var(--muted);
     font-size: var(--text-xs);
@@ -235,7 +235,7 @@
   }
 
   .foot {
-    margin: 10px 0 0;
+    margin: var(--space-2) 0 0;
     font-size: var(--text-xs);
   }
 

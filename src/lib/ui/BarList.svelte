@@ -52,7 +52,7 @@
     gap: var(--space-3);
     align-items: center;
     width: 100%;
-    padding: 6px var(--space-2);
+    padding: var(--space-1-5) var(--space-2);
     border: 0;
     background: transparent;
     text-align: left;

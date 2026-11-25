@@ -121,8 +121,8 @@
   .top {
     display: flex;
     align-items: center;
-    gap: 11px;
-    padding: 12px 8px 10px 14px;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-2) var(--space-2) 14px;
   }
 
   .who {
@@ -143,7 +143,7 @@
   .under {
     display: flex;
     align-items: center;
-    gap: 7px;
+    gap: var(--space-1-5);
     margin-top: 1px;
     color: var(--header-muted);
     font-size: var(--text-md);
@@ -154,8 +154,8 @@
   .live {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    padding: 1px 6px 1px 4px;
+    gap: var(--space-1);
+    padding: 1px var(--space-1-5) 1px var(--space-1);
     margin-left: -4px;
     border: 0;
     border-radius: var(--radius-pill);
@@ -209,8 +209,8 @@
     display: flex;
     align-items: baseline;
     justify-content: space-between;
-    gap: 10px;
-    padding: 0 14px 11px;
+    gap: var(--space-2);
+    padding: 0 var(--space-4) var(--space-3);
     font-size: var(--text-xs);
     white-space: nowrap;
   }
@@ -218,7 +218,7 @@
   .amount {
     display: flex;
     align-items: baseline;
-    gap: 8px;
+    gap: var(--space-2);
     min-width: 0;
   }
 

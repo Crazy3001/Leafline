@@ -204,11 +204,11 @@
   aside {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--space-0-5);
     width: 216px;
     flex: none;
     min-height: 0;
-    padding: 12px 10px;
+    padding: var(--space-3) var(--space-3);
     overflow-y: auto;
     border-right: var(--line-w) solid var(--border);
     background: color-mix(in srgb, var(--surface) 35%, var(--bg));
@@ -217,18 +217,18 @@
   aside.folded {
     width: 60px;
     align-items: center;
-    padding: 12px 8px;
+    padding: var(--space-3) var(--space-2);
   }
 
   .brand {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 2px 4px 10px 8px;
+    gap: var(--space-2);
+    padding: var(--space-0-5) var(--space-1) var(--space-2) var(--space-2);
   }
 
   .folded .brand {
-    padding: 2px 0 10px;
+    padding: var(--space-0-5) 0 var(--space-2);
   }
 
   .word {
@@ -262,9 +262,9 @@
 
   .who {
     display: grid;
-    gap: 3px;
-    margin-bottom: 8px;
-    padding: 11px 12px;
+    gap: var(--space-0-5);
+    margin-bottom: var(--space-2);
+    padding: var(--space-3) var(--space-3);
     border: var(--line-w) solid var(--line);
     border-radius: var(--radius);
     background: var(--surface);
@@ -276,7 +276,7 @@
     display: flex;
     align-items: baseline;
     justify-content: space-between;
-    gap: 8px;
+    gap: var(--space-2);
   }
 
   .name {
@@ -294,7 +294,7 @@
   }
 
   .line {
-    margin-top: 4px;
+    margin-top: var(--space-1);
     font-size: var(--text-xs);
   }
 
@@ -318,7 +318,7 @@
 
   .track {
     height: 5px;
-    margin-top: 5px;
+    margin-top: var(--space-1);
     border-radius: var(--radius-pill);
     background: var(--track);
     overflow: hidden;
@@ -339,7 +339,7 @@
     display: inline-flex;
     flex: none;
     align-items: center;
-    gap: 5px;
+    gap: var(--space-1);
     color: var(--faint);
     font-size: var(--text-xs);
     --dot: var(--faint);
@@ -369,7 +369,7 @@
 
   .ring {
     position: relative;
-    margin-bottom: 8px;
+    margin-bottom: var(--space-2);
   }
 
   .ring .dot {
@@ -406,8 +406,8 @@
   }
 
   .group {
-    margin: 10px 0 3px;
-    padding: 0 10px;
+    margin: var(--space-2) 0 var(--space-0-5);
+    padding: 0 var(--space-3);
     color: var(--faint);
     font-size: var(--text-xs);
     font-weight: var(--weight-body);
@@ -415,17 +415,17 @@
 
   .rule {
     display: block;
-    margin: 8px 6px;
+    margin: var(--space-2) var(--space-1-5);
     border-top: 1px solid var(--border);
   }
 
   .nav {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-2);
     width: 100%;
     height: 34px;
-    padding: 0 10px;
+    padding: 0 var(--space-3);
     border: 0;
     border-radius: var(--radius-sm);
     background: transparent;
@@ -484,10 +484,10 @@
 
   .foot {
     display: grid;
-    gap: 4px;
+    gap: var(--space-1);
     width: 100%;
     margin-top: auto;
-    padding-top: 10px;
+    padding-top: var(--space-2);
   }
 
   .text-size {
@@ -495,8 +495,8 @@
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 4px 6px;
-    padding: 0 0 0 10px;
+    gap: var(--space-1) var(--space-1-5);
+    padding: 0 0 0 var(--space-3);
   }
 
   .faint {
@@ -505,8 +505,8 @@
   }
 
   .credits {
-    margin: 6px 0 0;
-    padding: 8px 10px 0;
+    margin: var(--space-1-5) 0 0;
+    padding: var(--space-2) var(--space-3) 0;
     border-top: 1px solid var(--border);
     color: var(--faint);
     font-size: var(--text-2xs);

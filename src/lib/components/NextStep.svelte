@@ -332,15 +332,15 @@
   .bar {
     display: flex;
     align-items: flex-start;
-    gap: 6px;
-    padding: 5px 6px 5px 10px;
+    gap: var(--space-1-5);
+    padding: var(--space-1) var(--space-1-5) var(--space-1) var(--space-3);
     border-bottom: 1px solid var(--border);
     background: var(--surface-2);
     font-size: var(--text-md);
   }
 
   .bar.hud {
-    padding: 4px 4px 4px 10px;
+    padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
     border-top: 1px solid var(--border);
     border-bottom: 0;
     background: transparent;
@@ -349,8 +349,8 @@
 
   .trip {
     align-items: center;
-    gap: 10px;
-    padding: 8px 6px 8px 8px;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-1-5) var(--space-2) var(--space-2);
     border-left: 3px solid var(--accent);
     background: color-mix(in srgb, var(--accent) 7%, var(--surface-2));
   }
@@ -365,8 +365,8 @@
   }
 
   .trip.hud {
-    gap: 7px;
-    padding: 4px 4px 4px 6px;
+    gap: var(--space-1-5);
+    padding: var(--space-1) var(--space-1) var(--space-1) var(--space-1-5);
     border-left-width: 2px;
   }
 
@@ -403,7 +403,7 @@
   .head {
     display: flex;
     justify-content: space-between;
-    gap: 8px;
+    gap: var(--space-2);
     margin: 0 0 1px;
     font-size: var(--text-xs);
     line-height: 1.2;
@@ -411,8 +411,8 @@
 
   .progress {
     display: flex;
-    gap: 2px;
-    margin-top: 5px;
+    gap: var(--space-0-5);
+    margin-top: var(--space-1);
   }
 
   .progress span {
@@ -442,16 +442,16 @@
   .tools {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px;
-    margin-top: 6px;
+    gap: var(--space-1);
+    margin-top: var(--space-1-5);
   }
 
   .tool {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--space-1);
     height: 22px;
-    padding: 0 6px;
+    padding: 0 var(--space-1-5);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: color-mix(in srgb, var(--bg) 35%, transparent);
@@ -502,8 +502,8 @@
   }
 
   .drawer {
-    margin-top: 6px;
-    padding: 6px 8px 7px;
+    margin-top: var(--space-1-5);
+    padding: var(--space-1-5) var(--space-2) var(--space-1-5);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     background: color-mix(in srgb, var(--bg) 45%, transparent);
@@ -525,7 +525,7 @@
   }
 
   .drawer-note {
-    margin: 4px 0 0;
+    margin: var(--space-1) 0 0;
     color: var(--faint);
     font-size: var(--text-xs);
   }
@@ -534,7 +534,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     color: var(--warn);
   }
 
@@ -542,7 +542,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 10px;
+    gap: var(--space-2);
   }
 
   .switch-row .name {
@@ -562,8 +562,8 @@
   .kinds {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px 12px;
-    margin-top: 6px;
+    gap: var(--space-1) var(--space-3);
+    margin-top: var(--space-1-5);
   }
 
   .kinds.off {
@@ -573,7 +573,7 @@
   .kind {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: var(--space-1);
     color: var(--muted);
     font-size: var(--text-xs);
     cursor: pointer;
@@ -591,8 +591,8 @@
   .get {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 2px 8px;
+    gap: var(--space-1);
+    padding: var(--space-0-5) var(--space-2);
     border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
     border-radius: var(--radius-sm);
     background: var(--accent-soft);
@@ -619,12 +619,12 @@
 
   /* The pin's window frames it, and the next step is all it shows, so it reads larger. */
   .bar.pin {
-    padding: 6px 2px 6px 8px;
+    padding: var(--space-1-5) var(--space-0-5) var(--space-1-5) var(--space-2);
     border-bottom: 0;
   }
 
   .bar.pin + .bar.pin {
-    margin-top: 6px;
+    margin-top: var(--space-1-5);
   }
 
   .pin .next {
@@ -633,7 +633,7 @@
 
   .idle {
     margin: 0;
-    padding: 4px 0;
+    padding: var(--space-1) 0;
     color: var(--faint);
     font-size: var(--text-md);
   }
@@ -646,7 +646,7 @@
   .icon {
     display: inline-grid;
     flex: none;
-    margin-top: 3px;
+    margin-top: var(--space-0-5);
     color: var(--accent-text);
   }
 
@@ -668,7 +668,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
-    gap: 0 6px;
+    gap: 0 var(--space-1-5);
     font-size: var(--text-md);
     font-weight: var(--weight-strong);
     line-height: 1.3;
@@ -780,7 +780,7 @@
    * the window; with no known way it falls back to a plain card with a warning edge.
    */
   .bar:not(.hud) {
-    margin: 0 10px 10px;
+    margin: 0 var(--space-3) var(--space-2);
     border: var(--line-w) solid var(--line);
     border-radius: var(--radius-lg);
     box-shadow: var(--card-shadow);
@@ -791,8 +791,8 @@
   }
 
   .trip:not(.hud) {
-    gap: 12px;
-    padding: 11px 8px 11px 12px;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-2) var(--space-3) var(--space-3);
   }
 
   .trip.lost:not(.hud) {
@@ -820,8 +820,8 @@
   .go .head {
     align-items: center;
     justify-content: flex-start;
-    gap: 5px;
-    margin-bottom: 2px;
+    gap: var(--space-1);
+    margin-bottom: var(--space-0-5);
     color: var(--accent-sub);
     font-weight: var(--weight-strong);
   }
@@ -863,7 +863,7 @@
   }
 
   .go .rest {
-    margin-top: 2px;
+    margin-top: var(--space-0-5);
     font-size: var(--text-xs);
   }
 
@@ -874,8 +874,8 @@
   }
 
   .go .progress {
-    gap: 3px;
-    margin-top: 7px;
+    gap: var(--space-0-5);
+    margin-top: var(--space-1-5);
   }
 
   .go .progress span {

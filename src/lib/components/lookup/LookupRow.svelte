@@ -47,10 +47,10 @@
   .row {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
-    column-gap: 8px;
+    column-gap: var(--space-2);
     align-items: baseline;
     width: 100%;
-    padding: 6px 24px 6px 6px;
+    padding: var(--space-1-5) var(--space-6) var(--space-1-5) var(--space-1-5);
     border: 0;
     border-radius: var(--radius-sm);
     background: transparent;
@@ -65,7 +65,7 @@
   }
 
   .name :global(.row-pic) {
-    margin-right: 6px;
+    margin-right: var(--space-1-5);
   }
 
   .name {
@@ -89,7 +89,7 @@
   }
 
   small {
-    margin-left: 5px;
+    margin-left: var(--space-1-5);
     color: var(--faint);
     font-size: var(--text-xs);
     font-weight: var(--weight-body);
@@ -104,7 +104,7 @@
   .below {
     grid-column: 1 / -1;
     min-width: 0;
-    margin-top: 3px;
+    margin-top: var(--space-0-5);
   }
 
   .line {

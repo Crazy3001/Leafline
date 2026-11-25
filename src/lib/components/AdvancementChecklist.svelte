@@ -231,7 +231,7 @@
 <style>
   .steps {
     display: grid;
-    gap: 4px;
+    gap: var(--space-1);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -241,7 +241,7 @@
   .steps li {
     display: flex;
     align-items: baseline;
-    gap: 8px;
+    gap: var(--space-2);
   }
 
   .box {
@@ -288,7 +288,7 @@
   }
 
   .hedge {
-    margin: 8px 0 0;
+    margin: var(--space-2) 0 0;
     color: var(--faint);
     font-size: var(--text-xs);
     line-height: 1.4;

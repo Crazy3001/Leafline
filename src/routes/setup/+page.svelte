@@ -457,7 +457,7 @@
 
   /* Narrow: the steps run across the top. */
   header {
-    padding: 16px 28px 14px;
+    padding: var(--space-4) var(--space-8) var(--space-3);
     border-bottom: 1px solid var(--border);
     background: var(--header-bg);
     color: var(--header-text);
@@ -466,14 +466,14 @@
   .brand {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
     font-family: var(--font-display);
     font-size: var(--text-lg);
     font-weight: var(--weight-strong);
   }
 
   .about {
-    margin: 2px 0 12px;
+    margin: var(--space-0-5) 0 var(--space-3);
     color: var(--header-faint);
     font-size: var(--text-xs);
   }
@@ -481,7 +481,7 @@
   .steps {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px 16px;
+    gap: var(--space-2) var(--space-4);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -493,7 +493,7 @@
     position: relative;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
   }
 
   .steps li.current {
@@ -539,13 +539,13 @@
 
     header {
       grid-row: 1 / 3;
-      padding: 22px 18px;
+      padding: var(--space-5) var(--space-5);
       border-right: 1px solid var(--border);
       border-bottom: 0;
     }
 
     .about {
-      margin-bottom: 20px;
+      margin-bottom: var(--space-5);
     }
 
     .steps {
@@ -555,7 +555,7 @@
     }
 
     .steps li {
-      padding: 8px 0;
+      padding: var(--space-2) 0;
     }
 
     .num {
@@ -585,30 +585,30 @@
 
   main {
     overflow-y: auto;
-    padding: 22px 28px;
+    padding: var(--space-5) var(--space-8);
   }
 
   h1 {
-    margin: 0 0 6px;
+    margin: 0 0 var(--space-1-5);
     font-family: var(--font-display);
     font-size: var(--text-xl);
     font-weight: var(--weight-strong);
   }
 
   h2 {
-    margin: 22px 0 8px;
+    margin: var(--space-5) 0 var(--space-2);
     font-size: var(--text-md);
     font-weight: var(--weight-strong);
   }
 
   .lead {
-    margin: 0 0 14px;
+    margin: 0 0 var(--space-3);
     color: var(--muted);
   }
 
   .plain {
-    margin: 0 0 6px;
-    padding: 10px 12px;
+    margin: 0 0 var(--space-1-5);
+    padding: var(--space-2) var(--space-3);
     border-left: 2px solid var(--accent);
     background: var(--surface-2);
   }
@@ -617,14 +617,14 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 20px;
-    padding: 14px 0;
+    gap: var(--space-5);
+    padding: var(--space-3) 0;
     border-bottom: 1px solid var(--border);
   }
 
   .row label {
     display: grid;
-    gap: 2px;
+    gap: var(--space-0-5);
   }
 
   .name {
@@ -640,7 +640,7 @@
 
   .never {
     display: grid;
-    gap: 6px;
+    gap: var(--space-1-5);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -650,7 +650,7 @@
   .never li {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
   }
 
   .mark {
@@ -667,8 +667,8 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 16px;
-    padding: 8px 0;
+    gap: var(--space-4);
+    padding: var(--space-2) 0;
   }
 
   .keys div + div {
@@ -682,11 +682,11 @@
   dd.test {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: var(--space-3);
   }
 
   kbd {
-    padding: 1px 6px;
+    padding: 1px var(--space-1-5);
     border: 1px solid var(--border-strong);
     border-bottom-width: 2px;
     border-radius: var(--radius-sm);
@@ -699,7 +699,7 @@
   .status {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--space-1);
     min-width: 92px;
     color: var(--faint);
     font-size: var(--text-md);
@@ -724,8 +724,8 @@
 
   .tips li {
     display: flex;
-    gap: 12px;
-    padding: 12px 0;
+    gap: var(--space-3);
+    padding: var(--space-3) 0;
   }
 
   .tips li + li {
@@ -741,14 +741,14 @@
 
   .places {
     display: grid;
-    gap: 8px;
+    gap: var(--space-2);
   }
 
   .place {
     display: flex;
-    gap: 12px;
+    gap: var(--space-3);
     width: 100%;
-    padding: 12px;
+    padding: var(--space-3);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--surface);
@@ -776,26 +776,26 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 10px;
-    margin-top: 12px;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
   }
 
   .try .note {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     margin: 0;
   }
 
   .box {
-    padding: 12px;
+    padding: var(--space-3);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     background: var(--surface);
   }
 
   .note {
-    margin: 12px 0 0;
+    margin: var(--space-3) 0 0;
     color: var(--faint);
     font-size: var(--text-md);
   }
@@ -805,17 +805,17 @@
   }
 
   footer {
-    padding: 12px 28px 16px;
+    padding: var(--space-3) var(--space-8) var(--space-4);
     border-top: 1px solid var(--border);
   }
 
   footer .note {
-    margin: 0 0 8px;
+    margin: 0 0 var(--space-2);
   }
 
   .nav {
     display: flex;
-    gap: 8px;
+    gap: var(--space-2);
   }
 
   .spacer {
@@ -825,8 +825,8 @@
   .button {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 6px 14px;
+    gap: var(--space-1-5);
+    padding: var(--space-1-5) var(--space-4);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: transparent;
@@ -864,7 +864,7 @@
   .link {
     display: inline-flex;
     align-items: center;
-    gap: 3px;
+    gap: var(--space-0-5);
     padding: 0;
     border: 0;
     background: none;

@@ -138,13 +138,13 @@
 
 <style>
   .group + .group {
-    margin-top: 6px;
+    margin-top: var(--space-1-5);
   }
 
   .shop-line {
     display: flex;
     align-items: baseline;
-    gap: 6px;
+    gap: var(--space-1-5);
   }
 
   .shop-line .price {
@@ -159,9 +159,9 @@
   .mob-head {
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: var(--space-1);
     width: 100%;
-    padding: 4px 0;
+    padding: var(--space-1) 0;
     border: 0;
     background: transparent;
     text-align: left;
@@ -224,7 +224,7 @@
 
   .row-rest {
     flex: 1;
-    gap: 5px;
+    gap: var(--space-1);
     align-self: stretch;
   }
 
@@ -253,14 +253,14 @@
   }
 
   .maps {
-    gap: 3px;
-    padding: 0 0 7px 17px;
+    gap: var(--space-0-5);
+    padding: 0 0 var(--space-1-5) 17px;
   }
 
   .maps > li {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     font-size: var(--text-md);
   }
 
@@ -271,8 +271,8 @@
   }
 
   .quests {
-    gap: 6px;
-    padding: 6px 0 2px;
+    gap: var(--space-1-5);
+    padding: var(--space-1-5) 0 var(--space-0-5);
   }
 
   .quests li {

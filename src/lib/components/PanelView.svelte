@@ -90,7 +90,7 @@
 <style>
   .empty {
     margin: 0;
-    padding: 18px 10px;
+    padding: var(--space-4) var(--space-3);
     color: var(--faint);
     font-size: var(--text-md);
     text-align: center;

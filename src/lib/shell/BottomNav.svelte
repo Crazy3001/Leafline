@@ -64,7 +64,7 @@
   .tablist {
     display: flex;
     height: 60px;
-    padding: 0 4px;
+    padding: 0 var(--space-1);
     outline: none;
   }
 
@@ -74,9 +74,9 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 3px;
+    gap: var(--space-0-5);
     min-width: 0;
-    margin: 6px 3px;
+    margin: var(--space-1-5) var(--space-1);
     padding: 0;
     border: var(--line-w) solid transparent;
     border-radius: 12px;

@@ -290,18 +290,18 @@
 
 <style>
   .lead {
-    margin: 0 0 10px;
+    margin: 0 0 var(--space-2);
     color: var(--muted);
     font-size: var(--text-md);
   }
 
   /* A card pads itself; these sit beside cards, so they match it. A pinned window pads its body. */
   .controls {
-    padding: 8px 12px 0;
+    padding: var(--space-2) var(--space-3) 0;
   }
 
   .list {
-    padding: 0 12px 10px;
+    padding: 0 var(--space-3) var(--space-2);
   }
 
   .controls.pinned,
@@ -310,7 +310,7 @@
   }
 
   .count {
-    margin: 10px 0 4px;
+    margin: var(--space-2) 0 var(--space-1);
     color: var(--faint);
     font-size: var(--text-xs);
   }
@@ -333,10 +333,10 @@
   .row {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 26px 46px 44px;
-    column-gap: 6px;
+    column-gap: var(--space-1-5);
     align-items: baseline;
     width: 100%;
-    padding: 4px 24px 4px 4px;
+    padding: var(--space-1) var(--space-6) var(--space-1) var(--space-1);
     border: 0;
     border-radius: var(--radius-sm);
     background: transparent;
@@ -360,7 +360,7 @@
   }
 
   .head {
-    padding-block: 0 3px;
+    padding-block: 0 var(--space-0-5);
     color: var(--faint);
     font-size: var(--text-xs);
     font-weight: var(--weight-body);
@@ -393,7 +393,7 @@
   .name {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     min-width: 0;
     color: var(--text);
     font-size: var(--text-md);
@@ -416,7 +416,7 @@
 
   .tag {
     flex: none;
-    padding: 0 4px;
+    padding: 0 var(--space-1);
     border-radius: var(--radius-sm);
     background: var(--hover);
     color: var(--faint);
@@ -437,8 +437,8 @@
   .back {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    margin: 2px 12px 6px;
+    gap: var(--space-1);
+    margin: var(--space-0-5) var(--space-3) var(--space-1-5);
     padding: 0;
     border: 0;
     background: transparent;
@@ -459,11 +459,11 @@
   }
 
   .back.inline {
-    margin-top: 6px;
+    margin-top: var(--space-1-5);
   }
 
   .quiet {
-    margin: 10px 0 6px;
+    margin: var(--space-2) 0 var(--space-1-5);
     color: var(--faint);
     font-size: var(--text-md);
   }

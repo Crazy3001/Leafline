@@ -151,8 +151,8 @@
 
 <style>
   .levelling {
-    margin: 4px 0 8px;
-    padding: 8px 10px;
+    margin: var(--space-1) 0 var(--space-2);
+    padding: var(--space-2) var(--space-3);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background: var(--surface);
@@ -161,13 +161,13 @@
   .inputs {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
-    gap: 6px 8px;
+    gap: var(--space-1-5) var(--space-2);
     align-items: end;
   }
 
   label {
     display: grid;
-    gap: 2px;
+    gap: var(--space-0-5);
     color: var(--faint);
     font-size: var(--text-xs);
   }
@@ -176,7 +176,7 @@
   select {
     width: 100%;
     height: 26px;
-    padding: 0 6px;
+    padding: 0 var(--space-1-5);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--surface-2);
@@ -186,15 +186,15 @@
   .sort {
     display: inline-flex;
     grid-column: span 2;
-    gap: 2px;
-    padding: 2px;
+    gap: var(--space-0-5);
+    padding: var(--space-0-5);
     border-radius: var(--radius-sm);
     background: var(--hover);
   }
 
   .sort button {
     flex: 1;
-    padding: 3px 6px;
+    padding: var(--space-0-5) var(--space-1-5);
     border: 0;
     border-radius: var(--radius-sm);
     background: transparent;
@@ -210,14 +210,14 @@
 
   .plans {
     display: grid;
-    gap: 6px;
-    margin: 10px 0 0;
+    gap: var(--space-1-5);
+    margin: var(--space-2) 0 0;
     padding: 0;
     list-style: none;
   }
 
   .plans li {
-    padding: 5px 7px;
+    padding: var(--space-1) var(--space-2);
     border-radius: var(--radius-sm);
     background: var(--hover);
   }
@@ -229,7 +229,7 @@
   .head {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     font-size: var(--text-md);
     font-weight: var(--weight-strong);
   }
@@ -242,7 +242,7 @@
   }
 
   .line {
-    margin: 2px 0 0;
+    margin: var(--space-0-5) 0 0;
     color: var(--muted);
     font-size: var(--text-xs);
   }
@@ -256,7 +256,7 @@
   }
 
   .note {
-    margin: 8px 0 0;
+    margin: var(--space-2) 0 0;
     color: var(--faint);
     font-size: var(--text-xs);
   }

@@ -171,7 +171,7 @@
     gap: var(--space-2);
     width: 100%;
     margin-top: var(--space-3);
-    padding: var(--space-2) 10px;
+    padding: var(--space-2) var(--space-3);
     border: 0;
     background: var(--surface-2);
     color: var(--text);
@@ -193,7 +193,7 @@
     display: inline-flex;
     flex: none;
     align-items: center;
-    gap: 2px;
+    gap: var(--space-0-5);
   }
 
   .strong {
@@ -212,8 +212,8 @@
   .identity {
     display: flex;
     align-items: center;
-    gap: 12px;
-    margin-bottom: 12px;
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
   }
 
   .level {
@@ -246,7 +246,7 @@
   .mesos {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     color: var(--muted);
     font-size: var(--text-md);
   }
@@ -256,7 +256,7 @@
   }
 
   .name .seen {
-    margin-left: 6px;
+    margin-left: var(--space-1-5);
     font-family: var(--font-sans);
     font-size: var(--text-xs);
     font-weight: var(--weight-body);
@@ -271,23 +271,23 @@
 
   .gauges {
     display: grid;
-    gap: 8px;
+    gap: var(--space-2);
   }
 
   /* Under the window's header: the frame is the shared .card. */
   .vitals,
   .more {
-    margin: 0 10px 10px;
-    padding: 12px 14px 14px;
+    margin: 0 var(--space-3) var(--space-2);
+    padding: var(--space-3) var(--space-4) var(--space-3);
   }
 
   .vitals {
     display: grid;
-    gap: 10px;
+    gap: var(--space-2);
   }
 
   .gauges.two {
     grid-template-columns: 1fr 1fr;
-    gap: 14px;
+    gap: var(--space-3);
   }
 </style>

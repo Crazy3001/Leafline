@@ -97,15 +97,15 @@
     display: grid;
     grid-template-columns: minmax(0, 1.5fr) minmax(0, 1.3fr) repeat(3, minmax(0, 1fr));
     align-items: stretch;
-    padding: 16px 6px;
+    padding: var(--space-4) var(--space-1-5);
   }
 
   .tile {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--space-1);
     min-width: 0;
-    padding: 2px 18px;
+    padding: var(--space-0-5) var(--space-5);
     border-left: 1px solid var(--border);
   }
 
@@ -122,7 +122,7 @@
   .hero-row {
     display: flex;
     align-items: flex-end;
-    gap: 12px;
+    gap: var(--space-3);
     min-width: 0;
   }
 
@@ -155,7 +155,7 @@
     flex: 1;
     min-width: 60px;
     max-width: 170px;
-    margin-bottom: 4px;
+    margin-bottom: var(--space-1);
   }
 
   .mid {
@@ -179,7 +179,7 @@
   }
 
   .sub.at {
-    margin-bottom: 6px;
+    margin-bottom: var(--space-1-5);
   }
 
   .sub.up {
@@ -191,14 +191,14 @@
   }
 
   .controls {
-    margin-top: 2px;
+    margin-top: var(--space-0-5);
   }
 
   /* A narrower desk window: the big two on a row, the rest under them. */
   @container desk-main (max-width: 900px) {
     .glance {
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 14px 0;
+      gap: var(--space-3) 0;
     }
 
     .tile:nth-child(3) {

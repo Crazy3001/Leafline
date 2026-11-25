@@ -83,7 +83,7 @@
 <style>
   .pin {
     display: grid;
-    gap: 8px;
+    gap: var(--space-2);
     font-size: var(--text-md);
   }
 
@@ -91,7 +91,7 @@
     display: flex;
     align-items: baseline;
     justify-content: space-between;
-    gap: 10px;
+    gap: var(--space-2);
     color: var(--muted);
     font-size: var(--text-xs);
     font-weight: var(--weight-strong);
@@ -123,7 +123,7 @@
     display: flex;
     align-items: flex-end;
     justify-content: space-between;
-    gap: 12px;
+    gap: var(--space-3);
   }
 
   .rate {
@@ -151,7 +151,7 @@
   .row {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px 14px;
+    gap: var(--space-1) var(--space-3);
   }
 
   .row b {
@@ -177,19 +177,19 @@
 
   .quest {
     display: grid;
-    padding-top: 8px;
+    padding-top: var(--space-2);
     border-top: 1px solid var(--border);
   }
 
   .head.q {
-    margin-bottom: 6px;
+    margin-bottom: var(--space-1-5);
   }
 
   .objective {
     display: flex;
     justify-content: space-between;
-    gap: 10px;
-    margin-bottom: 4px;
+    gap: var(--space-2);
+    margin-bottom: var(--space-1);
   }
 
   .target {
@@ -219,7 +219,7 @@
 
   .bar {
     height: 5px;
-    margin-bottom: 8px;
+    margin-bottom: var(--space-2);
     border-radius: var(--radius-pill);
     background: var(--track);
     overflow: hidden;

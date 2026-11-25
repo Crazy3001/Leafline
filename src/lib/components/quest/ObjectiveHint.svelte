@@ -182,10 +182,10 @@
   .hint {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     width: 100%;
-    margin: 5px 0 0;
-    padding: 3px 4px 3px 2px;
+    margin: var(--space-1) 0 0;
+    padding: var(--space-0-5) var(--space-1) var(--space-0-5) var(--space-0-5);
     border: 0;
     border-radius: var(--radius-sm);
     background: transparent;
@@ -198,8 +198,8 @@
   .hint-row {
     display: flex;
     align-items: center;
-    gap: 4px;
-    margin: 5px 0 0;
+    gap: var(--space-1);
+    margin: var(--space-1) 0 0;
   }
 
   .hint-row .hint {
@@ -211,7 +211,7 @@
   .ground-row {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--space-1);
   }
 
   .ground-row .ground {
@@ -277,20 +277,20 @@
   }
 
   .detail {
-    margin: 4px 0 2px 19px;
-    padding-left: 8px;
+    margin: var(--space-1) 0 var(--space-0-5) 19px;
+    padding-left: var(--space-2);
     border-left: 1px solid var(--border);
   }
 
   .hunt + .hunt {
-    margin-top: 8px;
+    margin-top: var(--space-2);
   }
 
   .mob {
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
-    gap: 6px;
+    gap: var(--space-1-5);
     font-size: var(--text-md);
   }
 
@@ -301,7 +301,7 @@
   .maps {
     display: grid;
     gap: 1px;
-    margin: 3px 0 0;
+    margin: var(--space-0-5) 0 0;
     padding: 0;
     list-style: none;
   }
@@ -309,9 +309,9 @@
   .ground {
     display: flex;
     align-items: baseline;
-    gap: 8px;
+    gap: var(--space-2);
     width: 100%;
-    padding: 3px 6px;
+    padding: var(--space-0-5) var(--space-1-5);
     border: 0;
     border-radius: var(--radius-sm);
     background: transparent;
@@ -356,7 +356,7 @@
   }
 
   .route {
-    margin-top: 2px;
+    margin-top: var(--space-0-5);
   }
 
   .buy {
@@ -373,15 +373,15 @@
 
   .order {
     display: inline-flex;
-    gap: 2px;
-    margin: 0 0 6px;
-    padding: 2px;
+    gap: var(--space-0-5);
+    margin: 0 0 var(--space-1-5);
+    padding: var(--space-0-5);
     border-radius: var(--radius-sm);
     background: var(--hover);
   }
 
   .order button {
-    padding: 2px 8px;
+    padding: var(--space-0-5) var(--space-2);
     border: 0;
     border-radius: var(--radius-sm);
     background: transparent;
@@ -401,7 +401,7 @@
   }
 
   .note {
-    margin: 6px 0 0;
+    margin: var(--space-1-5) 0 0;
     font-size: var(--text-xs);
     color: var(--faint);
   }

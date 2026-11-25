@@ -196,7 +196,7 @@
     align-items: center;
     justify-content: space-between;
     height: 24px;
-    padding: 0 4px 0 10px;
+    padding: 0 var(--space-1) 0 var(--space-3);
     user-select: none;
     cursor: grab;
   }
@@ -204,7 +204,7 @@
   .title {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: var(--space-1);
     color: var(--muted);
     font-size: var(--text-xs);
     font-weight: var(--weight-strong);
@@ -244,14 +244,14 @@
 
   .body {
     min-height: 0;
-    padding: 2px 10px 10px;
+    padding: var(--space-0-5) var(--space-3) var(--space-2);
     overflow-y: hidden;
   }
 
   /* A pinned window is the card, so the sections inside it stay flat. */
   .body :global(.block.card) {
     margin: 0;
-    padding: 8px 0;
+    padding: var(--space-2) 0;
     border: 0;
     border-radius: 0;
     background: none;

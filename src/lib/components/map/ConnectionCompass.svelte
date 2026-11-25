@@ -263,7 +263,7 @@
     grid-template-rows: auto;
     grid-template-areas: "west wl here wr east";
     align-items: center;
-    padding: 4px 0 2px;
+    padding: var(--space-1) 0 var(--space-0-5);
   }
 
   .compass.has-up {
@@ -295,7 +295,7 @@
   .slot {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--space-1);
     min-width: 0;
   }
 
@@ -360,9 +360,9 @@
     flex-direction: column;
     align-items: center;
     justify-self: center;
-    gap: 2px;
+    gap: var(--space-0-5);
     max-width: 84px;
-    padding: 5px 6px;
+    padding: var(--space-1) var(--space-1-5);
     border-radius: var(--radius-sm);
     border: 1px solid color-mix(in srgb, var(--map) 45%, transparent);
     background: color-mix(in srgb, var(--map) 16%, transparent);
@@ -386,7 +386,7 @@
     gap: 1px;
     max-width: 100%;
     min-width: 0;
-    padding: 4px 6px 5px;
+    padding: var(--space-1) var(--space-1-5) var(--space-1);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--surface-3);
@@ -435,7 +435,7 @@
   .dir {
     display: flex;
     align-items: center;
-    gap: 3px;
+    gap: var(--space-0-5);
     white-space: nowrap;
     color: var(--faint);
     font-size: var(--text-xs);
@@ -505,7 +505,7 @@
     position: absolute;
     top: -7px;
     right: 6px;
-    padding: 0 4px;
+    padding: 0 var(--space-1);
     border-radius: var(--radius-sm);
     background: var(--accent-strong);
     color: var(--accent-ink);
@@ -526,7 +526,7 @@
 
   .more {
     align-self: center;
-    padding: 3px 8px;
+    padding: var(--space-0-5) var(--space-2);
     border: 1px dashed var(--border-strong);
     border-radius: var(--radius-sm);
     background: transparent;
@@ -560,8 +560,8 @@
 
   .others {
     display: grid;
-    gap: 5px;
-    margin-top: 10px;
+    gap: var(--space-1);
+    margin-top: var(--space-2);
   }
 
   .others-label {
@@ -572,7 +572,7 @@
   .other-list {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px;
+    gap: var(--space-1);
   }
 
   .other-list .node {
@@ -582,7 +582,7 @@
   /* The list: one row per portal, left to right across the map. */
   .list {
     display: grid;
-    gap: 3px;
+    gap: var(--space-0-5);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -591,10 +591,10 @@
   .row {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
     width: 100%;
     min-height: 28px;
-    padding: 3px 8px;
+    padding: var(--space-0-5) var(--space-2);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     background: var(--surface-3);
@@ -627,7 +627,7 @@
     display: inline-flex;
     flex: none;
     align-items: center;
-    gap: 3px;
+    gap: var(--space-0-5);
     width: 92px;
     white-space: nowrap;
     color: var(--faint);

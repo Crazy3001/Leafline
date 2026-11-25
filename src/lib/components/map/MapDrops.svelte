@@ -237,8 +237,8 @@
   .kind {
     display: flex;
     align-items: baseline;
-    gap: 6px;
-    margin: 10px 0 2px;
+    gap: var(--space-1-5);
+    margin: var(--space-2) 0 var(--space-0-5);
     color: var(--muted);
     font-size: var(--text-xs);
     font-weight: var(--weight-strong);
@@ -261,9 +261,9 @@
   .meso-line {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
     min-height: 30px;
-    padding: 2px 0;
+    padding: var(--space-0-5) 0;
   }
 
   .items > li + li {
@@ -274,7 +274,7 @@
     display: flex;
     flex: 1;
     align-items: center;
-    gap: 4px;
+    gap: var(--space-1);
     min-width: 0;
     overflow: hidden;
     font-size: var(--text-md);
@@ -292,7 +292,7 @@
     flex: none;
     flex-wrap: wrap;
     justify-content: flex-end;
-    gap: 2px;
+    gap: var(--space-0-5);
     max-width: 55%;
   }
 
@@ -311,26 +311,26 @@
   }
 
   .view {
-    margin-bottom: 6px;
+    margin-bottom: var(--space-1-5);
   }
 
   .monsters {
     display: grid;
-    gap: 8px;
+    gap: var(--space-2);
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
   .monsters > li + li {
-    padding-top: 8px;
+    padding-top: var(--space-2);
     border-top: 1px solid var(--border);
   }
 
   .mob-head {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     min-height: 26px;
   }
 
@@ -352,9 +352,9 @@
   .wrap {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px 12px;
-    margin: 2px 0 0;
-    padding: 0 0 0 4px;
+    gap: var(--space-1) var(--space-3);
+    margin: var(--space-0-5) 0 0;
+    padding: 0 0 0 var(--space-1);
     list-style: none;
     font-size: var(--text-md);
   }
@@ -366,8 +366,8 @@
   }
 
   .tag {
-    margin-left: 4px;
-    padding: 0 4px;
+    margin-left: var(--space-1);
+    padding: 0 var(--space-1);
     border-radius: var(--radius-sm);
     background: var(--surface-3);
     color: var(--muted);
@@ -382,15 +382,15 @@
   }
 
   .none {
-    margin-top: 8px;
+    margin-top: var(--space-2);
   }
 
   .load {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     height: 28px;
-    padding: 0 10px;
+    padding: 0 var(--space-3);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: transparent;
@@ -419,7 +419,7 @@
   }
 
   .error {
-    margin: 0 0 6px;
+    margin: 0 0 var(--space-1-5);
     font-size: var(--text-md);
     color: var(--bad);
   }

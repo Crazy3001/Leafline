@@ -325,18 +325,18 @@
 
 <style>
   .lead {
-    margin: 0 0 10px;
+    margin: 0 0 var(--space-2);
     color: var(--muted);
     font-size: var(--text-md);
   }
 
   /* A card pads itself; these sit beside cards, so they match it. A pinned window pads its body. */
   .controls {
-    padding: 10px 12px 0;
+    padding: var(--space-2) var(--space-3) 0;
   }
 
   .list {
-    padding: 0 12px 10px;
+    padding: 0 var(--space-3) var(--space-2);
   }
 
   .controls.pinned,
@@ -345,7 +345,7 @@
   }
 
   .for-me {
-    margin: -2px 0 6px;
+    margin: -2px 0 var(--space-1-5);
     padding: 0;
     border: 0;
     background: transparent;
@@ -361,7 +361,7 @@
   }
 
   .count {
-    margin: 0 0 4px;
+    margin: 0 0 var(--space-1);
     color: var(--faint);
     font-size: var(--text-xs);
   }
@@ -380,7 +380,7 @@
     display: grid;
     gap: 1px;
     width: 100%;
-    padding: 6px 24px 6px 6px;
+    padding: var(--space-1-5) var(--space-6) var(--space-1-5) var(--space-1-5);
     border: 0;
     border-radius: var(--radius-sm);
     background: transparent;
@@ -395,7 +395,7 @@
   }
 
   .row-name :global(.row-pic) {
-    margin-right: 6px;
+    margin-right: var(--space-1-5);
   }
 
   .row-name {
@@ -404,7 +404,7 @@
   }
 
   .row-name small {
-    margin-left: 5px;
+    margin-left: var(--space-1-5);
     color: var(--faint);
     font-size: var(--text-xs);
     font-weight: var(--weight-body);
@@ -421,8 +421,8 @@
   .back {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    margin: 2px 12px 6px;
+    gap: var(--space-1);
+    margin: var(--space-0-5) var(--space-3) var(--space-1-5);
     padding: 0;
     border: 0;
     background: transparent;
@@ -443,7 +443,7 @@
   }
 
   .quiet {
-    margin: 0 0 6px;
+    margin: 0 0 var(--space-1-5);
     color: var(--faint);
     font-size: var(--text-md);
   }
@@ -461,7 +461,7 @@
 
   .empty {
     margin: 0;
-    padding: 18px 10px;
+    padding: var(--space-4) var(--space-3);
     color: var(--faint);
     font-size: var(--text-md);
     text-align: center;

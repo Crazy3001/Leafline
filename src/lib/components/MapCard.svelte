@@ -243,13 +243,13 @@
   }
 
   .goto.top {
-    margin: 0 10px 10px;
+    margin: 0 var(--space-3) var(--space-2);
   }
 
   /* The map's own card in the tab; the frame is the shared .card. */
   .head {
-    margin: 0 10px 10px;
-    padding: 12px 14px 14px;
+    margin: 0 var(--space-3) var(--space-2);
+    padding: var(--space-3) var(--space-4) var(--space-3);
   }
 
   .source {
@@ -264,8 +264,8 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 4px 6px;
-    margin-top: 8px;
+    gap: var(--space-1) var(--space-1-5);
+    margin-top: var(--space-2);
     font-size: var(--text-xs);
   }
 
@@ -276,7 +276,7 @@
   .fact + .fact::before,
   .fact + .return::before {
     content: "·";
-    margin-right: 6px;
+    margin-right: var(--space-1-5);
     color: var(--faint);
   }
 
@@ -295,16 +295,16 @@
   /* Chips that lead to the parts below. In the overlay they stay in view while the map scrolls. */
   .jump {
     display: flex;
-    gap: 6px;
+    gap: var(--space-1-5);
     flex-wrap: wrap;
-    padding: 0 10px 10px;
+    padding: 0 var(--space-3) var(--space-2);
   }
 
   :global(#panel) .jump {
     position: sticky;
     top: 0;
     z-index: 2;
-    padding-top: 6px;
+    padding-top: var(--space-1-5);
     margin-top: -6px;
     background: var(--bg);
   }
@@ -313,9 +313,9 @@
     display: inline-flex;
     flex: none;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     height: var(--control-h-sm);
-    padding: 0 10px;
+    padding: 0 var(--space-3);
     border: var(--line-w) solid var(--control-line);
     border-radius: var(--radius-pill);
     background: var(--surface);
@@ -342,13 +342,13 @@
   }
 
   .save-row {
-    margin-top: 6px;
+    margin-top: var(--space-1-5);
   }
 
   .where {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-2);
   }
 
   .pin {
@@ -388,8 +388,8 @@
   .here {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 6px;
-    margin: 10px 0 0;
+    gap: var(--space-1-5);
+    margin: var(--space-2) 0 0;
   }
 
   /* The same tiles as src/lib/ui/Stat.svelte. */
@@ -418,7 +418,7 @@
   }
 
   .miss {
-    margin-top: 8px;
+    margin-top: var(--space-2);
   }
 
   /* Stays in view while a long map scrolls under it. */
@@ -428,10 +428,10 @@
     z-index: 1;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     width: 100%;
-    margin: -2px 0 10px;
-    padding: 6px 9px;
+    margin: -2px 0 var(--space-2);
+    padding: var(--space-1-5) var(--space-2);
     border: 1px solid color-mix(in srgb, var(--map) 45%, transparent);
     border-radius: var(--radius-sm);
     background: color-mix(in srgb, var(--map) 16%, var(--surface-3));
@@ -472,8 +472,8 @@
   }
 
   .doubt {
-    margin-top: 8px;
-    padding: 6px 8px;
+    margin-top: var(--space-2);
+    padding: var(--space-1-5) var(--space-2);
     border-radius: var(--radius-sm);
     background: var(--warn-soft);
     color: var(--muted);
@@ -481,8 +481,8 @@
   }
 
   .alt {
-    margin: 2px 2px 0 0;
-    padding: 0 6px;
+    margin: var(--space-0-5) var(--space-0-5) 0 0;
+    padding: 0 var(--space-1-5);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: transparent;
@@ -495,12 +495,12 @@
   }
 
   .setup {
-    margin-top: 10px;
-    padding-top: 10px;
+    margin-top: var(--space-2);
+    padding-top: var(--space-2);
     border-top: 1px solid var(--border);
   }
 
   .lookup {
-    margin-top: 12px;
+    margin-top: var(--space-3);
   }
 </style>

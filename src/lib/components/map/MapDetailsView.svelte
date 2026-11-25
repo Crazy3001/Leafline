@@ -318,15 +318,15 @@
   .portal-layout {
     display: flex;
     justify-content: flex-end;
-    margin: -2px 0 6px;
+    margin: -2px 0 var(--space-1-5);
   }
 
   .facts {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 4px 6px;
-    margin-top: 8px;
+    gap: var(--space-1) var(--space-1-5);
+    margin-top: var(--space-2);
     font-size: var(--text-xs);
   }
 
@@ -337,7 +337,7 @@
   .fact + .fact::before,
   .fact + .return::before {
     content: "·";
-    margin-right: 6px;
+    margin-right: var(--space-1-5);
     color: var(--faint);
   }
 
@@ -360,7 +360,7 @@
   }
 
   .mobs th {
-    padding: 0 0 3px;
+    padding: 0 0 var(--space-0-5);
     font-size: var(--text-xs);
     font-weight: var(--weight-body);
     color: var(--faint);
@@ -373,7 +373,7 @@
   }
 
   .mobs td {
-    padding: 3px 0;
+    padding: var(--space-0-5) 0;
     border-top: 1px solid var(--border);
     text-align: right;
     color: var(--muted);
@@ -381,7 +381,7 @@
 
   .mobs td + td,
   .mobs th + th {
-    padding-left: 8px;
+    padding-left: var(--space-2);
   }
 
   .mobs .mob {
@@ -400,8 +400,8 @@
   }
 
   .tag {
-    margin-left: 3px;
-    padding: 0 4px;
+    margin-left: var(--space-1);
+    padding: 0 var(--space-1);
     border-radius: var(--radius-sm);
     background: var(--hover);
     font-size: var(--text-xs);
@@ -411,7 +411,7 @@
   .quests,
   .npcs {
     display: grid;
-    gap: 6px;
+    gap: var(--space-1-5);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -420,7 +420,7 @@
   .quest-head {
     display: flex;
     justify-content: space-between;
-    gap: 8px;
+    gap: var(--space-2);
     font-size: var(--text-md);
   }
 
@@ -440,7 +440,7 @@
   }
 
   .undone {
-    margin: 0 0 4px;
+    margin: 0 0 var(--space-1);
     color: var(--muted);
     font-size: var(--text-xs);
   }
@@ -450,13 +450,13 @@
   }
 
   .npcs {
-    gap: 3px;
+    gap: var(--space-0-5);
   }
 
   .npcs li {
     display: flex;
     justify-content: space-between;
-    gap: 8px;
+    gap: var(--space-2);
     font-size: var(--text-md);
   }
 
@@ -476,8 +476,8 @@
   .shop-head {
     display: flex;
     align-items: baseline;
-    gap: 6px;
-    padding: 2px 0;
+    gap: var(--space-1-5);
+    padding: var(--space-0-5) 0;
   }
 
   .shop-head .gives {
@@ -503,7 +503,7 @@
   }
 
   .stock {
-    padding: 0 0 6px 20px;
+    padding: 0 0 var(--space-1-5) var(--space-5);
   }
 
   @media (prefers-reduced-motion: reduce) {

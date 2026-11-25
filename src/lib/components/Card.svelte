@@ -33,20 +33,20 @@
 <style>
   /* The frame itself is the shared .card in app.css. */
   .card {
-    margin: 0 10px 10px;
-    padding: 11px 14px 14px;
+    margin: 0 var(--space-3) var(--space-2);
+    padding: var(--space-3) var(--space-4) var(--space-3);
   }
 
   header {
     justify-content: space-between;
-    margin: 0 0 10px;
+    margin: 0 0 var(--space-2);
   }
 
   .plain-aside {
     display: flex;
     justify-content: flex-end;
-    gap: 6px;
-    margin-bottom: 6px;
+    gap: var(--space-1-5);
+    margin-bottom: var(--space-1-5);
     color: var(--muted);
     font-size: var(--text-xs);
   }
@@ -54,7 +54,7 @@
   .aside {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     color: var(--muted);
     font-size: var(--text-md);
   }

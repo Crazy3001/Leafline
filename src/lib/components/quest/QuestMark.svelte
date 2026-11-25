@@ -50,8 +50,8 @@
     display: inline-flex;
     flex: none;
     align-items: center;
-    gap: 3px;
-    margin-left: 4px;
+    gap: var(--space-0-5);
+    margin-left: var(--space-1);
     color: var(--faint);
     font-size: var(--text-xs);
     font-weight: var(--weight-strong);
@@ -60,7 +60,7 @@
   }
 
   .mark.label {
-    padding: 2px 6px 2px 5px;
+    padding: var(--space-0-5) var(--space-1-5) var(--space-0-5) var(--space-1-5);
     border-radius: 999px;
     background: var(--surface-3);
   }

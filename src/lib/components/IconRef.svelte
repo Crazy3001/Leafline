@@ -43,7 +43,7 @@
     justify-content: center;
     min-width: 24px;
     height: 24px;
-    padding: 0 2px;
+    padding: 0 var(--space-0-5);
     border: 1px solid transparent;
     border-radius: var(--radius-sm);
     background: transparent;
@@ -63,7 +63,7 @@
   .label {
     max-width: 96px;
     overflow: hidden;
-    padding: 0 3px;
+    padding: 0 var(--space-1);
     color: var(--muted);
     font-size: var(--text-xs);
     text-overflow: ellipsis;

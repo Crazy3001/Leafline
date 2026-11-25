@@ -160,9 +160,9 @@
 <style>
   .inspector {
     display: grid;
-    gap: 12px;
-    padding-bottom: 14px;
-    margin-bottom: 12px;
+    gap: var(--space-3);
+    padding-bottom: var(--space-3);
+    margin-bottom: var(--space-3);
     border-bottom: 1px solid var(--border);
   }
 
@@ -170,7 +170,7 @@
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 8px;
+    gap: var(--space-2);
   }
 
   .kicker,
@@ -182,7 +182,7 @@
   }
 
   .sub {
-    margin-bottom: 6px;
+    margin-bottom: var(--space-1-5);
   }
 
   h2 {
@@ -195,7 +195,7 @@
 
   .steps {
     display: inline-flex;
-    gap: 2px;
+    gap: var(--space-0-5);
   }
 
   .icon {
@@ -238,7 +238,7 @@
 
   .advance {
     margin: 0;
-    padding: 6px 10px;
+    padding: var(--space-1-5) var(--space-3);
     border-radius: var(--radius-sm);
     background: color-mix(in srgb, var(--ref-skill) 14%, var(--surface));
     color: var(--ref-skill);
@@ -247,7 +247,7 @@
 
   .warning {
     display: flex;
-    gap: 6px;
+    gap: var(--space-1-5);
     margin: 0;
     color: var(--warn);
     font-size: var(--text-md);
@@ -255,13 +255,13 @@
 
   .warning :global(svg) {
     flex: none;
-    margin-top: 3px;
+    margin-top: var(--space-0-5);
   }
 
   .spend {
     display: grid;
-    gap: 8px;
-    padding: 10px 12px;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
     border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
     border-radius: var(--radius);
     background: var(--accent-soft);
@@ -270,7 +270,7 @@
   .line {
     display: grid;
     grid-template-columns: 52px minmax(0, 1fr);
-    gap: 8px;
+    gap: var(--space-2);
     align-items: baseline;
   }
 
@@ -283,14 +283,14 @@
     display: flex;
     flex-wrap: wrap;
     justify-content: flex-end;
-    gap: 2px 10px;
+    gap: var(--space-0-5) var(--space-2);
     text-align: right;
   }
 
   .gain {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: var(--space-1);
     font-weight: var(--weight-body);
   }
 
@@ -324,13 +324,13 @@
   .stats {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 6px;
+    gap: var(--space-1-5);
   }
 
   .stat {
     display: grid;
     gap: 1px;
-    padding: 7px 8px;
+    padding: var(--space-1-5) var(--space-2);
     border-radius: var(--radius-sm);
     background: var(--surface-2);
   }
@@ -352,7 +352,7 @@
   }
 
   .stat small {
-    margin-left: 3px;
+    margin-left: var(--space-1);
     color: var(--good);
     font-size: var(--text-xs);
   }
@@ -360,7 +360,7 @@
   .skills,
   .gear {
     display: grid;
-    gap: 8px;
+    gap: var(--space-2);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -369,8 +369,8 @@
   .skills li {
     display: grid;
     grid-template-columns: 32px minmax(0, 1fr);
-    gap: 10px;
-    padding: 8px 10px;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
     border-radius: var(--radius-sm);
     background: var(--surface-2);
   }
@@ -393,14 +393,14 @@
   }
 
   .desc {
-    margin-top: 2px;
+    margin-top: var(--space-0-5);
     color: var(--muted);
     font-size: var(--text-md);
     line-height: 1.4;
   }
 
   .gear {
-    gap: 4px;
+    gap: var(--space-1);
   }
 
   .foot {

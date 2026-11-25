@@ -31,9 +31,9 @@
     display: inline-flex;
     flex: none;
     align-items: center;
-    gap: 3px;
+    gap: var(--space-0-5);
     height: 16px;
-    padding: 0 4px;
+    padding: 0 var(--space-1);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: transparent;

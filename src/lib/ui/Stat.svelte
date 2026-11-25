@@ -28,15 +28,15 @@
   .stat {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--space-0-5);
     min-width: 0;
-    padding: var(--space-2) 10px;
+    padding: var(--space-2) var(--space-3);
     border-radius: var(--radius);
     background: var(--surface-2);
   }
 
   .lg {
-    padding: 10px var(--space-3);
+    padding: var(--space-2) var(--space-3);
     border: var(--line-w) solid var(--line);
     border-radius: var(--radius);
     background: var(--surface-2);

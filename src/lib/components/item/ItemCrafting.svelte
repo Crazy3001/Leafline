@@ -43,7 +43,7 @@
 
 <style>
   .more {
-    margin-top: 4px;
+    margin-top: var(--space-1);
     padding: 0;
     border: 0;
     background: transparent;
