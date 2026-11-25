@@ -54,7 +54,7 @@ jobs:
           releaseBody: |
             An unofficial, read-only companion for MapleStory Classic World. Windows 10 and 11. What's new is in the [changelog](https://github.com/Crazy3001/Leafline/blob/main/CHANGELOG.md).
 
-            Download the `-setup.exe` (or the `.msi`) below and run it. The installer isn't code-signed yet, so Windows SmartScreen may warn: choose **More info → Run anyway**.
+            Download the `-setup.exe` (or the `.msi`) below and run it. The installer isn't code-signed, so Windows SmartScreen may warn: choose **More info → Run anyway**.
 
             **Use it at your own risk.** Nexon says it bans permanently for third-party tools and has never said whether a read-only overlay counts; the README explains what Leafline reads and what it never does. Leafline is not affiliated with or endorsed by Nexon.
 
