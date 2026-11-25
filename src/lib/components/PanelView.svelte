@@ -50,7 +50,7 @@
   {/if}
 {:else if panel === "character"}
   <!-- One card for who the character is and where the build plan has them, so the level shows once. -->
-  <CharacterCard hud={analysis?.hud ?? null} mesos={analysis?.mesos ?? null} {session} remember plain={pinned} linkTrain={!pinned} trim={shelled}>
+  <CharacterCard hud={analysis?.hud ?? null} mesos={analysis?.mesos ?? null} {session} remember plain={pinned} linkTrain={!pinned} trim={shelled} bare={wide && !pinned}>
     <BuildSection level={analysis?.hud?.level ?? session?.level ?? null} character={analysis?.hud?.name ?? null} glance={pinned} whole={wide && !pinned} />
   </CharacterCard>
 {:else if panel === "map"}

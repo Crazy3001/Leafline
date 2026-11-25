@@ -19,6 +19,7 @@
     plain = false,
     linkTrain = false,
     trim = false,
+    bare = false,
     children,
   }: {
     hud: HudReading | null;
@@ -32,6 +33,8 @@
     /** Under the main window's header, which already shows the level, name, job, EXP and time to
      *  level: only the mesos, HP and MP, and what follows as a card of its own. */
     trim?: boolean;
+    /** No card around the content, which brings its own (the desk view's wide build). */
+    bare?: boolean;
     /** More about the character under the rates, in the same card: the overlay puts the build plan here. */
     children?: Snippet;
   } = $props();
@@ -108,7 +111,7 @@
     The header above has who you are and the level; the game shows HP and MP. Here: the mesos you
     carry (read from the HUD, which the website doesn't), then the build and stats.
   -->
-  {#if children || can.liveReading}<section class="card more">
+  {#if children || can.liveReading}<section class="more" class:card={!bare} class:bare>
     {#if can.liveReading}<div class="purse-line">{@render purse()}</div>{/if}
     {#if children}{@render children()}{/if}
   </section>{/if}
@@ -277,6 +280,11 @@
   .more {
     margin: 0 var(--space-3) var(--space-2);
     padding: var(--space-3) var(--space-4) var(--space-3);
+  }
+
+  .more.bare {
+    margin: 0;
+    padding: 0;
   }
 
   .purse-line {
