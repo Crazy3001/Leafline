@@ -161,9 +161,9 @@
   {#if !sheet}
     <p class="quiet-line">
       {#if can.liveReading}
-        Open your Character Stat window in the game and press Detail, then Read. Leafline also reads it by itself while it is open.
+        Open your Character Stat window in game and press Detail. Leafline reads it while it's open.
       {:else}
-        Share the game window on Now (Read the game), then open your Character Stat window and press Detail: the website reads it once it holds still. Stats the Windows program read also come along in a records file (Settings, Data).
+        Share the game window on Now, then open your Character Stat window and press Detail.
       {/if}
     </p>
   {:else}
@@ -217,9 +217,9 @@
   {#if !buffs.length}
     <p class="quiet-line">
       {#if sheet}
-        No buffs known yet. Open your Skill window, or choose a job in your build, and your buffs show here.
+        No buffs known yet. Open your Skill window, or pick a job in your build.
       {:else}
-        Your buffs show here once your Skill window has been read or your build has a job.
+        Your buffs show here once your Skill window is read or your build has a job.
       {/if}
     </p>
   {:else}

@@ -212,8 +212,7 @@
     <div class="body">
       {#if editing}
         <p class="muted">
-          Name the potions you hunt with and what one costs you. Prices are yours; nothing is filled in for you. Pick the
-          quick slot a potion sits on and Leafline counts what you drink from the number the game shows there.
+          Name each potion, what one costs you and its quick slot. Leafline counts what you drink from that slot.
         </p>
         <div class="edit">
           {#each draft as d, i (i)}

@@ -1,9 +1,10 @@
 <script lang="ts">
+  import { tip } from "$lib/tip.svelte";
   // The website's way into live reading: share the game window with this page and Leafline reads
   // the game from it, tracking the session the way the program does (platform/live.ts). The
   // browser asks which window; the picture stays on this PC. Says plainly what it costs: the
   // same ban risk as the program. In a browser that can't share a window, says so and why.
-  import { Square, MonitorPlay } from "@lucide/svelte";
+  import { Info, MonitorPlay, Square } from "@lucide/svelte";
   import { onMount } from "svelte";
 
   import { backend } from "$lib/api";
@@ -34,6 +35,9 @@
       problem = err instanceof Error ? err.message : String(err);
     }
   }
+
+  /** Firefox shares screens, not a game's own window. */
+  const firefox = typeof navigator !== "undefined" && /firefox/i.test(navigator.userAgent);
 </script>
 
 <Card title="Read the game">
@@ -47,15 +51,19 @@
         {status.reason}
       {/if}
     </p>
-    {#if !compact}<p class="hint">Mesos are read while your inventory is open, the map from the minimap, quests from the Quest Helper and loot from the lines at the bottom right. Rest the mouse on an item and its card comes up in Look up. The session saves itself to your training log after 5 minutes.</p>{/if}
+    {#if !compact}<p class="hint">
+        Keep the HUD and minimap in view. The session saves itself after 5 minutes.
+        <span class="more" use:tip={"Mesos are read while your inventory is open, the map from the minimap, quests from the Quest Helper and loot from the lines at the bottom right. Rest the mouse on an item and its card comes up in Look up."}
+          ><Info size={12} aria-label="What is read, and when" /></span
+        >
+      </p>{/if}
     <div class="actions">
       <Button onclick={() => backend.stopLive()}><Square size={12} />Stop reading</Button>
     </div>
   {:else}
     <p class="lead">
-      Share the MapleStory window with this page and Leafline reads your level, EXP, mesos, map, quests and loot as you play,
-      the way the program does. In Firefox, share the screen the game is on instead: it can't film a game's window. The
-      picture stays on this computer.
+      Share the MapleStory window and Leafline reads your level, EXP, mesos, map, quests and loot as you play. The picture
+      stays on this computer.{#if firefox}{" "}Firefox can't share a game's window, so share the screen it's on.{/if}
     </p>
     <div class="actions">
       <Button variant="primary" onclick={start}><MonitorPlay size={14} />Share the game window…</Button>
@@ -65,14 +73,20 @@
   {/if}
   {#if can.readWindow}
     <p class="risk">
-      Reading a shared window carries the same ban risk as the program. Nexon has warned that third-party tools can mean a
-      permanent ban and hasn't said whether a read-only page like this counts. Leafline is unofficial; use it at your own
-      risk.
+      Same ban risk as the program: Nexon has warned that third-party tools can mean a permanent ban, and hasn't said
+      whether a read-only page counts. Leafline is unofficial; use it at your own risk.
     </p>
   {/if}
 </Card>
 
 <style>
+  .more {
+    display: inline-flex;
+    color: var(--faint);
+    vertical-align: -2px;
+    cursor: help;
+  }
+
   .lead {
     margin: 0 0 var(--space-2);
     color: var(--muted);
