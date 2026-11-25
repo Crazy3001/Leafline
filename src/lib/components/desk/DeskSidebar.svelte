@@ -6,6 +6,7 @@
     ChartLine,
     ChevronDown,
     ChevronRight,
+    Download,
     FlaskConical,
     Gem,
     Hammer,
@@ -27,6 +28,8 @@
   } from "@lucide/svelte";
 
   import { backend } from "$lib/api";
+  import { isWeb } from "$lib/platform";
+  import { noteRecordsSaved, recordsSavedAt } from "$lib/recordsfile";
   import Logo from "$lib/components/Logo.svelte";
   import { ZOOMS, type DeskView } from "$lib/desk";
   import { formatCompact } from "$lib/format";
@@ -121,6 +124,25 @@
     lastKnown(live.analysis?.mesos?.mesos ?? session?.mesos, known?.mesos, known?.mesosSeenAt),
   );
   const mesos = $derived(mesosShown.value);
+  // The website keeps the records in this browser, which can clear them: saving a records file is
+  // one click away, and goes quiet once one was saved in the last two weeks.
+  let savedAt = $state(isWeb ? recordsSavedAt() : null);
+  const saveDue = $derived(isWeb && (savedAt == null || Date.now() - savedAt > 14 * 86400_000));
+  const saveTip = $derived(
+    savedAt
+      ? `Your records live in this browser. Last saved to a file on ${new Date(savedAt).toLocaleDateString()}.`
+      : "Your records live in this browser, which can clear them. Save a copy to keep them safe.",
+  );
+  async function saveFile() {
+    try {
+      if (await backend.saveRecords()) {
+        noteRecordsSaved();
+        savedAt = recordsSavedAt();
+      }
+    } catch {
+      // Settings → Data says what went wrong when tried there.
+    }
+  }
   const zoomOptions = ZOOMS.map((z) => ({ id: z, label: `${Math.round(z * 100)}%` }));
 </script>
 
@@ -202,6 +224,11 @@
         <Segmented label="Text size" size="sm" options={zoomOptions} value={zoom} onchange={onzoom} />
       </div>
     {/if}
+    {#if isWeb}
+      <button class="nav" class:due={saveDue} aria-label={folded ? "Save records file" : undefined} use:tip={saveTip} onclick={saveFile}>
+        <Download size={16} />{#if !folded}<span class="label">Save records file</span>{/if}
+      </button>
+    {/if}
     <button class="nav" aria-label={folded ? "Settings" : undefined} use:tip={folded ? "Settings" : undefined} onclick={() => backend.showSettings()}>
       <Settings size={16} />{#if !folded}<span class="label">Settings</span>{/if}
     </button>
@@ -272,6 +299,10 @@
   .fold:hover {
     background: var(--hover);
     color: var(--text);
+  }
+
+  .nav.due {
+    color: var(--accent);
   }
 
   /* Remembered from an earlier read, not read now. */

@@ -10,6 +10,7 @@
     ExternalLink,
     FilePenLine,
     FolderOpen,
+    History,
     LoaderCircle,
     RefreshCw,
     ScrollText,
@@ -28,6 +29,9 @@
   import HotkeyButton from "$lib/components/HotkeyButton.svelte";
   import Logo from "$lib/components/Logo.svelte";
   import ReaderStatus from "$lib/components/ReaderStatus.svelte";
+  import BackupRestore from "$lib/components/BackupRestore.svelte";
+  import RecordsCompare from "$lib/components/RecordsCompare.svelte";
+  import { RECORDS_NOTE, recordsSavedAt } from "$lib/recordsfile";
   import DataSources from "$lib/components/DataSources.svelte";
   import { IDEA_URL, reportUrl } from "$lib/feedback";
   import { DROPS_URL, OSMS_URL, WIKI_URL } from "$lib/mapdata.svelte";
@@ -176,7 +180,23 @@
   let recordsNote = $state<string | null>(null);
   let recordsWarn = $state(false);
   let pickedRecords = $state<RecordsSummary | null>(null);
+  /** The records as they are now, beside a file or backup picked. */
+  let currentRecords = $state<RecordsSummary | null>(null);
   let recordsBusy = $state(false);
+  let showBackups = $state(false);
+  /** When this browser last saved a records file (the website keeps its records in the browser). */
+  const savedAt = isWeb ? recordsSavedAt() : null;
+  /** Whether the browser has promised not to clear the site's storage on its own. */
+  let persisted = $state<boolean | null>(null);
+  onMount(() => {
+    // A restore reloads every window; what it did is said once the page is back.
+    const note = sessionStorage.getItem(RECORDS_NOTE);
+    if (note) {
+      sessionStorage.removeItem(RECORDS_NOTE);
+      recordsNote = note;
+    }
+    if (isWeb) void navigator.storage?.persisted?.().then((p) => (persisted = p)).catch(() => {});
+  });
 
   function describeRecords(s: RecordsSummary): string {
     const parts = [
@@ -213,9 +233,11 @@
   const pickRecords = () =>
     recordsWork(async () => {
       pickedRecords = await backend.pickRecords();
+      currentRecords = pickedRecords ? await backend.recordsSummary().catch(() => null) : null;
     });
   const useRecords = () =>
     recordsWork(async () => {
+      sessionStorage.setItem(RECORDS_NOTE, "Now using the records from that file. The ones you had are kept aside" + (isWeb ? "." : ": Backups lists them as Before your last restore or import."));
       await backend.useRecords();
       pickedRecords = null;
     });
@@ -1117,6 +1139,14 @@
           <span class="help">
             Everything you recorded in one file: sessions, drops, builds, notes, spots and prices. Keep it as a backup,
             or open it in the {isWeb ? "Windows program" : "website"} or on another computer. Map data isn't in it.
+            {#if isWeb}
+              <strong class="keep">
+                This site keeps your records in this browser, which can clear them (clearing browsing data or site data does).
+                Save a records file now and then and keep it somewhere safe.
+              </strong>
+              {savedAt ? `Last saved from this browser on ${new Date(savedAt).toLocaleDateString()}.` : "Not saved from this browser yet."}
+              {#if persisted === false}This browser hasn't promised to keep them.{/if}
+            {/if}
           </span>
         </div>
         <div class="control exports">
@@ -1125,16 +1155,34 @@
         </div>
       </div>
       {#if pickedRecords}
-        <div class="note confirm" role="alertdialog" aria-label="Replace your records">
-          <span>
-            That file holds {describeRecords(pickedRecords)}. Use it in place of the records here? The ones here now are
-            kept aside, not deleted.
-          </span>
-          <button class="button" onclick={useRecords} disabled={recordsBusy}>Use these records</button>
-          <button class="button" onclick={() => (pickedRecords = null)} disabled={recordsBusy}>Cancel</button>
-        </div>
+        <RecordsCompare
+          title="That file"
+          incoming={pickedRecords}
+          current={currentRecords}
+          busy={recordsBusy}
+          onuse={useRecords}
+          oncancel={() => (pickedRecords = null)}
+        />
       {/if}
       {#if recordsNote}<p class="note" class:warn={recordsWarn}>{recordsNote}</p>{/if}
+
+      {#if can.dataFolder}
+        <div class="row">
+          <div class="label">
+            <span class="name">Backups</span>
+            <span class="help">
+              A copy of your records each day Leafline opens, the last 7. Look at one beside your records now, and restore
+              it if something went wrong: the records you have are kept aside first.
+            </span>
+          </div>
+          <div class="control">
+            <button class="button" aria-expanded={showBackups} onclick={() => (showBackups = !showBackups)}>
+              <History size={13} />{showBackups ? "Hide" : "Show"}
+            </button>
+          </div>
+        </div>
+        {#if showBackups}<BackupRestore onrestored={(m) => (recordsNote = m)} />{/if}
+      {/if}
 
       {#if can.dataFolder}
       <div class="row">
@@ -1777,11 +1825,11 @@
     gap: 6px;
   }
 
-  .confirm {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px;
+  .keep {
+    display: block;
+    margin: 4px 0 2px;
+    color: var(--text);
+    font-weight: 500;
   }
 
   .button {

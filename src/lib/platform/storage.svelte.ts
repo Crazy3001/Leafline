@@ -130,12 +130,5 @@ export async function recordsSummary(): Promise<RecordsSummary> {
   return JSON.parse(await send<string>({ op: "summary" }));
 }
 
-export interface RecordsSummary {
-  sessions: number;
-  drops: number;
-  builds: number;
-  notes: number;
-  characters: number;
-  spots: number;
-  prices: number;
-}
+import type { RecordsSummary } from "../types";
+export type { RecordsSummary };

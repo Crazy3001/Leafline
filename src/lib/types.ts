@@ -2275,6 +2275,19 @@ export interface RecordsSummary {
   characters: number;
   spots: number;
   prices: number;
+  /** When the newest session or drop was saved, Unix seconds. */
+  newest: number | null;
+}
+
+/** One of the records' daily copies, or the records kept aside before the last restore or import. */
+export interface Backup {
+  name: string;
+  /** `2026-11-24`; null for the records kept aside. */
+  day: string | null;
+  beforeRestore: boolean;
+  savedAt: number | null;
+  summary: RecordsSummary | null;
+  problem: string | null;
 }
 
 /** What the HUD showed at one moment, typed in. */

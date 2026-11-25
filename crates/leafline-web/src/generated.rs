@@ -793,6 +793,7 @@ mod records {
 
     pub fn dispatch(host: &dyn Host, name: &str, args: serde_json::Value) -> Option<Reply> {
         Some(match name {
+            "records_summary" => reply_result(service::records::records_summary(host)),
             "known_character" => {
                 #[derive(serde::Deserialize)]
                 #[serde(rename_all = "camelCase")]
