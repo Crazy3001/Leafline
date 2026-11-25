@@ -98,7 +98,7 @@ Leafline also runs in a browser at **[crazy3001.github.io/Leafline](https://craz
 - the build planner, scroll odds, Your fight and craft levelling
 - the drop log, timers and the training log
 - the four looks, a desk layout on a computer and the overlay's tabs on a phone
-- on a computer, in Firefox, Chrome or Edge: share the game window and it reads your level, EXP, mesos, map, Quest Helper and loot as you play and tracks the session, the way the program does. Rest the mouse on an item for its card, and open your Stat, Skill, inventory or Quest window to have it read
+- on a computer, in Chrome or Edge share the game window, or in Firefox the screen the game is on (Firefox can't film a game's window), and it reads your level, EXP, mesos, map, Quest Helper and loot as you play and tracks the session, the way the program does. Rest the mouse on an item for its card, and open your Stat, Skill, inventory or Quest window to have it read
 
 **It reads only a window you share,** in the browser, and the picture never leaves your computer. It carries the same ban risk as the program. Your records stay in that browser on that computer and are never sent anywhere. A browser can clear a site's storage, so save them with **Settings → Data → Records file** now and then; the same file opens in the program or another browser. One tab at a time can use your records.
 

@@ -69,7 +69,7 @@ export interface LiveRead {
 }
 
 export type FromLive =
-  | { type: "read"; read: LiveRead; width: number; height: number; frames: number; other: boolean }
+  | { type: "read"; read: LiveRead; width: number; height: number; frames: number; other: boolean; dark: boolean; still: boolean }
   /** The session as it was before another character's frames started a new one. */
   | { type: "other"; before: SessionSummary }
   | { type: "summary"; session: SessionSummary }
@@ -97,6 +97,28 @@ let reading: ReturnType<typeof followTrack> | null = null;
 
 /** Milliseconds since 1970, by this PC's clock. */
 const now = () => performance.timeOrigin + performance.now();
+
+/** The last full read's picture signature, and how many full reads in a row have had it. */
+let lastSig = -1;
+let stillFor = 0;
+
+/**
+ * About 4,000 pixels spread over a picture: whether it is (nearly) all black, and a signature
+ * that stays the same only while the picture does. Some browsers send black for a game in Full
+ * Screen, and Firefox keeps sending the first picture it took of a game's window.
+ */
+function glance(rgba: Uint8Array): { dark: boolean; sig: number } {
+  const step = Math.max(4, Math.floor(rgba.length / 4 / 4000) * 4);
+  let sum = 0;
+  let n = 0;
+  let sig = 0;
+  for (let i = 0; i + 2 < rgba.length; i += step) {
+    sum += Math.max(rgba[i], rgba[i + 1], rgba[i + 2]);
+    sig = (Math.imul(sig, 31) + rgba[i] * 65536 + rgba[i + 1] * 256 + rgba[i + 2]) | 0;
+    n++;
+  }
+  return { dark: n > 0 && sum / n < 8, sig };
+}
 
 async function handle(frame: VideoFrame) {
   try {
@@ -130,7 +152,10 @@ async function handle(frame: VideoFrame) {
     const { read, other } = JSON.parse(text) as { read: LiveRead; other: boolean };
     reads++;
     if (other) post({ type: "other", before: JSON.parse(before) as SessionSummary });
-    post({ type: "read", read, width, height, frames: reads, other });
+    const look = glance(data);
+    stillFor = look.sig === lastSig ? stillFor + 1 : 0;
+    lastSig = look.sig;
+    post({ type: "read", read, width, height, frames: reads, other, dark: !read.hud && look.dark, still: !read.hud && stillFor >= 3 });
   } catch (err) {
     busy = false;
     post({ type: "error", message: err instanceof Error ? err.message : String(err) });

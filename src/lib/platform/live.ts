@@ -169,6 +169,29 @@ async function freshKeeper(before: SessionSummary | null) {
 
 const send = (message: ToLive, transfer: Transferable[] = []) => worker?.postMessage(message, transfer);
 
+/**
+ * What to say while the shared picture has no status bar in it: what is wrong with the picture
+ * and its size, then what to check, most likely first. The website can't ask Windows whether HDR
+ * is on for the game's display, as the program does; the browser only knows about its own.
+ */
+function notFound(width: number, height: number, dark: boolean, still: boolean): string {
+  const size = width && height ? ` (${width}×${height})` : "";
+  const screen = shared?.surface === "monitor";
+  if (still && !screen)
+    return `The browser keeps sending the same picture of the window${size}: some browsers, Firefox among them, can't film a game's window as it plays. Stop reading, then share the screen the game is on instead, or use Chrome or Edge.`;
+  if (dark)
+    return `The shared ${screen ? "screen" : "window"}${size} is coming through black. Some browsers can't capture the game in Full Screen: try Windowed in the game's Graphics options, then share it again.`;
+  if (shared?.surface === "browser")
+    return `You shared a browser tab${size}. Stop reading, then share the MapleStory window, or the screen the game is on.`;
+  const hdr = typeof matchMedia === "function" && matchMedia("(dynamic-range: high)").matches;
+  return (
+    `Can't find the game's status bar in the shared ${screen ? "screen" : "window"}${size}. ` +
+    (hdr ? "Windows HDR looks on for this screen: " : "") +
+    (screen ? "Put the game in front on that screen. " : "") +
+    "Turn Windows HDR off and restart the game, set UI Size to Ideal Ratio, and check that you shared MapleStory."
+  );
+}
+
 function onWorker({ data }: MessageEvent<FromLive>) {
   switch (data.type) {
     case "read": {
@@ -199,7 +222,7 @@ function onWorker({ data }: MessageEvent<FromLive>) {
               hdr: false,
               held,
             }
-          : { state: "waiting", reason: "Reading the shared window. The game's status bar isn't in view." },
+          : { state: "waiting", reason: notFound(data.width, data.height, data.dark, data.still) },
       );
       break;
     }

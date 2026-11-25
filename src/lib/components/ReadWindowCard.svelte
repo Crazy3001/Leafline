@@ -54,7 +54,8 @@
   {:else}
     <p class="lead">
       Share the MapleStory window with this page and Leafline reads your level, EXP, mesos, map, quests and loot as you play,
-      the way the program does. The picture stays on this computer.
+      the way the program does. In Firefox, share the screen the game is on instead: it can't film a game's window. The
+      picture stays on this computer.
     </p>
     <div class="actions">
       <Button variant="primary" onclick={start}><MonitorPlay size={14} />Share the game window…</Button>
