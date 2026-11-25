@@ -1,5 +1,6 @@
-# Leafline: the Windows program (src-tauri), the website's WebAssembly worker (crates/leafline-web)
-# and the code they share (crates/leafline-core).
+# Leafline: the Windows program (src-tauri), the code it shares with the website (crates/leafline-core),
+# and the website's two WebAssembly builds: its records worker (crates/leafline-web) and its game
+# readers (crates/leafline-capture).
 [workspace]
 members = ["src-tauri", "crates/leafline-core", "crates/leafline-web", "crates/leafline-capture"]
 resolver = "3"
@@ -28,8 +29,8 @@ inherits = "release"
 opt-level = "z"
 strip = false
 
-# The capture test page's WebAssembly (crates/leafline-capture): the readers run on every frame,
-# so it is built for speed. Only that page downloads it.
+# The website's readers (crates/leafline-capture): they run on every frame, so they are built for
+# speed. Only a page that reads a shared game window downloads them.
 [profile.web-fast]
 inherits = "release"
 opt-level = 3

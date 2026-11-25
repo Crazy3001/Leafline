@@ -7,7 +7,12 @@ use std::rc::Rc;
 
 use leafline_core::clock::Duration;
 use leafline_core::error::{Error, Result};
+use leafline_core::pipeline::CharacterScan;
+use leafline_core::readers::questlog::QuestLogReading;
+use leafline_core::service::bag::{self, BAG_EVENT, BagCheck, BagRead, Pictures, SeenBag};
+use leafline_core::service::builds;
 use leafline_core::service::damage::DamageState;
+use leafline_core::service::questwindow::{QuestWindow, Strictness};
 use leafline_core::service::files::Files;
 use leafline_core::service::host::{Host, emit};
 use leafline_core::service::mapdata::{self, MAP_DATA_EVENT, MapDataState};
@@ -75,6 +80,13 @@ thread_local! {
     static MAP_VIEWS: RefCell<HashMap<u32, serde_json::Value>> = RefCell::new(HashMap::new());
     static HOST: RefCell<Option<Rc<WebHost>>> = const { RefCell::new(None) };
     static POOL: RefCell<Option<OpfsSAHPoolUtil>> = const { RefCell::new(None) };
+    /// Item pictures downloaded this visit for sell or keep, decoded, by address (the browser's
+    /// cache keeps the files themselves).
+    static ITEM_PICTURES: RefCell<HashMap<String, image::RgbaImage>> = RefCell::new(HashMap::new());
+    /// The last inventory tab read and its check, for "Look further" and a page that opens later.
+    static LAST_BAG: RefCell<(Option<BagRead>, Option<BagCheck>)> = const { RefCell::new((None, None)) };
+    /// The Quest window's views put together, kept strictly (see `service::questwindow`).
+    static QUEST_WINDOW: RefCell<Option<QuestWindow>> = const { RefCell::new(None) };
 }
 
 fn host() -> std::result::Result<Rc<WebHost>, JsValue> {
@@ -182,6 +194,25 @@ fn own(host: &WebHost, name: &str, args: serde_json::Value) -> Option<Reply> {
     struct MapId {
         id: u32,
     }
+    #[derive(Deserialize)]
+    struct Scan {
+        scan: CharacterScan,
+    }
+    #[derive(Deserialize)]
+    struct Bag {
+        bag: SeenBag,
+    }
+    #[derive(Deserialize)]
+    struct QuestLog {
+        name: String,
+        reading: QuestLogReading,
+        fresh: bool,
+    }
+    #[derive(Deserialize)]
+    struct LiveSession {
+        id: Option<i64>,
+        session: leafline_core::session::SessionSummary,
+    }
     let told = |result: Result<(Nav, bool)>| {
         reply_result(result.map(|(nav, changed)| {
             if changed {
@@ -222,6 +253,65 @@ fn own(host: &WebHost, name: &str, args: serde_json::Value) -> Option<Reply> {
             Ok(What { what }) => reply_result(records::csv(host, what).map(|(text, rows)| serde_json::json!({ "text": text, "rows": rows }))),
             Err(err) => Err(err),
         },
+        // A session read from a shared game window (platform/live.svelte.ts), saved as it goes
+        // the way the program's live loop saves its own: first as a new log entry, then over it.
+        "save_live_session" => match parse::<LiveSession>(args) {
+            Ok(LiveSession { id, session }) => reply_result(save_live_session(host, id, &session)),
+            Err(err) => Err(err),
+        },
+        // The game's windows, read by the live reading when the player holds them open
+        // (platform/live.ts): the build moved along, the bag checked, the quest log kept.
+        "catch_up_character" => match parse::<Scan>(args) {
+            Ok(Scan { scan }) => reply_result(builds::catch_up_clearly(host, scan).inspect(|read| {
+                if read.changed() {
+                    emit(host, builds::CHARACTER_READ_EVENT, &read.clone().on_its_own());
+                }
+            })),
+            Err(err) => Err(err),
+        },
+        "check_bag" => match parse::<Bag>(args) {
+            Ok(Bag { bag }) => match bag.read() {
+                Some(read) => reply(check_bag(host, read, false)),
+                None => Err("That isn't an inventory tab.".into()),
+            },
+            Err(err) => Err(err),
+        },
+        // The pictures a check would try, for the page to fetch together first: `bag` given, or
+        // the last tab read, every item of it (`wide`, for "Look further").
+        "bag_wants" => {
+            #[derive(Deserialize)]
+            struct Wants {
+                bag: Option<SeenBag>,
+                #[serde(default)]
+                wide: bool,
+            }
+            match parse::<Wants>(args) {
+                Ok(Wants { bag, wide }) => {
+                    let read = bag.and_then(|b| b.read()).or_else(|| LAST_BAG.with(|b| b.borrow().0.clone()));
+                    let urls = read.map_or(Ok(Vec::new()), |read| bag::wanted(host, &Downloads, &read, wide));
+                    reply_result(urls.map(|wanted| {
+                        wanted.into_iter().map(|(_, url)| url).filter(|url| !Downloads.has(url)).collect::<Vec<_>>()
+                    }))
+                }
+                Err(err) => Err(err),
+            }
+        }
+        "bag_look_further" => match LAST_BAG.with(|b| b.borrow().0.clone()) {
+            Some(read) => reply(check_bag(host, read, true)),
+            None => Err("Open your inventory in game first.".into()),
+        },
+        "last_bag" => reply(LAST_BAG.with(|b| b.borrow().1.clone())),
+        "follow_quest_log" => match parse::<QuestLog>(args) {
+            Ok(QuestLog { name, reading, fresh }) => reply_result(QUEST_WINDOW.with(|w| {
+                let mut w = w.borrow_mut();
+                let window = w.get_or_insert_with(|| QuestWindow::new(Strictness::Matched));
+                if fresh {
+                    window.closed();
+                }
+                window.keep(host, &name, &reading)
+            })),
+            Err(err) => Err(err),
+        },
         // Map data's daily check, which the program runs in the background at start.
         "update_map_data" => {
             if mapdata::wants_updates(&host.map)
@@ -233,6 +323,53 @@ fn own(host: &WebHost, name: &str, args: serde_json::Value) -> Option<Reply> {
         }
         _ => return None,
     })
+}
+
+/// Checks an inventory tab, keeps it and its result for later, and tells the page.
+fn check_bag(host: &WebHost, read: BagRead, wide: bool) -> BagCheck {
+    let check = bag::name_items(host, &Downloads, &read, wide).unwrap_or_else(|err| BagCheck::failed(err.to_string()));
+    LAST_BAG.with(|b| *b.borrow_mut() = (Some(read), Some(check.clone())));
+    emit(host, BAG_EVENT, &check);
+    check
+}
+
+/// Item pictures from OSMS, downloaded once a visit (the browser's cache keeps them between).
+struct Downloads;
+
+impl Pictures for Downloads {
+    fn has(&self, url: &str) -> bool {
+        ITEM_PICTURES.with(|p| p.borrow().contains_key(url))
+    }
+
+    fn load(&self, wanted: Vec<(u32, String)>) -> Vec<(u32, image::RgbaImage)> {
+        use leafline_core::mapdata::fetch::Source;
+        let xhr = Xhr::new(Duration::ZERO);
+        wanted
+            .into_iter()
+            .filter_map(|(id, url)| {
+                if let Some(image) = ITEM_PICTURES.with(|p| p.borrow().get(&url).cloned()) {
+                    return Some((id, image));
+                }
+                if !leafline_core::mapdata::pictures::allowed(&url) {
+                    return None;
+                }
+                let image = image::load_from_memory(&xhr.get(&url).ok()?).ok()?.to_rgba8();
+                ITEM_PICTURES.with(|p| p.borrow_mut().insert(url, image.clone()));
+                Some((id, image))
+            })
+            .collect()
+    }
+}
+
+/// Saves or updates a live session; its log id.
+fn save_live_session(host: &WebHost, id: Option<i64>, session: &leafline_core::session::SessionSummary) -> Result<i64> {
+    let now = leafline_core::clock::now();
+    let id = host.records.with(|db| match id {
+        Some(id) => db.update_session(id, session, now).map(|()| id),
+        None => db.save_session(session, "", now),
+    })?;
+    emit(host, records::HISTORY_EVENT, &());
+    Ok(id)
 }
 
 /// A map's picture cut to what is drawn, as the program's map cards show it, with its portals, NPCs

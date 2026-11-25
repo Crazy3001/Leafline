@@ -8,17 +8,12 @@
 import init, * as built from "./wasm/leafline_capture.js";
 
 import type { ReaderRead } from "./types";
+import { followTrack, frameRgba as rgba } from "../platform/capture";
 
 const wasm = built as {
   measure(rgba: Uint8Array, width: number, height: number, hintX: number, hintY: number): string;
   Readers: new () => { read(rgba: Uint8Array, w: number, h: number, at: number, fullEvery: number): string };
 };
-
-// Chrome's and Edge's stream reader, not yet in TypeScript's library.
-declare class MediaStreamTrackProcessor {
-  constructor(init: { track: MediaStreamTrack });
-  readable: ReadableStream<VideoFrame>;
-}
 
 export type ToWorker =
   | { op: "track"; track: MediaStreamTrack }
@@ -135,22 +130,6 @@ const nextSlot = (slot: number, at: number, every: number) => (slot + every > at
 
 /** Milliseconds since 1970, by this PC's clock, which the program's names use too. */
 const now = () => performance.timeOrigin + performance.now();
-
-let canvas: OffscreenCanvas | null = null;
-let context: OffscreenCanvasRenderingContext2D | null = null;
-
-/** The frame as RGBA bytes, the colour conversion done the way any page reading it would. */
-function rgba(frame: VideoFrame): { data: Uint8Array; width: number; height: number } {
-  const width = frame.displayWidth;
-  const height = frame.displayHeight;
-  if (!canvas || canvas.width !== width || canvas.height !== height) {
-    canvas = new OffscreenCanvas(width, height);
-    context = canvas.getContext("2d", { willReadFrequently: true, alpha: false });
-  }
-  context!.drawImage(frame, 0, 0);
-  const image = context!.getImageData(0, 0, width, height);
-  return { data: new Uint8Array(image.data.buffer), width, height };
-}
 
 async function save(bitmap: ImageBitmap, at: number) {
   saving++;
@@ -293,15 +272,11 @@ async function handle(frame: VideoFrame) {
   }
 }
 
-let reading: ReadableStreamDefaultReader<VideoFrame> | null = null;
+let reading: ReturnType<typeof followTrack> | null = null;
 
 async function follow(track: MediaStreamTrack) {
-  reading = new MediaStreamTrackProcessor({ track }).readable.getReader();
-  for (;;) {
-    const { value, done } = await reading.read();
-    if (done || !value) break;
-    await handle(value);
-  }
+  reading = followTrack(track, handle);
+  await reading.done;
   post({ type: "ended" });
 }
 

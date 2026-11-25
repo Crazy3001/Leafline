@@ -326,7 +326,7 @@
   {#if read}<DropLogger item={name} itemId={matched?.id ?? null} {map} />{/if}
 
   <!-- No prices until a price source gives permission. Prices logged by earlier builds stay in
-       the records file (src-tauri/src/userdata/prices.rs). -->
+       the records file (crates/leafline-core/src/userdata/prices.rs). -->
   <ItemNotes {name} />
   {/if}
 </Card>

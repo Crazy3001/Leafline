@@ -1,6 +1,6 @@
 // Game pictures: item, monster and NPC icons, map pictures and area emblems. The backend's `pic`
 // scheme hands them over, downloading each from OSMS Data Explorer the first time and keeping it
-// on this PC (src-tauri/src/mapdata/pictures.rs). With the setting off, or a picture missing,
+// on this PC (crates/leafline-core/src/mapdata/pictures.rs). With the setting off, or a picture missing,
 // names stand alone.
 
 import { isTauri } from "@tauri-apps/api/core";

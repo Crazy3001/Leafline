@@ -1,6 +1,7 @@
 // The website's pop-out: Chrome and Edge's Document Picture-in-Picture window, which stays over
-// other windows (the game included) like the program's pinned Now panel. It shows the session
-// being typed in, drawn by this page, so it follows the same numbers.
+// other windows (the game included) like the program's pinned Now panel. It shows the live numbers
+// while the game window is read, else the session being typed in, drawn by this page, so it
+// follows the same numbers.
 
 import { mount, unmount } from "svelte";
 
@@ -48,7 +49,7 @@ export async function openPip(onclose: () => void): Promise<boolean> {
   const target = await api.requestWindow({ width: 520, height: 110 });
   dress(target);
   // Loaded here, not at the top: the HUD imports the backend, which this module is part of.
-  const { default: Hud } = await import("../components/TypedSessionHud.svelte");
+  const { default: Hud } = await import("../components/PopOutHud.svelte");
   const app = mount(Hud, { target: target.document.body });
   open = { window: target, app };
   target.addEventListener("pagehide", () => {

@@ -3,7 +3,7 @@
 import { backend } from "./api";
 import type { BuildRules, DisplaySettings } from "./types";
 
-/** As in src-tauri/src/build/rules.rs, in the same order. */
+/** As in crates/leafline-core/src/build/rules.rs, in the same order. */
 export const DEFAULT_RULES: BuildRules = {
   apPerLevel: 5,
   spPerLevel: 3,
@@ -21,7 +21,7 @@ export const display = $state<DisplaySettings>({
   compactShape: "card",
   hotkeys: { enabled: true, keys: {} },
   travel: { enabled: false, cabs: true, vipCabs: false, scrolls: true },
-  live: { enabled: true, interval: 2, pauseAfter: 15, window: null, pickupLog: true },
+  live: { enabled: true, interval: 2, pauseAfter: 15, window: null, pickupLog: true, itemTooltips: true, characterWindows: true, bagCheck: true, questWindow: true },
   buildRules: DEFAULT_RULES,
   framesFolder: null,
   setupDone: false,

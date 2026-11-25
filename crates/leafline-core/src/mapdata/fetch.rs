@@ -19,6 +19,10 @@ pub const OSMS_BASE: &str = "https://osmsdataexplorer.com/data/api/v1/";
 /// Byte-for-byte copies of OSMS's files in Leafline's data repository, refreshed daily. Used only
 /// when OSMS can't be reached or sends something unusable, so a new install still gets map data.
 pub const MIRROR_BASE: &str = "https://raw.githubusercontent.com/Crazy3001/Leafline-data/main/osms/v1/";
+/// OSMS's files with facts from the patched game client laid over them, in OSMS's format, from
+/// Leafline's data repository. It's newer than OSMS only after a patch OSMS hasn't caught up with,
+/// and a plain copy of OSMS otherwise, so it's used only while its `meta.json` says it's newer.
+pub const MERGED_BASE: &str = "https://raw.githubusercontent.com/Crazy3001/Leafline-data/main/merged/v1/";
 
 /// Without a request from the user, OSMS is asked for changes at most this often.
 pub const CHECK_INTERVAL: i64 = 24 * 60 * 60;
@@ -86,7 +90,8 @@ pub struct RefreshReport {
 /// Brings the cache up to date with OSMS. Unless `force`d, does nothing if the last check was
 /// under [`CHECK_INTERVAL`] ago. Every changed file is verified against its checksum and parsed
 /// before any of them is stored. If OSMS fails, the same files are read from Leafline's mirror;
-/// if that fails too, OSMS's error is the one reported.
+/// if that fails too, OSMS's error is the one reported. While Leafline's merged copy is newer
+/// than what OSMS (or the mirror) offers, the files come from it instead.
 pub fn refresh(store: &mut Store, source: &dyn Source, force: bool, now: i64) -> Result<RefreshReport> {
     refresh_in_order(store, source, force, now, false)
 }
@@ -99,25 +104,36 @@ pub fn refresh_in_order(store: &mut Store, source: &dyn Source, force: bool, now
     if !force && ready && store.checked_at()?.is_some_and(|at| now - at < CHECK_INTERVAL) {
         return Ok(RefreshReport::default());
     }
-    if mirror_first {
-        return match refresh_from(store, source, MIRROR_BASE, now) {
-            Ok(report) => Ok(report),
-            Err(err) => {
-                eprintln!("mirror update failed ({err}); trying OSMS");
-                refresh_from(store, source, OSMS_BASE, now)
+    let order = if mirror_first { [MIRROR_BASE, OSMS_BASE] } else { [OSMS_BASE, MIRROR_BASE] };
+    // Asked for once, and only after OSMS or the mirror answers, to compare with it.
+    let merged = std::cell::OnceCell::new();
+    let merged = || merged.get_or_init(|| fetch_meta(source, MERGED_BASE).ok()).clone();
+    let mut osms_err = None;
+    for base in order {
+        let tried = fetch_meta(source, base).and_then(|meta| {
+            if let Some(newer) = merged().filter(|m| is_newer(m, &meta)) {
+                match download(store, source, MERGED_BASE, &newer, now) {
+                    Ok(report) => return Ok(report),
+                    Err(err) => eprintln!("merged data update failed ({err}); using {base}"),
+                }
             }
-        };
-    }
-    match refresh_from(store, source, OSMS_BASE, now) {
-        Ok(report) => Ok(report),
-        Err(err) => {
-            eprintln!("OSMS update failed ({err}); trying Leafline's mirror");
-            refresh_from(store, source, MIRROR_BASE, now).map_err(|_| err)
+            download(store, source, base, &meta, now)
+        });
+        match tried {
+            Ok(report) => return Ok(report),
+            Err(err) => {
+                eprintln!("update from {base} failed ({err})");
+                if base == OSMS_BASE {
+                    osms_err = Some(err);
+                }
+            }
         }
     }
+    Err(osms_err.expect("OSMS is always tried"))
 }
 
-fn refresh_from(store: &mut Store, source: &dyn Source, base: &str, now: i64) -> Result<RefreshReport> {
+/// `meta.json` from `base`, in a schema this version of Leafline reads.
+fn fetch_meta(source: &dyn Source, base: &str) -> Result<Meta> {
     let meta: Meta = serde_json::from_slice(&source.get(&format!("{base}meta.json"))?)
         .map_err(|err| Error::Download(format!("meta.json is not in the expected format: {err}")))?;
     if meta.schema_version != SCHEMA_VERSION {
@@ -126,6 +142,17 @@ fn refresh_from(store: &mut Store, source: &dyn Source, base: &str, now: i64) ->
             meta.schema_version
         )));
     }
+    Ok(meta)
+}
+
+/// Whether `merged` was built after `osms` last updated. Both write `data_updated_at` as
+/// `2026-11-18T18:54:44Z`, which sorts as text; anything else counts as not newer.
+fn is_newer(merged: &Meta, osms: &Meta) -> bool {
+    let stamp = |s: &str| s.len() == 20 && s.ends_with('Z');
+    stamp(&merged.data_updated_at) && stamp(&osms.data_updated_at) && merged.data_updated_at > osms.data_updated_at
+}
+
+fn download(store: &mut Store, source: &dyn Source, base: &str, meta: &Meta, now: i64) -> Result<RefreshReport> {
     let have = store.file_hashes()?;
     let mut downloads = Vec::new();
     for name in FILES {
@@ -143,7 +170,7 @@ fn refresh_from(store: &mut Store, source: &dyn Source, base: &str, now: i64) ->
             .map_err(|err| Error::Download(format!("{name} is not in the expected format: {err}")))?;
         downloads.push(Download { name: name.to_string(), meta: file.clone(), records });
     }
-    store.apply(&meta, &downloads, now)?;
+    store.apply(meta, &downloads, now)?;
     Ok(RefreshReport { checked: true, downloaded: downloads.into_iter().map(|d| d.name).collect() })
 }
 
@@ -173,8 +200,9 @@ pub(crate) mod tests {
     }
 
     impl FakeSource {
+        /// What was asked of OSMS, by file name.
         fn names(&self) -> Vec<String> {
-            self.requests.borrow().iter().map(|u| u.trim_start_matches(OSMS_BASE).to_string()).collect()
+            self.requests.borrow().iter().filter_map(|u| u.strip_prefix(OSMS_BASE)).map(str::to_string).collect()
         }
     }
 
@@ -199,6 +227,11 @@ pub(crate) mod tests {
         "ingredients": [{"item_id": 91, "count": 3}]}]"#;
 
     pub fn fake_osms(maps: &str) -> FakeSource {
+        fake_at(OSMS_BASE, maps, "fake", "2026-01-01T00:00:00Z")
+    }
+
+    /// `fake_osms`'s files served from `base`, with this build and update time in `meta.json`.
+    fn fake_at(base: &str, maps: &str, build: &str, updated: &str) -> FakeSource {
         let bodies = [
             ("maps.json", maps),
             ("monsters.json", MONSTERS),
@@ -219,14 +252,23 @@ pub(crate) mod tests {
             })
             .collect();
         let meta = format!(
-            r#"{{"schema_version": 1, "client_build": "fake", "data_updated_at": "2026-01-01T00:00:00Z", "files": {{{}}}}}"#,
+            r#"{{"schema_version": 1, "client_build": "{build}", "data_updated_at": "{updated}", "files": {{{}}}}}"#,
             files.join(",")
         );
         let mut source = FakeSource::default();
-        source.files.insert(format!("{OSMS_BASE}meta.json"), meta.into_bytes());
+        source.files.insert(format!("{base}meta.json"), meta.into_bytes());
         for (name, body) in bodies {
-            source.files.insert(format!("{OSMS_BASE}{name}"), body.as_bytes().to_vec());
+            source.files.insert(format!("{base}{name}"), body.as_bytes().to_vec());
         }
+        source
+    }
+
+    /// OSMS's fake files, plus a merged copy updated at `updated` whose maps add a third.
+    fn with_merged(updated: &str) -> FakeSource {
+        let more = MAPS.replace("}]}]", r#"}]}, {"id": 3, "name": "Glowmoss Hollow", "exits": []}]"#);
+        assert_ne!(more, MAPS);
+        let mut source = fake_osms(MAPS);
+        source.files.extend(fake_at(MERGED_BASE, &more, "merged", updated).files);
         source
     }
 
@@ -341,7 +383,7 @@ pub(crate) mod tests {
         let source = fake_osms(MAPS);
         let mut store = Store::open_in_memory().unwrap();
         refresh(&mut store, &source, false, 1000).unwrap();
-        assert!(source.requests.borrow().iter().all(|u| u.starts_with(OSMS_BASE)));
+        assert!(!source.requests.borrow().iter().any(|u| u.starts_with(MIRROR_BASE)));
     }
 
     #[test]
@@ -349,12 +391,43 @@ pub(crate) mod tests {
         let source = mirror_only(fake_osms(MAPS));
         let mut store = Store::open_in_memory().unwrap();
         refresh_in_order(&mut store, &source, false, 1000, true).unwrap();
-        assert!(source.requests.borrow().iter().all(|u| u.starts_with(MIRROR_BASE)));
+        assert!(!source.requests.borrow().iter().any(|u| u.starts_with(OSMS_BASE)));
         // And falls back to OSMS when the mirror can't answer.
         let source = fake_osms(MAPS);
         let mut store = Store::open_in_memory().unwrap();
         refresh_in_order(&mut store, &source, false, 1000, true).unwrap();
         assert!(store.status().unwrap().ready);
+    }
+
+    #[test]
+    fn takes_the_merged_copy_while_it_is_newer_than_osms() {
+        let source = with_merged("2026-01-02T00:00:00Z");
+        let mut store = Store::open_in_memory().unwrap();
+        refresh(&mut store, &source, false, 1000).unwrap();
+        assert_eq!(store.status().unwrap().client_build.as_deref(), Some("merged"));
+        assert_eq!(store.load().unwrap().unwrap().maps.len(), 3);
+        assert_eq!(source.names(), ["meta.json"], "only OSMS's meta.json, to compare");
+    }
+
+    #[test]
+    fn keeps_to_osms_once_it_has_caught_up() {
+        let source = with_merged("2026-01-01T00:00:00Z");
+        let mut store = Store::open_in_memory().unwrap();
+        refresh(&mut store, &source, false, 1000).unwrap();
+        assert_eq!(store.status().unwrap().client_build.as_deref(), Some("fake"));
+        let merged: Vec<String> =
+            source.requests.borrow().iter().filter(|u| u.starts_with(MERGED_BASE)).cloned().collect();
+        assert_eq!(merged, [format!("{MERGED_BASE}meta.json")], "the merged files are never downloaded");
+    }
+
+    #[test]
+    fn a_broken_merged_copy_falls_back_to_osms() {
+        let mut source = with_merged("2026-01-02T00:00:00Z");
+        source.files.insert(format!("{MERGED_BASE}maps.json"), b"[]".to_vec());
+        let mut store = Store::open_in_memory().unwrap();
+        refresh(&mut store, &source, false, 1000).unwrap();
+        assert_eq!(store.status().unwrap().client_build.as_deref(), Some("fake"));
+        assert_eq!(store.load().unwrap().unwrap().maps.len(), 2);
     }
 
     #[test]

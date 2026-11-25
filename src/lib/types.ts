@@ -1,4 +1,4 @@
-// Mirrors the structs the Rust side serialises (see src-tauri/src/pipeline.rs and readers/).
+// Mirrors the structs the Rust side serialises (see crates/leafline-core/src/pipeline.rs and readers/).
 
 export interface Rect {
   x: number;
@@ -194,7 +194,7 @@ export interface OverlayStatus {
   compact: boolean;
 }
 
-// Live reading (see src-tauri/src/app/live.rs and src-tauri/src/capture).
+// Live reading (see src-tauri/src/app/live.rs and crates/leafline-core/src/capture).
 
 export type LiveStatus =
   | { state: "off" }
@@ -240,6 +240,14 @@ export interface LiveChoice {
   window: WindowChoice | null;
   /** The Pickup Log is read between readings, for the loot picked up. */
   pickupLog: boolean;
+  /** The website reads an item tooltip the mouse rests on and shows its card. */
+  itemTooltips: boolean;
+  /** The website updates the build from the stat and skill windows while they're open. */
+  characterWindows: boolean;
+  /** The website checks the inventory tab that's open (sell or keep). */
+  bagCheck: boolean;
+  /** The website keeps the quest log from the Quest window while it's open. */
+  questWindow: boolean;
 }
 
 export interface ShortcutInfo {
@@ -291,7 +299,7 @@ export interface MapSummary {
   mesosPerHour: number | null;
 }
 
-/** What the session tracker has worked out so far (see src-tauri/src/session.rs). */
+/** What the session tracker has worked out so far (see crates/leafline-core/src/session.rs). */
 export interface SessionSummary {
   frames: number;
   startedAt: number | null;
@@ -389,7 +397,7 @@ export interface SessionSummary {
   loot?: LootSummary;
 }
 
-/** The recent rates at one moment of a session (see src-tauri/src/session.rs). */
+/** The recent rates at one moment of a session (see crates/leafline-core/src/session.rs). */
 export interface TimelinePoint {
   /** Active seconds into the session. */
   at: number;
@@ -414,7 +422,7 @@ export interface SessionTimeline {
   events: SessionEvent[];
 }
 
-/** How fast one quest counter went up on one map (see src-tauri/src/session.rs). */
+/** How fast one quest counter went up on one map (see crates/leafline-core/src/session.rs). */
 export interface CounterRate {
   target: string;
   required: number;
@@ -427,7 +435,7 @@ export interface CounterRate {
 }
 
 
-// Map data (see src-tauri/src/mapdata/). Facts from OSMS Data Explorer, fetched on request.
+// Map data (see crates/leafline-core/src/mapdata/). Facts from OSMS Data Explorer, fetched on request.
 
 /** What map data is cached locally. */
 export interface MapDataStatus {
@@ -537,7 +545,7 @@ export interface MapDetails {
   shops: Shop[];
 }
 
-// NPC shops (see src-tauri/src/mapdata/shops.rs), from Leafline's own shop file.
+// NPC shops (see crates/leafline-core/src/mapdata/shops.rs), from Leafline's own shop file.
 
 export interface ShopItem {
   item: string;
@@ -644,7 +652,7 @@ export interface Trip {
  */
 export type TripMessage = "ask" | "dismiss-offer" | "reroute";
 
-/** Taxis and return scrolls (see src-tauri/src/mapdata/travel.rs). */
+/** Taxis and return scrolls (see crates/leafline-core/src/mapdata/travel.rs). */
 export type TravelKind = "cab" | "vipCab" | "scroll" | "npc";
 
 export interface TravelStep {
@@ -723,7 +731,7 @@ export interface MonsterDrops {
   }[];
 }
 
-// Quest guide (see src-tauri/src/mapdata/guide.rs): where to go for each Quest Helper objective.
+// Quest guide (see crates/leafline-core/src/mapdata/guide.rs): where to go for each Quest Helper objective.
 
 /** A quest as the Quest Helper showed it, for the guide. */
 export interface QuestQuery {
@@ -801,7 +809,7 @@ export interface Guide {
   quests: QuestGuide[];
 }
 
-// Training spots (see src-tauri/src/mapdata/training.rs).
+// Training spots (see crates/leafline-core/src/mapdata/training.rs).
 
 /** EXP per hour the session tracker measured on a map, keyed by its minimap label. */
 export interface MeasuredRate {
@@ -820,7 +828,7 @@ export interface MeasuredRate {
   deaths?: number | null;
 }
 
-/** The character as the combat model sees them (src-tauri/src/mapdata/combat.rs). */
+/** The character as the combat model sees them (crates/leafline-core/src/mapdata/combat.rs). */
 export interface Fighter {
   level: number;
   /** One damage line, skill share included, before the monster's defence. */
@@ -835,7 +843,7 @@ export interface Fighter {
   attackSeconds: number;
 }
 
-/** One monster against the player's character, from the combat model (see src-tauri/src/mapdata/combat.rs). */
+/** One monster against the player's character, from the combat model (see crates/leafline-core/src/mapdata/combat.rs). */
 export interface MonsterFight {
   fighter: Fighter;
   fight: {
@@ -870,7 +878,7 @@ export interface ModelFit {
 
 /**
  * What the training estimates take as given because the map data doesn't say (see
- * src-tauri/src/mapdata/training.rs). The player can change both.
+ * crates/leafline-core/src/mapdata/training.rs). The player can change both.
  */
 export interface Assumptions {
   /** Seconds before a defeated monster is back. */
@@ -1133,7 +1141,7 @@ export interface TrainingSpots {
   spots: TrainingSpot[];
 }
 
-/** A training spot the player saved (src-tauri/src/userdata/spots.rs). */
+/** A training spot the player saved (crates/leafline-core/src/userdata/spots.rs). */
 export interface SavedSpot {
   mapId: number;
   /** The map's name when it was saved. */
@@ -1142,8 +1150,8 @@ export interface SavedSpot {
   savedAt: number;
 }
 
-/** The player's own note on an item (src-tauri/src/userdata/notes.rs). */
-/** The player's note on a map (src-tauri/src/userdata/notes.rs). */
+/** The player's own note on an item (crates/leafline-core/src/userdata/notes.rs). */
+/** The player's note on a map (crates/leafline-core/src/userdata/notes.rs). */
 export interface MapNote {
   mapId: number;
   /** The map's name when the note was written. */
@@ -1160,7 +1168,7 @@ export interface ItemNote {
   updatedAt: number;
 }
 
-/** A drop the player is logging (src-tauri/src/userdata/drops.rs). */
+/** A drop the player is logging (crates/leafline-core/src/userdata/drops.rs). */
 export interface NewDrop {
   item: string;
   itemId: number | null;
@@ -1178,7 +1186,7 @@ export interface LoggedDrop extends NewDrop {
   seenAt: number;
 }
 
-// Price log (see src-tauri/src/userdata/prices.rs): only prices the player logged.
+// Price log (see crates/leafline-core/src/userdata/prices.rs): only prices the player logged.
 
 export type CompactShape = "card" | "wide" | "bar";
 
@@ -1240,7 +1248,7 @@ export type UpdateStatus =
   | { state: "unavailable"; current: string; reason: string }
   | { state: "failed"; current: string; message: string };
 
-// Session history (see src-tauri/src/userdata/sessions.rs).
+// Session history (see crates/leafline-core/src/userdata/sessions.rs).
 
 export interface SavedSession {
   id: number;
@@ -1279,7 +1287,7 @@ export interface SavedSession {
   loot?: SessionLoot | null;
 }
 
-// Crafting (see src-tauri/src/build/crafting.rs): recipes from the map data.
+// Crafting (see crates/leafline-core/src/build/crafting.rs): recipes from the map data.
 
 export interface ItemAmount {
   id: number;
@@ -1315,13 +1323,13 @@ export interface CraftingPage {
   recipes: Recipe[];
 }
 
-/** The EXP a level takes, as the player's own HUD showed it (src-tauri/src/userdata/sessions.rs). */
+/** The EXP a level takes, as the player's own HUD showed it (crates/leafline-core/src/userdata/sessions.rs). */
 export interface LevelExp {
   level: number;
   needed: number;
 }
 
-/** A potion the player hunts with (src-tauri/src/userdata/potions.rs). Nothing here is bundled. */
+/** A potion the player hunts with (crates/leafline-core/src/userdata/potions.rs). Nothing here is bundled. */
 export interface PotionSlot {
   /** Stays with the slot; 0 for a new one. */
   slot: number;
@@ -1380,7 +1388,7 @@ export interface LootItem {
   count: number;
 }
 
-/** A session's loot as it goes (see src-tauri/src/loot.rs). */
+/** A session's loot as it goes (see crates/leafline-core/src/loot.rs). */
 export interface LootSummary {
   /** The log has been seen this session, so the totals mean something. */
   watched: boolean;
@@ -1456,7 +1464,7 @@ export interface History {
   maps: MapRate[];
 }
 
-// The build planner (see src-tauri/src/build/).
+// The build planner (see crates/leafline-core/src/build/).
 
 export type BaseStat = "str" | "dex" | "int" | "luk";
 
@@ -1710,7 +1718,7 @@ export interface CharacterRead {
   automatic: boolean;
 }
 
-// The monster search (see src-tauri/src/mapdata/bestiary.rs).
+// The monster search (see crates/leafline-core/src/mapdata/bestiary.rs).
 
 export interface MonsterQuery {
   /** A monster, an item it drops, or a map it lives on. */
@@ -1818,7 +1826,7 @@ export interface MonsterLink {
   text: string | null;
 }
 
-// The map and NPC searches (see src-tauri/src/mapdata/places.rs).
+// The map and NPC searches (see crates/leafline-core/src/mapdata/places.rs).
 
 export interface MapQuery {
   /** A map, a street or region, a monster on it or an NPC on it. */

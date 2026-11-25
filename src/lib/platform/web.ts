@@ -11,6 +11,7 @@ import type { DeskStatus, MapPicture, PinStatus } from "../types";
 import { emit, listen } from "./bus";
 import { commandBackend } from "./commands";
 import { setMapView, setPictureTable } from "./pictures.svelte";
+import { fetchBagPictures, liveReadings, liveStatus, resetLiveSession, setLiveHeld, startLive, stopLive } from "./live";
 import { closePip, openPip, pipOpen } from "./pip";
 import { checkRecords, exportRecords, importRecords, invoke, recordsSummary } from "./storage.svelte";
 
@@ -71,11 +72,12 @@ export const webBackend: Backend = {
   toggleOverlay: async () => {},
   shortcuts: async () => [],
   setHotkeysQuiet: async () => {},
-  liveStatus: async () => ({ state: "off" }),
-  setLiveHeld: async () => {},
-  resetSession: async () => {},
-  startLive: notHere("Reading the game"),
-  stopLive: async () => {},
+  // Reading a shared game window, where the browser can (see live.ts).
+  liveStatus: async () => liveStatus(),
+  setLiveHeld: async (held) => setLiveHeld(held),
+  resetSession: () => resetLiveSession(),
+  startLive: () => startLive(),
+  stopLive: () => stopLive(),
   liveWindows: async () => [],
   saveLiveFrame: notHere("Saving game pictures"),
   saveItemPicture: notHere("Saving game pictures"),
@@ -112,6 +114,9 @@ export const webBackend: Backend = {
   setDeskOnTop: async () => desk,
   async setPageZoom(zoom) {
     document.documentElement.style.setProperty("zoom", String(zoom));
+    // Zoom scales viewport units too, so full-height pages divide it back out (or at 150% the
+    // page is half again as tall as the window, and the sidebar's foot can't be reached).
+    document.documentElement.style.setProperty("--page-zoom", String(zoom));
   },
   monitorCount: async () => 1,
   setTyping: async () => {},
@@ -122,9 +127,13 @@ export const webBackend: Backend = {
     return rows;
   },
   readCharacter: notHere("Reading the character's windows"),
-  bagLookFurther: async () => {},
-  lastBag: async () => null,
-  currentReadings: async () => ({ analysis: null, session: null }),
+  // Sell or keep runs by itself while the inventory is open (see live.ts).
+  async bagLookFurther() {
+    await fetchBagPictures({ wide: true });
+    await invoke("bag_look_further");
+  },
+  lastBag: () => invoke("last_bag"),
+  currentReadings: async () => liveReadings(),
   pinStatus: async () => pins(),
   async pinPanel(panel) {
     if (panel === "now") await openPip(() => void emit("pins", pins()));

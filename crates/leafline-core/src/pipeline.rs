@@ -79,8 +79,15 @@ pub fn read_items(frame: &Frame, ocr: &Ocr) -> Result<Vec<ItemTooltip>> {
     tooltip::read_all(frame, &overview(frame, ocr)?, ocr)
 }
 
+/// [`read_items`] without the pass of OCR over the whole frame that finds the tooltips (the
+/// website's, whose OCR reads a line at a time): see `tooltip::read_all_drawn`.
+pub fn read_items_drawn(frame: &Frame, ocr: &Ocr) -> Result<Vec<ItemTooltip>> {
+    tooltip::read_all_drawn(frame, ocr)
+}
+
 /// What the character's windows show, with the name and level from the HUD.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CharacterScan {
     pub name: Option<String>,
     pub level: Option<u32>,
@@ -205,6 +212,39 @@ fn read_quests(frame: &Frame, scale: Option<f32>, overview: &[Line], ocr: &Ocr) 
         Some(reading) => Some(QuestReading { panel: view.to_window(reading.panel), ..reading }),
         None => quest::read(frame, overview, ocr)?,
     })
+}
+
+/// The Quest Helper read without OCR (the website's way, see [`quest::drawn`]): `read_text` reads
+/// the words in a rectangle of the picture it is given, for the header's page, the titles and
+/// targets the objective font can't read. As [`read_quests`], the panel is redrawn on the design
+/// grid first when the game draws its UI at another size.
+pub fn read_quests_drawn(
+    frame: &Frame,
+    hud: Option<&HudLayout>,
+    read_text: &mut dyn FnMut(&Frame, Rect) -> Option<String>,
+) -> Option<QuestReading> {
+    for button in quest::drawn::buttons(frame) {
+        // The HUD tells the UI size best; with none in view, the buttons' own size does.
+        let scale = match hud {
+            Some(_) => redrawn_scale(frame, hud),
+            None => Some(quest::drawn::scale(frame, button)).filter(|s| (s - CANONICAL_SCALE).abs() > 0.005),
+        };
+        let Some(scale) = scale else {
+            let Some(header) = quest::drawn::header(frame) else { continue };
+            let page = read_text(frame, header).and_then(|t| quest::drawn::page(&t));
+            return Some(quest::drawn::read(frame, frame, header, page, false, read_text));
+        };
+        let area = quest::drawn::around(button);
+        let smoothed = ui::smoothed(frame, area).unwrap_or(false);
+        let near_black = if smoothed { ui::NEAR_BLACK_SMOOTHED } else { ui::NEAR_BLACK };
+        let view = Canonical::sharp(frame, scale, area, near_black);
+        let Some(header) = quest::drawn::header(&view.frame) else { continue };
+        let digits = Canonical::inked(frame, scale, area, near_black);
+        let page = read_text(&view.frame, header).and_then(|t| quest::drawn::page(&t));
+        let reading = quest::drawn::read(&view.frame, &digits.frame, header, page, smoothed, read_text);
+        return Some(QuestReading { panel: view.to_window(reading.panel), ..reading });
+    }
+    None
 }
 
 /// At UI Size Default Ratio the digits are read as drawn, with the ink thresholds for thin

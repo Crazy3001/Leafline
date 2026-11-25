@@ -551,7 +551,7 @@ function perKill(mobs: MobRow[]) {
   return { hp: mean((m) => m.hp), exp: mean((m) => m.exp), level: mean((m) => m.level), count };
 }
 
-/** A short version of the backend's kill speed model (src-tauri/src/mapdata/training.rs). */
+/** A short version of the backend's kill speed model (crates/leafline-core/src/mapdata/training.rs). */
 function sampleSpeed(rates: MeasuredRate[], assumptions: Assumptions): KillSpeed | null {
   let seconds = 0;
   let hp = 0;

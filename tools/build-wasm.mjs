@@ -1,6 +1,6 @@
 // Builds the website's WebAssembly and its JavaScript glue: crates/leafline-web into
 // src/lib/platform/wasm/, which the website's storage worker loads, and crates/leafline-capture
-// into src/lib/capture/wasm/, which only the capture test page loads. Run by `npm run build:web`.
+// into src/lib/capture/wasm/, which the live reading worker and the capture test pages load. Run by `npm run build:web`.
 //
 // Needs: the wasm32-unknown-unknown Rust target, wasm-bindgen-cli at the same version as the
 // wasm-bindgen crate (0.2.130), and a clang that can build C for wasm32 (SQLite is C). Set
@@ -36,21 +36,32 @@ if (!env.CC_wasm32_unknown_unknown && process.platform === "win32") {
   }
 }
 
-const run = (cmd, args) => execFileSync(cmd, args, { cwd: root, env, stdio: "inherit" });
-// The storage worker is built small; the capture test's readers fast (see Cargo.toml's profiles).
+const run = (cmd, args, extra = {}) => execFileSync(cmd, args, { cwd: root, env: { ...env, ...extra }, stdio: "inherit" });
+// The storage worker is built small; the readers fast (see Cargo.toml's profiles).
+// The readers also use WebAssembly SIMD, which ocrs's text recognition is several times quicker
+// with: every browser that can share a window has it. They get a target folder of their own, so
+// the two builds' different flags don't rebuild each other's dependencies. The storage worker,
+// which every browser loads, stays without.
+const targetDir = env.CARGO_TARGET_DIR ?? join(root, "target");
 const builds = [
-  ["leafline-web", "web", "src/lib/platform/wasm"],
-  ["leafline-capture", "web-fast", "src/lib/capture/wasm"],
+  ["leafline-web", "web", "src/lib/platform/wasm", targetDir, {}],
+  [
+    "leafline-capture",
+    "web-fast",
+    "src/lib/capture/wasm",
+    join(targetDir, "simd"),
+    { CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: "-C target-feature=+simd128" },
+  ],
 ];
-for (const [crate, profile] of builds) {
-  run("cargo", ["build", "--profile", profile, "--target", "wasm32-unknown-unknown", "-p", crate]);
+for (const [crate, profile, , dir, extra] of builds) {
+  run("cargo", ["build", "--profile", profile, "--target", "wasm32-unknown-unknown", "-p", crate, "--target-dir", dir], extra);
 }
 
-for (const [name, profile, folder] of builds) {
+for (const [name, profile, folder, dir] of builds) {
   const crate = name.replace("-", "_");
   const out = join(root, folder);
   mkdirSync(out, { recursive: true });
-  const wasm = join(root, `target/wasm32-unknown-unknown/${profile}/${crate}.wasm`);
+  const wasm = join(dir, `wasm32-unknown-unknown/${profile}/${crate}.wasm`);
   run("wasm-bindgen", ["--target", "web", "--remove-name-section", "--remove-producers-section", "--out-dir", out, "--out-name", crate, wasm]);
   const built = join(out, `${crate}_bg.wasm`);
   const size = statSync(built).size;

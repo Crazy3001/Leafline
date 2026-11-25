@@ -237,7 +237,7 @@ let displaySettings: DisplaySettings = {
   compactShape: "card",
   hotkeys: { enabled: true, keys: {} },
   travel: { enabled: false, cabs: true, vipCabs: false, scrolls: true },
-  live: { enabled: true, interval: 2, pauseAfter: 15, window: null, pickupLog: true },
+  live: { enabled: true, interval: 2, pauseAfter: 15, window: null, pickupLog: true, itemTooltips: true, characterWindows: true, bagCheck: true, questWindow: true },
   framesFolder: null,
   setupDone: true,
   updateCheck: false,
@@ -436,7 +436,7 @@ const buildHandlers: (() => void)[] = [];
 const buildsChanged = () => buildHandlers.forEach((h) => h());
 
 /**
- * A rough stand-in for src-tauri/src/build/plan.rs, only for designing the pages: the same shape
+ * A rough stand-in for crates/leafline-core/src/build/plan.rs, only for designing the pages: the same shape
  * of answer, without the tier, prerequisite and problem rules. The tests cover the real one.
  */
 function mockExpand(build: Build): Expansion {

@@ -17,17 +17,31 @@ use crate::error::Result;
 pub struct Ocr {
     /// `None` for [`Ocr::none`].
     engine: Option<platform::Engine>,
+    /// A text recogniser given from outside, such as the website's.
+    other: Option<Box<dyn TextEngine>>,
+}
+
+/// A text recogniser other than the platform's: the website brings its own (ocrs, in
+/// `leafline-capture`), since a browser has no Windows OCR.
+pub trait TextEngine: Send + Sync {
+    /// The words in `image`, with rectangles in `image` pixels.
+    fn words(&self, image: &Frame) -> Result<Vec<Word>>;
 }
 
 impl Ocr {
     pub fn new() -> Result<Self> {
-        Ok(Self { engine: Some(platform::Engine::new()?) })
+        Ok(Self { engine: Some(platform::Engine::new()?), other: None })
     }
 
     /// No text recognition at all: every picture reads as no words. For timing the readers that
     /// need none, as the website must until it has an OCR of its own.
     pub fn none() -> Self {
-        Self { engine: None }
+        Self { engine: None, other: None }
+    }
+
+    /// Text recognition by `engine`, given from outside.
+    pub fn with(engine: Box<dyn TextEngine>) -> Self {
+        Self { engine: None, other: Some(engine) }
     }
 
     /// The largest width or height the engine accepts; larger images are shrunk to fit.
@@ -37,6 +51,9 @@ impl Ocr {
 
     /// Recognises words in `image`, with rectangles in `image` pixels.
     pub fn words(&self, image: &Frame) -> Result<Vec<Word>> {
+        if let Some(other) = &self.other {
+            return other.words(image);
+        }
         let Some(engine) = &self.engine else { return Ok(Vec::new()) };
         let limit = Self::max_dimension() as f32;
         let longest = image.width().max(image.height()) as f32;

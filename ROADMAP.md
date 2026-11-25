@@ -10,10 +10,8 @@ sends input, and stays free.
 ## Planned
 
 **Website**
-- Type in a session (level and EXP at the start and end) for EXP per hour, time to level and the training log
-- A pop-out window of Now's numbers that stays over the game
-- Map pictures with their portals and spawns, as in the program
-- Reading the game from a shared window in Firefox, Chrome and Edge, one reader at a time, each only once it reads as well as the program's
+- Reading the party size, shop windows and quick-slot potions from a shared window, as the program does
+- Reading well at UI sizes other than Ideal Ratio
 
 **Reading you can trust**
 - Better reading over bright, busy maps, for the Quest Helper and for item pickups

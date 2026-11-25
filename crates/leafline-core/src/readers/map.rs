@@ -12,6 +12,7 @@ use image::{Rgba, imageops};
 use serde::Serialize;
 
 use crate::error::Result;
+use crate::vision::glyphs::{Mask, ink_columns};
 use crate::vision::{Frame, Line, Ocr, Rect, Word, color, group_lines, preprocess};
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -93,6 +94,87 @@ fn read_with(frame: &Frame, ocr: &Ocr, is_orange: fn(&Rgba<u8>) -> bool) -> Resu
         }
     }
     Ok(None)
+}
+
+/// The minimap title's text as glyphs, for reading it by the game's own letter shapes: each line
+/// of the expanded header (street, then name) or the collapsed bar's one line, as the blank
+/// columns before each glyph and its ink.
+#[derive(Debug, Clone)]
+pub struct TitleGlyphs {
+    pub collapsed: bool,
+    /// The WORLD button's height in pixels, the title's scale.
+    pub button: f32,
+    pub lines: Vec<Vec<(u32, Mask)>>,
+}
+
+/// The minimap title's glyphs, found the way [`read`] finds the title.
+pub fn title_glyphs(frame: &Frame) -> Option<TitleGlyphs> {
+    for is_orange in [is_button_orange as fn(&Rgba<u8>) -> bool, is_button_orange_through_video] {
+        for button in world_buttons(frame, is_orange) {
+            if let Some(band) = expanded_band(frame, button) {
+                let lines = glyph_lines(frame, band, |p| preprocess::luminance(p) >= 200);
+                if !lines.is_empty() {
+                    return Some(TitleGlyphs { collapsed: false, button: button.h, lines });
+                }
+            } else if let Some(bar) = collapsed_bar(frame, button) {
+                let lines = glyph_lines(frame, bar, |p| preprocess::luminance(p) <= 90);
+                if !lines.is_empty() {
+                    return Some(TitleGlyphs { collapsed: true, button: button.h, lines });
+                }
+            }
+        }
+    }
+    None
+}
+
+/// The lines of text in `rect` (runs of rows with ink), each cut into glyphs at blank columns.
+fn glyph_lines(frame: &Frame, rect: Rect, is_text: impl Fn(&Rgba<u8>) -> bool) -> Vec<Vec<(u32, Mask)>> {
+    let (x0, y0, w, h) = rect.to_pixels(frame.width(), frame.height());
+    let inked_row = |y: u32| (x0..x0 + w).any(|x| is_text(frame.get_pixel(x, y)));
+    let mut rows: Vec<(u32, u32)> = Vec::new();
+    let mut start = None;
+    for y in y0..=y0 + h {
+        match (y < y0 + h && inked_row(y), start) {
+            (true, None) => start = Some(y),
+            (false, Some(top)) => {
+                rows.push((top, y));
+                start = None;
+            }
+            _ => {}
+        }
+    }
+    // Specks a pixel or two tall aren't lines of text.
+    let tallest = rows.iter().map(|(t, b)| b - t).max().unwrap_or(0);
+    rows.retain(|(t, b)| (b - t) * 2 >= tallest);
+    rows.into_iter()
+        .map(|(top, bottom)| {
+            let line = Rect::from_edges(x0 as f32, top as f32, (x0 + w) as f32, bottom as f32);
+            let mut previous = x0;
+            ink_columns(frame, line, &is_text)
+                .into_iter()
+                .map(|(left, right)| {
+                    let gap = left - previous;
+                    previous = right;
+                    (gap, Mask::new(frame, (left, right), (top, bottom), &is_text))
+                })
+                .collect()
+        })
+        .collect()
+}
+
+/// Where the minimap's title is, found as [`read`] finds it, and whether it is the collapsed
+/// bar's one line: for readers other than Windows OCR.
+pub fn title_area(frame: &Frame) -> Option<(Rect, bool)> {
+    for is_orange in [is_button_orange as fn(&Rgba<u8>) -> bool, is_button_orange_through_video] {
+        for button in world_buttons(frame, is_orange) {
+            if let Some(band) = expanded_band(frame, button) {
+                return Some((band, false));
+            } else if let Some(bar) = collapsed_bar(frame, button) {
+                return Some((bar, true));
+            }
+        }
+    }
+    None
 }
 
 /// Orange blocks shaped like the WORLD button, largest first.

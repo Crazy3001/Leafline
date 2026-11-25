@@ -47,7 +47,7 @@
     tester: Place | null;
   }
 
-  /** Branch names by the job id's hundreds, as `Branch::name` in src-tauri/src/build/rules.rs.
+  /** Branch names by the job id's hundreds, as `Branch::name` in crates/leafline-core/src/build/rules.rs.
    *  The advancement quests in the data are named after these, in case the skill data's own
    *  class name for the first job differs. */
   const BRANCHES: Record<number, string> = { 1: "Warrior", 2: "Magician", 3: "Bowman", 4: "Thief" };

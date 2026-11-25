@@ -211,8 +211,8 @@ impl<T: Clone + PartialEq> Steady<T> {
 }
 
 /// Everything the tracker has worked out so far.
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
 pub struct SessionSummary {
     pub frames: usize,
     pub started_at: Option<f64>,
@@ -321,8 +321,8 @@ pub struct SessionSummary {
     pub loot: LootSummary,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
 pub struct MapSummary {
     /// `None` collects time and gains that cannot be placed: before any map was read, and
     /// spans that started on one map and ended on another.

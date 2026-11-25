@@ -3,6 +3,50 @@
 What changed in each release of Leafline. Leafline is a work in progress: if something reads
 wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?template=bug_report.yml).
 
+## 0.5.0 (2026-11-24)
+
+### The website
+Leafline now also runs in a browser at **[crazy3001.github.io/Leafline](https://crazy3001.github.io/Leafline/)**,
+with nothing to install. It is the same Leafline, built from the same code: lookups, Go here,
+where to train, the build planner, the calculators, the drop log, timers and the training log, in
+the four looks, with the desk layout on a computer and the overlay's tabs on a phone.
+
+- **Read the game in the browser.** On a computer, in Firefox, Chrome or Edge, share the game
+  window from **Now → Read the game**. The website reads your level, EXP, mesos, map, name and
+  job, the Quest Helper and the Pickup Log, and tracks the session the way the program does.
+  Rest the mouse on an item for its card with its stats, and open your Stat, Skill, inventory or
+  Quest window to have it read. Each has a switch in **Settings → Reading**. The picture never
+  leaves your computer, and the website carries the same ban risk as the program.
+- **A typed-in session** for when nothing is read: type your level and EXP at the start and the
+  end, and get EXP per hour, time to level and a session in the training log.
+- **Pop out** keeps Now's numbers in a small window over the game.
+- **Records stay in your browser.** Save them with **Settings → Data → Records file** now and then, since
+  a browser can clear a site's storage.
+
+### Added
+- **Item cards while you play.** Rest the mouse on an item in game and its card comes up in Look
+  up, read from the tooltip, with no hotkey. The card changes only when the item does.
+- **Windows read while open.** Hold your Character Stat or Skill window still and your build moves
+  to what it shows; hold an inventory tab still for Sell or keep; scroll your Quest window and the
+  Quests tab keeps what it lists. Each has a switch in **Settings → Live reading**, and the
+  hotkeys work as before.
+- **A records file.** **Settings → Data** saves all your records to one file, and opens one: the
+  same file works in the program, the website or on another PC.
+- **A typed-in session** in the program too, shown on Now while live reading is off.
+
+### Changed
+- **Mesos are read by the game's own digit shapes**, with OCR only as a fallback, so they read
+  faster and slip less.
+- **Routes into Forgotten Hollow.** Its two ways in are portals the game's server sends you
+  through, so the data had no destination for them and Go here found no way in. Map data is
+  downloaded again once to pick this up.
+- **Map data after a patch.** When OSMS hasn't caught up with a game patch yet, Leafline uses
+  Leafline-data's copy with the patched client's maps, quests and items laid over it.
+- **Sell or keep** no longer starts a new check when an item's tooltip is drawn over the tab.
+
+### Fixed
+- **Critical Damage** on an item was read as Critical Rate. **Evasion** is now read too.
+
 ## 0.4.0 (2026-11-18)
 
 ### A new look

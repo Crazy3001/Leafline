@@ -12,6 +12,8 @@
 //!
 //! Items with no stats have no separator, so [`plain`] finds those.
 
+pub mod hover;
+pub mod names;
 mod parse;
 mod plain;
 
@@ -21,7 +23,8 @@ use image::{Rgba, imageops};
 use regex::Regex;
 use serde::Serialize;
 
-pub use parse::{ItemTooltip, JOBS, JobFlag, Property, Requirements, Stat};
+pub use names::{NameLines, name_lines, stat_lines};
+pub use parse::{ItemTooltip, JOBS, JobFlag, Property, Requirements, Stat, is_stat_label, parse_below, split_name};
 
 use super::digits::number;
 use super::text::{best_match, starts_like, trim_noise};
@@ -68,7 +71,17 @@ static CLEAN_NAME: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^[A-Za-z][A-Za-z' :-]*(?: \([A-Z]\))?(?: \(\+\d{1,2}\)?)?$").unwrap());
 
 pub fn read_all(frame: &Frame, overview: &[Line], ocr: &Ocr) -> Result<Vec<ItemTooltip>> {
-    let panels = locate(frame, overview);
+    read_panels(frame, locate(frame, overview), overview, ocr)
+}
+
+/// [`read_all`] without a pass of OCR over the whole frame to find the tooltips by (the
+/// website's): equipment by the separator rule with the panel's frame above it, plain items by
+/// the bullet before their name.
+pub fn read_all_drawn(frame: &Frame, ocr: &Ocr) -> Result<Vec<ItemTooltip>> {
+    read_panels(frame, locate_drawn(frame), &[], ocr)
+}
+
+fn read_panels(frame: &Frame, panels: Vec<Panel>, overview: &[Line], ocr: &Ocr) -> Result<Vec<ItemTooltip>> {
     let requirements = panels.iter().map(|p| RequirementRows::read(frame, *p, ocr)).collect::<Result<Vec<_>>>()?;
     // Digits OCR read cleanly teach the ones it missed, such as lone zeros.
     let mut digits = GlyphSet::default();
@@ -95,6 +108,27 @@ pub fn read_all(frame: &Frame, overview: &[Line], ocr: &Ocr) -> Result<Vec<ItemT
 /// Finds tooltip panels using the separator rules in `frame` and the text in `overview`
 /// (a quick OCR pass over the whole frame).
 pub fn locate(frame: &Frame, overview: &[Line]) -> Vec<Panel> {
+    panels(frame, |separator, unit| {
+        let guess = LINE_PITCH * unit;
+        // Job flags sit just above the separator and `Type:` just below it.
+        overview.iter().any(|line| {
+            line.rect.x >= separator.x - 2.0 * guess
+                && line.rect.x <= separator.right()
+                && (line.rect.center_y() - separator.y).abs() <= 2.5 * guess
+                && looks_like_tooltip_text(&line.text)
+        })
+    })
+}
+
+/// Tooltip panels found by their separator rule and their frame alone, with no text to go by:
+/// the rule must have the panel's light blue frame rising above it on one side, past the `REQ`
+/// block. The Equip window's lines can still pass; reading them finds no type or stats.
+pub fn locate_drawn(frame: &Frame) -> Vec<Panel> {
+    panels(frame, |separator, unit| frame_top(frame, separator, unit).is_some())
+}
+
+/// The panels whose separator `anchored` vouches for.
+fn panels(frame: &Frame, anchored: impl Fn(Rect, f32) -> bool) -> Vec<Panel> {
     let width = frame.width() as f32;
     let whole = Rect::new(0.0, 0.0, width, frame.height() as f32);
     // The rule is a thin line: where it runs on past the panel into a white window behind, the
@@ -112,18 +146,7 @@ pub fn locate(frame: &Frame, overview: &[Line]) -> Vec<Panel> {
     let mut panels: Vec<Panel> = Vec::new();
     for separator in join_collinear(pieces, width * 0.003).into_iter().filter(|r| r.w >= width * 0.08) {
         let unit = separator.w / SEPARATOR_WIDTH;
-        let guess = LINE_PITCH * unit;
-        // Job flags sit just above the separator and `Type:` just below it.
-        let anchors: Vec<&Line> = overview
-            .iter()
-            .filter(|line| {
-                line.rect.x >= separator.x - 2.0 * guess
-                    && line.rect.x <= separator.right()
-                    && (line.rect.center_y() - separator.y).abs() <= 2.5 * guess
-                    && looks_like_tooltip_text(&line.text)
-            })
-            .collect();
-        if anchors.is_empty() {
+        if !anchored(separator, unit) {
             continue;
         }
         // The panel's top is found from its frame, since long names wrap and make it taller. Its

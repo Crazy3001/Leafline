@@ -123,7 +123,7 @@ impl QuestTab {
 }
 
 /// One read of the window.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct QuestLogReading {
     pub tab: QuestTab,
@@ -132,10 +132,17 @@ pub struct QuestLogReading {
     pub scroll: Scroll,
     /// The detail pane, when it is open and its title reads.
     pub detail: Option<QuestDetail>,
+    /// Bars and rows in view whose text didn't read, so aren't in `items`.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub unread: u32,
+}
+
+fn is_zero(n: &u32) -> bool {
+    *n == 0
 }
 
 /// Where the list stands. A list that fits shows its top and its end at once.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Scroll {
     pub at_top: bool,
@@ -301,7 +308,14 @@ pub fn glance(frame: &Frame, hud_scale: Option<f32>) -> Option<Glance> {
 /// it was found.
 pub fn read(frame: &Frame, hud_scale: Option<f32>, ocr: &Ocr) -> Result<Option<QuestLogReading>> {
     let Some((view, anchor)) = locate(frame, hud_scale) else { return Ok(None) };
-    read_view(view.as_ref().unwrap_or(frame), &anchor, ocr).map(Some)
+    read_view(view.as_ref().unwrap_or(frame), &anchor, ocr, true).map(Some)
+}
+
+/// [`read`] without the detail pane: the list alone (the website's, whose OCR misreads the
+/// pane's numbers).
+pub fn read_list_only(frame: &Frame, hud_scale: Option<f32>, ocr: &Ocr) -> Result<Option<QuestLogReading>> {
+    let Some((view, anchor)) = locate(frame, hud_scale) else { return Ok(None) };
+    read_view(view.as_ref().unwrap_or(frame), &anchor, ocr, false).map(Some)
 }
 
 /// The window in `frame`: found as drawn when the UI is at the size the distances are measured
@@ -341,14 +355,14 @@ fn locate(frame: &Frame, hud_scale: Option<f32>) -> Option<(Option<Frame>, Ancho
     })
 }
 
-fn read_view(view: &Frame, anchor: &Anchor, ocr: &Ocr) -> Result<QuestLogReading> {
-    let items = read_list(view, anchor, ocr)?;
+fn read_view(view: &Frame, anchor: &Anchor, ocr: &Ocr, with_detail: bool) -> Result<QuestLogReading> {
+    let (items, unread) = read_list(view, anchor, ocr)?;
     let scroll = scroll(view, anchor);
-    let detail = match detail_box(view, anchor) {
+    let detail = match detail_box(view, anchor).filter(|_| with_detail) {
         Some(b) => read_detail(view, anchor, &b, ocr)?,
         None => None,
     };
-    Ok(QuestLogReading { tab: anchor.tab, items, scroll, detail })
+    Ok(QuestLogReading { tab: anchor.tab, items, scroll, detail, unread })
 }
 
 fn near(px: &Rgba<u8>, colour: [u8; 3], tolerance: u8) -> bool {
@@ -539,11 +553,13 @@ fn bar_start(view: &Frame, anchor: &Anchor, i: usize) -> Option<f32> {
     (from..to.min(view.width())).find(|&x| is_picked_row(view.get_pixel(x, y))).map(|x| x as f32)
 }
 
-fn read_list(view: &Frame, anchor: &Anchor, ocr: &Ocr) -> Result<Vec<LogItem>> {
+/// The list's bars and rows, and how many in view didn't read.
+fn read_list(view: &Frame, anchor: &Anchor, ocr: &Ocr) -> Result<(Vec<LogItem>, u32)> {
     let kinds: Vec<Slot> = (0..SLOTS).map(|i| slot_kind(view, anchor, i)).collect();
     if kinds.iter().all(|&k| k == Slot::Empty) {
-        return Ok(Vec::new());
+        return Ok((Vec::new(), 0));
     }
+    let mut unread = 0;
     let (keyed, area) = keyed_list(view, anchor, &kinds);
     let passes =
         PASSES.iter().map(|&(scale, filter)| ocr_lines(ocr, &keyed, scale, filter)).collect::<Result<Vec<_>>>()?;
@@ -558,7 +574,10 @@ fn read_list(view: &Frame, anchor: &Anchor, ocr: &Ocr) -> Result<Vec<LogItem>> {
             Slot::Region => {
                 let parsed: Vec<(String, Option<u32>)> = texts.iter().filter_map(|t| parse_region(t)).collect();
                 let names: Vec<String> = parsed.iter().map(|(name, _)| name.clone()).collect();
-                let Some(name) = agreed(&names) else { continue };
+                let Some(name) = agreed(&names) else {
+                    unread += 1;
+                    continue;
+                };
                 items.push(LogItem::Region { name, count: most_common(parsed.iter().filter_map(|(_, c)| *c)) });
             }
             Slot::Row | Slot::Picked => {
@@ -566,7 +585,10 @@ fn read_list(view: &Frame, anchor: &Anchor, ocr: &Ocr) -> Result<Vec<LogItem>> {
                 let titles: Vec<(String, bool)> =
                     texts.iter().map(|t| untruncated(t, dots)).filter(|(t, _)| !t.is_empty()).collect();
                 let names: Vec<String> = titles.iter().map(|(t, _)| t.clone()).collect();
-                let Some(title) = agreed(&names) else { continue };
+                let Some(title) = agreed(&names) else {
+                    unread += 1;
+                    continue;
+                };
                 let cut = titles.iter().any(|(_, cut)| *cut);
                 let mut readings: Vec<String> = Vec::new();
                 for name in names {
@@ -591,7 +613,7 @@ fn read_list(view: &Frame, anchor: &Anchor, ocr: &Ocr) -> Result<Vec<LogItem>> {
             Slot::Empty => {}
         }
     }
-    Ok(items)
+    Ok((items, unread))
 }
 
 /// Of several readings of one line, the one most like the others: two passes that agree outvote

@@ -21,7 +21,7 @@ use super::turnins::TurnIn;
 use crate::error::{Error, Result};
 
 /// Bump when the tables change; an older cache is then dropped and downloaded again.
-const CACHE_VERSION: i32 = 16;
+const CACHE_VERSION: i32 = 17;
 
 const SCHEMA: &str = "
 CREATE TABLE source_files (

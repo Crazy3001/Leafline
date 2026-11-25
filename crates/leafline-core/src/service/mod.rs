@@ -2,6 +2,7 @@
 //! functions over Leafline's state ([`host::Host`]). The program wraps each in a Tauri command;
 //! the website's worker calls them by the same command names.
 
+pub mod bag;
 pub mod builds;
 pub mod damage;
 pub mod fighter;
@@ -10,6 +11,7 @@ pub mod host;
 pub mod mapdata;
 pub mod nav;
 pub mod quests;
+pub mod questwindow;
 pub mod records;
 pub mod settings;
 pub mod sheet;

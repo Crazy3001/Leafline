@@ -9,7 +9,7 @@
   import { backend } from "$lib/api";
   import { bag, keepReasons, stackValue, watchBag } from "$lib/bag.svelte";
   import { formatAgo, formatNumber } from "$lib/format";
-  import { hotkey } from "$lib/settings.svelte";
+  import { display, hotkey } from "$lib/settings.svelte";
   import Button from "$lib/ui/Button.svelte";
   import Pic from "$lib/ui/Pic.svelte";
   import type { BagItem, BagTab } from "$lib/types";
@@ -121,8 +121,14 @@
   </Card>
 {:else}
   <p class="hint">
-    Open your Item Inventory and press {hotkey("CheckBag") ? hotkey("CheckBag") : "the Sell or keep hotkey (set it in Settings)"} to see what
-    to keep and what to sell.
+    {#if display.live.bagCheck}
+      Open your Item Inventory on a tab and hold it still while Leafline reads the game{hotkey("CheckBag")
+        ? `, or press ${hotkey("CheckBag")}`
+        : ""}, to see what to keep and what to sell.
+    {:else}
+      Open your Item Inventory and press {hotkey("CheckBag") ? hotkey("CheckBag") : "the Sell or keep hotkey (set it in Settings)"} to see what
+      to keep and what to sell.
+    {/if}
   </p>
 {/if}
 

@@ -49,6 +49,7 @@
 
   const SECTIONS = [
     { id: "live", title: "Live reading" },
+    { id: "reading", title: "Reading" },
     { id: "look", title: "Look" },
     { id: "overlay", title: "Overlay" },
     { id: "routes", title: "Routes" },
@@ -59,6 +60,8 @@
   ].filter((section) => {
     // The website doesn't read the game, float over it or take hotkeys.
     if (section.id === "live") return can.liveReading;
+    // The website's reading of a shared window, which has its own switches.
+    if (section.id === "reading") return can.readWindow;
     if (section.id === "overlay") return can.pins;
     if (section.id === "hotkeys") return can.hotkeys;
     return true;
@@ -383,6 +386,18 @@
     "Press keys or click for you. Nothing is automated: no botting, macros or auto-potions.",
     "Save pictures of your game unless you press Save frame, or upload screenshots, readings or records anywhere.",
   ];
+  // The website's own lists: it reads only a window the player shares, in the browser.
+  const webDoes = [
+    "Reads your name, level, EXP, mesos, map, Quest Helper and Pickup Log from the game window, only after you share it on Now (Read the game) and only until you stop. The picture is read in this browser and never leaves this computer.",
+    "Downloads a text-reading model (about 10 MB, from this site, kept by your browser) the first time you share the game, to read the map's name and the Quest Helper's titles.",
+    "Shows map, monster, quest, skill and equipment facts from community data, downloaded to this browser on your first visit.",
+    "Keeps your settings, sessions, notes, drop log and builds in this browser on this computer.",
+  ];
+  const webDoesNot = [
+    "Read or change the game's memory, files or network traffic.",
+    "Press keys or click for you. Nothing is automated: no botting, macros or auto-potions.",
+    "Keep pictures of your game, or send anything it reads, or your records, anywhere. No accounts, no analytics.",
+  ];
   const credits = [
     {
       what: "Map, monster, NPC, quest, skill and equipment data",
@@ -405,6 +420,17 @@
     { what: "Icons", who: "Lucide", licence: "ISC", url: "https://lucide.dev" },
     { what: "App framework", who: "Tauri", licence: "MIT / Apache-2.0", url: "https://tauri.app" },
     { what: "Interface", who: "Svelte", licence: "MIT", url: "https://svelte.dev" },
+    // The website reads the minimap title with ocrs; the program uses Windows' own OCR.
+    ...(isWeb
+      ? [
+          {
+            what: "Reading the map's name (website)",
+            who: "ocrs by Robert Knight, model trained on HierText",
+            licence: "MIT / Apache-2.0; model data CC BY-SA 4.0",
+            url: "https://github.com/robertknight/ocrs",
+          },
+        ]
+      : []),
   ];
 
   /** The section at the top of the page, lit in the menu. */
@@ -555,6 +581,87 @@
         </div>
 
         <div class="row">
+          <label for="item-tooltips">
+            <span class="name">Item cards</span>
+            <span class="help"
+              >Rest the mouse on an item in game and its card comes up in Look up, read from the tooltip. Off, only
+              the Read item hotkey{keyHint("ReadItem")} reads one.</span
+            >
+          </label>
+          <div class="control">
+            <input
+              id="item-tooltips"
+              class="switch"
+              type="checkbox"
+              role="switch"
+              checked={display.live.itemTooltips}
+              onchange={(e) => setLive({ itemTooltips: e.currentTarget.checked })}
+            />
+          </div>
+        </div>
+
+        <div class="row">
+          <label for="character-windows">
+            <span class="name">Stats and skills</span>
+            <span class="help"
+              >Open your Character Stat or Skill window and hold it still, and your build in the Character tab moves to
+              what it shows. Off, only the hotkey{keyHint("ReadCharacter")} reads them.</span
+            >
+          </label>
+          <div class="control">
+            <input
+              id="character-windows"
+              class="switch"
+              type="checkbox"
+              role="switch"
+              checked={display.live.characterWindows}
+              onchange={(e) => setLive({ characterWindows: e.currentTarget.checked })}
+            />
+          </div>
+        </div>
+
+        <div class="row">
+          <label for="bag-check">
+            <span class="name">Sell or keep</span>
+            <span class="help"
+              >Open your inventory on a tab and hold it still, and Look up says what to keep and what to sell to an NPC.
+              Items are named by their pictures, downloaded from OSMS the first time; one it can't name for sure is
+              listed as not recognised. Off, only the hotkey{keyHint("CheckBag")} checks it.</span
+            >
+          </label>
+          <div class="control">
+            <input
+              id="bag-check"
+              class="switch"
+              type="checkbox"
+              role="switch"
+              checked={display.live.bagCheck}
+              onchange={(e) => setLive({ bagCheck: e.currentTarget.checked })}
+            />
+          </div>
+        </div>
+
+        <div class="row">
+          <label for="quest-window">
+            <span class="name">Quest log</span>
+            <span class="help"
+              >Open your Quest window and scroll through it, and the Quests tab keeps what it lists. Only quests whose
+              titles match the quest data are kept.</span
+            >
+          </label>
+          <div class="control">
+            <input
+              id="quest-window"
+              class="switch"
+              type="checkbox"
+              role="switch"
+              checked={display.live.questWindow}
+              onchange={(e) => setLive({ questWindow: e.currentTarget.checked })}
+            />
+          </div>
+        </div>
+
+        <div class="row">
           <div class="label" id="interval-label">
             <span class="name">Read every</span>
             <span class="help">Shorter catches quick changes; longer uses less CPU.</span>
@@ -604,6 +711,110 @@
       <p class="note">
         Works windowed and in Full Screen. Pictures stay in memory unless you save one{keyHint("SaveFrame")}.
       </p>
+    </section>
+    {/if}
+
+    {#if can.readWindow}
+    <section id="reading">
+      <h2>Reading</h2>
+      <p class="lead">What Leafline reads from the game window you share with this page. It only looks at the picture, which stays on this computer.</p>
+      <div class="row">
+        <label for="web-pickup-log">
+          <span class="name">Count loot</span>
+          <span class="help"
+            >Reads the lines at the bottom right that say what you picked up, four times a second, for the Train tab's loot
+            and profit. Off uses less CPU.</span
+          >
+        </label>
+        <div class="control">
+          <input
+            id="web-pickup-log"
+            class="switch"
+            type="checkbox"
+            role="switch"
+            checked={display.live.pickupLog}
+            onchange={(e) => setLive({ pickupLog: e.currentTarget.checked })}
+          />
+        </div>
+      </div>
+      <div class="row">
+        <label for="web-item-tooltips">
+          <span class="name">Item cards</span>
+          <span class="help"
+            >Rest the mouse on an item in game and its card comes up in Look up. Its name and stats are read from the
+            tooltip; a stat that can't be read for sure shows the item's usual value instead, and an item it can't name
+            for sure shows no card.</span
+          >
+        </label>
+        <div class="control">
+          <input
+            id="web-item-tooltips"
+            class="switch"
+            type="checkbox"
+            role="switch"
+            checked={display.live.itemTooltips}
+            onchange={(e) => setLive({ itemTooltips: e.currentTarget.checked })}
+          />
+        </div>
+      </div>
+      <div class="row">
+        <label for="web-character-windows">
+          <span class="name">Stats and skills</span>
+          <span class="help"
+            >Open your Character Stat or Skill window and hold it still, and your build in the Character tab moves to what it
+            shows. A skill whose name can't be read for sure is left as your build had it.</span
+          >
+        </label>
+        <div class="control">
+          <input
+            id="web-character-windows"
+            class="switch"
+            type="checkbox"
+            role="switch"
+            checked={display.live.characterWindows}
+            onchange={(e) => setLive({ characterWindows: e.currentTarget.checked })}
+          />
+        </div>
+      </div>
+      <div class="row">
+        <label for="web-bag-check">
+          <span class="name">Sell or keep</span>
+          <span class="help"
+            >Open your inventory on a tab and hold it still, and Look up says what to keep and what to sell to an NPC. Items
+            are named by their pictures, downloaded from OSMS the first time; one it can't name for sure is listed as not
+            recognised.</span
+          >
+        </label>
+        <div class="control">
+          <input
+            id="web-bag-check"
+            class="switch"
+            type="checkbox"
+            role="switch"
+            checked={display.live.bagCheck}
+            onchange={(e) => setLive({ bagCheck: e.currentTarget.checked })}
+          />
+        </div>
+      </div>
+      <div class="row">
+        <label for="web-quest-window">
+          <span class="name">Quest log</span>
+          <span class="help"
+            >Open your Quest window and scroll through it, and the Quests tab keeps what it lists. Only quests whose titles
+            match the quest data are kept, and the detail pane on the right isn't read.</span
+          >
+        </label>
+        <div class="control">
+          <input
+            id="web-quest-window"
+            class="switch"
+            type="checkbox"
+            role="switch"
+            checked={display.live.questWindow}
+            onchange={(e) => setLive({ questWindow: e.currentTarget.checked })}
+          />
+        </div>
+      </div>
     </section>
     {/if}
 
@@ -1079,10 +1290,10 @@
         <ShieldCheck size={16} />
         <p>
           {#if isWeb}
-            <strong>Nothing read from the game.</strong> The website doesn't read your game at all: you type what it
-            needs. Your records stay in this browser on this computer and are never sent anywhere; save them to a file
-            now and then, since a browser can clear a site's storage. Leafline is unofficial and Nexon hasn't approved
-            it; use it at your own risk.
+            <strong>Reads only a window you share.</strong> Share the game window on Now and the page reads your level
+            and EXP from it, in this browser; otherwise you type what it needs. Nothing read and none of your records
+            are ever sent anywhere; save your records to a file now and then, since a browser can clear a site's
+            storage. Leafline is unofficial and Nexon hasn't approved it; use it at your own risk.
           {:else}
             <strong>Read-only.</strong> Leafline reads the game window while live reading is on, and nothing else of the
             game. Nexon hasn't said whether read-only overlays are allowed; use Leafline at your own risk.
@@ -1094,13 +1305,13 @@
         <div>
           <h3>What it does</h3>
           <ul>
-            {#each does as item}<li><span class="mark good"><Check size={12} /></span>{item}</li>{/each}
+            {#each isWeb ? webDoes : does as item}<li><span class="mark good"><Check size={12} /></span>{item}</li>{/each}
           </ul>
         </div>
         <div>
           <h3>What it never does</h3>
           <ul>
-            {#each doesNot as item}<li><span class="mark bad"><X size={12} /></span>{item}</li>{/each}
+            {#each isWeb ? webDoesNot : doesNot as item}<li><span class="mark bad"><X size={12} /></span>{item}</li>{/each}
           </ul>
         </div>
       </div>
@@ -1195,7 +1406,7 @@
   .page {
     display: grid;
     grid-template-columns: 150px 1fr;
-    height: 100vh;
+    height: calc(100vh / var(--page-zoom, 1));
   }
 
   /* The menu in the windows' header colours, as setup's steps are. */
