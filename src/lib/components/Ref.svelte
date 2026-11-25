@@ -18,6 +18,7 @@
     id = null,
     name = null,
     icon = true,
+    mark = true,
     class: extra = "",
     title,
     children,
@@ -28,6 +29,8 @@
     name?: string | null;
     /** Show its picture, when it has one. */
     icon?: boolean;
+    /** For a quest, show where it stands in the quest log. */
+    mark?: boolean;
     class?: string;
     /** More about it on hover, never that it opens a card. */
     title?: Tip;
@@ -52,4 +55,4 @@
     e.stopPropagation();
     openPeek({ kind, id, name }, e.currentTarget);
   }}
->{#if picture}<Pic kind={picture} {id} name={pictureName} size={kind === "map" ? 14 : 18} class="ref-pic" />{/if}{#if children}{@render children()}{:else}{name}{/if}{#if kind === "quest" && id != null}<QuestMark {id} />{/if}</button>
+>{#if picture}<Pic kind={picture} {id} name={pictureName} size={kind === "map" ? 14 : 18} class="ref-pic" />{/if}{#if children}{@render children()}{:else}{name}{/if}{#if kind === "quest" && id != null && mark}<QuestMark {id} />{/if}</button>

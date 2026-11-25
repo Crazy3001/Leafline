@@ -84,6 +84,7 @@ import type {
   PlaceLink,
   QuestLog,
   RegionTotal,
+  WholeLog,
   QuestPage,
   QuestQuery,
   QuestSearch,
@@ -207,6 +208,8 @@ export interface Backend {
   forgetQuestLog(name: string): Promise<void>;
   /** How many quests the data files under each region. */
   questRegionTotals(): Promise<RegionTotal[]>;
+  /** Every quest in the data with where it stands for a character at `level`, from their quest log and what their Quest Helper shows. */
+  wholeQuestLog(name: string | null, level: number | null, helper: string[]): Promise<WholeLog>;
   /** A character's quest log changed; with their name. */
   onQuestLog(handler: (name: string) => void): Promise<UnlistenFn>;
   /** All the data says about a quest. */

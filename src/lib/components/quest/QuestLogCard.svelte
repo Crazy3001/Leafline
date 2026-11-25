@@ -1,6 +1,7 @@
 <script lang="ts">
   // The character's quest log at a glance, as the game's Quest window last showed it: what is
-  // ready to hand in and to whom, what else is in progress, and how much of each region is done.
+  // ready to hand in and to whom, and what else is in progress. Every quest, region by region, is
+  // on the card below it.
   // Only true as of the last look, which the card says.
   import { untrack } from "svelte";
   import { CircleCheck } from "@lucide/svelte";
@@ -24,8 +25,6 @@
     { tab: "inProgress", label: "In Progress" },
     { tab: "completed", label: "Completed" },
   ];
-  /** Regions listed before "Show all". */
-  const REGIONS_SHOWN = 6;
 
   const log = $derived(questLog.log);
   const quests = $derived(log?.quests ?? []);
@@ -54,24 +53,6 @@
         .catch(() => {});
     });
   });
-
-  /**
-   * Each region with what is done there: the Completed tab's own count when its bar read,
-   * otherwise the done quests the log holds there, against what the data files under it.
-   */
-  const regions = $derived.by(() => {
-    const totals = new Map(questLog.totals.map((t) => [t.region, t.quests]));
-    const counted = new Map<string, number>();
-    for (const r of log?.regions ?? []) if (r.tab === "completed") counted.set(r.region, r.count);
-    for (const q of quests) {
-      if (!q.done || !q.region || (log?.regions ?? []).some((r) => r.tab === "completed" && r.region === q.region)) continue;
-      counted.set(q.region, (counted.get(q.region) ?? 0) + 1);
-    }
-    return [...counted.entries()]
-      .map(([region, done]) => ({ region, done, total: totals.get(region) ?? null }))
-      .sort((a, b) => b.done - a.done || a.region.localeCompare(b.region));
-  });
-  let allRegions = $state(false);
 
   const ago = (at: number) => formatAgo(Date.now() / 1000 - at);
 
@@ -160,22 +141,6 @@
       </ul>
     {/if}
 
-    {#if regions.length}
-      <h4>Done by region</h4>
-      <ul class="regions">
-        {#each allRegions ? regions : regions.slice(0, REGIONS_SHOWN) as r (r.region)}
-          <li>
-            <span>{r.region}</span>
-            <span class="tabular">{r.done}{#if r.total != null}<span class="faint">{` of ${r.total}`}</span>{/if}</span>
-            {#if r.total}<span class="bar"><span style:width="{Math.min(100, (100 * r.done) / r.total)}%"></span></span>{/if}
-          </li>
-        {/each}
-      </ul>
-      {#if regions.length > REGIONS_SHOWN}
-        <button class="link" onclick={() => (allRegions = !allRegions)}>{allRegions ? "Show fewer" : `Show all ${regions.length}`}</button>
-      {/if}
-    {/if}
-
     <p class="foot faint">
       Read from the Quest window, so true as of the last look.
       <button class="link" onclick={forget}>Forget this log</button>
@@ -219,8 +184,7 @@
     color: var(--good);
   }
 
-  .rows,
-  .regions {
+  .rows {
     margin: 0;
     padding: 0;
     list-style: none;
@@ -252,29 +216,6 @@
   .small {
     font-size: var(--text-xs);
     font-weight: 400;
-  }
-
-  .regions li {
-    display: grid;
-    grid-template-columns: 1fr auto 64px;
-    align-items: center;
-    gap: 8px;
-    padding: 2px 0;
-    font-size: var(--text-sm);
-  }
-
-  .bar {
-    height: 4px;
-    border-radius: 999px;
-    background: var(--surface-3);
-    overflow: hidden;
-  }
-
-  .bar span {
-    display: block;
-    height: 100%;
-    border-radius: 999px;
-    background: var(--good);
   }
 
   .link {

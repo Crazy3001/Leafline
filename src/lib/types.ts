@@ -2003,6 +2003,39 @@ export interface RegionTotal {
   quests: number;
 }
 
+/** Where a quest stands for a character: from their Quest window, or else from the data. */
+export type Stand = "ready" | "inProgress" | "canTake" | "notYet" | "done" | "gone";
+
+export interface WholeQuest {
+  /** The quest in the data; null for one the game listed that the data lacks. */
+  questId: number | null;
+  title: string;
+  stand: Stand;
+  /** Done because a quest that needs it is in progress or done. */
+  inferred: boolean;
+  /** The game listed it under this series' name; this is the step the player is likely on. */
+  series: string | null;
+  notYet: { level: number | null; after: QuestRef[]; notOfferedAt: number | null } | null;
+  levelMin: number | null;
+  giver: string | null;
+  repeat: string | null;
+  seenAt: number | null;
+}
+
+export interface WholeRegion {
+  region: string;
+  done: number;
+  total: number;
+  quests: WholeQuest[];
+}
+
+export interface WholeLog {
+  regions: WholeRegion[];
+  /** The Quest window has been read; without it everything is from the data. */
+  seen: boolean;
+  level: number | null;
+}
+
 export interface QuestRow {
   id: number;
   name: string;
