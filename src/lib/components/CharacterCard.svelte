@@ -104,15 +104,14 @@
 {/snippet}
 
 {#if trim}
-  <!-- HP, MP and mesos come from reading the HUD, which the website doesn't. -->
-  {#if can.liveReading}<section class="card vitals" aria-label="Mesos, HP and MP">
-    <div class="gauges two">
-      <Gauge label="HP" color="var(--hp)" fraction={fraction(hud?.hp)} value={gaugeText(hud?.hp)} />
-      <Gauge label="MP" color="var(--mp)" fraction={fraction(hud?.mp)} value={gaugeText(hud?.mp)} />
-    </div>
-    {@render purse()}
+  <!--
+    The header above has who you are and the level; the game shows HP and MP. Here: the mesos you
+    carry (read from the HUD, which the website doesn't), then the build and stats.
+  -->
+  {#if children || can.liveReading}<section class="card more">
+    {#if can.liveReading}<div class="purse-line">{@render purse()}</div>{/if}
+    {#if children}{@render children()}{/if}
   </section>{/if}
-  {#if children}<section class="card more">{@render children()}</section>{/if}
 {:else}
 <Card title="Character" {plain}>
   {#snippet aside()}
@@ -275,19 +274,12 @@
   }
 
   /* Under the window's header: the frame is the shared .card. */
-  .vitals,
   .more {
     margin: 0 var(--space-3) var(--space-2);
     padding: var(--space-3) var(--space-4) var(--space-3);
   }
 
-  .vitals {
-    display: grid;
-    gap: var(--space-2);
-  }
-
-  .gauges.two {
-    grid-template-columns: 1fr 1fr;
-    gap: var(--space-3);
+  .purse-line {
+    margin-bottom: var(--space-3);
   }
 </style>
