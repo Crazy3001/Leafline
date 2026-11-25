@@ -9,6 +9,7 @@
   import Logo from "$lib/components/Logo.svelte";
   import { formatClockIn, formatCompact, formatDuration, formatNumber } from "$lib/format";
   import { live } from "$lib/readings.svelte";
+  import { place, regionHue, watchRegion } from "$lib/region.svelte";
   import { hotkey, keyHint } from "$lib/settings.svelte";
   import { tip } from "$lib/tip.svelte";
   import IconButton from "$lib/ui/IconButton.svelte";
@@ -43,6 +44,9 @@
     onlock: () => void;
     ontools: () => void;
   } = $props();
+
+  watchRegion();
+  const hue = $derived(regionHue(place.region));
 
   const hud = $derived(live.analysis?.hud ?? null);
   const session = $derived(live.session);
@@ -79,7 +83,7 @@
   );
 </script>
 
-<header data-tauri-drag-region>
+<header class:washed={hue != null} style:--region-hue={hue} data-tauri-drag-region>
   <div class="top" data-tauri-drag-region>
     <LevelRing {level} {percent}><Logo size={20} /></LevelRing>
     <div class="who" data-tauri-drag-region>
@@ -131,6 +135,8 @@
 
 <style>
   header {
+    position: relative;
+    isolation: isolate;
     flex: none;
     margin-bottom: var(--header-gap);
     border-radius: var(--header-radius);
@@ -138,6 +144,25 @@
     color: var(--header-text);
     user-select: none;
     cursor: grab;
+  }
+
+  /* The region you're in, as a soft glow from the top left, fading to the next when you travel. */
+  header::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: radial-gradient(90% 140% at 0% 0%, hsl(var(--region-hue) 62% 52% / 0.22), transparent 70%);
+    opacity: 0;
+    transition:
+      opacity 0.8s ease,
+      --region-hue 1.2s ease;
+    pointer-events: none;
+  }
+
+  header.washed::before {
+    opacity: 1;
   }
 
   .top {

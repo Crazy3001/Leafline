@@ -7,9 +7,13 @@
   import SessionControls from "$lib/components/SessionControls.svelte";
   import { formatClockIn, formatCompact, formatDuration, formatNumber, partyLabel } from "$lib/format";
   import { live } from "$lib/readings.svelte";
+  import { place, regionHue, watchRegion } from "$lib/region.svelte";
   import { mesosCoverage } from "$lib/training";
   import LevelRing from "$lib/ui/LevelRing.svelte";
   import Sparkline from "$lib/ui/Sparkline.svelte";
+
+  watchRegion();
+  const hue = $derived(regionHue(place.region));
 
   const hud = $derived(live.analysis?.hud ?? null);
   const session = $derived(live.session);
@@ -59,7 +63,7 @@
   }
 </script>
 
-<section class="bar" aria-label="Your character and this session">
+<section class="bar" class:washed={hue != null} style:--region-hue={hue} aria-label="Your character and this session">
   <div class="cell ident">
     <LevelRing {level} {percent} size={46}><span class="num lv-none">?</span></LevelRing>
     <div class="who">
@@ -68,7 +72,7 @@
         <span class="status {status.tone}" use:tip={status.tip}><span class="dot" aria-hidden="true"></span>{status.text}</span>
       </div>
       <div class="sub">
-        {#if level != null}Lv {level}{job ? ` ${job}` : ""}{:else}Level not read yet{/if}{#if where}<span class="where"> · {where}</span>{/if}
+        {#if level != null}Lv {level}{job ? ` ${job}` : ""}{:else}Level not read yet{/if}{#if where}<span class="where" use:tip={place.region}> · {where}</span>{/if}
       </div>
     </div>
   </div>
@@ -124,12 +128,46 @@
 
 <style>
   .bar {
+    position: relative;
+    isolation: isolate;
     display: grid;
     grid-template-columns: minmax(0, 1.5fr) minmax(0, 1.4fr) minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr);
     align-items: center;
     padding: var(--space-3) var(--space-1);
     border-bottom: 1px solid var(--border);
     background: var(--surface);
+  }
+
+  /*
+   * The region you're in, as a soft glow from the bar's left end. Its hue comes from the region's
+   * name; it fades to the next when you travel.
+   */
+  .bar::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: radial-gradient(70% 260% at 0% 0%, hsl(var(--region-hue) 62% 52% / var(--wash, 0.2)), transparent 72%);
+    opacity: 0;
+    transition:
+      opacity 0.8s ease,
+      --region-hue 1.2s ease;
+    pointer-events: none;
+  }
+
+  .bar.washed::before {
+    opacity: 1;
+  }
+
+  :global([data-theme$="light"]) .bar::before {
+    --wash: 0.16;
+  }
+
+  /* The ring is drawn for the dark header; here it sits on the page's own surface. */
+  .ident {
+    --header-text: var(--text);
+    --header-faint: var(--faint);
+    --header-track: var(--track);
   }
 
   .cell {
