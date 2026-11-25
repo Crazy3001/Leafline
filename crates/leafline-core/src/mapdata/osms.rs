@@ -978,6 +978,60 @@ pub struct Dataset {
     pub recipes: Vec<RecipeRecord>,
 }
 
+/// Each map's portals, by name and type only, for [`settle_scripted_exits`].
+#[derive(Deserialize)]
+struct PortalKinds {
+    id: u32,
+    #[serde(default)]
+    portals: Vec<PortalKind>,
+}
+
+#[derive(Deserialize)]
+struct PortalKind {
+    name: String,
+    #[serde(rename = "type")]
+    kind: Option<u32>,
+}
+
+/// The portal type whose script, run by the game's server, decides where it leads.
+const SCRIPTED: u32 = 8;
+
+/// Fills in where scripted portals lead. The data names no destination for them, so routes
+/// couldn't use them; the ways into Forgotten Hollow are two. When exactly one portal on another
+/// map leads back to a scripted portal by name, that map is where it goes. Landing spots and
+/// other portals without a destination are left alone: arriving somewhere doesn't mean you can
+/// leave by the same spot.
+fn settle_scripted_exits(maps: &mut [MapRecord], kinds: Vec<PortalKinds>) {
+    let scripted: std::collections::HashSet<(u32, String)> = kinds
+        .into_iter()
+        .flat_map(|m| m.portals.into_iter().filter(|p| p.kind == Some(SCRIPTED)).map(move |p| (m.id, p.name)))
+        .collect();
+    let mut back: HashMap<(u32, String), Vec<(u32, String)>> = HashMap::new();
+    for map in maps.iter() {
+        for portal in &map.portals {
+            let (Some(dest), Some(to)) = (portal.dest_map_id, &portal.dest_portal) else { continue };
+            if dest != map.id && dest != NO_MAP {
+                back.entry((dest, to.clone())).or_default().push((map.id, portal.name.clone()));
+            }
+        }
+    }
+    for map in maps.iter_mut() {
+        for portal in &mut map.portals {
+            let key = (map.id, portal.name.clone());
+            if portal.dest_map_id.is_some_and(|d| d != NO_MAP) || !scripted.contains(&key) {
+                continue;
+            }
+            if let Some([(from, name)]) = back.get(&key).map(Vec::as_slice) {
+                portal.dest_map_id = Some(*from);
+                portal.dest_portal = Some(name.clone());
+                if !map.exits.contains(from) {
+                    map.exits.push(*from);
+                }
+            }
+        }
+    }
+}
+
 /// One downloaded file, parsed.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Records {
@@ -994,7 +1048,11 @@ impl Records {
     /// Parses the file called `name`, one of [`FILES`].
     pub fn parse(name: &str, body: &[u8]) -> serde_json::Result<Self> {
         Ok(match name {
-            "maps.json" => Self::Maps(serde_json::from_slice(body)?),
+            "maps.json" => {
+                let mut maps: Vec<MapRecord> = serde_json::from_slice(body)?;
+                settle_scripted_exits(&mut maps, serde_json::from_slice(body)?);
+                Self::Maps(maps)
+            }
             "monsters.json" => Self::Monsters(serde_json::from_slice(body)?),
             "npcs.json" => Self::Npcs(serde_json::from_slice(body)?),
             "quests.json" => Self::Quests(serde_json::from_slice(body)?),
@@ -1018,6 +1076,26 @@ impl Records {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_scripted_portal_leads_where_its_only_way_back_comes_from() {
+        // Made-up maps in OSMS's shape. Grove's scripted `down00` names no destination; Hollow's
+        // `east00` leads back to it, so that is where it goes. Grove's `st00` is a landing spot,
+        // also led to by name, and stays as it is.
+        let json = br#"[
+            {"id": 1, "name": "Grove", "exits": [], "portals": [
+                {"name": "down00", "type": 8, "dest_map_id": 999999999},
+                {"name": "st00", "type": 1, "dest_map_id": 999999999}]},
+            {"id": 2, "name": "Hollow", "exits": [1], "portals": [
+                {"name": "east00", "type": 1, "dest_map_id": 1, "dest_portal": "down00"}]},
+            {"id": 3, "name": "Path", "exits": [1], "portals": [
+                {"name": "west00", "type": 2, "dest_map_id": 1, "dest_portal": "st00"}]}]"#;
+        let Records::Maps(maps) = Records::parse("maps.json", json).unwrap() else { panic!("maps") };
+        let grove = &maps[0];
+        assert_eq!((grove.portals[0].dest_map_id, grove.portals[0].dest_portal.as_deref()), (Some(2), Some("east00")));
+        assert_eq!(grove.portals[1].dest_map_id, Some(NO_MAP), "a landing spot is not a way out");
+        assert_eq!(grove.exits, [2]);
+    }
 
     #[test]
     fn a_skill_that_costs_mp_and_hits_nothing_is_a_buff_with_its_effects_by_level() {
