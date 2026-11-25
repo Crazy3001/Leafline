@@ -21,7 +21,7 @@
   import { JOBS, blankQuery, gearView, gives, itemSlot, itemView, lastLine, watchItems } from "$lib/items.svelte";
   import { mapData, watchMapData } from "$lib/mapdata.svelte";
   import { live } from "$lib/readings.svelte";
-  import { hotkey } from "$lib/settings.svelte";
+  import { display, hotkey } from "$lib/settings.svelte";
   import type { ItemFilters, ItemKind, ItemPage, ItemRecord, ItemTooltip, MapReading } from "$lib/types";
 
   let {
@@ -309,6 +309,9 @@
       <p class="empty">
         {#if __LEAFLINE_WEB__}
           Search above, or while Leafline reads the game, rest the mouse on an item in game to bring up its card.
+        {:else if display.live.itemTooltips}
+          Search above, or while Leafline reads the game, rest the mouse on an item in game to bring up its
+          card{hotkey("ReadItem") ? `, or press ${hotkey("ReadItem")} over it` : ""}.
         {:else}
           Search above, or hover an item in game and {hotkey("ReadItem") ? `press ${hotkey("ReadItem")}` : "use the Read item hotkey"} to check that copy.
         {/if}

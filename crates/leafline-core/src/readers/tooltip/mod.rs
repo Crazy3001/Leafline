@@ -12,6 +12,7 @@
 //!
 //! Items with no stats have no separator, so [`plain`] finds those.
 
+pub mod hover;
 pub mod names;
 mod parse;
 mod plain;

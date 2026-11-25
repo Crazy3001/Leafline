@@ -27,9 +27,9 @@
 ![The desk view with the Train panel and the training log: a session's EXP and mesos per hour, its rate over time, each map, and the drops logged](.github/screenshots/desk-log.png)
 
 ### Items
-- **Item check:** hover an item in game and press your hotkey. Leafline reads the tooltip and shows its stats with the base and bonus, its requirements, whether it's clean or scrolled (and how many scrolls failed), and whether your build can wear it.
+- **Item check:** rest the mouse on an item in game, or hover it and press your hotkey. Leafline reads the tooltip and shows its stats with the base and bonus, its requirements, whether it's clean or scrolled (and how many scrolls failed), and whether your build can wear it.
 - **Where to get it:** every monster players have seen drop it, each with the maps it lives on and a route there, the NPC shops that sell it, the quests that give it, and the recipe that crafts it.
-- **Sell or keep:** open an inventory tab and press your hotkey. Leafline names each item by its picture, says which to keep (a quest you're doing needs it, crafting uses it, your build will wear it, you're tracking it) and which to sell, and what the bag fetches from an NPC.
+- **Sell or keep:** open an inventory tab and hold it still, or press your hotkey. Leafline names each item by its picture, says which to keep (a quest you're doing needs it, crafting uses it, your build will wear it, you're tracking it) and which to sell, and what the bag fetches from an NPC.
 - **Tracked items:** star an item to keep it listed with who drops it, the best map to hunt it and a shop when one sells it.
 - **Drop log:** log an item as a drop from a monster on your map, and send it on to MeowDB's community drop lists with one click if you like.
 - **Your own notes** on any item, kept on your PC.

@@ -129,16 +129,16 @@ pub struct LiveChoice {
     pub window: Option<WindowChoice>,
     /// The Pickup Log is read between readings, for the loot picked up.
     pub pickup_log: bool,
-    /// The website reads an item tooltip the mouse rests on and shows its card (the program reads
-    /// them on its hotkey instead).
+    /// An item tooltip the mouse rests on is read and its card shown. The program's Read item
+    /// hotkey reads one whatever this says.
     pub item_tooltips: bool,
-    /// The website updates the build from the Character Stat and Skill windows while they're
-    /// open (the program follows them always, and reads them on its hotkey).
+    /// The build is updated from the Character Stat and Skill windows while they're open. The
+    /// program's hotkey reads them whatever this says.
     pub character_windows: bool,
-    /// The website checks the inventory tab that's open, for sell or keep (the program, on its
-    /// hotkey).
+    /// The inventory tab that's open is checked, for sell or keep, once it's held still. The
+    /// program's hotkey checks it whatever this says.
     pub bag_check: bool,
-    /// The website keeps the quest log from the Quest window while it's open.
+    /// The quest log is kept from the Quest window while it's open.
     pub quest_window: bool,
 }
 

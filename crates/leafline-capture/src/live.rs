@@ -23,6 +23,7 @@ use leafline_core::vision::{Frame, Ocr};
 
 use std::sync::Arc;
 
+use leafline_core::readers::tooltip::hover::{HOLD, same_cards as same_items, same_places};
 use leafline_core::readers::tooltip::{self, ItemTooltip, NameLines};
 use leafline_core::vision::Rect;
 
@@ -40,11 +41,6 @@ use crate::words::DarkText;
 
 /// Live frames are plentiful, so a reading must agree twice before it counts, as in the program.
 const CONFIRMATIONS: usize = 2;
-/// How long a tooltip must stay in one place (the mouse resting on an item) before it is read, in
-/// seconds: long enough to pass over items on the way to another, short enough to feel prompt.
-const HOLD: f64 = 0.6;
-/// How far a tooltip may move, in pixels, and still be the same one held.
-const HELD_WITHIN: f32 = 3.0;
 /// Full reads in a row without the Quest window before it counts as closed, and the next opening
 /// as a fresh look, as in the program.
 const QUEST_WINDOW_CLOSED_AFTER: u32 = 3;
@@ -108,8 +104,7 @@ struct WindowChoice {
 struct Windows {
     character: character::Watch,
     /// The inventory tab last seen, and the one last handed over.
-    bag_seen: Option<inventory::Inventory>,
-    bag_read: Option<inventory::Inventory>,
+    bag: inventory::TabWatch,
     quest_log: questlog::Watch,
     quest_closed: u32,
     quest_fresh: bool,
@@ -452,8 +447,7 @@ impl LiveReader {
     pub fn set_windows(&mut self, character: bool, bag: bool, quest_log: bool) {
         self.choice = WindowChoice { character, bag, quest_log };
         if !bag {
-            self.windows.bag_seen = None;
-            self.windows.bag_read = None;
+            self.windows.bag = inventory::TabWatch::default();
         }
     }
 
@@ -482,17 +476,11 @@ impl LiveReader {
                 self.windows.reads.character = Some(CharacterScan { name: name.clone(), level, windows });
             }
         }
-        if self.choice.bag {
-            let seen = inventory::read_video(frame).filter(|i| i.tab.is_some());
-            let held = seen.as_ref().is_some_and(|s| self.windows.bag_seen.as_ref().is_some_and(|last| same_tab(s, last)));
-            if held
-                && let Some(seen) = &seen
-                && !self.windows.bag_read.as_ref().is_some_and(|read| same_tab(seen, read))
-            {
-                self.windows.bag_read = Some(seen.clone());
-                self.windows.reads.bag = Some(SeenBag::new(seen, name.clone(), level));
-            }
-            self.windows.bag_seen = seen;
+        if self.choice.bag
+            && let Some(seen) = self.windows.bag.settled(inventory::read_video(frame))
+        {
+            self.windows.reads.bag = Some(SeenBag::new(&seen, name.clone(), level));
+            self.windows.bag.checked(seen);
         }
         if self.choice.quest_log && self.text.is_some() {
             let glance = questlog::glance(frame, scale);
@@ -536,34 +524,6 @@ struct Hover {
     read: bool,
     /// The equipment names read whose stats are still to be read.
     stats_for: Vec<NameLines>,
-}
-
-/// Pictures of one slot this alike are the same item, through a video's noise from frame to frame:
-/// the average difference per colour channel.
-const SAME_SLOT: f32 = 6.0;
-
-/// Whether two reads of an inventory tab show the same: the same slots filled, the same counts,
-/// pictures alike.
-fn same_tab(a: &inventory::Inventory, b: &inventory::Inventory) -> bool {
-    let alike = |x: &inventory::BagSlot, y: &inventory::BagSlot| {
-        let pixels = (x.picture.pixels.len() * 3) as f32;
-        let total: u32 = x.picture.pixels.iter().zip(&y.picture.pixels).flat_map(|(p, q)| p.iter().zip(q).map(|(a, b)| u32::from(a.abs_diff(*b)))).sum();
-        x.index == y.index && x.count == y.count && x.count_unsure == y.count_unsure && pixels > 0.0 && total as f32 / pixels <= SAME_SLOT
-    };
-    a.tab == b.tab && a.slots.len() == b.slots.len() && a.slots.iter().zip(&b.slots).all(|(x, y)| alike(x, y))
-}
-
-/// Whether two sets of item tooltips would show the same cards.
-fn same_items(a: &[ItemTooltip], b: &[ItemTooltip]) -> bool {
-    let key = |items: &[ItemTooltip]| {
-        items.iter().map(|t| (t.name.clone(), t.upgrades, t.upgraded, t.stats.clone(), t.remaining_enhancements)).collect::<Vec<_>>()
-    };
-    key(a) == key(b)
-}
-
-/// Whether two looks found tooltips in the same places, give or take a few pixels.
-fn same_places(a: &[Rect], b: &[Rect]) -> bool {
-    a.len() == b.len() && a.iter().zip(b).all(|(a, b)| (a.x - b.x).abs() <= HELD_WITHIN && (a.y - b.y).abs() <= HELD_WITHIN)
 }
 
 /// A settled log line as the session counts it, as the program's live loop takes it

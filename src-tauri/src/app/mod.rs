@@ -10,6 +10,7 @@ mod desk;
 mod fighter;
 mod generated;
 mod host;
+mod hover;
 mod layout;
 mod live;
 mod mapdata;

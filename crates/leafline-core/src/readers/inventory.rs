@@ -113,6 +113,55 @@ impl SlotPicture {
     }
 }
 
+/// Pictures of one slot this alike are the same item, through a video's noise from frame to frame:
+/// the average difference per colour channel.
+const SAME_SLOT: f32 = 6.0;
+
+/// Whether two reads of an inventory tab show the same: the same slots filled, the same counts,
+/// pictures alike. Live readers check a tab once it reads the same twice in a row (held still,
+/// not being scrolled or rearranged), and again only when this says it changed.
+pub fn same_tab(a: &Inventory, b: &Inventory) -> bool {
+    let alike = |x: &BagSlot, y: &BagSlot| {
+        let pixels = (x.picture.pixels.len() * 3) as f32;
+        let total: u32 = x
+            .picture
+            .pixels
+            .iter()
+            .zip(&y.picture.pixels)
+            .flat_map(|(p, q)| p.iter().zip(q).map(|(a, b)| u32::from(a.abs_diff(*b))))
+            .sum();
+        x.index == y.index && x.count == y.count && x.count_unsure == y.count_unsure && pixels > 0.0 && total as f32 / pixels <= SAME_SLOT
+    };
+    a.tab == b.tab && a.slots.len() == b.slots.len() && a.slots.iter().zip(&b.slots).all(|(x, y)| alike(x, y))
+}
+
+/// Follows the inventory across live reads, for sell or keep: a tab is to be checked once it
+/// reads the same twice in a row, and again only when what it shows changes.
+#[derive(Debug, Default)]
+pub struct TabWatch {
+    /// The tab at the last read, and the one last checked.
+    seen: Option<Inventory>,
+    checked: Option<Inventory>,
+}
+
+impl TabWatch {
+    /// What a new read found (`None`: no inventory). Gives back the tab to check now: one open
+    /// on a tab, reading as it did at the last read, and not the one checked last.
+    pub fn settled(&mut self, seen: Option<Inventory>) -> Option<Inventory> {
+        let seen = seen.filter(|i| i.tab.is_some());
+        let same = |a: &Option<Inventory>, b: &Option<Inventory>| matches!((a, b), (Some(a), Some(b)) if same_tab(a, b));
+        let due = (same(&seen, &self.seen) && !same(&seen, &self.checked)).then(|| seen.clone()).flatten();
+        self.seen = seen;
+        due
+    }
+
+    /// The tab [`TabWatch::settled`] gave is being checked. One not marked (a check was under way)
+    /// is given again at the next read.
+    pub fn checked(&mut self, tab: Inventory) {
+        self.checked = Some(tab);
+    }
+}
+
 /// Reads the window, or `None` when no Item Inventory is open.
 pub fn read(frame: &Frame) -> Option<Inventory> {
     read_found(frame, frame, find(frame, is_white, 0)?)
@@ -498,5 +547,37 @@ pub(crate) mod tests {
     #[test]
     fn no_window_no_reading() {
         assert_eq!(read(&Frame::from_pixel(800, 600, Rgba([255, 255, 255, 255]))), None);
+    }
+
+    fn tab(colour: u8, count: &str) -> Option<Inventory> {
+        read(&window(1, 3, &[(0, [colour, 30, 30], Some(count)), (6, [30, 160, 30], None)]).0)
+    }
+
+    #[test]
+    fn a_tab_is_checked_once_it_reads_the_same_twice() {
+        let mut watch = TabWatch::default();
+        assert!(watch.settled(tab(200, "27")).is_none(), "seen once");
+        let due = watch.settled(tab(202, "27")).expect("held still, a shade off is the same picture");
+        watch.checked(due);
+        assert!(watch.settled(tab(200, "27")).is_none(), "already checked");
+        assert!(watch.settled(tab(200, "28")).is_none(), "a count changed: seen once");
+        assert!(watch.settled(tab(200, "28")).is_some(), "and held");
+        assert!(watch.settled(tab(120, "28")).is_none(), "another item in the slot: seen once");
+    }
+
+    #[test]
+    fn a_tab_not_marked_checked_is_given_again() {
+        let mut watch = TabWatch::default();
+        watch.settled(tab(200, "27"));
+        assert!(watch.settled(tab(200, "27")).is_some());
+        assert!(watch.settled(tab(200, "27")).is_some(), "a check was under way, so not marked");
+    }
+
+    #[test]
+    fn a_closed_inventory_starts_afresh() {
+        let mut watch = TabWatch::default();
+        watch.settled(tab(200, "27"));
+        assert!(watch.settled(None).is_none());
+        assert!(watch.settled(tab(200, "27")).is_none(), "opened again: seen once");
     }
 }
