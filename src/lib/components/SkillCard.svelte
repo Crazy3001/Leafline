@@ -74,19 +74,19 @@
     margin: 0;
     font-family: var(--font-display);
     font-size: var(--text-lg);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .facts {
     margin: 2px 0 0;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .about {
     margin: 0 0 8px;
     color: var(--text);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     line-height: 1.5;
     white-space: pre-line;
   }
@@ -94,7 +94,7 @@
   .needs {
     margin: 0 0 8px;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .levels {
@@ -103,7 +103,7 @@
     margin: 0;
     padding: 0;
     list-style: none;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .levels li {

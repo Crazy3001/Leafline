@@ -294,8 +294,8 @@
     min-width: 0;
     overflow: hidden;
     color: var(--text);
-    font-size: var(--text-sm);
-    font-weight: 600;
+    font-size: var(--text-md);
+    font-weight: var(--weight-strong);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -315,7 +315,7 @@
     color: var(--ref, var(--accent));
     font-family: var(--font-display);
     font-size: var(--text-xs);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     letter-spacing: 0.04em;
     text-transform: uppercase;
   }

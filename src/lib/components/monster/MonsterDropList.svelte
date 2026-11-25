@@ -49,7 +49,7 @@
     align-items: baseline;
     gap: 5px;
     padding: 2px 0;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   li + li {
@@ -58,7 +58,7 @@
 
   li :global(.ref) {
     min-width: 0;
-    font-weight: 500;
+    font-weight: var(--weight-body);
   }
 
   .mesos {
@@ -68,9 +68,9 @@
   .rate {
     margin-left: auto;
     color: var(--text);
-    font-weight: 600;
-    font-size: var(--text-sm);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
+    font-size: var(--text-md);
+    font-weight: var(--weight-strong);
     white-space: nowrap;
   }
 
@@ -85,7 +85,7 @@
   .note {
     margin: 0;
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
 </style>

@@ -205,9 +205,9 @@
     display: inline-flex;
     align-items: center;
     gap: 5px;
+    color: var(--muted);
     font-size: var(--text-xs);
-    font-weight: 600;
-    color: var(--faint);
+    font-weight: var(--weight-strong);
   }
 
   .actions {

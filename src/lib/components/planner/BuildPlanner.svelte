@@ -1314,7 +1314,7 @@
     gap: 8px;
     margin: 0 8px 12px;
     font-family: var(--font-display);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .list {
@@ -1371,7 +1371,7 @@
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     cursor: pointer;
   }
 
@@ -1415,7 +1415,7 @@
     margin: 0 0 6px;
     font-family: var(--font-display);
     font-size: var(--text-xl);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .lead {
@@ -1451,7 +1451,7 @@
     color: var(--text);
     font-family: var(--font-display);
     font-size: var(--text-xl);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   input.name:hover {
@@ -1465,7 +1465,7 @@
   .path {
     margin: 2px 0 0;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .tabs {
@@ -1512,7 +1512,7 @@
     margin: 14px 0 6px;
     font-family: var(--font-display);
     font-size: var(--text-md);
-    font-weight: 400;
+    font-weight: var(--weight-body);
     color: var(--muted);
   }
 
@@ -1527,7 +1527,7 @@
   .help {
     margin: 0 0 8px;
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .quiet {
@@ -1545,7 +1545,7 @@
     display: grid;
     gap: 3px;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   label.inline {
@@ -1590,7 +1590,7 @@
 
   summary {
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     cursor: pointer;
   }
 
@@ -1647,14 +1647,14 @@
   .max {
     flex: none;
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .reached {
     flex: none;
     min-width: 88px;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     text-align: right;
   }
 
@@ -1721,7 +1721,7 @@
     gap: 14px;
     margin: 6px 0 0;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .legend i {
@@ -1741,7 +1741,7 @@
     padding: 4px 12px;
     color: var(--faint);
     font-size: var(--text-xs);
-    font-weight: 400;
+    font-weight: var(--weight-body);
     text-align: right;
   }
 
@@ -1804,7 +1804,7 @@
     align-items: center;
     gap: 6px 10px;
     margin: 0 0 8px;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .chip.worn {
@@ -1831,7 +1831,7 @@
     color: var(--faint);
     font-family: var(--font-display);
     font-size: var(--text-xs);
-    font-weight: 400;
+    font-weight: var(--weight-body);
   }
 
   .chip b.warn {
@@ -1842,7 +1842,7 @@
     padding: 0;
     border: 0;
     background: transparent;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     cursor: pointer;
   }
 
@@ -1863,7 +1863,7 @@
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     cursor: pointer;
   }
 
@@ -1989,7 +1989,7 @@
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     white-space: nowrap;
     cursor: pointer;
   }
@@ -2014,7 +2014,7 @@
     padding: 6px 10px;
     background: var(--bad-soft);
     color: var(--bad);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   /* The Plan tab. */
@@ -2024,7 +2024,7 @@
     margin: 0 0 12px;
     padding: 0;
     list-style: none;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .plan-problems li {
@@ -2073,7 +2073,7 @@
     margin: 0;
     font-family: var(--font-display);
     font-size: var(--text-md);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .order-head .help {
@@ -2085,8 +2085,8 @@
     margin: 10px 0 2px;
     color: var(--muted);
     font-family: var(--font-display);
-    font-size: var(--text-sm);
-    font-weight: 400;
+    font-size: var(--text-md);
+    font-weight: var(--weight-body);
   }
 
   .order {
@@ -2163,7 +2163,7 @@
 
   .to {
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     white-space: nowrap;
   }
 
@@ -2173,7 +2173,7 @@
     background: transparent;
     color: var(--muted);
     font-family: var(--font-display);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     text-align: right;
     white-space: nowrap;
     cursor: pointer;
@@ -2194,7 +2194,7 @@
     padding: 1px 8px;
     border-radius: 6px;
     font-size: var(--text-xs);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .tag:empty {

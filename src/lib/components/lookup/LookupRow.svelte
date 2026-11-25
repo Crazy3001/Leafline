@@ -71,7 +71,7 @@
   .name {
     overflow: hidden;
     font-size: var(--text-md);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -92,7 +92,7 @@
     margin-left: 5px;
     color: var(--faint);
     font-size: var(--text-xs);
-    font-weight: 500;
+    font-weight: var(--weight-body);
   }
 
   .aside {

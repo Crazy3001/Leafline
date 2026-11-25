@@ -155,7 +155,7 @@
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     cursor: pointer;
   }
 
@@ -215,7 +215,7 @@
     border: 0;
     background: transparent;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     cursor: pointer;
   }
 
@@ -230,8 +230,8 @@
     border-radius: var(--radius-sm);
     background: var(--accent);
     color: var(--accent-ink);
-    font-size: var(--text-sm);
-    font-weight: 600;
+    font-size: var(--text-md);
+    font-weight: var(--weight-strong);
     cursor: pointer;
   }
 
@@ -243,6 +243,6 @@
   .error {
     margin: 6px 0 0;
     color: var(--bad);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 </style>

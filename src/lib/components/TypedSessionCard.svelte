@@ -119,7 +119,7 @@
   .hint {
     margin: 0 0 10px;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .hint.warn {
@@ -158,7 +158,7 @@
     grid-template-columns: 76px 1fr;
     align-items: center;
     gap: 8px;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   label span {
@@ -207,11 +207,11 @@
 
   .or {
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .clock {
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .outcome {
@@ -229,7 +229,7 @@
   .outcome dd {
     margin: 2px 0 0;
     font-size: var(--text-lg);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .actions {
@@ -249,7 +249,7 @@
     background: var(--accent);
     color: var(--accent-ink);
     font: inherit;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     cursor: pointer;
   }
 
@@ -264,7 +264,7 @@
     background: none;
     color: var(--accent);
     font: inherit;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     cursor: pointer;
   }
 

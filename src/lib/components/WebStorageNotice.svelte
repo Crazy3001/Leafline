@@ -46,7 +46,7 @@
     border-bottom: var(--line-w) solid var(--accent);
     background: var(--surface);
     color: var(--text);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .button {

@@ -99,7 +99,7 @@
     gap: 10px;
     min-height: 28px;
     padding: 3px 0;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .steps li::before {
@@ -138,7 +138,7 @@
     background: var(--surface-2);
     color: var(--map);
     font-size: var(--text-xs);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .end .n {
@@ -173,7 +173,7 @@
   }
 
   .now .text {
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .text {
@@ -203,7 +203,7 @@
     align-items: center;
     gap: 4px;
     color: var(--travel);
-    font-weight: 500;
+    font-weight: var(--weight-body);
   }
 
   .service :global(svg) {
@@ -232,7 +232,7 @@
 
   .map,
   .text :global(.step-map) {
-    font-weight: 500;
+    font-weight: var(--weight-body);
   }
 
   .note {

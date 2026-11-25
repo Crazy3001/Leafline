@@ -356,13 +356,13 @@
   .mobs {
     width: 100%;
     border-collapse: collapse;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .mobs th {
     padding: 0 0 3px;
     font-size: var(--text-xs);
-    font-weight: 500;
+    font-weight: var(--weight-body);
     color: var(--faint);
     text-align: right;
   }
@@ -421,11 +421,11 @@
     display: flex;
     justify-content: space-between;
     gap: 8px;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   li :global(.ref.quest-name) {
-    font-weight: 500;
+    font-weight: var(--weight-body);
   }
 
   .lv {
@@ -457,7 +457,7 @@
     display: flex;
     justify-content: space-between;
     gap: 8px;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
 
@@ -470,7 +470,7 @@
     margin: 0;
     padding: 0;
     list-style: none;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .shop-head {

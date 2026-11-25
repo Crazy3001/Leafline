@@ -15,20 +15,20 @@
     padding: 8px;
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .filters :global(label),
   .filters :global(.levels) {
     display: grid;
-    grid-template-columns: 48px 1fr;
+    grid-template-columns: 60px 1fr;
     align-items: center;
     gap: 6px;
     color: var(--muted);
   }
 
   .filters :global(.levels) {
-    grid-template-columns: 48px 1fr auto 1fr;
+    grid-template-columns: 60px 1fr auto 1fr;
   }
 
   .filters :global(.to) {

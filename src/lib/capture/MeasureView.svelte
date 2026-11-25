@@ -166,18 +166,18 @@
   h4 {
     margin: 16px 0 6px;
     font-family: var(--font-display);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   table {
     width: 100%;
     border-collapse: collapse;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   th {
     text-align: left;
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     color: var(--muted);
   }
 

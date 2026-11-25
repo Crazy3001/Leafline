@@ -878,7 +878,7 @@
     background: var(--surface);
     color: var(--text);
     font: inherit;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     text-align: center;
     -moz-appearance: textfield;
     appearance: textfield;
@@ -956,7 +956,7 @@
   .name {
     overflow: hidden;
     font-size: var(--text-md);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     white-space: nowrap;
     text-overflow: ellipsis;
   }
@@ -993,7 +993,7 @@
 
   .value {
     font-size: var(--text-lg);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     line-height: 1.2;
   }
 
@@ -1041,7 +1041,7 @@
   }
 
   .why strong {
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     color: var(--text);
   }
 
@@ -1084,7 +1084,7 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .assume label > span:first-child {
@@ -1126,13 +1126,13 @@
   table {
     width: 100%;
     border-collapse: collapse;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   th {
     padding: 0 0 4px;
     font-size: var(--text-xs);
-    font-weight: 400;
+    font-weight: var(--weight-body);
     color: var(--faint);
     text-align: right;
   }
@@ -1163,7 +1163,7 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     color: var(--muted);
     cursor: pointer;
   }
@@ -1179,7 +1179,7 @@
 
   .quiet {
     margin: 0;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     color: var(--faint);
   }
 
@@ -1189,7 +1189,7 @@
 
   .warn {
     margin: 0;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     color: var(--warn);
   }
 

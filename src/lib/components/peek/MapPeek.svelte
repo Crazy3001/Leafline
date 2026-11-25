@@ -61,7 +61,7 @@
   .name {
     font-family: var(--font-display);
     font-size: var(--text-xl);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     line-height: 1.15;
   }
 

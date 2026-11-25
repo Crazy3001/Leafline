@@ -140,7 +140,7 @@
     padding: 1px 7px;
     border-radius: var(--radius-sm);
     font-size: var(--text-xs);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .running {
@@ -177,12 +177,12 @@
 
   dd {
     margin: 0;
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   dd.sub {
     font-size: var(--text-xs);
-    font-weight: 400;
+    font-weight: var(--weight-body);
     color: var(--muted);
   }
 
@@ -190,13 +190,13 @@
     width: 100%;
     margin-top: 10px;
     border-collapse: collapse;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .maps thead th {
     padding: 0 0 4px;
     font-size: var(--text-xs);
-    font-weight: 500;
+    font-weight: var(--weight-body);
     color: var(--faint);
     text-align: right;
   }
@@ -211,7 +211,7 @@
 
   .maps tbody th {
     padding: 5px 8px 5px 0;
-    font-weight: 400;
+    font-weight: var(--weight-body);
     text-align: left;
   }
 
@@ -255,6 +255,6 @@
     padding: 0;
     list-style: none;
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 </style>

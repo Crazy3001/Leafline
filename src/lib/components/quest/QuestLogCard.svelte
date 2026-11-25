@@ -152,7 +152,7 @@
   .lead {
     margin: 0;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .looks {
@@ -175,9 +175,8 @@
     gap: 5px;
     margin: 10px 0 4px;
     color: var(--muted);
-    font-family: var(--font-display);
-    font-size: var(--text-sm);
-    font-weight: 600;
+    font-size: var(--text-xs);
+    font-weight: var(--weight-strong);
   }
 
   h4 :global(svg) {
@@ -200,7 +199,7 @@
 
   .name {
     font-size: var(--text-md);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .sub {
@@ -215,7 +214,7 @@
 
   .small {
     font-size: var(--text-xs);
-    font-weight: 400;
+    font-weight: var(--weight-body);
   }
 
   .link {

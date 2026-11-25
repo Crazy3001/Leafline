@@ -51,7 +51,7 @@
     gap: 4px;
     padding: 8px 0;
     border-top: 1px solid var(--border);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .recipe:first-child {
@@ -74,7 +74,7 @@
 
   .makes strong,
   .ing strong {
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .times {

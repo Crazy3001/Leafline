@@ -292,7 +292,7 @@
   .lead {
     margin: 0 0 10px;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   /* A card pads itself; these sit beside cards, so they match it. A pinned window pads its body. */
@@ -341,7 +341,7 @@
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     text-align: right;
   }
 
@@ -363,7 +363,7 @@
     padding-block: 0 3px;
     color: var(--faint);
     font-size: var(--text-xs);
-    font-weight: 500;
+    font-weight: var(--weight-body);
   }
 
   .head > :first-child {
@@ -396,8 +396,8 @@
     gap: 6px;
     min-width: 0;
     color: var(--text);
-    font-size: var(--text-sm);
-    font-weight: 500;
+    font-size: var(--text-md);
+    font-weight: var(--weight-body);
     text-align: left;
   }
 
@@ -421,7 +421,7 @@
     background: var(--hover);
     color: var(--faint);
     font-size: var(--text-xs);
-    font-weight: 400;
+    font-weight: var(--weight-body);
   }
 
   .note {
@@ -443,7 +443,7 @@
     border: 0;
     background: transparent;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     cursor: pointer;
   }
 
@@ -465,7 +465,7 @@
   .quiet {
     margin: 10px 0 6px;
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .spin {

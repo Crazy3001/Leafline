@@ -138,10 +138,9 @@
 
   h3 {
     margin: var(--space-4) 2px var(--space-2);
-    color: var(--faint);
-    font-family: var(--font-display);
-    font-size: var(--text-sm);
-    font-weight: 600;
+    color: var(--muted);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-strong);
   }
 
   .row {
@@ -187,6 +186,6 @@
   kbd {
     color: var(--faint);
     font-family: var(--font-sans);
-    font-size: 10px;
+    font-size: var(--text-2xs);
   }
 </style>

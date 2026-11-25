@@ -351,7 +351,7 @@
     margin: 0;
     font-family: var(--font-display);
     font-size: var(--text-lg);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     line-height: 1.25;
   }
 
@@ -363,7 +363,7 @@
     margin: 0 0 8px;
     padding: 6px 8px;
     border-radius: var(--radius-sm);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     color: var(--muted);
     border: 1px solid var(--border);
   }
@@ -391,8 +391,8 @@
     border-left: 3px solid var(--accent-strong);
     background: var(--warn-soft);
     color: var(--text);
-    font-size: var(--text-sm);
-    font-weight: 500;
+    font-size: var(--text-md);
+    font-weight: var(--weight-body);
   }
 
   .tip b {
@@ -422,7 +422,7 @@
     border-radius: var(--radius-sm);
     background: var(--hover);
     color: var(--text);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     cursor: pointer;
   }
 
@@ -433,20 +433,20 @@
   .summary {
     margin: 2px 0 10px;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .slots {
     margin: -8px 0 10px;
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .verdict {
     padding: 2px 8px;
     border-radius: var(--radius-sm);
     font-size: var(--text-xs);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     color: var(--good);
     background: var(--good-soft);
   }
@@ -470,14 +470,14 @@
     width: 100%;
     padding: 5px 0;
     text-align: left;
-    font-weight: 500;
+    font-weight: var(--weight-body);
     color: var(--muted);
   }
 
   .stats .value {
     padding: 5px 8px;
     text-align: right;
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     white-space: nowrap;
   }
 
@@ -486,7 +486,7 @@
     text-align: right;
     white-space: nowrap;
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .bonus {
@@ -527,12 +527,12 @@
   .req b {
     margin-left: 5px;
     color: var(--text);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .req.zero b {
     color: var(--faint);
-    font-weight: 500;
+    font-weight: var(--weight-body);
   }
 
   .req.unread {

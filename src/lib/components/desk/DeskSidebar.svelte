@@ -233,8 +233,8 @@
 
   .word {
     font-family: var(--font-display);
-    font-size: 16px;
-    font-weight: 600;
+    font-size: var(--text-lg);
+    font-weight: var(--weight-strong);
   }
 
   .fold {
@@ -282,7 +282,7 @@
   .name {
     min-width: 0;
     overflow: hidden;
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -290,7 +290,7 @@
   .sub,
   .line {
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .line {
@@ -305,7 +305,7 @@
 
   .exp {
     color: var(--exp-text);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .exp.dim {
@@ -394,8 +394,8 @@
   }
 
   .small-lv {
-    font-size: 13px;
-    font-weight: 600;
+    font-size: var(--text-md);
+    font-weight: var(--weight-strong);
   }
 
   nav {
@@ -410,7 +410,7 @@
     padding: 0 10px;
     color: var(--faint);
     font-size: var(--text-xs);
-    font-weight: 500;
+    font-weight: var(--weight-body);
   }
 
   .rule {
@@ -432,7 +432,7 @@
     color: var(--muted);
     font: inherit;
     font-size: var(--text-md);
-    font-weight: 500;
+    font-weight: var(--weight-body);
     text-align: left;
     cursor: pointer;
   }
@@ -479,7 +479,7 @@
   .nav.more {
     height: 28px;
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .foot {
@@ -509,7 +509,7 @@
     padding: 8px 10px 0;
     border-top: 1px solid var(--border);
     color: var(--faint);
-    font-size: 10.5px;
+    font-size: var(--text-2xs);
     line-height: 15px;
   }
 </style>

@@ -486,7 +486,7 @@
     padding: 0;
     list-style: none;
     color: var(--header-faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .steps li {
@@ -517,7 +517,7 @@
     background: var(--header-track);
     color: var(--header-muted);
     font-size: var(--text-xs);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .current .num {
@@ -592,13 +592,13 @@
     margin: 0 0 6px;
     font-family: var(--font-display);
     font-size: var(--text-xl);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   h2 {
     margin: 22px 0 8px;
     font-size: var(--text-md);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .lead {
@@ -629,13 +629,13 @@
 
   .name {
     display: block;
-    font-weight: 500;
+    font-weight: var(--weight-body);
   }
 
   .help {
     display: block;
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .never {
@@ -693,7 +693,7 @@
     background: var(--surface-2);
     color: var(--text);
     font-family: var(--font-sans);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .status {
@@ -702,7 +702,7 @@
     gap: 4px;
     min-width: 92px;
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .status.good,
@@ -797,7 +797,7 @@
   .note {
     margin: 12px 0 0;
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .note.warn {
@@ -842,7 +842,7 @@
     border-color: var(--accent);
     background: var(--accent);
     color: var(--accent-ink);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .button.primary:hover:enabled {

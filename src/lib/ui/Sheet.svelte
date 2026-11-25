@@ -102,7 +102,7 @@
     min-width: 0;
     overflow: hidden;
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     text-overflow: ellipsis;
     white-space: nowrap;
   }

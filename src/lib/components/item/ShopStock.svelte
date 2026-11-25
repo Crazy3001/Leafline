@@ -28,7 +28,7 @@
     margin: 0;
     padding: 0;
     list-style: none;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .stock li {

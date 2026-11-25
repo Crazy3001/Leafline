@@ -92,7 +92,7 @@
     margin: 0;
     padding: 18px 10px;
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     text-align: center;
   }
 </style>

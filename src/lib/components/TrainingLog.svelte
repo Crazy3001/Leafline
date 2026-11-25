@@ -915,7 +915,7 @@
     margin: 0 0 12px;
     padding: 0;
     list-style: none;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .drops li {
@@ -978,7 +978,7 @@
   h1 {
     margin: 0;
     font-size: var(--text-lg);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   h2,
@@ -986,13 +986,13 @@
     margin: 0;
     font-family: var(--font-display);
     font-size: var(--text-md);
-    font-weight: 400;
+    font-weight: var(--weight-body);
     color: var(--muted);
   }
 
   h2.big {
     font-size: var(--text-xl);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     color: var(--text);
   }
 
@@ -1000,7 +1000,7 @@
     display: inline-flex;
     align-items: center;
     gap: var(--space-2);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     color: var(--muted);
   }
 
@@ -1012,7 +1012,7 @@
     background: var(--surface-2);
     color: var(--text);
     font: inherit;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .short {
@@ -1020,12 +1020,12 @@
     align-items: center;
     gap: 6px;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     cursor: pointer;
   }
 
   .who {
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     color: var(--muted);
   }
 
@@ -1069,7 +1069,7 @@
   .nav[aria-current="page"] {
     background: var(--surface-3);
     color: var(--text);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   main {
@@ -1128,7 +1128,7 @@
     border-top: 1px solid var(--border);
     background: transparent;
     color: var(--text);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     text-align: left;
     cursor: pointer;
   }
@@ -1180,7 +1180,7 @@
   }
 
   .strong {
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .muted {
@@ -1205,7 +1205,7 @@
 
   .detail-head p {
     margin: 4px 0 0;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .actions {
@@ -1251,7 +1251,7 @@
   }
 
   .best-rate {
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .best-bar {
@@ -1316,8 +1316,8 @@
     background: transparent;
     color: var(--accent-text);
     font: inherit;
-    font-size: var(--text-sm);
-    font-weight: 600;
+    font-size: var(--text-md);
+    font-weight: var(--weight-strong);
     cursor: pointer;
   }
 
@@ -1384,7 +1384,7 @@
 
   .picked p {
     margin: 2px 0 0;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   textarea {
@@ -1394,14 +1394,14 @@
     background: var(--surface);
     color: var(--text);
     font: inherit;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     resize: vertical;
   }
 
   table {
     width: 100%;
     border-collapse: collapse;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     font-variant-numeric: tabular-nums;
   }
 
@@ -1416,7 +1416,7 @@
   th {
     padding: 0 0 6px;
     font-size: var(--text-xs);
-    font-weight: 400;
+    font-weight: var(--weight-body);
     color: var(--faint);
     text-align: right;
   }
@@ -1482,12 +1482,12 @@
 
   .huge {
     font-size: var(--text-hero);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .panel p {
     margin: 0;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .empty {
@@ -1508,7 +1508,7 @@
 
   .quiet {
     margin: 0;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     color: var(--faint);
   }
 
@@ -1517,6 +1517,6 @@
     padding: var(--space-2) var(--space-3);
     background: var(--bad-soft);
     color: var(--bad);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 </style>

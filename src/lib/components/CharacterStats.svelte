@@ -271,7 +271,7 @@
 
   .when {
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .link {
@@ -283,7 +283,7 @@
     border: 0;
     background: transparent;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     cursor: pointer;
   }
 
@@ -301,13 +301,13 @@
   .problem {
     margin: 0 0 4px;
     color: var(--warn);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .quiet-line {
     margin: 0 0 4px;
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .grid {
@@ -339,7 +339,7 @@
 
   dd {
     margin: 0;
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -348,7 +348,7 @@
   .small {
     color: var(--faint);
     font-size: var(--text-xs);
-    font-weight: 400;
+    font-weight: var(--weight-body);
   }
 
   .up {
@@ -366,8 +366,8 @@
   .sub {
     margin: 12px 0 6px;
     font-family: var(--font-display);
-    font-size: var(--text-sm);
-    font-weight: 400;
+    font-size: var(--text-md);
+    font-weight: var(--weight-body);
     color: var(--muted);
   }
 
@@ -388,7 +388,7 @@
     padding: 6px 8px;
     border-radius: var(--radius-sm);
     background: var(--hover);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .buffs li.off .buff-effect {

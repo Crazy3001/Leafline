@@ -218,7 +218,7 @@
   .lead {
     margin: 0 0 8px;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .filters {
@@ -240,7 +240,7 @@
     background: transparent;
     color: var(--text);
     font: inherit;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     text-align: left;
     cursor: pointer;
   }
@@ -256,7 +256,7 @@
   }
 
   .region-name {
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .done-count {
@@ -312,17 +312,17 @@
 
   .bang {
     font-size: var(--text-xs);
-    font-weight: 800;
+    font-weight: var(--weight-strong);
   }
 
   .name {
-    font-size: var(--text-sm);
-    font-weight: 600;
+    font-size: var(--text-md);
+    font-weight: var(--weight-strong);
   }
 
   .stand-done .name,
   .stand-gone .name {
-    font-weight: 400;
+    font-weight: var(--weight-body);
   }
 
   .sub {

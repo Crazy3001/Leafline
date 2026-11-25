@@ -84,7 +84,7 @@
     color: var(--nav-text);
     font-family: var(--font-sans);
     font-size: var(--text-xs);
-    font-weight: 500;
+    font-weight: var(--weight-body);
     cursor: pointer;
     transition:
       background 0.14s ease,

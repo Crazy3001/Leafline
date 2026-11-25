@@ -74,7 +74,7 @@
 
   .value {
     font-size: var(--text-lg);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .lv .value {
@@ -95,7 +95,7 @@
     background: var(--bg);
     color: var(--text);
     font: inherit;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .hint {

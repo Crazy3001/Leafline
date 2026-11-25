@@ -59,8 +59,8 @@
     border-radius: var(--radius-pill);
     background: var(--surface);
     color: var(--muted);
-    font-size: var(--text-sm);
-    font-weight: 500;
+    font-size: var(--text-md);
+    font-weight: var(--weight-body);
     white-space: nowrap;
     cursor: pointer;
     transition:

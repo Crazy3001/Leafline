@@ -53,7 +53,7 @@
     display: flex;
     gap: 6px;
     margin: 0;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     color: var(--muted);
   }
 
@@ -65,7 +65,7 @@
 
   .state strong {
     color: var(--text);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .explain {
@@ -82,8 +82,8 @@
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: transparent;
-    font-size: var(--text-sm);
-    font-weight: 500;
+    font-size: var(--text-md);
+    font-weight: var(--weight-body);
     cursor: pointer;
   }
 
@@ -96,7 +96,7 @@
     border-color: var(--accent);
     background: var(--accent);
     color: var(--accent-ink);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .action.primary:hover:not(:disabled) {
@@ -127,7 +127,7 @@
   .error,
   .message {
     margin: 0;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .error {

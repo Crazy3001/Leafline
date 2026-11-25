@@ -199,7 +199,7 @@
     background: var(--surface);
     color: var(--text);
     font: inherit;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     text-align: left;
     cursor: pointer;
     transition:
@@ -238,8 +238,8 @@
     border-radius: var(--radius-sm);
     background: var(--surface-3);
     color: var(--muted);
-    font-size: 10px;
-    font-weight: 600;
+    font-size: var(--text-2xs);
+    font-weight: var(--weight-strong);
   }
 
   .level-up {
@@ -262,18 +262,15 @@
     align-items: baseline;
     gap: 6px;
     margin: var(--space-3) 0 2px;
-    color: var(--faint);
-    font-family: var(--font-display);
+    color: var(--muted);
     font-size: var(--text-xs);
-    font-weight: 600;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
+    font-weight: var(--weight-strong);
   }
 
   .count,
   .quiet {
     margin: 0;
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 </style>

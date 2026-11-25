@@ -60,7 +60,7 @@
     border-left: 2px solid var(--border-strong);
     background: var(--hover);
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .fit.good {

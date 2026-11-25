@@ -38,8 +38,8 @@
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--muted);
-    font-size: 10px;
-    font-weight: 500;
+    font-size: var(--text-2xs);
+    font-weight: var(--weight-body);
     line-height: 1;
     vertical-align: 1px;
     cursor: pointer;

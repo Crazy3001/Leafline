@@ -66,7 +66,7 @@
     flex-direction: column;
     justify-content: space-between;
     align-items: flex-end;
-    font-size: 10px;
+    font-size: var(--text-2xs);
     line-height: 1;
     color: var(--faint);
   }
@@ -125,7 +125,7 @@
     flex: 1;
     min-width: 0;
     overflow: hidden;
-    font-size: 10px;
+    font-size: var(--text-2xs);
     color: var(--faint);
     text-align: center;
     white-space: nowrap;
@@ -134,7 +134,7 @@
   .detail {
     margin: 6px 0 0;
     min-height: 18px;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     color: var(--muted);
   }
 </style>

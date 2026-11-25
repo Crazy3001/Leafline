@@ -218,7 +218,7 @@
     display: inline-flex;
     align-items: center;
     gap: var(--space-2);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     color: var(--muted);
   }
 
@@ -234,7 +234,7 @@
     background: var(--surface-2);
     color: var(--text);
     font: inherit;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .panel {
@@ -255,14 +255,14 @@
     width: 100%;
     min-width: 560px;
     border-collapse: collapse;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     font-variant-numeric: tabular-nums;
   }
 
   th {
     padding: 0 0 6px;
     font-size: var(--text-xs);
-    font-weight: 400;
+    font-weight: var(--weight-body);
     color: var(--faint);
     text-align: right;
   }
@@ -301,7 +301,7 @@
   }
 
   .strong {
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .fold {
@@ -327,7 +327,7 @@
   }
 
   td :global(.ref.name) {
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .street {
@@ -343,7 +343,7 @@
 
   .quiet {
     margin: 0;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     color: var(--faint);
   }
 </style>

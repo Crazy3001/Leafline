@@ -186,7 +186,7 @@
     align-items: center;
     gap: 4px;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .level input {
@@ -203,7 +203,7 @@
     background: var(--surface);
     color: var(--text);
     font: inherit;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .ahead {
@@ -284,7 +284,7 @@
   .note {
     margin: 4px 0 6px;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .how {

@@ -84,13 +84,13 @@
 
   .from strong {
     color: var(--ref-map);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .quiet,
   .from .quiet {
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .link {
@@ -100,8 +100,8 @@
     background: transparent;
     color: var(--accent-text);
     font: inherit;
-    font-size: var(--text-sm);
-    font-weight: 600;
+    font-size: var(--text-md);
+    font-weight: var(--weight-strong);
     cursor: pointer;
   }
 

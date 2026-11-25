@@ -166,7 +166,7 @@
     padding: 5px 10px;
     border-radius: var(--radius-sm);
     background: var(--surface-2);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .progress li + li {
@@ -196,7 +196,7 @@
     padding: 8px 10px;
     border-radius: var(--radius-sm);
     background: var(--warn-soft);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .differs ul {
@@ -207,7 +207,7 @@
   .differs-head {
     margin: 0;
     color: var(--warn);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .differs-foot {
@@ -220,14 +220,14 @@
     margin: 0;
     font-family: var(--font-display);
     font-size: var(--text-lg);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     line-height: 1.25;
   }
 
   .meta {
     margin: 2px 0 6px;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   /* Keeps a quest in the Quests tab, with its hints, while the Quest Helper isn't showing it. */
@@ -241,7 +241,7 @@
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: transparent;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     cursor: pointer;
   }
 
@@ -258,7 +258,7 @@
     min-height: 26px;
     margin: 0 0 8px;
     color: var(--good);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .stop {
@@ -267,7 +267,7 @@
     border: 0;
     background: transparent;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     text-decoration: underline;
     text-decoration-color: var(--border-strong);
     cursor: pointer;
@@ -282,7 +282,7 @@
   .note {
     margin: 0;
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .spin {

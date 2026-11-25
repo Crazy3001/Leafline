@@ -19,7 +19,7 @@
     background: var(--bg);
     color: var(--text);
     font-family: var(--font-sans);
-    font-size: var(--text-sm, 13px);
+    font-size: var(--text-md);
     line-height: 1.5;
   }
 

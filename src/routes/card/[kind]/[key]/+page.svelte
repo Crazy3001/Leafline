@@ -147,7 +147,7 @@
     color: var(--ref, var(--accent));
     font-family: var(--font-display);
     font-size: var(--text-xs);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     letter-spacing: 0.04em;
     text-transform: uppercase;
   }

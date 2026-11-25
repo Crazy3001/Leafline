@@ -75,7 +75,7 @@
     gap: 2px 8px;
     margin: 2px 0 0;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .here {

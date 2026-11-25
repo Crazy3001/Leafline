@@ -110,7 +110,7 @@
     background: transparent;
     color: var(--muted);
     font: inherit;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     cursor: pointer;
   }
 

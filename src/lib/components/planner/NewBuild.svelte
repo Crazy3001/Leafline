@@ -191,7 +191,7 @@
     margin: 0;
     font-family: var(--font-display);
     font-size: var(--text-2xl);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .lead {
@@ -208,7 +208,7 @@
     margin: 0;
     font-family: var(--font-display);
     font-size: var(--text-md);
-    font-weight: 400;
+    font-weight: var(--weight-body);
     color: var(--muted);
   }
 
@@ -272,7 +272,7 @@
   }
 
   .start-name {
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .start.on .muted {
@@ -285,12 +285,12 @@
 
   .faint {
     color: var(--faint);
-    font-weight: 400;
+    font-weight: var(--weight-body);
   }
 
   .warn {
     color: var(--warn);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .names {
@@ -304,7 +304,7 @@
     display: grid;
     gap: 3px;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .grow {
@@ -334,7 +334,7 @@
   .help {
     margin: 0;
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .error {
@@ -342,7 +342,7 @@
     padding: 6px 10px;
     background: var(--bad-soft);
     color: var(--bad);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .actions {
@@ -359,7 +359,7 @@
     background: var(--accent);
     color: var(--accent-ink);
     font: inherit;
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     cursor: pointer;
   }
 

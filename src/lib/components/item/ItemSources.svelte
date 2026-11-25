@@ -175,9 +175,7 @@
   .group-title {
     color: var(--muted);
     font-size: var(--text-xs);
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
+    font-weight: var(--weight-strong);
   }
 
   .count {
@@ -235,13 +233,13 @@
   }
 
   .mob-name {
-    font-size: var(--text-sm);
-    font-weight: 600;
+    font-size: var(--text-md);
+    font-weight: var(--weight-strong);
   }
 
   .missing .mob-name {
     color: var(--faint);
-    font-weight: 400;
+    font-weight: var(--weight-body);
   }
 
   .muted {
@@ -263,7 +261,7 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .dist {
@@ -290,6 +288,6 @@
   .note {
     margin: 0;
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 </style>

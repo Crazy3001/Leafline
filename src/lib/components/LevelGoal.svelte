@@ -196,17 +196,17 @@
   }
 
   .target {
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     color: var(--muted);
   }
 
   .target .num {
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     color: var(--text);
   }
 
   .muted {
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     color: var(--muted);
   }
 
@@ -215,11 +215,11 @@
   }
 
   .line {
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .line strong {
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .note {
@@ -228,7 +228,7 @@
   }
 
   .reached {
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     color: var(--good);
   }
 
@@ -236,7 +236,7 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     color: var(--muted);
   }
 

@@ -837,7 +837,7 @@
     border-bottom: 1px solid var(--border);
     font-family: var(--font-display);
     font-size: var(--text-md);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .link.warn-line {
@@ -853,8 +853,8 @@
   .sub {
     margin: 12px 0 6px;
     font-family: var(--font-display);
-    font-size: var(--text-sm);
-    font-weight: 400;
+    font-size: var(--text-md);
+    font-weight: var(--weight-body);
     color: var(--muted);
   }
 
@@ -878,7 +878,7 @@
 
   .head.strip .title {
     color: var(--text);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .head {
@@ -901,7 +901,7 @@
     overflow: hidden;
     font-family: var(--font-display);
     font-size: var(--text-md);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -916,7 +916,7 @@
   .lead {
     margin: 0 0 10px;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .action {
@@ -929,8 +929,8 @@
     border-radius: var(--radius-sm);
     background: var(--accent);
     color: var(--accent-ink);
-    font-size: var(--text-sm);
-    font-weight: 600;
+    font-size: var(--text-md);
+    font-weight: var(--weight-strong);
     cursor: pointer;
   }
 
@@ -946,7 +946,7 @@
     border: 0;
     background: transparent;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     cursor: pointer;
   }
 
@@ -969,7 +969,7 @@
     color: var(--muted);
     font-family: var(--font-display);
     font-size: var(--text-md);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .todo {
@@ -994,7 +994,7 @@
     width: 38px;
     color: var(--muted);
     font-size: var(--text-xs);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .dim {
@@ -1004,7 +1004,7 @@
 
   .advance {
     color: var(--text);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .stats {
@@ -1027,7 +1027,7 @@
 
   dd {
     margin: 0;
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   /* What gear adds, beside the stat: shown, never part of the plan's count. */
@@ -1035,25 +1035,25 @@
     margin-left: 4px;
     color: var(--muted);
     font-size: var(--text-xs);
-    font-weight: 500;
+    font-weight: var(--weight-body);
   }
 
   .next {
     margin: 10px 0 0;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .next strong {
     color: var(--text);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   h4 {
     margin: 12px 0 4px;
     font-family: var(--font-display);
-    font-size: var(--text-sm);
-    font-weight: 400;
+    font-size: var(--text-md);
+    font-weight: var(--weight-body);
   }
 
   .warn-title {
@@ -1064,7 +1064,7 @@
     margin: 0;
     padding: 0;
     list-style: none;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .coming li {
@@ -1127,8 +1127,8 @@
   .slot-name {
     margin: 0 0 3px;
     font-family: var(--font-display);
-    font-size: var(--text-sm);
-    font-weight: 400;
+    font-size: var(--text-md);
+    font-weight: var(--weight-body);
     color: var(--muted);
   }
 
@@ -1151,8 +1151,8 @@
     padding: 0;
     border: 0;
     background: transparent;
-    font-size: var(--text-sm);
-    font-weight: 600;
+    font-size: var(--text-md);
+    font-weight: var(--weight-strong);
     text-align: left;
     cursor: pointer;
   }
@@ -1164,7 +1164,7 @@
 
   .line .none {
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .line .end {
@@ -1175,7 +1175,7 @@
 
   .line .lv {
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .line .lv.good {
@@ -1224,7 +1224,7 @@
     border-radius: var(--radius-sm);
     background: var(--surface);
     color: var(--text);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .stat-edit {
@@ -1273,18 +1273,18 @@
   .quiet-line {
     margin: 0 0 4px;
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .quiet-line strong {
     color: var(--muted);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .goal-error {
     margin: 4px 0 0;
     color: var(--bad);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .find {
@@ -1311,7 +1311,7 @@
     outline: 0;
     background: transparent;
     color: var(--text);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .found {
@@ -1332,7 +1332,7 @@
     border: 0;
     background: transparent;
     color: var(--text);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     text-align: left;
     cursor: pointer;
   }
@@ -1373,14 +1373,14 @@
     border-bottom: 1px solid var(--border-strong);
     color: var(--text);
     font-size: var(--text-xs);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     letter-spacing: 0.06em;
     text-transform: uppercase;
   }
 
   .skill-group .count {
     color: var(--faint);
-    font-weight: 400;
+    font-weight: var(--weight-body);
   }
 
   .skills li {
@@ -1403,7 +1403,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: var(--text-md);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .skill-level {
@@ -1411,7 +1411,7 @@
   }
 
   .skill-level b {
-    font-weight: 700;
+    font-weight: var(--weight-strong);
   }
 
   /* Level reached over the level the plan ends at, to the skill's maximum. */
@@ -1438,12 +1438,12 @@
   .skill-next {
     grid-column: 1 / -1;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .skill-next b {
     color: var(--accent-text-strong);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .skills .faint,
@@ -1453,7 +1453,7 @@
 
   .skills li.done .skill-name {
     color: var(--muted);
-    font-weight: 500;
+    font-weight: var(--weight-body);
   }
 
   .skills li.done .bar .have {
@@ -1466,8 +1466,8 @@
 
   .max {
     color: var(--good);
-    font-size: var(--text-sm);
-    font-weight: 700;
+    font-size: var(--text-md);
+    font-weight: var(--weight-strong);
     letter-spacing: 0.06em;
   }
 

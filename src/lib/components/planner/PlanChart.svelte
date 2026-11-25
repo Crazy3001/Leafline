@@ -363,7 +363,7 @@
     min-width: 0;
     padding-right: 10px;
     overflow: hidden;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -487,8 +487,8 @@
     border-radius: 5px;
     background: var(--accent);
     color: var(--accent-ink);
-    font-size: 10.5px;
-    font-weight: 600;
+    font-size: var(--text-2xs);
+    font-weight: var(--weight-strong);
     white-space: nowrap;
     transform: translateX(-50%);
   }
@@ -514,8 +514,8 @@
     overflow: hidden;
     border-radius: 6px;
     font-family: var(--font-display);
-    font-size: 10.5px;
-    font-weight: 600;
+    font-size: var(--text-2xs);
+    font-weight: var(--weight-strong);
     white-space: nowrap;
   }
 
@@ -583,8 +583,8 @@
     height: 18px;
     color: var(--muted);
     font-family: var(--font-display);
-    font-size: 10.5px;
-    font-weight: 600;
+    font-size: var(--text-2xs);
+    font-weight: var(--weight-strong);
     line-height: 18px;
     white-space: nowrap;
   }
@@ -599,7 +599,7 @@
 
   .out.note {
     color: var(--faint);
-    font-weight: 400;
+    font-weight: var(--weight-body);
   }
 
   .mark {
@@ -613,7 +613,7 @@
 
   .mark b {
     color: var(--muted);
-    font-size: 10px;
+    font-size: var(--text-2xs);
   }
 
   .dot {

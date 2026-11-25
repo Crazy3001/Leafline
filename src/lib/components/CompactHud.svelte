@@ -198,7 +198,7 @@
     background: var(--accent);
     color: var(--accent-ink);
     font-size: var(--text-xs);
-    font-weight: 700;
+    font-weight: var(--weight-strong);
   }
 
   :global(:root:not([data-theme^="sprout"])) .lv {
@@ -228,7 +228,7 @@
 
   .stat b {
     font-size: var(--text-md);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .mesos {
@@ -267,7 +267,7 @@
     border-radius: var(--radius-pill);
     background: var(--hover);
     color: var(--muted);
-    font-size: 10px;
+    font-size: var(--text-2xs);
     font-variant-numeric: tabular-nums;
   }
 
@@ -313,8 +313,8 @@
     margin: 4px 0 3px;
     overflow: hidden;
     color: var(--faint);
-    font-size: 10px;
-    font-weight: 600;
+    font-size: var(--text-2xs);
+    font-weight: var(--weight-strong);
     letter-spacing: 0.03em;
     text-overflow: ellipsis;
     text-transform: uppercase;

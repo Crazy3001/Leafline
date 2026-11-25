@@ -40,8 +40,8 @@
     background: var(--surface-2);
     box-shadow: var(--control-shadow);
     color: var(--text);
-    font-size: var(--text-sm);
-    font-weight: 500;
+    font-size: var(--text-md);
+    font-weight: var(--weight-body);
     white-space: nowrap;
     text-decoration: none;
     cursor: pointer;
@@ -83,7 +83,7 @@
   .primary {
     background: var(--accent);
     color: var(--accent-ink);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .primary:hover:not(:disabled) {

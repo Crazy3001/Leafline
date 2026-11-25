@@ -179,7 +179,7 @@
 
   .name {
     font-size: var(--text-md);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .help {
