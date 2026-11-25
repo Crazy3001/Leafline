@@ -44,8 +44,8 @@ pub struct BagRead {
 }
 
 /// What a check found.
-#[derive(Debug, Clone, Default, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
 pub struct BagCheck {
     /// A check is under way; the rest is from the one before.
     pub busy: bool,
@@ -70,7 +70,7 @@ impl BagCheck {
 }
 
 /// One slot's item.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BagItem {
     pub slot: u32,
@@ -91,14 +91,14 @@ pub struct BagItem {
     pub wanted_by: Vec<QuestAsk>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct QuestAsk {
     pub id: u32,
     pub name: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", tag = "kind")]
 pub enum Keep {
     /// A crafting recipe uses it.

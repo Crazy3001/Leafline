@@ -30,6 +30,7 @@
   import Logo from "$lib/components/Logo.svelte";
   import { ZOOMS, type DeskView } from "$lib/desk";
   import { formatCompact } from "$lib/format";
+  import { ago, lastKnown, profile, watchProfile } from "$lib/profile.svelte";
   import { live } from "$lib/readings.svelte";
   import LevelRing from "$lib/ui/LevelRing.svelte";
   import Segmented from "$lib/ui/Segmented.svelte";
@@ -76,12 +77,22 @@
   let more = $state(false);
   const moreOpen = $derived(more || MORE.some((t) => t.id === view));
 
-  const hud = $derived(live.analysis?.hud ?? null);
-  const session = $derived(live.session);
-  const level = $derived(hud?.level ?? session?.level ?? null);
-  const percent = $derived(hud?.exp?.percent ?? hud?.expPercent ?? session?.percent ?? null);
-  const name = $derived(hud?.name ?? session?.name ?? null);
-  const job = $derived(hud?.job ?? session?.job ?? null);
+  watchProfile();
+
+  // Read now when this character is on screen; else what was read of them last, faded and dated.
+  const hud = $derived(profile.live ? (live.analysis?.hud ?? null) : null);
+  const session = $derived(profile.live ? live.session : null);
+  const known = $derived(profile.known);
+  const levelShown = $derived(lastKnown(hud?.level ?? session?.level, known?.level, known?.seenAt));
+  const level = $derived(levelShown.value);
+  const percentShown = $derived(
+    lastKnown(hud?.exp?.percent ?? hud?.expPercent ?? session?.percent, known?.expPercent, known?.seenAt),
+  );
+  const percent = $derived(percentShown.value);
+  const name = $derived(hud?.name ?? session?.name ?? profile.name);
+  const job = $derived(lastKnown(hud?.job ?? session?.job, known?.job, known?.seenAt).value);
+  /** When what is shown was read, for a character not on screen now. */
+  const seenAt = $derived(levelShown.at ?? percentShown.at);
   const reading = $derived(live.liveStatus.state === "reading");
   const status = $derived.by(() => {
     const s = live.liveStatus;
@@ -106,7 +117,10 @@
         ? `${formatCompact(session.expPerHour)} EXP / hr`
         : null,
   );
-  const mesos = $derived(live.analysis?.mesos?.mesos ?? session?.mesos ?? null);
+  const mesosShown = $derived(
+    lastKnown(live.analysis?.mesos?.mesos ?? session?.mesos, known?.mesos, known?.mesosSeenAt),
+  );
+  const mesos = $derived(mesosShown.value);
   const zoomOptions = ZOOMS.map((z) => ({ id: z, label: `${Math.round(z * 100)}%` }));
 </script>
 
@@ -144,15 +158,15 @@
         <b class="name">{name ?? "Your character"}</b>
         <span class="status {status.tone}" use:tip={statusTip}><span class="dot" aria-hidden="true"></span>{status.text}</span>
       </div>
-      <div class="sub">
+      <div class="sub" class:stale={levelShown.at != null}>
         {#if level != null}Lv {level}{job ? ` ${job}` : ""}{:else}Level not read yet{/if}
         {#if percent != null}<span class="num exp" class:dim={!reading}> · {percent.toFixed(1)}%</span>{/if}
       </div>
-      <div class="track" aria-hidden="true"><span class:dim={!reading} style:width="{Math.max(0, Math.min(100, percent ?? 0))}%"></span></div>
-      {#if expRate || mesos != null}
+      <div class="track" class:stale={percentShown.at != null} aria-hidden="true"><span class:dim={!reading} style:width="{Math.max(0, Math.min(100, percent ?? 0))}%"></span></div>
+      {#if expRate || mesos != null || seenAt != null}
         <div class="line">
-          <span>{expRate ?? ""}</span>
-          {#if mesos != null}<span class="num mesos">{mesos.toLocaleString()}</span>{/if}
+          <span>{#if expRate}{expRate}{:else if seenAt != null}<span class="stale">Last seen {ago(seenAt)}</span>{/if}</span>
+          {#if mesos != null}<span class="num mesos" class:stale={mesosShown.at != null} use:tip={mesosShown.at != null ? `As of ${ago(mesosShown.at)}` : undefined}>{mesos.toLocaleString()}</span>{/if}
         </div>
       {/if}
     </div>
@@ -258,6 +272,11 @@
   .fold:hover {
     background: var(--hover);
     color: var(--text);
+  }
+
+  /* Remembered from an earlier read, not read now. */
+  .stale {
+    opacity: 0.6;
   }
 
   .who {

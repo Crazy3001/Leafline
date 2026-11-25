@@ -64,6 +64,8 @@ export interface WindowReads {
 export interface LiveRead {
   analysis: Analysis;
   session: SessionSummary;
+  /** What the HUD shows of the character, for the records to remember between visits. */
+  seen: unknown | null;
   hud: boolean;
   ms: number;
 }

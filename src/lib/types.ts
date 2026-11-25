@@ -104,12 +104,22 @@ export interface MesoReading {
   rect: Rect;
 }
 
-/** A character's mesos the last time they were on screen, remembered between runs. */
-export interface KnownMesos {
+/**
+ * What Leafline last read of a character, remembered between runs, each part with when (Unix
+ * seconds). Shown, dated and faded, until the game is read again; never used for a rate.
+ */
+export interface KnownCharacter {
   name: string;
-  mesos: number;
-  /** Unix seconds. */
-  seenAt: number;
+  level: number | null;
+  job: string | null;
+  expPercent: number | null;
+  expPoints: number | null;
+  /** `Street : Name`, as the session tracker keys maps. */
+  map: string | null;
+  /** When the level, job, EXP and map were read. */
+  seenAt: number | null;
+  mesos: number | null;
+  mesosSeenAt: number | null;
 }
 
 export interface MapReading {

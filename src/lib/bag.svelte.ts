@@ -3,18 +3,62 @@
 // tracked items and the quests they are doing are added.
 
 import { backend } from "./api";
+import { characters } from "./characters.svelte";
 import { live } from "./readings.svelte";
 import { followedQuests } from "./quests.svelte";
 import { isTracked } from "./tracked.svelte";
 import type { BagCheck, BagItem } from "./types";
 
-export const bag = $state<{ check: BagCheck | null; seq: number }>({ check: null, seq: 0 });
+export const bag = $state<{
+  /** The check made this run. */
+  check: BagCheck | null;
+  seq: number;
+  /** The last check kept for the character looked at, from an earlier run. */
+  known: BagCheck | null;
+  /** The player closed the kept one. */
+  knownClosed: boolean;
+}>({ check: null, seq: 0, known: null, knownClosed: false });
+
+const same = (a: string | null | undefined, b: string | null | undefined) =>
+  a != null && b != null && a.trim().toLowerCase() === b.trim().toLowerCase();
+
+/**
+ * The check to show: this run's, unless it is another character's than the one looked at; else the
+ * one kept for them, which says when it was read.
+ */
+export function shownBag(): { check: BagCheck; kept: boolean } | null {
+  const active = characters.active;
+  const mine = bag.check && (bag.check.busy || !bag.check.character || !active || same(bag.check.character, active));
+  if (bag.check && mine) return { check: bag.check, kept: false };
+  if (bag.known && !bag.knownClosed) return { check: bag.known, kept: true };
+  return null;
+}
+
+let asked = 0;
+
+function loadKnown(name: string | null) {
+  const ask = ++asked;
+  backend
+    .knownBag(name)
+    .then((check) => {
+      if (ask === asked) bag.known = check;
+    })
+    .catch(() => {});
+}
 
 let watching = false;
 
 export function watchBag() {
   if (watching) return;
   watching = true;
+  $effect.root(() => {
+    $effect(() => {
+      const name = characters.active;
+      bag.knownClosed = false;
+      loadKnown(name);
+    });
+  });
+  void backend.onKnownCharacter(() => loadKnown(characters.active));
   backend
     .lastBag()
     .then((check) => {

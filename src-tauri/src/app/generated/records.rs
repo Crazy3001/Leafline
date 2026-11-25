@@ -10,10 +10,12 @@ use leafline_core::service::records::*;
 use std::path::Path;
 use std::sync::{Mutex, MutexGuard};
 use serde::{Deserialize, Serialize};
+use leafline_core::service::bag::BagCheck;
 use leafline_core::service::host::{Host, emit};
 use leafline_core::error::{Error, Result};
+use leafline_core::session::SessionSummary;
 use leafline_core::userdata::{RecordsSummary, UserData};
-use leafline_core::userdata::characters::KnownMesos;
+use leafline_core::userdata::characters::{KnownCharacter, SeenCharacter};
 use leafline_core::userdata::drops::{LoggedDrop, NewDrop};
 use leafline_core::userdata::notes::{ItemNote, MapNote};
 use leafline_core::userdata::potions::{PotionSlot, SessionPotion};
@@ -22,8 +24,13 @@ use leafline_core::userdata::spots::SavedSpot;
 use leafline_core::clock::now;
 
 #[tauri::command]
-pub fn known_mesos(app: AppHandle, name: Option<String>) -> Result<Option<KnownMesos>> {
-    service::records::known_mesos(&AppHost(app), name)
+pub fn known_character(app: AppHandle, name: Option<String>) -> Result<Option<KnownCharacter>> {
+    service::records::known_character(&AppHost(app), name)
+}
+
+#[tauri::command]
+pub fn known_bag(app: AppHandle, name: Option<String>) -> Result<Option<BagCheck>> {
+    service::records::known_bag(&AppHost(app), name)
 }
 
 #[tauri::command]

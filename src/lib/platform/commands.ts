@@ -41,7 +41,7 @@ import type {
   TravelInfo,
   Guide,
   History,
-  KnownMesos,
+  KnownCharacter,
   LoggedDrop,
   NewDrop,
   MapDataDownload,
@@ -215,8 +215,9 @@ export function commandBackend(invoke: Invoke, listen: Listen, emit: Emit): Back
       await invoke("save_image", { path, png: Array.from(png) });
       return true;
     },
-    knownMesos: (name) => invoke("known_mesos", { name }),
-    onKnownMesos: (handler) => listen("known-mesos", () => handler()),
+    knownCharacter: (name) => invoke("known_character", { name }),
+    knownBag: (name) => invoke("known_bag", { name }),
+    onKnownCharacter: (handler) => listen("known-character", () => handler()),
     setSessionNote: (id, note) => invoke("set_session_note", { id, note }),
     renameMap: (from, to) => invoke("rename_map", { from, to }),
     openDataFolder: () => invoke("open_data_folder"),

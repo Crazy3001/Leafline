@@ -7,7 +7,7 @@
   import Card from "../Card.svelte";
   import Ref from "../Ref.svelte";
   import { backend } from "$lib/api";
-  import { bag, keepReasons, stackValue, watchBag } from "$lib/bag.svelte";
+  import { bag, keepReasons, shownBag, stackValue, watchBag } from "$lib/bag.svelte";
   import { formatAgo, formatNumber } from "$lib/format";
   import { display, hotkey } from "$lib/settings.svelte";
   import Button from "$lib/ui/Button.svelte";
@@ -20,7 +20,10 @@
 
   const TABS: Record<BagTab, string> = { equip: "Equip", use: "Use", setup: "Set-up", etc: "Etc", cash: "Cash", deco: "Deco" };
 
-  const check = $derived(bag.check);
+  const shown = $derived(shownBag());
+  const check = $derived(shown?.check ?? null);
+  /** Kept from an earlier run: faded, and said to be as of then. */
+  const kept = $derived(shown?.kept ?? false);
   const rows = $derived((check?.items ?? []).map((item) => ({ item, why: keepReasons(item), value: stackValue(item) })));
   const keep = $derived(rows.filter((r) => r.why.length));
   const sell = $derived(rows.filter((r) => !r.why.length));
@@ -49,11 +52,20 @@
     {#snippet aside()}
       <span class="aside">
         {#if check.tab}{TABS[check.tab]} tab ·{/if}
-        {formatAgo(Date.now() / 1000 - check.at)}
-        <button class="icon" aria-label="Close the bag check" use:tip={"Close"} onclick={() => (bag.check = null)}><X size={12} /></button>
+        {kept ? `as of ${formatAgo(Date.now() / 1000 - check.at)}` : formatAgo(Date.now() / 1000 - check.at)}
+        <button
+          class="icon"
+          aria-label="Close the bag check"
+          use:tip={"Close"}
+          onclick={() => (kept ? (bag.knownClosed = true) : (bag.check = null))}><X size={12} /></button
+        >
       </span>
     {/snippet}
 
+    {#if kept}
+      <p class="quiet">Your bag as Leafline last checked it{check.character ? ` for ${check.character}` : ""}. Open the inventory in game to check it again.</p>
+    {/if}
+    <div class="body" class:stale={kept}>
     {#if check.busy}
       <p class="quiet"><span class="spin"><LoaderCircle size={13} /></span> Checking your bag… The first check downloads item pictures.</p>
     {/if}
@@ -105,7 +117,7 @@
         <p class="quiet">
           {check.unknown.length} slot{check.unknown.length === 1 ? "" : "s"} not recognised{check.wide ? "." : ": Leafline tried the items most likely at your level."}
         </p>
-        {#if !check.wide && check.more > 0}
+        {#if !check.wide && check.more > 0 && !kept}
           <Button size="sm" variant="ghost" onclick={lookFurther} disabled={asking || check.busy}>
             Look further (downloads up to {formatNumber(check.more)} pictures)
           </Button>
@@ -118,6 +130,7 @@
     {:else if !check.busy}
       <p class="quiet">That tab is empty.</p>
     {/if}
+    </div>
   </Card>
 {:else}
   <p class="hint">
@@ -133,6 +146,11 @@
 {/if}
 
 <style>
+  /* Kept from an earlier run, not read now. */
+  .stale {
+    opacity: 0.6;
+  }
+
   .aside {
     display: inline-flex;
     align-items: center;

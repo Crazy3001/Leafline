@@ -210,6 +210,9 @@ function onWorker({ data }: MessageEvent<FromLive>) {
       } else {
         void save(read.session);
       }
+      // Remembered for showing, dated, after the page is opened again (the worker keeps to once a
+      // minute unless the level, job or map changed).
+      if (read.seen) void invoke("note_character", { seen: read.seen }).catch(() => {});
       setStatus(
         read.hud
           ? {

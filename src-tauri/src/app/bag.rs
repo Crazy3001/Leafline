@@ -6,7 +6,8 @@
 //! player's switch for the second is `live.bagCheck`.
 //!
 //! Pictures come from OSMS through the picture cache, downloaded the first time and kept on this
-//! PC.
+//! PC. Each finished check is kept as its character's last one (`records::keep_bag`), so the window
+//! can show it, dated, after Leafline is opened again.
 
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -120,6 +121,9 @@ fn start(app: &AppHandle, ask: Ask) -> Result<bool> {
             report::note(format!("Couldn't check the bag: {err}"));
             BagCheck::failed(err.to_string())
         });
+        if let Err(err) = super::records::keep_bag(&AppHost::new(&handle), &check) {
+            report::note(format!("Couldn't keep the bag check: {err}"));
+        }
         let state = handle.state::<BagState>();
         *state.result.lock().expect("bag lock") = Some(check.clone());
         state.busy.store(false, Ordering::SeqCst);

@@ -14,6 +14,7 @@
   import NowScreen from "$lib/shell/NowScreen.svelte";
   import { tabInfo } from "$lib/shell/tabs";
   import { openPanel } from "$lib/nav.svelte";
+  import { profile } from "$lib/profile.svelte";
   import type { Analysis, Panel, SessionSummary } from "$lib/types";
 
   let {
@@ -51,7 +52,7 @@
 {:else if panel === "character"}
   <!-- One card for who the character is and where the build plan has them, so the level shows once. -->
   <CharacterCard hud={analysis?.hud ?? null} mesos={analysis?.mesos ?? null} {session} remember plain={pinned} linkTrain={!pinned} trim={shelled}>
-    <BuildSection level={analysis?.hud?.level ?? session?.level ?? null} character={analysis?.hud?.name ?? null} glance={pinned} whole={wide && !pinned} />
+    <BuildSection level={analysis?.hud?.level ?? session?.level ?? null} character={profile.live ? (analysis?.hud?.name ?? profile.name) : profile.name} glance={pinned} whole={wide && !pinned} />
   </CharacterCard>
 {:else if panel === "map"}
   {#if analysis?.map}

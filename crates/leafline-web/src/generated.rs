@@ -776,10 +776,12 @@ mod records {
     use std::path::Path;
     use std::sync::{Mutex, MutexGuard};
     use serde::{Deserialize, Serialize};
+    use leafline_core::service::bag::BagCheck;
     use leafline_core::service::host::{Host, emit};
     use leafline_core::error::{Error, Result};
+    use leafline_core::session::SessionSummary;
     use leafline_core::userdata::{RecordsSummary, UserData};
-    use leafline_core::userdata::characters::KnownMesos;
+    use leafline_core::userdata::characters::{KnownCharacter, SeenCharacter};
     use leafline_core::userdata::drops::{LoggedDrop, NewDrop};
     use leafline_core::userdata::notes::{ItemNote, MapNote};
     use leafline_core::userdata::potions::{PotionSlot, SessionPotion};
@@ -791,7 +793,7 @@ mod records {
 
     pub fn dispatch(host: &dyn Host, name: &str, args: serde_json::Value) -> Option<Reply> {
         Some(match name {
-            "known_mesos" => {
+            "known_character" => {
                 #[derive(serde::Deserialize)]
                 #[serde(rename_all = "camelCase")]
                 struct Args {
@@ -801,7 +803,19 @@ mod records {
                     Ok(args) => args,
                     Err(err) => return Some(Err(err)),
                 };
-                reply_result(service::records::known_mesos(host, name))
+                reply_result(service::records::known_character(host, name))
+            }
+            "known_bag" => {
+                #[derive(serde::Deserialize)]
+                #[serde(rename_all = "camelCase")]
+                struct Args {
+                name: Option<String>,
+                }
+                let Args { name } = match parse(args) {
+                    Ok(args) => args,
+                    Err(err) => return Some(Err(err)),
+                };
+                reply_result(service::records::known_bag(host, name))
             }
             "saved_spots" => reply_result(service::records::saved_spots(host)),
             "set_spot_saved" => {

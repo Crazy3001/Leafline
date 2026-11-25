@@ -56,6 +56,9 @@ pub struct LiveRead {
     pub hud: bool,
     /// How long reading took, in milliseconds.
     pub ms: f32,
+    /// What the HUD shows of the character, for the records to remember between visits (shown
+    /// only, never fed back into a rate).
+    pub seen: Option<leafline_core::userdata::characters::SeenCharacter>,
 }
 
 /// What the game's windows gave since this was last asked, for the page to keep: each is read once
@@ -317,7 +320,9 @@ impl LiveReader {
         analysis.tooltips.clone_from(&self.items);
         let hud = analysis.hud.is_some();
         let ms = started.elapsed().as_secs_f32() * 1000.0;
-        Some((LiveRead { analysis, session: self.tracker.summary(), hud, ms }, other))
+        let session = self.tracker.summary();
+        let seen = leafline_core::service::records::seen_of(&session);
+        Some((LiveRead { analysis, session, hud, ms, seen }, other))
     }
 }
 
