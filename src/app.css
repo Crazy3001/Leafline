@@ -3,6 +3,13 @@
 @import "./lib/ui/fonts.css";
 @import "./lib/ui/themes.css";
 
+/* The player bar's region colour, registered so a new region fades in rather than jumping. */
+@property --region-hue {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 142;
+}
+
 :root,
 [data-theme="ember-dark"] {
   color-scheme: dark;

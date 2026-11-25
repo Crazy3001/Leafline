@@ -1,6 +1,7 @@
 <script lang="ts">
-  // The five tabs along the bottom. The open one is a filled pill, easy to find at a glance; a
-  // dot marks a tab whose content changed while you were elsewhere.
+  // The five tabs along the bottom. The open one is marked quietly, in its icon's colour and a short
+  // bar over it, so the screen's amber stays for what to do; a dot marks a tab whose content
+  // changed while you were elsewhere.
   import { tip } from "$lib/tip.svelte";
 
   import { TABS, type Tab } from "./tabs";
@@ -95,11 +96,29 @@
     background: color-mix(in srgb, var(--nav-text) 12%, transparent);
   }
 
+  button {
+    position: relative;
+  }
+
   button.on {
-    border-color: var(--nav-line);
-    background: var(--accent);
-    color: var(--accent-ink);
+    color: var(--header-text);
     font-weight: var(--weight-strong);
+  }
+
+  button.on .icon {
+    color: var(--accent);
+  }
+
+  button.on::before {
+    content: "";
+    position: absolute;
+    top: calc(-1 * var(--space-1-5) - var(--line-w));
+    left: 50%;
+    width: 24px;
+    height: 3px;
+    border-radius: 0 0 3px 3px;
+    background: var(--accent);
+    transform: translateX(-50%);
   }
 
   button:focus-visible {
@@ -107,9 +126,6 @@
     outline-offset: 1px;
   }
 
-  button.on:focus-visible {
-    outline-color: var(--text);
-  }
 
   .icon {
     position: relative;

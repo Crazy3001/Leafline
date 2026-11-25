@@ -17,6 +17,21 @@
     children?: Snippet;
   } = $props();
 
+  // A level gained lights the ring once. The first level read is not a level-up.
+  let last: number | null = null;
+  let leveled = $state(false);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  $effect(() => {
+    const now = level;
+    if (now != null && last != null && now > last) {
+      leveled = true;
+      clearTimeout(timer);
+      timer = setTimeout(() => (leveled = false), 1600);
+    }
+    if (now != null) last = now;
+    return () => clearTimeout(timer);
+  });
+
   const R = 20.5;
   const LENGTH = 2 * Math.PI * R;
   const filled = $derived(percent == null ? 0 : (Math.min(100, Math.max(0, percent)) / 100) * LENGTH);
@@ -25,7 +40,7 @@
   );
 </script>
 
-<div class="ring" style:width="{size}px" style:height="{size}px">
+<div class="ring" class:leveled style:width="{size}px" style:height="{size}px">
   <svg width={size} height={size} viewBox="0 0 48 48" role="img" aria-label={label}>
     <circle class="track" cx="24" cy="24" r={R} />
     {#if filled > 0}
@@ -46,6 +61,27 @@
   .ring {
     position: relative;
     flex: none;
+    border-radius: 50%;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .ring.leveled {
+      animation: leveled 1.6s ease-out;
+    }
+  }
+
+  @keyframes leveled {
+    0% {
+      box-shadow: 0 0 0 0 color-mix(in srgb, var(--exp) 70%, transparent);
+      transform: scale(1);
+    }
+    25% {
+      transform: scale(1.08);
+    }
+    100% {
+      box-shadow: 0 0 0 14px transparent;
+      transform: scale(1);
+    }
   }
 
   svg {
