@@ -570,9 +570,11 @@
         label="{metric === 'exp' ? 'EXP' : 'Mesos'} per hour over this session"
       />
       <p class="caption">
-        Each point is the rate over the 5 minutes before it; the first 2½ minutes are left out.
-        {#if metric === "mesos"}Mesos are spread evenly between your looks at them, so the line reaches only your last look.{/if}
-        {#if session.events?.length}Green dots are level-ups, red ones deaths.{/if}
+        {#if session.events?.length}Green dots are level-ups, red ones deaths.{" "}{/if}<span
+          class="info"
+          use:tip={`Each point is the rate over the 5 minutes before it; the first 2½ minutes are left out.${metric === "mesos" ? " Mesos are spread evenly between your looks at them, so the line reaches only your last look." : ""}`}
+          ><Info size={12} aria-label="How the graph is drawn" /></span
+        >
       </p>
     {:else}
       <p class="caption">The graph starts after 5 minutes of play.</p>
@@ -630,8 +632,7 @@
   {:else if !whole}
     <Block title="Past sessions">
       <p class="caption">
-        Nothing saved yet. A session is saved when it ends; your best maps and your last sessions then show here, and
-        all of them in the training log.
+        Nothing saved yet. Sessions save when they end, and your best maps show here.
       </p>
       <div><Button onclick={openTrainingLog}>Training log</Button></div>
     </Block>

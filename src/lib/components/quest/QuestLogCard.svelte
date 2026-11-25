@@ -31,6 +31,8 @@
   const inProgress = $derived(quests.filter((q) => q.state === "inProgress"));
   const ready = $derived(inProgress.filter(readyToHandIn));
   const rest = $derived(inProgress.filter((q) => !readyToHandIn(q)));
+  /** The Quest window's tabs not yet scrolled through, by name. */
+  const unseenTabs = $derived(TABS.filter(({ tab }) => !look(tab)?.wholeAt).map(({ label }) => label));
   const lastLook = $derived(Math.max(0, ...(log?.looks ?? []).map((l) => l.seenAt)));
 
   /** The data's page for each quest ready to hand in, for who takes it. */
@@ -72,23 +74,14 @@
 
   {#if !hasLog() && !can.liveReading}
     <p class="lead">
-      Share the game window on Now (Read the game), then open your Quest window and scroll each tab to its end: the
-      website keeps what it lists. A log the Windows program read also comes along in a records file (Settings, Data).
+      Share the game window on Now, then open your Quest window and scroll each tab to its end.
     </p>
   {:else if !hasLog()}
-    <p class="lead">
-      Open the Quest window in game and Leafline reads it while it's open: what you've done, what's in progress and what
-      you can take. Scroll each tab to its end once so it sees every row.
-    </p>
+    <p class="lead">Open your Quest window in game and scroll each tab to its end once. Leafline reads it while it's open.</p>
   {:else}
-    <p class="looks">
-      {#each TABS as { tab, label }, i (tab)}
-        {@const seen = look(tab)}
-        {#if i}<span class="faint">{" · "}</span>{/if}
-        <span class:whole={!!seen?.wholeAt} class:unseen={!seen}>{label}</span>
-        <span class="faint">{" "}{#if !seen}not seen{:else if seen.wholeAt}{ago(seen.wholeAt)}{:else}partly seen{/if}</span>
-      {/each}
-    </p>
+    {#if unseenTabs.length}
+      <p class="looks">Scroll {unseenTabs.length > 1 ? `${unseenTabs.slice(0, -1).join(", ")} and ${unseenTabs.at(-1)}` : unseenTabs[0]} to the end in your Quest window to see every quest.</p>
+    {/if}
 
     {#if ready.length}
       <h4><CircleCheck size={12} /> Ready to hand in</h4>
@@ -142,7 +135,6 @@
     {/if}
 
     <p class="foot faint">
-      Read from the Quest window, so true as of the last look.
       <button class="link" onclick={forget}>Forget this log</button>
     </p>
   {/if}
@@ -161,13 +153,7 @@
     font-size: var(--text-xs);
   }
 
-  .looks .whole {
-    color: var(--text);
-  }
 
-  .looks .unseen {
-    color: var(--faint);
-  }
 
   h4 {
     display: flex;

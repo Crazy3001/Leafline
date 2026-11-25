@@ -538,8 +538,7 @@
     <p class="lead">{error}</p>
   {:else if loaded && !plan}
     <p class="lead">
-      No build yet. Choose a job and write your goals in order, from a guide or your own idea, and Leafline lays them out
-      level by level.
+      No build yet. Pick a job and your goals, and Leafline lays them out level by level.
     </p>
     <button class="btn primary" onclick={() => openPlanner()}><Pencil size={13} />Plan a build</button>
     <h4 class="sub">Stats</h4>
@@ -551,8 +550,7 @@
     <h4 class="sub">Your stats by the plan</h4>
     {#if !statsKnown}
       <p class="quiet-line">
-        Not read yet, so the plan counts from zero. Open your Character Stat and Skill windows in the game and Leafline reads
-        them, or press Read stats.
+        Not read yet, so the plan counts from zero. Open your Character Stat and Skill windows in game, or press Read stats.
       </p>
     {/if}
     <dl class="stats">
