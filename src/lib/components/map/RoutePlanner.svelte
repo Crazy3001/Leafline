@@ -67,7 +67,7 @@
   .target {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     color: var(--muted);
     font-size: var(--text-md);
   }
@@ -100,7 +100,7 @@
   }
 
   .note {
-    margin: 6px 0 0;
+    margin: var(--space-1-5) 0 0;
     font-size: var(--text-xs);
     color: var(--faint);
   }

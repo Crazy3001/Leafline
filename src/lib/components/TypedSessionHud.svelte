@@ -51,8 +51,8 @@
     display: flex;
     flex-wrap: wrap;
     align-items: stretch;
-    gap: 6px;
-    padding: 8px;
+    gap: var(--space-1-5);
+    padding: var(--space-2);
     color: var(--text);
     font-family: var(--font-body, inherit);
   }
@@ -60,8 +60,8 @@
   .cell,
   .now {
     display: grid;
-    gap: 2px;
-    padding: 6px 10px;
+    gap: var(--space-0-5);
+    padding: var(--space-1-5) var(--space-3);
     border: var(--line-w) solid var(--line);
     border-radius: var(--radius);
     background: var(--surface);
@@ -83,13 +83,13 @@
 
   .inputs {
     display: flex;
-    gap: 4px;
+    gap: var(--space-1);
   }
 
   input {
     width: 52px;
     height: 24px;
-    padding: 0 6px;
+    padding: 0 var(--space-1-5);
     border: var(--line-w) solid var(--control-line);
     border-radius: var(--radius-sm);
     background: var(--bg);
@@ -99,7 +99,7 @@
   }
 
   .hint {
-    margin: 0 8px 8px;
+    margin: 0 var(--space-2) var(--space-2);
     color: var(--faint);
     font-size: var(--text-xs);
   }

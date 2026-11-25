@@ -45,13 +45,13 @@
 <style>
   .panel {
     display: grid;
-    gap: 8px;
+    gap: var(--space-2);
   }
 
   .state,
   .explain {
     display: flex;
-    gap: 6px;
+    gap: var(--space-1-5);
     margin: 0;
     font-size: var(--text-md);
     color: var(--muted);
@@ -59,7 +59,7 @@
 
   .state :global(svg) {
     flex: none;
-    margin-top: 2px;
+    margin-top: var(--space-0-5);
     color: var(--muted);
   }
 
@@ -76,9 +76,9 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 7px;
+    gap: var(--space-1-5);
     height: var(--control-h);
-    padding: 0 10px;
+    padding: 0 var(--space-3);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: transparent;

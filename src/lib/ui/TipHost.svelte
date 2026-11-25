@@ -66,7 +66,7 @@
     position: fixed;
     z-index: 2000;
     max-width: min(280px, calc(100vw - 12px));
-    padding: 6px 9px;
+    padding: var(--space-1-5) var(--space-2);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--surface-raised);
@@ -85,7 +85,7 @@
   /* A tooltip with a picture or a list reads as a small card. */
   .tip:not(.words) {
     min-width: 160px;
-    padding: 9px 11px;
+    padding: var(--space-2) var(--space-3);
     border-radius: var(--radius);
   }
 

@@ -180,10 +180,10 @@
     grid-column: 2 / -1;
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: var(--space-5);
     min-width: 0;
     max-width: 860px;
-    padding: 24px 36px 32px;
+    padding: var(--space-6) var(--space-10) var(--space-8);
     overflow-y: auto;
   }
 
@@ -195,13 +195,13 @@
   }
 
   .lead {
-    margin: 4px 0 0;
+    margin: var(--space-1) 0 0;
     color: var(--muted);
   }
 
   section {
     display: grid;
-    gap: 8px;
+    gap: var(--space-2);
   }
 
   h2 {
@@ -219,13 +219,13 @@
   .jobs {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: 14px;
+    gap: var(--space-3);
   }
 
   .column {
     display: grid;
     align-content: start;
-    gap: 6px;
+    gap: var(--space-1-5);
   }
 
   .class-name {
@@ -238,7 +238,7 @@
   }
 
   .choice {
-    padding: 7px 10px;
+    padding: var(--space-1-5) var(--space-3);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     background: var(--surface);
@@ -261,14 +261,14 @@
   .starts {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 10px;
+    gap: var(--space-2);
   }
 
   .start {
     display: grid;
     align-content: start;
-    gap: 4px;
-    padding: 12px 14px;
+    gap: var(--space-1);
+    padding: var(--space-3) var(--space-4);
   }
 
   .start-name {
@@ -296,13 +296,13 @@
   .names {
     display: flex;
     flex-wrap: wrap;
-    gap: 12px;
+    gap: var(--space-3);
     max-width: 640px;
   }
 
   label {
     display: grid;
-    gap: 3px;
+    gap: var(--space-0-5);
     color: var(--muted);
     font-size: var(--text-md);
   }
@@ -313,7 +313,7 @@
   }
 
   input {
-    padding: 4px 7px;
+    padding: var(--space-1) var(--space-2);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--surface-2);
@@ -339,7 +339,7 @@
 
   .error {
     margin: 0;
-    padding: 6px 10px;
+    padding: var(--space-1-5) var(--space-3);
     background: var(--bad-soft);
     color: var(--bad);
     font-size: var(--text-md);
@@ -348,12 +348,12 @@
   .actions {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: var(--space-3);
   }
 
   .create {
     height: 32px;
-    padding: 0 18px;
+    padding: 0 var(--space-5);
     border: 0;
     border-radius: var(--radius-sm);
     background: var(--accent);
@@ -369,7 +369,7 @@
   }
 
   .cancel {
-    padding: 0 8px;
+    padding: 0 var(--space-2);
     border: 0;
     background: transparent;
     color: var(--muted);

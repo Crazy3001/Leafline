@@ -353,18 +353,18 @@
   .top {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 12px 16px;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
   }
 
   .search {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-2);
     flex: 0 1 340px;
     min-width: 180px;
     height: var(--control-h);
-    padding: 0 12px;
+    padding: 0 var(--space-3);
     border: var(--line-w) solid var(--control-line);
     border-radius: var(--radius);
     background: var(--surface);
@@ -388,7 +388,7 @@
   }
 
   kbd {
-    padding: 1px 6px;
+    padding: 1px var(--space-1-5);
     border-radius: 5px;
     background: var(--surface-3);
     color: var(--muted);
@@ -410,9 +410,9 @@
     display: inline-flex;
     flex: none;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     height: var(--control-h);
-    padding: 0 13px;
+    padding: 0 var(--space-3);
     border: var(--line-w) solid var(--control-line);
     border-radius: var(--radius-pill);
     background: var(--surface);
@@ -449,8 +449,8 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    padding: 0 16px 16px;
+    gap: var(--space-3);
+    padding: 0 var(--space-4) var(--space-4);
     overflow-y: auto;
   }
 
@@ -482,7 +482,7 @@
    */
   .flow {
     columns: 3 400px;
-    column-gap: 12px;
+    column-gap: var(--space-3);
   }
 
   .flow.two {
@@ -495,13 +495,13 @@
   }
 
   .flow :global(.block) {
-    margin: 0 0 12px;
+    margin: 0 0 var(--space-3);
   }
 
   /* The character switch for Now's cards, under the strip. */
   .view > :global(.picker) {
     margin: 0;
-    padding: 0 4px;
+    padding: 0 var(--space-1);
   }
 
   /* One card under another, as wide as the window: Quests, whose cards sit side by side inside. */
@@ -513,7 +513,7 @@
   /* Quests in the Now view: the pinned window's short form, framed as a card. */
   .quests-glance {
     display: block;
-    padding: 12px 14px;
+    padding: var(--space-3) var(--space-4);
   }
 
   .quests-glance :global(.card) {

@@ -136,12 +136,12 @@
   .aside {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
   }
 
   .icon {
     display: inline-grid;
-    padding: 2px;
+    padding: var(--space-0-5);
     border: 0;
     background: transparent;
     color: var(--faint);
@@ -155,7 +155,7 @@
   .sum {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px 16px;
+    gap: var(--space-1) var(--space-4);
     font-size: var(--text-md);
   }
 
@@ -164,7 +164,7 @@
   }
 
   h4 {
-    margin: 10px 0 4px;
+    margin: var(--space-2) 0 var(--space-1);
     color: var(--muted);
     font-size: var(--text-xs);
     font-weight: var(--weight-strong);
@@ -173,7 +173,7 @@
   ul {
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: var(--space-0-5);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -183,7 +183,7 @@
     display: grid;
     grid-template-columns: 18px 1fr auto 64px;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
     font-size: var(--text-md);
   }
 
@@ -196,7 +196,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
-    gap: 2px 6px;
+    gap: var(--space-0-5) var(--space-1-5);
     min-width: 0;
   }
 
@@ -215,13 +215,13 @@
 
   .quiet,
   .hint {
-    margin: 6px 0 0;
+    margin: var(--space-1-5) 0 0;
     font-size: var(--text-md);
     color: var(--faint);
   }
 
   .hint {
-    margin: 10px 0 0;
+    margin: var(--space-2) 0 0;
     font-size: var(--text-xs);
   }
 
@@ -232,7 +232,7 @@
   }
 
   .caption {
-    margin: 8px 0 0;
+    margin: var(--space-2) 0 0;
     font-size: var(--text-xs);
     color: var(--faint);
   }

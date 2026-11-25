@@ -58,7 +58,7 @@
   .columns {
     display: grid;
     grid-template-columns: 44px minmax(0, 1fr);
-    gap: 4px var(--space-2);
+    gap: var(--space-1) var(--space-2);
   }
 
   .ticks {
@@ -88,7 +88,7 @@
     position: absolute;
     inset: 0;
     display: flex;
-    gap: 2px;
+    gap: var(--space-0-5);
   }
 
   .col {
@@ -101,7 +101,7 @@
   }
 
   .cap {
-    margin-bottom: 4px;
+    margin-bottom: var(--space-1);
     font-size: var(--text-xs);
     white-space: nowrap;
     visibility: hidden;
@@ -118,7 +118,7 @@
 
   .labels {
     display: flex;
-    gap: 2px;
+    gap: var(--space-0-5);
   }
 
   .labels span {
@@ -132,7 +132,7 @@
   }
 
   .detail {
-    margin: 6px 0 0;
+    margin: var(--space-1-5) 0 0;
     min-height: 18px;
     font-size: var(--text-md);
     color: var(--muted);

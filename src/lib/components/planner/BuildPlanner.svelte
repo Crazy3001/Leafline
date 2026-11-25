@@ -1294,16 +1294,16 @@
   }
 
   select.switch {
-    margin-bottom: 4px;
+    margin-bottom: var(--space-1);
     max-width: 100%;
   }
 
   nav {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--space-0-5);
     min-height: 0;
-    padding: 16px 10px;
+    padding: var(--space-4) var(--space-3);
     border-right: 1px solid var(--border);
     background: var(--surface);
   }
@@ -1311,8 +1311,8 @@
   .brand {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin: 0 8px 12px;
+    gap: var(--space-2);
+    margin: 0 var(--space-2) var(--space-3);
     font-family: var(--font-display);
     font-weight: var(--weight-strong);
   }
@@ -1322,7 +1322,7 @@
     align-content: start;
     gap: 1px;
     min-height: 0;
-    margin-bottom: 8px;
+    margin-bottom: var(--space-2);
     overflow-y: auto;
   }
 
@@ -1330,7 +1330,7 @@
     display: grid;
     gap: 0;
     width: 100%;
-    padding: 6px 10px;
+    padding: var(--space-1-5) var(--space-3);
     border: 0;
     border-left: 2px solid transparent;
     border-radius: 0;
@@ -1365,8 +1365,8 @@
   .side {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 6px 10px;
+    gap: var(--space-1-5);
+    padding: var(--space-1-5) var(--space-3);
     border: 0;
     border-radius: var(--radius-sm);
     background: transparent;
@@ -1392,7 +1392,7 @@
 
   textarea {
     width: 100%;
-    margin: 4px 0;
+    margin: var(--space-1) 0;
     resize: vertical;
   }
 
@@ -1408,23 +1408,23 @@
     align-self: center;
     justify-self: center;
     max-width: 420px;
-    padding: 24px;
+    padding: var(--space-6);
   }
 
   h1 {
-    margin: 0 0 6px;
+    margin: 0 0 var(--space-1-5);
     font-family: var(--font-display);
     font-size: var(--text-xl);
     font-weight: var(--weight-strong);
   }
 
   .lead {
-    margin: 0 0 14px;
+    margin: 0 0 var(--space-3);
     color: var(--muted);
   }
 
   .box {
-    padding: 12px;
+    padding: var(--space-3);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
   }
@@ -1432,8 +1432,8 @@
   .top {
     display: flex;
     align-items: flex-start;
-    gap: 12px;
-    padding: 16px 22px 10px;
+    gap: var(--space-3);
+    padding: var(--space-4) var(--space-6) var(--space-2);
   }
 
   .titles {
@@ -1463,19 +1463,19 @@
   }
 
   .path {
-    margin: 2px 0 0;
+    margin: var(--space-0-5) 0 0;
     color: var(--muted);
     font-size: var(--text-md);
   }
 
   .tabs {
     display: flex;
-    padding: 0 22px;
+    padding: 0 var(--space-6);
     border-bottom: 1px solid var(--border);
   }
 
   .tabs button {
-    padding: 8px 14px;
+    padding: var(--space-2) var(--space-4);
     border: 0;
     background: transparent;
     color: var(--muted);
@@ -1495,21 +1495,21 @@
   .content {
     flex: 1;
     min-height: 0;
-    padding: 12px 22px 28px;
+    padding: var(--space-3) var(--space-6) var(--space-6);
     overflow-y: auto;
   }
 
   section {
-    padding: 4px 0 14px;
+    padding: var(--space-1) 0 var(--space-3);
     border-bottom: 1px solid var(--border);
   }
 
   section + section {
-    padding-top: 12px;
+    padding-top: var(--space-3);
   }
 
   h2.group {
-    margin: 14px 0 6px;
+    margin: var(--space-3) 0 var(--space-1-5);
     font-family: var(--font-display);
     font-size: var(--text-md);
     font-weight: var(--weight-body);
@@ -1525,7 +1525,7 @@
   }
 
   .help {
-    margin: 0 0 8px;
+    margin: 0 0 var(--space-2);
     color: var(--faint);
     font-size: var(--text-md);
   }
@@ -1537,13 +1537,13 @@
   .fields {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px 12px;
-    margin-top: 6px;
+    gap: var(--space-2) var(--space-3);
+    margin-top: var(--space-1-5);
   }
 
   label {
     display: grid;
-    gap: 3px;
+    gap: var(--space-0-5);
     color: var(--muted);
     font-size: var(--text-md);
   }
@@ -1551,14 +1551,14 @@
   label.inline {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: var(--space-1);
     flex: none;
   }
 
   input,
   select,
   textarea {
-    padding: 4px 7px;
+    padding: var(--space-1) var(--space-2);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--surface-2);
@@ -1585,7 +1585,7 @@
   }
 
   details {
-    margin-top: 10px;
+    margin-top: var(--space-2);
   }
 
   summary {
@@ -1601,8 +1601,8 @@
   .have {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-    gap: 6px 14px;
-    margin-top: 8px;
+    gap: var(--space-1-5) var(--space-3);
+    margin-top: var(--space-2);
   }
 
   .have label {
@@ -1612,7 +1612,7 @@
 
   .goals {
     display: grid;
-    margin: 0 0 8px;
+    margin: 0 0 var(--space-2);
     padding: 0;
     list-style: none;
   }
@@ -1620,8 +1620,8 @@
   .goals li {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 5px 0;
+    gap: var(--space-2);
+    padding: var(--space-1) 0;
     border-top: 1px solid var(--border);
   }
 
@@ -1634,7 +1634,7 @@
   .with-icon {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     min-width: 0;
   }
 
@@ -1701,7 +1701,7 @@
   }
 
   .add {
-    margin-top: 10px;
+    margin-top: var(--space-2);
   }
 
   .add select {
@@ -1718,8 +1718,8 @@
   .legend {
     display: flex;
     flex-wrap: wrap;
-    gap: 14px;
-    margin: 6px 0 0;
+    gap: var(--space-3);
+    margin: var(--space-1-5) 0 0;
     color: var(--muted);
     font-size: var(--text-md);
   }
@@ -1728,7 +1728,7 @@
     display: inline-block;
     width: 8px;
     height: 8px;
-    margin-right: 5px;
+    margin-right: var(--space-1-5);
   }
 
   .along {
@@ -1738,7 +1738,7 @@
   }
 
   .along th {
-    padding: 4px 12px;
+    padding: var(--space-1) var(--space-3);
     color: var(--faint);
     font-size: var(--text-xs);
     font-weight: var(--weight-body);
@@ -1746,7 +1746,7 @@
   }
 
   .along td {
-    padding: 5px 12px;
+    padding: var(--space-1) var(--space-3);
     border-top: 1px solid var(--border);
     text-align: right;
   }
@@ -1770,13 +1770,13 @@
   .slots > li {
     display: grid;
     grid-template-columns: 76px minmax(0, 1fr);
-    gap: 4px 12px;
-    padding: 8px 0;
+    gap: var(--space-1) var(--space-3);
+    padding: var(--space-2) 0;
     border-top: 1px solid var(--border);
   }
 
   .slot-name {
-    padding-top: 3px;
+    padding-top: var(--space-0-5);
     color: var(--muted);
     font-family: var(--font-display);
   }
@@ -1785,14 +1785,14 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
   }
 
   .chip {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 2px 6px 2px 8px;
+    gap: var(--space-1-5);
+    padding: var(--space-0-5) var(--space-1-5) var(--space-0-5) var(--space-2);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     background: var(--surface);
@@ -1802,13 +1802,13 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 6px 10px;
-    margin: 0 0 8px;
+    gap: var(--space-1-5) var(--space-2);
+    margin: 0 0 var(--space-2);
     font-size: var(--text-md);
   }
 
   .chip.worn {
-    padding-right: 8px;
+    padding-right: var(--space-2);
     border-color: var(--border-strong);
     background: var(--surface-2);
   }
@@ -1819,7 +1819,7 @@
 
   /* The data's pick for a tier, not one of the plan's goals: no remove button, a dashed edge. */
   .chip.data {
-    padding-right: 8px;
+    padding-right: var(--space-2);
     border-style: dashed;
   }
 
@@ -1857,8 +1857,8 @@
   .add-chip {
     display: inline-flex;
     align-items: center;
-    gap: 3px;
-    padding: 3px 8px;
+    gap: var(--space-0-5);
+    padding: var(--space-0-5) var(--space-2);
     border: 1px dashed var(--border-strong);
     border-radius: var(--radius-sm);
     background: transparent;
@@ -1876,7 +1876,7 @@
 
   .finder {
     grid-column: 2;
-    padding: 10px;
+    padding: var(--space-2);
     background: var(--surface-2);
   }
 
@@ -1884,15 +1884,15 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 12px;
-    margin-bottom: 8px;
+    gap: var(--space-3);
+    margin-bottom: var(--space-2);
   }
 
   .search {
     display: flex;
     flex: 1;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     min-width: 180px;
     max-width: 320px;
   }
@@ -1912,7 +1912,7 @@
   .found button {
     display: grid;
     width: 100%;
-    padding: 4px 8px;
+    padding: var(--space-1) var(--space-2);
     border: 0;
     border-radius: var(--radius-sm);
     background: var(--hover);
@@ -1932,7 +1932,7 @@
 
   .guide {
     display: flex;
-    gap: 6px;
+    gap: var(--space-1-5);
     max-width: 600px;
   }
 
@@ -1944,8 +1944,8 @@
   .links {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
-    margin-bottom: 10px;
+    gap: var(--space-1-5);
+    margin-bottom: var(--space-2);
   }
 
   .plans {
@@ -1958,8 +1958,8 @@
   .plans li {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 6px 0;
+    gap: var(--space-2);
+    padding: var(--space-1-5) 0;
   }
 
   .plans li + li {
@@ -1972,7 +1972,7 @@
 
   .actions {
     display: flex;
-    gap: 8px;
+    gap: var(--space-2);
     border-bottom: 0;
   }
 
@@ -1983,8 +1983,8 @@
   .plain {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 4px 9px;
+    gap: var(--space-1-5);
+    padding: var(--space-1) var(--space-2);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: transparent;
@@ -2010,8 +2010,8 @@
   }
 
   .error {
-    margin: 10px 22px 0;
-    padding: 6px 10px;
+    margin: var(--space-2) var(--space-6) 0;
+    padding: var(--space-1-5) var(--space-3);
     background: var(--bad-soft);
     color: var(--bad);
     font-size: var(--text-md);
@@ -2020,8 +2020,8 @@
   /* The Plan tab. */
   .plan-problems {
     display: grid;
-    gap: 6px;
-    margin: 0 0 12px;
+    gap: var(--space-1-5);
+    margin: 0 0 var(--space-3);
     padding: 0;
     list-style: none;
     font-size: var(--text-md);
@@ -2030,8 +2030,8 @@
   .plan-problems li {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 6px 10px;
+    gap: var(--space-2);
+    padding: var(--space-1-5) var(--space-3);
     border-radius: var(--radius-sm);
     background: var(--surface-2);
     color: var(--muted);
@@ -2051,13 +2051,13 @@
   }
 
   .plain.small {
-    padding: 2px 8px;
+    padding: var(--space-0-5) var(--space-2);
     font-size: var(--text-xs);
   }
 
   .plan-card {
-    margin-bottom: 12px;
-    padding: 14px 16px 12px;
+    margin-bottom: var(--space-3);
+    padding: var(--space-3) var(--space-4) var(--space-3);
   }
 
   .order-head {
@@ -2065,8 +2065,8 @@
     flex-wrap: wrap;
     align-items: baseline;
     justify-content: space-between;
-    gap: 4px 12px;
-    margin-bottom: 4px;
+    gap: var(--space-1) var(--space-3);
+    margin-bottom: var(--space-1);
   }
 
   .order-head h2 {
@@ -2082,7 +2082,7 @@
   }
 
   .order-group {
-    margin: 10px 0 2px;
+    margin: var(--space-2) 0 var(--space-0-5);
     color: var(--muted);
     font-family: var(--font-display);
     font-size: var(--text-md);
@@ -2100,9 +2100,9 @@
     display: grid;
     grid-template-columns: 22px 20px minmax(0, 1fr) auto 84px 56px;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
     min-height: 34px;
-    padding: 0 6px;
+    padding: 0 var(--space-1-5);
     border-top: 1px solid var(--border);
   }
 
@@ -2158,7 +2158,7 @@
   }
 
   .goal-name small {
-    margin-left: 6px;
+    margin-left: var(--space-1-5);
   }
 
   .to {
@@ -2191,7 +2191,7 @@
 
   .tag {
     justify-self: end;
-    padding: 1px 8px;
+    padding: 1px var(--space-2);
     border-radius: 6px;
     font-size: var(--text-xs);
     font-weight: var(--weight-strong);
@@ -2224,8 +2224,8 @@
   .order-foot {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
-    margin: 12px 0 0;
+    gap: var(--space-2);
+    margin: var(--space-3) 0 0;
   }
 
   @container planner (max-width: 640px) {
@@ -2240,7 +2240,7 @@
   }
 
   .credit {
-    margin-top: 16px;
+    margin-top: var(--space-4);
     padding: 0;
     border: 0;
     background: transparent;

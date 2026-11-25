@@ -114,12 +114,12 @@
   .facts {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
-    gap: 6px;
+    gap: var(--space-1-5);
     margin: 0;
   }
 
   .facts div {
-    padding: 4px 7px;
+    padding: var(--space-1) var(--space-2);
     border-radius: var(--radius-sm);
     background: var(--hover);
   }
@@ -140,8 +140,8 @@
 
   .spread {
     display: grid;
-    gap: 3px;
-    margin: 8px 0 0;
+    gap: var(--space-0-5);
+    margin: var(--space-2) 0 0;
     padding: 0;
     list-style: none;
   }
@@ -150,7 +150,7 @@
     display: grid;
     grid-template-columns: 74px 1fr 36px;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
     font-size: var(--text-xs);
   }
 
@@ -178,7 +178,7 @@
   }
 
   .why {
-    margin: 8px 0 0;
+    margin: var(--space-2) 0 0;
     color: var(--faint);
     font-size: var(--text-xs);
   }

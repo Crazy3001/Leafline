@@ -173,12 +173,23 @@
   --text-2xl: 22px;
   --text-hero: 30px;
 
-  /* Spacing scale. */
+  /*
+   * Spacing scale: every gap, padding and margin is one of these. A 4px grid, plus two small
+   * steps for inside a row (2 between a name and its sub-line, 6 between an icon and its text).
+   * Ties round down for gaps and row heights, so lists stay dense, and up at a card's sides.
+   * 1px stays as a literal (hairline grids), and so does a left indent that lines text up
+   * under an icon.
+   */
+  --space-0-5: 2px;
   --space-1: 4px;
+  --space-1-5: 6px;
   --space-2: 8px;
   --space-3: 12px;
   --space-4: 16px;
   --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
 
   /* Controls. */
   --control-h: 30px;
@@ -259,7 +270,7 @@ button {
 .strip {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   min-height: 24px;
 }
 
@@ -291,15 +302,15 @@ button {
 .tip-head {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 /* A row of small numbers under a tooltip's title: Lv, HP, EXP. */
 .tip-stats {
   display: flex;
-  gap: 10px;
-  margin-top: 6px;
-  padding-top: 5px;
+  gap: var(--space-2);
+  margin-top: var(--space-1-5);
+  padding-top: var(--space-1);
   border-top: 1px solid var(--border);
   color: var(--text);
 }
@@ -328,9 +339,9 @@ button {
 
 .tip-list {
   display: grid;
-  gap: 2px;
-  margin: 5px 0 0;
-  padding: 5px 0 0;
+  gap: var(--space-0-5);
+  margin: var(--space-1) 0 0;
+  padding: var(--space-1) 0 0;
   border-top: 1px solid var(--border);
   list-style: none;
 }
@@ -338,12 +349,12 @@ button {
 .tip-list li {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-1-5);
 }
 
 .tip-list .tip-num {
   margin-left: auto;
-  padding-left: 10px;
+  padding-left: var(--space-3);
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
@@ -364,7 +375,7 @@ button {
 .ref.with-pic {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: var(--space-1);
   max-width: 100%;
   vertical-align: middle;
 }
@@ -430,8 +441,8 @@ button {
 }
 
 .ref.more {
-  margin-top: 3px;
-  padding: 0 6px;
+  margin-top: var(--space-0-5);
+  padding: 0 var(--space-1-5);
   color: var(--muted);
   font-size: var(--text-xs);
 }

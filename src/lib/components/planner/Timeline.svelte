@@ -174,7 +174,7 @@
 <style>
   aside {
     min-height: 0;
-    padding: 14px 14px 24px;
+    padding: var(--space-3) var(--space-4) var(--space-6);
     border-left: 1px solid var(--border);
     background: var(--surface);
     overflow-y: auto;
@@ -182,9 +182,9 @@
 
   .problems {
     display: grid;
-    gap: 6px;
-    margin-bottom: 12px;
-    padding-bottom: 12px;
+    gap: var(--space-1-5);
+    margin-bottom: var(--space-3);
+    padding-bottom: var(--space-3);
     border-bottom: 1px solid var(--border);
     font-size: var(--text-md);
   }
@@ -195,13 +195,13 @@
 
   .warning {
     display: flex;
-    gap: 6px;
+    gap: var(--space-1-5);
     color: var(--warn);
   }
 
   .warning :global(svg) {
     flex: none;
-    margin-top: 3px;
+    margin-top: var(--space-0-5);
   }
 
   .note {
@@ -211,8 +211,8 @@
   .head {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin-bottom: 8px;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
   }
 
   h2 {
@@ -252,9 +252,9 @@
   .row {
     display: grid;
     grid-template-columns: 62px minmax(0, 1fr) 14px;
-    gap: 8px;
+    gap: var(--space-2);
     width: 100%;
-    padding: 6px 6px;
+    padding: var(--space-1-5) var(--space-1-5);
     border: 0;
     background: transparent;
     color: var(--text);
@@ -321,14 +321,14 @@
   .line.gear {
     display: flex;
     flex-wrap: wrap;
-    gap: 2px;
-    margin: 1px 0 2px -2px;
+    gap: var(--space-0-5);
+    margin: 1px 0 var(--space-0-5) -2px;
   }
 
   .line.with-icon {
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: var(--space-1);
   }
 
   .line .text {
@@ -338,7 +338,7 @@
   .tick {
     display: inline-grid;
     flex: none;
-    margin-left: 4px;
+    margin-left: var(--space-1);
     color: var(--good);
   }
 
@@ -348,15 +348,15 @@
   }
 
   .inner {
-    margin: 0 6px 6px 18px;
+    margin: 0 var(--space-1-5) var(--space-1-5) 18px;
     border-left: 1px solid var(--border);
   }
 
   .inner li {
     display: grid;
     grid-template-columns: 44px minmax(0, 1fr);
-    gap: 8px;
-    padding: 3px 8px;
+    gap: var(--space-2);
+    padding: var(--space-0-5) var(--space-2);
   }
 
   .inner li.here .at {
@@ -364,7 +364,7 @@
   }
 
   .key {
-    margin: 10px 0 0;
+    margin: var(--space-2) 0 0;
     color: var(--faint);
     font-size: var(--text-xs);
   }

@@ -34,8 +34,8 @@
   .stock li {
     display: flex;
     align-items: baseline;
-    gap: 6px;
-    padding: 3px 0;
+    gap: var(--space-1-5);
+    padding: var(--space-0-5) 0;
     border-top: 1px solid var(--border);
   }
 

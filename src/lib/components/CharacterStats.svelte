@@ -259,14 +259,14 @@
 <style>
   .sheet {
     display: grid;
-    gap: 2px;
+    gap: var(--space-0-5);
   }
 
   .top {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin-bottom: 4px;
+    gap: var(--space-2);
+    margin-bottom: var(--space-1);
   }
 
   .when {
@@ -277,7 +277,7 @@
   .link {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--space-1);
     margin-left: auto;
     padding: 0;
     border: 0;
@@ -299,13 +299,13 @@
   }
 
   .problem {
-    margin: 0 0 4px;
+    margin: 0 0 var(--space-1);
     color: var(--warn);
     font-size: var(--text-md);
   }
 
   .quiet-line {
-    margin: 0 0 4px;
+    margin: 0 0 var(--space-1);
     color: var(--faint);
     font-size: var(--text-md);
   }
@@ -313,8 +313,8 @@
   .grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
-    gap: 6px;
-    margin: 6px 0 4px;
+    gap: var(--space-1-5);
+    margin: var(--space-1-5) 0 var(--space-1);
   }
 
   .grid.four {
@@ -323,7 +323,7 @@
 
   .grid div {
     min-width: 0;
-    padding: 5px 8px;
+    padding: var(--space-1) var(--space-2);
     border-radius: var(--radius-sm);
     background: var(--hover);
   }
@@ -364,7 +364,7 @@
   }
 
   .sub {
-    margin: 12px 0 6px;
+    margin: var(--space-3) 0 var(--space-1-5);
     font-family: var(--font-display);
     font-size: var(--text-md);
     font-weight: var(--weight-body);
@@ -373,8 +373,8 @@
 
   .buffs {
     display: grid;
-    gap: 4px;
-    margin: 4px 0 0;
+    gap: var(--space-1);
+    margin: var(--space-1) 0 0;
     padding: 0;
     list-style: none;
   }
@@ -383,9 +383,9 @@
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
-    column-gap: 8px;
+    column-gap: var(--space-2);
     row-gap: 1px;
-    padding: 6px 8px;
+    padding: var(--space-1-5) var(--space-2);
     border-radius: var(--radius-sm);
     background: var(--hover);
     font-size: var(--text-md);

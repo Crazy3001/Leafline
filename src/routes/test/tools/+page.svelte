@@ -204,7 +204,7 @@
 
 <style>
   h3 {
-    margin: 14px 0 2px;
+    margin: var(--space-3) 0 var(--space-0-5);
     font-size: var(--text-md);
   }
 </style>

@@ -767,13 +767,13 @@
   .parts {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 18px 24px;
+    gap: var(--space-4) var(--space-6);
     align-items: start;
   }
 
   .part {
     display: grid;
-    gap: 6px;
+    gap: var(--space-1-5);
     min-width: 0;
     align-content: start;
   }
@@ -785,9 +785,9 @@
   .parts .outfit li {
     display: grid;
     grid-template-columns: 72px minmax(0, 1fr);
-    column-gap: 8px;
+    column-gap: var(--space-2);
     row-gap: 1px;
-    padding: 9px 0;
+    padding: var(--space-2) 0;
   }
 
   .parts .outfit li > :global(*) {
@@ -814,7 +814,7 @@
   }
 
   .parts .outfit .piece-line {
-    margin: 0 0 3px 68px;
+    margin: 0 0 var(--space-0-5) 68px;
     overflow: hidden;
     color: var(--faint);
     text-overflow: ellipsis;
@@ -832,8 +832,8 @@
   }
 
   .part-title {
-    margin: 0 0 2px;
-    padding-bottom: 6px;
+    margin: 0 0 var(--space-0-5);
+    padding-bottom: var(--space-1-5);
     border-bottom: 1px solid var(--border);
     font-family: var(--font-display);
     font-size: var(--text-md);
@@ -841,17 +841,17 @@
   }
 
   .link.warn-line {
-    margin-top: 8px;
+    margin-top: var(--space-2);
     color: var(--warn);
   }
 
   .views {
     display: flex;
-    margin: 8px 0 10px;
+    margin: var(--space-2) 0 var(--space-2);
   }
 
   .sub {
-    margin: 12px 0 6px;
+    margin: var(--space-3) 0 var(--space-1-5);
     font-family: var(--font-display);
     font-size: var(--text-md);
     font-weight: var(--weight-body);
@@ -859,21 +859,21 @@
   }
 
   .build {
-    margin-top: 12px;
-    padding-top: 10px;
+    margin-top: var(--space-3);
+    padding-top: var(--space-2);
     border-top: 1px solid var(--border);
   }
 
   /* In the tab, the build opens with a band like a section of its own, out to the card's edges. */
   .build.full {
-    margin-top: 16px;
+    margin-top: var(--space-4);
     padding-top: 0;
     border-top: 0;
   }
 
   .head.strip {
     align-items: center;
-    margin: 0 0 10px;
+    margin: 0 0 var(--space-2);
   }
 
   .head.strip .title {
@@ -884,8 +884,8 @@
   .head {
     display: flex;
     align-items: baseline;
-    gap: 8px;
-    margin-bottom: 8px;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
   }
 
   .title {
@@ -909,12 +909,12 @@
   .tools {
     display: inline-flex;
     flex: none;
-    gap: 10px;
+    gap: var(--space-2);
     margin-left: auto;
   }
 
   .lead {
-    margin: 0 0 10px;
+    margin: 0 0 var(--space-2);
     color: var(--muted);
     font-size: var(--text-md);
   }
@@ -922,9 +922,9 @@
   .action {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     height: var(--control-h);
-    padding: 0 10px;
+    padding: 0 var(--space-3);
     border: 1px solid var(--accent);
     border-radius: var(--radius-sm);
     background: var(--accent);
@@ -941,7 +941,7 @@
   .link {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--space-1);
     padding: 0;
     border: 0;
     background: transparent;
@@ -959,7 +959,7 @@
   /* The level's to-do list, set against the level like a row of the plan. */
   .now {
     display: flex;
-    gap: 10px;
+    gap: var(--space-2);
     align-items: baseline;
   }
 
@@ -980,8 +980,8 @@
   .todo p {
     display: flex;
     align-items: baseline;
-    gap: 6px;
-    margin: 0 0 3px;
+    gap: var(--space-1-5);
+    margin: 0 0 var(--space-0-5);
     font-size: var(--text-md);
   }
 
@@ -1010,12 +1010,12 @@
   .stats {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 6px;
-    margin: 10px 0 0;
+    gap: var(--space-1-5);
+    margin: var(--space-2) 0 0;
   }
 
   .stats div {
-    padding: 5px 8px;
+    padding: var(--space-1) var(--space-2);
     border-radius: var(--radius-sm);
     background: var(--hover);
   }
@@ -1032,14 +1032,14 @@
 
   /* What gear adds, beside the stat: shown, never part of the plan's count. */
   dd .gear {
-    margin-left: 4px;
+    margin-left: var(--space-1);
     color: var(--muted);
     font-size: var(--text-xs);
     font-weight: var(--weight-body);
   }
 
   .next {
-    margin: 10px 0 0;
+    margin: var(--space-2) 0 0;
     color: var(--muted);
     font-size: var(--text-md);
   }
@@ -1050,7 +1050,7 @@
   }
 
   h4 {
-    margin: 12px 0 4px;
+    margin: var(--space-3) 0 var(--space-1);
     font-family: var(--font-display);
     font-size: var(--text-md);
     font-weight: var(--weight-body);
@@ -1069,8 +1069,8 @@
 
   .coming li {
     display: flex;
-    gap: 10px;
-    padding: 3px 0;
+    gap: var(--space-2);
+    padding: var(--space-0-5) 0;
   }
 
   .coming li + li {
@@ -1086,7 +1086,7 @@
   .what {
     display: flex;
     flex-wrap: wrap;
-    gap: 2px 14px;
+    gap: var(--space-0-5) var(--space-3);
     min-width: 0;
   }
 
@@ -1117,7 +1117,7 @@
   }
 
   .outfit li {
-    padding: 6px 0 8px;
+    padding: var(--space-1-5) 0 var(--space-2);
   }
 
   .outfit li + li {
@@ -1125,7 +1125,7 @@
   }
 
   .slot-name {
-    margin: 0 0 3px;
+    margin: 0 0 var(--space-0-5);
     font-family: var(--font-display);
     font-size: var(--text-md);
     font-weight: var(--weight-body);
@@ -1137,7 +1137,7 @@
     display: grid;
     grid-template-columns: 64px minmax(0, 1fr) auto;
     align-items: baseline;
-    gap: 6px;
+    gap: var(--space-1-5);
     padding: 1px 0;
   }
 
@@ -1170,7 +1170,7 @@
   .line .end {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
   }
 
   .line .lv {
@@ -1202,15 +1202,15 @@
 
   .edit {
     display: grid;
-    gap: 6px;
-    margin-top: 6px;
-    padding: 8px;
+    gap: var(--space-1-5);
+    margin-top: var(--space-1-5);
+    padding: var(--space-2);
     background: var(--surface-2);
   }
 
   .edit-field {
     display: grid;
-    gap: 2px;
+    gap: var(--space-0-5);
     font-size: var(--text-xs);
     color: var(--muted);
   }
@@ -1219,7 +1219,7 @@
   .edit select {
     min-width: 0;
     height: 26px;
-    padding: 0 6px;
+    padding: 0 var(--space-1-5);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--surface);
@@ -1231,7 +1231,7 @@
     display: grid;
     grid-template-columns: 1fr 72px 20px;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
   }
 
   .add-stat {
@@ -1241,18 +1241,18 @@
   .edit-pair {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 6px;
+    gap: var(--space-1-5);
   }
 
   .edit-actions {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: var(--space-3);
   }
 
   .action.small {
     height: 24px;
-    padding: 0 12px;
+    padding: 0 var(--space-3);
   }
 
   .piece-line {
@@ -1271,7 +1271,7 @@
   }
 
   .quiet-line {
-    margin: 0 0 4px;
+    margin: 0 0 var(--space-1);
     color: var(--faint);
     font-size: var(--text-md);
   }
@@ -1282,7 +1282,7 @@
   }
 
   .goal-error {
-    margin: 4px 0 0;
+    margin: var(--space-1) 0 0;
     color: var(--bad);
     font-size: var(--text-md);
   }
@@ -1290,10 +1290,10 @@
   .find {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     height: 28px;
-    margin-top: 10px;
-    padding: 0 8px;
+    margin-top: var(--space-2);
+    padding: 0 var(--space-2);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--surface);
@@ -1315,7 +1315,7 @@
   }
 
   .found {
-    margin-top: 4px;
+    margin-top: var(--space-1);
     border: 1px solid var(--border);
   }
 
@@ -1326,9 +1326,9 @@
   .found button {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
     width: 100%;
-    padding: 5px 8px;
+    padding: var(--space-1) var(--space-2);
     border: 0;
     background: transparent;
     color: var(--text);
@@ -1368,8 +1368,8 @@
     display: flex;
     align-items: baseline;
     justify-content: space-between;
-    margin: 14px 0 4px;
-    padding-bottom: 3px;
+    margin: var(--space-3) 0 var(--space-1);
+    padding-bottom: var(--space-0-5);
     border-bottom: 1px solid var(--border-strong);
     color: var(--text);
     font-size: var(--text-xs);
@@ -1386,8 +1386,8 @@
   .skills li {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
-    gap: 3px 10px;
-    padding: 7px 0;
+    gap: var(--space-0-5) var(--space-2);
+    padding: var(--space-1-5) 0;
   }
 
   .skills li + li {
@@ -1397,7 +1397,7 @@
   .skill-name {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1461,7 +1461,7 @@
   }
 
   .skills li.done {
-    padding: 5px 0;
+    padding: var(--space-1) 0;
   }
 
   .max {
@@ -1472,26 +1472,26 @@
   }
 
   .warnings li {
-    padding: 3px 0 3px 8px;
+    padding: var(--space-0-5) 0 var(--space-0-5) var(--space-2);
     border-left: 2px solid var(--warn);
     color: var(--muted);
   }
 
   .warnings li + li {
-    margin-top: 4px;
+    margin-top: var(--space-1);
   }
 
   footer {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px 12px;
-    margin-top: 12px;
+    gap: var(--space-1) var(--space-3);
+    margin-top: var(--space-3);
   }
 
   .credit {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--space-1);
     padding: 0;
     border: 0;
     background: transparent;
@@ -1509,6 +1509,6 @@
 
   /* The picture of a skill, in line with its name. */
   :global(.skill-pic) {
-    margin-right: 4px;
+    margin-right: var(--space-1);
   }
 </style>

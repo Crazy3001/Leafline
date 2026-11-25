@@ -108,8 +108,8 @@
   .legend {
     display: flex;
     align-items: baseline;
-    gap: 8px;
-    padding: 0 6px 3px;
+    gap: var(--space-2);
+    padding: 0 var(--space-1-5) var(--space-0-5);
     color: var(--faint);
     font-size: var(--text-xs);
   }
@@ -150,9 +150,9 @@
   .ground {
     display: flex;
     align-items: baseline;
-    gap: 8px;
+    gap: var(--space-2);
     width: 100%;
-    padding: 3px 6px;
+    padding: var(--space-0-5) var(--space-1-5);
     border: 0;
     border-radius: var(--radius-sm);
     background: transparent;
@@ -210,8 +210,8 @@
   }
 
   .more {
-    margin-top: 3px;
-    padding: 0 6px;
+    margin-top: var(--space-0-5);
+    padding: 0 var(--space-1-5);
     border: 0;
     background: transparent;
     color: var(--muted);
@@ -220,7 +220,7 @@
   }
 
   .open {
-    margin: 6px 0 0;
+    margin: var(--space-1-5) 0 0;
     color: var(--faint);
     font-size: var(--text-xs);
   }
@@ -232,11 +232,11 @@
   }
 
   .route {
-    margin-top: 2px;
+    margin-top: var(--space-0-5);
   }
 
   .note {
-    margin: 6px 0 0;
+    margin: var(--space-1-5) 0 0;
     color: var(--faint);
     font-size: var(--text-xs);
   }

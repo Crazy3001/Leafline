@@ -47,8 +47,8 @@
   li {
     display: flex;
     align-items: baseline;
-    gap: 5px;
-    padding: 2px 0;
+    gap: var(--space-1);
+    padding: var(--space-0-5) 0;
     font-size: var(--text-md);
   }
 
@@ -75,7 +75,7 @@
   }
 
   .tag {
-    padding: 0 4px;
+    padding: 0 var(--space-1);
     border-radius: var(--radius-sm);
     background: var(--surface-3);
     color: var(--muted);

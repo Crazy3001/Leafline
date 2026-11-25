@@ -82,11 +82,11 @@
 
 <style>
   .controls {
-    padding: 8px 12px 0;
+    padding: var(--space-2) var(--space-3) 0;
   }
 
   .list {
-    padding: 0 12px 10px;
+    padding: 0 var(--space-3) var(--space-2);
   }
 
   .controls.pinned,
@@ -103,8 +103,8 @@
   .back {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    margin: 0 0 8px;
+    gap: var(--space-1);
+    margin: 0 0 var(--space-2);
     padding: 0;
     border: 0;
     background: transparent;
@@ -120,7 +120,7 @@
 
   .count,
   .quiet {
-    margin: 0 0 4px;
+    margin: 0 0 var(--space-1);
     color: var(--faint);
     font-size: var(--text-md);
   }

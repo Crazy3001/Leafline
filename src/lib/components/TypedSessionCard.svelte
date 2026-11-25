@@ -117,7 +117,7 @@
 <style>
   .lead,
   .hint {
-    margin: 0 0 10px;
+    margin: 0 0 var(--space-2);
     color: var(--muted);
     font-size: var(--text-md);
   }
@@ -133,20 +133,20 @@
   .sides {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-    gap: 10px;
+    gap: var(--space-2);
   }
 
   fieldset {
     display: grid;
-    gap: 6px;
+    gap: var(--space-1-5);
     margin: 0;
-    padding: 8px 10px 10px;
+    padding: var(--space-2) var(--space-3) var(--space-2);
     border: var(--line-w) solid var(--line);
     border-radius: var(--radius);
   }
 
   legend {
-    padding: 0 4px;
+    padding: 0 var(--space-1);
     color: var(--muted);
     font-size: var(--text-xs);
     text-transform: uppercase;
@@ -157,7 +157,7 @@
     display: grid;
     grid-template-columns: 76px 1fr;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
     font-size: var(--text-md);
   }
 
@@ -172,7 +172,7 @@
   input {
     min-width: 0;
     height: var(--control-h);
-    padding: 0 8px;
+    padding: 0 var(--space-2);
     border: var(--line-w) solid var(--control-line);
     border-radius: var(--radius);
     background: var(--surface);
@@ -187,14 +187,14 @@
 
   .time,
   .map {
-    margin-top: 10px;
+    margin-top: var(--space-2);
   }
 
   .time {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-2);
   }
 
   .time label {
@@ -217,8 +217,8 @@
   .outcome {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-    gap: 8px;
-    margin: 12px 0 6px;
+    gap: var(--space-2);
+    margin: var(--space-3) 0 var(--space-1-5);
   }
 
   .outcome dt {
@@ -227,7 +227,7 @@
   }
 
   .outcome dd {
-    margin: 2px 0 0;
+    margin: var(--space-0-5) 0 0;
     font-size: var(--text-lg);
     font-weight: var(--weight-strong);
   }
@@ -235,15 +235,15 @@
   .actions {
     display: flex;
     justify-content: flex-end;
-    margin-top: 8px;
+    margin-top: var(--space-2);
   }
 
   .go {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     height: var(--control-h);
-    padding: 0 12px;
+    padding: 0 var(--space-3);
     border: var(--line-w) solid var(--accent);
     border-radius: var(--radius);
     background: var(--accent);

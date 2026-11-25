@@ -332,7 +332,7 @@
   .open {
     display: flex;
     align-items: center;
-    gap: 3px;
+    gap: var(--space-0-5);
     width: 100%;
     margin-left: -3px;
     padding: 0;
@@ -364,8 +364,8 @@
   .payout {
     display: flex;
     align-items: baseline;
-    gap: 5px;
-    margin: 7px 0 0;
+    gap: var(--space-1);
+    margin: var(--space-1-5) 0 0;
     color: var(--muted);
     font-size: var(--text-md);
   }
@@ -410,15 +410,15 @@
   }
 
   .details {
-    margin-top: 6px;
-    padding-top: 2px;
+    margin-top: var(--space-1-5);
+    padding-top: var(--space-0-5);
     border-top: 1px solid var(--border);
   }
 
   /* Each quest is its own block: a flat fill, a frame and an amber rule down the left, so one quest
      ends visibly before the next begins. The rule turns green once every step is done. */
   .quest {
-    padding: 0 10px 10px;
+    padding: 0 var(--space-3) var(--space-2);
     border: 1px solid var(--border-strong);
     border-left: 3px solid var(--accent);
     border-radius: var(--radius-sm);
@@ -435,7 +435,7 @@
 
   .quests {
     display: grid;
-    gap: 10px;
+    gap: var(--space-2);
     align-items: start;
   }
 
@@ -454,9 +454,9 @@
   .title {
     display: flex;
     align-items: center;
-    gap: 4px;
-    margin: 0 -10px 8px;
-    padding: 6px 10px;
+    gap: var(--space-1);
+    margin: 0 -10px var(--space-2);
+    padding: var(--space-1-5) var(--space-3);
     border-bottom: 1px solid var(--border);
     background: var(--surface-3);
     font-family: var(--font-display);
@@ -472,8 +472,8 @@
   .giver {
     display: flex;
     align-items: center;
-    gap: 5px;
-    margin: -5px 0 8px;
+    gap: var(--space-1);
+    margin: -5px 0 var(--space-2);
     color: var(--muted);
     font-size: var(--text-md);
   }
@@ -494,7 +494,7 @@
 
   .steps {
     display: grid;
-    gap: 8px;
+    gap: var(--space-2);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -504,7 +504,7 @@
     display: inline-flex;
     flex-wrap: wrap;
     align-items: baseline;
-    gap: 0 5px;
+    gap: 0 var(--space-1);
   }
 
   .verb {
@@ -519,8 +519,8 @@
   .row {
     display: flex;
     justify-content: space-between;
-    gap: 8px;
-    margin-bottom: 4px;
+    gap: var(--space-2);
+    margin-bottom: var(--space-1);
   }
 
   .count {
@@ -537,8 +537,8 @@
   .eta {
     display: flex;
     align-items: center;
-    gap: 5px;
-    margin: 4px 0 0;
+    gap: var(--space-1);
+    margin: var(--space-1) 0 0;
     color: var(--muted);
     font-size: var(--text-xs);
   }
@@ -554,30 +554,30 @@
 
   /* Pinned: the same layout, packed tighter. */
   .dense .title {
-    margin-bottom: 5px;
-    padding: 4px 10px;
+    margin-bottom: var(--space-1);
+    padding: var(--space-1) var(--space-3);
     font-size: var(--text-md);
   }
 
   .dense .giver {
-    margin: -2px 0 5px;
+    margin: -2px 0 var(--space-1);
   }
 
   .dense .steps {
-    gap: 5px;
+    gap: var(--space-1);
   }
 
   .dense .row {
-    margin-bottom: 2px;
+    margin-bottom: var(--space-0-5);
     font-size: var(--text-md);
   }
 
   .quest.dense {
-    padding-bottom: 7px;
+    padding-bottom: var(--space-1-5);
   }
 
   .quest.dense + .quest.dense {
-    margin-top: 7px;
+    margin-top: var(--space-1-5);
   }
 
   .empty {
@@ -587,8 +587,8 @@
   }
 
   .footer {
-    margin: 12px 0 0;
-    padding-top: 10px;
+    margin: var(--space-3) 0 0;
+    padding-top: var(--space-2);
     border-top: 1px solid var(--border);
     color: var(--faint);
     font-size: var(--text-md);
@@ -598,14 +598,14 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
   }
 
   .lookup button {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 4px 10px;
+    gap: var(--space-1-5);
+    padding: var(--space-1) var(--space-3);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--hover);
@@ -637,12 +637,12 @@
   .error {
     border-top: 0;
     padding-top: 0;
-    margin-top: 6px;
+    margin-top: var(--space-1-5);
     color: var(--bad);
   }
 
   .credit {
-    margin: 10px 0 0;
+    margin: var(--space-2) 0 0;
     color: var(--faint);
     font-size: var(--text-xs);
   }

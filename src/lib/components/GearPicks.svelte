@@ -88,8 +88,8 @@
   .slots > li {
     display: grid;
     grid-template-columns: 52px 1fr;
-    gap: 6px;
-    padding: 3px 0;
+    gap: var(--space-1-5);
+    padding: var(--space-0-5) 0;
   }
 
   .slots > li + li {
@@ -104,7 +104,7 @@
 
   .picks {
     display: grid;
-    gap: 2px;
+    gap: var(--space-0-5);
     min-width: 0;
   }
 
@@ -112,7 +112,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
-    gap: 0 8px;
+    gap: 0 var(--space-2);
     min-width: 0;
   }
 
@@ -126,7 +126,7 @@
   }
 
   li :global(.ref.name small) {
-    margin-left: 4px;
+    margin-left: var(--space-1);
     color: var(--faint);
     font-size: var(--text-xs);
     font-weight: var(--weight-body);
@@ -161,7 +161,7 @@
   }
 
   .how {
-    margin: 6px 0 0;
+    margin: var(--space-1-5) 0 0;
     color: var(--faint);
     font-size: var(--text-xs);
   }

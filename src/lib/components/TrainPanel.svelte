@@ -649,7 +649,7 @@
   /* A block pads itself; the chips sit beside blocks, so they match it. */
   .views {
     display: flex;
-    padding: 0 10px 10px;
+    padding: 0 var(--space-3) var(--space-2);
   }
 
   .view {
@@ -663,7 +663,7 @@
   .state {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: var(--space-1);
     font-size: var(--text-xs);
   }
 
@@ -689,7 +689,7 @@
   .empty {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--space-1);
     padding: var(--space-3);
     background: var(--surface-2);
     font-size: var(--text-md);
@@ -712,7 +712,7 @@
   .recent {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--space-0-5);
   }
 
   .recent {
@@ -765,7 +765,7 @@
   .level {
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: var(--space-1);
     font-size: var(--text-md);
   }
 
@@ -781,12 +781,12 @@
   .tiles {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 6px;
+    gap: var(--space-1-5);
   }
 
   .reminder {
     margin: 0;
-    padding: 6px var(--space-2);
+    padding: var(--space-1-5) var(--space-2);
     border-left: 2px solid var(--warn);
     background: var(--surface-2);
     font-size: var(--text-xs);
@@ -817,7 +817,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
-    gap: 4px var(--space-2);
+    gap: var(--space-1) var(--space-2);
     margin: 0 0 var(--space-2);
     font-size: var(--text-md);
     color: var(--muted);
@@ -852,7 +852,7 @@
   .compare {
     display: grid;
     grid-template-columns: 96px minmax(0, 1fr) 44px;
-    gap: 6px var(--space-2);
+    gap: var(--space-1-5) var(--space-2);
     align-items: center;
     font-size: var(--text-md);
   }
@@ -868,7 +868,7 @@
   }
 
   th {
-    padding: 0 0 4px;
+    padding: 0 0 var(--space-1);
     font-size: var(--text-xs);
     font-weight: var(--weight-body);
     color: var(--faint);
@@ -876,7 +876,7 @@
   }
 
   td {
-    padding: 5px 0;
+    padding: var(--space-1) 0;
     border-top: 1px solid var(--border);
     text-align: right;
     white-space: nowrap;
@@ -903,7 +903,7 @@
     display: inline-block;
     width: 6px;
     height: 6px;
-    margin-right: 6px;
+    margin-right: var(--space-1-5);
     vertical-align: 1px;
     background: var(--accent);
   }
@@ -911,7 +911,7 @@
   .notes {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--space-1);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -932,7 +932,7 @@
   .recent-list li {
     display: flex;
     gap: var(--space-2);
-    padding: 7px 0;
+    padding: var(--space-1-5) 0;
     border-top: 1px solid var(--border);
     font-size: var(--text-md);
   }

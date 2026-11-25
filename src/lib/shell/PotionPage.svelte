@@ -31,8 +31,8 @@
 
 <style>
   .page {
-    margin: 0 10px 10px;
-    padding: 12px 14px 14px;
+    margin: 0 var(--space-3) var(--space-2);
+    padding: var(--space-3) var(--space-4) var(--space-3);
   }
 
   .quiet {

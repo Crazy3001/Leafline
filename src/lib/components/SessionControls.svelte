@@ -49,7 +49,7 @@
   .controls {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
   }
 
   .end {

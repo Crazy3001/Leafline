@@ -128,8 +128,8 @@
 
 <style>
   .notes {
-    margin-top: 12px;
-    padding-top: 10px;
+    margin-top: var(--space-3);
+    padding-top: var(--space-2);
     border-top: 1px solid var(--border);
   }
 
@@ -143,14 +143,14 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 4px;
+    margin-bottom: var(--space-1);
   }
 
   .add {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 2px 8px;
+    gap: var(--space-1);
+    padding: var(--space-0-5) var(--space-2);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: transparent;
@@ -174,7 +174,7 @@
   }
 
   .when {
-    margin: 2px 0 0;
+    margin: var(--space-0-5) 0 0;
     color: var(--faint);
     font-size: var(--text-xs);
   }
@@ -182,7 +182,7 @@
   textarea {
     display: block;
     width: 100%;
-    padding: 6px 8px;
+    padding: var(--space-1-5) var(--space-2);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--well);
@@ -200,8 +200,8 @@
   .actions {
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-top: 6px;
+    gap: var(--space-2);
+    margin-top: var(--space-1-5);
   }
 
   .keys {
@@ -225,7 +225,7 @@
 
   .save {
     height: var(--control-h-sm);
-    padding: 0 12px;
+    padding: 0 var(--space-3);
     border: 1px solid var(--accent);
     border-radius: var(--radius-sm);
     background: var(--accent);
@@ -241,7 +241,7 @@
   }
 
   .error {
-    margin: 6px 0 0;
+    margin: var(--space-1-5) 0 0;
     color: var(--bad);
     font-size: var(--text-md);
   }

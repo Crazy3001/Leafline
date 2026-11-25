@@ -73,12 +73,12 @@
 
 <style>
   .verdict {
-    margin: 0 0 6px;
+    margin: 0 0 var(--space-1-5);
     font-weight: var(--weight-strong);
   }
 
   .note {
-    margin: 0 0 10px;
+    margin: 0 0 var(--space-2);
   }
 
   table {
@@ -95,7 +95,7 @@
 
   th,
   td {
-    padding: 4px 8px 4px 0;
+    padding: var(--space-1) var(--space-2) var(--space-1) 0;
     border-bottom: var(--line-w) solid var(--line);
     vertical-align: top;
   }
@@ -114,7 +114,7 @@
   }
 
   details {
-    margin-top: 8px;
+    margin-top: var(--space-2);
   }
 
   summary {

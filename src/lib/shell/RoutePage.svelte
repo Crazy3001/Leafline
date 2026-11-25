@@ -65,16 +65,16 @@
 <style>
   .page {
     display: grid;
-    gap: 10px;
-    margin: 0 10px 10px;
-    padding: 12px 14px 14px;
+    gap: var(--space-2);
+    margin: 0 var(--space-3) var(--space-2);
+    padding: var(--space-3) var(--space-4) var(--space-3);
   }
 
   .from {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 4px 8px;
+    gap: var(--space-1) var(--space-2);
     color: var(--map);
   }
 
@@ -106,7 +106,7 @@
   }
 
   .plan {
-    padding-top: 10px;
+    padding-top: var(--space-2);
     border-top: 1px solid var(--border);
   }
 </style>

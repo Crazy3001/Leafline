@@ -1385,16 +1385,16 @@
   .received {
     display: inline-flex;
     align-items: center;
-    gap: 3px;
-    margin-left: 8px;
+    gap: var(--space-0-5);
+    margin-left: var(--space-2);
     color: var(--good);
     font-size: var(--text-md);
   }
 
   .reset-keys {
     display: flex;
-    gap: 6px;
-    margin-top: 8px;
+    gap: var(--space-1-5);
+    margin-top: var(--space-2);
   }
 
   .path {
@@ -1413,8 +1413,8 @@
   .nav {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    padding: 18px 10px;
+    gap: var(--space-0-5);
+    padding: var(--space-4) var(--space-3);
     border-right: 1px solid var(--border);
     background: var(--header-bg);
     color: var(--header-text);
@@ -1423,14 +1423,14 @@
   .brand {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin: 0 8px 14px;
+    gap: var(--space-2);
+    margin: 0 var(--space-2) var(--space-3);
     font-family: var(--font-display);
     font-weight: var(--weight-strong);
   }
 
   .nav a {
-    padding: 6px 10px;
+    padding: var(--space-1-5) var(--space-3);
     border-radius: var(--radius-pill);
     color: var(--header-muted);
     text-decoration: none;
@@ -1451,12 +1451,12 @@
 
   main {
     overflow-y: auto;
-    padding: 6px 28px 40px;
+    padding: var(--space-1-5) var(--space-8) var(--space-10);
     scroll-behavior: smooth;
   }
 
   section {
-    padding: 22px 0 10px;
+    padding: var(--space-5) 0 var(--space-2);
     border-bottom: 1px solid var(--border);
   }
 
@@ -1465,20 +1465,20 @@
   }
 
   h2 {
-    margin: 0 0 4px;
+    margin: 0 0 var(--space-1);
     font-family: var(--font-display);
     font-size: var(--text-xl);
     font-weight: var(--weight-strong);
   }
 
   h3 {
-    margin: 18px 0 8px;
+    margin: var(--space-4) 0 var(--space-2);
     font-size: var(--text-md);
     font-weight: var(--weight-strong);
   }
 
   .lead {
-    margin: 0 0 14px;
+    margin: 0 0 var(--space-3);
     color: var(--muted);
   }
 
@@ -1486,8 +1486,8 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 20px;
-    padding: 12px 0;
+    gap: var(--space-5);
+    padding: var(--space-3) 0;
   }
 
   .row + .row {
@@ -1497,7 +1497,7 @@
   .row label,
   .label {
     display: grid;
-    gap: 2px;
+    gap: var(--space-0-5);
   }
 
   .name {
@@ -1516,7 +1516,7 @@
   .slider {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-2);
   }
 
   .slider input {
@@ -1532,13 +1532,13 @@
 
   .segmented {
     display: flex;
-    padding: 2px;
+    padding: var(--space-0-5);
     border-radius: var(--radius-sm);
     background: var(--hover);
   }
 
   .segmented button {
-    padding: 5px 12px;
+    padding: var(--space-1) var(--space-3);
     border: 0;
     border-radius: var(--radius-sm);
     background: transparent;
@@ -1610,15 +1610,15 @@
 
   /* Settings most players never need, folded away. */
   .advanced {
-    margin: 4px 0 0;
+    margin: var(--space-1) 0 0;
     border-top: 1px solid var(--border);
   }
 
   .advanced > summary {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 10px 0;
+    gap: var(--space-1-5);
+    padding: var(--space-2) 0;
     color: var(--muted);
     font-size: var(--text-md);
     cursor: pointer;
@@ -1649,8 +1649,8 @@
 
   .kinds {
     display: grid;
-    gap: 2px;
-    margin: 0 0 6px;
+    gap: var(--space-0-5);
+    margin: 0 0 var(--space-1-5);
     padding: 0;
     border: 0;
   }
@@ -1662,13 +1662,13 @@
   .kind {
     display: flex;
     align-items: flex-start;
-    gap: 9px;
-    padding: 6px 0;
+    gap: var(--space-2);
+    padding: var(--space-1-5) 0;
     cursor: pointer;
   }
 
   .kind input {
-    margin: 2px 0 0;
+    margin: var(--space-0-5) 0 0;
     accent-color: var(--accent);
   }
 
@@ -1685,8 +1685,8 @@
   }
 
   .connections {
-    margin: 4px 0 2px;
-    padding: 8px 12px;
+    margin: var(--space-1) 0 var(--space-0-5);
+    padding: var(--space-2) var(--space-3);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
   }
@@ -1698,8 +1698,8 @@
 
   .connections ul {
     display: grid;
-    gap: 10px;
-    margin: 10px 0 0;
+    gap: var(--space-2);
+    margin: var(--space-2) 0 0;
     padding: 0;
     list-style: none;
   }
@@ -1712,7 +1712,7 @@
   .service-head {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
   }
 
   .source {
@@ -1722,7 +1722,7 @@
 
   .connections .help,
   .route-line {
-    margin: 2px 0 0 18px;
+    margin: var(--space-0-5) 0 0 18px;
   }
 
   .route-line {
@@ -1735,8 +1735,8 @@
   }
 
   .tag {
-    margin-left: 8px;
-    padding: 1px 6px;
+    margin-left: var(--space-2);
+    padding: 1px var(--space-1-5);
     border-radius: var(--radius-sm);
     background: color-mix(in srgb, var(--travel) 16%, transparent);
     color: var(--travel);
@@ -1769,21 +1769,21 @@
 
   .exports {
     display: flex;
-    gap: 6px;
+    gap: var(--space-1-5);
   }
 
   .confirm {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
   }
 
   .button {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 5px 12px;
+    gap: var(--space-1-5);
+    padding: var(--space-1) var(--space-3);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: transparent;
@@ -1804,8 +1804,8 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin: 6px 0 12px;
-    padding: 10px 12px;
+    margin: var(--space-1-5) 0 var(--space-3);
+    padding: var(--space-2) var(--space-3);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius);
     background: var(--glass);
@@ -1817,7 +1817,7 @@
 
   .keys {
     display: grid;
-    gap: 2px;
+    gap: var(--space-0-5);
     margin: 0;
   }
 
@@ -1825,7 +1825,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 7px 0;
+    padding: var(--space-1-5) 0;
   }
 
   .keys div + div {
@@ -1839,12 +1839,12 @@
   dd {
     display: flex;
     align-items: center;
-    gap: 3px;
+    gap: var(--space-0-5);
     margin: 0;
   }
 
   .note {
-    margin: 10px 0 12px;
+    margin: var(--space-2) 0 var(--space-3);
     color: var(--faint);
     font-size: var(--text-md);
   }
@@ -1852,8 +1852,8 @@
 
   .policy {
     display: flex;
-    gap: 10px;
-    padding: 12px;
+    gap: var(--space-2);
+    padding: var(--space-3);
     border: 1px solid color-mix(in srgb, var(--good) 30%, transparent);
     border-radius: var(--radius);
     background: var(--good-soft);
@@ -1862,7 +1862,7 @@
 
   .policy :global(svg) {
     flex: none;
-    margin-top: 2px;
+    margin-top: var(--space-0-5);
     color: var(--good);
   }
 
@@ -1888,12 +1888,12 @@
 
   .picker {
     display: flex;
-    gap: 6px;
+    gap: var(--space-1-5);
   }
 
   .picker select {
     width: 260px;
-    padding: 5px 8px;
+    padding: var(--space-1) var(--space-2);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--surface-2);
@@ -1907,13 +1907,13 @@
   }
 
   .icon-only {
-    padding: 5px 8px;
+    padding: var(--space-1) var(--space-2);
   }
 
   .status {
     display: inline-block;
-    margin-right: 6px;
-    padding: 0 7px;
+    margin-right: var(--space-1-5);
+    padding: 0 var(--space-2);
     border-radius: var(--radius-sm);
     background: var(--hover);
     color: var(--muted);
@@ -1934,12 +1934,12 @@
   .lists {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 20px;
+    gap: var(--space-5);
   }
 
   ul {
     display: grid;
-    gap: 7px;
+    gap: var(--space-1-5);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -1947,7 +1947,7 @@
 
   li {
     display: flex;
-    gap: 8px;
+    gap: var(--space-2);
     color: var(--muted);
     font-size: var(--text-md);
   }
@@ -1978,7 +1978,7 @@
   }
 
   .credits td {
-    padding: 6px 0;
+    padding: var(--space-1-5) 0;
     border-top: 1px solid var(--border);
     color: var(--muted);
   }
@@ -1988,7 +1988,7 @@
   }
 
   .credits td + td {
-    padding-left: 12px;
+    padding-left: var(--space-3);
     white-space: nowrap;
   }
 
@@ -2000,7 +2000,7 @@
   .link {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--space-1);
     padding: 0;
     border: 0;
     background: transparent;
@@ -2035,9 +2035,9 @@
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
-    gap: 4px 12px;
-    margin: 0 0 14px;
-    padding: 8px 12px;
+    gap: var(--space-1) var(--space-3);
+    margin: 0 0 var(--space-3);
+    padding: var(--space-2) var(--space-3);
     border-left: 2px solid var(--accent);
     background: var(--accent-soft);
     font-size: var(--text-md);
@@ -2054,12 +2054,12 @@
   }
 
   .help.status {
-    margin-top: 4px;
+    margin-top: var(--space-1);
     color: var(--faint);
   }
 
   .help.warn {
-    margin-top: 4px;
+    margin-top: var(--space-1);
     color: var(--warn);
   }
 </style>

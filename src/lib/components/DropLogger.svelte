@@ -147,7 +147,7 @@
 <style>
   .lead,
   .done {
-    margin: 0 0 6px;
+    margin: 0 0 var(--space-1-5);
     color: var(--muted);
     font-size: var(--text-md);
   }
@@ -155,7 +155,7 @@
   .done {
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: var(--space-1);
     color: var(--text);
   }
 
@@ -166,16 +166,16 @@
   .row {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px;
+    gap: var(--space-1);
   }
 
   .mob,
   .act {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: var(--space-1);
     height: var(--control-h-sm);
-    padding: 0 8px;
+    padding: 0 var(--space-2);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--surface-2);
@@ -223,15 +223,15 @@
 
   .other {
     display: flex;
-    gap: 4px;
-    margin-top: 6px;
+    gap: var(--space-1);
+    margin-top: var(--space-1-5);
   }
 
   .other input {
     flex: 1;
     min-width: 0;
     height: var(--control-h-sm);
-    padding: 0 8px;
+    padding: 0 var(--space-2);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--well);
@@ -246,13 +246,13 @@
   }
 
   .hint {
-    margin: 6px 0 0;
+    margin: var(--space-1-5) 0 0;
     color: var(--faint);
     font-size: var(--text-xs);
   }
 
   .error {
-    margin: 6px 0 0;
+    margin: var(--space-1-5) 0 0;
     color: var(--bad);
     font-size: var(--text-md);
   }

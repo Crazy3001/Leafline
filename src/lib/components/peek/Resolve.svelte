@@ -51,7 +51,7 @@
   .note {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     margin: 0;
     color: var(--muted);
     font-size: var(--text-md);

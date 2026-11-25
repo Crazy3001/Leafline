@@ -73,9 +73,9 @@
 <style>
   .page {
     display: grid;
-    gap: 8px;
-    margin: 0 10px 10px;
-    padding: 12px 14px 14px;
+    gap: var(--space-2);
+    margin: 0 var(--space-3) var(--space-2);
+    padding: var(--space-3) var(--space-4) var(--space-3);
   }
 
   .lead,
@@ -98,9 +98,9 @@
   li button {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-2);
     width: 100%;
-    padding: 8px 4px;
+    padding: var(--space-2) var(--space-1);
     border: 0;
     border-radius: var(--radius-sm);
     background: transparent;

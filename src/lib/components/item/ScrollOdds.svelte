@@ -132,13 +132,13 @@
   .inputs {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-    gap: 6px 8px;
+    gap: var(--space-1-5) var(--space-2);
     align-items: end;
   }
 
   label {
     display: grid;
-    gap: 2px;
+    gap: var(--space-0-5);
     color: var(--faint);
     font-size: var(--text-xs);
   }
@@ -146,14 +146,14 @@
   label.check {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     color: var(--muted);
   }
 
   input[type="number"] {
     width: 100%;
     height: 26px;
-    padding: 0 6px;
+    padding: 0 var(--space-1-5);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--surface);
@@ -163,15 +163,15 @@
   .rates {
     display: inline-flex;
     grid-column: span 2;
-    gap: 2px;
-    padding: 2px;
+    gap: var(--space-0-5);
+    padding: var(--space-0-5);
     border-radius: var(--radius-sm);
     background: var(--hover);
   }
 
   .rates button {
     flex: 1;
-    padding: 3px 0;
+    padding: var(--space-0-5) 0;
     border: 0;
     border-radius: var(--radius-sm);
     background: transparent;
@@ -188,12 +188,12 @@
   .facts {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
-    gap: 6px;
-    margin: 10px 0 0;
+    gap: var(--space-1-5);
+    margin: var(--space-2) 0 0;
   }
 
   .facts div {
-    padding: 4px 7px;
+    padding: var(--space-1) var(--space-2);
     border-radius: var(--radius-sm);
     background: var(--hover);
   }
@@ -226,8 +226,8 @@
 
   .passes {
     display: grid;
-    gap: 2px;
-    margin: 10px 0 0;
+    gap: var(--space-0-5);
+    margin: var(--space-2) 0 0;
     padding: 0;
     list-style: none;
   }
@@ -236,7 +236,7 @@
     display: grid;
     grid-template-columns: 18px 1fr 44px;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
     font-size: var(--text-xs);
   }
 
@@ -269,7 +269,7 @@
   }
 
   .note {
-    margin: 8px 0 0;
+    margin: var(--space-2) 0 0;
     color: var(--faint);
     font-size: var(--text-xs);
   }

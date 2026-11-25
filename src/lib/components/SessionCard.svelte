@@ -127,7 +127,7 @@
 
 <style>
   .party {
-    margin-right: 6px;
+    margin-right: var(--space-1-5);
     color: var(--muted);
     font-size: var(--text-xs);
   }
@@ -137,7 +137,7 @@
   }
 
   .state {
-    padding: 1px 7px;
+    padding: 1px var(--space-2);
     border-radius: var(--radius-sm);
     font-size: var(--text-xs);
     font-weight: var(--weight-strong);
@@ -156,7 +156,7 @@
   .totals {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 6px;
+    gap: var(--space-1-5);
     margin: 0;
   }
 
@@ -165,7 +165,7 @@
   }
 
   .totals div {
-    padding: 6px 8px;
+    padding: var(--space-1-5) var(--space-2);
     border-radius: var(--radius-sm);
     background: var(--hover);
   }
@@ -188,13 +188,13 @@
 
   .maps {
     width: 100%;
-    margin-top: 10px;
+    margin-top: var(--space-2);
     border-collapse: collapse;
     font-size: var(--text-md);
   }
 
   .maps thead th {
-    padding: 0 0 4px;
+    padding: 0 0 var(--space-1);
     font-size: var(--text-xs);
     font-weight: var(--weight-body);
     color: var(--faint);
@@ -210,13 +210,13 @@
   }
 
   .maps tbody th {
-    padding: 5px 8px 5px 0;
+    padding: var(--space-1) var(--space-2) var(--space-1) 0;
     font-weight: var(--weight-body);
     text-align: left;
   }
 
   .maps td {
-    padding: 5px 0 5px 8px;
+    padding: var(--space-1) 0 var(--space-1) var(--space-2);
     color: var(--muted);
     text-align: right;
     white-space: nowrap;
@@ -243,15 +243,15 @@
     display: inline-block;
     width: 6px;
     height: 6px;
-    margin: 0 6px 1px 0;
+    margin: 0 var(--space-1-5) 1px 0;
     border-radius: var(--radius-sm);
     background: var(--map);
   }
 
   .notes {
     display: grid;
-    gap: 3px;
-    margin: 10px 0 0;
+    gap: var(--space-0-5);
+    margin: var(--space-2) 0 0;
     padding: 0;
     list-style: none;
     color: var(--faint);

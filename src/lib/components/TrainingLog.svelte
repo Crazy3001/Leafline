@@ -912,7 +912,7 @@
 
 <style>
   .drops {
-    margin: 0 0 12px;
+    margin: 0 0 var(--space-3);
     padding: 0;
     list-style: none;
     font-size: var(--text-md);
@@ -921,8 +921,8 @@
   .drops li {
     display: flex;
     justify-content: space-between;
-    gap: 8px;
-    padding: 3px 0;
+    gap: var(--space-2);
+    padding: var(--space-0-5) 0;
     border-top: 1px solid var(--border);
   }
 
@@ -971,7 +971,7 @@
   .brand {
     display: inline-flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-2);
     margin-right: var(--space-3);
   }
 
@@ -1006,7 +1006,7 @@
 
   select {
     height: var(--control-h);
-    padding: 0 6px;
+    padding: 0 var(--space-1-5);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--surface-2);
@@ -1018,7 +1018,7 @@
   .short {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     color: var(--muted);
     font-size: var(--text-md);
     cursor: pointer;
@@ -1045,7 +1045,7 @@
     display: flex;
     flex: 1 1 140px;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--space-0-5);
     max-width: 180px;
   }
 
@@ -1091,7 +1091,7 @@
   .panel {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: var(--space-2);
     padding: var(--space-3);
     border: var(--line-w) solid var(--line);
     border-radius: var(--radius-lg);
@@ -1123,7 +1123,7 @@
     gap: var(--space-2);
     align-items: center;
     width: 100%;
-    padding: 9px var(--space-3);
+    padding: var(--space-2) var(--space-3);
     border: 0;
     border-top: 1px solid var(--border);
     background: transparent;
@@ -1143,7 +1143,7 @@
 
   .srow.head {
     padding-top: 0;
-    padding-bottom: 6px;
+    padding-bottom: var(--space-1-5);
     border-top: 0;
     font-size: var(--text-xs);
     color: var(--faint);
@@ -1204,7 +1204,7 @@
   }
 
   .detail-head p {
-    margin: 4px 0 0;
+    margin: var(--space-1) 0 0;
     font-size: var(--text-md);
   }
 
@@ -1230,7 +1230,7 @@
   /* Overview: best maps, each run's average as a bar with a mark at its best. */
   .bests {
     display: grid;
-    gap: 10px;
+    gap: var(--space-2);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -1239,7 +1239,7 @@
   .bests li {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
-    gap: 4px 10px;
+    gap: var(--space-1) var(--space-2);
     align-items: baseline;
   }
 
@@ -1288,10 +1288,10 @@
   .recent button {
     display: grid;
     grid-template-columns: 64px minmax(0, 1fr) 70px 60px;
-    gap: 10px;
+    gap: var(--space-2);
     align-items: center;
     width: 100%;
-    padding: 8px 4px;
+    padding: var(--space-2) var(--space-1);
     border: 0;
     border-top: 1px solid var(--border);
     background: transparent;
@@ -1339,7 +1339,7 @@
   .key {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     color: var(--muted);
   }
 
@@ -1383,7 +1383,7 @@
   }
 
   .picked p {
-    margin: 2px 0 0;
+    margin: var(--space-0-5) 0 0;
     font-size: var(--text-md);
   }
 
@@ -1414,7 +1414,7 @@
   }
 
   th {
-    padding: 0 0 6px;
+    padding: 0 0 var(--space-1-5);
     font-size: var(--text-xs);
     font-weight: var(--weight-body);
     color: var(--faint);
@@ -1422,7 +1422,7 @@
   }
 
   td {
-    padding: 7px 0;
+    padding: var(--space-1-5) 0;
     border-top: 1px solid var(--border);
     text-align: right;
   }
@@ -1437,7 +1437,7 @@
     place-items: center;
     width: 20px;
     height: 20px;
-    margin-left: 4px;
+    margin-left: var(--space-1);
     padding: 0;
     border: 0;
     border-radius: var(--radius-sm);
@@ -1460,7 +1460,7 @@
   .rename {
     width: 100%;
     height: 24px;
-    padding: 0 6px;
+    padding: 0 var(--space-1-5);
     border: 1px solid var(--accent);
     border-radius: var(--radius-sm);
     background: var(--surface);
@@ -1477,7 +1477,7 @@
   .figure {
     display: flex;
     align-items: baseline;
-    gap: 10px;
+    gap: var(--space-2);
   }
 
   .huge {
@@ -1493,7 +1493,7 @@
   .empty {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--space-1);
     padding: var(--space-5);
     border: 1px solid var(--border);
     border-radius: var(--radius);

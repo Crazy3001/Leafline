@@ -32,9 +32,9 @@
     flex: none;
     align-items: center;
     justify-content: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     height: var(--control-h);
-    padding: 0 12px;
+    padding: 0 var(--space-3);
     border: var(--line-w) solid var(--control-line);
     border-radius: var(--radius);
     background: var(--surface-2);
@@ -72,7 +72,7 @@
   .sm {
     height: var(--control-h-sm);
     border-radius: var(--radius-sm);
-    padding: 0 8px;
+    padding: 0 var(--space-2);
     font-size: var(--text-xs);
   }
 

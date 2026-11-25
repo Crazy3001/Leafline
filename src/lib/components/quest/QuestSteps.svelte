@@ -152,8 +152,8 @@
   .chain-at {
     display: flex;
     flex-wrap: wrap;
-    gap: 2px 0;
-    margin: 4px 0 0;
+    gap: var(--space-0-5) 0;
+    margin: var(--space-1) 0 0;
     padding: 0;
     list-style: none;
     font-size: var(--text-md);
@@ -161,7 +161,7 @@
 
   .chain-at li + li::before {
     content: "→";
-    margin: 0 6px;
+    margin: 0 var(--space-1-5);
     color: var(--faint);
   }
 
@@ -174,13 +174,13 @@
   }
 
   .story {
-    margin: 6px 0 0;
+    margin: var(--space-1-5) 0 0;
     color: var(--muted);
     font-size: var(--text-md);
   }
 
   h4 {
-    margin: 10px 0 4px;
+    margin: var(--space-2) 0 var(--space-1);
     color: var(--muted);
     font-size: var(--text-xs);
     font-weight: var(--weight-strong);
@@ -188,7 +188,7 @@
 
   .steps {
     display: grid;
-    gap: 6px;
+    gap: var(--space-1-5);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -236,12 +236,12 @@
   .pay {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
-    gap: 6px;
-    margin: 0 0 6px;
+    gap: var(--space-1-5);
+    margin: 0 0 var(--space-1-5);
   }
 
   .pay div {
-    padding: 4px 7px;
+    padding: var(--space-1) var(--space-2);
     border-radius: var(--radius-sm);
     background: var(--hover);
   }
@@ -284,12 +284,12 @@
   }
 
   .links :global(.ref) {
-    padding: 2px 0;
+    padding: var(--space-0-5) 0;
     font-weight: var(--weight-strong);
   }
 
   .maybe {
-    margin-left: 4px;
+    margin-left: var(--space-1);
     color: var(--faint);
     font-size: var(--text-xs);
   }

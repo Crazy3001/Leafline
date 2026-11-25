@@ -339,7 +339,7 @@
   }
 
   .lead {
-    margin: 0 0 10px;
+    margin: 0 0 var(--space-2);
     color: var(--muted);
     font-size: var(--text-md);
   }
@@ -347,15 +347,15 @@
   /* A card pads itself; these sit beside cards, so they match it. A pinned window pads its body. */
   .views {
     display: flex;
-    padding: 0 10px 10px;
+    padding: 0 var(--space-3) var(--space-2);
   }
 
   .controls {
-    padding: 10px 12px 0;
+    padding: var(--space-2) var(--space-3) 0;
   }
 
   .list {
-    padding: 0 12px 10px;
+    padding: 0 var(--space-3) var(--space-2);
   }
 
   .controls.pinned,
@@ -365,18 +365,18 @@
 
   .search {
     display: flex;
-    gap: 4px;
-    margin-bottom: 8px;
+    gap: var(--space-1);
+    margin-bottom: var(--space-2);
   }
 
   .field {
     display: flex;
     flex: 1;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     min-width: 0;
     height: 28px;
-    padding: 0 8px;
+    padding: 0 var(--space-2);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--surface);
@@ -407,10 +407,10 @@
     flex: none;
     align-items: center;
     justify-content: center;
-    gap: 3px;
+    gap: var(--space-0-5);
     min-width: 28px;
     height: 28px;
-    padding: 0 6px;
+    padding: 0 var(--space-1-5);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: transparent;
@@ -432,9 +432,9 @@
 
   .filters {
     display: grid;
-    gap: 5px;
-    margin-bottom: 8px;
-    padding: 8px;
+    gap: var(--space-1);
+    margin-bottom: var(--space-2);
+    padding: var(--space-2);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     font-size: var(--text-md);
@@ -444,14 +444,14 @@
     display: grid;
     grid-template-columns: 48px 1fr;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     color: var(--muted);
   }
 
   .filters select {
     min-width: 0;
     height: 24px;
-    padding: 0 4px;
+    padding: 0 var(--space-1);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--surface);
@@ -464,7 +464,7 @@
   }
 
   .count {
-    margin: 0 0 4px;
+    margin: 0 0 var(--space-1);
     color: var(--faint);
     font-size: var(--text-xs);
   }
@@ -483,7 +483,7 @@
     display: grid;
     gap: 1px;
     width: 100%;
-    padding: 5px 4px;
+    padding: var(--space-1) var(--space-1);
     border: 0;
     background: transparent;
     text-align: left;
@@ -512,8 +512,8 @@
   .back {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    margin: 2px 12px 6px;
+    gap: var(--space-1);
+    margin: var(--space-0-5) var(--space-3) var(--space-1-5);
     padding: 0;
     border: 0;
     background: transparent;
@@ -534,7 +534,7 @@
   }
 
   .quiet {
-    margin: 0 0 6px;
+    margin: 0 0 var(--space-1-5);
     color: var(--faint);
     font-size: var(--text-md);
   }
@@ -552,7 +552,7 @@
 
   .empty {
     margin: 0;
-    padding: 18px 10px;
+    padding: var(--space-4) var(--space-3);
     color: var(--faint);
     font-size: var(--text-md);
     text-align: center;

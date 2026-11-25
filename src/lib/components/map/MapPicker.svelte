@@ -82,9 +82,9 @@
   .field {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     height: 28px;
-    padding: 0 8px;
+    padding: 0 var(--space-2);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--surface);
@@ -118,7 +118,7 @@
     right: 0;
     max-height: 220px;
     margin: 0;
-    padding: 4px;
+    padding: var(--space-1);
     overflow-y: auto;
     list-style: none;
     border: 1px solid var(--border-strong);
@@ -130,7 +130,7 @@
   .results button {
     display: grid;
     width: 100%;
-    padding: 5px 8px;
+    padding: var(--space-1) var(--space-2);
     border: 0;
     border-radius: var(--radius-sm);
     background: transparent;
@@ -153,7 +153,7 @@
   }
 
   .empty {
-    padding: 6px 8px;
+    padding: var(--space-1-5) var(--space-2);
     font-size: var(--text-md);
     color: var(--faint);
   }

@@ -314,15 +314,15 @@
   .potions {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--space-1-5);
   }
 
   .head {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     width: 100%;
-    padding: 4px 0;
+    padding: var(--space-1) 0;
     border: 0;
     background: transparent;
     color: var(--text);
@@ -361,7 +361,7 @@
   .body {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--space-2);
   }
 
   .muted {
@@ -387,7 +387,7 @@
 
   select.where {
     height: var(--control-h);
-    padding: 0 4px;
+    padding: 0 var(--space-1);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--surface-2);
@@ -403,7 +403,7 @@
   }
 
   th {
-    padding: 0 0 4px;
+    padding: 0 0 var(--space-1);
     font-size: var(--text-xs);
     font-weight: var(--weight-body);
     color: var(--faint);
@@ -411,7 +411,7 @@
   }
 
   td {
-    padding: 3px 0;
+    padding: var(--space-0-5) 0;
     border-top: 1px solid var(--border);
     text-align: right;
   }
@@ -437,7 +437,7 @@
 
   input {
     height: 22px;
-    padding: 0 4px;
+    padding: 0 var(--space-1);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--surface);
@@ -455,19 +455,19 @@
     display: flex;
     flex-wrap: wrap;
     justify-content: space-between;
-    gap: 8px;
+    gap: var(--space-2);
     font-size: var(--text-md);
   }
 
   .edit {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--space-1);
   }
 
   .edit-row {
     display: flex;
-    gap: 4px;
+    gap: var(--space-1);
   }
 
   .edit-row .name {
@@ -501,7 +501,7 @@
   .actions {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
   }
 
   @media (prefers-reduced-motion: reduce) {

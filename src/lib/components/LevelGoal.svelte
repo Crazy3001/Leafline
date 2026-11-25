@@ -182,13 +182,13 @@
   .goal {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--space-1-5);
   }
 
   .row {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
   }
 
   .grow {
@@ -235,7 +235,7 @@
   .set {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     font-size: var(--text-md);
     color: var(--muted);
   }
@@ -243,7 +243,7 @@
   .set input {
     width: 52px;
     height: 22px;
-    padding: 0 4px;
+    padding: 0 var(--space-1);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--surface);

@@ -74,7 +74,7 @@
 
 <style>
   .lead {
-    margin: 0 0 10px;
+    margin: 0 0 var(--space-2);
     color: var(--muted);
     font-size: var(--text-md);
   }
@@ -86,12 +86,12 @@
 
   .actions {
     display: flex;
-    gap: 8px;
-    margin-bottom: 10px;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
   }
 
   .hint {
-    margin: 0 0 10px;
+    margin: 0 0 var(--space-2);
     color: var(--faint);
     font-size: var(--text-xs);
   }
@@ -102,7 +102,7 @@
 
   .risk {
     margin: 0;
-    padding-top: 8px;
+    padding-top: var(--space-2);
     border-top: 1px solid var(--border);
     color: var(--faint);
     font-size: var(--text-xs);

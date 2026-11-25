@@ -86,7 +86,7 @@
 <style>
   .tracked {
     display: grid;
-    gap: 10px;
+    gap: var(--space-2);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -95,7 +95,7 @@
   .head {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     font-size: var(--text-md);
     font-weight: var(--weight-strong);
   }
@@ -130,7 +130,7 @@
   }
 
   .note {
-    margin: 4px 0 0 19px;
+    margin: var(--space-1) 0 0 19px;
     color: var(--faint);
     font-size: var(--text-xs);
   }

@@ -84,9 +84,9 @@
     display: flex;
     flex: none;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     min-height: 42px;
-    padding: 6px 8px 6px 14px;
+    padding: var(--space-1-5) var(--space-2) var(--space-1-5) 14px;
     border-bottom: 1px solid var(--border);
   }
 

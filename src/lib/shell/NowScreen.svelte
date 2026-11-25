@@ -174,16 +174,16 @@
   .now {
     display: grid;
     align-content: start;
-    gap: 10px;
-    padding: 0 10px 10px;
+    gap: var(--space-2);
+    padding: 0 var(--space-3) var(--space-2);
   }
 
   .head {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 10px;
-    padding: 10px 14px 0;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-4) 0;
     color: var(--muted);
     font-size: var(--text-md);
   }
@@ -213,13 +213,13 @@
   .tiles {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-    padding: 10px 10px 0;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3) 0;
   }
 
   .tile {
     min-width: 0;
-    padding: 10px 12px;
+    padding: var(--space-2) var(--space-3);
     border: var(--line-w) solid var(--tile-border);
     border-radius: 12px;
     color: var(--tile-text);
@@ -255,7 +255,7 @@
   }
 
   .note {
-    margin-top: 2px;
+    margin-top: var(--space-0-5);
     overflow: hidden;
     color: var(--tile-label);
     font-size: var(--text-xs);
@@ -270,14 +270,14 @@
 
   .cells {
     display: flex;
-    margin-top: 10px;
+    margin-top: var(--space-2);
     border-top: 1px solid var(--border);
   }
 
   .cell {
     flex: 1;
     min-width: 0;
-    padding: 9px 12px;
+    padding: var(--space-2) var(--space-3);
     border-right: 1px solid var(--border);
   }
 
@@ -288,7 +288,7 @@
   .v {
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: var(--space-1);
     font-size: var(--text-lg);
     font-weight: var(--weight-strong);
     white-space: nowrap;
@@ -303,7 +303,7 @@
 
   .quiet {
     margin: 0;
-    padding: 10px 14px 4px;
+    padding: var(--space-2) var(--space-4) var(--space-1);
     color: var(--faint);
     font-size: var(--text-md);
   }
@@ -314,7 +314,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 10px;
+    gap: var(--space-2);
     width: 100%;
     border: 0;
     background: transparent;
@@ -325,7 +325,7 @@
   }
 
   .more {
-    padding: 8px 12px 9px 14px;
+    padding: var(--space-2) var(--space-3) var(--space-2) 14px;
     border-top: 1px solid var(--border);
     border-radius: 0 0 var(--radius-lg) var(--radius-lg);
     color: var(--faint);
@@ -346,12 +346,12 @@
   }
 
   .quest {
-    padding: 12px 14px;
+    padding: var(--space-3) var(--space-4);
   }
 
   .quest-head {
     align-items: baseline;
-    margin-bottom: 10px;
+    margin-bottom: var(--space-2);
     padding: 0;
   }
 
@@ -368,7 +368,7 @@
     display: inline-flex;
     flex: none;
     align-items: center;
-    gap: 2px;
+    gap: var(--space-0-5);
   }
 
   .quest-head:hover .label {
@@ -378,8 +378,8 @@
   .objective {
     display: flex;
     justify-content: space-between;
-    gap: 10px;
-    margin-bottom: 5px;
+    gap: var(--space-2);
+    margin-bottom: var(--space-1);
   }
 
   .target {
@@ -409,7 +409,7 @@
 
   .bar {
     height: 6px;
-    margin-bottom: 10px;
+    margin-bottom: var(--space-2);
     border-radius: var(--radius-pill);
     background: var(--track);
     overflow: hidden;
@@ -437,7 +437,7 @@
   }
 
   .row {
-    padding: 10px 12px 10px 14px;
+    padding: var(--space-2) var(--space-3) var(--space-2) 14px;
     color: var(--muted);
   }
 

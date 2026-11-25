@@ -216,13 +216,13 @@
 
 <style>
   .lead {
-    margin: 0 0 8px;
+    margin: 0 0 var(--space-2);
     color: var(--muted);
     font-size: var(--text-md);
   }
 
   .filters {
-    margin-bottom: 8px;
+    margin-bottom: var(--space-2);
   }
 
   section + section {
@@ -233,9 +233,9 @@
     display: grid;
     grid-template-columns: auto 1fr auto 64px;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     width: 100%;
-    padding: 6px 0;
+    padding: var(--space-1-5) 0;
     border: 0;
     background: transparent;
     color: var(--text);
@@ -277,7 +277,7 @@
   }
 
   .rows {
-    margin: 0 0 6px;
+    margin: 0 0 var(--space-1-5);
     padding: 0 0 0 19px;
     list-style: none;
   }
@@ -285,8 +285,8 @@
   .rows li {
     display: grid;
     grid-template-columns: 16px 1fr;
-    gap: 4px;
-    padding: 3px 0;
+    gap: var(--space-1);
+    padding: var(--space-0-5) 0;
   }
 
   .icon {
@@ -328,7 +328,7 @@
   .sub {
     display: flex;
     flex-wrap: wrap;
-    gap: 0 8px;
+    gap: 0 var(--space-2);
     margin: 0;
     color: var(--muted);
     font-size: var(--text-xs);

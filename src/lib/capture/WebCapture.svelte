@@ -300,7 +300,7 @@
 <style>
   table {
     width: 100%;
-    margin-top: 8px;
+    margin-top: var(--space-2);
     border-collapse: collapse;
     font-variant-numeric: tabular-nums;
   }
@@ -313,7 +313,7 @@
 
   th,
   td {
-    padding: 3px 8px 3px 0;
+    padding: var(--space-0-5) var(--space-2) var(--space-0-5) 0;
     border-bottom: var(--line-w) solid var(--line);
   }
 </style>

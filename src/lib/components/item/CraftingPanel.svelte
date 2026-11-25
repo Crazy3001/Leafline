@@ -167,11 +167,11 @@
 <style>
   /* Padded like the other halves of the Lookup tab; a pinned window pads its body. */
   .controls {
-    padding: 8px 12px 0;
+    padding: var(--space-2) var(--space-3) 0;
   }
 
   .list {
-    padding: 0 12px 10px;
+    padding: 0 var(--space-3) var(--space-2);
   }
 
   .controls.pinned,
@@ -183,17 +183,17 @@
   .disciplines {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
-    gap: 4px;
-    margin-bottom: 6px;
+    gap: var(--space-1);
+    margin-bottom: var(--space-1-5);
   }
 
   .disciplines button {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     min-width: 0;
     height: 36px;
-    padding: 0 8px;
+    padding: 0 var(--space-2);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background: var(--surface);
@@ -243,8 +243,8 @@
   }
 
   .level-up {
-    margin: 2px 0 4px;
-    padding: 3px 10px;
+    margin: var(--space-0-5) 0 var(--space-1);
+    padding: var(--space-0-5) var(--space-3);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-pill);
     background: transparent;
@@ -260,8 +260,8 @@
   h3 {
     display: flex;
     align-items: baseline;
-    gap: 6px;
-    margin: var(--space-3) 0 2px;
+    gap: var(--space-1-5);
+    margin: var(--space-3) 0 var(--space-0-5);
     color: var(--muted);
     font-size: var(--text-xs);
     font-weight: var(--weight-strong);

@@ -154,7 +154,7 @@
 <style>
   ul {
     display: grid;
-    gap: 8px;
+    gap: var(--space-2);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -163,8 +163,8 @@
   .row {
     display: flex;
     align-items: center;
-    gap: 6px;
-    margin-bottom: 4px;
+    gap: var(--space-1-5);
+    margin-bottom: var(--space-1);
   }
 
   .name {
@@ -227,9 +227,9 @@
   .add {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     height: var(--control-h-sm);
-    padding: 0 8px;
+    padding: 0 var(--space-2);
     border: 0;
     border-radius: var(--radius-sm);
     background: transparent;
@@ -245,12 +245,12 @@
 
   .form {
     display: grid;
-    gap: 6px;
-    margin-top: 8px;
+    gap: var(--space-1-5);
+    margin-top: var(--space-2);
   }
 
   input {
-    padding: 4px 8px;
+    padding: var(--space-1) var(--space-2);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--bg);
@@ -266,11 +266,11 @@
 
   .presets {
     display: flex;
-    gap: 4px;
+    gap: var(--space-1);
   }
 
   .presets button {
-    padding: 3px 8px;
+    padding: var(--space-0-5) var(--space-2);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     background: transparent;
@@ -293,7 +293,7 @@
     display: flex;
     justify-content: flex-end;
     align-items: center;
-    gap: 12px;
+    gap: var(--space-3);
   }
 
   .link {
@@ -306,7 +306,7 @@
   }
 
   .go {
-    padding: 4px 14px;
+    padding: var(--space-1) var(--space-4);
     border: 0;
     border-radius: var(--radius-sm);
     background: var(--accent);

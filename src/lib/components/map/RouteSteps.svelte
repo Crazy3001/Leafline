@@ -87,7 +87,7 @@
   /* A vertical line of stops: each step a dot on the rail, the last one filled, where it ends. */
   .steps {
     display: grid;
-    margin: 8px 0 0;
+    margin: var(--space-2) 0 0;
     padding: 0;
     list-style: none;
   }
@@ -96,9 +96,9 @@
     position: relative;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-2);
     min-height: 28px;
-    padding: 3px 0;
+    padding: var(--space-0-5) 0;
     font-size: var(--text-md);
   }
 
@@ -180,7 +180,7 @@
     display: inline-flex;
     flex-wrap: wrap;
     align-items: baseline;
-    gap: 4px;
+    gap: var(--space-1);
     min-width: 0;
   }
 
@@ -201,7 +201,7 @@
   .service {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--space-1);
     color: var(--travel);
     font-weight: var(--weight-body);
   }
@@ -236,7 +236,7 @@
   }
 
   .note {
-    margin: 6px 0 0;
+    margin: var(--space-1-5) 0 0;
     font-size: var(--text-xs);
     color: var(--faint);
   }
