@@ -13,7 +13,16 @@
   import Pic from "$lib/ui/Pic.svelte";
   import type { MapReading, ObjectiveGuide, ItemWhere } from "$lib/types";
 
-  let { map = null, plain = false }: { map?: MapReading | null; plain?: boolean } = $props();
+  let {
+    map = null,
+    plain = false,
+    explain = false,
+  }: {
+    map?: MapReading | null;
+    plain?: boolean;
+    /** Shown on its own (a tool page), so an empty list says how to fill it instead of showing nothing. */
+    explain?: boolean;
+  } = $props();
 
   /** Droppers and maps shown per item before the item's own page. */
   const DROPPERS = 4;
@@ -81,9 +90,22 @@
       {/each}
     </ul>
   </Card>
+{:else if explain}
+  <Card title="Tracked items" {plain}>
+    <p class="explain">
+      Nothing tracked yet. On an item's card, press <strong>Track it</strong>: it stays here with who drops it, the nearest
+      maps to hunt it from where you are, and who sells it.
+    </p>
+  </Card>
 {/if}
 
 <style>
+  .explain {
+    margin: 0;
+    color: var(--muted);
+    font-size: var(--text-sm);
+  }
+
   .tracked {
     display: grid;
     gap: 10px;

@@ -18,6 +18,13 @@
   const KEY = "leafline.timers";
   const PRESETS = [1, 5, 10, 30];
 
+  let {
+    explain = false,
+  }: {
+    /** Shown on its own (a tool page), so with no timers it says what they are for. */
+    explain?: boolean;
+  } = $props();
+
   let timers = $state<Countdown[]>(load());
   let now = $state(Date.now());
   let adding = $state(false);
@@ -147,6 +154,14 @@
       </form>
     {/if}
   </Card>
+{:else if explain}
+  <Card title="Timers">
+    <p class="explain">
+      Countdowns for anything you keep time on: a buff, a boss, a quest you can take again later. Each counts down here while
+      Leafline is open.
+    </p>
+    <button class="add" onclick={() => (adding = true)}><Timer size={12} /> Start a timer</button>
+  </Card>
 {:else}
   <div class="add-row"><button class="add" onclick={() => (adding = true)}><Timer size={12} /> Start a timer</button></div>
 {/if}
@@ -217,6 +232,12 @@
   .icon:hover {
     background: var(--hover);
     color: var(--text);
+  }
+
+  .explain {
+    margin: 0 0 var(--space-2);
+    color: var(--muted);
+    font-size: var(--text-sm);
   }
 
   .add-row {

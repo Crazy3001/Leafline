@@ -342,11 +342,11 @@
             {:else if over.page === "sell"}
               <BagCheck />
             {:else if over.page === "timers"}
-              <TimersCard />
+              <TimersCard explain />
             {:else if over.page === "drops"}
               <DropLogView character={characters.viewing ?? ""} />
             {:else if over.page === "tracked"}
-              <TrackedItems map={live.analysis?.map ?? null} />
+              <TrackedItems map={live.analysis?.map ?? null} explain />
             {:else if over.page === "potions"}
               <PotionPage />
             {:else if over.page === "route"}
