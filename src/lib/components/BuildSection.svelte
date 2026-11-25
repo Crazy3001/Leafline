@@ -98,7 +98,7 @@
     { id: "stats" as View, label: "Stats" },
     { id: "gear" as View, label: "Gear" },
     { id: "skills" as View, label: "Skills" },
-    ...(canAdvance ? [{ id: "advance" as View, label: "Job advance" }] : []),
+    ...(canAdvance ? [{ id: "advance" as View, label: "Advance" }] : []),
   ]);
 
   // Gear, slot by slot: what is worn, the plan's next goal and a better pick. What is worn comes
@@ -995,10 +995,22 @@
     margin: var(--space-2) 0 0;
   }
 
+  /* Numbers on the card, split by rules, as in Stats: no box per number. */
   .stats div {
-    padding: var(--space-1) var(--space-2);
-    border-radius: var(--radius-sm);
-    background: var(--hover);
+    min-width: 0;
+    padding: 0 var(--space-2);
+    border-left: 1px solid var(--border);
+  }
+
+  .stats div:first-child {
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .stats dd {
+    font-family: var(--font-display);
+    font-size: var(--text-xl);
+    font-variant-numeric: tabular-nums;
   }
 
   dt {
