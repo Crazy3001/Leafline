@@ -129,11 +129,32 @@ pub struct LiveChoice {
     pub window: Option<WindowChoice>,
     /// The Pickup Log is read between readings, for the loot picked up.
     pub pickup_log: bool,
+    /// An item tooltip the mouse rests on is read and its card shown. The program's Read item
+    /// hotkey reads one whatever this says.
+    pub item_tooltips: bool,
+    /// The build is updated from the Character Stat and Skill windows while they're open. The
+    /// program's hotkey reads them whatever this says.
+    pub character_windows: bool,
+    /// The inventory tab that's open is checked, for sell or keep, once it's held still. The
+    /// program's hotkey checks it whatever this says.
+    pub bag_check: bool,
+    /// The quest log is kept from the Quest window while it's open.
+    pub quest_window: bool,
 }
 
 impl Default for LiveChoice {
     fn default() -> Self {
-        Self { enabled: true, interval: 2.0, pause_after: 15.0, window: None, pickup_log: true }
+        Self {
+            enabled: true,
+            interval: 2.0,
+            pause_after: 15.0,
+            window: None,
+            pickup_log: true,
+            item_tooltips: true,
+            character_windows: true,
+            bag_check: true,
+            quest_window: true,
+        }
     }
 }
 

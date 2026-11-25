@@ -1,32 +1,30 @@
-//! Sell or keep, on a hotkey: one picture of the game, the Item Inventory's open tab read, each
-//! item named by its picture and given what says to keep it. The window marks the rest to sell
-//! and adds up what the bag is worth at NPC prices.
+//! Sell or keep: the Item Inventory's open tab read, each item named by its picture and given
+//! what says to keep it (see `service::bag`, which the website shares). The window marks the rest
+//! to sell and adds up what the bag is worth at NPC prices. On a hotkey, from one picture of the
+//! game; and while live reading runs, from its pictures once the tab has read the same twice in a
+//! row, and again only when what it shows changes ([`BagFollow`], as the website does). The
+//! player's switch for the second is `live.bagCheck`.
 //!
 //! Pictures come from OSMS through the picture cache, downloaded the first time and kept on this
-//! PC. A check tries the items a character near this level most likely carries, plus every item
-//! of the tab whose picture is kept already; "Look further" tries every item of the tab, which
-//! may download many pictures, so the player asks for it.
+//! PC.
 
-use std::collections::{BTreeSet, HashSet};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
 
 use super::host::AppHost;
-use super::mapdata::MapDataState;
 use super::pictures::PictureState;
 use super::readings;
-use super::records::now;
 use super::settings::SettingsState;
-use super::{builds, live, overlay, report};
+use super::{live, overlay, report};
 use crate::error::{Error, Result};
-use crate::mapdata::bag;
-use crate::readers::inventory::{self, Inventory, Tab};
-
-/// Emitted to every window with each check's result, and with `busy` while one runs.
-pub const BAG_EVENT: &str = "bag";
+use crate::pipeline::Analysis;
+use crate::readers::inventory::{self, TabWatch};
+use crate::session::SessionSummary;
+use crate::vision::Frame;
+pub use leafline_core::service::bag::{BAG_EVENT, BagCheck, BagRead as Read};
+use leafline_core::service::bag::{self as shared, Pictures};
 
 #[derive(Default)]
 pub struct BagState {
@@ -36,82 +34,13 @@ pub struct BagState {
     result: Mutex<Option<BagCheck>>,
 }
 
-#[derive(Clone)]
-struct Read {
-    inventory: Inventory,
-    character: Option<String>,
-    level: Option<u32>,
-}
-
-/// What a check found.
-#[derive(Debug, Clone, Default, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BagCheck {
-    /// A check is under way; the rest is from the one before.
-    pub busy: bool,
-    /// Unix seconds.
-    pub at: i64,
-    pub tab: Option<Tab>,
-    pub character: Option<String>,
-    pub items: Vec<BagItem>,
-    /// Slots holding something no picture matched.
-    pub unknown: Vec<u32>,
-    /// Every item of the tab was tried.
-    pub wide: bool,
-    /// Pictures "Look further" would still download.
-    pub more: usize,
-    pub problem: Option<String>,
-}
-
-/// One slot's item.
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BagItem {
-    pub slot: u32,
-    pub count: u32,
-    /// Every item drawn the same, best first. More than one when the picture can't tell them apart.
-    pub ids: Vec<u32>,
-    pub name: String,
-    /// What an NPC pays for one, from the item data, when the items drawn alike agree. What the
-    /// data's price means in Classic isn't confirmed.
-    pub price: Option<i64>,
-    /// The lowest and highest when they don't agree.
-    pub price_range: Option<(i64, i64)>,
-    /// Can't be traded or dropped: an NPC may still buy it.
-    pub untradable: bool,
-    /// What says to keep it, from the data and the build.
-    pub keep: Vec<Keep>,
-    /// Quests that ask for it, for the window to check against the ones being done.
-    pub wanted_by: Vec<QuestAsk>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct QuestAsk {
-    pub id: u32,
-    pub name: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase", tag = "kind")]
-pub enum Keep {
-    /// A crafting recipe uses it.
-    Recipe,
-    /// Gear the build will wear.
-    Plan,
-    /// The data marks it a quest item.
-    Quest,
-    /// A scroll: worth more to players than to an NPC, as a rule.
-    Scroll,
-}
-
 /// The hotkey: reads the open tab from one picture of the game. The Settings switch for live
 /// reading covers this too.
 pub fn check(app: &AppHandle) -> Result<()> {
     if !app.state::<SettingsState>().get().live.enabled {
         return super::settings::open(app);
     }
-    start(app, None)
+    start(app, Ask::Hotkey).map(drop)
 }
 
 /// "Look further": tries every item of the tab last read.
@@ -121,7 +50,44 @@ pub fn bag_look_further(app: AppHandle) -> Result<()> {
     let Some(read) = last else {
         return Err(Error::Invalid("Check your bag first.".into()));
     };
-    start(&app, Some(read))
+    start(&app, Ask::Further(read)).map(drop)
+}
+
+/// Follows the Item Inventory across live pictures, as the website does: a tab is checked once it
+/// reads the same twice in a row (held still, not being scrolled or rearranged), and again only
+/// when what it shows changes (`inventory::TabWatch`).
+#[derive(Default)]
+pub struct BagFollow {
+    watch: TabWatch,
+}
+
+impl BagFollow {
+    pub fn follow(&mut self, app: &AppHandle, frame: &Frame, analysis: &Analysis, session: &SessionSummary) {
+        let Some(seen) = self.watch.settled_in(frame, inventory::read) else { return };
+        let hud = analysis.hud.as_ref();
+        let read = Read {
+            inventory: seen.clone(),
+            character: hud.and_then(|h| h.name.clone()).or_else(|| session.name.clone()),
+            level: hud.and_then(|h| h.level).or(session.level),
+            video: false,
+        };
+        match start(app, Ask::Seen(read)) {
+            Ok(true) => self.watch.checked(seen),
+            // A check is under way: this tab is tried again at the next reading.
+            Ok(false) => {}
+            Err(err) => report::note(format!("Couldn't check the bag: {err}")),
+        }
+    }
+}
+
+/// What a check is for.
+enum Ask {
+    /// The hotkey: a picture of its own, the overlay brought up.
+    Hotkey,
+    /// "Look further" on the tab last read: every item tried.
+    Further(Read),
+    /// A tab live reading saw held still: quietly, the result in place.
+    Seen(Read),
 }
 
 /// The last check, for a window that opens after it.
@@ -130,37 +96,43 @@ pub fn last_bag(state: State<BagState>) -> Option<BagCheck> {
     state.result.lock().expect("bag lock").clone()
 }
 
-fn start(app: &AppHandle, again: Option<Read>) -> Result<()> {
+/// Starts a check beside whatever asked for it. `false` when one is already under way.
+fn start(app: &AppHandle, ask: Ask) -> Result<bool> {
     let state = app.state::<BagState>();
     if state.busy.swap(true, Ordering::SeqCst) {
-        return Ok(());
+        return Ok(false);
     }
     let busy = BagCheck { busy: true, ..state.result.lock().expect("bag lock").clone().unwrap_or_default() };
     let _ = app.emit(BAG_EVENT, &busy);
     let handle = app.clone();
-    std::thread::Builder::new().name("bag-check".into()).spawn(move || {
-        let wide = again.is_some();
+    let wide = matches!(ask, Ask::Further(_));
+    let show = !matches!(ask, Ask::Seen(_));
+    let spawned = std::thread::Builder::new().name("bag-check".into()).spawn(move || {
         let result = (|| {
-            let read = match again {
-                Some(read) => read,
-                None => read_bag(&handle)?,
+            let read = match ask {
+                Ask::Further(read) | Ask::Seen(read) => read,
+                Ask::Hotkey => read_bag(&handle)?,
             };
             *handle.state::<BagState>().last.lock().expect("bag lock") = Some(read.clone());
             name_items(&handle, &read, wide)
         })();
         let check = result.unwrap_or_else(|err| {
             report::note(format!("Couldn't check the bag: {err}"));
-            BagCheck { at: now(), problem: Some(err.to_string()), ..BagCheck::default() }
+            BagCheck::failed(err.to_string())
         });
         let state = handle.state::<BagState>();
         *state.result.lock().expect("bag lock") = Some(check.clone());
         state.busy.store(false, Ordering::SeqCst);
-        if let Err(err) = overlay::show_full(&handle) {
+        if show && let Err(err) = overlay::show_full(&handle) {
             report::note(err.to_string());
         }
         let _ = handle.emit(BAG_EVENT, &check);
-    })?;
-    Ok(())
+    });
+    if let Err(err) = spawned {
+        state.busy.store(false, Ordering::SeqCst);
+        return Err(err.into());
+    }
+    Ok(true)
 }
 
 /// Loads the pictures, downloading the missing ones a few at a time (the cache keeps to its own
@@ -190,84 +162,24 @@ fn read_bag(app: &AppHandle) -> Result<Read> {
         inventory,
         character: hud.and_then(|h| h.name.clone()).or_else(|| session.as_ref().and_then(|s| s.name.clone())),
         level: hud.and_then(|h| h.level).or_else(|| session.as_ref().and_then(|s| s.level)),
+        video: false,
     })
 }
 
 fn name_items(app: &AppHandle, read: &Read, wide: bool) -> Result<BagCheck> {
-    if !app.state::<SettingsState>().get().show_pictures {
-        return Err(Error::Invalid(
-            "Sell or keep names items by their pictures. Turn on Show game pictures in Settings → Data.".into(),
-        ));
-    }
-    let Some(tab) = read.inventory.tab else {
-        return Err(Error::Invalid("Leafline couldn't tell which tab is open.".into()));
-    };
-    if bag::kinds(tab).is_empty() {
-        return Err(Error::Invalid("Cash and Deco items aren't in the item data. Open Equip, Use, Set-up or Etc.".into()));
-    }
-    let data = app.state::<MapDataState>();
-    let (Some(atlas), Some(catalog)) = (data.atlas(), data.catalog()) else {
-        return Err(Error::Invalid("Download the map data first: items are named from it.".into()));
-    };
-    let index = data.pictures();
-    let pictures = app.state::<PictureState>();
-    let url = |id: u32| index.resolve(&format!("/item/{id}")).map(str::to_string);
-    let planned = read.level.map_or_else(HashSet::new, |level| builds::planned_gear(&AppHost::new(app), read.character.as_deref(), level));
-    let every = bag::every(&catalog, tab);
-    let mut ids: BTreeSet<u32> = if wide {
-        every.iter().copied().collect()
-    } else {
-        let extra: Vec<u32> = planned.iter().copied().collect();
-        let dropped = data.dropped_pairs().unwrap_or_default();
-        bag::likely(&atlas, &catalog, &dropped, read.level, tab, &extra).into_iter().collect()
-    };
-    // Pictures already on this PC cost nothing to try.
-    ids.extend(every.iter().copied().filter(|&id| url(id).is_some_and(|u| pictures.has(&u))));
-    let images = load_pictures(&pictures, ids.iter().filter_map(|&id| Some((id, url(id)?))).collect());
-    let candidates: Vec<(u32, &image::RgbaImage)> = images.iter().map(|(id, image)| (*id, image)).collect();
-    let more = every.iter().filter(|&&id| url(id).is_some_and(|u| !pictures.has(&u))).count();
-
-    let facts = bag::KeepFacts::new(&atlas, &catalog, planned);
-    let mut check = BagCheck { at: now(), tab: Some(tab), character: read.character.clone(), wide, more, ..BagCheck::default() };
-    for slot in &read.inventory.slots {
-        let Some(named) = bag::name(&slot.picture, &candidates) else {
-            check.unknown.push(slot.index);
-            continue;
-        };
-        let records: Vec<_> = named.ids.iter().filter_map(|&id| catalog.item(id)).collect();
-        let Some(first) = records.first() else { continue };
-        let prices: Vec<i64> = records.iter().filter_map(|r| r.price).collect();
-        let (low, high) = (prices.iter().min().copied(), prices.iter().max().copied());
-        let any = |test: &dyn Fn(u32) -> bool| named.ids.iter().any(|&id| test(id));
-        let mut keep = Vec::new();
-        if any(&|id| facts.in_recipes.contains(&id)) {
-            keep.push(Keep::Recipe);
-        }
-        if any(&|id| facts.planned.contains(&id)) {
-            keep.push(Keep::Plan);
-        }
-        if records.iter().any(|r| r.quest_item) {
-            keep.push(Keep::Quest);
-        }
-        if records.iter().all(|r| r.kind == crate::mapdata::osms::ItemKind::Scroll) {
-            keep.push(Keep::Scroll);
-        }
-        check.items.push(BagItem {
-            slot: slot.index,
-            count: slot.count.unwrap_or(1),
-            ids: named.ids.clone(),
-            name: first.name.clone(),
-            price: (low == high).then_some(low).flatten(),
-            price_range: low.zip(high).filter(|(l, h)| l != h),
-            untradable: records.iter().all(|r| r.untradable),
-            keep,
-            wanted_by: named
-                .ids
-                .iter()
-                .flat_map(|id| facts.wanted_by.get(id).into_iter().flatten())
-                .map(|(id, name)| QuestAsk { id: *id, name: name.clone() })
-                .collect(),
-        });
-    }
-    Ok(check)
+    shared::name_items(&AppHost::new(app), &Cache(&app.state::<PictureState>()), read, wide)
 }
+
+/// The picture cache, as the shared check takes it.
+struct Cache<'a>(&'a PictureState);
+
+impl Pictures for Cache<'_> {
+    fn has(&self, url: &str) -> bool {
+        self.0.has(url)
+    }
+
+    fn load(&self, wanted: Vec<(u32, String)>) -> Vec<(u32, image::RgbaImage)> {
+        load_pictures(self.0, wanted)
+    }
+}
+

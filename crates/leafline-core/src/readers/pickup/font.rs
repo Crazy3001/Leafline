@@ -50,6 +50,17 @@ const LETTERS: [(char, [&str; 11]); N] = [
 ];
 const N: usize = 33;
 
+/// Letters the HUD's job and name have shown in the same font that the log hasn't yet, taken from
+/// frames of the game on 2026-11-20. Only [`read_glyphs`] uses them, so the log reads as before.
+const HUD_LETTERS: [(char, [&str; 11]); 6] = [
+    ('K', ["#.....#", "#....#.", "#...#..", "#..#...", "#.#....", "##.#...", "#...#..", "#....#.", "#.....#", ".......", "......."]),
+    ('T', ["#######", "...#...", "...#...", "...#...", "...#...", "...#...", "...#...", "...#...", "...#...", ".......", "......."]),
+    ('b', ["#....", "#....", "#.##.", "##..#", "#...#", "#...#", "#...#", "##..#", "#.##.", ".....", "....."]),
+    ('f', ["..#", ".#.", "###", ".#.", ".#.", ".#.", ".#.", ".#.", ".#.", "...", "..."]),
+    ('y', [".....", ".....", "#...#", "#...#", ".#.#.", ".#.#.", ".#.#.", "..#..", "..#..", "..#..", ".#..."]),
+    ('z', [".....", ".....", "#####", "...#.", "...#.", "..#..", ".#...", ".#...", "#####", ".....", "....."]),
+];
+
 /// How much of a glyph must agree with a letter.
 const FITS: f32 = 0.88;
 /// How many more pixels it must agree on than with any other letter of its width: i and l differ
@@ -75,9 +86,32 @@ fn glyphs() -> impl Iterator<Item = (char, &'static [&'static str; 11])> {
 /// known letter fits (one not seen yet, or spoiled by the world behind it) is [`UNKNOWN`]; with
 /// more than a quarter of them unknown, the line is left to OCR.
 pub fn read_line(ink: &[Vec<bool>]) -> Option<String> {
+    let text = glyphs_of(ink, true)?;
+    let glyphs = text.chars().filter(|c| *c != ' ').count();
+    let unknown = text.chars().filter(|c| *c == UNKNOWN).count();
+    (glyphs > 0 && unknown as f32 <= MOST_UNKNOWN * glyphs as f32).then_some(text)
+}
+
+/// Every glyph of a line in the log's font, [`UNKNOWN`] for those no known one fits however many
+/// there are: for other text the game draws in it, such as the HUD's job and name. `ink` is left
+/// to right, its rows lined up with the font's (the capitals' top in row 0).
+pub fn read_glyphs(ink: &[Vec<bool>]) -> String {
+    glyphs_of(ink, false).unwrap_or_default()
+}
+
+/// The glyphs a line may hold: the log's own, and for other text in its font the HUD's too.
+fn set(right_to_left: bool) -> impl Iterator<Item = (char, &'static [&'static str; 11])> {
+    let hud = HUD_LETTERS.iter().map(|(c, rows)| (*c, rows)).filter(move |_| !right_to_left);
+    glyphs().chain(hud)
+}
+
+fn glyphs_of(ink: &[Vec<bool>], right_to_left: bool) -> Option<String> {
     let columns = ink.first()?.len();
     // Screen order, left to right.
-    let at = |x: usize, y: usize| ink.get(y).and_then(|row| row.get(columns - 1 - x)).copied().unwrap_or(false);
+    let at = |x: usize, y: usize| {
+        let x = if right_to_left { columns - 1 - x } else { x };
+        ink.get(y).and_then(|row| row.get(x)).copied().unwrap_or(false)
+    };
     let inked = |x: usize| (0..ink.len()).any(|y| at(x, y));
     let mut text = String::new();
     let mut x = 0;
@@ -98,17 +132,53 @@ pub fn read_line(ink: &[Vec<bool>]) -> Option<String> {
             text.push(' ');
         }
         last_end = Some(x - 1);
-        text.push(best(&at, first, width).unwrap_or(UNKNOWN));
+        match best(set(right_to_left), &at, first, width) {
+            Some(c) => text.push(c),
+            // Outside the log, letters the font kerns close can touch (`zyX` in a name): a run
+            // no glyph fits is tried as two or three that do, side by side.
+            None if !right_to_left => match touching(&at, first, width, 3) {
+                Some(letters) => text.push_str(&letters),
+                None => text.push(UNKNOWN),
+            },
+            None => text.push(UNKNOWN),
+        }
     }
-    let glyphs = text.chars().filter(|c| *c != ' ').count();
-    let unknown = text.chars().filter(|c| *c == UNKNOWN).count();
-    (glyphs > 0 && unknown as f32 <= MOST_UNKNOWN * glyphs as f32).then_some(text)
+    Some(text)
+}
+
+/// The letters of a run `width` columns wide at `first`, as up to `most` glyphs that touch with no
+/// blank column between them, each fitting as [`best`] wants; `None` unless exactly one way fits.
+fn touching(at: &impl Fn(usize, usize) -> bool, first: usize, width: usize, most: usize) -> Option<String> {
+    if most < 2 {
+        return None;
+    }
+    let mut found: Option<String> = None;
+    let widths: std::collections::BTreeSet<usize> = set(false).map(|(_, rows)| rows[0].len()).filter(|&w| w >= 3).collect();
+    for w in widths.into_iter().filter(|&w| w + 3 <= width) {
+        let Some(left) = best(set(false), at, first, w) else { continue };
+        let rest = width - w;
+        let right = best(set(false), at, first + w, rest)
+            .map(String::from)
+            .or_else(|| touching(at, first + w, rest, most - 1));
+        if let Some(right) = right {
+            if found.is_some() {
+                return None;
+            }
+            found = Some(format!("{left}{right}"));
+        }
+    }
+    found
 }
 
 /// The glyph of `width` that fits columns `first..` best, when it fits well and clearly better
 /// than any other of that width.
-fn best(at: &impl Fn(usize, usize) -> bool, first: usize, width: usize) -> Option<char> {
-    let mut scored: Vec<(f32, char)> = glyphs()
+fn best(
+    set: impl Iterator<Item = (char, &'static [&'static str; 11])>,
+    at: &impl Fn(usize, usize) -> bool,
+    first: usize,
+    width: usize,
+) -> Option<char> {
+    let mut scored: Vec<(f32, char)> = set
         .filter(|(_, rows)| rows[0].len() == width)
         .map(|(c, rows)| {
             let mut agree = 0;
@@ -133,7 +203,7 @@ mod tests {
     /// A line drawn from the glyphs, left to right, a blank column between letters and five
     /// between words.
     fn drawn(text: &str) -> Vec<Vec<bool>> {
-        let glyph = |c: char| glyphs().find(|(g, _)| *g == c).map(|(_, rows)| rows).expect("a known glyph");
+        let glyph = |c: char| set(false).find(|(g, _)| *g == c).map(|(_, rows)| rows).expect("a known glyph");
         let mut rows = vec![String::new(); 11];
         for (i, word) in text.split(' ').enumerate() {
             for (j, c) in word.chars().enumerate() {
@@ -148,6 +218,25 @@ mod tests {
             }
         }
         rows.iter().map(|row| row.chars().rev().map(|c| c == '#').collect()).collect()
+    }
+
+    #[test]
+    fn letters_that_touch_outside_the_log_are_split() {
+        // `LazyXRay` as the HUD draws a name: z, y and X with no blank column between them.
+        let mut rows = vec![String::new(); 11];
+        for (i, part) in ["La", "zyX", "Ray"].iter().enumerate() {
+            for (j, c) in part.chars().enumerate() {
+                let glyph = set(false).find(|(g, _)| *g == c).expect("a known glyph").1;
+                for (y, row) in rows.iter_mut().enumerate() {
+                    if (i > 0 || j > 0) && !(i == 1 && j > 0) {
+                        row.push('.');
+                    }
+                    row.push_str(glyph[y]);
+                }
+            }
+        }
+        let ink: Vec<Vec<bool>> = rows.iter().map(|row| row.chars().map(|c| c == '#').collect()).collect();
+        assert_eq!(read_glyphs(&ink), "LazyXRay");
     }
 
     #[test]

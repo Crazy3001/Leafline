@@ -16,3 +16,5 @@ if (!dev || !existsSync(join(root, "src/lib/platform/wasm/leafline_web.js"))) {
 }
 const args = dev ? [vite, "dev", "--mode", "web", "--port", "1433", "--strictPort"] : [vite, "build", "--mode", "web"];
 execFileSync(process.execPath, args, { cwd: root, env, stdio: "inherit" });
+// The minimap title's OCR model, beside the pages (see tools/ocr-model.mjs).
+if (!dev) await (await import("./ocr-model.mjs")).placeOcrModel();

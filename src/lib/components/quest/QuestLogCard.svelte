@@ -9,6 +9,7 @@
   import Ref from "../Ref.svelte";
   import GoButton from "../GoButton.svelte";
   import { backend } from "$lib/api";
+  import { can } from "$lib/platform";
   import { npcPlace } from "$lib/destination.svelte";
   import { formatAgo } from "$lib/format";
   import { hasLog, look, questLog, readyToHandIn, watchQuestLog } from "$lib/questlog.svelte";
@@ -88,7 +89,12 @@
     {#if lastLook}<span>As of {ago(lastLook)}</span>{/if}
   {/snippet}
 
-  {#if !hasLog()}
+  {#if !hasLog() && !can.liveReading}
+    <p class="lead">
+      The Windows program reads your Quest window: what you've done, what's in progress and what you can take. Its log comes
+      along in a records file (Settings, Data); the website doesn't read the Quest window yet.
+    </p>
+  {:else if !hasLog()}
     <p class="lead">
       Open the Quest window in game and Leafline reads it while it's open: what you've done, what's in progress and what
       you can take. Scroll each tab to its end once so it sees every row.

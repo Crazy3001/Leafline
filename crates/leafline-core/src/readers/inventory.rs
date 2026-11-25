@@ -14,7 +14,7 @@ use super::counts;
 use crate::vision::{Frame, Rect};
 
 /// The tabs, left to right.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Tab {
     Equip,
@@ -88,6 +88,9 @@ pub struct BagSlot {
     /// Row times five plus column, counting from the top left of the slots in view.
     pub index: u32,
     pub count: Option<u32>,
+    /// Read from a video, the count didn't read the same twice: how many there are isn't known.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub count_unsure: bool,
     #[serde(skip)]
     pub picture: SlotPicture,
 }
@@ -110,9 +113,167 @@ impl SlotPicture {
     }
 }
 
+/// Pictures of one slot this alike are the same item, through a video's noise from frame to frame:
+/// the average difference per colour channel.
+const SAME_SLOT: f32 = 6.0;
+
+/// Whether two reads of an inventory tab show the same: the same slots filled, the same counts,
+/// pictures alike. Live readers check a tab once it reads the same twice in a row (held still,
+/// not being scrolled or rearranged), and again only when this says it changed.
+pub fn same_tab(a: &Inventory, b: &Inventory) -> bool {
+    let alike = |x: &BagSlot, y: &BagSlot| {
+        let pixels = (x.picture.pixels.len() * 3) as f32;
+        let total: u32 = x
+            .picture
+            .pixels
+            .iter()
+            .zip(&y.picture.pixels)
+            .flat_map(|(p, q)| p.iter().zip(q).map(|(a, b)| u32::from(a.abs_diff(*b))))
+            .sum();
+        x.index == y.index && x.count == y.count && x.count_unsure == y.count_unsure && pixels > 0.0 && total as f32 / pixels <= SAME_SLOT
+    };
+    a.tab == b.tab && a.slots.len() == b.slots.len() && a.slots.iter().zip(&b.slots).all(|(x, y)| alike(x, y))
+}
+
+/// Follows the inventory across live reads, for sell or keep: a tab is to be checked once it
+/// reads the same twice in a row, and again only when what it shows changes.
+#[derive(Debug, Default)]
+pub struct TabWatch {
+    /// The tab at the last read, and the one last checked.
+    seen: Option<Inventory>,
+    checked: Option<Inventory>,
+}
+
+impl TabWatch {
+    /// What a new read found (`None`: no inventory). Gives back the tab to check now: one open
+    /// on a tab, reading as it did at the last read, and not the one checked last.
+    pub fn settled(&mut self, seen: Option<Inventory>) -> Option<Inventory> {
+        let seen = seen.filter(|i| i.tab.is_some());
+        let same = |a: &Option<Inventory>, b: &Option<Inventory>| matches!((a, b), (Some(a), Some(b)) if same_tab(a, b));
+        let due = (same(&seen, &self.seen) && !same(&seen, &self.checked)).then(|| seen.clone()).flatten();
+        self.seen = seen;
+        due
+    }
+
+    /// [`TabWatch::settled`] for a live picture, the tab read from it by `read`. A picture with an
+    /// item tooltip showing is passed over, as if it hadn't been taken: hovering an item in the
+    /// open tab draws its tooltip over the slots, which would read as a changed tab and check it
+    /// again, and again once the tooltip went.
+    pub fn settled_in(&mut self, frame: &Frame, read: impl FnOnce(&Frame) -> Option<Inventory>) -> Option<Inventory> {
+        if !crate::readers::tooltip::name_lines(frame).is_empty() {
+            return None;
+        }
+        self.settled(read(frame))
+    }
+
+    /// The tab [`TabWatch::settled`] gave is being checked. One not marked (a check was under way)
+    /// is given again at the next read.
+    pub fn checked(&mut self, tab: Inventory) {
+        self.checked = Some(tab);
+    }
+}
+
 /// Reads the window, or `None` when no Item Inventory is open.
 pub fn read(frame: &Frame) -> Option<Inventory> {
-    let (start, top, cell) = find(frame)?;
+    read_found(frame, frame, find(frame, is_white, 0)?)
+}
+
+/// [`read`] for a picture that went through a video encoding (a browser's shared window), whose
+/// white comes out a shade off, whose edges may bleed a pixel, and whose colour is kept only for
+/// each square of four pixels. The window is found with that give, then read on its own grid of
+/// font pixels: each the average of the window pixels it covers, the grid lined up where the
+/// window's white frame comes out whitest. The counts are read from a copy of that grid with
+/// their white fill and black outline made pure again.
+pub fn read_video(frame: &Frame) -> Option<Inventory> {
+    if let Some(found) = find(frame, is_white, 0) {
+        return read_found(frame, frame, found);
+    }
+    // With the give, other white lines can pass for the window's: the one with a tab open is it.
+    found_all(frame, is_near_white, VIDEO_BLEED)
+        .into_iter()
+        .filter_map(|found| read_video_at(frame, found))
+        .find(|inventory| inventory.tab.is_some())
+}
+
+fn read_video_at(frame: &Frame, (start, top, cell): (u32, u32, u32)) -> Option<Inventory> {
+    let (width, height) = (TOP_LINE + 2 * CORNER, MESO_BOX.1 + 15);
+    let left = |dx: u32| (start + dx).checked_sub(VIDEO_BLEED + CORNER * cell);
+    let grids = (0..=2 * VIDEO_BLEED).flat_map(|dx| (0..=cell).map(move |dy| (dx, dy)));
+    let whitest = grids
+        .filter_map(|(dx, dy)| {
+            let (x, y) = (left(dx)?, (top + dy).checked_sub(1)?);
+            let grid = on_grid(frame, x, y, cell, width, height)?;
+            Some((frame_whiteness(&grid), x, y, grid))
+        })
+        .max_by_key(|(white, ..)| *white)?;
+    let (_, x, y, grid) = whitest;
+    let keyed = |loose: bool| Frame::from_fn(grid.width(), grid.height(), |gx, gy| image::Rgba(keyed_count(grid.get_pixel(gx, gy).0, loose)));
+    let mut inventory = read_found(&grid, &keyed(false), (CORNER, 0, 1))?;
+    // The counts read again with the fill and outline taken more loosely: a count that reads
+    // otherwise (a 1 of 11 lost where colour blurred) isn't known.
+    if let Some(again) = read_found(&grid, &keyed(true), (CORNER, 0, 1)) {
+        for slot in &mut inventory.slots {
+            let other = again.slots.iter().find(|s| s.index == slot.index).and_then(|s| s.count);
+            if other != slot.count {
+                slot.count_unsure = true;
+            }
+        }
+    }
+    inventory.window = Rect::new(x as f32, y as f32, (width * cell) as f32, (height * cell) as f32);
+    Some(inventory)
+}
+
+/// The `width` x `height` font pixels from `(x, y)` of the window, each the average of its
+/// `cell` x `cell` window pixels.
+fn on_grid(frame: &Frame, x: u32, y: u32, cell: u32, width: u32, height: u32) -> Option<Frame> {
+    if x + width * cell > frame.width() || y + height * cell > frame.height() {
+        return None;
+    }
+    Some(Frame::from_fn(width, height, |gx, gy| {
+        let mut sum = [0u32; 3];
+        for py in 0..cell {
+            for px in 0..cell {
+                let p = frame.get_pixel(x + gx * cell + px, y + gy * cell + py).0;
+                for c in 0..3 {
+                    sum[c] += u32::from(p[c]);
+                }
+            }
+        }
+        let n = cell * cell;
+        image::Rgba([(sum[0] / n) as u8, (sum[1] / n) as u8, (sum[2] / n) as u8, 255])
+    }))
+}
+
+/// How white the window's frame comes out on a grid: its top line and left edge, the font pixels
+/// that are white when the grid lines up.
+fn frame_whiteness(grid: &Frame) -> u32 {
+    let sum = |x: u32, y: u32| grid.get_pixel(x, y).0[..3].iter().map(|&c| u32::from(c)).sum::<u32>();
+    let line: u32 = (CORNER..CORNER + TOP_LINE).map(|x| sum(x, 0)).sum();
+    let edge: u32 = (LEFT_EDGE.0..LEFT_EDGE.1).map(|y| sum(0, y)).sum();
+    line + edge
+}
+
+/// A count's fill and outline as drawn, from their averages through a video: white or pale blue
+/// to pure white, near black to pure black.
+/// `loose` takes paler fill and greyer outline too.
+fn keyed_count([r, g, b, a]: [u8; 4], loose: bool) -> [u8; 4] {
+    // The loose fill stays clear of an empty slot's ground, (225, 223, 213).
+    let (fill, dark) = if loose { ((110, 120, 219), 72) } else { ((130, 140, 228), 48) };
+    if r >= fill.0 && g >= fill.1 && b >= fill.2 {
+        [255, 255, 255, a]
+    } else if r.max(g).max(b) <= dark {
+        [0, 0, 0, a]
+    } else {
+        [r, g, b, a]
+    }
+}
+
+/// How far a video's edges may run past or short of where they're drawn, in pixels.
+const VIDEO_BLEED: u32 = 2;
+
+/// The window whose top line starts at `(start, top)`, `cell` window pixels to a font pixel:
+/// pictures from `frame`, counts from `counted` (the same, but for a video's).
+fn read_found(frame: &Frame, counted: &Frame, (start, top, cell): (u32, u32, u32)) -> Option<Inventory> {
     let at = |x: u32, y: u32| (start + x * cell, top + y * cell);
     let tab = open_tab(frame, start, top, cell);
     let mut slots = Vec::new();
@@ -129,7 +290,7 @@ pub fn read(frame: &Frame) -> Option<Inventory> {
             // A picked slot's frame is drawn over the count's outline where they meet.
             let outside = |x: u32, y: u32| x < x0 || y < y0 || x >= x0 + side || y >= y0 + side;
             let area = (x0 - margin, y0 - margin, x0 + side + margin, y0 + side + margin);
-            let count = counts::read_walled(frame, area, Some(cell), &outside)
+            let count = counts::read_walled(counted, area, Some(cell), &outside)
                 .into_iter()
                 .filter(|c| c.left + margin >= x0 && c.left < x0 + side)
                 .max_by_key(|c| c.bottom);
@@ -167,12 +328,39 @@ pub fn read(frame: &Frame) -> Option<Inventory> {
             if used < EMPTY_BELOW && count.is_none() {
                 continue;
             }
-            slots.push(BagSlot { index: row * COLUMNS + column, count: count.map(|c| c.value), picture });
+            // Through a video a digit can lose its outline and drop out of the count unseen: fill
+            // left over beside the count, or in the corner where a count stands, makes it unsure.
+            let video = !std::ptr::eq(frame, counted);
+            let count_unsure = video && leftover_fill(counted, count.as_ref(), x0, y0, side);
+            slots.push(BagSlot { index: row * COLUMNS + column, count: count.map(|c| c.value), count_unsure, picture });
         }
     }
     let left = start.saturating_sub(CORNER * cell) as f32;
     let window = Rect::new(left, top as f32, ((TOP_LINE + 2 * CORNER) * cell) as f32, ((MESO_BOX.1 + 15) * cell) as f32);
     Some(Inventory { tab, slots, window })
+}
+
+/// Font pixels of a count's fill, keyed pure white, standing against its keyed black outline and
+/// not part of the count read: to the right of it along its rows, or with no count read, in the
+/// slot's bottom-left corner where counts stand. Read on a video's grid, one window pixel to a
+/// font pixel.
+fn leftover_fill(keyed: &Frame, count: Option<&counts::Count>, x0: u32, y0: u32, side: u32) -> bool {
+    const BESIDE: u32 = 7;
+    const CORNER_WIDTH: u32 = 20;
+    let (left, top, right, bottom) = match count {
+        Some(c) => (c.right, c.top, (c.right + BESIDE).min(x0 + side), c.bottom),
+        None => (x0, (y0 + side).saturating_sub(counts::DIGIT_ROWS + 2), x0 + CORNER_WIDTH, y0 + side),
+    };
+    let at = |x: u32, y: u32| (x < keyed.width() && y < keyed.height()).then(|| keyed.get_pixel(x, y).0);
+    let fill = |x: u32, y: u32| at(x, y).is_some_and(|p| p[..3] == [255, 255, 255]);
+    let outline = |x: u32, y: u32| at(x, y).is_some_and(|p| p[..3] == [0, 0, 0]);
+    let edged = (top..bottom)
+        .flat_map(|y| (left..right).map(move |x| (x, y)))
+        .filter(|&(x, y)| {
+            fill(x, y) && (outline(x + 1, y) || outline(x, y + 1) || x.checked_sub(1).is_some_and(|x| outline(x, y)) || y.checked_sub(1).is_some_and(|y| outline(x, y)))
+        })
+        .count();
+    edged >= 3
 }
 
 /// A colour that isn't an empty slot's ground.
@@ -184,41 +372,77 @@ fn is_white(frame: &Frame, x: u32, y: u32) -> bool {
     x < frame.width() && y < frame.height() && frame.get_pixel(x, y).0[..3] == [255, 255, 255]
 }
 
+/// White as a video encoding gives it back.
+fn is_near_white(frame: &Frame, x: u32, y: u32) -> bool {
+    x < frame.width() && y < frame.height() && frame.get_pixel(x, y).0[..3].iter().all(|&c| c >= 236)
+}
+
+type White = fn(&Frame, u32, u32) -> bool;
+
 /// Where the window's top line starts, its row, and the window pixels to a font pixel.
-fn find(frame: &Frame) -> Option<(u32, u32, u32)> {
+/// `bleed`: how far the top line may run past or short of its length at either end.
+fn find(frame: &Frame, white: White, bleed: u32) -> Option<(u32, u32, u32)> {
+    first_found(frame, white, bleed, &mut |found| Some(found))
+}
+
+/// Every place [`find`] would take for the window, top first.
+fn found_all(frame: &Frame, white: White, bleed: u32) -> Vec<(u32, u32, u32)> {
+    let mut all = Vec::new();
+    first_found(frame, white, bleed, &mut |found| {
+        all.push(found);
+        None::<()>
+    });
+    all
+}
+
+/// Hands each place the window's top line, left edge and meso box are found at to `take`, top
+/// first, until it takes one.
+fn first_found<T>(frame: &Frame, white: White, bleed: u32, take: &mut dyn FnMut((u32, u32, u32)) -> Option<T>) -> Option<T> {
     let (width, height) = (frame.width(), frame.height());
     for y in 0..height {
         let mut x = 0;
         while x < width {
-            if !is_white(frame, x, y) {
+            if !white(frame, x, y) {
                 x += 1;
                 continue;
             }
             let start = x;
-            while x < width && is_white(frame, x, y) {
+            while x < width && white(frame, x, y) {
                 x += 1;
             }
             let length = x - start;
-            let Some(cell) = (1..=MAX_CELL).find(|c| length == TOP_LINE * c) else { continue };
-            if left_edge(frame, start, y, cell) && meso_box(frame, start, y, cell) {
-                return Some((start, y, cell));
+            let Some(cell) = (1..=MAX_CELL).find(|c| length.abs_diff(TOP_LINE * c) <= 2 * bleed) else { continue };
+            // A bled line starts early by as much as it runs long, give or take.
+            let starts = (0..=bleed).flat_map(|d| [start + d, start.saturating_sub(d)]);
+            for start in starts {
+                if left_edge(frame, start, y, cell, white, bleed)
+                    && meso_box(frame, start, y, cell, white, bleed)
+                    && let Some(taken) = take((start, y, cell))
+                {
+                    return Some(taken);
+                }
             }
         }
     }
     None
 }
 
-fn left_edge(frame: &Frame, start: u32, top: u32, cell: u32) -> bool {
+fn left_edge(frame: &Frame, start: u32, top: u32, cell: u32, white: White, bleed: u32) -> bool {
     let Some(x) = start.checked_sub(CORNER * cell) else { return false };
     let (from, to) = (top + LEFT_EDGE.0 * cell, top + LEFT_EDGE.1 * cell);
-    let white = (from..to).filter(|&y| is_white(frame, x, y)).count() as u32;
-    white * 10 >= (to - from) * 9
+    let column = |x: u32| (from..to).filter(|&y| white(frame, x, y)).count() as u32;
+    let most = (x.saturating_sub(bleed)..=x + bleed).map(column).max().unwrap_or(0);
+    most * 10 >= (to - from) * 9
 }
 
-fn meso_box(frame: &Frame, start: u32, top: u32, cell: u32) -> bool {
+fn meso_box(frame: &Frame, start: u32, top: u32, cell: u32, white: White, bleed: u32) -> bool {
     let (x, y) = (start + MESO_BOX.0 * cell, top + MESO_BOX.1 * cell);
     let length = MESO_BOX.2 * cell;
-    is_white(frame, x, y) && !is_white(frame, x.wrapping_sub(1), y) && (x..x + length).all(|px| is_white(frame, px, y))
+    if bleed == 0 {
+        return white(frame, x, y) && !white(frame, x.wrapping_sub(1), y) && (x..x + length).all(|px| white(frame, px, y));
+    }
+    // The box's top, give or take the bleed at its ends and a row either way.
+    (y.saturating_sub(1)..=y + 1).any(|y| (x + bleed..x + length - bleed).all(|px| white(frame, px, y)))
 }
 
 /// The tab drawn pink, the open one.
@@ -298,8 +522,73 @@ pub(crate) mod tests {
         }
     }
 
+    /// A window as a browser's video gives it back: white a shade off, every pixel's colour
+    /// nudged, and the top line a pixel long at its start.
+    fn through_a_video(frame: &Frame, (start, top): (u32, u32)) -> Frame {
+        let mut out = Frame::from_fn(frame.width(), frame.height(), |x, y| {
+            let [r, g, b, a] = frame.get_pixel(x, y).0;
+            let nudge = |c: u8| if c == 255 { 250 } else { c.saturating_add(((x + y) % 3) as u8) };
+            Rgba([nudge(r), nudge(g), nudge(b), a])
+        });
+        out.put_pixel(start - 1, top, Rgba([248, 249, 250, 255]));
+        out
+    }
+
+    #[test]
+    fn a_window_through_a_video_reads_on_its_own_grid() {
+        let items = [(0, [200, 30, 30], Some("27")), (6, [30, 160, 30], Some("109")), (29, [40, 40, 200], None)];
+        let (frame, at) = window(2, 1, &items);
+        let video = through_a_video(&frame, at);
+        assert!(read(&video).is_none(), "the exact reading wants pure white");
+        let bag = read_video(&video).expect("window found");
+        assert_eq!(bag.tab, Some(Tab::Use));
+        let slots: Vec<(u32, Option<u32>, bool)> = bag.slots.iter().map(|s| (s.index, s.count, s.count_unsure)).collect();
+        assert_eq!(slots, [(0, Some(27), false), (6, Some(109), false), (29, None, false)]);
+        // A slot's picture is its font pixels' colours, near what was drawn.
+        let px = bag.slots[0].picture.get(10, 10);
+        assert!(px.iter().zip([200u8, 30, 30]).all(|(a, b)| a.abs_diff(b) <= 3), "{px:?}");
+    }
+
+    #[test]
+    fn a_window_seen_exactly_reads_the_same_by_either_way() {
+        let (frame, _) = window(2, 3, &[(4, [90, 90, 200], Some("5"))]);
+        assert_eq!(read_video(&frame), read(&frame));
+    }
+
     #[test]
     fn no_window_no_reading() {
         assert_eq!(read(&Frame::from_pixel(800, 600, Rgba([255, 255, 255, 255]))), None);
+    }
+
+    fn tab(colour: u8, count: &str) -> Option<Inventory> {
+        read(&window(1, 3, &[(0, [colour, 30, 30], Some(count)), (6, [30, 160, 30], None)]).0)
+    }
+
+    #[test]
+    fn a_tab_is_checked_once_it_reads_the_same_twice() {
+        let mut watch = TabWatch::default();
+        assert!(watch.settled(tab(200, "27")).is_none(), "seen once");
+        let due = watch.settled(tab(202, "27")).expect("held still, a shade off is the same picture");
+        watch.checked(due);
+        assert!(watch.settled(tab(200, "27")).is_none(), "already checked");
+        assert!(watch.settled(tab(200, "28")).is_none(), "a count changed: seen once");
+        assert!(watch.settled(tab(200, "28")).is_some(), "and held");
+        assert!(watch.settled(tab(120, "28")).is_none(), "another item in the slot: seen once");
+    }
+
+    #[test]
+    fn a_tab_not_marked_checked_is_given_again() {
+        let mut watch = TabWatch::default();
+        watch.settled(tab(200, "27"));
+        assert!(watch.settled(tab(200, "27")).is_some());
+        assert!(watch.settled(tab(200, "27")).is_some(), "a check was under way, so not marked");
+    }
+
+    #[test]
+    fn a_closed_inventory_starts_afresh() {
+        let mut watch = TabWatch::default();
+        watch.settled(tab(200, "27"));
+        assert!(watch.settled(None).is_none());
+        assert!(watch.settled(tab(200, "27")).is_none(), "opened again: seen once");
     }
 }

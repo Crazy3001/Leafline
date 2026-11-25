@@ -2,9 +2,11 @@
 //! the session tracker. It stays off until the player turns it on in Settings, and only ever looks at the window; see [`crate::capture`]. Each session saves itself
 //! as it goes, so a crash or a closed window costs half a minute of it at most.
 //!
-//! Item tooltips are not part of this. An item check is one picture on the player's hotkey. The
-//! character's stat and skill windows are read from these same pictures while they are open, and
-//! from one picture on a hotkey otherwise. So is the Quest window, only while it is open.
+//! The game's windows are read from these same pictures while they are open, each with its switch
+//! in Settings, as the website reads them: an item tooltip the mouse rests on (see
+//! [`super::hover`]), the Character Stat and Skill windows, the Item Inventory's open tab for sell
+//! or keep (see [`super::bag::BagFollow`]) and the Quest window. The hotkeys read the same from a
+//! picture of their own, whether live reading is running or not.
 
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -21,6 +23,8 @@ use super::builds;
 use super::fighter;
 use super::report;
 use super::settings::{self, SettingsState};
+use super::bag::BagFollow;
+use super::hover::ItemHover;
 use super::questlog::QuestLogFollow;
 use super::{overlay, pins, readings, recovery};
 use crate::capture::{self, Capturer, GameWindow, Grab};
@@ -34,6 +38,7 @@ use crate::readers::character::{self, Watch};
 use crate::readers::npc;
 use crate::readers::pickup::{self, PickupReader};
 use crate::readers::tooltip::ItemTooltip;
+use crate::readers::tooltip::hover::same_cards;
 use crate::session::{Sample, SessionSummary, SessionTracker, TrackerConfig};
 use crate::vision::{Frame, Ocr};
 
@@ -48,7 +53,7 @@ pub const CHARACTER_READ_EVENT: &str = "character-read";
 
 /// How long a grab waits for the game to draw a fresh picture.
 const FRESH_FRAME_WAIT: Duration = Duration::from_millis(300);
-/// How often the Pickup Log is looked at between readings. A new line starts fading at once and
+/// How often the Pickup Log and item tooltips are looked at between readings. A new line starts fading at once and
 /// six can come in half a second, as the recording of 2026-11-15 showed; four looks a second saw
 /// every one of them at nearly full brightness. The one-picture-a-second limit was lifted for
 /// this on 2026-11-15. Only the log's corner of each picture is read.
@@ -219,6 +224,44 @@ fn read_item_once(app: &AppHandle) -> Result<(u32, u32, Vec<ItemTooltip>)> {
     *app.state::<LiveState>().item_picture.lock().expect("live lock") = Some((Instant::now(), frame.clone()));
     let items = pipeline::read_items(&frame, &Ocr::new()?)?;
     Ok((frame.width(), frame.height(), items))
+}
+
+/// Reads the item tooltips in `frame`, which the mouse has rested on, as the Read item hotkey does
+/// but quietly: the card changes in place, and only when the items differ from those on show; a
+/// tooltip that names nothing leaves the last card as it was. The overlay isn't brought up. Runs
+/// beside the live loop, so the Pickup Log is still looked at meanwhile. `false` when an item
+/// check is already under way.
+pub(super) fn read_hovered(app: &AppHandle, frame: Arc<Frame>) -> bool {
+    let state = app.state::<LiveState>();
+    if state.reading_item.swap(true, Ordering::SeqCst) {
+        return false;
+    }
+    let handle = app.clone();
+    let spawned = std::thread::Builder::new().name("item-hover".into()).spawn(move || {
+        let read = Ocr::new().and_then(|ocr| pipeline::read_items(&frame, &ocr));
+        let state = handle.state::<LiveState>();
+        state.reading_item.store(false, Ordering::SeqCst);
+        match read {
+            Ok(items) if !items.is_empty() => {
+                // Kept for "Save item picture", as the hotkey's is.
+                *state.item_picture.lock().expect("live lock") = Some((Instant::now(), frame.clone()));
+                let shown = readings::current_analysis(&handle).map(|a| a.tooltips).unwrap_or_default();
+                if same_cards(&shown, &items) {
+                    return;
+                }
+                let found = items.len();
+                readings::publish_items(&handle, frame.width(), frame.height(), items);
+                let _ = handle.emit(ITEM_READ_EVENT, &ItemRead { found, problem: None });
+            }
+            Ok(_) => {}
+            Err(err) => report::note(format!("Couldn't read the hovered item: {err}")),
+        }
+    });
+    if let Err(err) = spawned {
+        state.reading_item.store(false, Ordering::SeqCst);
+        report::note(format!("Couldn't read the hovered item: {err}"));
+    }
+    true
 }
 
 /// One picture of the game, for something the player asked to read.
@@ -556,6 +599,8 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
     let mut names = NameSnap::new(app.state::<UserDataState>().with(|db| db.character_names()).unwrap_or_default());
     let mut windows = Watch::default();
     let mut quest_log = QuestLogFollow::default();
+    let mut bags = BagFollow::default();
+    let mut items = ItemHover::default();
     let mut estimates = Estimates::default();
     let mut twin = None;
     let mut held = false;
@@ -583,6 +628,12 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
             break;
         }
         tracker.set_idle_after(choice.pause_after);
+        if !choice.item_tooltips {
+            items.forget();
+        }
+        if !choice.bag_check {
+            bags = BagFollow::default();
+        }
 
         if state.reset.swap(false, Ordering::SeqCst) {
             keeper.save(app, &tracker.summary());
@@ -666,6 +717,7 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
         }
         match grabbed {
             Grab::Frame(frame) => {
+                let frame = Arc::new(frame);
                 let started = Instant::now();
                 let mut analysis = match pipeline::analyze_live(&frame, &ocr) {
                     Ok(analysis) => analysis,
@@ -736,8 +788,18 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
                 if session.active_seconds > last_active.0 {
                     last_active = (session.active_seconds, Instant::now());
                 }
-                follow_windows(app, &mut windows, &frame, &analysis, &ocr);
-                quest_log.follow(app, &frame, &analysis, &ocr);
+                if choice.item_tooltips {
+                    items.look(app, Some(&frame));
+                }
+                if choice.character_windows {
+                    follow_windows(app, &mut windows, &frame, &analysis, &ocr);
+                }
+                if choice.quest_window {
+                    quest_log.follow(app, &frame, &analysis, &ocr);
+                }
+                if choice.bag_check {
+                    bags.follow(app, &frame, &analysis, &session);
+                }
                 readings::publish_live_analysis(app, analysis);
                 readings::publish_session(app, &session);
                 if keeper.due() {
@@ -763,11 +825,16 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
                         held,
                     },
                 );
-                *state.frame.lock().expect("live lock") = Some(Arc::new(frame));
+                *state.frame.lock().expect("live lock") = Some(frame);
             }
             // The same picture again proves nothing, so it is not read twice: a misread would
             // otherwise confirm itself. A long quiet spell then pauses the clock like any idle time.
-            Grab::Unchanged => {}
+            // A tooltip held over a still scene is still held, though.
+            Grab::Unchanged => {
+                if choice.item_tooltips {
+                    items.look(app, None);
+                }
+            }
             Grab::Minimized => {
                 was_minimized = true;
                 set_status(app, LiveStatus::Waiting { reason: "The game is minimised.".into() });
@@ -779,9 +846,15 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
             }
         }
         match game.as_mut() {
-            Some((capturer, _, _)) if choice.pickup_log => {
-                let mut look = |frame: &Frame| {
-                    if read_pickups(app, &mut pickups, &mut tracker, frame, ui_scale, &ocr) {
+            Some((capturer, _, _)) if choice.pickup_log || choice.item_tooltips => {
+                let mut look = |frame: Option<&Arc<Frame>>| {
+                    if choice.item_tooltips {
+                        items.look(app, frame);
+                    }
+                    if choice.pickup_log
+                        && let Some(frame) = frame
+                        && read_pickups(app, &mut pickups, &mut tracker, frame, ui_scale, &ocr)
+                    {
                         readings::publish_session(app, &tracker.summary());
                     }
                 };
@@ -837,8 +910,14 @@ fn as_pickup(catalog: Option<&Catalog>, arrival: &pickup::Arrival) -> Pickup {
 }
 
 /// [`pause`], looking at the game every [`PICKUP_EVERY`] meanwhile and handing each new picture
-/// to `look`.
-fn pause_looking(state: &LiveState, tick: Instant, interval: f64, capturer: &mut Capturer, look: &mut impl FnMut(&Frame)) {
+/// to `look`, or `None` when the game drew nothing new since the last.
+fn pause_looking(
+    state: &LiveState,
+    tick: Instant,
+    interval: f64,
+    capturer: &mut Capturer,
+    look: &mut impl FnMut(Option<&Arc<Frame>>),
+) {
     let until = tick + Duration::from_secs_f64(interval);
     let mut next = Instant::now() + PICKUP_EVERY;
     while !state.stop.load(Ordering::SeqCst) {
@@ -848,8 +927,10 @@ fn pause_looking(state: &LiveState, tick: Instant, interval: f64, capturer: &mut
         }
         if now >= next {
             next = now + PICKUP_EVERY;
-            if let Ok(Grab::Frame(frame)) = capturer.grab(Duration::ZERO) {
-                look(&frame);
+            match capturer.grab(Duration::ZERO) {
+                Ok(Grab::Frame(frame)) => look(Some(&Arc::new(frame))),
+                Ok(Grab::Unchanged) => look(None),
+                _ => {}
             }
             continue;
         }

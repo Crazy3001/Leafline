@@ -149,6 +149,131 @@ pub fn name(slot: &SlotPicture, pictures: &[(u32, &RgbaImage)]) -> Option<Named>
     Some(Named { ids, score: best })
 }
 
+/// Through a video, the best match must differ by no more than this on average...
+const VIDEO_ACCEPT: f32 = 30.0;
+/// ...and every other picture by this much more. Measured on a browser's frames of the alt's bag
+/// (2026-11-20): the right item scored 1 to 28, and a wrong one never came within 10 of it.
+const VIDEO_MARGIN: f32 = 10.0;
+
+/// [`name`] for a slot read from a video (a browser's shared window, put back on the game's grid
+/// by `inventory::read_video`): only a picture that fits well and clearly better than any other.
+/// Pictures drawn the same still come back together.
+pub fn name_video(slot: &SlotPicture, pictures: &[(u32, &RgbaImage)]) -> Option<Named> {
+    let scored = scores(slot, pictures, Metric::Exact);
+    let &(best, _) = scored.first()?;
+    if best > VIDEO_ACCEPT {
+        return None;
+    }
+    let ids: Vec<u32> = scored.iter().take_while(|(s, _)| *s <= best + SAME_PICTURE).map(|(_, id)| *id).collect();
+    let next = scored.get(ids.len()).map_or(f32::INFINITY, |(s, _)| *s);
+    (next - best >= VIDEO_MARGIN).then_some(Named { ids, score: best })
+}
+
+/// How a slot seen through a video encoding is compared with a picture: by brightness, which the
+/// encoding keeps for every pixel, or by colour with both smoothed over their neighbours, since
+/// the encoding keeps colour only for each square of four pixels.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Metric {
+    Exact,
+    Luma,
+    Smooth,
+}
+
+/// Every picture's best difference from the slot by `metric`, lined up as [`name`] lines them
+/// up, best first.
+pub fn scores(slot: &SlotPicture, pictures: &[(u32, &RgbaImage)], metric: Metric) -> Vec<(f32, u32)> {
+    let Some((top, right)) = slot_corner(slot) else { return Vec::new() };
+    let seen = laid_out(|x, y| slot.get(x, y), metric);
+    let mut scored: Vec<(f32, u32)> = pictures
+        .iter()
+        .filter_map(|&(id, picture)| {
+            let (ptop, pright) = picture_corner(picture)?;
+            let (dx, dy) = (right as i32 - pright as i32, top as i32 - ptop as i32);
+            let best = (-SHIFT..=SHIFT)
+                .flat_map(|sx| (-SHIFT..=SHIFT).map(move |sy| (sx, sy)))
+                .map(|(sx, sy)| {
+                    let laid = laid_out(|x, y| lay(picture, x as i32 - dx - sx, y as i32 - dy - sy), metric);
+                    compare(slot, &seen, &laid, metric)
+                })
+                .fold(f32::INFINITY, f32::min);
+            Some((best, id))
+        })
+        .collect();
+    scored.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
+    scored
+}
+
+/// The picture's pixel at `(x, y)` laid on an empty slot's ground (the ground outside it).
+fn lay(picture: &RgbaImage, x: i32, y: i32) -> [u8; 3] {
+    let (w, h) = picture.dimensions();
+    if x < 0 || y < 0 || x as u32 >= w || y as u32 >= h {
+        return GROUND;
+    }
+    let [r, g, b, a] = picture.get_pixel(x as u32, y as u32).0;
+    let blend = |c: u8, ground: u8| ((u32::from(c) * u32::from(a) + u32::from(ground) * (255 - u32::from(a)) + 127) / 255) as u8;
+    [blend(r, GROUND[0]), blend(g, GROUND[1]), blend(b, GROUND[2])]
+}
+
+/// A slot's worth of pixels as `metric` compares them: as they are, or smoothed.
+fn laid_out(at: impl Fn(u32, u32) -> [u8; 3], metric: Metric) -> Vec<[f32; 3]> {
+    let raw: Vec<[f32; 3]> = (0..SLOT_SIZE * SLOT_SIZE)
+        .map(|i| {
+            let p = at(i % SLOT_SIZE, i / SLOT_SIZE);
+            [f32::from(p[0]), f32::from(p[1]), f32::from(p[2])]
+        })
+        .collect();
+    if metric != Metric::Smooth {
+        return raw;
+    }
+    (0..SLOT_SIZE * SLOT_SIZE)
+        .map(|i| {
+            let (x, y) = ((i % SLOT_SIZE) as i32, (i / SLOT_SIZE) as i32);
+            let mut sum = [0.0f32; 3];
+            let mut n = 0.0;
+            for (nx, ny) in (-1..=1).flat_map(|dx| (-1..=1).map(move |dy| (x + dx, y + dy))) {
+                if nx >= 0 && ny >= 0 && (nx as u32) < SLOT_SIZE && (ny as u32) < SLOT_SIZE {
+                    let p = raw[(ny as u32 * SLOT_SIZE + nx as u32) as usize];
+                    for c in 0..3 {
+                        sum[c] += p[c];
+                    }
+                    n += 1.0;
+                }
+            }
+            sum.map(|v| v / n)
+        })
+        .collect()
+}
+
+fn luma(p: [f32; 3]) -> f32 {
+    0.299 * p[0] + 0.587 * p[1] + 0.114 * p[2]
+}
+
+/// The average difference over the pixels compared where either side draws, per pixel: the three
+/// channels summed, or three times the brightness's, on the same scale.
+fn compare(slot: &SlotPicture, seen: &[[f32; 3]], laid: &[[f32; 3]], metric: Metric) -> f32 {
+    let ground = [f32::from(GROUND[0]), f32::from(GROUND[1]), f32::from(GROUND[2])];
+    let off = |p: [f32; 3]| p.iter().zip(ground).map(|(a, b)| (a - b).abs()).sum::<f32>() > 12.0;
+    let (mut total, mut count) = (0.0f32, 0u32);
+    for y in 0..SLOT_SIZE {
+        for x in 0..SLOT_SIZE {
+            if !compared(slot, x, y) {
+                continue;
+            }
+            let i = (y * SLOT_SIZE + x) as usize;
+            let (a, b) = (seen[i], laid[i]);
+            if !off(a) && !off(b) {
+                continue;
+            }
+            total += match metric {
+                Metric::Luma => 3.0 * (luma(a) - luma(b)).abs(),
+                _ => a.iter().zip(b).map(|(a, b)| (a - b).abs()).sum::<f32>(),
+            };
+            count += 1;
+        }
+    }
+    if count == 0 { f32::INFINITY } else { total / count as f32 }
+}
+
 /// Whether a slot pixel is part of what is compared: inside the slot's frame (a picked slot is
 /// outlined) and clear of the count.
 fn compared(slot: &SlotPicture, x: u32, y: u32) -> bool {

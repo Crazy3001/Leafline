@@ -39,7 +39,7 @@ BLOCKING = {
 }
 
 # Service functions taking a Host that are helpers, not commands.
-NOT_COMMANDS = {'planned_gear', 'catch_up', 'note', 'set_buff_of', 'view', 'buffs_of', 'fighter', 'measured',
+NOT_COMMANDS = {'planned_gear', 'catch_up', 'catch_up_clearly', 'note', 'set_buff_of', 'view', 'buffs_of', 'fighter', 'measured',
                 'prior', 'csv', 'own_travel_file', 'travel_file'}
 
 

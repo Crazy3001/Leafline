@@ -65,7 +65,7 @@ const MIN_STRIP_RUN: u32 = 120;
 const LOOK_STEP: usize = 8;
 
 /// One read of what the windows show. A window that isn't open, or doesn't read cleanly, is `None`.
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CharacterReading {
     pub stats: Option<StatWindow>,
@@ -76,7 +76,7 @@ pub struct CharacterReading {
 
 /// What the detail pane shows. Its lines stand in this order under ATTACK, one label pitch apart;
 /// a line that doesn't read is `None` and the others still count.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DetailWindow {
     /// The Attack line, `107 - 289`.
@@ -113,7 +113,7 @@ pub struct DetailBonus {
     pub jump: i32,
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StatWindow {
     pub level: u32,
@@ -134,7 +134,7 @@ pub struct StatWindow {
 }
 
 /// What worn gear adds to each stat.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Bonus {
     pub str: u32,
@@ -143,7 +143,7 @@ pub struct Bonus {
     pub luk: u32,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SkillWindow {
     /// The rows of the tab in view, as far as it is scrolled.
@@ -152,7 +152,7 @@ pub struct SkillWindow {
     pub skill_points: Option<u32>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SkillRow {
     pub name: String,
     pub level: u32,

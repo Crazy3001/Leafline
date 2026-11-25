@@ -27,9 +27,9 @@
 ![The desk view with the Train panel and the training log: a session's EXP and mesos per hour, its rate over time, each map, and the drops logged](.github/screenshots/desk-log.png)
 
 ### Items
-- **Item check:** hover an item in game and press your hotkey. Leafline reads the tooltip and shows its stats with the base and bonus, its requirements, whether it's clean or scrolled (and how many scrolls failed), and whether your build can wear it.
+- **Item check:** rest the mouse on an item in game, or hover it and press your hotkey. Leafline reads the tooltip and shows its stats with the base and bonus, its requirements, whether it's clean or scrolled (and how many scrolls failed), and whether your build can wear it.
 - **Where to get it:** every monster players have seen drop it, each with the maps it lives on and a route there, the NPC shops that sell it, the quests that give it, and the recipe that crafts it.
-- **Sell or keep:** open an inventory tab and press your hotkey. Leafline names each item by its picture, says which to keep (a quest you're doing needs it, crafting uses it, your build will wear it, you're tracking it) and which to sell, and what the bag fetches from an NPC.
+- **Sell or keep:** open an inventory tab and hold it still, or press your hotkey. Leafline names each item by its picture, says which to keep (a quest you're doing needs it, crafting uses it, your build will wear it, you're tracking it) and which to sell, and what the bag fetches from an NPC.
 - **Tracked items:** star an item to keep it listed with who drops it, the best map to hunt it and a shop when one sells it.
 - **Drop log:** log an item as a drop from a monster on your map, and send it on to MeowDB's community drop lists with one click if you like.
 - **Your own notes** on any item, kept on your PC.
@@ -90,7 +90,7 @@ Your sessions, notes, drop log, builds and settings stay in `%APPDATA%\app.leafl
 
 ## Website
 
-Leafline also runs in a browser at **[crazy3001.github.io/Leafline](https://crazy3001.github.io/Leafline/)**, with nothing to install, on Windows, Mac, Linux and phones. It is the same Leafline, built from the same code, without the parts that need the game window:
+Leafline also runs in a browser at **[crazy3001.github.io/Leafline](https://crazy3001.github.io/Leafline/)**, with nothing to install, on Windows, Mac, Linux and phones. It is the same Leafline, built from the same code:
 
 - look up items, monsters, maps, NPCs, quests and skills, with who drops what and where to find it
 - Go here routes to any map or NPC you pick
@@ -98,8 +98,9 @@ Leafline also runs in a browser at **[crazy3001.github.io/Leafline](https://craz
 - the build planner, scroll odds, Your fight and craft levelling
 - the drop log, timers and the training log
 - the four looks, a desk layout on a computer and the overlay's tabs on a phone
+- on a computer, in Firefox, Chrome or Edge: share the game window and it reads your level, EXP, mesos, map, Quest Helper and loot as you play and tracks the session, the way the program does (item tooltips are still to come)
 
-**It doesn't read the game at all.** Your records stay in that browser on that computer and are never sent anywhere. A browser can clear a site's storage, so use **Settings → Data → Save my records** now and then; the same file opens in the program or another browser. One tab at a time can use your records.
+**It reads only a window you share,** in the browser, and the picture never leaves your computer. It carries the same ban risk as the program. Your records stay in that browser on that computer and are never sent anywhere. A browser can clear a site's storage, so use **Settings → Data → Save my records** now and then; the same file opens in the program or another browser. One tab at a time can use your records.
 
 ## Install
 
@@ -204,6 +205,7 @@ Leafline ships no game data. It downloads community data on your PC when you ask
 - Map, monster, NPC, quest, skill, crafting and equipment data, and the game pictures: [OSMS Data Explorer](https://osmsdataexplorer.com), CC BY 4.0.
 - Monster drops: built for Leafline from the game's item text, [StrategyWiki](https://strategywiki.org/wiki/MapleStory/Drops_(Victoria_Island)) contributors (CC BY-SA 4.0) and players' reports.
 - Taxi routes and return scrolls: [mapleclassic.wiki](https://mapleclassic.wiki) contributors, CC BY-NC-SA 4.0.
+- The website reads the map's name and the Quest Helper's titles with [ocrs](https://github.com/robertknight/ocrs) (MIT / Apache-2.0), whose model is trained on HierText (CC BY-SA 4.0).
 
 Game content belongs to Nexon. Leafline is unofficial and not affiliated with or endorsed by Nexon.
 

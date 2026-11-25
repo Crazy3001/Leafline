@@ -26,3 +26,5 @@ web-sys = { version = "0.3", features = ["XmlHttpRequest", "XmlHttpRequestRespon
 web-time = "1"
 console_error_panic_hook = "0.1"
 base64 = "0.22.1"
+# Item pictures decoded for sell or keep, with the same formats the shared code reads.
+image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "webp"] }

@@ -11,5 +11,5 @@ mod text;
 
 pub use frame::{Frame, SUPPORTED_EXTENSIONS, is_supported, load};
 pub use geometry::Rect;
-pub use ocr::Ocr;
+pub use ocr::{Ocr, TextEngine};
 pub use text::{Line, Word, group_lines};

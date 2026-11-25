@@ -43,6 +43,7 @@
   import { followTrip } from "$lib/wayfinder.svelte";
   import type { PinStatus } from "$lib/types";
   import { can, isWeb } from "$lib/platform";
+  import ReadWindowCard from "$lib/components/ReadWindowCard.svelte";
 
   // Links to the training log and the planner open here, not in windows of their own.
   deskWindow.active = true;
@@ -279,7 +280,8 @@
           <DeskGlance />
           <CharacterPicker />
           <div class="flow">
-            {#if !can.liveReading || live.liveStatus.state === "off"}
+            {#if isWeb}<div class="block"><ReadWindowCard /></div>{/if}
+            {#if can.liveReading ? live.liveStatus.state === "off" : live.liveStatus.state !== "reading" && live.liveStatus.state !== "waiting"}
               <div class="block"><TypedSessionCard /></div>
             {/if}
             {#if (live.analysis?.quest?.quests ?? []).some((q) => q.objectives.length)}
@@ -336,7 +338,7 @@
 
   .desk {
     display: flex;
-    height: 100vh;
+    height: calc(100vh / var(--page-zoom, 1));
     background: var(--bg);
   }
 

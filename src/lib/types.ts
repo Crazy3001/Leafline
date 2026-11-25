@@ -240,6 +240,14 @@ export interface LiveChoice {
   window: WindowChoice | null;
   /** The Pickup Log is read between readings, for the loot picked up. */
   pickupLog: boolean;
+  /** The website reads an item tooltip the mouse rests on and shows its card. */
+  itemTooltips: boolean;
+  /** The website updates the build from the stat and skill windows while they're open. */
+  characterWindows: boolean;
+  /** The website checks the inventory tab that's open (sell or keep). */
+  bagCheck: boolean;
+  /** The website keeps the quest log from the Quest window while it's open. */
+  questWindow: boolean;
 }
 
 export interface ShortcutInfo {
