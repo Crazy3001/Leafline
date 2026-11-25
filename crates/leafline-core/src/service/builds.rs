@@ -322,6 +322,26 @@ pub fn catch_up(h: &dyn Host, scan: CharacterScan) -> Result<CharacterRead> {
     Ok(CharacterRead { stats, skills, build: Some(build.name), result, ..CharacterRead::default() })
 }
 
+/// Emitted with what a read of the character's windows changed, as the program's live loop does.
+pub const CHARACTER_READ_EVENT: &str = "character-read";
+
+/// [`catch_up`] for the website, whose skill names are read by ocrs: a row counts only when its
+/// name is clearly one skill of the build's job path, and is then named as the data names it; the
+/// others are left out, so those skills stay as the build had them.
+pub fn catch_up_clearly(h: &dyn Host, mut scan: CharacterScan) -> Result<CharacterRead> {
+    if let (Some(skills), Some(catalog)) = (scan.windows.skills.as_mut(), h.map().catalog()) {
+        let job = h.records().with(|db| db.active_build(scan.name.as_deref()))?.map(|b| b.plan.job);
+        skills.rows.retain_mut(|row| match job.and_then(|job| progress::skill_called_clearly(&catalog, &row.name, job)) {
+            Some((_, name)) => {
+                row.name = name;
+                true
+            }
+            None => false,
+        });
+    }
+    catch_up(h, scan)
+}
+
 /// Gear to look for at `level` on this build. `None` without the build or the map data.
 pub fn gear_suggestions(h: &dyn Host, id: i64, level: u32) -> Result<Option<GearSuggestions>> {
     let Some(catalog) = h.map().catalog() else { return Ok(None) };

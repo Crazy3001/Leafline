@@ -5,6 +5,7 @@
 use leafline_core::capturetest::{measure, pattern};
 use leafline_core::vision::Frame;
 
+pub mod engine;
 pub mod identity;
 pub mod items;
 pub mod live;
@@ -129,6 +130,18 @@ mod web {
         /// The player's switch: read a tooltip the mouse rests on.
         pub fn set_item_tooltips(&mut self, on: bool) {
             self.0.set_item_tooltips(on);
+        }
+
+        /// The player's switches for the windows read when open: the Character Stat and Skill
+        /// windows, the inventory tab (sell or keep), the Quest window.
+        pub fn set_windows(&mut self, character: bool, bag: bool, quest_log: bool) {
+            self.0.set_windows(character, bag, quest_log);
+        }
+
+        /// What the game's windows gave since this was last asked, as JSON (see
+        /// `live::WindowReads`); else an empty string.
+        pub fn take_windows(&mut self) -> String {
+            self.0.take_windows().map(|reads| serde_json::to_string(&reads).unwrap_or_default()).unwrap_or_default()
         }
 
         /// The item tooltips last read, as JSON, if they changed since this was last asked; else

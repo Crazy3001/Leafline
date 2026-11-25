@@ -11,7 +11,7 @@ import { base } from "$app/paths";
 import type { Analysis, LiveStatus, SessionSummary } from "../types";
 import { emit, listen } from "./bus";
 import { canRead, cantRead, shareWindow, type SharedWindow } from "./capture";
-import type { FromLive, ReadingChoice, ToLive } from "./live.worker";
+import type { FromLive, ReadingChoice, ToLive, WindowReads } from "./live.worker";
 import { invoke } from "./storage.svelte";
 
 /** Active seconds before a session is worth keeping (a quick login to sell isn't training). */
@@ -67,7 +67,17 @@ function publishSession(next: SessionSummary) {
   void emit("session", next);
 }
 
-type LiveSettings = { live?: { interval?: number; pauseAfter?: number; pickupLog?: boolean; itemTooltips?: boolean } };
+type LiveSettings = {
+  live?: {
+    interval?: number;
+    pauseAfter?: number;
+    pickupLog?: boolean;
+    itemTooltips?: boolean;
+    characterWindows?: boolean;
+    bagCheck?: boolean;
+    questWindow?: boolean;
+  };
+};
 
 function choiceOf(s: LiveSettings): ReadingChoice {
   return {
@@ -75,6 +85,9 @@ function choiceOf(s: LiveSettings): ReadingChoice {
     idleAfter: s.live?.pauseAfter ?? 15,
     pickupLog: s.live?.pickupLog ?? true,
     itemTooltips: s.live?.itemTooltips ?? true,
+    characterWindows: s.live?.characterWindows ?? true,
+    bagCheck: s.live?.bagCheck ?? true,
+    questWindow: s.live?.questWindow ?? true,
   };
 }
 
@@ -205,6 +218,9 @@ function onWorker({ data }: MessageEvent<FromLive>) {
       }
       if (data.tooltips.length) void emit("item-read", { found: data.tooltips.length, problem: null });
       break;
+    case "windows":
+      void keepWindows(data.reads);
+      break;
     case "snapshot":
       void writeRecovery(data.tracker);
       break;
@@ -215,6 +231,62 @@ function onWorker({ data }: MessageEvent<FromLive>) {
       console.error("Live reading:", data.message);
       break;
   }
+}
+
+/**
+ * Hands what the game's windows showed to the records, as the program's live loop does: the build
+ * moved along from the stat and skill windows, the open inventory tab checked (sell or keep), the
+ * Quest window kept as the character's quest log. Each command tells the page what changed by its
+ * events ("character-read", "bag", "quest-log"). Nothing leaves this PC.
+ */
+async function keepWindows(reads: WindowReads) {
+  const run = async (what: string, command: string, args: Record<string, unknown>) => {
+    try {
+      await invoke(command, args);
+    } catch (err) {
+      console.error(`Couldn't keep the ${what}:`, err);
+    }
+  };
+  if (reads.character) await run("character's windows", "catch_up_character", { scan: reads.character });
+  if (reads.questLog) await run("quest log", "follow_quest_log", reads.questLog);
+  if (reads.bag) {
+    const bag = reads.bag;
+    await run("bag check", "check_bag", { bag, ...(await fetchBagPictures({ bag })) });
+  }
+}
+
+/** Pictures fetched for a bag check at once. */
+const PICTURES_AT_ONCE = 8;
+
+/**
+ * Fetches the item pictures a bag check will try, several at a time, so the storage worker finds
+ * them in the browser's cache (OSMS lets it keep them for hours) instead of downloading each in
+ * turn. Shows the check as under way meanwhile, as the program does. Returns nothing: the args
+ * spread into the check's are empty.
+ */
+export async function fetchBagPictures(args: { bag?: unknown; wide?: boolean }): Promise<Record<string, never>> {
+  let urls: string[] = [];
+  try {
+    urls = await invoke<string[]>("bag_wants", args);
+  } catch {
+    return {};
+  }
+  if (!urls.length) return {};
+  const last = await invoke<Record<string, unknown> | null>("last_bag").catch(() => null);
+  void emit("bag", { at: Date.now() / 1000, tab: null, character: null, items: [], unknown: [], wide: false, more: 0, problem: null, ...last, busy: true });
+  let next = 0;
+  const one = async () => {
+    while (next < urls.length) {
+      const url = urls[next++];
+      try {
+        await (await fetch(url)).arrayBuffer();
+      } catch {
+        // The check goes on without it.
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: PICTURES_AT_ONCE }, one));
+  return {};
 }
 
 /** Asks the player for the game window and starts reading it. Null back means they cancelled. */

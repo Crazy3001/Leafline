@@ -11,7 +11,7 @@ import type { DeskStatus, MapPicture, PinStatus } from "../types";
 import { emit, listen } from "./bus";
 import { commandBackend } from "./commands";
 import { setMapView, setPictureTable } from "./pictures.svelte";
-import { liveReadings, liveStatus, resetLiveSession, setLiveHeld, startLive, stopLive } from "./live";
+import { fetchBagPictures, liveReadings, liveStatus, resetLiveSession, setLiveHeld, startLive, stopLive } from "./live";
 import { closePip, openPip, pipOpen } from "./pip";
 import { checkRecords, exportRecords, importRecords, invoke, recordsSummary } from "./storage.svelte";
 
@@ -127,8 +127,12 @@ export const webBackend: Backend = {
     return rows;
   },
   readCharacter: notHere("Reading the character's windows"),
-  bagLookFurther: async () => {},
-  lastBag: async () => null,
+  // Sell or keep runs by itself while the inventory is open (see live.ts).
+  async bagLookFurther() {
+    await fetchBagPictures({ wide: true });
+    await invoke("bag_look_further");
+  },
+  lastBag: () => invoke("last_bag"),
   currentReadings: async () => liveReadings(),
   pinStatus: async () => pins(),
   async pinPanel(panel) {

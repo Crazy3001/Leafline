@@ -676,6 +676,64 @@
           />
         </div>
       </div>
+      <div class="row">
+        <label for="web-character-windows">
+          <span class="name">Stats and skills</span>
+          <span class="help"
+            >Open your Character Stat or Skill window and hold it still, and your build in the Character tab moves to what it
+            shows. A skill whose name can't be read for sure is left as your build had it.</span
+          >
+        </label>
+        <div class="control">
+          <input
+            id="web-character-windows"
+            class="switch"
+            type="checkbox"
+            role="switch"
+            checked={display.live.characterWindows}
+            onchange={(e) => setLive({ characterWindows: e.currentTarget.checked })}
+          />
+        </div>
+      </div>
+      <div class="row">
+        <label for="web-bag-check">
+          <span class="name">Sell or keep</span>
+          <span class="help"
+            >Open your inventory on a tab and hold it still, and Look up says what to keep and what to sell to an NPC. Items
+            are named by their pictures, downloaded from OSMS the first time; one it can't name for sure is listed as not
+            recognised.</span
+          >
+        </label>
+        <div class="control">
+          <input
+            id="web-bag-check"
+            class="switch"
+            type="checkbox"
+            role="switch"
+            checked={display.live.bagCheck}
+            onchange={(e) => setLive({ bagCheck: e.currentTarget.checked })}
+          />
+        </div>
+      </div>
+      <div class="row">
+        <label for="web-quest-window">
+          <span class="name">Quest log</span>
+          <span class="help"
+            >Open your Quest window and scroll through it, and the Quests tab keeps what it lists. Only quests whose titles
+            match the quest data are kept, and the detail pane on the right isn't read.</span
+          >
+        </label>
+        <div class="control">
+          <input
+            id="web-quest-window"
+            class="switch"
+            type="checkbox"
+            role="switch"
+            checked={display.live.questWindow}
+            onchange={(e) => setLive({ questWindow: e.currentTarget.checked })}
+          />
+        </div>
+      </div>
     </section>
     {/if}
 

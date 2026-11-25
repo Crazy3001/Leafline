@@ -90,7 +90,7 @@ pub fn catch_up(
 }
 
 /// The skill of this job path, Beginner skills included, whose name is closest to `name`.
-fn skill_called(catalog: &Catalog, name: &str, job: u32) -> Option<(u32, String)> {
+pub fn skill_called(catalog: &Catalog, name: &str, job: u32) -> Option<(u32, String)> {
     let mut path = path_of(job);
     path.push(0);
     catalog
@@ -103,6 +103,27 @@ fn skill_called(catalog: &Catalog, name: &str, job: u32) -> Option<(u32, String)
         .map(|(_, s)| (s.id, s.name.clone()))
 }
 
+/// How far ahead of the next a skill's name must be for [`skill_called_clearly`].
+const CLEAR_LEAD: f64 = 0.15;
+
+/// [`skill_called`] for a name read by a rougher OCR (the website's): only when one skill of the
+/// path is clearly closest, read exactly or well ahead of any other.
+pub fn skill_called_clearly(catalog: &Catalog, name: &str, job: u32) -> Option<(u32, String)> {
+    let mut path = path_of(job);
+    path.push(0);
+    let mut scored: Vec<(f64, &crate::mapdata::osms::SkillRecord)> = catalog
+        .skills()
+        .iter()
+        .filter(|s| path.contains(&s.job_id))
+        .map(|s| (strsim::normalized_levenshtein(&s.name.to_lowercase(), &name.to_lowercase()), s))
+        .collect();
+    scored.sort_by(|a, b| b.0.total_cmp(&a.0));
+    let (best, skill) = *scored.first()?;
+    // Skills of one name on several jobs aren't a doubt.
+    let next = scored.iter().skip(1).find(|(_, s)| s.name != skill.name).map_or(0.0, |(score, _)| *score);
+    (best >= MIN_SKILL_SCORE && (best > 0.999 || best - next >= CLEAR_LEAD)).then(|| (skill.id, skill.name.clone()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::catalog::tests::skill;
@@ -111,6 +132,19 @@ mod tests {
 
     const SNAILS: u32 = 1;
     const STAB: u32 = 2;
+
+    #[test]
+    fn a_rough_read_counts_only_when_one_skill_is_clearly_closest() {
+        let catalog = Catalog::new(
+            vec![skill(10, "Arrow Blow", 300, 20, &[]), skill(11, "Arrow Bomb", 300, 20, &[]), skill(12, "Iron Arrow", 300, 20, &[])],
+            Vec::new(),
+        );
+        assert_eq!(skill_called_clearly(&catalog, "Iron Arrou", 300).map(|s| s.0), Some(12));
+        assert_eq!(skill_called_clearly(&catalog, "Arrow Blow", 300).map(|s| s.0), Some(10), "read exactly");
+        // Closest to Arrow Blow, but Arrow Bomb is nearly as close.
+        assert_eq!(skill_called(&catalog, "Arrow Blom", 300).map(|s| s.0), Some(10));
+        assert_eq!(skill_called_clearly(&catalog, "Arrow Blom", 300), None);
+    }
 
     fn catalog() -> Catalog {
         Catalog::new(

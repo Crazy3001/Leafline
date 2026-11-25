@@ -86,7 +86,8 @@ pub fn read_items_drawn(frame: &Frame, ocr: &Ocr) -> Result<Vec<ItemTooltip>> {
 }
 
 /// What the character's windows show, with the name and level from the HUD.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CharacterScan {
     pub name: Option<String>,
     pub level: Option<u32>,

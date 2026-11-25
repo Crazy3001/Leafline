@@ -132,11 +132,29 @@ pub struct LiveChoice {
     /// The website reads an item tooltip the mouse rests on and shows its card (the program reads
     /// them on its hotkey instead).
     pub item_tooltips: bool,
+    /// The website updates the build from the Character Stat and Skill windows while they're
+    /// open (the program follows them always, and reads them on its hotkey).
+    pub character_windows: bool,
+    /// The website checks the inventory tab that's open, for sell or keep (the program, on its
+    /// hotkey).
+    pub bag_check: bool,
+    /// The website keeps the quest log from the Quest window while it's open.
+    pub quest_window: bool,
 }
 
 impl Default for LiveChoice {
     fn default() -> Self {
-        Self { enabled: true, interval: 2.0, pause_after: 15.0, window: None, pickup_log: true, item_tooltips: true }
+        Self {
+            enabled: true,
+            interval: 2.0,
+            pause_after: 15.0,
+            window: None,
+            pickup_log: true,
+            item_tooltips: true,
+            character_windows: true,
+            bag_check: true,
+            quest_window: true,
+        }
     }
 }
 

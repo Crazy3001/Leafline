@@ -26,6 +26,12 @@ use std::sync::Arc;
 use leafline_core::readers::tooltip::{self, ItemTooltip, NameLines};
 use leafline_core::vision::Rect;
 
+use leafline_core::pipeline::CharacterScan;
+use leafline_core::readers::{character, inventory, questlog};
+use leafline_core::readers::questlog::QuestLogReading;
+use leafline_core::service::bag::SeenBag;
+
+use crate::engine::OcrsEngine;
 use crate::identity::IdentityReader;
 use crate::items::{ReadName, TooltipReader};
 use crate::ocr::Recogniser;
@@ -39,6 +45,9 @@ const CONFIRMATIONS: usize = 2;
 const HOLD: f64 = 0.6;
 /// How far a tooltip may move, in pixels, and still be the same one held.
 const HELD_WITHIN: f32 = 3.0;
+/// Full reads in a row without the Quest window before it counts as closed, and the next opening
+/// as a fresh look, as in the program.
+const QUEST_WINDOW_CLOSED_AFTER: u32 = 3;
 
 
 /// What one frame gave: the readings for the page to show, and the session so far.
@@ -53,8 +62,67 @@ pub struct LiveRead {
     pub ms: f32,
 }
 
+/// What the game's windows gave since this was last asked, for the page to keep: each is read once
+/// its window has shown the same at two reads in a row (held still, not being dragged or
+/// scrolled), and again only when what it shows changes.
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WindowReads {
+    /// The Character Stat and Skill windows, with the name and level from the HUD.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub character: Option<CharacterScan>,
+    /// The Item Inventory's open tab, for sell or keep.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bag: Option<SeenBag>,
+    /// The Quest window, for the character's quest log.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub quest_log: Option<QuestLogSeen>,
+}
+
+impl WindowReads {
+    pub fn is_empty(&self) -> bool {
+        self.character.is_none() && self.bag.is_none() && self.quest_log.is_none()
+    }
+}
+
+/// One read of the Quest window, and whose.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QuestLogSeen {
+    pub name: String,
+    pub reading: QuestLogReading,
+    /// The window was shut since the last read: its tabs start afresh.
+    pub fresh: bool,
+}
+
+/// The player's switches for the windows read when open.
+#[derive(Debug, Clone, Copy)]
+struct WindowChoice {
+    character: bool,
+    bag: bool,
+    quest_log: bool,
+}
+
+/// What follows the windows from one read to the next.
+#[derive(Default)]
+struct Windows {
+    character: character::Watch,
+    /// The inventory tab last seen, and the one last handed over.
+    bag_seen: Option<inventory::Inventory>,
+    bag_read: Option<inventory::Inventory>,
+    quest_log: questlog::Watch,
+    quest_closed: u32,
+    quest_fresh: bool,
+    reads: WindowReads,
+}
+
 pub struct LiveReader {
     ocr: Ocr,
+    /// ocrs as an OCR engine, for the readers that take words from a picture (skill names, the
+    /// Quest window).
+    text: Option<Ocr>,
+    choice: WindowChoice,
+    windows: Windows,
     /// ocrs, once the page has handed over its model; until then no text is read (the map, the
     /// character's name and job).
     recogniser: Option<Arc<Recogniser>>,
@@ -109,6 +177,9 @@ impl LiveReader {
     fn with(tracker: SessionTracker, idle_after: f64) -> Self {
         Self {
             ocr: Ocr::none(),
+            text: None,
+            choice: WindowChoice { character: true, bag: true, quest_log: true },
+            windows: Windows::default(),
             recogniser: None,
             tooltips: TooltipReader::default(),
             item_tooltips: true,
@@ -133,7 +204,9 @@ impl LiveReader {
 
     /// ocrs's text recognition model, for the minimap title and the HUD's name and job.
     pub fn set_text_model(&mut self, recognition: Vec<u8>) -> Result<(), String> {
-        self.recogniser = Some(Arc::new(Recogniser::new(recognition)?));
+        let recogniser = Arc::new(Recogniser::new(recognition)?);
+        self.text = Some(Ocr::with(Box::new(OcrsEngine::new(recogniser.clone()))));
+        self.recogniser = Some(recogniser);
         Ok(())
     }
 
@@ -245,6 +318,7 @@ impl LiveReader {
             self.tracker.push(&sample);
         }
         self.look(frame, at);
+        self.follow_windows(frame, &analysis);
         analysis.tooltips.clone_from(&self.items);
         let hud = analysis.hud.is_some();
         let ms = started.elapsed().as_secs_f32() * 1000.0;
@@ -372,6 +446,89 @@ impl LiveReader {
     }
 }
 
+impl LiveReader {
+    /// The player's switches: update the build from the Character Stat and Skill windows; check
+    /// the inventory tab that's open (sell or keep); keep the quest log from the Quest window.
+    pub fn set_windows(&mut self, character: bool, bag: bool, quest_log: bool) {
+        self.choice = WindowChoice { character, bag, quest_log };
+        if !bag {
+            self.windows.bag_seen = None;
+            self.windows.bag_read = None;
+        }
+    }
+
+    /// What the windows gave since this was last asked; `None` with nothing new.
+    pub fn take_windows(&mut self) -> Option<WindowReads> {
+        let reads = std::mem::take(&mut self.windows.reads);
+        (!reads.is_empty()).then_some(reads)
+    }
+
+    /// Follows the game's windows on a full read, as the program's live loop does: each is read
+    /// once it has shown the same twice in a row, and again only when that changes.
+    fn follow_windows(&mut self, frame: &Frame, analysis: &Analysis) {
+        let hud = analysis.hud.as_ref();
+        let name = hud.and_then(|h| h.name.clone());
+        let level = hud.and_then(|h| h.level);
+        let scale = analysis.hud_layout.as_ref().map(|layout| ui::hud_scale(frame, layout));
+        if self.choice.character
+            && let Some(layout) = &analysis.hud_layout
+        {
+            let glance = character::glance(frame, layout, level);
+            // A window can't be matched to a build without the player's name.
+            if self.windows.character.settled(glance)
+                && name.is_some()
+                && let Some(windows) = self.read_character_windows(frame, Some(layout))
+            {
+                self.windows.reads.character = Some(CharacterScan { name: name.clone(), level, windows });
+            }
+        }
+        if self.choice.bag {
+            let seen = inventory::read_video(frame).filter(|i| i.tab.is_some());
+            let held = seen.as_ref().is_some_and(|s| self.windows.bag_seen.as_ref().is_some_and(|last| same_tab(s, last)));
+            if held
+                && let Some(seen) = &seen
+                && !self.windows.bag_read.as_ref().is_some_and(|read| same_tab(seen, read))
+            {
+                self.windows.bag_read = Some(seen.clone());
+                self.windows.reads.bag = Some(SeenBag::new(seen, name.clone(), level));
+            }
+            self.windows.bag_seen = seen;
+        }
+        if self.choice.quest_log && self.text.is_some() {
+            let glance = questlog::glance(frame, scale);
+            if glance.is_none() {
+                self.windows.quest_closed += 1;
+                if self.windows.quest_closed >= QUEST_WINDOW_CLOSED_AFTER {
+                    self.windows.quest_fresh = true;
+                }
+            } else {
+                self.windows.quest_closed = 0;
+            }
+            if self.windows.quest_log.settled(glance)
+                && let Some(name) = name
+                && let Some(reading) = self.read_quest_window(frame, scale)
+            {
+                let fresh = std::mem::take(&mut self.windows.quest_fresh);
+                self.windows.reads.quest_log = Some(QuestLogSeen { name, reading, fresh });
+            }
+        }
+    }
+
+    /// The Character Stat and Skill windows in `frame`, skill names read by ocrs; `None` with
+    /// neither open (or before the page has handed over ocrs's model).
+    pub fn read_character_windows(&self, frame: &Frame, layout: Option<&leafline_core::readers::hud::HudLayout>) -> Option<character::CharacterReading> {
+        let text = self.text.as_ref()?;
+        let windows = character::read(frame, layout, text).ok()?;
+        (windows.stats.is_some() || windows.skills.is_some() || windows.detail.is_some()).then_some(windows)
+    }
+
+    /// The Quest window in `frame`, read by ocrs; `None` with it closed (or before the page has
+    /// handed over ocrs's model).
+    pub fn read_quest_window(&self, frame: &Frame, scale: Option<f32>) -> Option<QuestLogReading> {
+        questlog::read_list_only(frame, scale, self.text.as_ref()?).ok().flatten()
+    }
+}
+
 /// Tooltips found at the last looks: where (their bullets), since when, and whether read.
 struct Hover {
     places: Vec<Rect>,
@@ -379,6 +536,21 @@ struct Hover {
     read: bool,
     /// The equipment names read whose stats are still to be read.
     stats_for: Vec<NameLines>,
+}
+
+/// Pictures of one slot this alike are the same item, through a video's noise from frame to frame:
+/// the average difference per colour channel.
+const SAME_SLOT: f32 = 6.0;
+
+/// Whether two reads of an inventory tab show the same: the same slots filled, the same counts,
+/// pictures alike.
+fn same_tab(a: &inventory::Inventory, b: &inventory::Inventory) -> bool {
+    let alike = |x: &inventory::BagSlot, y: &inventory::BagSlot| {
+        let pixels = (x.picture.pixels.len() * 3) as f32;
+        let total: u32 = x.picture.pixels.iter().zip(&y.picture.pixels).flat_map(|(p, q)| p.iter().zip(q).map(|(a, b)| u32::from(a.abs_diff(*b)))).sum();
+        x.index == y.index && x.count == y.count && x.count_unsure == y.count_unsure && pixels > 0.0 && total as f32 / pixels <= SAME_SLOT
+    };
+    a.tab == b.tab && a.slots.len() == b.slots.len() && a.slots.iter().zip(&b.slots).all(|(x, y)| alike(x, y))
 }
 
 /// Whether two sets of item tooltips would show the same cards.

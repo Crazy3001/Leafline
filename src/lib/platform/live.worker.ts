@@ -23,6 +23,8 @@ interface Live {
   set_pickup_log(on: boolean): void;
   set_item_tooltips(on: boolean): void;
   take_items(): string;
+  set_windows(character: boolean, bag: boolean, questLog: boolean): void;
+  take_windows(): string;
   reset(): void;
 }
 const wasm = built as { Live: new (idleAfter: number, saved?: string | null) => Live };
@@ -43,6 +45,20 @@ export interface ReadingChoice {
   pickupLog: boolean;
   /** Read an item tooltip the mouse rests on. */
   itemTooltips: boolean;
+  /** Update the build from the stat and skill windows while they're open. */
+  characterWindows: boolean;
+  /** Check the inventory tab that's open (sell or keep). */
+  bagCheck: boolean;
+  /** Keep the quest log from the Quest window while it's open. */
+  questWindow: boolean;
+}
+
+/** What the game's windows gave at a full read (crates/leafline-capture, live.rs WindowReads),
+ *  for the page to hand to the records: each read once its window has held still. */
+export interface WindowReads {
+  character?: unknown;
+  bag?: unknown;
+  questLog?: { name: string; reading: unknown; fresh: boolean };
 }
 
 export interface LiveRead {
@@ -59,6 +75,8 @@ export type FromLive =
   | { type: "summary"; session: SessionSummary }
   /** The item tooltips read from a held hover, when they change: the last ones stay until then. */
   | { type: "items"; tooltips: ItemTooltip[] }
+  /** A window held open was read. */
+  | { type: "windows"; reads: WindowReads }
   | { type: "snapshot"; tracker: string }
   | { type: "ended" }
   | { type: "error"; message: string };
@@ -104,8 +122,10 @@ async function handle(frame: VideoFrame) {
     const before = live.summary();
     const text = live.read(data, width, height, at / 1000);
     const items = live.take_items();
+    const windows = live.take_windows();
     busy = false;
     if (items) post({ type: "items", tooltips: JSON.parse(items) as ItemTooltip[] });
+    if (windows) post({ type: "windows", reads: JSON.parse(windows) as WindowReads });
     if (text === "null") return;
     const { read, other } = JSON.parse(text) as { read: LiveRead; other: boolean };
     reads++;
@@ -128,6 +148,7 @@ self.onmessage = async ({ data }: MessageEvent<ToLive>) => {
       live = new wasm.Live(data.idleAfter, data.saved);
       live.set_pickup_log(data.pickupLog);
       live.set_item_tooltips(data.itemTooltips);
+      live.set_windows(data.characterWindows, data.bagCheck, data.questWindow);
       post({ type: "summary", session: JSON.parse(live.summary()) as SessionSummary });
       void loadTextReading(live, data.textModel, data.dataSources);
       break;
@@ -136,6 +157,7 @@ self.onmessage = async ({ data }: MessageEvent<ToLive>) => {
       live?.set_idle_after(data.idleAfter);
       live?.set_pickup_log(data.pickupLog);
       live?.set_item_tooltips(data.itemTooltips);
+      live?.set_windows(data.characterWindows, data.bagCheck, data.questWindow);
       if (live) {
         const items = live.take_items();
         if (items) post({ type: "items", tooltips: JSON.parse(items) as ItemTooltip[] });
