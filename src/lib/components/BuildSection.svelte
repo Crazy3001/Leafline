@@ -79,6 +79,8 @@
   const step = $derived(steps.findLast((s) => s.level <= at) ?? steps[0] ?? null);
   const hasWork = (s: LevelStep) => s.ap.length > 0 || s.sp.length > 0 || s.advance != null;
   const coming = $derived(steps.filter((s) => s.level > at && hasWork(s)).slice(0, COMING));
+  /** Coming up as shown: where the Gear card sits beside it, only levels that spend SP or AP or advance. */
+  const comingShown = $derived(whole ? steps.filter((s) => s.level > at && (s.advance || s.sp.length || s.ap.length)).slice(0, COMING) : coming);
   const advance = $derived(steps.find((s) => s.level > at && s.advance));
   /** The next level that brings a gear goal within reach. */
   const nextGear = $derived(steps.find((s) => s.level > at && s.gear.length));
@@ -338,6 +340,7 @@
 
 {#snippet wearing(row: Outfit["slots"][number])}
   {@const piece = row.wearing}
+            {#if piece || !(row.suggested || row.next)}
             <div class="line">
               <span class="label">Wearing</span>
               {#if piece}
@@ -359,6 +362,7 @@
                 <span class="none">Nothing worn</span>
               {/if}
             </div>
+            {/if}
             {#if piece && editing?.id === piece.id}
               <div class="edit">
                 <label class="edit-field">
@@ -547,6 +551,7 @@
     {#snippet planPart()}
     {@render todo(step)}
 
+    {#if !whole}
     <h4 class="sub">Your stats by the plan</h4>
     {#if !statsKnown}
       <p class="quiet-line">
@@ -561,8 +566,8 @@
             {#if statsKnown && gearBonus?.[stat.id]}
               <!-- The total the game shows, then what you put in and what your gear adds. -->
               {step.stats[stat.id] + gearBonus[stat.id]}
-              <span class="gear" use:tip={"Points you put in, plus what your gear adds as the Character Stat window last showed it"}
-                >({step.stats[stat.id]}+{gearBonus[stat.id]})</span
+              <span class="gear" use:tip={`${step.stats[stat.id]} you put in, +${gearBonus[stat.id]} from gear as the Character Stat window last showed it`}
+                >+{gearBonus[stat.id]} gear</span
               >
             {:else}
               {statsKnown ? step.stats[stat.id] : "—"}
@@ -571,11 +576,12 @@
         </div>
       {/each}
     </dl>
+    {/if}
 
-    {#if coming.length}
+    {#if comingShown.length}
       <h4 class="sub">Coming up</h4>
         <ul class="coming">
-          {#each coming as s (s.level)}
+          {#each comingShown as s (s.level)}
             <li>
               <span class="when tabular">Lv {s.level}</span>
               <span class="what">
@@ -583,17 +589,17 @@
                 <!-- What the level adds, then the total it makes: "Double Stab +3 (4)". -->
                 {#each s.sp as gain (gain.skillId)}<span><Ref kind="skill" id={gain.skillId} name={gain.name} /> <span class="tabular">+{gain.to - gain.from}</span> <span class="total tabular">({gain.to})</span></span>{/each}
                 {#each s.ap as gain (gain.stat)}<span>{statLabel(gain.stat)} <span class="tabular">+{gain.amount}</span> <span class="total tabular">({gain.total})</span></span>{/each}
-                {#each s.gear as name (name)}<Ref kind="item" name={name} />{/each}
+                {#if !whole}{#each s.gear as name (name)}<Ref kind="item" name={name} />{/each}{/if}
               </span>
             </li>
           {/each}
         </ul>
     {/if}
 
-    {#if nextGear || advance}
+    {#if (nextGear && !whole) || advance}
       <h4 class="sub">Next</h4>
       <ul class="coming">
-        {#if nextGear}
+        {#if nextGear && !whole}
           <li>
             <span class="when tabular">Lv {nextGear.level}</span>
             <span class="what"
@@ -731,9 +737,9 @@
     {#if whole}
       <!-- Room for every part at once, as in the desk view: side by side where it fits. -->
       <div class="parts">
+        <div class="part"><h4 class="part-title">Stats</h4>{@render statsPart()}</div>
         <div class="part"><h4 class="part-title">Level up</h4>{@render planPart()}</div>
         <div class="part"><h4 class="part-title">Gear</h4>{@render gearPart()}</div>
-        <div class="part"><h4 class="part-title">Stats</h4>{@render statsPart()}</div>
         <div class="part"><h4 class="part-title">Skills</h4>{@render skillsView()}</div>
         {#if canAdvance && nextAdvance?.advance && plan.build.plan.job}<div class="part"><h4 class="part-title">Job advance</h4>{@render advancePart()}</div>{/if}
       </div>
@@ -764,8 +770,8 @@
 <style>
   .parts {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: var(--space-4) var(--space-6);
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: var(--space-3);
     align-items: start;
   }
 
@@ -774,6 +780,23 @@
     gap: var(--space-1-5);
     min-width: 0;
     align-content: start;
+  }
+
+  /* Side by side, each part is a card of its own, so each reads as one thing. */
+  .parts .part {
+    padding: var(--space-4);
+    border: var(--line-w) solid var(--line);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    box-shadow: var(--card-shadow);
+  }
+
+  .parts .part-title {
+    margin: 0 0 var(--space-1);
+    font-family: var(--font-display);
+    font-size: var(--text-lg);
+    font-weight: var(--weight-strong);
+    color: var(--text);
   }
 
   /*
@@ -998,6 +1021,16 @@
     min-width: 0;
     padding: 0 var(--space-2);
     border-left: 1px solid var(--border);
+  }
+
+  /* What gear adds, small under the total, as in Stats. */
+  .stats .gear {
+    display: block;
+    color: var(--faint);
+    font-family: var(--font-sans);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-body);
+    cursor: help;
   }
 
   .stats div:first-child {
