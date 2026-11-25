@@ -57,7 +57,7 @@
     max-width: 260px;
     margin: 0;
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   ol {
@@ -67,7 +67,7 @@
     padding: 0;
     list-style: none;
     text-align: left;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   li {
@@ -86,7 +86,7 @@
     color: var(--accent-text);
     font-family: var(--font-display);
     font-size: var(--text-xs);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .inline {
@@ -95,7 +95,7 @@
     background: transparent;
     color: var(--accent-text);
     font: inherit;
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     cursor: pointer;
   }
 
@@ -107,7 +107,7 @@
 
   .inline.small {
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     font-weight: inherit;
   }
 

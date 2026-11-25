@@ -69,7 +69,7 @@
     align-items: center;
     gap: 6px;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .to {
@@ -79,7 +79,7 @@
 
   .to strong {
     color: var(--text);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .clear {

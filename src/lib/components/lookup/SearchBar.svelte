@@ -130,7 +130,7 @@
     background: transparent;
     color: var(--text);
     font: inherit;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .field input::-webkit-search-cancel-button {

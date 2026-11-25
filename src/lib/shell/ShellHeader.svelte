@@ -146,7 +146,7 @@
     gap: 7px;
     margin-top: 1px;
     color: var(--header-muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     white-space: nowrap;
   }
 
@@ -162,7 +162,7 @@
     background: transparent;
     color: var(--header-faint);
     font: inherit;
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     cursor: pointer;
   }
 
@@ -211,7 +211,7 @@
     justify-content: space-between;
     gap: 10px;
     padding: 0 14px 11px;
-    font-size: 11.5px;
+    font-size: var(--text-xs);
     white-space: nowrap;
   }
 
@@ -225,8 +225,8 @@
   .pct {
     color: var(--header-exp);
     font-family: var(--font-display);
-    font-size: 14px;
-    font-weight: 600;
+    font-size: var(--text-lg);
+    font-weight: var(--weight-strong);
     font-variant-numeric: tabular-nums;
   }
 
@@ -243,7 +243,7 @@
 
   .when b {
     color: var(--header-text);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   /* Dragged narrow: the exact points give way before the time to level does. */

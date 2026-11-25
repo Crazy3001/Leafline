@@ -29,7 +29,7 @@
     border-bottom: 2px solid transparent;
     background: transparent;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     cursor: pointer;
   }
 
@@ -42,6 +42,6 @@
   .kinds [aria-checked="true"] {
     border-bottom-color: var(--accent);
     color: var(--text);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 </style>

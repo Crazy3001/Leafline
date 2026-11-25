@@ -367,7 +367,7 @@
     gap: 5px;
     margin: 7px 0 0;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .payout :global(svg) {
@@ -461,12 +461,12 @@
     background: var(--surface-3);
     font-family: var(--font-display);
     font-size: var(--text-lg);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .unread {
     color: var(--muted);
-    font-weight: 400;
+    font-weight: var(--weight-body);
   }
 
   .giver {
@@ -475,7 +475,7 @@
     gap: 5px;
     margin: -5px 0 8px;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   /* The last step: who takes the quest in, plain until every step before it is done. */
@@ -485,7 +485,7 @@
 
   .hand-in.ready .giver {
     color: var(--good);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .faint {
@@ -569,7 +569,7 @@
 
   .dense .row {
     margin-bottom: 2px;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .quest.dense {
@@ -583,7 +583,7 @@
   .empty {
     margin: 0;
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .footer {
@@ -591,7 +591,7 @@
     padding-top: 10px;
     border-top: 1px solid var(--border);
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .lookup {
@@ -610,7 +610,7 @@
     border-radius: var(--radius-sm);
     background: var(--hover);
     color: var(--text);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     cursor: pointer;
   }
 

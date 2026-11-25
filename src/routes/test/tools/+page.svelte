@@ -205,6 +205,6 @@
 <style>
   h3 {
     margin: 14px 0 2px;
-    font-size: var(--text-sm, 13px);
+    font-size: var(--text-md);
   }
 </style>

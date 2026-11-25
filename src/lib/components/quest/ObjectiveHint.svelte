@@ -190,7 +190,7 @@
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     text-align: left;
     cursor: pointer;
   }
@@ -291,11 +291,11 @@
     flex-wrap: wrap;
     align-items: baseline;
     gap: 6px;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .mob :global(.ref) {
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .maps {
@@ -316,7 +316,7 @@
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     text-align: left;
     cursor: pointer;
   }

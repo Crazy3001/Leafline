@@ -172,7 +172,7 @@
 
     td:nth-child(2) {
       grid-area: item;
-      font-weight: 600;
+      font-weight: var(--weight-strong);
     }
 
     td:nth-child(3) {
@@ -217,7 +217,7 @@
   h2 {
     margin: 0;
     font-size: var(--text-lg);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .grow {
@@ -245,7 +245,7 @@
 
   .mname {
     flex: 1;
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   ul {
@@ -259,22 +259,21 @@
     justify-content: space-between;
     gap: 8px;
     padding: 1px 0;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   table {
     width: 100%;
     border-collapse: collapse;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   th {
     padding: 4px 6px;
+    text-align: left;
     color: var(--faint);
     font-size: var(--text-xs);
-    font-weight: 600;
-    text-align: left;
-    text-transform: uppercase;
+    font-weight: var(--weight-body);
   }
 
   td {
@@ -297,7 +296,7 @@
   .quiet {
     margin: 0;
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .caption {

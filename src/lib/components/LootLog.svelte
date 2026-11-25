@@ -162,7 +162,7 @@
     background: transparent;
     color: var(--text);
     font: inherit;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     text-align: left;
     cursor: pointer;
   }
@@ -172,7 +172,7 @@
   }
 
   .title {
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .chevron {
@@ -201,7 +201,7 @@
 
   p {
     margin: 0;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .small {
@@ -213,23 +213,23 @@
     flex-wrap: wrap;
     justify-content: space-between;
     gap: 8px;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .totals strong {
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   table {
     width: 100%;
     border-collapse: collapse;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   th {
     padding: 0 0 4px;
     font-size: var(--text-xs);
-    font-weight: 400;
+    font-weight: var(--weight-body);
     color: var(--faint);
     text-align: right;
   }

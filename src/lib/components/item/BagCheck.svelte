@@ -156,20 +156,18 @@
     display: flex;
     flex-wrap: wrap;
     gap: 4px 16px;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .sum strong {
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   h4 {
     margin: 10px 0 4px;
-    font-size: var(--text-xs);
-    font-weight: 600;
     color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
+    font-size: var(--text-xs);
+    font-weight: var(--weight-strong);
   }
 
   ul {
@@ -186,7 +184,7 @@
     grid-template-columns: 18px 1fr auto 64px;
     align-items: center;
     gap: 8px;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .pic {
@@ -218,7 +216,7 @@
   .quiet,
   .hint {
     margin: 6px 0 0;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     color: var(--faint);
   }
 
@@ -229,7 +227,7 @@
 
   .warn {
     margin: 0;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     color: var(--warn);
   }
 

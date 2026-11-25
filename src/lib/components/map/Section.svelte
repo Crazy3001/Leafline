@@ -111,8 +111,8 @@
 
   .title {
     font-family: var(--font-display);
-    font-size: var(--text-sm);
-    font-weight: 600;
+    font-size: var(--text-md);
+    font-weight: var(--weight-strong);
     letter-spacing: 0.01em;
     color: var(--text);
   }
@@ -164,7 +164,7 @@
   }
 
   .own > .head .title {
-    font-size: 14px;
+    font-size: var(--text-lg);
     font-weight: var(--weight-strong);
   }
 

@@ -74,7 +74,7 @@
 <style>
   .verdict {
     margin: 0 0 6px;
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .note {
@@ -84,12 +84,12 @@
   table {
     width: 100%;
     border-collapse: collapse;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   th {
     text-align: left;
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     color: var(--muted);
   }
 

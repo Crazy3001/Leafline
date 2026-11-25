@@ -116,7 +116,7 @@
   .label {
     color: var(--faint);
     font-size: var(--text-xs);
-    font-weight: 500;
+    font-weight: var(--weight-body);
   }
 
   .hero-row {
@@ -134,7 +134,7 @@
 
   .hero {
     font-size: 42px;
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     line-height: 1.05;
     white-space: nowrap;
   }
@@ -159,8 +159,8 @@
   }
 
   .mid {
-    font-size: 28px;
-    font-weight: 600;
+    font-size: var(--text-hero);
+    font-weight: var(--weight-strong);
     line-height: 1.15;
     white-space: nowrap;
   }
@@ -175,7 +175,7 @@
 
   .sub {
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .sub.at {

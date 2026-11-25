@@ -336,7 +336,7 @@
     padding: 5px 6px 5px 10px;
     border-bottom: 1px solid var(--border);
     background: var(--surface-2);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .bar.hud {
@@ -507,7 +507,7 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     background: color-mix(in srgb, var(--bg) 45%, transparent);
-    font-weight: 400;
+    font-weight: var(--weight-body);
   }
 
   /* A long trip scrolls inside the drawer rather than pushing the panels off the window. */
@@ -548,8 +548,8 @@
   .switch-row .name {
     display: block;
     color: var(--text);
-    font-size: var(--text-sm);
-    font-weight: 500;
+    font-size: var(--text-md);
+    font-weight: var(--weight-body);
   }
 
   .switch-row .help {
@@ -635,12 +635,12 @@
     margin: 0;
     padding: 4px 0;
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .idle strong {
     color: var(--muted);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .icon {
@@ -670,18 +670,18 @@
     align-items: baseline;
     gap: 0 6px;
     font-size: var(--text-md);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     line-height: 1.3;
   }
 
   .hud .next {
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .label {
     color: var(--accent-text-strong);
     font-family: var(--font-display);
-    font-weight: 400;
+    font-weight: var(--weight-body);
   }
 
   .verb {
@@ -694,7 +694,7 @@
 
   .arrow {
     color: var(--accent-text);
-    font-weight: 400;
+    font-weight: var(--weight-body);
   }
 
   .map {
@@ -703,13 +703,13 @@
 
   .fare {
     font-size: var(--text-xs);
-    font-weight: 400;
+    font-weight: var(--weight-body);
   }
 
   .hidden-hint {
     color: var(--warn);
     font-size: var(--text-xs);
-    font-weight: 400;
+    font-weight: var(--weight-body);
   }
 
   .rest {
@@ -719,7 +719,7 @@
   }
 
   .rest :global(.ref) {
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .line {
@@ -730,11 +730,11 @@
 
   .arrived .line {
     color: var(--good);
-    font-weight: 500;
+    font-weight: var(--weight-body);
   }
 
   .quest {
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .offer {
@@ -823,12 +823,12 @@
     gap: 5px;
     margin-bottom: 2px;
     color: var(--accent-sub);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .go .head .label {
     font-family: var(--font-sans);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .go .head .faint::before {
@@ -864,7 +864,7 @@
 
   .go .rest {
     margin-top: 2px;
-    font-size: 11.5px;
+    font-size: var(--text-xs);
   }
 
   .go .rest :global(.ref) {
@@ -913,7 +913,7 @@
   .go .tool.lit,
   .go .tool.square.lit {
     color: var(--accent-ink);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .go .tool.open {

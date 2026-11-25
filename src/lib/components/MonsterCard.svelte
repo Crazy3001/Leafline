@@ -290,21 +290,21 @@
 
   .rank b {
     color: var(--exp-text);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .name {
     margin: 0;
     font-family: var(--font-display);
     font-size: var(--text-lg);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     line-height: 1.25;
   }
 
   .meta {
     margin: 2px 0 8px;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .soft {
@@ -316,7 +316,7 @@
     align-items: center;
     gap: 3px;
     color: var(--bad);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .facts {
@@ -340,20 +340,20 @@
 
   dd {
     margin: 0;
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .kills {
     margin: 6px 0 0;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .elements {
     display: grid;
     gap: 1px;
     margin-top: 8px;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .good {
@@ -381,22 +381,22 @@
     gap: 8px;
     padding: 2px 0;
     border-top: 1px solid var(--border);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .stats dt {
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .stats dd {
-    font-weight: 500;
+    font-weight: var(--weight-body);
   }
 
   .traits {
     margin: 6px 0 0;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .link {
@@ -417,8 +417,8 @@
   }
 
   .link.strong {
-    font-size: var(--text-sm);
-    font-weight: 600;
+    font-size: var(--text-md);
+    font-weight: var(--weight-strong);
   }
 
   .quests,
@@ -426,7 +426,7 @@
     margin: 0;
     padding: 0;
     list-style: none;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .quests li,
@@ -451,7 +451,7 @@
 
   .quests .yours-now {
     color: var(--accent-text-strong);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .who {
@@ -507,7 +507,7 @@
 
   .note {
     margin: 0;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .spin {

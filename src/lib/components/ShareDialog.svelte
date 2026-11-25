@@ -119,7 +119,7 @@
     margin: 0;
     font-family: var(--font-display);
     font-size: var(--text-lg);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .close {
@@ -151,7 +151,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: 16px;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     color: var(--muted);
   }
 
@@ -186,6 +186,6 @@
   .problem {
     margin: 0;
     color: var(--bad);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 </style>

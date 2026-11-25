@@ -417,7 +417,7 @@
     border-radius: var(--radius-pill);
     background: var(--surface);
     color: var(--text);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     white-space: nowrap;
     cursor: pointer;
   }

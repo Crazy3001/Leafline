@@ -178,7 +178,7 @@
     margin: 0;
     color: var(--faint);
     font-size: var(--text-xs);
-    font-weight: 500;
+    font-weight: var(--weight-body);
   }
 
   .sub {
@@ -188,8 +188,8 @@
   h2 {
     margin: 0;
     font-family: var(--font-display);
-    font-size: 24px;
-    font-weight: 600;
+    font-size: var(--text-2xl);
+    font-weight: var(--weight-strong);
     line-height: 1.15;
   }
 
@@ -228,7 +228,7 @@
     border: 0;
     background: transparent;
     color: var(--accent-text);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     cursor: pointer;
   }
 
@@ -242,7 +242,7 @@
     border-radius: var(--radius-sm);
     background: color-mix(in srgb, var(--ref-skill) 14%, var(--surface));
     color: var(--ref-skill);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .warning {
@@ -250,7 +250,7 @@
     gap: 6px;
     margin: 0;
     color: var(--warn);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .warning :global(svg) {
@@ -276,7 +276,7 @@
 
   .what {
     font-family: var(--font-display);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .into {
@@ -291,7 +291,7 @@
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    font-weight: 500;
+    font-weight: var(--weight-body);
   }
 
   .gain i {
@@ -318,7 +318,7 @@
 
   .quiet {
     margin: 0;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .stats {
@@ -348,7 +348,7 @@
   .stat .value {
     font-family: var(--font-display);
     font-size: var(--text-lg);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .stat small {
@@ -389,13 +389,13 @@
   }
 
   .skill-name {
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .desc {
     margin-top: 2px;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     line-height: 1.4;
   }
 

@@ -185,25 +185,25 @@
     gap: 10px;
     padding: 10px 14px 0;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .title {
     min-width: 0;
     overflow: hidden;
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   .where {
     color: var(--faint);
-    font-weight: 500;
+    font-weight: var(--weight-body);
   }
 
   .clock {
     flex: none;
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .clock.paused {
@@ -240,7 +240,7 @@
   .rate {
     overflow: hidden;
     font-size: var(--text-hero);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     line-height: 34px;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -265,7 +265,7 @@
 
   .note.good {
     color: var(--tile-good);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .cells {
@@ -290,7 +290,7 @@
     align-items: center;
     gap: 5px;
     font-size: var(--text-lg);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     white-space: nowrap;
   }
 
@@ -305,7 +305,7 @@
     margin: 0;
     padding: 10px 14px 4px;
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .more,
@@ -329,7 +329,7 @@
     border-top: 1px solid var(--border);
     border-radius: 0 0 var(--radius-lg) var(--radius-lg);
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .more:hover,
@@ -358,7 +358,7 @@
   .quest-title {
     min-width: 0;
     overflow: hidden;
-    font-size: 14px;
+    font-size: var(--text-lg);
     font-weight: var(--weight-strong);
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -391,7 +391,7 @@
 
   .count {
     flex: none;
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .count.done {
@@ -400,7 +400,7 @@
 
   .of {
     color: var(--faint);
-    font-weight: 500;
+    font-weight: var(--weight-body);
   }
 
   .count.done .of {
@@ -455,11 +455,11 @@
 
   .dim {
     color: var(--faint);
-    font-size: 11.5px;
+    font-size: var(--text-xs);
   }
 
   .mapname {
     color: var(--ref-map);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 </style>

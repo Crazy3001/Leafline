@@ -49,7 +49,7 @@
     background: transparent;
     color: var(--accent-text-strong);
     font: inherit;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     cursor: pointer;
   }
 </style>

@@ -50,7 +50,7 @@
   .value {
     overflow: hidden;
     font-size: var(--text-lg);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     line-height: 1.2;
     white-space: nowrap;
     text-overflow: ellipsis;

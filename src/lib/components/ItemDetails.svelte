@@ -238,13 +238,13 @@
   .piece-error {
     margin: 4px 0 0;
     color: var(--bad);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .about {
     margin: 8px 0 0;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     white-space: pre-line;
   }
 
@@ -268,13 +268,13 @@
 
   dd {
     margin: 0;
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .tags {
     margin: 6px 0 0;
     color: var(--warn);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .actions {
@@ -293,7 +293,7 @@
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     cursor: pointer;
   }
 
@@ -312,7 +312,7 @@
   .note {
     margin: 4px 0 0;
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .spin {

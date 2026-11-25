@@ -230,15 +230,15 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: var(--text-sm);
-    font-weight: 600;
+    font-size: var(--text-md);
+    font-weight: var(--weight-strong);
   }
 
   .head .facts {
     margin-left: auto;
     color: var(--faint);
     font-size: var(--text-xs);
-    font-weight: 400;
+    font-weight: var(--weight-body);
   }
 
   .line {

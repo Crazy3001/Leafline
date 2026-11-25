@@ -79,8 +79,8 @@
 
   .name {
     overflow: hidden;
-    font-size: var(--text-sm);
-    font-weight: 600;
+    font-size: var(--text-md);
+    font-weight: var(--weight-strong);
     white-space: nowrap;
     text-overflow: ellipsis;
   }
@@ -108,8 +108,8 @@
   }
 
   .value {
-    font-size: var(--text-sm);
-    font-weight: 600;
+    font-size: var(--text-md);
+    font-weight: var(--weight-strong);
     white-space: nowrap;
   }
 </style>

@@ -54,7 +54,7 @@
     margin-left: 4px;
     color: var(--faint);
     font-size: var(--text-xs);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     line-height: 1;
     vertical-align: -1px;
   }
@@ -89,7 +89,7 @@
 
   .bang {
     width: 11px;
-    font-weight: 800;
+    font-weight: var(--weight-strong);
     text-align: center;
   }
 </style>

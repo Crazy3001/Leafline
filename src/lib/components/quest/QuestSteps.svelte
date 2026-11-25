@@ -156,7 +156,7 @@
     margin: 4px 0 0;
     padding: 0;
     list-style: none;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .chain-at li + li::before {
@@ -170,21 +170,20 @@
   }
 
   .chain-at li.here {
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .story {
     margin: 6px 0 0;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   h4 {
     margin: 10px 0 4px;
     color: var(--muted);
-    font-family: var(--font-display);
-    font-size: var(--text-sm);
-    font-weight: 400;
+    font-size: var(--text-xs);
+    font-weight: var(--weight-strong);
   }
 
   .steps {
@@ -213,14 +212,14 @@
 
   .step {
     margin: 0;
-    font-size: var(--text-sm);
-    font-weight: 600;
+    font-size: var(--text-md);
+    font-weight: var(--weight-strong);
   }
 
   .done .step,
   .done .step :global(.ref) {
     color: var(--faint);
-    font-weight: 500;
+    font-weight: var(--weight-body);
     text-decoration: line-through;
   }
 
@@ -254,7 +253,7 @@
 
   dd {
     margin: 0;
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   dd.exp,
@@ -265,7 +264,7 @@
   .chain {
     margin: 0;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .chain .mesos {
@@ -281,12 +280,12 @@
     padding: 0;
     list-style: none;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .links :global(.ref) {
     padding: 2px 0;
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .maybe {

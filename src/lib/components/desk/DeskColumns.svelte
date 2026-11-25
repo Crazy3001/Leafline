@@ -246,7 +246,7 @@
 
   .faint {
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .tab,
@@ -255,14 +255,14 @@
     padding: 0 14px;
     border: var(--line-w) solid var(--control-line);
     border-radius: var(--radius-pill);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     white-space: nowrap;
   }
 
   .tab {
     background: var(--surface);
     color: var(--muted);
-    font-weight: 500;
+    font-weight: var(--weight-body);
     cursor: pointer;
   }
 
@@ -351,7 +351,7 @@
     gap: 7px;
     margin: 0;
     font-family: var(--font-display);
-    font-size: 15px;
+    font-size: var(--text-lg);
     font-weight: var(--weight-strong);
   }
 

@@ -621,8 +621,8 @@
     border-radius: var(--radius-sm);
     background: var(--accent-strong);
     color: var(--accent-ink);
-    font-size: 10px;
-    font-weight: 700;
+    font-size: var(--text-2xs);
+    font-weight: var(--weight-strong);
     line-height: 14px;
     white-space: nowrap;
     transform: translateX(-50%);
@@ -712,7 +712,7 @@
     gap: 6px;
     margin: 0;
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .spin {

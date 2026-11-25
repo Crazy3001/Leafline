@@ -148,7 +148,7 @@
     background: transparent;
     color: var(--text);
     font: inherit;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   input::-webkit-search-cancel-button {
@@ -192,7 +192,7 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .name :global(svg) {
@@ -207,7 +207,7 @@
   .empty {
     padding: 6px 8px;
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .error {
@@ -223,7 +223,7 @@
     margin: 6px 0 0;
     padding: 0;
     list-style: none;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .recent li {
@@ -247,7 +247,7 @@
     background: var(--surface-2);
     color: var(--text);
     font-size: var(--text-xs);
-    font-weight: 500;
+    font-weight: var(--weight-body);
     white-space: nowrap;
     text-overflow: ellipsis;
     cursor: pointer;

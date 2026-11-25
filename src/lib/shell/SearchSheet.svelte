@@ -407,7 +407,7 @@
     background: transparent;
     color: var(--text);
     font: inherit;
-    font-size: 14px;
+    font-size: var(--text-lg);
   }
 
   input::placeholder {
@@ -468,10 +468,9 @@
 
   h3 {
     margin: 0;
-    color: var(--faint);
-    font-family: var(--font-display);
-    font-size: var(--text-sm);
-    font-weight: 600;
+    color: var(--muted);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-strong);
   }
 
   .all,
@@ -484,8 +483,8 @@
     background: transparent;
     color: var(--accent-text);
     font: inherit;
-    font-size: var(--text-sm);
-    font-weight: 600;
+    font-size: var(--text-md);
+    font-weight: var(--weight-strong);
     cursor: pointer;
   }
 
@@ -549,6 +548,6 @@
   .quiet {
     margin: 14px 2px 0;
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 </style>

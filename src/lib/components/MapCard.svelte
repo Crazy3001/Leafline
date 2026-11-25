@@ -321,7 +321,7 @@
     background: var(--surface);
     color: var(--muted);
     font-size: var(--text-xs);
-    font-weight: 500;
+    font-weight: var(--weight-body);
     white-space: nowrap;
     cursor: pointer;
   }
@@ -375,13 +375,13 @@
 
   .street {
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .name {
     font-family: var(--font-display);
     font-size: var(--text-xl);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     line-height: 1.2;
   }
 
@@ -407,14 +407,14 @@
     margin: 0;
     font-family: var(--font-display);
     font-size: var(--text-lg);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     color: var(--text);
   }
 
   .empty {
     margin: 0;
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .miss {
@@ -436,7 +436,7 @@
     border-radius: var(--radius-sm);
     background: color-mix(in srgb, var(--map) 16%, var(--surface-3));
     color: var(--map);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     text-align: left;
     cursor: pointer;
     transition:
@@ -468,7 +468,7 @@
 
   .back-to strong {
     color: var(--text);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .doubt {

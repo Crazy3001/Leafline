@@ -239,16 +239,13 @@
     align-items: baseline;
     gap: 6px;
     margin: 10px 0 2px;
-    color: var(--faint);
-    font-family: var(--font-display);
+    color: var(--muted);
     font-size: var(--text-xs);
-    font-weight: 600;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
+    font-weight: var(--weight-strong);
   }
 
   .kind span {
-    font-weight: 400;
+    font-weight: var(--weight-body);
     letter-spacing: 0;
   }
 
@@ -280,7 +277,7 @@
     gap: 4px;
     min-width: 0;
     overflow: hidden;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     white-space: nowrap;
   }
 
@@ -305,8 +302,8 @@
 
   .meso-line .mesos {
     flex: 1;
-    font-size: var(--text-sm);
-    font-weight: 600;
+    font-size: var(--text-md);
+    font-weight: var(--weight-strong);
   }
 
   .mesos {
@@ -338,7 +335,7 @@
   }
 
   .mob-head :global(.ref.mob-name) {
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .empty .summary {
@@ -359,7 +356,7 @@
     margin: 2px 0 0;
     padding: 0 0 0 4px;
     list-style: none;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .wrap li {
@@ -380,7 +377,7 @@
 
   .note {
     margin: 0;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     color: var(--faint);
   }
 
@@ -397,7 +394,7 @@
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: transparent;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     cursor: pointer;
   }
 
@@ -423,7 +420,7 @@
 
   .error {
     margin: 0 0 6px;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     color: var(--bad);
   }
 </style>

@@ -175,7 +175,7 @@
     border: 0;
     background: var(--surface-2);
     color: var(--text);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     text-align: left;
     cursor: pointer;
   }
@@ -197,7 +197,7 @@
   }
 
   .strong {
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .muted {
@@ -206,7 +206,7 @@
 
   .rate-line {
     margin: var(--space-3) 0 0;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .identity {
@@ -226,21 +226,21 @@
     border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
     font-family: var(--font-display);
     font-size: var(--text-xl);
-    font-weight: 700;
+    font-weight: var(--weight-strong);
     line-height: 1;
     color: var(--text);
   }
 
   .lv {
     font-size: var(--text-xs);
-    font-weight: 400;
+    font-weight: var(--weight-body);
     color: var(--muted);
   }
 
   .name {
     font-family: var(--font-display);
     font-size: var(--text-lg);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .mesos {
@@ -248,7 +248,7 @@
     align-items: center;
     gap: 6px;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .seen {
@@ -259,7 +259,7 @@
     margin-left: 6px;
     font-family: var(--font-sans);
     font-size: var(--text-xs);
-    font-weight: 400;
+    font-weight: var(--weight-body);
   }
 
   .coin {

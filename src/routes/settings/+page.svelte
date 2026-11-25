@@ -1388,7 +1388,7 @@
     gap: 3px;
     margin-left: 8px;
     color: var(--good);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .reset-keys {
@@ -1468,13 +1468,13 @@
     margin: 0 0 4px;
     font-family: var(--font-display);
     font-size: var(--text-xl);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   h3 {
     margin: 18px 0 8px;
     font-size: var(--text-md);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .lead {
@@ -1501,12 +1501,12 @@
   }
 
   .name {
-    font-weight: 500;
+    font-weight: var(--weight-body);
   }
 
   .help {
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .control {
@@ -1620,7 +1620,7 @@
     gap: 6px;
     padding: 10px 0;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     cursor: pointer;
     list-style: none;
   }
@@ -1717,7 +1717,7 @@
 
   .source {
     margin-left: auto;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .connections .help,
@@ -1727,7 +1727,7 @@
 
   .route-line {
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .route-line .from {
@@ -1812,7 +1812,7 @@
   }
 
   .sample {
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .keys {
@@ -1846,7 +1846,7 @@
   .note {
     margin: 10px 0 12px;
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
 
@@ -1918,7 +1918,7 @@
     background: var(--hover);
     color: var(--muted);
     font-size: var(--text-xs);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .status.on {
@@ -2046,7 +2046,7 @@
   .update-note {
     flex-basis: 100%;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .update-note.warn {

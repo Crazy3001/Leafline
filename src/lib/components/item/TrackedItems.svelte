@@ -96,8 +96,8 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: var(--text-sm);
-    font-weight: 600;
+    font-size: var(--text-md);
+    font-weight: var(--weight-strong);
   }
 
   .head :global(.ref) {

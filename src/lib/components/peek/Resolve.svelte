@@ -54,7 +54,7 @@
     gap: 6px;
     margin: 0;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .bad {

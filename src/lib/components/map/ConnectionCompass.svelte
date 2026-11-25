@@ -368,7 +368,7 @@
     background: color-mix(in srgb, var(--map) 16%, transparent);
     color: var(--map);
     font-size: var(--text-xs);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     line-height: 1.25;
     text-align: center;
     overflow-wrap: anywhere;
@@ -436,10 +436,10 @@
     display: flex;
     align-items: center;
     gap: 3px;
-    font-size: var(--text-xs);
-    font-weight: 600;
     white-space: nowrap;
     color: var(--faint);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-body);
   }
 
   .label {
@@ -448,8 +448,8 @@
     line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
-    font-size: var(--text-sm);
-    font-weight: 500;
+    font-size: var(--text-md);
+    font-weight: var(--weight-body);
     line-height: 1.25;
     overflow-wrap: anywhere;
   }
@@ -509,8 +509,8 @@
     border-radius: var(--radius-sm);
     background: var(--accent-strong);
     color: var(--accent-ink);
-    font-size: 10px;
-    font-weight: 700;
+    font-size: var(--text-2xs);
+    font-weight: var(--weight-strong);
     line-height: 13px;
   }
 
@@ -598,7 +598,7 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     background: var(--surface-3);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     text-align: left;
     cursor: pointer;
     transition:
@@ -629,10 +629,10 @@
     align-items: center;
     gap: 3px;
     width: 92px;
+    white-space: nowrap;
     color: var(--faint);
     font-size: var(--text-xs);
-    font-weight: 600;
-    white-space: nowrap;
+    font-weight: var(--weight-body);
   }
 
   .row.next .row-dir {
@@ -647,7 +647,7 @@
     flex: 1;
     min-width: 0;
     overflow: hidden;
-    font-weight: 500;
+    font-weight: var(--weight-body);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -664,7 +664,7 @@
 
   .none {
     margin: 0;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     color: var(--faint);
   }
 </style>

@@ -406,7 +406,7 @@
     border-radius: var(--radius);
     background: var(--surface-2);
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     line-height: 1.4;
   }
 
@@ -493,7 +493,7 @@
   .tool-note {
     margin: 4px 14px;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     line-height: 1.5;
   }
 </style>

@@ -186,7 +186,7 @@
     margin-bottom: 12px;
     padding-bottom: 12px;
     border-bottom: 1px solid var(--border);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .problems p {
@@ -220,7 +220,7 @@
     margin: 0;
     font-family: var(--font-display);
     font-size: var(--text-lg);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .rows,
@@ -228,7 +228,7 @@
     margin: 0;
     padding: 0;
     list-style: none;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .rows > li {
@@ -294,7 +294,7 @@
   .picked > .row .at,
   li.picked > .at {
     color: var(--accent-text-strong);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .here .at,
@@ -314,7 +314,7 @@
   .line.advance,
   .line.you {
     color: var(--accent-text-strong);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   /* New gear as a row of its pictures; each names itself on hover and opens its card. */

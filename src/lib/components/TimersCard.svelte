@@ -176,12 +176,12 @@
   }
 
   .time {
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .done .time {
     color: var(--good);
-    font-weight: 500;
+    font-weight: var(--weight-body);
   }
 
   .done .name {
@@ -234,7 +234,7 @@
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     cursor: pointer;
   }
 
@@ -256,7 +256,7 @@
     background: var(--bg);
     color: var(--text);
     font: inherit;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   input:focus {
@@ -275,7 +275,7 @@
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     cursor: pointer;
   }
 
@@ -301,7 +301,7 @@
     border: 0;
     background: transparent;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     cursor: pointer;
   }
 
@@ -311,8 +311,8 @@
     border-radius: var(--radius-sm);
     background: var(--accent);
     color: var(--accent-ink);
-    font-size: var(--text-sm);
-    font-weight: 600;
+    font-size: var(--text-md);
+    font-weight: var(--weight-strong);
     cursor: pointer;
   }
 

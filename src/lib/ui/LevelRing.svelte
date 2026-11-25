@@ -81,13 +81,13 @@
 
   .lv {
     font-size: 8.5px;
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     color: var(--header-faint);
   }
 
   .n {
     font-size: 17px;
-    font-weight: 700;
+    font-weight: var(--weight-strong);
     font-variant-numeric: tabular-nums;
   }
 

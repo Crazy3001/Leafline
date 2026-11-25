@@ -82,7 +82,7 @@
     margin: 0;
     padding: 0;
     list-style: none;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .slots > li {
@@ -117,8 +117,8 @@
   }
 
   li :global(.ref.name) {
-    font-size: var(--text-sm);
-    font-weight: 600;
+    font-size: var(--text-md);
+    font-weight: var(--weight-strong);
   }
 
   li :global(.ref.name.goal) {
@@ -129,7 +129,7 @@
     margin-left: 4px;
     color: var(--faint);
     font-size: var(--text-xs);
-    font-weight: 500;
+    font-weight: var(--weight-body);
   }
 
   .gives {

@@ -308,7 +308,7 @@
   th {
     text-align: left;
     color: var(--muted);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   th,

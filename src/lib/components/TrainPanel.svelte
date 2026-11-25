@@ -692,7 +692,7 @@
     gap: 4px;
     padding: var(--space-3);
     background: var(--surface-2);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     color: var(--muted);
   }
 
@@ -740,13 +740,13 @@
 
   .hero {
     font-size: var(--text-hero);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     line-height: 1;
   }
 
   .recent .num {
     font-size: var(--text-lg);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .pace {
@@ -766,7 +766,7 @@
     display: flex;
     flex-direction: column;
     gap: 5px;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .level-line {
@@ -819,7 +819,7 @@
     align-items: baseline;
     gap: 4px var(--space-2);
     margin: 0 0 var(--space-2);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     color: var(--muted);
   }
 
@@ -844,8 +844,8 @@
   }
 
   .map-name {
-    font-size: var(--text-sm);
-    font-weight: 600;
+    font-size: var(--text-md);
+    font-weight: var(--weight-strong);
     color: var(--text);
   }
 
@@ -854,7 +854,7 @@
     grid-template-columns: 96px minmax(0, 1fr) 44px;
     gap: 6px var(--space-2);
     align-items: center;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .compare > :nth-child(3n) {
@@ -864,13 +864,13 @@
   table {
     width: 100%;
     border-collapse: collapse;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   th {
     padding: 0 0 4px;
     font-size: var(--text-xs);
-    font-weight: 400;
+    font-weight: var(--weight-body);
     color: var(--faint);
     text-align: right;
   }
@@ -934,7 +934,7 @@
     gap: var(--space-2);
     padding: 7px 0;
     border-top: 1px solid var(--border);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .day {

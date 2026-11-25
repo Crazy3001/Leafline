@@ -149,7 +149,7 @@
   .done {
     margin: 0 0 6px;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .done {
@@ -180,7 +180,7 @@
     border-radius: var(--radius-sm);
     background: var(--surface-2);
     color: var(--text);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     cursor: pointer;
   }
 
@@ -213,7 +213,7 @@
     border: 0;
     background: transparent;
     color: var(--accent-text-strong);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     cursor: pointer;
   }
 
@@ -237,7 +237,7 @@
     background: var(--well);
     color: var(--text);
     font: inherit;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .other input:focus {
@@ -254,6 +254,6 @@
   .error {
     margin: 6px 0 0;
     color: var(--bad);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 </style>

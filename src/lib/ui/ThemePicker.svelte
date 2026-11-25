@@ -209,8 +209,8 @@
     border-radius: 6px;
     color: var(--tile-text);
     font-family: var(--font-display);
-    font-size: 10px;
-    font-weight: 600;
+    font-size: var(--text-2xs);
+    font-weight: var(--weight-strong);
     line-height: 14px;
   }
 

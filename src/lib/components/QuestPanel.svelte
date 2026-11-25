@@ -341,7 +341,7 @@
   .lead {
     margin: 0 0 10px;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   /* A card pads itself; these sit beside cards, so they match it. A pinned window pads its body. */
@@ -395,7 +395,7 @@
     background: transparent;
     color: var(--text);
     font: inherit;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .field input::-webkit-search-cancel-button {
@@ -437,7 +437,7 @@
     padding: 8px;
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .filters label {
@@ -498,7 +498,7 @@
 
   .row-name {
     font-size: var(--text-md);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .row-line {
@@ -518,7 +518,7 @@
     border: 0;
     background: transparent;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     cursor: pointer;
   }
 
@@ -536,7 +536,7 @@
   .quiet {
     margin: 0 0 6px;
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .spin {
@@ -554,7 +554,7 @@
     margin: 0;
     padding: 18px 10px;
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     text-align: center;
   }
 
