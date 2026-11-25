@@ -634,8 +634,8 @@
 
 {#snippet moveButtons(onmove: (by: number) => void, first: boolean, last: boolean)}
   <span class="moves">
-    <button class="icon" use:tip={"Move up"} aria-label="Move up" disabled={first} onclick={() => onmove(-1)}><ArrowUp size={12} /></button>
-    <button class="icon" use:tip={"Move down"} aria-label="Move down" disabled={last} onclick={() => onmove(1)}><ArrowDown size={12} /></button>
+    <button class="icon-btn xs icon" use:tip={"Move up"} aria-label="Move up" disabled={first} onclick={() => onmove(-1)}><ArrowUp size={12} /></button>
+    <button class="icon-btn xs icon" use:tip={"Move down"} aria-label="Move down" disabled={last} onclick={() => onmove(1)}><ArrowDown size={12} /></button>
   </span>
 {/snippet}
 
@@ -726,7 +726,7 @@
           <input class="name" maxlength="80" aria-label="Build name" bind:value={draft.name} />
           <p class="path">{pathSummary}</p>
         </div>
-        <button class="plain" onclick={copyCode}>
+        <button class="btn" onclick={copyCode}>
           <ClipboardCopy size={13} />{copied ? "Copied" : "Copy plan code"}
         </button>
       </header>
@@ -748,7 +748,7 @@
                   {#if problem.severity === "warning"}<TriangleAlert size={13} />{/if}
                   <span>{problem.message}</span>
                   {#if problem.level != null}
-                    <button class="plain small" onclick={() => pick(problem.level!)}>Show Lv {problem.level}</button>
+                    <button class="btn sm" onclick={() => pick(problem.level!)}>Show Lv {problem.level}</button>
                   {/if}
                 </li>
               {/each}
@@ -822,8 +822,8 @@
               <p class="quiet">No skill goals yet.</p>
             {/each}
             <p class="order-foot">
-              <button class="plain" onclick={() => pickTab("skills")}><Plus size={13} />Add or change goals in Skills</button>
-              <button class="plain" onclick={() => pickTab("stats")}>Stat goals in Stats</button>
+              <button class="btn" onclick={() => pickTab("skills")}><Plus size={13} />Add or change goals in Skills</button>
+              <button class="btn" onclick={() => pickTab("stats")}>Stat goals in Stats</button>
             </p>
           </div>
         {:else if tab === "skills"}
@@ -850,7 +850,7 @@
                   </label>
                   <span class="max tabular">of {skill?.maxLevel ?? "?"}</span>
                   {@render reachedBadge(skillReached(goal, draft.start.skills, steps))}
-                  <button class="icon" use:tip={"Remove"} aria-label="Remove {skill?.name ?? 'skill'}" onclick={() => draft?.plan.skills.splice(index, 1)}
+                  <button class="icon-btn xs icon" use:tip={"Remove"} aria-label="Remove {skill?.name ?? 'skill'}" onclick={() => draft?.plan.skills.splice(index, 1)}
                     ><X size={12} /></button
                   >
                 </li>
@@ -915,7 +915,7 @@
                   {:else}
                     <span class="reached tabular normal">{stepAt(steps, endLevel)?.stats[goal.stat] ?? "?"} by Lv {endLevel}</span>
                   {/if}
-                  <button class="icon" use:tip={"Remove"} aria-label="Remove {statLabel(goal.stat)} goal" onclick={() => draft?.plan.stats.splice(i, 1)}
+                  <button class="icon-btn xs icon" use:tip={"Remove"} aria-label="Remove {statLabel(goal.stat)} goal" onclick={() => draft?.plan.stats.splice(i, 1)}
                     ><X size={12} /></button
                   >
                 </li>
@@ -923,7 +923,7 @@
             </ol>
           {/if}
           <button
-            class="plain"
+            class="btn"
             onclick={() => draft?.plan.stats.push({ stat: "dex", target: (draft?.start.stats?.dex ?? 0) + 5, fromLevel: null })}
           >
             <Plus size={13} />Add a stat goal
@@ -1002,7 +1002,7 @@
                       <b>{now ? "now" : step.level}</b>
                       <Ref kind="item" id={step.item.id} name={step.item.name} />
                       {#if step.planned}
-                        <button class="icon small" aria-label="Stop aiming for {step.item.name}" onclick={() => dropGoal(step.item.id)}><X size={11} /></button>
+                        <button class="icon-btn xs icon small" aria-label="Stop aiming for {step.item.name}" onclick={() => dropGoal(step.item.id)}><X size={11} /></button>
                       {/if}
                     </span>
                   {/each}
@@ -1011,14 +1011,14 @@
                     <span class="chip passed" use:tip={below ? `Needs Lv ${item.reqLevel}: you're past it, and the path has a better piece` : "A better piece of this tier or a higher one comes as soon"}>
                       <b class="warn">{below ? `below Lv ${gearFrom}` : "passed over"}</b>
                       <Ref kind="item" id={item.id} name={item.name} />
-                      <button class="icon small" aria-label="Stop aiming for {item.name}" onclick={() => dropGoal(item.id)}><X size={11} /></button>
+                      <button class="icon-btn xs icon small" aria-label="Stop aiming for {item.name}" onclick={() => dropGoal(item.id)}><X size={11} /></button>
                     </span>
                   {/each}
                   {#each stuckBySlot.get(slot) ?? [] as check (check.item.id)}
                     <span class="chip passed">
                       <b class="warn">{check.usable ? "out of reach" : "wrong job"}</b>
                       <Ref kind="item" id={check.item.id} name={check.item.name} />
-                      <button class="icon small" aria-label="Stop aiming for {check.item.name}" onclick={() => dropGoal(check.item.id)}><X size={11} /></button>
+                      <button class="icon-btn xs icon small" aria-label="Stop aiming for {check.item.name}" onclick={() => dropGoal(check.item.id)}><X size={11} /></button>
                     </span>
                   {/each}
                   <button class="add-chip" class:on={adding === slot} aria-expanded={adding === slot} onclick={() => openFinder(slot)}>
@@ -1163,14 +1163,14 @@
                       {#if starter.source}
                         <small>
                           {starter.source.credit}
-                          <button class="plain" onclick={() => starter.source && backend.openGuide(starter.source.url)}>
+                          <button class="btn" onclick={() => starter.source && backend.openGuide(starter.source.url)}>
                             Open {starter.source.name}'s guide
                           </button>
                         </small>
                       {/if}
                       {#if starter.missing.length}<small class="warn">Not in this data: {starter.missing.join(", ")}</small>{/if}
                     </span>
-                    <button class="plain" class:danger={confirmStarter === starter.id} onclick={() => useStarter(starter)}>
+                    <button class="btn" class:danger={confirmStarter === starter.id} onclick={() => useStarter(starter)}>
                       {confirmStarter === starter.id ? "Replace my goals?" : "Use this plan"}
                     </button>
                   </li>
@@ -1191,7 +1191,7 @@
               <label><span>2nd job at Lv</span><input class="number" type="number" min="2" value={rules.secondJobLevel} oninput={(e) => setRules({ secondJobLevel: whole(e.currentTarget.value) })} /></label>
             </div>
             {#if rulesChanged}
-              <button class="plain" onclick={() => setRules(DEFAULT_RULES)}><RotateCcw size={13} />Back to the defaults</button>
+              <button class="btn" onclick={() => setRules(DEFAULT_RULES)}><RotateCcw size={13} />Back to the defaults</button>
             {/if}
           </section>
 
@@ -1200,7 +1200,7 @@
             {#if jobGuides.length}
               <div class="links">
                 {#each jobGuides as guide (guide.url)}
-                  <button class="plain" onclick={() => backend.openGuide(guide.url)}>
+                  <button class="btn" onclick={() => backend.openGuide(guide.url)}>
                     <ExternalLink size={13} />{guide.job}, {guide.site} ({guide.levels})
                   </button>
                 {/each}
@@ -1208,7 +1208,7 @@
             {/if}
             <div class="guide">
               <input type="url" placeholder="https://" aria-label="Guide link" bind:value={draft.guide} />
-              <button class="plain" disabled={!draft.guide.trim()} onclick={() => draft && backend.openGuide(draft.guide)}>
+              <button class="btn" disabled={!draft.guide.trim()} onclick={() => draft && backend.openGuide(draft.guide)}>
                 <ExternalLink size={13} />Open
               </button>
             </div>
@@ -1216,9 +1216,9 @@
           </section>
 
           <section class="actions">
-            <button class="plain" onclick={copyCode}><ClipboardCopy size={13} />{copied ? "Copied" : "Copy plan code"}</button>
-            <button class="plain" onclick={duplicate}><Plus size={13} />Duplicate build</button>
-            <button class="plain push" class:danger={confirmDelete} onclick={remove}>
+            <button class="btn" onclick={copyCode}><ClipboardCopy size={13} />{copied ? "Copied" : "Copy plan code"}</button>
+            <button class="btn" onclick={duplicate}><Plus size={13} />Duplicate build</button>
+            <button class="btn push" class:danger={confirmDelete} onclick={remove}>
               <Trash2 size={13} />{confirmDelete ? "Really delete?" : "Delete build"}
             </button>
           </section>
@@ -1671,33 +1671,9 @@
     flex: none;
   }
 
-  .icon {
-    display: grid;
-    flex: none;
-    place-items: center;
-    width: 20px;
-    height: 20px;
-    padding: 0;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--faint);
-    cursor: pointer;
-  }
-
   .icon.small {
     width: 16px;
     height: 16px;
-  }
-
-  .icon:hover:not(:disabled) {
-    background: var(--hover);
-    color: var(--text);
-  }
-
-  .icon:disabled {
-    opacity: 0.35;
-    cursor: default;
   }
 
   .add {
@@ -1980,35 +1956,6 @@
     margin-left: auto;
   }
 
-  .plain {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-1-5);
-    padding: var(--space-1) var(--space-2);
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--muted);
-    font-size: var(--text-md);
-    white-space: nowrap;
-    cursor: pointer;
-  }
-
-  .plain:hover:not(:disabled) {
-    color: var(--text);
-    background: var(--hover);
-  }
-
-  .plain:disabled {
-    color: var(--faint);
-    cursor: default;
-  }
-
-  .plain.danger {
-    border-color: var(--bad);
-    color: var(--bad);
-  }
-
   .error {
     margin: var(--space-2) var(--space-6) 0;
     padding: var(--space-1-5) var(--space-3);
@@ -2048,11 +1995,6 @@
 
   .plan-problems :global(svg) {
     flex: none;
-  }
-
-  .plain.small {
-    padding: var(--space-0-5) var(--space-2);
-    font-size: var(--text-xs);
   }
 
   .plan-card {

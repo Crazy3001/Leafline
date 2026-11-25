@@ -22,14 +22,14 @@
       <Database size={13} />
       <span><strong class="tabular">{maps}</strong> maps · data from {updated} · checked {ago(status.checkedAt)}</span>
     </p>
-    <button class="action" onclick={() => downloadMapData(true)} disabled={mapData.downloading}>
+    <button class="btn" onclick={() => downloadMapData(true)} disabled={mapData.downloading}>
       {#if mapData.downloading}<span class="spin"><LoaderCircle size={13} /></span>Checking…{:else}<RefreshCw
           size={13}
         />Check for updates{/if}
     </button>
   {:else}
     <p class="explain">Maps, monsters, quests and items need the community map data: about 2 MB, downloaded once.</p>
-    <button class="action primary" onclick={() => downloadMapData(false)} disabled={mapData.downloading}>
+    <button class="btn primary" onclick={() => downloadMapData(false)} disabled={mapData.downloading}>
       {#if mapData.downloading}<span class="spin"><LoaderCircle size={13} /></span>Downloading…{:else}<Database
           size={13}
         />Download map data{/if}
@@ -72,44 +72,8 @@
     color: var(--faint);
   }
 
-  .action {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--space-1-5);
-    height: var(--control-h);
-    padding: 0 var(--space-3);
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
-    background: transparent;
-    font-size: var(--text-md);
-    font-weight: var(--weight-body);
-    cursor: pointer;
-  }
-
-  .action:hover:not(:disabled) {
-    background: var(--surface-2);
-  }
-
   /* The one main action where it shows, so the primary button style. */
-  .action.primary {
-    border-color: var(--accent);
-    background: var(--accent);
-    color: var(--accent-ink);
-    font-weight: var(--weight-strong);
-  }
-
-  .action.primary:hover:not(:disabled) {
-    border-color: var(--accent-strong);
-    background: var(--accent-strong);
-  }
-
-  .action:disabled {
-    color: var(--muted);
-    cursor: default;
-  }
-
-  .compact .action {
+  .compact .btn {
     justify-self: start;
   }
 

@@ -258,6 +258,200 @@ button {
   box-shadow: var(--card-shadow);
 }
 
+/*
+ * The one button. ui/Button.svelte draws it; a plain <button class="btn"> is the same thing where
+ * a component won't do (a submit, a tooltip with a picture). Secondary unless told otherwise:
+ * `primary` for the single main action on a view, `ghost` with no frame, `danger`. `sm` is the
+ * small size for inside a row.
+ */
+.btn {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1-5);
+  height: var(--control-h);
+  padding: 0 var(--space-3);
+  border: var(--line-w) solid var(--control-line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  box-shadow: var(--control-shadow);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-md);
+  font-weight: var(--weight-body);
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    transform 0.08s ease;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--surface-3);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 1px;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.btn.sm {
+  height: var(--control-h-sm);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+}
+
+.btn.primary {
+  border-color: transparent;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: var(--weight-strong);
+}
+
+/* Sprout outlines everything in ink, the main button too. */
+[data-theme^="sprout"] .btn.primary {
+  border-color: var(--control-line);
+}
+
+.btn.primary:hover:not(:disabled) {
+  background: var(--accent-strong);
+}
+
+.btn.ghost {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: var(--muted);
+}
+
+.btn.ghost:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.btn.danger {
+  border-color: color-mix(in srgb, var(--bad) 45%, transparent);
+  background: transparent;
+  box-shadow: none;
+  color: var(--bad);
+}
+
+.btn.danger:hover:not(:disabled) {
+  background: var(--bad-soft);
+}
+
+.btn[aria-pressed="true"] {
+  background: var(--surface-3);
+}
+
+/*
+ * A button that is only an icon: square, frameless, lit under the pointer. Three sizes: 34 for a
+ * window's header, `sm` 28 inside a card, `xs` 22 inside a row. ui/IconButton.svelte draws it.
+ */
+.icon-btn {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
+}
+
+.icon-btn.sm {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+}
+
+/* Inside a row it stays quiet until the pointer comes. */
+.icon-btn.xs {
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  color: var(--faint);
+}
+
+.icon-btn:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.icon-btn:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 1px;
+}
+
+.icon-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.icon-btn.active,
+.icon-btn[aria-pressed="true"] {
+  color: var(--accent-text);
+}
+
+/*
+ * A small tag beside a name: a kind, a count, a state. Quiet by default; `good`, `warn`, `bad`
+ * and `travel` colour it when the colour means something.
+ */
+.badge {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--hover);
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-body);
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+.badge.good {
+  background: var(--good-soft);
+  color: var(--good);
+}
+
+.badge.warn {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.badge.bad {
+  background: var(--bad-soft);
+  color: var(--bad);
+}
+
+.badge.travel {
+  background: color-mix(in srgb, var(--travel) 16%, transparent);
+  color: var(--travel);
+}
+
 .num {
   font-family: var(--font-display);
   font-variant-numeric: tabular-nums;

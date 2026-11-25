@@ -215,7 +215,7 @@
             <td class="mob">
               <Ref kind="mob" id={mob.id} name={monsterLabel(mob.name)} />
               {#if mob.boss}<span class="boss" use:tip={"Boss"}><Skull size={11} /></span>{/if}
-              {#if mob.undead}<span class="tag">undead</span>{/if}
+              {#if mob.undead}<span class="badge tag">undead</span>{/if}
             </td>
             <td class="tabular">{mob.level}</td>
             <td class="tabular">{formatCompact(mob.hp)}</td>
@@ -401,11 +401,6 @@
 
   .tag {
     margin-left: var(--space-1);
-    padding: 0 var(--space-1);
-    border-radius: var(--radius-sm);
-    background: var(--hover);
-    font-size: var(--text-xs);
-    color: var(--faint);
   }
 
   .quests,

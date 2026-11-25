@@ -142,7 +142,7 @@
     <Pic kind="mob" id={mob.id} size={20} />
     <span use:clipped class="label">{monsterLabel(mob.name)}</span>
     {#if mob.boss}<span class="boss" use:tip={"Boss"}><Skull size={11} /></span>{/if}
-    {#if mob.undead}<span class="tag">undead</span>{/if}
+    {#if mob.undead}<span class="badge tag">undead</span>{/if}
   </span>
 {/snippet}
 
@@ -412,16 +412,6 @@
     flex: none;
     align-self: center;
     color: var(--bad);
-  }
-
-  .tag {
-    flex: none;
-    padding: 0 var(--space-1);
-    border-radius: var(--radius-sm);
-    background: var(--hover);
-    color: var(--faint);
-    font-size: var(--text-xs);
-    font-weight: var(--weight-body);
   }
 
   .note {

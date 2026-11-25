@@ -55,7 +55,7 @@
 
 <Card title="Session">
   {#snippet aside()}
-    <button class="icon" aria-label="Clear" title="Clear" onclick={reset}><RotateCcw size={12} /></button>
+    <button class="icon-btn xs icon" aria-label="Clear" title="Clear" onclick={reset}><RotateCcw size={12} /></button>
   {/snippet}
   <p class="lead">Type what your EXP bar shows when you start and when you stop.</p>
 
@@ -268,21 +268,4 @@
     cursor: pointer;
   }
 
-  .icon {
-    display: grid;
-    place-items: center;
-    width: 20px;
-    height: 20px;
-    padding: 0;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--faint);
-    cursor: pointer;
-  }
-
-  .icon:hover {
-    background: var(--hover);
-    color: var(--text);
-  }
 </style>

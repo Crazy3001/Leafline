@@ -166,7 +166,7 @@
       {@render name(offer.destination)}{#if offer.giver}<span class="faint">, who gave it</span>{/if}
     </span>
     <GoButton place={offer.destination} />
-    <button class="close" aria-label="Not now" onclick={dismissOffer}><X size={11} /></button>
+    <button class="icon-btn xs close" aria-label="Not now" onclick={dismissOffer}><X size={11} /></button>
   </div>
 {/if}
 
@@ -318,11 +318,11 @@
       {/if}
     </div>
     {#if canPin}
-      <button class="close" use:tip={"Pin the route"} aria-label="Pin the route" onclick={pinRoute}
+      <button class="icon-btn xs close" use:tip={"Pin the route"} aria-label="Pin the route" onclick={pinRoute}
         ><Pin size={11} /></button
       >
     {/if}
-    <button class="close" aria-label="Cancel the trip" onclick={() => endTrip()}><X size={11} /></button>
+    <button class="icon-btn xs close" aria-label="Cancel the trip" onclick={() => endTrip()}><X size={11} /></button>
   </div>
 {:else if pin && !trip.offer}
   <p class="idle">Not heading anywhere. Pick <strong>Go</strong> beside a map or NPC, or <strong>Go to…</strong> in the Map tab.</p>
@@ -751,27 +751,6 @@
 
   .warn {
     color: var(--warn);
-  }
-
-  .close {
-    display: grid;
-    flex: none;
-    place-items: center;
-    width: 20px;
-    height: 20px;
-    padding: 0;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--faint);
-    cursor: pointer;
-  }
-
-  .close:hover,
-  .close:focus-visible {
-    background: var(--hover);
-    color: var(--text);
-    outline: none;
   }
 
   /*

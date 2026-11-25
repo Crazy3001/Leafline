@@ -143,15 +143,15 @@
     <span class="title" data-tauri-drag-region><Icon size={12} />{info.title}</span>
     <span class="actions">
       {#if sized}
-        <button class="action" use:tip={"Fit to contents"} onclick={fitToContent}><Minimize2 size={12} /></button>
+        <button class="icon-btn xs action" use:tip={"Fit to contents"} onclick={fitToContent}><Minimize2 size={12} /></button>
       {/if}
       <button
-        class="action"
+        class="icon-btn xs action"
         use:tip={panel === "route" ? "Open the Map tab" : `Open the ${info.title} tab`}
         onclick={() => backend.showPanel(panel)}
         ><AppWindow size={12} /></button
       >
-      <button class="action" use:tip={"Unpin"} onclick={() => backend.unpinPanel(panel)}><PinOff size={12} /></button>
+      <button class="icon-btn xs action" use:tip={"Unpin"} onclick={() => backend.unpinPanel(panel)}><PinOff size={12} /></button>
     </span>
   </header>
   <div class="body" class:scrolls={capped} bind:this={body}>
@@ -215,27 +215,13 @@
   }
 
   .action {
-    display: grid;
-    place-items: center;
-    width: 20px;
-    height: 20px;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--faint);
     opacity: 0;
-    cursor: pointer;
     transition: opacity 0.15s ease;
   }
 
   .frame:hover .action,
   .action:focus-visible {
     opacity: 1;
-  }
-
-  .action:hover {
-    background: var(--hover);
-    color: var(--text);
   }
 
   .locked .action {
