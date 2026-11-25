@@ -91,7 +91,12 @@
   }
 </script>
 
-{#if key != null}
+{#if key != null && loaded && !note && !editing}
+  <div class="notes bare" class:flush>
+    <button class="btn sm ghost" onclick={edit}><Plus size={12} /> Add a note</button>
+    {#if error}<p class="error">{error}</p>{/if}
+  </div>
+{:else if key != null}
   <div class="notes" class:flush>
     <div class="head">
       <span class="eyebrow">{title}</span>
@@ -131,6 +136,12 @@
     margin-top: var(--space-3);
     padding-top: var(--space-2);
     border-top: 1px solid var(--border);
+  }
+
+  .notes.bare {
+    margin-top: var(--space-1-5);
+    padding-top: 0;
+    border-top: 0;
   }
 
   .flush {

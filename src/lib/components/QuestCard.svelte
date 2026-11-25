@@ -10,7 +10,7 @@
   import ObjectiveHint from "./quest/ObjectiveHint.svelte";
   import QuestSteps from "./quest/QuestSteps.svelte";
   import { backend } from "$lib/api";
-  import { formatCompact, formatDuration, objectiveProgress, splitMapLabel } from "$lib/format";
+  import { formatCompact, formatDuration, objectiveProgress, questTitle, splitMapLabel } from "$lib/format";
   import { measuredRates, watchHistory } from "$lib/history.svelte";
   import { mapData, watchMapData } from "$lib/mapdata.svelte";
   import { payout, questView, toggleExpanded, unfollow } from "$lib/quests.svelte";
@@ -166,7 +166,22 @@
       lookingUp = false;
     }
   }
+
+  /** Every step done: the quest waits to be handed in. */
+  function isFinished(objectives: { current: number; required: number; unread?: boolean }[]) {
+    return objectives.length > 0 && objectives.every((o) => objectiveProgress(o) >= 1 && !o.unread);
+  }
+
+  /** Quests ready to hand in first, the rest in the game's order. */
+  const order = $derived(
+    quest.quests.map((_, i) => i).sort((a, b) => Number(isFinished(quest.quests[b].objectives)) - Number(isFinished(quest.quests[a].objectives)) || a - b),
+  );
 </script>
+
+{#snippet named(full: string)}
+  {@const t = questTitle(full)}
+  <span class="qname">{t.name}</span>{#if t.tag}<span class="badge qtag">{t.tag}</span>{/if}
+{/snippet}
 
 {#snippet who(person: string, maps: MapRef[])}
   <Ref kind="npc" name={person} />{#if maps.length}<span class="faint">{" · "}</span>{#each maps as m, k (m.id)}{#if k}<span class="faint">, </span>{/if}{#if m.known}<Ref kind="map" id={m.id} name={m.name} />{:else}<span class="faint">{m.name}</span>{/if}{/each}{/if}{" "}<GoButton place={npcPlace(person, maps)} />
@@ -179,9 +194,10 @@
 
   <!-- Where the card is wide, as in the desk view, the quests sit two across. -->
   <div class="quest-area"><div class="quests">
-  {#each quest.quests as { title, objectives }, i}
+  {#each order as i (i)}
+    {@const { title, objectives } = quest.quests[i]}
     {@const info = guide?.quests[i]}
-    {@const finished = objectives.length > 0 && objectives.every((o) => objectiveProgress(o) >= 1 && !o.unread)}
+    {@const finished = isFinished(objectives)}
     {@const id = info?.quest?.quest.id}
     {@const sheet = id != null ? sheets[id] : null}
     {@const expanded = id != null && questView.expanded.includes(id)}
@@ -191,10 +207,10 @@
         {#if id != null}
           <button class="open" aria-expanded={expanded} onclick={() => toggleExpanded(id)}>
             <span class="chevron" class:expanded><ChevronRight size={13} /></span>
-            <span>{info?.quest?.quest.name}</span>
+            {@render named(info?.quest?.quest.name ?? title)}
           </button>
         {:else if title}
-          {title}
+          {@render named(title)}
         {:else}
           <!-- Leafline blanks a title too rough to name until it matches a quest. -->
           <span class="unread">Can't read this quest yet</span>
@@ -397,18 +413,35 @@
     border-top: 1px solid var(--border);
   }
 
-  /* Each quest is its own block: a flat fill, a frame and an amber rule down the left, so one quest
-     ends visibly before the next begins. The rule turns green once every step is done. */
+  /* Quests sit on the card itself, split by a rule: no box inside the box. One ready to hand in
+     says so in green beside its name. */
   .quest {
-    padding: 0 var(--space-3) var(--space-2);
-    border: 1px solid var(--border-strong);
-    border-left: 3px solid var(--accent);
-    border-radius: var(--radius-sm);
-    background: var(--surface-2);
+    min-width: 0;
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--border);
   }
 
-  .quest.finished {
-    border-left-color: var(--good);
+  .quest:first-child {
+    padding-top: 0;
+    border-top: 0;
+  }
+
+  .quest.finished .qname {
+    color: var(--good);
+  }
+
+  .qname {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .qtag {
+    max-width: 45%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-family: var(--font-sans);
   }
 
   .quest-area {
@@ -417,7 +450,7 @@
 
   .quests {
     display: grid;
-    gap: var(--space-2);
+    gap: var(--space-3) var(--space-6);
     align-items: start;
   }
 
@@ -425,22 +458,30 @@
     .quests {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
+
+    .quest:nth-child(2) {
+      padding-top: 0;
+      border-top: 0;
+    }
   }
 
   @container quest-list (min-width: 1150px) {
     .quests {
       grid-template-columns: repeat(3, minmax(0, 1fr));
     }
+
+    .quest:nth-child(3) {
+      padding-top: 0;
+      border-top: 0;
+    }
   }
 
   .title {
     display: flex;
     align-items: center;
-    gap: var(--space-1);
-    margin: 0 -10px var(--space-2);
-    padding: var(--space-1-5) var(--space-3);
-    border-bottom: 1px solid var(--border);
-    background: var(--surface-3);
+    gap: var(--space-1-5);
+    min-width: 0;
+    margin: 0 0 var(--space-2);
     font-family: var(--font-display);
     font-size: var(--text-lg);
     font-weight: var(--weight-strong);

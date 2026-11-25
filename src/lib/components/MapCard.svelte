@@ -84,30 +84,6 @@
   // often, so a lone good match isn't worth a warning.
   const doubtful = $derived(!!found && !browsing && (found.score < 0.85 || found.alternatives.length > 0));
 
-  /** The parts of the map shown, for the chips that jump to them. */
-  const jumps = $derived.by(() => {
-    const d = shown;
-    if (!d) return [];
-    const some = d.mobs.length > 0;
-    return [
-      { id: "map-portals", label: "Portals", count: d.exits.length as number | null, show: true },
-      { id: "map-monsters", label: "Monsters", count: d.mobTotal, show: some },
-      { id: "map-drops", label: "Drops", count: null, show: some },
-      { id: "map-quests", label: "Quests", count: d.quests.length, show: d.quests.length > 0 },
-      { id: "map-npcs", label: "NPCs", count: d.npcs.length, show: d.npcs.length > 0 },
-      { id: "map-shops", label: "Shops", count: d.shops?.length ?? 0, show: (d.shops?.length ?? 0) > 0 },
-    ].filter((j) => j.show);
-  });
-
-  /** Opens a part if it is folded and brings it to the top. */
-  function jumpTo(id: string) {
-    const part = document.getElementById(id);
-    if (!part) return;
-    const head = part.querySelector<HTMLButtonElement>(":scope > button[aria-expanded]");
-    if (head?.getAttribute("aria-expanded") === "false") head.click();
-    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    requestAnimationFrame(() => part.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" }));
-  }
 </script>
 
 {#snippet heading()}
@@ -135,7 +111,6 @@
           <div class="name">{map.name}</div>
         {/if}
       </div>
-      {#if split && map?.collapsed && !browsing}<span class="source">Minimap title</span>{/if}
     </div>
     {#if split && shown}
       {@const facts = mapFacts(shown)}
@@ -176,8 +151,7 @@
 {/snippet}
 
 {#if split}
-  <!-- The tab: where to go on top, the map's own card, chips that jump to its parts, then each
-       part as a card. -->
+  <!-- The tab: where to go on top, the map's own card, then each part as a card. -->
   {#if ready}<div class="goto top"><GoTo /></div>{/if}
   <section class="card head">
     {@render heading()}
@@ -192,23 +166,12 @@
     {/if}
   </section>
   {#if shown}
-    {#if jumps.length > 1}
-      <nav class="jump" aria-label="Jump to a part of this map">
-        {#each jumps as j (j.id)}
-          <button onclick={() => jumpTo(j.id)}>{j.label}{#if j.count != null}<span class="tabular n">{j.count}</span>{/if}</button>
-        {/each}
-      </nav>
-    {/if}
     {#key shown.map.id}
       <MapDetailsView details={shown} {current} {variant} split onnavigate={navigate} />
     {/key}
   {/if}
 {:else}
   <Card title="Map" {plain}>
-    {#snippet aside()}
-      {#if map?.collapsed && !browsing}<span>Minimap title</span>{/if}
-    {/snippet}
-
     {@render heading()}
 
     <!-- Setting a place is done in the tab; a pinned window follows it in the Route pin. -->
@@ -252,13 +215,6 @@
     padding: var(--space-3) var(--space-4) var(--space-3);
   }
 
-  .source {
-    align-self: flex-start;
-    margin-left: auto;
-    color: var(--faint);
-    font-size: var(--text-xs);
-    white-space: nowrap;
-  }
 
   .facts {
     display: flex;
@@ -292,54 +248,6 @@
     font-size: var(--text-xs);
   }
 
-  /* Chips that lead to the parts below. In the overlay they stay in view while the map scrolls. */
-  .jump {
-    display: flex;
-    gap: var(--space-1-5);
-    flex-wrap: wrap;
-    padding: 0 var(--space-3) var(--space-2);
-  }
-
-  :global(#panel) .jump {
-    position: sticky;
-    top: 0;
-    z-index: 2;
-    padding-top: var(--space-1-5);
-    margin-top: -6px;
-    background: var(--bg);
-  }
-
-  .jump button {
-    display: inline-flex;
-    flex: none;
-    align-items: center;
-    gap: var(--space-1-5);
-    height: var(--control-h-sm);
-    padding: 0 var(--space-3);
-    border: var(--line-w) solid var(--control-line);
-    border-radius: var(--radius-pill);
-    background: var(--surface);
-    color: var(--muted);
-    font-size: var(--text-xs);
-    font-weight: var(--weight-body);
-    white-space: nowrap;
-    cursor: pointer;
-  }
-
-  .jump button:hover {
-    background: var(--surface-2);
-    color: var(--text);
-  }
-
-  .jump button:focus-visible {
-    outline: 2px solid var(--accent-text);
-    outline-offset: 1px;
-  }
-
-  .jump .n {
-    color: var(--faint);
-    font-size: var(--text-xs);
-  }
 
   .save-row {
     margin-top: var(--space-1-5);
