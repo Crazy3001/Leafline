@@ -155,6 +155,17 @@ impl TabWatch {
         due
     }
 
+    /// [`TabWatch::settled`] for a live picture, the tab read from it by `read`. A picture with an
+    /// item tooltip showing is passed over, as if it hadn't been taken: hovering an item in the
+    /// open tab draws its tooltip over the slots, which would read as a changed tab and check it
+    /// again, and again once the tooltip went.
+    pub fn settled_in(&mut self, frame: &Frame, read: impl FnOnce(&Frame) -> Option<Inventory>) -> Option<Inventory> {
+        if !crate::readers::tooltip::name_lines(frame).is_empty() {
+            return None;
+        }
+        self.settled(read(frame))
+    }
+
     /// The tab [`TabWatch::settled`] gave is being checked. One not marked (a check was under way)
     /// is given again at the next read.
     pub fn checked(&mut self, tab: Inventory) {

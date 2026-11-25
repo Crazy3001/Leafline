@@ -477,7 +477,7 @@ impl LiveReader {
             }
         }
         if self.choice.bag
-            && let Some(seen) = self.windows.bag.settled(inventory::read_video(frame))
+            && let Some(seen) = self.windows.bag.settled_in(frame, inventory::read_video)
         {
             self.windows.reads.bag = Some(SeenBag::new(&seen, name.clone(), level));
             self.windows.bag.checked(seen);
