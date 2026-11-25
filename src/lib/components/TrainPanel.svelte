@@ -368,8 +368,11 @@
 
     {#if lv != null && percent != null}
       <div class="level">
-        <div class="level-line"><span class="muted">Lv {lv} to {lv + 1}</span><span class="tabular">{percent.toFixed(2)}%</span></div>
-        <ExpBar {percent} points={session.exp?.points ?? null} needed={session.expNeeded} />
+        <!-- The window's header has the level's bar; a pinned window has no header, so it draws its own. -->
+        {#if glance}
+          <div class="level-line"><span class="muted">Lv {lv} to {lv + 1}</span><span class="tabular">{percent.toFixed(2)}%</span></div>
+          <ExpBar {percent} points={session.exp?.points ?? null} needed={session.expNeeded} />
+        {/if}
         {#if toLevel || levelPace}
           <span class="muted tabular" use:tip={toLevel?.tip ?? ""}>
             {#if toLevel}{toLevel.line}{/if}{#if toLevel && levelPace}{" · "}{/if}{#if levelPace}{levelPace}{/if}
@@ -390,12 +393,13 @@
     {/if}
 
     <div class="tiles">
-      <Stat
+      <!-- On the desk, the player bar over the view has the rate. -->
+      {#if !glanced}<Stat
         label="Mesos / hr"
         value={formatCompact(mesosRate)}
         sub={mesosSub}
         faint={session.mesosPerHour != null && coverage?.partial && coverage.thin}
-      />
+      />{/if}
       <Stat
         label="EXP gained"
         value={signed(session.expGained)}
