@@ -63,6 +63,25 @@ function setStatus(next: LiveStatus) {
 
 export const liveStatus = () => status;
 export const liveSight = () => sight;
+
+let pictureWanted: ((png: Blob | null) => void) | null = null;
+
+/**
+ * "This misread": the last picture read, as a PNG, and what Leafline read from it (the same report
+ * the program saves: crates/leafline-core/src/sight.rs `misread_report`), for the page to save as
+ * downloads. Nothing is sent anywhere.
+ */
+export async function liveMisread(): Promise<{ png: Blob; report: string }> {
+  if (!worker) throw new Error("Leafline isn't reading the game. Share it on Now first.");
+  const png = await new Promise<Blob | null>((resolve) => {
+    pictureWanted = resolve;
+    send({ op: "picture" });
+    setTimeout(() => resolve(null), 5000);
+  });
+  if (!png) throw new Error("There is no picture read yet. Keep the game in front for a moment.");
+  const report = await invoke<unknown>("misread_report", { analysis, session, sight });
+  return { png, report: JSON.stringify(report, null, 2) };
+}
 export const liveReadings = () => ({ analysis, session });
 
 function publishSession(next: SessionSummary) {
@@ -262,6 +281,10 @@ function onWorker({ data }: MessageEvent<FromLive>) {
       break;
     case "ended":
       void stopLive();
+      break;
+    case "picture":
+      pictureWanted?.(data.png);
+      pictureWanted = null;
       break;
     case "error":
       console.error("Live reading:", data.message);

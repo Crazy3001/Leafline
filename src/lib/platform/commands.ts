@@ -131,6 +131,7 @@ export function commandBackend(invoke: Invoke, listen: Listen, emit: Emit): Back
     stopLive: () => invoke("stop_live"),
     liveWindows: () => invoke("live_windows"),
     saveLiveFrame: () => invoke("save_live_frame"),
+    saveMisread: () => invoke("save_misread_frame"),
     saveItemPicture: (reading) => invoke("save_item_picture", { reading }),
     onLive: (handler) => listen<LiveStatus>("live", (e) => handler(e.payload)),
     readerSight: () => invoke("reader_sight"),

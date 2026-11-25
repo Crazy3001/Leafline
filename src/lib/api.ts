@@ -128,6 +128,9 @@ export interface Backend {
   liveWindows(): Promise<GameWindow[]>;
   /** Saves the last live picture to the saved pictures folder and returns its path. */
   saveLiveFrame(): Promise<string>;
+  /** "This misread": saves the last picture read with what Leafline read from it, for a bug report.
+   *  The program saves a folder; the website downloads the two files. Returns where, or the name. */
+  saveMisread(): Promise<string>;
   /** Saves the last item check's picture, with `reading` (what was read) beside it. */
   saveItemPicture(reading: string | null): Promise<string>;
   onLive(handler: (status: LiveStatus) => void): Promise<UnlistenFn>;

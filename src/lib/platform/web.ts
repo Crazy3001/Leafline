@@ -11,7 +11,7 @@ import type { DeskStatus, MapPicture, PinStatus } from "../types";
 import { emit, listen } from "./bus";
 import { commandBackend } from "./commands";
 import { setMapView, setPictureTable } from "./pictures.svelte";
-import { fetchBagPictures, liveReadings, liveSight, liveStatus, resetLiveSession, setLiveHeld, startLive, stopLive } from "./live";
+import { fetchBagPictures, liveMisread, liveReadings, liveSight, liveStatus, resetLiveSession, setLiveHeld, startLive, stopLive } from "./live";
 import { closePip, openPip, pipOpen } from "./pip";
 import { checkRecords, exportRecords, importRecords, invoke, recordsSummary } from "./storage.svelte";
 import { noteRecordsSaved } from "../recordsfile";
@@ -82,6 +82,14 @@ export const webBackend: Backend = {
   stopLive: () => stopLive(),
   liveWindows: async () => [],
   saveLiveFrame: notHere("Saving game pictures"),
+  // "This misread": the picture and what was read from it, as two downloads beside each other.
+  async saveMisread() {
+    const { png, report } = await liveMisread();
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-");
+    download(png, `leafline-misread-${stamp}.png`, "image/png");
+    download(report, `leafline-misread-${stamp}.json`, "application/json");
+    return `leafline-misread-${stamp}`;
+  },
   saveItemPicture: notHere("Saving game pictures"),
   // The worker cuts the map's picture with the shared code; the page shows it as a data address.
   async mapPicture(id) {

@@ -303,6 +303,25 @@ fn own(host: &WebHost, name: &str, args: serde_json::Value) -> Option<Reply> {
             None => Err("Open your inventory in game first.".into()),
         },
         "last_bag" => reply(LAST_BAG.with(|b| b.borrow().1.clone())),
+        // "This misread": what was read, put the way the program saves it beside the picture.
+        "misread_report" => {
+            #[derive(Deserialize)]
+            struct Read {
+                analysis: Option<serde_json::Value>,
+                session: Option<serde_json::Value>,
+                sight: Option<serde_json::Value>,
+            }
+            match parse::<Read>(args) {
+                Ok(Read { analysis, session, sight }) => reply(leafline_core::sight::misread_report(
+                    &version(),
+                    leafline_core::clock::now_f64(),
+                    analysis,
+                    session,
+                    sight,
+                )),
+                Err(err) => Err(err),
+            }
+        }
         // What the live reading's HUD showed of the character (platform/live.ts), remembered as the
         // program's live loop does, for showing until the game is read again.
         "note_character" => {

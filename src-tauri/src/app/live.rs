@@ -545,6 +545,43 @@ pub fn save_frame(app: &AppHandle) -> Result<PathBuf> {
     Ok(path)
 }
 
+/// What a misread folder's README says.
+const MISREAD_README: &str = "Leafline saved this when you pressed This misread.\r\n\r\n\
+picture.png is the last picture of the game Leafline read, and read.json is what it read from it, with what \
+each part of the game was last read as. Attach both to a bug report (github.com/Crazy3001/Leafline/issues) and \
+say what was wrong.\r\n\r\n\
+They stay on this PC: Leafline never sends them anywhere. They show your game and your character's name, so look \
+at them before you post them.\r\n";
+
+/// "This misread": the last picture read, what Leafline read from it and what each reader has seen,
+/// together in a folder of their own in the saved pictures folder, for a bug report. Nothing is sent.
+pub fn save_misread(app: &AppHandle) -> Result<PathBuf> {
+    let state = app.state::<LiveState>();
+    let frame = state.frame.lock().expect("live lock").clone();
+    let frame = frame.ok_or_else(|| Error::Invalid("There is no live picture yet. Start live reading with the game in front.".into()))?;
+    let folder = frames_folder(app)?.join(format!("misread-{}", file_stamp(SystemTime::now())));
+    std::fs::create_dir_all(&folder)?;
+    frame.save(folder.join("picture.png"))?;
+    let sight = serde_json::to_value(state.sight.lock().expect("live lock").clone()).ok();
+    let report = crate::sight::misread_report(
+        &app.package_info().version.to_string(),
+        unix_seconds(SystemTime::now()),
+        readings::current_analysis(app).and_then(|a| serde_json::to_value(a).ok()),
+        readings::current_session(app).and_then(|s| serde_json::to_value(s).ok()),
+        sight,
+    );
+    let text = serde_json::to_string_pretty(&report).map_err(|err| Error::Invalid(err.to_string()))?;
+    std::fs::write(folder.join("read.json"), text)?;
+    std::fs::write(folder.join("README.txt"), MISREAD_README)?;
+    let _ = app.emit(FRAME_SAVED_EVENT, &folder);
+    Ok(folder)
+}
+
+#[tauri::command]
+pub fn save_misread_frame(app: AppHandle) -> Result<PathBuf> {
+    save_misread(&app)
+}
+
 /// Saves the last item check's picture, however long ago it was taken, with what Leafline read from
 /// it beside it as a `.json` file, for a bug report about that reading.
 pub fn save_item_frame(app: &AppHandle, reading: Option<&str>) -> Result<PathBuf> {
