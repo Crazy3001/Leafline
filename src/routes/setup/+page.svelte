@@ -21,6 +21,7 @@
   import { backend } from "$lib/api";
   import HotkeyButton from "$lib/components/HotkeyButton.svelte";
   import Logo from "$lib/components/Logo.svelte";
+  import ReaderStatus from "$lib/components/ReaderStatus.svelte";
   import ThemePicker from "$lib/ui/ThemePicker.svelte";
   import MapDataPanel from "$lib/components/map/MapDataPanel.svelte";
   import { WIKI_URL, mapData } from "$lib/mapdata.svelte";
@@ -28,11 +29,12 @@
   import type { ShortcutInfo } from "$lib/types";
   import { watchTyping } from "$lib/typing";
 
-  const STEPS = ["Welcome", "Look", "Hotkeys", "Game settings", "Views", "Map data"];
+  const STEPS = ["Welcome", "Look", "Hotkeys", "Game settings", "Reading check", "Views", "Map data"];
   const LOOK_STEP = 1;
   const KEYS_STEP = 2;
   const GAME_STEP = 3;
-  const SCREENS_STEP = 4;
+  const CHECK_STEP = 4;
+  const SCREENS_STEP = 5;
 
   let step = $state(0);
   let shortcuts = $state<ShortcutInfo[]>([]);
@@ -356,6 +358,15 @@
             </div>
           </li>
         </ul>
+      </section>
+    {:else if step === CHECK_STEP}
+      <section>
+        <h1>Reading check</h1>
+        <p class="lead">
+          A quick look that Leafline can read your game as it is set up. Skip it if the game isn't running: Settings has the same
+          check under What Leafline sees.
+        </p>
+        <ReaderStatus setup />
       </section>
     {:else if step === SCREENS_STEP}
       <section>

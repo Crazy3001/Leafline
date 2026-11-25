@@ -48,6 +48,7 @@ impl QuestLogFollow {
         let Some(name) = analysis.hud.as_ref().and_then(|hud| hud.name.clone()) else { return };
         match questlog::read(frame, scale, ocr) {
             Ok(Some(reading)) => {
+                super::live::see(app, crate::sight::Reader::QuestWindow);
                 if let Err(err) = self.window.keep(&AppHost::new(app), &name, &reading) {
                     report::note(format!("Couldn't keep the quest log: {err}"));
                 }

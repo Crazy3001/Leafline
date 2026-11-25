@@ -8,7 +8,7 @@
 // this PC.
 
 import { base } from "$app/paths";
-import type { Analysis, LiveStatus, SessionSummary } from "../types";
+import type { Analysis, LiveStatus, SessionSummary, Sight } from "../types";
 import { emit, listen } from "./bus";
 import { canRead, cantRead, shareWindow, type SharedWindow } from "./capture";
 import type { FromLive, ReadingChoice, ToLive, WindowReads } from "./live.worker";
@@ -34,6 +34,8 @@ const RECOVERY_VERSION = 1;
 let status: LiveStatus = { state: "off" };
 let analysis: Analysis | null = null;
 let session: SessionSummary | null = null;
+/** What Leafline sees, as the worker last said. */
+let sight: Sight | null = null;
 let worker: Worker | null = null;
 let shared: SharedWindow | null = null;
 let held = false;
@@ -60,6 +62,7 @@ function setStatus(next: LiveStatus) {
 }
 
 export const liveStatus = () => status;
+export const liveSight = () => sight;
 export const liveReadings = () => ({ analysis, session });
 
 function publishSession(next: SessionSummary) {
@@ -210,6 +213,13 @@ function onWorker({ data }: MessageEvent<FromLive>) {
       } else {
         void save(read.session);
       }
+      // What the picture was like: the worker knows black and frozen pictures, the page whether
+      // this screen is HDR (it can't ask about the game's).
+      const hdr = typeof matchMedia === "function" && matchMedia("(dynamic-range: high)").matches;
+      sight = read.sight.picture
+        ? { ...read.sight, picture: { ...read.sight.picture, hdr, dark: read.sight.picture.dark || data.dark, still: data.still } }
+        : read.sight;
+      void emit("sight", sight);
       // Remembered for showing, dated, after the page is opened again (the worker keeps to once a
       // minute unless the level, job or map changed).
       if (read.seen) void invoke("note_character", { seen: read.seen }).catch(() => {});

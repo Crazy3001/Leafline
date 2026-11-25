@@ -17,5 +17,6 @@ pub mod readers;
 pub mod replay;
 pub mod service;
 pub mod session;
+pub mod sight;
 pub mod userdata;
 pub mod vision;

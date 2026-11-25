@@ -49,6 +49,7 @@ import type {
   QuestLog,
   QuestRow,
   SessionSummary,
+  Sight,
 } from "../types";
 import type { BuffRow, PlayerDamage, SkillEffects, StatSheet, StatsView } from "../types";
 import sample from "./sample-analysis.json";
@@ -491,6 +492,28 @@ const mockPlan = (build: Build): BuildPlan => {
 const newestBuild = () => [...mockBuilds].sort((a, b) => b.usedAt - a.usedAt)[0];
 
 let liveStatus: LiveStatus = { state: "off" };
+const sightHandlers: ((sight: Sight) => void)[] = [];
+const sightStarted = Date.now() / 1000 - 600;
+function mockSight(now: number): Sight {
+  return {
+    since: sightStarted,
+    seen: [
+      { reader: "statusBar", at: now - 1 },
+      { reader: "level", at: now - 1 },
+      { reader: "exp", at: now - 1 },
+      { reader: "name", at: now - 1 },
+      { reader: "map", at: sightStarted + 30 },
+      { reader: "mesos", at: now - 340 },
+      { reader: "questHelper", at: now - 2 },
+      { reader: "pickupLog", at: now - 45 },
+    ],
+    rejected: [
+      { reader: "exp", at: now - 95, reason: "An EXP reading didn't fit the ones around it and was left out (read as Lv 30, 2431 EXP (25.40%))." },
+      { reader: "mesos", at: now - 420, reason: "A meso amount that wasn't read the same twice was left out." },
+    ],
+    picture: { at: now - 1, width: 2560, height: 1440, statusBar: true, hdr: false, smoothedUi: false, dark: false, still: false },
+  };
+}
 let liveTimer: ReturnType<typeof setInterval> | undefined;
 const liveHandlers: ((status: LiveStatus) => void)[] = [];
 const setLive = (status: LiveStatus) => {
@@ -601,6 +624,7 @@ export const mockBackend: Backend = {
       frames += 1;
       setLive({ state: "reading", window: "MapleStory", width: 2560, height: 1440, frames, readMs: 412, hdr: false, smoothedUi: false, held: false });
       analysisHandlers.forEach((h) => h(sampleAnalysis));
+      sightHandlers.forEach((h) => h(mockSight(Date.now() / 1000)));
     }, displaySettings.live.interval * 1000);
   },
   async stopLive() {
@@ -610,6 +634,13 @@ export const mockBackend: Backend = {
   liveWindows: async () => mockWindows,
   saveItemPicture: async () => "C:\Users\you\AppData\Local\app.leafline.overlay\frames\leafline-item-2026-10-30_13-05-09.png",
   saveLiveFrame: async () => "C:\\Users\\you\\AppData\\Local\\app.leafline.overlay\\frames\\leafline-2026-10-30_13-05-09.png",
+  // What Leafline sees: a run ten minutes old that has read the HUD, with two readings left out.
+  // None in an empty preview. While the mock reads, the HUD keeps reading and the map doesn't.
+  readerSight: async () => (preview?.empty ? null : mockSight(Date.now() / 1000)),
+  async onSight(handler) {
+    sightHandlers.push(handler);
+    return () => {};
+  },
   async onLive(handler) {
     liveHandlers.push(handler);
     return () => {};

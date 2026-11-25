@@ -122,6 +122,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             live::live_status,
+            live::reader_sight,
             capturetest::open_capture_test,
             capturetest::open_capture_pattern,
             capturetest::capture_pattern,

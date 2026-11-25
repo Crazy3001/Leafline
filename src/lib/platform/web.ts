@@ -11,7 +11,7 @@ import type { DeskStatus, MapPicture, PinStatus } from "../types";
 import { emit, listen } from "./bus";
 import { commandBackend } from "./commands";
 import { setMapView, setPictureTable } from "./pictures.svelte";
-import { fetchBagPictures, liveReadings, liveStatus, resetLiveSession, setLiveHeld, startLive, stopLive } from "./live";
+import { fetchBagPictures, liveReadings, liveSight, liveStatus, resetLiveSession, setLiveHeld, startLive, stopLive } from "./live";
 import { closePip, openPip, pipOpen } from "./pip";
 import { checkRecords, exportRecords, importRecords, invoke, recordsSummary } from "./storage.svelte";
 
@@ -74,6 +74,7 @@ export const webBackend: Backend = {
   setHotkeysQuiet: async () => {},
   // Reading a shared game window, where the browser can (see live.ts).
   liveStatus: async () => liveStatus(),
+  readerSight: async () => liveSight(),
   setLiveHeld: async (held) => setLiveHeld(held),
   resetSession: () => resetLiveSession(),
   startLive: () => startLive(),

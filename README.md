@@ -66,6 +66,7 @@
 - **Desk view** for a big window or a second screen: a sidebar of views (Now, Quests, Map, Train, Me, Look up, the training log, the build planner and the tools), each laid out across the width, or **My layout** with panels in columns you arrange yourself.
 - **Hotkeys** that work while the game is in front, without sending the game any input. Setup tests each key with the game in front.
 - **Countdown timers** for anything you want to keep time on.
+- **What Leafline sees:** when each part of the game was last read (status bar, level, EXP, name, map, mesos, Quest Helper, Pickup Log, item cards, and the Stat, Skill, inventory and Quest windows), or why not: not seen yet, HDR, UI size, a black or frozen picture. A reading check in setup and Settings ticks off what reads with the game in front, and readings left out as doubtful are listed with why. It all stays on your PC.
 
 ![The overlay with Train, Lookup, Route, Quests, Character and Map each pinned into its own small window around the game](https://github.com/user-attachments/assets/b8d5ae3a-1122-4ef2-a91c-9f3864ad642c)
 
@@ -164,7 +165,7 @@ No. It only looks at the game window. It has no login and never asks for your Ne
 Leafline won't use a price site's data without its permission, and it won't read chat or player shops as you play. Price data may come later if a site agrees. For now each item shows its NPC sell price from the data.
 
 ### Something reads wrong. What should I check?
-Most misreads come from game settings: **UI Size: Ideal Ratio**, **HDR off** (restart the game after), and the English client. Bright, busy maps such as Henesys can make the Quest Helper hard to read, since its text is black on a see-through panel. Item tooltips are the same: the box is drawn over whatever is behind it, so move your inventory or equipment window to a quiet part of the screen and close any windows (chat, other panels) behind where the tooltip appears, then hover the item and press the hotkey again. Leafline prefers showing nothing over showing a wrong number, so a blank usually means it wasn't sure.
+**Settings → What Leafline sees** shows what reads and names the likely cause of what doesn't. Most misreads come from game settings: **UI Size: Ideal Ratio**, **HDR off** (restart the game after), and the English client. Bright, busy maps such as Henesys can make the Quest Helper hard to read, since its text is black on a see-through panel. Item tooltips are the same: the box is drawn over whatever is behind it, so move your inventory or equipment window to a quiet part of the screen and close any windows (chat, other panels) behind where the tooltip appears, then hover the item and press the hotkey again. Leafline prefers showing nothing over showing a wrong number, so a blank usually means it wasn't sure.
 
 ### How do I report a bug?
 [Open an issue](https://github.com/Crazy3001/Leafline/issues). **Settings → Feedback → Bug report details → Copy** copies what Leafline knows about its own state, with no character names, chat or file paths. A picture helps too: **Save frame** on the overlay saves the last picture Leafline read. It shows your game, so only post it if you're happy to share it.
