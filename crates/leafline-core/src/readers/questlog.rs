@@ -237,6 +237,28 @@ pub struct Glance {
     detail: usize,
 }
 
+impl Glance {
+    /// Whether two glances show the same window: the same tab, rows and scroll, with each count of
+    /// ink within a little of the other's. A shared window comes through a browser as video, whose
+    /// pixels wobble a little from picture to picture, and a shared screen carries the mouse
+    /// pointer, so exact counts might never come round twice.
+    fn alike(&self, other: &Glance) -> bool {
+        let near = |a: usize, b: usize| a.abs_diff(b) <= INK_GIVE.max(a.max(b) / 10);
+        let thumb = match (self.thumb, other.thumb) {
+            (Some(a), Some(b)) => a.0.abs_diff(b.0) <= 1 && a.1.abs_diff(b.1) <= 1,
+            (a, b) => a == b,
+        };
+        self.tab == other.tab
+            && thumb
+            && self.slots.len() == other.slots.len()
+            && self.slots.iter().zip(&other.slots).all(|(a, b)| a.0 == b.0 && near(a.1, b.1))
+            && near(self.detail, other.detail)
+    }
+}
+
+/// Ink pixels two glances of the same window may differ by at least (see [`Glance::alike`]).
+const INK_GIVE: usize = 6;
+
 /// Decides when a change in the window is worth a full read: once it has shown the same in two
 /// pictures, which skips a list mid-scroll, and only the once.
 #[derive(Debug, Default)]
@@ -248,7 +270,11 @@ pub struct Watch {
 impl Watch {
     /// Takes in this picture's glance, `None` with the window closed, and says whether to read.
     pub fn settled(&mut self, glance: Option<Glance>) -> bool {
-        let settled = glance.is_some() && glance == self.last && glance != self.read;
+        let alike = |a: &Option<Glance>, b: &Option<Glance>| match (a, b) {
+            (Some(a), Some(b)) => a.alike(b),
+            _ => false,
+        };
+        let settled = alike(&glance, &self.last) && !alike(&glance, &self.read);
         if settled {
             self.read.clone_from(&glance);
         }
@@ -1213,5 +1239,23 @@ mod tests {
         assert!(!watch.settled(Some(first.clone())));
         assert!(watch.settled(Some(first)), "opened again, read again");
         assert!(glance(&Frame::from_pixel(600, 400, WHITE), None).is_none());
+    }
+
+    #[test]
+    fn a_glance_wobbling_a_little_still_settles() {
+        let first = glance(&window(1, &[Slot::Region, Slot::Row]), None).unwrap();
+        let mut wobbled = first.clone();
+        for slot in &mut wobbled.slots {
+            slot.1 += 3;
+        }
+        wobbled.detail += 2;
+        let mut watch = Watch::default();
+        assert!(!watch.settled(Some(first.clone())));
+        assert!(watch.settled(Some(wobbled.clone())), "video noise isn't a change");
+        assert!(!watch.settled(Some(first.clone())), "already read");
+        let mut changed = first.clone();
+        changed.slots[1].1 = changed.slots[1].1 * 2 + 50;
+        assert!(!watch.settled(Some(changed.clone())));
+        assert!(watch.settled(Some(changed)), "a real change is read once it holds");
     }
 }

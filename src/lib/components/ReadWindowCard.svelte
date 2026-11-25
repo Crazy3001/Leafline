@@ -1,6 +1,6 @@
 <script lang="ts">
   // The website's way into live reading: share the game window with this page and Leafline reads
-  // level and EXP from it, tracking the session the way the program does (platform/live.ts). The
+  // the game from it, tracking the session the way the program does (platform/live.ts). The
   // browser asks which window; the picture stays on this PC. Says plainly what it costs: the
   // same ban risk as the program. In a browser that can't share a window, says so and why.
   import { Square, MonitorPlay } from "@lucide/svelte";
@@ -21,7 +21,7 @@
   const on = $derived(status.state === "reading" || status.state === "waiting");
   let problem = $state<string | null>(null);
 
-  // The website can't read the HUD's name yet, so sessions are saved under the character picked.
+  // Sessions go under the name read from the HUD; until one is read, under the character picked.
   onMount(() => {
     if (__LEAFLINE_WEB__) void import("$lib/platform/live").then((m) => m.setLiveCharacter(() => characters.viewing));
   });
