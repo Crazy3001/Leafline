@@ -24,6 +24,11 @@ use leafline_core::userdata::spots::SavedSpot;
 use leafline_core::clock::now;
 
 #[tauri::command]
+pub fn records_summary(app: AppHandle) -> Result<RecordsSummary> {
+    service::records::records_summary(&AppHost(app))
+}
+
+#[tauri::command]
 pub fn known_character(app: AppHandle, name: Option<String>) -> Result<Option<KnownCharacter>> {
     service::records::known_character(&AppHost(app), name)
 }

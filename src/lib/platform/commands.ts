@@ -339,5 +339,8 @@ export function commandBackend(invoke: Invoke, listen: Listen, emit: Emit): Back
     typedSessionOutcome: (session) => invoke("typed_session_outcome", { session }),
     saveTypedSession: (session) => invoke("save_typed_session", { session }),
     onRecordsReplaced: (handler) => listen("records-replaced", () => handler()),
+    recordsSummary: () => invoke("records_summary"),
+    listBackups: () => invoke("list_backups"),
+    checkBackup: (name) => invoke("check_backup", { name }),
   };
 }

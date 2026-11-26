@@ -14,6 +14,7 @@ import { setMapView, setPictureTable } from "./pictures.svelte";
 import { fetchBagPictures, liveReadings, liveSight, liveStatus, resetLiveSession, setLiveHeld, startLive, stopLive } from "./live";
 import { closePip, openPip, pipOpen } from "./pip";
 import { checkRecords, exportRecords, importRecords, invoke, recordsSummary } from "./storage.svelte";
+import { noteRecordsSaved } from "../recordsfile";
 
 /** Asks the player for a file, the way a page does. Null if they close the picker. */
 function chooseFile(accept: string): Promise<File | null> {
@@ -167,6 +168,7 @@ export const webBackend: Backend = {
     const bytes = await exportRecords();
     const stamp = new Date().toISOString().slice(0, 10);
     download(bytes as BlobPart, `leafline-records-${stamp}.leafline`, "application/octet-stream");
+    noteRecordsSaved();
     return recordsSummary();
   },
   async pickRecords() {
@@ -174,4 +176,7 @@ export const webBackend: Backend = {
     return file ? checkRecords(new Uint8Array(await file.arrayBuffer())) : null;
   },
   useRecords: () => importRecords(),
+  // The website keeps no daily copies: the browser holds its records (see Settings → Data).
+  listBackups: async () => [],
+  checkBackup: notHere("Restoring a backup"),
 };

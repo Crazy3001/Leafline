@@ -88,7 +88,7 @@ Nothing read from the game leaves your PC. Leafline only goes online to:
 - download a game picture from OSMS Data Explorer the first time it is shown, if game pictures are on (they start on), and
 - ask GitHub for the latest version number at startup, if you turn the update check on (it starts off). That request carries Leafline's name and version and nothing else. A new version is downloaded only when you press **Download and install**: Leafline fetches the release's installer and its `SHA256SUMS.txt` from this repository, runs the installer only if its SHA-256 matches, and closes so it can install.
 
-Your sessions, notes, drop log, builds and settings stay in `%APPDATA%\app.leafline.overlay`, with a daily backup of the last 7 days. **Settings → Data** opens the folder.
+Your sessions, notes, drop log, builds and settings stay in `%APPDATA%\app.leafline.overlay`, with a daily backup of the last 7 days. **Settings → Data → Backups** lists them with what each holds beside your records now, and restores one, keeping your current records aside first so a restore can be undone. **Settings → Data** also opens the folder.
 
 ## Website
 
@@ -102,7 +102,7 @@ Leafline also runs in a browser at **[crazy3001.github.io/Leafline](https://craz
 - the four looks, a desk layout on a computer and the overlay's tabs on a phone
 - on a computer, in Chrome or Edge share the game window, or in Firefox the screen the game is on (Firefox can't film a game's window), and it reads your level, EXP, mesos, map, Quest Helper and loot as you play and tracks the session, the way the program does. Rest the mouse on an item for its card, and open your Stat, Skill, inventory or Quest window to have it read
 
-**It reads only a window you share,** in the browser, and the picture never leaves your computer. It carries the same ban risk as the program. Your records stay in that browser on that computer and are never sent anywhere. A browser can clear a site's storage, so save them with **Settings → Data → Records file** now and then; the same file opens in the program or another browser. One tab at a time can use your records.
+**It reads only a window you share,** in the browser, and the picture never leaves your computer. It carries the same ban risk as the program. Your records stay in that browser on that computer and are never sent anywhere. A browser can clear a site's storage, so save them with **Save records file** in the sidebar (or **Settings → Data → Records file**) now and then; the same file opens in the program or another browser. One tab at a time can use your records.
 
 ## Install
 

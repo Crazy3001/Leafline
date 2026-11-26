@@ -37,6 +37,7 @@ import type {
   Guide,
   History,
   KnownCharacter,
+  Backup,
   Sight,
   LoggedDrop,
   NewDrop,
@@ -478,6 +479,12 @@ export interface Backend {
   pickRecords(): Promise<RecordsSummary | null>;
   /** Replaces the records with the picked file's. The ones before are kept aside. */
   useRecords(): Promise<RecordsSummary>;
+  /** What the records hold now. */
+  recordsSummary(): Promise<RecordsSummary>;
+  /** The records' daily copies and the ones kept aside before the last restore (the program only). */
+  listBackups(): Promise<Backup[]>;
+  /** Takes in a backup by its name, as `pickRecords` takes in a file; `useRecords` then restores it. */
+  checkBackup(name: string): Promise<RecordsSummary>;
   /** What a typed-in session works out to, before it is saved. */
   typedSessionOutcome(session: TypedSession): Promise<TypedOutcome>;
   /** Saves a typed-in session in the training log; returns its id. */

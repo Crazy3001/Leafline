@@ -5,6 +5,7 @@
   import { tip } from "$lib/tip.svelte";
   import {
     ChartLine,
+    Download,
     House,
     LayoutGrid,
     ListChecks,
@@ -23,7 +24,8 @@
   import { backend } from "$lib/api";
   import Logo from "$lib/components/Logo.svelte";
   import { DESK_TOOL_PAGES, ZOOMS, type DeskView } from "$lib/desk";
-  import { can } from "$lib/platform";
+  import { can, isWeb } from "$lib/platform";
+  import { noteRecordsSaved, recordsSavedAt } from "$lib/recordsfile";
   import { live } from "$lib/readings.svelte";
   import { changeSettings, display } from "$lib/settings.svelte";
 
@@ -74,6 +76,26 @@
   });
   const lightLook = $derived(display.theme === "focus-light" || display.theme === "ember-light" || display.theme === "sprout-light");
 
+  // The website keeps the records in this browser, which can clear them: saving a records file is
+  // one click away, and goes quiet once one was saved in the last two weeks.
+  let savedAt = $state(isWeb ? recordsSavedAt() : null);
+  const saveDue = $derived(isWeb && (savedAt == null || Date.now() - savedAt > 14 * 86400_000));
+  const saveTip = $derived(
+    savedAt
+      ? `Your records live in this browser. Last saved to a file on ${new Date(savedAt).toLocaleDateString()}.`
+      : "Your records live in this browser, which can clear them. Save a copy to keep them safe.",
+  );
+  async function saveFile() {
+    try {
+      if (await backend.saveRecords()) {
+        noteRecordsSaved();
+        savedAt = recordsSavedAt();
+      }
+    } catch {
+      // Settings → Data says what went wrong when tried there.
+    }
+  }
+
   /** The next text size, round and round. */
   const nextZoom = $derived(ZOOMS[(ZOOMS.indexOf(zoom) + 1) % ZOOMS.length]);
 
@@ -122,6 +144,11 @@
         <button role="radio" aria-checked={lightLook} aria-label="Light" use:tip={"Focus Light"} class:on={lightLook} onclick={() => void changeSettings({ theme: "focus-light" })}><Sun size={16} /></button>
         <button role="radio" aria-checked={!lightLook} aria-label="Dark" use:tip={"Focus Dark"} class:on={!lightLook} onclick={() => void changeSettings({ theme: "focus-dark" })}><Moon size={16} /></button>
       </div>
+    {/if}
+    {#if isWeb}
+      <button class="nav" class:due={saveDue} aria-label={folded ? "Save records file" : undefined} use:tip={saveTip} onclick={saveFile}>
+        <Download size={16} />{#if !folded}<span class="label">Save records file</span>{/if}
+      </button>
     {/if}
     <div class="foot-row">
       <button class="nav" aria-label={folded ? "Settings" : undefined} use:tip={folded ? "Settings" : undefined} onclick={() => backend.showSettings()}>
@@ -228,6 +255,11 @@
   .nav:hover {
     background: var(--hover);
     color: var(--text);
+  }
+
+  /* No records file saved in two weeks. */
+  .nav.due {
+    color: var(--accent-text-strong);
   }
 
   .nav.on {

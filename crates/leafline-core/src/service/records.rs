@@ -116,6 +116,11 @@ impl UserDataState {
 /// them is out of date.
 pub const RECORDS_REPLACED_EVENT: &str = "records-replaced";
 
+/// What the records hold now, to set beside a backup or a records file before using it.
+pub fn records_summary(h: &dyn Host) -> Result<RecordsSummary> {
+    h.records().with(|db| db.summary())
+}
+
 /// What was last read of a character (level, job, EXP, map, mesos, each with when), or with no
 /// name, of the one seen last. For showing until the game is read again: never for a rate.
 pub fn known_character(h: &dyn Host, name: Option<String>) -> Result<Option<KnownCharacter>> {

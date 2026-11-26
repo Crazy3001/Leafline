@@ -286,6 +286,8 @@ pub struct RecordsSummary {
     pub characters: i64,
     pub spots: i64,
     pub prices: i64,
+    /// When the newest session or drop was saved, Unix seconds; none with neither.
+    pub newest: Option<i64>,
 }
 
 impl UserData {
@@ -329,6 +331,11 @@ impl UserData {
             characters: count("characters")?,
             spots: count("saved_spots")?,
             prices: count("prices")?,
+            newest: self.conn.query_row(
+                "SELECT MAX(at) FROM (SELECT MAX(saved_at) AS at FROM sessions UNION ALL SELECT MAX(seen_at) FROM drops)",
+                [],
+                |row| row.get(0),
+            )?,
         })
     }
 

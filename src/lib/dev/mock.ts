@@ -1477,8 +1477,20 @@ export const mockBackend: Backend = {
   async finishSetup() {},
   version: async () => "dev",
   saveRecords: async () => null,
-  pickRecords: async () => null,
-  useRecords: async () => ({ sessions: 0, drops: 0, builds: 0, notes: 0, characters: 0, spots: 0, prices: 0 }),
+  pickRecords: async () => ({ sessions: 31, drops: 12, builds: 2, notes: 4, characters: 2, spots: 3, prices: 9, newest: Date.now() / 1000 - 9 * 86400 }),
+  useRecords: async () => ({ sessions: 0, drops: 0, builds: 0, notes: 0, characters: 0, spots: 0, prices: 0, newest: null }),
+  recordsSummary: async () => ({ sessions: 38, drops: 15, builds: 2, notes: 5, characters: 2, spots: 3, prices: 9, newest: Date.now() / 1000 - 3600 }),
+  // The last week's daily copies, the oldest unreadable, and the records kept before a restore.
+  listBackups: async () => {
+    const day = (ago: number) => new Date(Date.now() - ago * 86400_000).toISOString().slice(0, 10);
+    const summary = (sessions: number, drops: number, builds = 2) => ({ sessions, drops, builds, notes: 5, characters: 2, spots: 3, prices: 9, newest: Date.now() / 1000 - 86400 });
+    return [
+      ...[0, 1, 2, 3, 4, 5].map((ago) => ({ name: `leafline-${day(ago)}.sqlite3`, day: day(ago), beforeRestore: false, savedAt: null, summary: summary(38 - ago * 2, 15 - ago, ago > 3 ? 1 : 2), problem: null })),
+      { name: `leafline-${day(6)}.sqlite3`, day: day(6), beforeRestore: false, savedAt: null, summary: null, problem: "That file isn't a Leafline records file." },
+      { name: "leafline-before-import.sqlite3", day: null, beforeRestore: true, savedAt: null, summary: summary(40, 15), problem: null },
+    ];
+  },
+  checkBackup: async () => ({ sessions: 34, drops: 13, builds: 2, notes: 5, characters: 2, spots: 3, prices: 9, newest: Date.now() / 1000 - 2 * 86400 }),
   onRecordsReplaced: async () => () => {},
   typedSessionOutcome: async (s) => ({
     percentGained: (s.end.level - s.start.level) * 100 + s.end.percent - s.start.percent,
