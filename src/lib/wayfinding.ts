@@ -96,3 +96,58 @@ export function shortest(routes: (MapRoute | null)[]): MapRoute | null {
 export function arrivedLine(destination: Destination, at: MapRef): string {
   return destination.kind === "npc" ? `${destination.name} is on this map` : `You're on ${at.name}`;
 }
+
+/** The eight ways a portal can lie, clockwise from straight up. */
+export const BEARINGS = ["up", "up-right", "right", "down-right", "down", "down-left", "left", "up-left"] as const;
+export type Bearing = (typeof BEARINGS)[number];
+
+/** Closer than this, in the game's pixels, a portal counts as where the last one comes out. */
+const NEAR_PX = 90;
+
+const bearingWords: Record<Bearing, string> = {
+  up: "Portal straight up",
+  "up-right": "Portal up to the right",
+  right: "Portal to the right",
+  "down-right": "Portal down to the right",
+  down: "Portal straight down",
+  "down-left": "Portal down to the left",
+  left: "Portal to the left",
+  "up-left": "Portal up to the left",
+};
+
+/**
+ * Which way to head for a step, for the compass. Measured from where the last portal comes out
+ * when the data places both; otherwise the portal's third of the map, or its name's direction.
+ * Leafline never knows where the player stands, so on the first map only the third is known.
+ */
+export type Heading = {
+  /** A way to point the arrow, or none (a ride, a door, the middle of the map). */
+  bearing: Bearing | null;
+  /** What the step says to do. */
+  words: string;
+  /** What the arrow is worked out from, for its tooltip. */
+  basis: string;
+  /** The portal is about where the last one comes out. */
+  near?: boolean;
+};
+
+export function heading(step: RouteStep): Heading {
+  if (step.travel) return { bearing: null, words: step.travel.service, basis: "A ride or scroll" };
+  const t = step.toward;
+  if (t) {
+    if (Math.hypot(t.dx, t.dy) < NEAR_PX)
+      return { bearing: null, words: "Portal by where you come in", basis: "Next to the portal you come out of, by the map data", near: true };
+    // Clockwise from up, in eighths; the game's y grows downward.
+    const eighth = Math.round(((Math.atan2(t.dx, -t.dy) * 180) / Math.PI + 360) / 45) % 8;
+    const bearing = BEARINGS[eighth];
+    return { bearing, words: bearingWords[bearing], basis: "From the portal you come out of, by the map data" };
+  }
+  const third = "Which third of the map the portal stands in, by the map data";
+  if (step.side === "left") return { bearing: "left", words: stepVerb(step), basis: third };
+  if (step.side === "right") return { bearing: "right", words: stepVerb(step), basis: third };
+  if (step.side === "centre") return { bearing: null, words: stepVerb(step), basis: third };
+  const named = "Guessed from the portal's name";
+  if (step.direction === "west") return { bearing: "left", words: stepVerb(step), basis: named };
+  if (step.direction === "east") return { bearing: "right", words: stepVerb(step), basis: named };
+  return { bearing: null, words: stepVerb(step), basis: step.direction === "other" ? "The data doesn't place this portal" : named };
+}

@@ -16,6 +16,7 @@
   import CraftingPanel from "$lib/components/item/CraftingPanel.svelte";
   import TrackedItems from "$lib/components/item/TrackedItems.svelte";
   import NextStep from "$lib/components/NextStep.svelte";
+  import Compass from "$lib/components/desk/Compass.svelte";
   import PanelView from "$lib/components/PanelView.svelte";
   import TimersCard from "$lib/components/TimersCard.svelte";
   import { reportUrl } from "$lib/feedback";
@@ -335,7 +336,9 @@
       </div>
     {/if}
 
-    <NextStep />
+    <!-- The website's phone view has the desk's compass, one line under the header; the program
+         keeps the fuller route bar over the game. -->
+    {#if isWeb}<div class="phone-compass"><Compass line onpick={() => select("map")} /></div>{:else}<NextStep />{/if}
 
     <div class="stage">
       <div class="main" id="panel" role="tabpanel" aria-labelledby="tab-{tab}">
@@ -518,5 +521,11 @@
   .whose :global(.none) {
     padding: var(--space-2);
     font-size: var(--text-md);
+  }
+
+  .phone-compass {
+    display: flex;
+    justify-content: center;
+    padding: 0 var(--space-3) var(--space-2);
   }
 </style>
