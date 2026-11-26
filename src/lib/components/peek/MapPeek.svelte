@@ -43,8 +43,8 @@
   .head {
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-bottom: 10px;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
   }
 
   .names {
@@ -61,7 +61,7 @@
   .name {
     font-family: var(--font-display);
     font-size: var(--text-xl);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     line-height: 1.15;
   }
 

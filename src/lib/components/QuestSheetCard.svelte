@@ -154,7 +154,7 @@
 
 <style>
   .progress {
-    margin: 0 0 10px;
+    margin: 0 0 var(--space-2);
     padding: 0;
     list-style: none;
   }
@@ -162,15 +162,15 @@
   .progress li {
     display: flex;
     justify-content: space-between;
-    gap: 8px;
-    padding: 5px 10px;
+    gap: var(--space-2);
+    padding: var(--space-1) var(--space-3);
     border-radius: var(--radius-sm);
     background: var(--surface-2);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .progress li + li {
-    margin-top: 3px;
+    margin-top: var(--space-0-5);
   }
 
   .progress li.done span:last-child {
@@ -181,8 +181,8 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 6px;
-    margin: 0 0 8px;
+    gap: var(--space-1-5);
+    margin: 0 0 var(--space-2);
     color: var(--muted);
     font-size: var(--text-xs);
   }
@@ -192,22 +192,22 @@
   }
 
   .differs {
-    margin-top: 10px;
-    padding: 8px 10px;
+    margin-top: var(--space-2);
+    padding: var(--space-2) var(--space-3);
     border-radius: var(--radius-sm);
     background: var(--warn-soft);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .differs ul {
-    margin: 4px 0;
-    padding-left: 16px;
+    margin: var(--space-1) 0;
+    padding-left: var(--space-4);
   }
 
   .differs-head {
     margin: 0;
     color: var(--warn);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .differs-foot {
@@ -220,28 +220,28 @@
     margin: 0;
     font-family: var(--font-display);
     font-size: var(--text-lg);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     line-height: 1.25;
   }
 
   .meta {
-    margin: 2px 0 6px;
+    margin: var(--space-0-5) 0 var(--space-1-5);
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   /* Keeps a quest in the Quests tab, with its hints, while the Quest Helper isn't showing it. */
   .follow {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: var(--space-1);
     height: 26px;
-    margin: 0 0 8px;
-    padding: 0 9px;
+    margin: 0 0 var(--space-2);
+    padding: 0 var(--space-2);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: transparent;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     cursor: pointer;
   }
 
@@ -254,20 +254,20 @@
   .following {
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: var(--space-1);
     min-height: 26px;
-    margin: 0 0 8px;
+    margin: 0 0 var(--space-2);
     color: var(--good);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .stop {
-    margin-left: 4px;
+    margin-left: var(--space-1);
     padding: 0;
     border: 0;
     background: transparent;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     text-decoration: underline;
     text-decoration-color: var(--border-strong);
     cursor: pointer;
@@ -282,7 +282,7 @@
   .note {
     margin: 0;
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .spin {

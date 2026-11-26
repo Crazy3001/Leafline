@@ -86,6 +86,7 @@ import type {
   PlaceLink,
   QuestLog,
   RegionTotal,
+  WholeLog,
   QuestPage,
   QuestQuery,
   QuestSearch,
@@ -215,6 +216,8 @@ export interface Backend {
   forgetQuestLog(name: string): Promise<void>;
   /** How many quests the data files under each region. */
   questRegionTotals(): Promise<RegionTotal[]>;
+  /** Every quest in the data with where it stands for a character at `level`, from their quest log and what their Quest Helper shows. */
+  wholeQuestLog(name: string | null, level: number | null, helper: string[]): Promise<WholeLog>;
   /** A character's quest log changed; with their name. */
   onQuestLog(handler: (name: string) => void): Promise<UnlistenFn>;
   /** All the data says about a quest. */
@@ -308,8 +311,11 @@ export interface Backend {
 
   /** What was last read of a character, or with no name, of the character seen last. */
   knownCharacter(name: string | null): Promise<KnownCharacter | null>;
-  /** A character's last bag check, kept between runs; with no name, the one read last. */
-  knownBag(name: string | null): Promise<BagCheck | null>;
+  /** A character's last check of each bag tab, kept between runs, the newest first; with no name,
+   *  those of the character whose bag was read last. */
+  knownBags(name: string | null): Promise<BagCheck[]>;
+  /** Every character Leafline has a record of, the one seen last first. */
+  knownCharacters(): Promise<string[]>;
   /** What was last read of some character (or their bag) changed. */
   onKnownCharacter(handler: () => void): Promise<UnlistenFn>;
 

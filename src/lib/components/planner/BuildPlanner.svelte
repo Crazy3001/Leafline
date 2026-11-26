@@ -32,6 +32,7 @@
   import LevelInspector from "$lib/components/planner/LevelInspector.svelte";
   import NewBuild from "$lib/components/planner/NewBuild.svelte";
   import PlanChart from "$lib/components/planner/PlanChart.svelte";
+  import StarterCard from "$lib/components/planner/StarterCard.svelte";
   import Timeline from "$lib/components/planner/Timeline.svelte";
   import Segmented from "$lib/ui/Segmented.svelte";
   import { guideLinks } from "$lib/guides";
@@ -337,6 +338,8 @@
     draft.plan = JSON.parse(JSON.stringify(starter.plan));
     // A plan that follows a guide brings its link, unless the build already has one.
     if (starter.source && !draft.guide.trim()) draft.guide = starter.source.url;
+    // A Lv 1 character with no stats entered yet starts from the plan's roll.
+    if (!draft.start.stats && draft.start.level <= 1) draft.start.stats = { ...starter.start };
   }
 
   // Skills.
@@ -616,6 +619,8 @@
     rulesTimer = setTimeout(() => changeSettings({ buildRules: next }), SAVE_DELAY);
   }
 
+  /** Slots whose passed-over goals are shown; folded into a count otherwise. */
+  let openPassed = $state<string[]>([]);
   const GENDERS = [
     { id: "", label: "Either" },
     { id: "male", label: "Male" },
@@ -627,15 +632,15 @@
   const rulesChanged = $derived(JSON.stringify(display.buildRules) !== JSON.stringify(DEFAULT_RULES));
   const pathSummary = $derived(
     draft
-      ? `${jobPath} · ${draft.character ? `${draft.character}, ` : ""}Lv ${draft.start.level}${genderWord ? ` · ${genderWord}` : ""} · planned to Lv ${draft.plan.planTo}`
+      ? `${jobPath} · Lv ${draft.start.level}${genderWord ? ` · ${genderWord}` : ""} · planned to Lv ${draft.plan.planTo}`
       : "",
   );
 </script>
 
 {#snippet moveButtons(onmove: (by: number) => void, first: boolean, last: boolean)}
   <span class="moves">
-    <button class="icon" use:tip={"Move up"} aria-label="Move up" disabled={first} onclick={() => onmove(-1)}><ArrowUp size={12} /></button>
-    <button class="icon" use:tip={"Move down"} aria-label="Move down" disabled={last} onclick={() => onmove(1)}><ArrowDown size={12} /></button>
+    <button class="icon-btn xs icon" use:tip={"Move up"} aria-label="Move up" disabled={first} onclick={() => onmove(-1)}><ArrowUp size={12} /></button>
+    <button class="icon-btn xs icon" use:tip={"Move down"} aria-label="Move down" disabled={last} onclick={() => onmove(1)}><ArrowDown size={12} /></button>
   </span>
 {/snippet}
 
@@ -725,10 +730,33 @@
           {/if}
           <input class="name" maxlength="80" aria-label="Build name" bind:value={draft.name} />
           <p class="path">{pathSummary}</p>
+          <!-- Which character the build follows: Leafline uses it whenever it reads that name. -->
+          <p class="who">
+            {#if draft.character}
+              <span>Used when Leafline reads <b>{draft.character}</b></span>
+            {:else}
+              <span>For any character without a build of their own</span>
+            {/if}
+            {#if character && draft.character?.toLowerCase() !== character.toLowerCase()}
+              <button class="btn sm" onclick={() => draft && (draft.character = character)}>Use for {character}</button>
+            {/if}
+            {#if draft.character}
+              <button class="btn sm ghost" onclick={() => draft && (draft.character = null)}>Use for anyone</button>
+            {/if}
+          </p>
         </div>
-        <button class="plain" onclick={copyCode}>
-          <ClipboardCopy size={13} />{copied ? "Copied" : "Copy plan code"}
-        </button>
+        <div class="top-actions">
+          <button class="btn" onclick={copyCode}>
+            <ClipboardCopy size={13} />{copied ? "Copied" : "Copy plan code"}
+          </button>
+          <button class="icon-btn sm" aria-label="Duplicate build" use:tip={"Duplicate build"} onclick={duplicate}><Plus size={14} /></button>
+          {#if confirmDelete}
+            <button class="btn danger" onclick={remove}><Trash2 size={13} />Really delete?</button>
+            <button class="btn ghost" onclick={() => (confirmDelete = false)}>Keep</button>
+          {:else}
+            <button class="icon-btn sm" aria-label="Delete build" use:tip={"Delete build"} onclick={remove}><Trash2 size={14} /></button>
+          {/if}
+        </div>
       </header>
 
       <div class="tabs" role="tablist" aria-label="Plan">
@@ -748,7 +776,7 @@
                   {#if problem.severity === "warning"}<TriangleAlert size={13} />{/if}
                   <span>{problem.message}</span>
                   {#if problem.level != null}
-                    <button class="plain small" onclick={() => pick(problem.level!)}>Show Lv {problem.level}</button>
+                    <button class="btn sm" onclick={() => pick(problem.level!)}>Show Lv {problem.level}</button>
                   {/if}
                 </li>
               {/each}
@@ -822,8 +850,8 @@
               <p class="quiet">No skill goals yet.</p>
             {/each}
             <p class="order-foot">
-              <button class="plain" onclick={() => pickTab("skills")}><Plus size={13} />Add or change goals in Skills</button>
-              <button class="plain" onclick={() => pickTab("stats")}>Stat goals in Stats</button>
+              <button class="btn" onclick={() => pickTab("skills")}><Plus size={13} />Add or change goals in Skills</button>
+              <button class="btn" onclick={() => pickTab("stats")}>Stat goals in Stats</button>
             </p>
           </div>
         {:else if tab === "skills"}
@@ -850,7 +878,7 @@
                   </label>
                   <span class="max tabular">of {skill?.maxLevel ?? "?"}</span>
                   {@render reachedBadge(skillReached(goal, draft.start.skills, steps))}
-                  <button class="icon" use:tip={"Remove"} aria-label="Remove {skill?.name ?? 'skill'}" onclick={() => draft?.plan.skills.splice(index, 1)}
+                  <button class="icon-btn xs icon" use:tip={"Remove"} aria-label="Remove {skill?.name ?? 'skill'}" onclick={() => draft?.plan.skills.splice(index, 1)}
                     ><X size={12} /></button
                   >
                 </li>
@@ -878,7 +906,10 @@
           </label>
           {#if !firstJob}<p class="help">Choose a job in Settings to add its skills.</p>{/if}
         {:else if tab === "stats"}
-          <p class="help">Each level's AP goes to the first goal that can take it. End with one goal that takes the rest.</p>
+          <p class="help">
+            Each level's AP goes to the first goal that can take it. End with one goal that takes the rest. A goal "with gear"
+            counts what your worn gear and the plan's gear add, so no AP goes where gear already covers it.
+          </p>
           {#if draft.plan.stats.length}
             <ol class="goals">
               {#each draft.plan.stats as goal, i}
@@ -898,6 +929,12 @@
                   {#if goal.target != null}
                     <input class="number" aria-label="Target" type="number" min="0" bind:value={goal.target} />
                   {/if}
+                  {#if goal.target != null}
+                    <label class="inline" use:tip={"Count what worn gear adds, as the game does for requirements"}>
+                      <input type="checkbox" checked={goal.withGear ?? false} onchange={(e) => (goal.withGear = e.currentTarget.checked)} />
+                      <span>with gear</span>
+                    </label>
+                  {/if}
                   <label class="inline">
                     <span>from Lv</span>
                     <input
@@ -915,7 +952,7 @@
                   {:else}
                     <span class="reached tabular normal">{stepAt(steps, endLevel)?.stats[goal.stat] ?? "?"} by Lv {endLevel}</span>
                   {/if}
-                  <button class="icon" use:tip={"Remove"} aria-label="Remove {statLabel(goal.stat)} goal" onclick={() => draft?.plan.stats.splice(i, 1)}
+                  <button class="icon-btn xs icon" use:tip={"Remove"} aria-label="Remove {statLabel(goal.stat)} goal" onclick={() => draft?.plan.stats.splice(i, 1)}
                     ><X size={12} /></button
                   >
                 </li>
@@ -923,7 +960,7 @@
             </ol>
           {/if}
           <button
-            class="plain"
+            class="btn"
             onclick={() => draft?.plan.stats.push({ stat: "dex", target: (draft?.start.stats?.dex ?? 0) + 5, fromLevel: null })}
           >
             <Plus size={13} />Add a stat goal
@@ -1002,23 +1039,33 @@
                       <b>{now ? "now" : step.level}</b>
                       <Ref kind="item" id={step.item.id} name={step.item.name} />
                       {#if step.planned}
-                        <button class="icon small" aria-label="Stop aiming for {step.item.name}" onclick={() => dropGoal(step.item.id)}><X size={11} /></button>
+                        <button class="icon-btn xs icon small" aria-label="Stop aiming for {step.item.name}" onclick={() => dropGoal(step.item.id)}><X size={11} /></button>
                       {/if}
                     </span>
                   {/each}
-                  {#each path?.passed ?? [] as item (item.id)}
-                    {@const below = item.reqLevel <= gearFrom}
-                    <span class="chip passed" use:tip={below ? `Needs Lv ${item.reqLevel}: you're past it, and the path has a better piece` : "A better piece of this tier or a higher one comes as soon"}>
-                      <b class="warn">{below ? `below Lv ${gearFrom}` : "passed over"}</b>
-                      <Ref kind="item" id={item.id} name={item.name} />
-                      <button class="icon small" aria-label="Stop aiming for {item.name}" onclick={() => dropGoal(item.id)}><X size={11} /></button>
-                    </span>
-                  {/each}
+                  {#if path?.passed.length && !openPassed.includes(slot)}
+                    <button
+                      class="chip more"
+                      use:tip={"Goals the path skips: outgrown, or a better piece comes as soon"}
+                      onclick={() => (openPassed = [...openPassed, slot])}
+                    >
+                      {path.passed.length} passed over
+                    </button>
+                  {:else}
+                    {#each path?.passed ?? [] as item (item.id)}
+                      {@const below = item.reqLevel <= gearFrom}
+                      <span class="chip passed" use:tip={below ? `Needs Lv ${item.reqLevel}: you're past it, and the path has a better piece` : "A better piece of this tier or a higher one comes as soon"}>
+                        <b class="warn">{below ? `below Lv ${gearFrom}` : "passed over"}</b>
+                        <Ref kind="item" id={item.id} name={item.name} />
+                        <button class="icon-btn xs icon small" aria-label="Stop aiming for {item.name}" onclick={() => dropGoal(item.id)}><X size={11} /></button>
+                      </span>
+                    {/each}
+                  {/if}
                   {#each stuckBySlot.get(slot) ?? [] as check (check.item.id)}
                     <span class="chip passed">
                       <b class="warn">{check.usable ? "out of reach" : "wrong job"}</b>
                       <Ref kind="item" id={check.item.id} name={check.item.name} />
-                      <button class="icon small" aria-label="Stop aiming for {check.item.name}" onclick={() => dropGoal(check.item.id)}><X size={11} /></button>
+                      <button class="icon-btn xs icon small" aria-label="Stop aiming for {check.item.name}" onclick={() => dropGoal(check.item.id)}><X size={11} /></button>
                     </span>
                   {/each}
                   <button class="add-chip" class:on={adding === slot} aria-expanded={adding === slot} onclick={() => openFinder(slot)}>
@@ -1150,32 +1197,18 @@
           {#if jobPlans.length}
             <section>
               <h2 class="group">Ready-made plans</h2>
-              <p class="help">
-                Each follows one written guide and credits it. Untested in game. Using one replaces your goals; your stats
-                stay.
-              </p>
-              <ul class="plans">
+              <p class="help">Using one replaces your goals; your stats stay.</p>
+              <div class="plans">
                 {#each jobPlans as starter (starter.id)}
-                  <li>
-                    <span class="goal-name">
-                      <span>{starter.name}</span>
-                      <small>{starter.summary}</small>
-                      {#if starter.source}
-                        <small>
-                          {starter.source.credit}
-                          <button class="plain" onclick={() => starter.source && backend.openGuide(starter.source.url)}>
-                            Open {starter.source.name}'s guide
-                          </button>
-                        </small>
-                      {/if}
-                      {#if starter.missing.length}<small class="warn">Not in this data: {starter.missing.join(", ")}</small>{/if}
-                    </span>
-                    <button class="plain" class:danger={confirmStarter === starter.id} onclick={() => useStarter(starter)}>
-                      {confirmStarter === starter.id ? "Replace my goals?" : "Use this plan"}
-                    </button>
-                  </li>
+                  <StarterCard plan={starter} jobName={jobName(starter.job)}>
+                    {#snippet action()}
+                      <button class="btn sm" class:danger={confirmStarter === starter.id} onclick={() => useStarter(starter)}>
+                        {confirmStarter === starter.id ? "Replace my goals?" : "Use this plan"}
+                      </button>
+                    {/snippet}
+                  </StarterCard>
                 {/each}
-              </ul>
+              </div>
             </section>
           {/if}
 
@@ -1191,7 +1224,7 @@
               <label><span>2nd job at Lv</span><input class="number" type="number" min="2" value={rules.secondJobLevel} oninput={(e) => setRules({ secondJobLevel: whole(e.currentTarget.value) })} /></label>
             </div>
             {#if rulesChanged}
-              <button class="plain" onclick={() => setRules(DEFAULT_RULES)}><RotateCcw size={13} />Back to the defaults</button>
+              <button class="btn" onclick={() => setRules(DEFAULT_RULES)}><RotateCcw size={13} />Back to the defaults</button>
             {/if}
           </section>
 
@@ -1200,7 +1233,7 @@
             {#if jobGuides.length}
               <div class="links">
                 {#each jobGuides as guide (guide.url)}
-                  <button class="plain" onclick={() => backend.openGuide(guide.url)}>
+                  <button class="btn" onclick={() => backend.openGuide(guide.url)}>
                     <ExternalLink size={13} />{guide.job}, {guide.site} ({guide.levels})
                   </button>
                 {/each}
@@ -1208,7 +1241,7 @@
             {/if}
             <div class="guide">
               <input type="url" placeholder="https://" aria-label="Guide link" bind:value={draft.guide} />
-              <button class="plain" disabled={!draft.guide.trim()} onclick={() => draft && backend.openGuide(draft.guide)}>
+              <button class="btn" disabled={!draft.guide.trim()} onclick={() => draft && backend.openGuide(draft.guide)}>
                 <ExternalLink size={13} />Open
               </button>
             </div>
@@ -1216,9 +1249,9 @@
           </section>
 
           <section class="actions">
-            <button class="plain" onclick={copyCode}><ClipboardCopy size={13} />{copied ? "Copied" : "Copy plan code"}</button>
-            <button class="plain" onclick={duplicate}><Plus size={13} />Duplicate build</button>
-            <button class="plain push" class:danger={confirmDelete} onclick={remove}>
+            <button class="btn" onclick={copyCode}><ClipboardCopy size={13} />{copied ? "Copied" : "Copy plan code"}</button>
+            <button class="btn" onclick={duplicate}><Plus size={13} />Duplicate build</button>
+            <button class="btn push" class:danger={confirmDelete} onclick={remove}>
               <Trash2 size={13} />{confirmDelete ? "Really delete?" : "Delete build"}
             </button>
           </section>
@@ -1294,16 +1327,16 @@
   }
 
   select.switch {
-    margin-bottom: 4px;
+    margin-bottom: var(--space-1);
     max-width: 100%;
   }
 
   nav {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--space-0-5);
     min-height: 0;
-    padding: 16px 10px;
+    padding: var(--space-4) var(--space-3);
     border-right: 1px solid var(--border);
     background: var(--surface);
   }
@@ -1311,10 +1344,10 @@
   .brand {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin: 0 8px 12px;
+    gap: var(--space-2);
+    margin: 0 var(--space-2) var(--space-3);
     font-family: var(--font-display);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .list {
@@ -1322,7 +1355,7 @@
     align-content: start;
     gap: 1px;
     min-height: 0;
-    margin-bottom: 8px;
+    margin-bottom: var(--space-2);
     overflow-y: auto;
   }
 
@@ -1330,7 +1363,7 @@
     display: grid;
     gap: 0;
     width: 100%;
-    padding: 6px 10px;
+    padding: var(--space-1-5) var(--space-3);
     border: 0;
     border-left: 2px solid transparent;
     border-radius: 0;
@@ -1365,13 +1398,13 @@
   .side {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 6px 10px;
+    gap: var(--space-1-5);
+    padding: var(--space-1-5) var(--space-3);
     border: 0;
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     cursor: pointer;
   }
 
@@ -1392,7 +1425,7 @@
 
   textarea {
     width: 100%;
-    margin: 4px 0;
+    margin: var(--space-1) 0;
     resize: vertical;
   }
 
@@ -1408,23 +1441,23 @@
     align-self: center;
     justify-self: center;
     max-width: 420px;
-    padding: 24px;
+    padding: var(--space-6);
   }
 
   h1 {
-    margin: 0 0 6px;
+    margin: 0 0 var(--space-1-5);
     font-family: var(--font-display);
     font-size: var(--text-xl);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .lead {
-    margin: 0 0 14px;
+    margin: 0 0 var(--space-3);
     color: var(--muted);
   }
 
   .box {
-    padding: 12px;
+    padding: var(--space-3);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
   }
@@ -1432,8 +1465,8 @@
   .top {
     display: flex;
     align-items: flex-start;
-    gap: 12px;
-    padding: 16px 22px 10px;
+    gap: var(--space-3);
+    padding: var(--space-4) var(--space-6) var(--space-2);
   }
 
   .titles {
@@ -1451,7 +1484,7 @@
     color: var(--text);
     font-family: var(--font-display);
     font-size: var(--text-xl);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   input.name:hover {
@@ -1463,19 +1496,41 @@
   }
 
   .path {
-    margin: 2px 0 0;
+    margin: var(--space-0-5) 0 0;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
+  }
+
+  .who {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1-5) var(--space-2);
+    margin: var(--space-1) 0 0;
+    color: var(--faint);
+    font-size: var(--text-md);
+  }
+
+  .who b {
+    color: var(--text);
+    font-weight: var(--weight-strong);
+  }
+
+  .top-actions {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: var(--space-1-5);
   }
 
   .tabs {
     display: flex;
-    padding: 0 22px;
+    padding: 0 var(--space-6);
     border-bottom: 1px solid var(--border);
   }
 
   .tabs button {
-    padding: 8px 14px;
+    padding: var(--space-2) var(--space-4);
     border: 0;
     background: transparent;
     color: var(--muted);
@@ -1495,24 +1550,24 @@
   .content {
     flex: 1;
     min-height: 0;
-    padding: 12px 22px 28px;
+    padding: var(--space-3) var(--space-6) var(--space-6);
     overflow-y: auto;
   }
 
   section {
-    padding: 4px 0 14px;
+    padding: var(--space-1) 0 var(--space-3);
     border-bottom: 1px solid var(--border);
   }
 
   section + section {
-    padding-top: 12px;
+    padding-top: var(--space-3);
   }
 
   h2.group {
-    margin: 14px 0 6px;
+    margin: var(--space-3) 0 var(--space-1-5);
     font-family: var(--font-display);
     font-size: var(--text-md);
-    font-weight: 400;
+    font-weight: var(--weight-body);
     color: var(--muted);
   }
 
@@ -1525,9 +1580,9 @@
   }
 
   .help {
-    margin: 0 0 8px;
+    margin: 0 0 var(--space-2);
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .quiet {
@@ -1537,28 +1592,28 @@
   .fields {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px 12px;
-    margin-top: 6px;
+    gap: var(--space-2) var(--space-3);
+    margin-top: var(--space-1-5);
   }
 
   label {
     display: grid;
-    gap: 3px;
+    gap: var(--space-0-5);
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   label.inline {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: var(--space-1);
     flex: none;
   }
 
   input,
   select,
   textarea {
-    padding: 4px 7px;
+    padding: var(--space-1) var(--space-2);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--surface-2);
@@ -1585,12 +1640,12 @@
   }
 
   details {
-    margin-top: 10px;
+    margin-top: var(--space-2);
   }
 
   summary {
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     cursor: pointer;
   }
 
@@ -1601,8 +1656,8 @@
   .have {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-    gap: 6px 14px;
-    margin-top: 8px;
+    gap: var(--space-1-5) var(--space-3);
+    margin-top: var(--space-2);
   }
 
   .have label {
@@ -1612,7 +1667,7 @@
 
   .goals {
     display: grid;
-    margin: 0 0 8px;
+    margin: 0 0 var(--space-2);
     padding: 0;
     list-style: none;
   }
@@ -1620,8 +1675,8 @@
   .goals li {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 5px 0;
+    gap: var(--space-2);
+    padding: var(--space-1) 0;
     border-top: 1px solid var(--border);
   }
 
@@ -1634,7 +1689,7 @@
   .with-icon {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     min-width: 0;
   }
 
@@ -1647,14 +1702,14 @@
   .max {
     flex: none;
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .reached {
     flex: none;
     min-width: 88px;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     text-align: right;
   }
 
@@ -1671,37 +1726,13 @@
     flex: none;
   }
 
-  .icon {
-    display: grid;
-    flex: none;
-    place-items: center;
-    width: 20px;
-    height: 20px;
-    padding: 0;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--faint);
-    cursor: pointer;
-  }
-
   .icon.small {
     width: 16px;
     height: 16px;
   }
 
-  .icon:hover:not(:disabled) {
-    background: var(--hover);
-    color: var(--text);
-  }
-
-  .icon:disabled {
-    opacity: 0.35;
-    cursor: default;
-  }
-
   .add {
-    margin-top: 10px;
+    margin-top: var(--space-2);
   }
 
   .add select {
@@ -1718,17 +1749,17 @@
   .legend {
     display: flex;
     flex-wrap: wrap;
-    gap: 14px;
-    margin: 6px 0 0;
+    gap: var(--space-3);
+    margin: var(--space-1-5) 0 0;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .legend i {
     display: inline-block;
     width: 8px;
     height: 8px;
-    margin-right: 5px;
+    margin-right: var(--space-1-5);
   }
 
   .along {
@@ -1738,15 +1769,15 @@
   }
 
   .along th {
-    padding: 4px 12px;
+    padding: var(--space-1) var(--space-3);
     color: var(--faint);
     font-size: var(--text-xs);
-    font-weight: 400;
+    font-weight: var(--weight-body);
     text-align: right;
   }
 
   .along td {
-    padding: 5px 12px;
+    padding: var(--space-1) var(--space-3);
     border-top: 1px solid var(--border);
     text-align: right;
   }
@@ -1770,13 +1801,13 @@
   .slots > li {
     display: grid;
     grid-template-columns: 76px minmax(0, 1fr);
-    gap: 4px 12px;
-    padding: 8px 0;
+    gap: var(--space-1) var(--space-3);
+    padding: var(--space-2) 0;
     border-top: 1px solid var(--border);
   }
 
   .slot-name {
-    padding-top: 3px;
+    padding-top: var(--space-0-5);
     color: var(--muted);
     font-family: var(--font-display);
   }
@@ -1785,14 +1816,14 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
   }
 
   .chip {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 2px 6px 2px 8px;
+    gap: var(--space-1-5);
+    padding: var(--space-0-5) var(--space-1-5) var(--space-0-5) var(--space-2);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     background: var(--surface);
@@ -1802,13 +1833,13 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 6px 10px;
-    margin: 0 0 8px;
-    font-size: var(--text-sm);
+    gap: var(--space-1-5) var(--space-2);
+    margin: 0 0 var(--space-2);
+    font-size: var(--text-md);
   }
 
   .chip.worn {
-    padding-right: 8px;
+    padding-right: var(--space-2);
     border-color: var(--border-strong);
     background: var(--surface-2);
   }
@@ -1819,7 +1850,7 @@
 
   /* The data's pick for a tier, not one of the plan's goals: no remove button, a dashed edge. */
   .chip.data {
-    padding-right: 8px;
+    padding-right: var(--space-2);
     border-style: dashed;
   }
 
@@ -1827,11 +1858,24 @@
     opacity: 0.75;
   }
 
+  .chip.more {
+    padding-right: var(--space-2);
+    border-style: dashed;
+    color: var(--faint);
+    font: inherit;
+    font-size: var(--text-xs);
+    cursor: pointer;
+  }
+
+  .chip.more:hover {
+    color: var(--text);
+  }
+
   .chip b {
     color: var(--faint);
     font-family: var(--font-display);
     font-size: var(--text-xs);
-    font-weight: 400;
+    font-weight: var(--weight-body);
   }
 
   .chip b.warn {
@@ -1842,7 +1886,7 @@
     padding: 0;
     border: 0;
     background: transparent;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     cursor: pointer;
   }
 
@@ -1857,13 +1901,13 @@
   .add-chip {
     display: inline-flex;
     align-items: center;
-    gap: 3px;
-    padding: 3px 8px;
+    gap: var(--space-0-5);
+    padding: var(--space-0-5) var(--space-2);
     border: 1px dashed var(--border-strong);
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     cursor: pointer;
   }
 
@@ -1876,7 +1920,7 @@
 
   .finder {
     grid-column: 2;
-    padding: 10px;
+    padding: var(--space-2);
     background: var(--surface-2);
   }
 
@@ -1884,15 +1928,15 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 12px;
-    margin-bottom: 8px;
+    gap: var(--space-3);
+    margin-bottom: var(--space-2);
   }
 
   .search {
     display: flex;
     flex: 1;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     min-width: 180px;
     max-width: 320px;
   }
@@ -1912,7 +1956,7 @@
   .found button {
     display: grid;
     width: 100%;
-    padding: 4px 8px;
+    padding: var(--space-1) var(--space-2);
     border: 0;
     border-radius: var(--radius-sm);
     background: var(--hover);
@@ -1932,7 +1976,7 @@
 
   .guide {
     display: flex;
-    gap: 6px;
+    gap: var(--space-1-5);
     max-width: 600px;
   }
 
@@ -1944,35 +1988,19 @@
   .links {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
-    margin-bottom: 10px;
+    gap: var(--space-1-5);
+    margin-bottom: var(--space-2);
   }
 
   .plans {
     display: grid;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .plans li {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 6px 0;
-  }
-
-  .plans li + li {
-    border-top: 1px solid var(--border);
-  }
-
-  small.warn {
-    color: var(--warn);
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: var(--space-3);
   }
 
   .actions {
     display: flex;
-    gap: 8px;
+    gap: var(--space-2);
     border-bottom: 0;
   }
 
@@ -1980,58 +2008,29 @@
     margin-left: auto;
   }
 
-  .plain {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 9px;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--muted);
-    font-size: var(--text-sm);
-    white-space: nowrap;
-    cursor: pointer;
-  }
-
-  .plain:hover:not(:disabled) {
-    color: var(--text);
-    background: var(--hover);
-  }
-
-  .plain:disabled {
-    color: var(--faint);
-    cursor: default;
-  }
-
-  .plain.danger {
-    border-color: var(--bad);
-    color: var(--bad);
-  }
-
   .error {
-    margin: 10px 22px 0;
-    padding: 6px 10px;
+    margin: var(--space-2) var(--space-6) 0;
+    padding: var(--space-1-5) var(--space-3);
     background: var(--bad-soft);
     color: var(--bad);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   /* The Plan tab. */
   .plan-problems {
     display: grid;
-    gap: 6px;
-    margin: 0 0 12px;
+    gap: var(--space-1-5);
+    margin: 0 0 var(--space-3);
     padding: 0;
     list-style: none;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .plan-problems li {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 6px 10px;
+    gap: var(--space-2);
+    padding: var(--space-1-5) var(--space-3);
     border-radius: var(--radius-sm);
     background: var(--surface-2);
     color: var(--muted);
@@ -2050,14 +2049,9 @@
     flex: none;
   }
 
-  .plain.small {
-    padding: 2px 8px;
-    font-size: var(--text-xs);
-  }
-
   .plan-card {
-    margin-bottom: 12px;
-    padding: 14px 16px 12px;
+    margin-bottom: var(--space-3);
+    padding: var(--space-3) var(--space-4) var(--space-3);
   }
 
   .order-head {
@@ -2065,15 +2059,15 @@
     flex-wrap: wrap;
     align-items: baseline;
     justify-content: space-between;
-    gap: 4px 12px;
-    margin-bottom: 4px;
+    gap: var(--space-1) var(--space-3);
+    margin-bottom: var(--space-1);
   }
 
   .order-head h2 {
     margin: 0;
     font-family: var(--font-display);
     font-size: var(--text-md);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .order-head .help {
@@ -2082,11 +2076,11 @@
   }
 
   .order-group {
-    margin: 10px 0 2px;
+    margin: var(--space-2) 0 var(--space-0-5);
     color: var(--muted);
     font-family: var(--font-display);
-    font-size: var(--text-sm);
-    font-weight: 400;
+    font-size: var(--text-md);
+    font-weight: var(--weight-body);
   }
 
   .order {
@@ -2100,9 +2094,9 @@
     display: grid;
     grid-template-columns: 22px 20px minmax(0, 1fr) auto 84px 56px;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
     min-height: 34px;
-    padding: 0 6px;
+    padding: 0 var(--space-1-5);
     border-top: 1px solid var(--border);
   }
 
@@ -2158,12 +2152,12 @@
   }
 
   .goal-name small {
-    margin-left: 6px;
+    margin-left: var(--space-1-5);
   }
 
   .to {
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     white-space: nowrap;
   }
 
@@ -2173,7 +2167,7 @@
     background: transparent;
     color: var(--muted);
     font-family: var(--font-display);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     text-align: right;
     white-space: nowrap;
     cursor: pointer;
@@ -2191,10 +2185,10 @@
 
   .tag {
     justify-self: end;
-    padding: 1px 8px;
+    padding: 1px var(--space-2);
     border-radius: 6px;
     font-size: var(--text-xs);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .tag:empty {
@@ -2224,8 +2218,8 @@
   .order-foot {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
-    margin: 12px 0 0;
+    gap: var(--space-2);
+    margin: var(--space-3) 0 0;
   }
 
   @container planner (max-width: 640px) {
@@ -2240,7 +2234,7 @@
   }
 
   .credit {
-    margin-top: 16px;
+    margin-top: var(--space-4);
     padding: 0;
     border: 0;
     background: transparent;

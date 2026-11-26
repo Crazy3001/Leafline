@@ -169,6 +169,7 @@ export function commandBackend(invoke: Invoke, listen: Listen, emit: Emit): Back
     questLog: (name) => invoke("quest_log", { name }),
     forgetQuestLog: (name) => invoke("forget_quest_log", { name }),
     questRegionTotals: () => invoke("quest_region_totals"),
+    wholeQuestLog: (name, level, helper) => invoke("whole_quest_log", { name, level, helper }),
     onQuestLog: (handler) => listen<string>("quest-log", (e) => handler(e.payload)),
     questSheet: (id, mapName, mapStreet, mapTwin) => invoke("quest_sheet", { id, mapName, mapStreet, mapTwin }),
     showQuest: (id) => invoke("show_quest", { id }),
@@ -220,7 +221,8 @@ export function commandBackend(invoke: Invoke, listen: Listen, emit: Emit): Back
       return true;
     },
     knownCharacter: (name) => invoke("known_character", { name }),
-    knownBag: (name) => invoke("known_bag", { name }),
+    knownBags: (name) => invoke("known_bags", { name }),
+    knownCharacters: () => invoke("known_characters"),
     onKnownCharacter: (handler) => listen("known-character", () => handler()),
     setSessionNote: (id, note) => invoke("set_session_note", { id, note }),
     renameMap: (from, to) => invoke("rename_map", { from, to }),

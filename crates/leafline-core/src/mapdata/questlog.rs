@@ -80,6 +80,48 @@ impl Atlas {
         })
     }
 
+    /// The series a row of the Quest window names, when it isn't one quest's title: the game lists
+    /// a quest that is part of a series under the series' name ("Collecting For Maya" for "Maya's
+    /// First Collection"). Gives the series' name as the data has it and its quests in the row's
+    /// region. `None` when no series fits, or more
+    /// than one fits equally.
+    pub fn log_series(&self, readings: &[&str], cut: bool, region: Option<&str>) -> Option<(String, Vec<u32>)> {
+        let region = region.and_then(|r| self.quest_region_like(r));
+        let in_region = |q: &&super::osms::QuestRecord| region.is_none() || q.region == region;
+        let mut series: Vec<&String> = self.quests.values().filter(in_region).filter_map(|q| q.chain.as_ref()).collect();
+        series.sort();
+        series.dedup();
+        readings.iter().find_map(|reading| {
+            let read = fold(reading);
+            if read.is_empty() || (cut && read.chars().count() < SHORTEST_CUT) {
+                return None;
+            }
+            let mut scored: Vec<(f64, &String)> = series
+                .iter()
+                .map(|name| {
+                    let folded = fold(name);
+                    let score = if cut {
+                        let start: String = folded.chars().take(read.chars().count()).collect();
+                        normalized_levenshtein(&start, &read)
+                    } else {
+                        normalized_levenshtein(&folded, &read)
+                    };
+                    (score, *name)
+                })
+                .filter(|(score, _)| *score >= if cut { SAME_START } else { SAME_TITLE })
+                .collect();
+            scored.sort_by(|a, b| b.0.total_cmp(&a.0));
+            let name = match scored[..] {
+                [] => return None,
+                [(_, name)] => name,
+                [(best, name), (next, _), ..] if best > next + 1e-9 => name,
+                _ => return None,
+            };
+            let quests = self.quests.values().filter(in_region).filter(|q| q.chain.as_ref() == Some(name)).map(|q| q.id).collect();
+            Some((name.clone(), quests))
+        })
+    }
+
     /// A quest's name as the data has it.
     pub fn quest_name(&self, id: u32) -> Option<String> {
         self.quests.get(&id).map(|q| q.name.clone())
@@ -123,6 +165,27 @@ mod tests {
             ],
             ..Dataset::default()
         })
+    }
+
+    #[test]
+    fn a_series_name_gives_the_series_and_its_quests() {
+        let in_series = |id, name: &str, series: &str| QuestRecord { chain: Some(series.into()), ..quest(id, name, "Fern Isle") };
+        let atlas = Atlas::new(Dataset {
+            quests: vec![
+                in_series(1, "Bea's First Basket", "Baskets For Bea"),
+                in_series(2, "Bea's Second Basket", "Baskets For Bea"),
+                in_series(3, "The Lone Lighthouse", "Light Of The Isle"),
+                quest(4, "Pebble Patrol", "Fern Isle"),
+                quest(5, "Owl Feathers", "Duskwood"),
+            ],
+            ..Dataset::default()
+        });
+        assert_eq!(atlas.log_quest(&["Baskets For Bea"], false, None), None, "not a quest's own title");
+        assert_eq!(atlas.log_series(&["Baskets For Bea"], false, Some("Fern Isle")), Some(("Baskets For Bea".into(), vec![1, 2])));
+        assert_eq!(atlas.log_series(&["Baskets Fer Bea"], false, None).map(|s| s.0), Some("Baskets For Bea".into()));
+        assert_eq!(atlas.log_series(&["Light Of The..."], true, None), Some(("Light Of The Isle".into(), vec![3])));
+        assert_eq!(atlas.log_series(&["Pebble Patrol"], false, None), None, "a quest without a series");
+        assert_eq!(atlas.log_series(&["Baskets For Bea"], false, Some("Duskwood")), None, "another region's");
     }
 
     #[test]

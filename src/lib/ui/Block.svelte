@@ -26,9 +26,9 @@
   .block {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    margin: 0 10px 10px;
-    padding: 11px 14px 14px;
+    gap: var(--space-2);
+    margin: 0 var(--space-3) var(--space-2);
+    padding: var(--space-3) var(--space-4) var(--space-3);
   }
 
   /* A block inside a card or another block is a part of it, not a card of its own. */
@@ -58,7 +58,7 @@
   .aside {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     font-size: var(--text-xs);
     color: var(--muted);
   }

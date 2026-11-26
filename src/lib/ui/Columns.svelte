@@ -58,7 +58,7 @@
   .columns {
     display: grid;
     grid-template-columns: 44px minmax(0, 1fr);
-    gap: 4px var(--space-2);
+    gap: var(--space-1) var(--space-2);
   }
 
   .ticks {
@@ -66,7 +66,7 @@
     flex-direction: column;
     justify-content: space-between;
     align-items: flex-end;
-    font-size: 10px;
+    font-size: var(--text-2xs);
     line-height: 1;
     color: var(--faint);
   }
@@ -88,7 +88,7 @@
     position: absolute;
     inset: 0;
     display: flex;
-    gap: 2px;
+    gap: var(--space-0-5);
   }
 
   .col {
@@ -101,7 +101,7 @@
   }
 
   .cap {
-    margin-bottom: 4px;
+    margin-bottom: var(--space-1);
     font-size: var(--text-xs);
     white-space: nowrap;
     visibility: hidden;
@@ -118,23 +118,23 @@
 
   .labels {
     display: flex;
-    gap: 2px;
+    gap: var(--space-0-5);
   }
 
   .labels span {
     flex: 1;
     min-width: 0;
     overflow: hidden;
-    font-size: 10px;
+    font-size: var(--text-2xs);
     color: var(--faint);
     text-align: center;
     white-space: nowrap;
   }
 
   .detail {
-    margin: 6px 0 0;
+    margin: var(--space-1-5) 0 0;
     min-height: 18px;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     color: var(--muted);
   }
 </style>

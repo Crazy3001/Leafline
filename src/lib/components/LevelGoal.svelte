@@ -158,8 +158,8 @@
     <div class="row">
       <span class="target">Goal <span class="num">Lv {stored.target}</span></span>
       <span class="grow"></span>
-      <button class="icon" aria-label="Change the goal" use:tip={"Change the goal"} onclick={startEditing}><Pencil size={12} /></button>
-      <button class="icon" aria-label="Clear the goal" use:tip={"Clear the goal"} onclick={() => save(null)}><X size={12} /></button>
+      <button class="icon-btn xs icon" aria-label="Change the goal" use:tip={"Change the goal"} onclick={startEditing}><Pencil size={12} /></button>
+      <button class="icon-btn xs icon" aria-label="Clear the goal" use:tip={"Clear the goal"} onclick={() => save(null)}><X size={12} /></button>
     </div>
     {#if level == null}
       <p class="muted">Your level shows once the HUD is read.</p>
@@ -182,13 +182,13 @@
   .goal {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--space-1-5);
   }
 
   .row {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
   }
 
   .grow {
@@ -196,17 +196,17 @@
   }
 
   .target {
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     color: var(--muted);
   }
 
   .target .num {
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     color: var(--text);
   }
 
   .muted {
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     color: var(--muted);
   }
 
@@ -215,11 +215,11 @@
   }
 
   .line {
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .line strong {
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .note {
@@ -228,22 +228,22 @@
   }
 
   .reached {
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     color: var(--good);
   }
 
   .set {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    font-size: var(--text-sm);
+    gap: var(--space-1-5);
+    font-size: var(--text-md);
     color: var(--muted);
   }
 
   .set input {
     width: 52px;
     height: 22px;
-    padding: 0 4px;
+    padding: 0 var(--space-1);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--surface);
@@ -252,21 +252,4 @@
     text-align: right;
   }
 
-  .icon {
-    display: grid;
-    place-items: center;
-    width: 22px;
-    height: 22px;
-    padding: 0;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--muted);
-    cursor: pointer;
-  }
-
-  .icon:hover {
-    background: var(--hover);
-    color: var(--text);
-  }
 </style>

@@ -79,6 +79,8 @@
   const step = $derived(steps.findLast((s) => s.level <= at) ?? steps[0] ?? null);
   const hasWork = (s: LevelStep) => s.ap.length > 0 || s.sp.length > 0 || s.advance != null;
   const coming = $derived(steps.filter((s) => s.level > at && hasWork(s)).slice(0, COMING));
+  /** Coming up as shown: where the Gear card sits beside it, only levels that spend SP or AP or advance. */
+  const comingShown = $derived(whole ? steps.filter((s) => s.level > at && (s.advance || s.sp.length || s.ap.length)).slice(0, COMING) : coming);
   const advance = $derived(steps.find((s) => s.level > at && s.advance));
   /** The next level that brings a gear goal within reach. */
   const nextGear = $derived(steps.find((s) => s.level > at && s.gear.length));
@@ -98,7 +100,7 @@
     { id: "stats" as View, label: "Stats" },
     { id: "gear" as View, label: "Gear" },
     { id: "skills" as View, label: "Skills" },
-    ...(canAdvance ? [{ id: "advance" as View, label: "Job advance" }] : []),
+    ...(canAdvance ? [{ id: "advance" as View, label: "Advance" }] : []),
   ]);
 
   // Gear, slot by slot: what is worn, the plan's next goal and a better pick. What is worn comes
@@ -338,6 +340,7 @@
 
 {#snippet wearing(row: Outfit["slots"][number])}
   {@const piece = row.wearing}
+            {#if piece || !(row.suggested || row.next)}
             <div class="line">
               <span class="label">Wearing</span>
               {#if piece}
@@ -348,10 +351,10 @@
                   {#if piece.level != null}<span class="lv tabular" class:good={row.wearingFit?.ok} class:bad={row.wearingFit && !row.wearingFit.ok} use:tip={fitTitle(row.wearingFit)}
                       >{piece.level ? `Lv ${piece.level}` : "Any level"}</span
                     >{/if}
-                  <button class="remove" use:tip={"Edit"} aria-label="Edit {piece.name}" onclick={() => startEdit(piece)}
+                  <button class="icon-btn xs remove" use:tip={"Edit"} aria-label="Edit {piece.name}" onclick={() => startEdit(piece)}
                     ><Pencil size={11} /></button
                   >
-                  <button class="remove" use:tip={"Take it off"} aria-label="Take off {piece.name}" onclick={() => removePiece(piece.id)}
+                  <button class="icon-btn xs remove" use:tip={"Take it off"} aria-label="Take off {piece.name}" onclick={() => removePiece(piece.id)}
                     ><X size={12} /></button
                   >
                 </span>
@@ -359,6 +362,7 @@
                 <span class="none">Nothing worn</span>
               {/if}
             </div>
+            {/if}
             {#if piece && editing?.id === piece.id}
               <div class="edit">
                 <label class="edit-field">
@@ -372,7 +376,7 @@
                       {#if !STAT_LABELS.includes(stat.label)}<option>{stat.label}</option>{/if}
                     </select>
                     <input type="number" bind:value={stat.value} aria-label="{stat.label} value" />
-                    <button class="remove" aria-label="Remove {stat.label}" onclick={() => editing?.stats.splice(k, 1)}
+                    <button class="icon-btn xs remove" aria-label="Remove {stat.label}" onclick={() => editing?.stats.splice(k, 1)}
                       ><X size={11} /></button
                     >
                   </div>
@@ -391,7 +395,7 @@
                   </label>
                 </div>
                 <div class="edit-actions">
-                  <button class="action small" onclick={saveEdit}>Save</button>
+                  <button class="btn primary sm" onclick={saveEdit}>Save</button>
                   <button class="link" onclick={() => (editing = null)}>Cancel</button>
                 </div>
               </div>
@@ -538,21 +542,20 @@
     <p class="lead">{error}</p>
   {:else if loaded && !plan}
     <p class="lead">
-      No build yet. Choose a job and write your goals in order, from a guide or your own idea, and Leafline lays them out
-      level by level.
+      No build yet. Pick a job and your goals, and Leafline lays them out level by level.
     </p>
-    <button class="action" onclick={() => openPlanner()}><Pencil size={13} />Plan a build</button>
+    <button class="btn primary" onclick={() => openPlanner()}><Pencil size={13} />Plan a build</button>
     <h4 class="sub">Stats</h4>
     <CharacterStats {character} />
   {:else if plan && step}
     {#snippet planPart()}
     {@render todo(step)}
 
+    {#if !whole}
     <h4 class="sub">Your stats by the plan</h4>
     {#if !statsKnown}
       <p class="quiet-line">
-        Not read yet, so the plan counts from zero. Open your Character Stat and Skill windows in the game and Leafline reads
-        them, or press Read stats.
+        Not read yet, so the plan counts from zero. Open your Character Stat and Skill windows in game, or press Read stats.
       </p>
     {/if}
     <dl class="stats">
@@ -563,8 +566,8 @@
             {#if statsKnown && gearBonus?.[stat.id]}
               <!-- The total the game shows, then what you put in and what your gear adds. -->
               {step.stats[stat.id] + gearBonus[stat.id]}
-              <span class="gear" use:tip={"Points you put in, plus what your gear adds as the Character Stat window last showed it"}
-                >({step.stats[stat.id]}+{gearBonus[stat.id]})</span
+              <span class="gear" use:tip={`${step.stats[stat.id]} you put in, +${gearBonus[stat.id]} from gear as the Character Stat window last showed it`}
+                >+{gearBonus[stat.id]} gear</span
               >
             {:else}
               {statsKnown ? step.stats[stat.id] : "—"}
@@ -573,11 +576,12 @@
         </div>
       {/each}
     </dl>
+    {/if}
 
-    {#if coming.length}
+    {#if comingShown.length}
       <h4 class="sub">Coming up</h4>
         <ul class="coming">
-          {#each coming as s (s.level)}
+          {#each comingShown as s (s.level)}
             <li>
               <span class="when tabular">Lv {s.level}</span>
               <span class="what">
@@ -585,17 +589,17 @@
                 <!-- What the level adds, then the total it makes: "Double Stab +3 (4)". -->
                 {#each s.sp as gain (gain.skillId)}<span><Ref kind="skill" id={gain.skillId} name={gain.name} /> <span class="tabular">+{gain.to - gain.from}</span> <span class="total tabular">({gain.to})</span></span>{/each}
                 {#each s.ap as gain (gain.stat)}<span>{statLabel(gain.stat)} <span class="tabular">+{gain.amount}</span> <span class="total tabular">({gain.total})</span></span>{/each}
-                {#each s.gear as name (name)}<Ref kind="item" name={name} />{/each}
+                {#if !whole}{#each s.gear as name (name)}<Ref kind="item" name={name} />{/each}{/if}
               </span>
             </li>
           {/each}
         </ul>
     {/if}
 
-    {#if nextGear || advance}
+    {#if (nextGear && !whole) || advance}
       <h4 class="sub">Next</h4>
       <ul class="coming">
-        {#if nextGear}
+        {#if nextGear && !whole}
           <li>
             <span class="when tabular">Lv {nextGear.level}</span>
             <span class="what"
@@ -666,13 +670,13 @@
                   >
                   {#if row.suggestedPlanned}
                     <button
-                      class="remove"
+                      class="icon-btn xs remove"
                       use:tip={"Remove goal"}
                       aria-label="Stop aiming for {pick.name}"
                       onclick={() => setGoal(pick.id, false)}><X size={12} /></button
                     >
                   {:else}
-                    <button class="remove" use:tip={"Aim for this"} aria-label="Aim for {pick.name}" onclick={() => setGoal(pick.id, true)}
+                    <button class="icon-btn xs remove" use:tip={"Aim for this"} aria-label="Aim for {pick.name}" onclick={() => setGoal(pick.id, true)}
                       ><Plus size={12} /></button
                     >
                   {/if}
@@ -698,13 +702,13 @@
                   </span>
                   {#if row.planned}
                     <button
-                      class="remove"
+                      class="icon-btn xs remove"
                       use:tip={"Remove goal"}
                       aria-label="Stop aiming for {next.item.name}"
                       onclick={() => setGoal(next.item.id, false)}><X size={12} /></button
                     >
                   {:else}
-                    <button class="remove" use:tip={"Aim for this"} aria-label="Aim for {next.item.name}" onclick={() => setGoal(next.item.id, true)}
+                    <button class="icon-btn xs remove" use:tip={"Aim for this"} aria-label="Aim for {next.item.name}" onclick={() => setGoal(next.item.id, true)}
                       ><Plus size={12} /></button
                     >
                   {/if}
@@ -733,9 +737,9 @@
     {#if whole}
       <!-- Room for every part at once, as in the desk view: side by side where it fits. -->
       <div class="parts">
+        <div class="part"><h4 class="part-title">Stats</h4>{@render statsPart()}</div>
         <div class="part"><h4 class="part-title">Level up</h4>{@render planPart()}</div>
         <div class="part"><h4 class="part-title">Gear</h4>{@render gearPart()}</div>
-        <div class="part"><h4 class="part-title">Stats</h4>{@render statsPart()}</div>
         <div class="part"><h4 class="part-title">Skills</h4>{@render skillsView()}</div>
         {#if canAdvance && nextAdvance?.advance && plan.build.plan.job}<div class="part"><h4 class="part-title">Job advance</h4>{@render advancePart()}</div>{/if}
       </div>
@@ -766,16 +770,33 @@
 <style>
   .parts {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 18px 24px;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: var(--space-3);
     align-items: start;
   }
 
   .part {
     display: grid;
-    gap: 6px;
+    gap: var(--space-1-5);
     min-width: 0;
     align-content: start;
+  }
+
+  /* Side by side, each part is a card of its own, so each reads as one thing. */
+  .parts .part {
+    padding: var(--space-4);
+    border: var(--line-w) solid var(--line);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    box-shadow: var(--card-shadow);
+  }
+
+  .parts .part-title {
+    margin: 0 0 var(--space-1);
+    font-family: var(--font-display);
+    font-size: var(--text-lg);
+    font-weight: var(--weight-strong);
+    color: var(--text);
   }
 
   /*
@@ -785,9 +806,9 @@
   .parts .outfit li {
     display: grid;
     grid-template-columns: 72px minmax(0, 1fr);
-    column-gap: 8px;
+    column-gap: var(--space-2);
     row-gap: 1px;
-    padding: 9px 0;
+    padding: var(--space-2) 0;
   }
 
   .parts .outfit li > :global(*) {
@@ -814,7 +835,7 @@
   }
 
   .parts .outfit .piece-line {
-    margin: 0 0 3px 68px;
+    margin: 0 0 var(--space-0-5) 68px;
     overflow: hidden;
     color: var(--faint);
     text-overflow: ellipsis;
@@ -832,60 +853,60 @@
   }
 
   .part-title {
-    margin: 0 0 2px;
-    padding-bottom: 6px;
+    margin: 0 0 var(--space-0-5);
+    padding-bottom: var(--space-1-5);
     border-bottom: 1px solid var(--border);
     font-family: var(--font-display);
     font-size: var(--text-md);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .link.warn-line {
-    margin-top: 8px;
+    margin-top: var(--space-2);
     color: var(--warn);
   }
 
   .views {
     display: flex;
-    margin: 8px 0 10px;
+    margin: var(--space-2) 0 var(--space-2);
   }
 
   .sub {
-    margin: 12px 0 6px;
+    margin: var(--space-3) 0 var(--space-1-5);
     font-family: var(--font-display);
-    font-size: var(--text-sm);
-    font-weight: 400;
+    font-size: var(--text-md);
+    font-weight: var(--weight-body);
     color: var(--muted);
   }
 
   .build {
-    margin-top: 12px;
-    padding-top: 10px;
+    margin-top: var(--space-3);
+    padding-top: var(--space-2);
     border-top: 1px solid var(--border);
   }
 
   /* In the tab, the build opens with a band like a section of its own, out to the card's edges. */
   .build.full {
-    margin-top: 16px;
+    margin-top: var(--space-4);
     padding-top: 0;
     border-top: 0;
   }
 
   .head.strip {
     align-items: center;
-    margin: 0 0 10px;
+    margin: 0 0 var(--space-2);
   }
 
   .head.strip .title {
     color: var(--text);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .head {
     display: flex;
     align-items: baseline;
-    gap: 8px;
-    margin-bottom: 8px;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
   }
 
   .title {
@@ -901,7 +922,7 @@
     overflow: hidden;
     font-family: var(--font-display);
     font-size: var(--text-md);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -909,44 +930,25 @@
   .tools {
     display: inline-flex;
     flex: none;
-    gap: 10px;
+    gap: var(--space-2);
     margin-left: auto;
   }
 
   .lead {
-    margin: 0 0 10px;
+    margin: 0 0 var(--space-2);
     color: var(--muted);
-    font-size: var(--text-sm);
-  }
-
-  .action {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    height: var(--control-h);
-    padding: 0 10px;
-    border: 1px solid var(--accent);
-    border-radius: var(--radius-sm);
-    background: var(--accent);
-    color: var(--accent-ink);
-    font-size: var(--text-sm);
-    font-weight: 600;
-    cursor: pointer;
-  }
-
-  .action:hover {
-    filter: brightness(1.2);
+    font-size: var(--text-md);
   }
 
   .link {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--space-1);
     padding: 0;
     border: 0;
     background: transparent;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     cursor: pointer;
   }
 
@@ -959,7 +961,7 @@
   /* The level's to-do list, set against the level like a row of the plan. */
   .now {
     display: flex;
-    gap: 10px;
+    gap: var(--space-2);
     align-items: baseline;
   }
 
@@ -969,7 +971,7 @@
     color: var(--muted);
     font-family: var(--font-display);
     font-size: var(--text-md);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .todo {
@@ -980,8 +982,8 @@
   .todo p {
     display: flex;
     align-items: baseline;
-    gap: 6px;
-    margin: 0 0 3px;
+    gap: var(--space-1-5);
+    margin: 0 0 var(--space-0-5);
     font-size: var(--text-md);
   }
 
@@ -994,7 +996,7 @@
     width: 38px;
     color: var(--muted);
     font-size: var(--text-xs);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .dim {
@@ -1004,20 +1006,42 @@
 
   .advance {
     color: var(--text);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .stats {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 6px;
-    margin: 10px 0 0;
+    gap: var(--space-1-5);
+    margin: var(--space-2) 0 0;
   }
 
+  /* Numbers on the card, split by rules, as in Stats: no box per number. */
   .stats div {
-    padding: 5px 8px;
-    border-radius: var(--radius-sm);
-    background: var(--hover);
+    min-width: 0;
+    padding: 0 var(--space-2);
+    border-left: 1px solid var(--border);
+  }
+
+  /* What gear adds, small under the total, as in Stats. */
+  .stats .gear {
+    display: block;
+    color: var(--faint);
+    font-family: var(--font-sans);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-body);
+    cursor: help;
+  }
+
+  .stats div:first-child {
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .stats dd {
+    font-family: var(--font-display);
+    font-size: var(--text-xl);
+    font-variant-numeric: tabular-nums;
   }
 
   dt {
@@ -1027,33 +1051,33 @@
 
   dd {
     margin: 0;
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   /* What gear adds, beside the stat: shown, never part of the plan's count. */
   dd .gear {
-    margin-left: 4px;
+    margin-left: var(--space-1);
     color: var(--muted);
     font-size: var(--text-xs);
-    font-weight: 500;
+    font-weight: var(--weight-body);
   }
 
   .next {
-    margin: 10px 0 0;
+    margin: var(--space-2) 0 0;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .next strong {
     color: var(--text);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   h4 {
-    margin: 12px 0 4px;
+    margin: var(--space-3) 0 var(--space-1);
     font-family: var(--font-display);
-    font-size: var(--text-sm);
-    font-weight: 400;
+    font-size: var(--text-md);
+    font-weight: var(--weight-body);
   }
 
   .warn-title {
@@ -1064,13 +1088,13 @@
     margin: 0;
     padding: 0;
     list-style: none;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .coming li {
     display: flex;
-    gap: 10px;
-    padding: 3px 0;
+    gap: var(--space-2);
+    padding: var(--space-0-5) 0;
   }
 
   .coming li + li {
@@ -1086,7 +1110,7 @@
   .what {
     display: flex;
     flex-wrap: wrap;
-    gap: 2px 14px;
+    gap: var(--space-0-5) var(--space-3);
     min-width: 0;
   }
 
@@ -1094,30 +1118,8 @@
     color: var(--muted);
   }
 
-  .remove {
-    display: grid;
-    flex: none;
-    place-items: center;
-    width: 20px;
-    height: 20px;
-    padding: 0;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--faint);
-    cursor: pointer;
-  }
-
-  .remove:hover,
-  .remove:focus-visible {
-    background: var(--hover);
-    color: var(--text);
-    text-decoration: none;
-    outline: none;
-  }
-
   .outfit li {
-    padding: 6px 0 8px;
+    padding: var(--space-1-5) 0 var(--space-2);
   }
 
   .outfit li + li {
@@ -1125,10 +1127,10 @@
   }
 
   .slot-name {
-    margin: 0 0 3px;
+    margin: 0 0 var(--space-0-5);
     font-family: var(--font-display);
-    font-size: var(--text-sm);
-    font-weight: 400;
+    font-size: var(--text-md);
+    font-weight: var(--weight-body);
     color: var(--muted);
   }
 
@@ -1137,7 +1139,7 @@
     display: grid;
     grid-template-columns: 64px minmax(0, 1fr) auto;
     align-items: baseline;
-    gap: 6px;
+    gap: var(--space-1-5);
     padding: 1px 0;
   }
 
@@ -1151,8 +1153,8 @@
     padding: 0;
     border: 0;
     background: transparent;
-    font-size: var(--text-sm);
-    font-weight: 600;
+    font-size: var(--text-md);
+    font-weight: var(--weight-strong);
     text-align: left;
     cursor: pointer;
   }
@@ -1164,18 +1166,18 @@
 
   .line .none {
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .line .end {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
   }
 
   .line .lv {
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .line .lv.good {
@@ -1202,15 +1204,15 @@
 
   .edit {
     display: grid;
-    gap: 6px;
-    margin-top: 6px;
-    padding: 8px;
+    gap: var(--space-1-5);
+    margin-top: var(--space-1-5);
+    padding: var(--space-2);
     background: var(--surface-2);
   }
 
   .edit-field {
     display: grid;
-    gap: 2px;
+    gap: var(--space-0-5);
     font-size: var(--text-xs);
     color: var(--muted);
   }
@@ -1219,19 +1221,19 @@
   .edit select {
     min-width: 0;
     height: 26px;
-    padding: 0 6px;
+    padding: 0 var(--space-1-5);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--surface);
     color: var(--text);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .stat-edit {
     display: grid;
     grid-template-columns: 1fr 72px 20px;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
   }
 
   .add-stat {
@@ -1241,18 +1243,13 @@
   .edit-pair {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 6px;
+    gap: var(--space-1-5);
   }
 
   .edit-actions {
     display: flex;
     align-items: center;
-    gap: 12px;
-  }
-
-  .action.small {
-    height: 24px;
-    padding: 0 12px;
+    gap: var(--space-3);
   }
 
   .piece-line {
@@ -1271,29 +1268,29 @@
   }
 
   .quiet-line {
-    margin: 0 0 4px;
+    margin: 0 0 var(--space-1);
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .quiet-line strong {
     color: var(--muted);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .goal-error {
-    margin: 4px 0 0;
+    margin: var(--space-1) 0 0;
     color: var(--bad);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .find {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     height: 28px;
-    margin-top: 10px;
-    padding: 0 8px;
+    margin-top: var(--space-2);
+    padding: 0 var(--space-2);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--surface);
@@ -1311,11 +1308,11 @@
     outline: 0;
     background: transparent;
     color: var(--text);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .found {
-    margin-top: 4px;
+    margin-top: var(--space-1);
     border: 1px solid var(--border);
   }
 
@@ -1326,13 +1323,13 @@
   .found button {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
     width: 100%;
-    padding: 5px 8px;
+    padding: var(--space-1) var(--space-2);
     border: 0;
     background: transparent;
     color: var(--text);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     text-align: left;
     cursor: pointer;
   }
@@ -1368,26 +1365,26 @@
     display: flex;
     align-items: baseline;
     justify-content: space-between;
-    margin: 14px 0 4px;
-    padding-bottom: 3px;
+    margin: var(--space-3) 0 var(--space-1);
+    padding-bottom: var(--space-0-5);
     border-bottom: 1px solid var(--border-strong);
     color: var(--text);
     font-size: var(--text-xs);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     letter-spacing: 0.06em;
     text-transform: uppercase;
   }
 
   .skill-group .count {
     color: var(--faint);
-    font-weight: 400;
+    font-weight: var(--weight-body);
   }
 
   .skills li {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
-    gap: 3px 10px;
-    padding: 7px 0;
+    gap: var(--space-0-5) var(--space-2);
+    padding: var(--space-1-5) 0;
   }
 
   .skills li + li {
@@ -1397,13 +1394,13 @@
   .skill-name {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: var(--text-md);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .skill-level {
@@ -1411,7 +1408,7 @@
   }
 
   .skill-level b {
-    font-weight: 700;
+    font-weight: var(--weight-strong);
   }
 
   /* Level reached over the level the plan ends at, to the skill's maximum. */
@@ -1438,12 +1435,12 @@
   .skill-next {
     grid-column: 1 / -1;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .skill-next b {
     color: var(--accent-text-strong);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .skills .faint,
@@ -1453,7 +1450,7 @@
 
   .skills li.done .skill-name {
     color: var(--muted);
-    font-weight: 500;
+    font-weight: var(--weight-body);
   }
 
   .skills li.done .bar .have {
@@ -1461,37 +1458,37 @@
   }
 
   .skills li.done {
-    padding: 5px 0;
+    padding: var(--space-1) 0;
   }
 
   .max {
     color: var(--good);
-    font-size: var(--text-sm);
-    font-weight: 700;
+    font-size: var(--text-md);
+    font-weight: var(--weight-strong);
     letter-spacing: 0.06em;
   }
 
   .warnings li {
-    padding: 3px 0 3px 8px;
+    padding: var(--space-0-5) 0 var(--space-0-5) var(--space-2);
     border-left: 2px solid var(--warn);
     color: var(--muted);
   }
 
   .warnings li + li {
-    margin-top: 4px;
+    margin-top: var(--space-1);
   }
 
   footer {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px 12px;
-    margin-top: 12px;
+    gap: var(--space-1) var(--space-3);
+    margin-top: var(--space-3);
   }
 
   .credit {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--space-1);
     padding: 0;
     border: 0;
     background: transparent;
@@ -1509,6 +1506,6 @@
 
   /* The picture of a skill, in line with its name. */
   :global(.skill-pic) {
-    margin-right: 4px;
+    margin-right: var(--space-1);
   }
 </style>

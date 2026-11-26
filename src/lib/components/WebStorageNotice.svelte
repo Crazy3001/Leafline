@@ -27,7 +27,7 @@
         {storage.state === "moved" ? "Leafline moved to another tab." : "Leafline is open in another tab."} One tab at a
         time can use your records.
       </span>
-      <button class="button" onclick={take} disabled={taking}>{taking ? "Waiting…" : "Use it here"}</button>
+      <button class="btn primary" onclick={take} disabled={taking}>{taking ? "Waiting…" : "Use it here"}</button>
     {/if}
   </div>
 {/if}
@@ -41,22 +41,12 @@
     flex-wrap: wrap;
     align-items: center;
     justify-content: center;
-    gap: 10px;
-    padding: 8px 16px;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-4);
     border-bottom: var(--line-w) solid var(--accent);
     background: var(--surface);
     color: var(--text);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
-  .button {
-    height: var(--control-h);
-    padding: 0 12px;
-    border: var(--line-w) solid var(--accent);
-    border-radius: var(--radius);
-    background: var(--accent);
-    color: var(--accent-ink);
-    font: inherit;
-    cursor: pointer;
-  }
 </style>

@@ -10,8 +10,15 @@
 
   import { backend } from "$lib/api";
   import DeskColumns from "$lib/components/desk/DeskColumns.svelte";
-  import DeskGlance from "$lib/components/desk/DeskGlance.svelte";
+  import DeskBar from "$lib/components/desk/DeskBar.svelte";
   import DeskSidebar from "$lib/components/desk/DeskSidebar.svelte";
+  import DeskTools from "$lib/components/desk/DeskTools.svelte";
+  import DeskCharacter from "$lib/components/desk/DeskCharacter.svelte";
+  import DeskHero from "$lib/components/desk/DeskHero.svelte";
+  import DeskMap from "$lib/components/desk/DeskMap.svelte";
+  import DeskQuests from "$lib/components/desk/DeskQuests.svelte";
+  import NextUp from "$lib/components/desk/NextUp.svelte";
+  import Segmented from "$lib/ui/Segmented.svelte";
   import CharacterPicker from "$lib/components/CharacterPicker.svelte";
   import DropLogView from "$lib/components/DropLogView.svelte";
   import BagCheck from "$lib/components/item/BagCheck.svelte";
@@ -29,7 +36,20 @@
   import SearchSheet from "$lib/shell/SearchSheet.svelte";
   import SharePage from "$lib/shell/SharePage.svelte";
   import { toolPageTitle, type ToolInfo } from "$lib/shell/tabs";
-  import { DESK_TOOL_PAGES, loadFolded, loadPrefs, loadView, saveFolded, savePrefs, saveView, viewOfPanel, type DeskView } from "$lib/desk";
+  import {
+    DESK_TOOL_PAGES,
+    loadFolded,
+    loadPrefs,
+    loadTrain,
+    loadView,
+    saveFolded,
+    savePrefs,
+    saveTrain,
+    saveView,
+    viewOfPanel,
+    type DeskTrain,
+    type DeskView,
+  } from "$lib/desk";
   import { characters } from "$lib/characters.svelte";
   import { blankQuery, gearView, itemView, lookup, watchItems } from "$lib/items.svelte";
   import { monsterView, watchMonsters } from "$lib/monsters.svelte";
@@ -50,6 +70,22 @@
 
   let prefs = $state(loadPrefs());
   let view = $state<DeskView>(loadView());
+  /** Which page of Train shows. */
+  let trainPage = $state<DeskTrain>(loadTrain());
+  const TRAIN_PAGES: { id: DeskTrain; label: string }[] = [
+    { id: "session", label: "This session" },
+    { id: "where", label: "Where to train" },
+    { id: "log", label: "Training log" },
+  ];
+  function pickTrain(page: DeskTrain) {
+    trainPage = page;
+    saveTrain(page);
+  }
+  /** The training log, asked for by a link or a window. */
+  function openLog() {
+    pickTrain("log");
+    go("train");
+  }
   let folded = $state(loadFolded());
   /** Where a link took you from, for the Back button. */
   let from = $state<DeskView | null>(null);
@@ -67,6 +103,7 @@
     train: "Train",
     me: "Me",
     lookup: "Look up",
+    tools: "Tools",
     planner: "Build planner",
     layout: "My layout",
   };
@@ -151,7 +188,10 @@
     if ("page" in action) {
       if ((DESK_TOOL_PAGES as string[]).includes(action.page)) go(action.page);
     } else if ("tab" in action) go(action.tab);
-    else if ("window" in action) go(action.window === "build" ? "planner" : "train");
+    else if ("window" in action) {
+      if (action.window === "build") go("planner");
+      else openLog();
+    }
     else if (action.search === "gear") {
       itemView.id = null;
       itemView.query = { ...blankQuery(), kind: "equip" };
@@ -163,7 +203,7 @@
 
   /** A view the backend asked for when it opened or brought forward this window. */
   function openTab(name: string) {
-    if (name === "log") go("train");
+    if (name === "log") openLog();
     else if (name === "planner") go("planner");
   }
 
@@ -188,7 +228,7 @@
   });
 
   $effect(() => {
-    if (logRequest.seq) go("train");
+    if (logRequest.seq) untrack(openLog);
   });
 
   $effect(() => {
@@ -215,18 +255,28 @@
     }
   });
 
-  /** "/" puts the cursor in the search box, as on many sites, unless you're typing somewhere. */
+  /** The five tabs by number, in the sidebar's order. */
+  const NUMBERED: DeskView[] = ["now", "train", "quests", "map", "me"];
+
+  /**
+   * "/" puts the cursor in the search box, as on many sites, and 1 to 5 open the five tabs, unless
+   * you're typing somewhere. Keys in this window only; the game's never see them.
+   */
   function keys(event: KeyboardEvent) {
     const typing = (event.target as Element | null)?.closest?.("input, textarea, select, [contenteditable]");
-    if (event.key === "/" && !typing && !event.ctrlKey && !event.altKey && !event.metaKey) {
+    if (typing || event.ctrlKey || event.altKey || event.metaKey) return;
+    if (event.key === "/") {
       event.preventDefault();
       void openSearch();
+    } else if (/^[1-5]$/.test(event.key)) {
+      event.preventDefault();
+      pick(NUMBERED[Number(event.key) - 1]);
     }
   }
 
   const level = $derived(live.analysis?.hud?.level ?? live.session?.level ?? null);
   /** Views that are one page wide and read better not stretched across a big screen. */
-  const narrowViews: DeskView[] = ["lookup", "crafting", "drops", "timers", "sell", "tracked", "potions", "route", "share"];
+  const narrowViews: DeskView[] = ["lookup", "tools", "crafting", "drops", "timers", "sell", "tracked", "potions", "route", "share"];
 </script>
 
 <svelte:head><title>{isWeb ? "Leafline" : "Leafline — Desk view"}</title></svelte:head>
@@ -249,6 +299,8 @@
   />
 
   <div class="main">
+    <!-- On Now the character card has these numbers; everywhere else the bar keeps them in view. -->
+    {#if view !== "now"}<DeskBar />{/if}
     <div class="top">
       {#if from}
         <button class="pill" onclick={back}><ArrowLeft size={14} />Back to {viewName(from)}</button>
@@ -277,20 +329,23 @@
     <div class="view" class:narrow={narrowViews.includes(view)} class:full={view === "planner" || view === "layout"} aria-label={viewName(view)}>
       {#key view}
         {#if view === "now"}
-          <DeskGlance />
+          <DeskHero />
           <CharacterPicker />
-          <div class="flow">
-            {#if isWeb}<div class="block"><ReadWindowCard /></div>{/if}
-            {#if can.liveReading ? live.liveStatus.state === "off" : live.liveStatus.state !== "reading" && live.liveStatus.state !== "waiting"}
-              <div class="block"><TypedSessionCard /></div>
-            {/if}
-            {#if (live.analysis?.quest?.quests ?? []).some((q) => q.objectives.length)}
-              <section class="block card quests-glance">
-                <PanelView panel="quests" analysis={live.analysis} session={live.session} pinned />
-              </section>
-            {/if}
-            <TrainPanel {level} map={live.analysis?.map ?? null} session={live.session} whole glanced />
+          {#if isWeb}<ReadWindowCard />{/if}
+          <!-- Who you are and what to do next on top; the session, your quests and this map under them. -->
+          <div class="now-r1">
+            <DeskCharacter ongo={() => go("me")} />
+            <NextUp onme={() => go("me")} />
           </div>
+          <div class="now-r2">
+            <TrainPanel {level} map={live.analysis?.map ?? null} session={live.session} only="chart" />
+            <DeskQuests ongo={() => go("quests")} />
+            <DeskMap ongo={() => go("map")} />
+          </div>
+          <!-- Without live reading, a session can be typed in. -->
+          {#if can.liveReading ? live.liveStatus.state === "off" : live.liveStatus.state !== "reading" && live.liveStatus.state !== "waiting"}
+            <div class="typed"><TypedSessionCard /></div>
+          {/if}
         {:else if view === "quests"}
           <div class="stack"><PanelView panel="quests" analysis={live.analysis} session={live.session} roomy /></div>
         {:else if view === "map"}
@@ -298,7 +353,17 @@
         {:else if view === "me"}
           <div class="stack"><PanelView panel="character" analysis={live.analysis} session={live.session} roomy shelled wide /></div>
         {:else if view === "train"}
-          <TrainingLog embedded />
+          <div class="train-pages"><Segmented label="Train shows" options={TRAIN_PAGES} value={trainPage} onchange={pickTrain} /></div>
+          {#if trainPage === "log"}
+            <TrainingLog embedded />
+          {:else if trainPage === "where"}
+            <div class="stack"><TrainPanel {level} map={live.analysis?.map ?? null} session={live.session} only="where" /></div>
+          {:else}
+            <CharacterPicker />
+            <div class="flow two"><TrainPanel {level} map={live.analysis?.map ?? null} session={live.session} only="session" glanced /></div>
+          {/if}
+        {:else if view === "tools"}
+          <DeskTools ontool={openTool} />
         {:else if view === "lookup"}
           <div class="lookup-view">
             {#key searchFocus}<SearchSheet focus={searchFocus > 0} {landed} ontool={openTool} />{/key}
@@ -353,18 +418,18 @@
   .top {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 12px 16px;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
   }
 
   .search {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-2);
     flex: 0 1 340px;
     min-width: 180px;
     height: var(--control-h);
-    padding: 0 12px;
+    padding: 0 var(--space-3);
     border: var(--line-w) solid var(--control-line);
     border-radius: var(--radius);
     background: var(--surface);
@@ -388,7 +453,7 @@
   }
 
   kbd {
-    padding: 1px 6px;
+    padding: 1px var(--space-1-5);
     border-radius: 5px;
     background: var(--surface-3);
     color: var(--muted);
@@ -410,14 +475,14 @@
     display: inline-flex;
     flex: none;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     height: var(--control-h);
-    padding: 0 13px;
+    padding: 0 var(--space-3);
     border: var(--line-w) solid var(--control-line);
     border-radius: var(--radius-pill);
     background: var(--surface);
     color: var(--text);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     white-space: nowrap;
     cursor: pointer;
   }
@@ -449,8 +514,8 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    padding: 0 16px 16px;
+    gap: var(--space-3);
+    padding: 0 var(--space-4) var(--space-4);
     overflow-y: auto;
   }
 
@@ -482,7 +547,7 @@
    */
   .flow {
     columns: 3 400px;
-    column-gap: 12px;
+    column-gap: var(--space-3);
   }
 
   .flow.two {
@@ -495,13 +560,13 @@
   }
 
   .flow :global(.block) {
-    margin: 0 0 12px;
+    margin: 0 0 var(--space-3);
   }
 
   /* The character switch for Now's cards, under the strip. */
   .view > :global(.picker) {
     margin: 0;
-    padding: 0 4px;
+    padding: 0 var(--space-1);
   }
 
   /* One card under another, as wide as the window: Quests, whose cards sit side by side inside. */
@@ -510,17 +575,38 @@
     margin-right: 0;
   }
 
-  /* Quests in the Now view: the pinned window's short form, framed as a card. */
-  .quests-glance {
-    display: block;
-    padding: 12px 14px;
+  /* Now: the character and Next up side by side, then three cards. Narrow windows stack them. */
+  .now-r1 {
+    display: grid;
+    grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+    gap: var(--space-4);
+    align-items: stretch;
   }
 
-  .quests-glance :global(.card) {
+  .now-r2 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: var(--space-4);
+    align-items: start;
+  }
+
+  /* Panels' own side margins are for the overlay; the rows space them here. */
+  .now-r1 :global(.card),
+  .now-r2 :global(.card) {
     margin: 0;
-    border: 0;
-    box-shadow: none;
-    background: none;
-    padding: 0;
+  }
+
+  @container desk-main (max-width: 1000px) {
+    .now-r1 {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  .typed {
+    max-width: 640px;
+  }
+
+  .train-pages {
+    display: flex;
   }
 </style>

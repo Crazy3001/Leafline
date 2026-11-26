@@ -175,6 +175,7 @@ pub struct GearPath {
 
 /// Each slot's way up from `from` to the plan's end. A piece joins at the level it asks for (job
 /// and gender count, stats don't: the player raises those to suit), if it is of a higher tier (needs a higher level) than the last one and scores above it.
+/// A piece the plan isn't aiming for joins only if the plan's stats reach it by the end.
 /// Within a tier the plan's own goal wins over the data's pick, when it too beats the last piece.
 /// What is worn is never offered again. An overall or a shield has a path only when worn or
 /// planned, and then only of the plan's goals; a worn overall leaves the top and bottom out.
@@ -230,13 +231,24 @@ pub fn gear_paths(build: &Build, expansion: &Expansion, rules: &Rules, catalog: 
         }
         let is_worn = |item: &ItemRecord| worn.as_ref().is_some_and(|p| p.is_copy_of(item, catalog));
         let is_goal = |item: &ItemRecord| goals.iter().any(|g| g.id == item.id);
+        // Weapons of two kinds don't compare by Attack: a claw's stars add to it, a dagger has no
+        // stars. So between its weapon goals, a plan is offered only the kind it holds by then,
+        // as a claw to Lv 30 and daggers after.
+        let kind_at = |at: u32| -> Option<&str> {
+            let held = goals.iter().filter(|g| g.req_level <= at).max_by_key(|g| g.req_level);
+            held.or_else(|| goals.iter().min_by_key(|g| g.req_level)).and_then(|g| g.weapon_type.as_deref())
+        };
         let mut candidates: Vec<&ItemRecord> = goals.clone();
         if !optional {
+            // A piece joins at its level before the plan's stats reach it, but not one they never
+            // reach: a DEX dagger on a plan that leaves DEX at its roll.
+            let some_day = wearers.last().map(|(_, wearer)| wearer);
             candidates.extend(
                 catalog
                     .equipment()
                     .filter(|i| i.slot == slot && !novelty(i) && !is_goal(i))
-                    .filter(|i| trained.is_empty() || i.weapon_type.as_ref().is_none_or(|w| trained.contains(w))),
+                    .filter(|i| trained.is_empty() || i.weapon_type.as_ref().is_none_or(|w| trained.contains(w)))
+                    .filter(|i| some_day.is_none_or(|wearer| wearer.can_wear(i))),
             );
         }
         candidates.retain(|i| !is_worn(i));
@@ -253,7 +265,9 @@ pub fn gear_paths(build: &Build, expansion: &Expansion, rules: &Rules, catalog: 
                 .iter()
                 .copied()
                 .filter(|i| {
-                    wearer.old_enough(i)
+                    // A goal may be any weapon the class holds; other pieces only the job's own.
+                    (if is_goal(i) { wearer.old_enough_for_goal(i) } else { wearer.old_enough(i) })
+                        && (is_goal(i) || kind_at(*at).is_none_or(|kind| i.weapon_type.as_deref() == Some(kind)))
                         && floor.is_none_or(|f| scorer.of(i) > f)
                         && pair.is_none_or(|p| scorer.of(i) > p)
                         && tier.is_none_or(|t| if first { i.req_level >= t } else { i.req_level > t })
@@ -386,7 +400,7 @@ mod tests {
             start: Start { level, stats: Some(Stats { str: 4, dex: 25, int: 4, luk: 40 }), pieces, ..Start::default() },
             plan: Plan {
                 job: 400,
-                stats: vec![StatGoal { stat: Stat::Luk, target: None, from_level: None }],
+                stats: vec![StatGoal { stat: Stat::Luk, target: None, from_level: None, with_gear: false }],
                 gear,
                 plan_to: 40,
                 ..Plan::default()
@@ -459,6 +473,63 @@ mod tests {
         assert!(!weapon.suggested_planned);
         assert_eq!(weapon.next.map(|n| (n.item.name, n.level)), Some(("Iron Dagger".into(), Some(25))));
         assert!(!weapon.planned);
+    }
+
+    /// A Bandit's plan with Claw and Dagger Mastery in the data, so only daggers are its own.
+    fn bandit_420(gear: Vec<u32>, stats: Stats, catalog_items: Vec<ItemRecord>) -> (Build, Catalog) {
+        let catalog = Catalog::new(
+            vec![skill(1, "Double Stab", 400, 20, &[]), skill(2, "Claw Mastery", 410, 20, &[]), skill(3, "Dagger Mastery", 420, 20, &[])],
+            catalog_items,
+        );
+        let mut build = bandit(1, gear, Vec::new());
+        build.plan.job = 420;
+        build.plan.plan_to = 40;
+        build.start.stats = Some(stats);
+        (build, catalog)
+    }
+
+    fn weapon_path(build: &Build, catalog: &Catalog) -> Vec<(String, u32)> {
+        let rules = Rules::default();
+        let e = expand(build, &rules, catalog);
+        let paths = gear_paths(build, &e, &rules, catalog, 1);
+        let weapon = paths.iter().find(|p| p.slot == "Weapon").unwrap();
+        weapon.now.iter().chain(&weapon.steps).map(|s| (s.item.name.clone(), s.level)).collect()
+    }
+
+    fn claw(id: u32, name: &str, level: u32, attack: i64) -> ItemRecord {
+        let mut c = dagger(id, name, level, attack);
+        c.weapon_type = Some("Claw".into());
+        c
+    }
+
+    #[test]
+    fn a_plan_that_switches_from_claws_to_daggers_keeps_each_kind_in_its_levels() {
+        // A dagger out-hits a claw on Attack alone, since a claw's stars add to it. A Bandit's
+        // plan may still name claws for 1st job.
+        let items = vec![
+            claw(1, "Old Claw", 10, 10),
+            claw(2, "Mid Claw", 20, 16),
+            dagger(3, "Field Dagger", 15, 30),
+            dagger(4, "Late Dagger", 30, 48),
+            dagger(5, "Later Dagger", 35, 53),
+        ];
+        let (build, catalog) = bandit_420(vec![1, 2, 4], Stats { str: 4, dex: 25, int: 4, luk: 40 }, items);
+        let steps = weapon_path(&build, &catalog);
+        let want = [("Old Claw", 10), ("Mid Claw", 20), ("Late Dagger", 30), ("Later Dagger", 35)];
+        assert_eq!(steps, want.map(|(n, l)| (n.to_string(), l)));
+    }
+
+    #[test]
+    fn a_piece_the_plan_never_has_the_stats_for_is_left_off_its_path() {
+        let mut dex = dagger(3, "Dex Dagger", 25, 40);
+        dex.req_dex = 200;
+        let mut later = dagger(4, "Later Dex Dagger", 35, 53);
+        later.req_dex = 20;
+        let items = vec![dagger(1, "Old Dagger", 10, 17), dagger(2, "Goal Dagger", 30, 48), dex, later];
+        let (build, catalog) = bandit_420(vec![1, 2], Stats { str: 4, dex: 20, int: 4, luk: 12 }, items);
+        // DEX stays at 20 to Lv 40: the dagger asking 200 never fits; the one asking 20 does.
+        let want = [("Old Dagger", 10), ("Goal Dagger", 30), ("Later Dex Dagger", 35)];
+        assert_eq!(weapon_path(&build, &catalog), want.map(|(n, l)| (n.to_string(), l)));
     }
 
     #[test]
@@ -645,7 +716,7 @@ mod tests {
         );
         let build = Build {
             start: Start { level: 35, stats: Some(Stats { str: 30, dex: 120, int: 4, luk: 4 }), ..Start::default() },
-            plan: Plan { job: 320, stats: vec![StatGoal { stat: Stat::Dex, target: None, from_level: None }], plan_to: 70, ..Plan::default() },
+            plan: Plan { job: 320, stats: vec![StatGoal { stat: Stat::Dex, target: None, from_level: None, with_gear: false }], plan_to: 70, ..Plan::default() },
             ..Build::default()
         };
         let outfit = at(&build, &catalog, 35);
@@ -669,7 +740,7 @@ mod tests {
         let catalog = Catalog::new(vec![skill(1, "Iron Arrow", 320, 20, &[])], items);
         let build = Build {
             start: Start { level: 33, stats: Some(Stats { str: 30, dex: 160, int: 4, luk: 4 }), pieces: vec![worn(30, &catalog), worn(92, &catalog)], ..Start::default() },
-            plan: Plan { job: 320, stats: vec![StatGoal { stat: Stat::Dex, target: None, from_level: None }], gear: vec![40, 50, 70, 90, 91], plan_to: 70, ..Plan::default() },
+            plan: Plan { job: 320, stats: vec![StatGoal { stat: Stat::Dex, target: None, from_level: None, with_gear: false }], gear: vec![40, 50, 70, 90, 91], plan_to: 70, ..Plan::default() },
             ..Build::default()
         };
         let outfit = at(&build, &catalog, 33);

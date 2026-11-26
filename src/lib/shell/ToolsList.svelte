@@ -79,15 +79,15 @@
   .grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
+    gap: var(--space-2);
   }
 
   .tile {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-2);
     width: 100%;
-    padding: 10px;
+    padding: var(--space-2);
     border: var(--line-w) solid var(--line);
     border-radius: var(--radius-lg);
     background: var(--surface);
@@ -144,16 +144,15 @@
   }
 
   h3 {
-    margin: var(--space-4) 2px var(--space-2);
-    color: var(--faint);
-    font-family: var(--font-display);
-    font-size: var(--text-sm);
-    font-weight: 600;
+    margin: var(--space-4) var(--space-0-5) var(--space-2);
+    color: var(--muted);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-strong);
   }
 
   .row {
     display: flex;
-    gap: 6px;
+    gap: var(--space-1-5);
   }
 
   .row li {
@@ -165,9 +164,9 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
+    gap: var(--space-1);
     width: 100%;
-    padding: 9px 2px 7px;
+    padding: var(--space-2) var(--space-0-5) var(--space-1-5);
     border: var(--line-w) solid var(--line);
     border-radius: var(--radius);
     background: var(--surface);
@@ -194,6 +193,6 @@
   kbd {
     color: var(--faint);
     font-family: var(--font-sans);
-    font-size: 10px;
+    font-size: var(--text-2xs);
   }
 </style>

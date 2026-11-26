@@ -101,6 +101,12 @@ impl<'a> Wearer<'a> {
         item.kind == ItemKind::Equip && self.right_gender(item) && self.right_job(item) && self.level >= item.req_level
     }
 
+    /// As [`Self::old_enough`] for a piece the plan names, which may be any weapon the class can
+    /// hold: a Bandit's plan can carry a claw through 1st job before its daggers.
+    pub fn old_enough_for_goal(&self, item: &ItemRecord) -> bool {
+        item.kind == ItemKind::Equip && self.right_gender(item) && self.right_class(item) && self.level >= item.req_level
+    }
+
     fn right_gender(&self, item: &ItemRecord) -> bool {
         match (&item.gender, &self.build.start.gender) {
             (Some(made_for), Some(gender)) => made_for == gender,
@@ -111,10 +117,14 @@ impl<'a> Wearer<'a> {
     /// A Beginner wears only what anyone can. After that, gear for the job's class, and of
     /// weapons only those the build's job trains in.
     fn right_job(&self, item: &ItemRecord) -> bool {
-        let branch = Branch::of_job(self.build.plan.job).filter(|_| self.level >= self.rules.first_job_level);
-        let Some(branch) = branch else { return item.classes.is_empty() };
         let trained = self.weapons.is_empty() || item.weapon_type.as_ref().is_none_or(|w| self.weapons.contains(w));
-        usable_by(item, branch) && trained
+        self.right_class(item) && (self.level < self.rules.first_job_level || trained)
+    }
+
+    /// Gear for anyone as a Beginner, then gear for the job's class.
+    fn right_class(&self, item: &ItemRecord) -> bool {
+        let branch = Branch::of_job(self.build.plan.job).filter(|_| self.level >= self.rules.first_job_level);
+        branch.map_or(item.classes.is_empty(), |branch| usable_by(item, branch))
     }
 
     /// Whether every weapon for this job takes both hands, leaving none for a shield. The data has
@@ -302,8 +312,8 @@ mod tests {
             plan: Plan {
                 job: 410,
                 stats: vec![
-                    StatGoal { stat: Stat::Dex, target: Some(60), from_level: None },
-                    StatGoal { stat: Stat::Luk, target: None, from_level: None },
+                    StatGoal { stat: Stat::Dex, target: Some(60), from_level: None, with_gear: false },
+                    StatGoal { stat: Stat::Luk, target: None, from_level: None, with_gear: false },
                 ],
                 plan_to: 40,
                 ..Plan::default()

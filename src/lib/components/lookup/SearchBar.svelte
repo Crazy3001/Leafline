@@ -89,8 +89,8 @@
 <style>
   .search {
     display: flex;
-    gap: 4px;
-    margin-bottom: 6px;
+    gap: var(--space-1);
+    margin-bottom: var(--space-1-5);
   }
 
   /* Only the buttons, at the right: the sheet's box above does the typing. */
@@ -99,8 +99,8 @@
   }
 
   .folded .tool {
-    gap: 5px;
-    padding: 0 9px;
+    gap: var(--space-1);
+    padding: 0 var(--space-2);
     border-radius: var(--radius-pill);
   }
 
@@ -108,10 +108,10 @@
     display: flex;
     flex: 1;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     min-width: 0;
     height: 28px;
-    padding: 0 8px;
+    padding: 0 var(--space-2);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--surface);
@@ -130,7 +130,7 @@
     background: transparent;
     color: var(--text);
     font: inherit;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .field input::-webkit-search-cancel-button {
@@ -142,10 +142,10 @@
     flex: none;
     align-items: center;
     justify-content: center;
-    gap: 3px;
+    gap: var(--space-0-5);
     min-width: 28px;
     height: 28px;
-    padding: 0 6px;
+    padding: 0 var(--space-1-5);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: transparent;

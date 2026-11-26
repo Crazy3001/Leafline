@@ -18,8 +18,17 @@ const DELAY = 420;
 /** Moving straight on to another element while one shows, the next one shows at once. */
 const WARM = 350;
 
-// Plain state: an element and a snippet are kept as they are, not wrapped.
-export const tipState = $state<{ body: TipBody | null; anchor: HTMLElement | null }>({ body: null, anchor: null });
+// Plain state: an element and a snippet are kept as they are, not wrapped. `at` is where the
+// mouse is, so the tooltip sits beside it and follows it across the element.
+export const tipState = $state<{ body: TipBody | null; anchor: HTMLElement | null; at: { x: number; y: number } | null }>({
+  body: null,
+  anchor: null,
+  at: null,
+});
+
+/** The mouse's last place over an element with a tooltip. */
+let pointer: { x: number; y: number } | null = null;
+let moveFrame = 0;
 
 let timer: ReturnType<typeof setTimeout> | undefined;
 let hiddenAt = 0;
@@ -29,6 +38,7 @@ export function hideTip() {
   if (tipState.anchor) hiddenAt = performance.now();
   tipState.body = null;
   tipState.anchor = null;
+  tipState.at = null;
 }
 
 function usable(body: Tip): body is TipBody | TipWhen {
@@ -69,12 +79,23 @@ export function tip(node: HTMLElement, body: Tip) {
     if (!body || !node.isConnected) return;
     tipState.anchor = node;
     tipState.body = body;
+    tipState.at = pointer;
   };
   const enter = (e: PointerEvent) => {
     if (e.pointerType === "touch" || !usable(current)) return;
+    pointer = { x: e.clientX, y: e.clientY };
     clearTimeout(timer);
     const warm = tipState.anchor != null || performance.now() - hiddenAt < WARM;
     timer = setTimeout(show, warm ? 40 : DELAY);
+  };
+  const move = (e: PointerEvent) => {
+    if (e.pointerType === "touch") return;
+    pointer = { x: e.clientX, y: e.clientY };
+    if (tipState.anchor !== node || moveFrame) return;
+    moveFrame = requestAnimationFrame(() => {
+      moveFrame = 0;
+      if (tipState.anchor === node) tipState.at = pointer;
+    });
   };
   const leave = () => {
     clearTimeout(timer);
@@ -87,6 +108,7 @@ export function tip(node: HTMLElement, body: Tip) {
   };
 
   node.addEventListener("pointerenter", enter);
+  node.addEventListener("pointermove", move);
   node.addEventListener("pointerleave", leave);
   node.addEventListener("pointerdown", press);
 
@@ -101,6 +123,7 @@ export function tip(node: HTMLElement, body: Tip) {
     destroy() {
       leave();
       node.removeEventListener("pointerenter", enter);
+      node.removeEventListener("pointermove", move);
       node.removeEventListener("pointerleave", leave);
       node.removeEventListener("pointerdown", press);
     },

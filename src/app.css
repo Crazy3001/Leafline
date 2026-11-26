@@ -3,6 +3,13 @@
 @import "./lib/ui/fonts.css";
 @import "./lib/ui/themes.css";
 
+/* The player bar's region colour, registered so a new region fades in rather than jumping. */
+@property --region-hue {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 142;
+}
+
 :root,
 [data-theme="ember-dark"] {
   color-scheme: dark;
@@ -153,21 +160,43 @@
   --scroll-thumb: rgba(255, 255, 255, 0.09);
   --scroll-thumb-hover: rgba(255, 255, 255, 0.18);
 
-  /* Type scale: seven sizes and no others. */
+  /*
+   * Type scale: seven sizes and no others, each with one job, so a glance can tell them apart.
+   *   2xs   10  marks inside a picture or a chart: ticks, flags, key caps
+   *   xs    11  captions and labels: the word over a number, a group's name, a table head
+   *   md    13  body: names, rows, values, buttons
+   *   lg    15  a section's heading, a card's name, a number that matters
+   *   xl    18  a window's or a big card's title
+   *   2xl   22  a large number
+   *   hero  30  the one number a panel is about
+   * Labels are quiet (muted or faint, body weight); names and values are loud (text colour,
+   * --weight-strong). Bold is for those, never for a label.
+   */
+  --text-2xs: 10px;
   --text-xs: 11px;
-  --text-sm: 12px;
   --text-md: 13px;
   --text-lg: 15px;
   --text-xl: 18px;
   --text-2xl: 22px;
   --text-hero: 30px;
 
-  /* Spacing scale. */
+  /*
+   * Spacing scale: every gap, padding and margin is one of these. A 4px grid, plus two small
+   * steps for inside a row (2 between a name and its sub-line, 6 between an icon and its text).
+   * Ties round down for gaps and row heights, so lists stay dense, and up at a card's sides.
+   * 1px stays as a literal (hairline grids), and so does a left indent that lines text up
+   * under an icon.
+   */
+  --space-0-5: 2px;
   --space-1: 4px;
+  --space-1-5: 6px;
   --space-2: 8px;
   --space-3: 12px;
   --space-4: 16px;
   --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
 
   /* Controls. */
   --control-h: 30px;
@@ -209,20 +238,18 @@ button {
   font-variant-numeric: tabular-nums;
 }
 
+/* The name of a group of rows: small, but strong enough to start the group. */
 .eyebrow {
-  font-family: var(--font-display);
   font-size: var(--text-xs);
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--faint);
+  font-weight: var(--weight-strong);
+  color: var(--muted);
 }
 
-/* A small label over a number or a group. */
+/* A small label over a number. */
 .label {
   color: var(--faint);
   font-size: var(--text-xs);
-  font-weight: 500;
+  font-weight: var(--weight-body);
   letter-spacing: var(--label-tracking);
   text-transform: var(--label-case);
 }
@@ -238,6 +265,200 @@ button {
   box-shadow: var(--card-shadow);
 }
 
+/*
+ * The one button. ui/Button.svelte draws it; a plain <button class="btn"> is the same thing where
+ * a component won't do (a submit, a tooltip with a picture). Secondary unless told otherwise:
+ * `primary` for the single main action on a view, `ghost` with no frame, `danger`. `sm` is the
+ * small size for inside a row.
+ */
+.btn {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1-5);
+  height: var(--control-h);
+  padding: 0 var(--space-3);
+  border: var(--line-w) solid var(--control-line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  box-shadow: var(--control-shadow);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-md);
+  font-weight: var(--weight-body);
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    transform 0.08s ease;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--surface-3);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 1px;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.btn.sm {
+  height: var(--control-h-sm);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+}
+
+.btn.primary {
+  border-color: transparent;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: var(--weight-strong);
+}
+
+/* Sprout outlines everything in ink, the main button too. */
+[data-theme^="sprout"] .btn.primary {
+  border-color: var(--control-line);
+}
+
+.btn.primary:hover:not(:disabled) {
+  background: var(--accent-strong);
+}
+
+.btn.ghost {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: var(--muted);
+}
+
+.btn.ghost:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.btn.danger {
+  border-color: color-mix(in srgb, var(--bad) 45%, transparent);
+  background: transparent;
+  box-shadow: none;
+  color: var(--bad);
+}
+
+.btn.danger:hover:not(:disabled) {
+  background: var(--bad-soft);
+}
+
+.btn[aria-pressed="true"] {
+  background: var(--surface-3);
+}
+
+/*
+ * A button that is only an icon: square, frameless, lit under the pointer. Three sizes: 34 for a
+ * window's header, `sm` 28 inside a card, `xs` 22 inside a row. ui/IconButton.svelte draws it.
+ */
+.icon-btn {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
+}
+
+.icon-btn.sm {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+}
+
+/* Inside a row it stays quiet until the pointer comes. */
+.icon-btn.xs {
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  color: var(--faint);
+}
+
+.icon-btn:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.icon-btn:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 1px;
+}
+
+.icon-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.icon-btn.active,
+.icon-btn[aria-pressed="true"] {
+  color: var(--accent-text);
+}
+
+/*
+ * A small tag beside a name: a kind, a count, a state. Quiet by default; `good`, `warn`, `bad`
+ * and `travel` colour it when the colour means something.
+ */
+.badge {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--hover);
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-body);
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+.badge.good {
+  background: var(--good-soft);
+  color: var(--good);
+}
+
+.badge.warn {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.badge.bad {
+  background: var(--bad-soft);
+  color: var(--bad);
+}
+
+.badge.travel {
+  background: color-mix(in srgb, var(--travel) 16%, transparent);
+  color: var(--travel);
+}
+
 .num {
   font-family: var(--font-display);
   font-variant-numeric: tabular-nums;
@@ -250,13 +471,13 @@ button {
 .strip {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   min-height: 24px;
 }
 
 .strip-title {
   font-family: var(--font-display);
-  font-size: 14px;
+  font-size: var(--text-lg);
   font-weight: var(--weight-strong);
   line-height: 1.3;
   color: var(--text);
@@ -271,7 +492,7 @@ button {
 .tip-title {
   display: block;
   color: var(--text);
-  font-weight: 600;
+  font-weight: var(--weight-strong);
 }
 
 .tip-sub {
@@ -282,22 +503,22 @@ button {
 .tip-head {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 /* A row of small numbers under a tooltip's title: Lv, HP, EXP. */
 .tip-stats {
   display: flex;
-  gap: 10px;
-  margin-top: 6px;
-  padding-top: 5px;
+  gap: var(--space-2);
+  margin-top: var(--space-1-5);
+  padding-top: var(--space-1);
   border-top: 1px solid var(--border);
   color: var(--text);
 }
 
 .tip-stats b {
   color: var(--faint);
-  font-weight: 500;
+  font-weight: var(--weight-body);
 }
 
 /* The map picture's marks, drawn small beside a tooltip that has no picture of its own. */
@@ -319,9 +540,9 @@ button {
 
 .tip-list {
   display: grid;
-  gap: 2px;
-  margin: 5px 0 0;
-  padding: 5px 0 0;
+  gap: var(--space-0-5);
+  margin: var(--space-1) 0 0;
+  padding: var(--space-1) 0 0;
   border-top: 1px solid var(--border);
   list-style: none;
 }
@@ -329,12 +550,12 @@ button {
 .tip-list li {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-1-5);
 }
 
 .tip-list .tip-num {
   margin-left: auto;
-  padding-left: 10px;
+  padding-left: var(--space-3);
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
@@ -355,7 +576,7 @@ button {
 .ref.with-pic {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: var(--space-1);
   max-width: 100%;
   vertical-align: middle;
 }
@@ -407,7 +628,7 @@ button {
 .ref.link,
 .ref.quest,
 .ref.mob-name {
-  font-weight: 600;
+  font-weight: var(--weight-strong);
 }
 
 .ref.upgraded,
@@ -421,8 +642,8 @@ button {
 }
 
 .ref.more {
-  margin-top: 3px;
-  padding: 0 6px;
+  margin-top: var(--space-0-5);
+  padding: 0 var(--space-1-5);
   color: var(--muted);
   font-size: var(--text-xs);
 }
@@ -434,7 +655,7 @@ button {
 .missing .ref.mob-name,
 .empty .ref.mob-name {
   color: var(--faint);
-  font-weight: 400;
+  font-weight: var(--weight-body);
 }
 
 /*

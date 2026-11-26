@@ -311,6 +311,7 @@
       {pinTitle}
       searching={over?.kind === "search"}
       tooling={over?.kind === "tools" || over?.kind === "tool"}
+      rates={tab !== "now" && tab !== "train"}
       onlive={toggleLive}
       onsearch={() => toggleOver("search")}
       onpin={togglePin}
@@ -422,13 +423,13 @@
     display: flex;
     flex: none;
     align-items: flex-start;
-    gap: 6px;
-    margin: 0 10px 10px;
-    padding: 7px 8px 7px 12px;
+    gap: var(--space-1-5);
+    margin: 0 var(--space-3) var(--space-2);
+    padding: var(--space-1-5) var(--space-2) var(--space-1-5) var(--space-3);
     border-radius: var(--radius);
     background: var(--surface-2);
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     line-height: 1.4;
   }
 
@@ -501,21 +502,21 @@
   .tool {
     display: grid;
     align-content: start;
-    padding: 10px 0;
+    padding: var(--space-2) 0;
   }
 
   /* The drop log brings no margins of its own: it was made for the training log's wide page. */
   .tool :global(.split),
   .tool :global(.empty),
   .tool :global(.problem) {
-    margin-right: 10px;
-    margin-left: 10px;
+    margin-right: var(--space-3);
+    margin-left: var(--space-3);
   }
 
   .tool-note {
-    margin: 4px 14px;
+    margin: var(--space-1) var(--space-4);
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     line-height: 1.5;
   }
 </style>

@@ -70,7 +70,7 @@
             <span class="star"><Star size={11} /></span>
             <Pic kind="item" id={item.id} size={18} />
             <Ref kind="item" id={item.id} name={item.name} icon={false} />
-            <button class="remove" use:tip={"Stop tracking"} aria-label="Stop tracking {item.name}" onclick={() => untrack(item.id)}
+            <button class="icon-btn xs remove" use:tip={"Stop tracking"} aria-label="Stop tracking {item.name}" onclick={() => untrack(item.id)}
               ><X size={11} /></button
             >
           </div>
@@ -108,7 +108,7 @@
 
   .tracked {
     display: grid;
-    gap: 10px;
+    gap: var(--space-2);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -117,9 +117,9 @@
   .head {
     display: flex;
     align-items: center;
-    gap: 6px;
-    font-size: var(--text-sm);
-    font-weight: 600;
+    gap: var(--space-1-5);
+    font-size: var(--text-md);
+    font-weight: var(--weight-strong);
   }
 
   .head :global(.ref) {
@@ -132,27 +132,8 @@
     color: var(--mesos);
   }
 
-  .remove {
-    display: inline-grid;
-    place-items: center;
-    width: 20px;
-    height: 20px;
-    padding: 0;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--faint);
-    cursor: pointer;
-  }
-
-  .remove:hover,
-  .remove:focus-visible {
-    background: var(--hover);
-    color: var(--text);
-  }
-
   .note {
-    margin: 4px 0 0 19px;
+    margin: var(--space-1) 0 0 19px;
     color: var(--faint);
     font-size: var(--text-xs);
   }
