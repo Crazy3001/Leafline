@@ -1,8 +1,10 @@
 <script lang="ts">
-  // The desk view's sidebar: the five tabs, then Look up, Tools (one page of every tool) and the
-  // player's own layout. Its foot keeps the character switch (whose numbers every page shows) over
-  // whether Leafline is reading; how the session goes is in the player bar over the views, and the
-  // data's credits are in Settings. It folds to icons in a narrow window.
+  // The desk view's sidebar: the light/dark switch beside the fold button, the character switch
+  // (whose numbers every page shows) under the logo, then the five tabs, Look up, Tools (one page
+  // of every tool) and the player's own layout. Whether Leafline is reading is said by the player
+  // bar over the views (on the website, by the Share button), as is how the session goes; the
+  // data's credits are in Settings. Its foot keeps the ban-risk line. It folds to icons in a
+  // narrow window.
   import { tip } from "$lib/tip.svelte";
   import {
     ChartLine,
@@ -13,8 +15,8 @@
     Map as MapIcon,
     PanelLeftClose,
     PanelLeftOpen,
-    Search,
     Moon,
+    Search,
     Settings,
     Shapes,
     Sun,
@@ -26,10 +28,11 @@
   import Logo from "$lib/components/Logo.svelte";
   import CharacterSwitch from "./CharacterSwitch.svelte";
   import { DESK_TOOL_PAGES, ZOOMS, type DeskView } from "$lib/desk";
-  import { can, isWeb } from "$lib/platform";
+  import { isWeb } from "$lib/platform";
   import { noteRecordsSaved, recordsSavedAt } from "$lib/recordsfile";
   import { live } from "$lib/readings.svelte";
-  import { changeSettings, display } from "$lib/settings.svelte";
+  import { changeSettings } from "$lib/settings.svelte";
+  import { darkLook, lightSwitch } from "$lib/ui/theme.svelte";
 
   /** What the ban risk is, in the README's FAQ. */
   const RISK_URL = "https://github.com/Crazy3001/Leafline#is-it-allowed-can-i-get-banned";
@@ -66,20 +69,8 @@
   /** A tool's page or the build planner is under Tools. */
   const current = $derived<DeskView>(view === "planner" || (DESK_TOOL_PAGES as string[]).includes(view) ? "tools" : view);
 
-  /** What live reading is doing, said in the sidebar's foot. */
-  const status = $derived.by(() => {
-    const s = live.liveStatus;
-    if (s.state === "reading") return { tone: "good", text: "Reading live", line: s.window || "The game window" };
-    if (s.state === "waiting") return { tone: "warn", text: "Waiting", line: s.reason };
-    if (s.state === "failed") return { tone: "bad", text: "Stopped", line: s.message };
-    // The program reads by itself once live reading is on; the website, once the game window is shared.
-    return {
-      tone: "quiet",
-      text: "Not reading",
-      line: can.liveReading ? "Turn reading on in the overlay" : "Share the game window at the top",
-    };
-  });
-  const lightLook = $derived(display.theme === "focus-light" || display.theme === "ember-light" || display.theme === "sprout-light");
+  const dark = $derived(darkLook());
+  const flip = $derived(lightSwitch());
 
   // The website keeps the records in this browser, which can clear them: saving a records file is
   // one click away, and goes quiet once one was saved in the last two weeks.
@@ -124,10 +115,15 @@
 <aside class:folded aria-label="Desk view">
   <div class="brand">
     {#if !folded}<Logo size={18} /><span class="word">Leafline</span>{/if}
+    <button class="icon-btn sm look" aria-label={flip.label} use:tip={flip.label} onclick={() => void changeSettings({ theme: flip.to })}>
+      {#if dark}<Sun size={16} />{:else}<Moon size={16} />{/if}
+    </button>
     <button class="icon-btn sm fold" aria-label={folded ? "Show the sidebar" : "Fold the sidebar"} use:tip={folded ? "Show the sidebar" : "Fold the sidebar"} onclick={onfold}>
       {#if folded}<PanelLeftOpen size={16} />{:else}<PanelLeftClose size={16} />{/if}
     </button>
   </div>
+
+  <CharacterSwitch {folded} onunfold={onfold} />
 
   <nav aria-label="Views">
     {#each VIEWS as v, i (v.id)}
@@ -140,17 +136,6 @@
   </nav>
 
   <div class="foot">
-    <CharacterSwitch {folded} onunfold={onfold} />
-    {#if !folded}
-      <div class="status {status.tone}" use:tip={status.line}>
-        <b><span class="dot" aria-hidden="true"></span>{status.text}</b>
-        <span class="sline">{status.line}</span>
-      </div>
-      <div class="look" role="radiogroup" aria-label="Light or dark">
-        <button role="radio" aria-checked={lightLook} aria-label="Light" use:tip={"Focus Light"} class:on={lightLook} onclick={() => void changeSettings({ theme: "focus-light" })}><Sun size={16} /></button>
-        <button role="radio" aria-checked={!lightLook} aria-label="Dark" use:tip={"Focus Dark"} class:on={!lightLook} onclick={() => void changeSettings({ theme: "focus-dark" })}><Moon size={16} /></button>
-      </div>
-    {/if}
     {#if isWeb}
       <button class="nav" class:due={saveDue} aria-label={folded ? "Save records file" : undefined} use:tip={saveTip} onclick={saveFile}>
         <Download size={16} />{#if !folded}<span class="label">Save records file</span>{/if}
@@ -201,7 +186,10 @@
     padding: var(--space-0-5) var(--space-1) var(--space-2) var(--space-2);
   }
 
+  /* Folded, the sun/moon and the fold button stand one over the other. */
   .folded .brand {
+    flex-direction: column;
+    gap: var(--space-1);
     padding: var(--space-0-5) 0 var(--space-2);
   }
 
@@ -211,11 +199,11 @@
     font-weight: var(--weight-strong);
   }
 
-  .fold {
+  .look {
     margin-left: auto;
   }
 
-  .folded .fold {
+  .folded .look {
     margin: 0;
   }
 
@@ -277,8 +265,7 @@
     color: var(--accent-text-strong);
   }
 
-  .nav:focus-visible,
-  .fold:focus-visible {
+  .nav:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: -2px;
   }
@@ -324,83 +311,6 @@
 
   .count + .key {
     margin-left: var(--space-1-5);
-  }
-
-  /* Whether Leafline is reading, where it's easy to glance at. */
-  .status {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-0-5);
-    padding: var(--space-2) var(--space-3);
-    border-radius: var(--radius);
-    background: var(--surface-2);
-    color: var(--faint);
-    font-size: var(--text-xs);
-  }
-
-  .status b {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-1-5);
-    color: var(--muted);
-    font-size: var(--text-md);
-  }
-
-  .status.good b {
-    color: var(--good);
-  }
-
-  .status.warn b {
-    color: var(--warn);
-  }
-
-  .status.bad b {
-    color: var(--bad);
-  }
-
-  .status .dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: currentColor;
-  }
-
-  .sline {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .look {
-    display: inline-flex;
-    align-self: center;
-    gap: var(--space-1);
-    margin: var(--space-1) 0;
-    padding: var(--space-1);
-    border-radius: var(--radius-pill);
-    background: var(--surface-2);
-  }
-
-  .look button {
-    display: grid;
-    place-items: center;
-    width: 34px;
-    height: 34px;
-    border: 0;
-    border-radius: 50%;
-    background: transparent;
-    color: var(--muted);
-    cursor: pointer;
-  }
-
-  .look button.on {
-    background: var(--accent);
-    color: var(--accent-ink);
-  }
-
-  .look button:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 1px;
   }
 
   .foot-row {

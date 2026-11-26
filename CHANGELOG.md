@@ -39,13 +39,20 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
   info mark now. The map you're on has its own line under your level and job, whole, with its
   region. Now drops the Welcome banner and the Your character card, which said the same things,
   so Next up and Quests come first.
-- **Pick a character from any page.** The desk sidebar keeps the character switch above the
-  reading status: who Leafline shows, their level and job, and "as of …" when it was read
+- **Pick a character from any page.** The desk sidebar has the character switch at its top,
+  under the logo: who Leafline shows, their level and job, and "as of …" when it was read
   earlier. It opens a list of every character this copy has seen, each with a last-seen line
   (level, job, how long ago, last map, or "Playing now"), with All characters once there are two.
   Arrow keys, Enter and Esc work in the list. In the overlay and on a phone, the name in the header opens the same list. It shows
   from the first character read; with none yet, it says how to get one. Logging in on another
   character still switches by itself, and the switch says so for a few seconds.
+- **A tidier desk sidebar.** Light or dark is a sun/moon button beside the fold button (on a
+  phone, in the Tools menu); it keeps the look you picked in Settings and swaps its light or dark
+  half. The "Not reading" card is gone: the player bar says whether Leafline is reading (on the
+  website, the Share button does). Folded,
+  the character is a round button with their first letter.
+- On the website, the Share button turns amber and says "Can't read the picture" when the shared
+  picture is black, frozen or washed out by Windows HDR; its tooltip says what to do.
 - **Look up shows the list and the open card side by side** on a wide window, for items,
   monsters, maps, NPCs and skills; the picked row stays marked. A narrow window opens the card in
   the list's place, with a way back, as before.

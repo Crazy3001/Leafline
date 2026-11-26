@@ -1,8 +1,8 @@
 <script lang="ts">
-  // The desk sidebar's character switch, in view on every page: whose numbers Leafline shows, with
-  // when they were read when it isn't reading them now, and the list of every character to pick
-  // another. The list opens upward, over the reading status. Folded to icons, it is one round
-  // badge with the level, which opens the sidebar and the list.
+  // The desk sidebar's character switch, under the logo on every page: whose numbers Leafline
+  // shows, with when they were read when it isn't reading them now, and the list of every character
+  // to pick another. The list drops down over the tabs; Esc or a click elsewhere closes it. Folded
+  // to icons, it is one round badge with the name's first letter, which opens the sidebar and the list.
   import { ChevronsUpDown, UserRound } from "@lucide/svelte";
 
   import CharacterList from "$lib/components/CharacterList.svelte";
@@ -17,6 +17,7 @@
 
   let open = $state(false);
   let button = $state<HTMLButtonElement>();
+  let box = $state<HTMLElement>();
 
   /** Closes the list, focus back on the switch. */
   function close() {
@@ -28,6 +29,8 @@
   const sub = $derived([shown.level.value != null ? `Lv ${shown.level.value}` : null, shown.job.value].filter(Boolean).join(" · "));
   /** A switch made by logging in, said for a few seconds. */
   const fresh = $derived(switched.name != null && !characters.all && switched.name === characters.active);
+  /** The folded badge's letter. */
+  const initial = $derived(characters.all ? null : (shown.name?.trim().charAt(0).toUpperCase() ?? null));
 
   function toggle() {
     if (folded) {
@@ -42,9 +45,14 @@
       close();
     }
   }
+
+  /** A click outside the switch closes the list, leaving focus where the click put it. */
+  function onpointerdown(event: PointerEvent) {
+    if (open && box && !box.contains(event.target as Node)) open = false;
+  }
 </script>
 
-<svelte:window {onkeydown} />
+<svelte:window {onkeydown} {onpointerdown} />
 
 {#if folded}
   <button
@@ -54,19 +62,14 @@
     use:tip={none ? "No character seen yet" : `${characters.all ? "All characters" : shown.name}${sub ? `, ${sub}` : ""}`}
     onclick={toggle}
   >
-    {#if none || characters.all || shown.level.value == null}<UserRound size={16} />{:else}<span class="num">{shown.level.value}</span>{/if}
+    {#if none || initial == null}<UserRound size={16} />{:else}<span class="letter" aria-hidden="true">{initial}</span>{/if}
   </button>
 {:else}
-  <section class="switch" class:open aria-label="Character">
+  <section class="switch" class:open aria-label="Character" bind:this={box}>
     {#if none}
       <!-- Says, in one line, how a character comes to be known. -->
       <div class="empty"><CharacterList /></div>
     {:else}
-      {#if open}
-        <div class="menu">
-          <CharacterList onpick={close} />
-        </div>
-      {/if}
       <button class="current" class:fresh bind:this={button} aria-haspopup="listbox" aria-expanded={open} aria-label="Character: {characters.all ? 'All characters' : shown.name}. Pick another" onclick={toggle}>
         <span class="id">
           <b>{characters.all ? "All characters" : shown.name}</b>
@@ -81,18 +84,29 @@
         </span>
         <ChevronsUpDown size={15} />
       </button>
+      {#if open}
+        <div class="menu">
+          <CharacterList onpick={close} />
+        </div>
+      {/if}
     {/if}
   </section>
 {/if}
 
 <style>
   .switch {
-    display: grid;
-    gap: var(--space-1);
+    position: relative;
+    margin-bottom: var(--space-2);
   }
 
+  /* Drops down over the tabs, so they don't move while it's open. */
   .menu {
-    max-height: 50vh;
+    position: absolute;
+    top: calc(100% + var(--space-1));
+    left: 0;
+    right: 0;
+    z-index: 5;
+    max-height: 60vh;
     overflow-y: auto;
     padding: var(--space-1);
     border: var(--line-w) solid var(--line);
@@ -177,7 +191,7 @@
     place-items: center;
     width: 40px;
     height: 40px;
-    margin: 0 auto var(--space-1);
+    margin: 0 auto var(--space-2);
     border: var(--line-w) solid var(--control-line);
     border-radius: 50%;
     background: var(--surface);
@@ -185,10 +199,9 @@
     cursor: pointer;
   }
 
-  .num {
+  .letter {
     font-family: var(--font-display);
     font-size: var(--text-md);
     font-weight: var(--weight-strong);
-    font-variant-numeric: tabular-nums;
   }
 </style>

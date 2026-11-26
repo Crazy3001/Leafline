@@ -548,6 +548,8 @@ const newestBuild = () => [...mockBuilds].sort((a, b) => b.usedAt - a.usedAt)[0]
 let liveStatus: LiveStatus = { state: "off" };
 const sightHandlers: ((sight: Sight) => void)[] = [];
 const sightStarted = Date.now() / 1000 - 600;
+/** A dev change to the picture, made with `__leafline.picture(...)`. */
+let pictureChange: Partial<Sight["picture"]> = {};
 function mockSight(now: number): Sight {
   return {
     since: sightStarted,
@@ -565,7 +567,7 @@ function mockSight(now: number): Sight {
       { reader: "exp", at: now - 95, reason: "An EXP reading didn't fit the ones around it and was left out (read as Lv 30, 2431 EXP (25.40%))." },
       { reader: "mesos", at: now - 420, reason: "A meso amount that wasn't read the same twice was left out." },
     ],
-    picture: { at: now - 1, width: 2560, height: 1440, statusBar: true, hdr: false, smoothedUi: false, dark: false, still: false },
+    picture: { at: now - 1, width: 2560, height: 1440, statusBar: true, hdr: false, smoothedUi: false, dark: false, still: false, ...pictureChange },
   };
 }
 let liveTimer: ReturnType<typeof setInterval> | undefined;
@@ -607,7 +609,8 @@ function changeNav(next: NavState): NavState {
  * Dev-only controls for walking the sample world from the browser console, to try "Go here":
  * `__leafline.walk("Mossbank")` reads that map's header next, `walk(null)` hides the minimap,
  * `walk("Mosbank?")` reads a header too rough to trust, `finish()` fills the first quest's counters,
- * `login("Fernwick")` reads the game as another character, as after logging in on them.
+ * `login("Fernwick")` reads the game as another character, as after logging in on them,
+ * `picture({ still: true, statusBar: false })` makes the picture a bad one (`picture({})` mends it).
  */
 let liveAnalysis: Analysis = sampleAnalysis;
 function emitAnalysis(change: Partial<Analysis>) {
@@ -626,6 +629,10 @@ if (typeof window !== "undefined") {
       const [first, ...rest] = quest.quests;
       const done = { ...first, objectives: first.objectives.map((o) => ({ ...o, current: o.required })) };
       emitAnalysis({ quest: { ...quest, quests: [done, ...rest] } });
+    },
+    picture(change: Partial<Sight["picture"]>) {
+      pictureChange = change;
+      sightHandlers.forEach((h) => h(mockSight(Date.now() / 1000)));
     },
     login(name: string) {
       sessionHandlers.forEach((h) => h({ ...sampleSessionSummary, name }));

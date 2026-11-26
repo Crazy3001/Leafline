@@ -1,8 +1,8 @@
 <script lang="ts">
   // The website's way into live reading, on the desk's top row: share the game window and Leafline
-  // reads the game from it (platform/live.ts); Stop reading while it does. Its state is the same
-  // live status the sidebar shows. What it reads and how to share well is in its tooltip; the ban
-  // risk line is in the sidebar's foot.
+  // reads the game from it (platform/live.ts); Stop reading while it does. It is where the website
+  // says whether it's reading; the player bar leaves that to it. What it reads and how to share
+  // well is in its tooltip; the ban risk line is in the sidebar's foot.
   import { MonitorPlay, Square } from "@lucide/svelte";
   import { onMount } from "svelte";
 
@@ -11,11 +11,20 @@
   import { can } from "$lib/platform";
   import { support } from "$lib/platform/capture";
   import { live } from "$lib/readings.svelte";
+  import { pictureNotes, pictureProblem, sight, watchSight } from "$lib/sight.svelte";
   import { tip } from "$lib/tip.svelte";
 
   const status = $derived(live.liveStatus);
   const on = $derived(status.state === "reading" || status.state === "waiting");
   let problem = $state<string | null>(null);
+
+  if (can.readWindow) watchSight();
+  /**
+   * While reading, a picture Leafline can't use (black, frozen, washed out by Windows HDR, no
+   * status bar), or one it reads less well: the button turns amber and its tooltip says what to do.
+   */
+  const unusable = $derived(status.state === "reading" && sight.value?.picture ? pictureProblem() : null);
+  const issue = $derived(unusable ?? (status.state === "reading" ? (pictureNotes()[0] ?? null) : null));
 
   // Sessions go under the name read from the HUD; until one is read, under the character picked.
   onMount(() => {
@@ -45,8 +54,8 @@
 {#if can.readWindow}
   {#if on}
     <!-- Whether it's reading, and the way to stop, in one place. -->
-    <span class="live {status.state}" role="status" use:tip={status.state === "waiting" ? status.reason : READING_TIP}>
-      <span class="dot" aria-hidden="true"></span>{status.state === "reading" ? "Reading live" : "Waiting…"}
+    <span class="live {status.state}" class:warn={issue} role="status" use:tip={status.state === "waiting" ? status.reason : (issue ?? READING_TIP)}>
+      <span class="dot" aria-hidden="true"></span>{status.state === "waiting" ? "Waiting…" : unusable ? "Can't read the picture" : "Reading live"}
       <button class="stop" onclick={() => backend.stopLive()}><Square size={11} />Stop</button>
     </span>
   {:else}
@@ -109,7 +118,8 @@
     white-space: nowrap;
   }
 
-  .live.waiting {
+  .live.waiting,
+  .live.warn {
     border-color: color-mix(in srgb, var(--warn) 45%, transparent);
     background: color-mix(in srgb, var(--warn) 10%, var(--surface));
     color: var(--warn);

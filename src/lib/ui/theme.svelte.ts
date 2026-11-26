@@ -21,6 +21,28 @@ export const THEMES: ThemeChoice[] = [
   { id: "sprout-dark", name: "Sprout Dark", line: "Plum, ink and stickers", dark: true },
 ];
 
+/** Whether the look in use is a dark one. */
+export function darkLook(): boolean {
+  return THEMES.find((t) => t.id === display.theme)?.dark ?? true;
+}
+
+/** The same look's other half: Focus Dark and Focus Light, Ember Dark and Ember Light, and so on. */
+const OTHER: Record<Theme, Theme> = {
+  "focus-dark": "focus-light",
+  "focus-light": "focus-dark",
+  "ember-dark": "ember-light",
+  "ember-light": "ember-dark",
+  "sprout-light": "sprout-dark",
+  "sprout-dark": "sprout-light",
+};
+
+/** What the sun/moon button says and switches to. */
+export function lightSwitch(): { label: string; to: Theme } {
+  const to = OTHER[known(display.theme) ? display.theme : "focus-dark"];
+  const name = THEMES.find((t) => t.id === to)?.name ?? "";
+  return { label: `Switch to ${name}`, to };
+}
+
 /** Remembered per window so a window opens in its look before the settings arrive. */
 const KEY = "leafline.theme";
 

@@ -1,14 +1,15 @@
 <script lang="ts">
-  // The desk view's player bar, over every view: who you are and whether Leafline is reading,
-  // how far through the level and when the next one comes, the two rates and the session's clock.
-  // These numbers live here and nowhere else on the desk, Now included, so the views under it
-  // don't repeat them.
+  // The desk view's player bar, over every view: who you are and whether Leafline is reading (on
+  // the website, the Share button on the top row says that), how far through the level and when
+  // the next one comes, the two rates and the session's clock. These numbers live here and nowhere
+  // else on the desk, Now included, so the views under it don't repeat them.
   import { tip } from "$lib/tip.svelte";
 
   import Ref from "$lib/components/Ref.svelte";
   import SessionControls from "$lib/components/SessionControls.svelte";
   import { formatClockIn, formatCompact, formatDuration, formatNumber, partyLabel } from "$lib/format";
   import { ago, shownCharacter, watchProfile } from "$lib/profile.svelte";
+  import { can } from "$lib/platform";
   import { live } from "$lib/readings.svelte";
   import { place, regionHue, watchRegion } from "$lib/region.svelte";
   import { mesosCoverage } from "$lib/training";
@@ -43,7 +44,11 @@
     if (s.state === "reading") return { tone: "good", text: "Reading", tip: `Reading ${s.window}` };
     if (s.state === "waiting") return { tone: "warn", text: "Waiting", tip: s.reason };
     if (s.state === "failed") return { tone: "bad", text: "Stopped", tip: `Live reading stopped: ${s.message}` };
-    return { tone: "quiet", text: "Not reading", tip: "Not reading the game" };
+    return {
+      tone: "quiet",
+      text: "Not reading",
+      tip: can.liveReading ? "Not reading the game. Turn live reading on in the overlay" : "Not reading the game",
+    };
   });
 
   const big = (value: number | null | undefined) =>
@@ -78,7 +83,8 @@
     <div class="who">
       <div class="name-row">
         <b class="name">{name ?? "Your character"}</b>
-        <span class="status {status.tone}" use:tip={status.tip}><span class="dot" aria-hidden="true"></span>{status.text}</span>
+        <!-- On the website, the Share button on the top row says this, so it isn't said twice. -->
+        {#if !can.readWindow}<span class="status {status.tone}" use:tip={status.tip}><span class="dot" aria-hidden="true"></span>{status.text}</span>{/if}
       </div>
       <div class="sub" class:stale={who.seenAt != null}>
         {#if level != null}Lv {level}{job ? ` ${job}` : ""}{:else}Level not read yet{/if}
