@@ -10,7 +10,9 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
   the list's place, with a way back, as before.
 - Equipment names the classes that can wear it under its name, in Look up's list and on its card.
 - An item's **Where to get it** groups its sources: Dropped by, Sold by, From quests and Crafted
-  from. Scrolling odds come after it.
+  from, each folded with its count when an item opens. Scrolling odds come after it.
+- **New build:** the bar at the bottom holds the build's name, who it's for, the level it starts
+  at and who its gear is made for, beside Create build.
 - **Weapons have their Attack again.** The map data names weapon attack differently now. Leafline
   reads the new name, but map data downloaded earlier kept no Attack, so weapons showed none and
   the build planner's weapon path passed over most planned weapons. The map data downloads once
