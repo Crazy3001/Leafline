@@ -7,8 +7,9 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
 
 - **Pick a character from any page.** The desk sidebar keeps the character switch above the
   reading status: who Leafline shows, their level and job, and "as of …" when it was read
-  earlier. It opens a list of every character this copy has seen, with All characters once there
-  are two. In the overlay and on a phone, the name in the header opens the same list. It shows
+  earlier. It opens a list of every character this copy has seen, each with a last-seen line
+  (level, job, how long ago, last map, or "Playing now"), with All characters once there are two.
+  Arrow keys, Enter and Esc work in the list. In the overlay and on a phone, the name in the header opens the same list. It shows
   from the first character read; with none yet, it says how to get one. Logging in on another
   character still switches by itself, and the switch says so for a few seconds.
 - **Look up shows the list and the open card side by side** on a wide window, for items,

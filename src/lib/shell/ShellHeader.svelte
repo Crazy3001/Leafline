@@ -111,7 +111,7 @@
   <div class="top" data-tauri-drag-region>
     <span class="ring" class:stale={levelShown.at != null}><LevelRing {level} {percent}><Logo size={20} /></LevelRing></span>
     <div class="who" data-tauri-drag-region>
-      <button class="name" class:fresh aria-expanded={choosing} aria-label="{characters.all ? 'All characters' : (name ?? 'No character yet')}. Pick a character" onclick={onwho}>
+      <button class="name" class:fresh aria-haspopup="dialog" aria-expanded={choosing} aria-label="{characters.all ? 'All characters' : (name ?? 'No character yet')}. Pick a character" onclick={onwho}>
         <span>{characters.all ? "All characters" : (name ?? "Leafline")}</span><ChevronDown size={15} />
       </button>
       <div class="under" data-tauri-drag-region>

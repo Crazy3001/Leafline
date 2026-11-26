@@ -16,6 +16,13 @@
   watchSwitches();
 
   let open = $state(false);
+  let button = $state<HTMLButtonElement>();
+
+  /** Closes the list, focus back on the switch. */
+  function close() {
+    open = false;
+    button?.focus();
+  }
   const shown = $derived(shownCharacter());
   const none = $derived(characters.known.length === 0);
   const sub = $derived([shown.level.value != null ? `Lv ${shown.level.value}` : null, shown.job.value].filter(Boolean).join(" · "));
@@ -32,7 +39,7 @@
   function onkeydown(event: KeyboardEvent) {
     if (open && event.key === "Escape") {
       event.preventDefault();
-      open = false;
+      close();
     }
   }
 </script>
@@ -57,10 +64,10 @@
     {:else}
       {#if open}
         <div class="menu">
-          <CharacterList onpick={() => (open = false)} />
+          <CharacterList onpick={close} />
         </div>
       {/if}
-      <button class="current" class:fresh aria-expanded={open} aria-label="Character: {characters.all ? 'All characters' : shown.name}. Pick another" onclick={toggle}>
+      <button class="current" class:fresh bind:this={button} aria-haspopup="listbox" aria-expanded={open} aria-label="Character: {characters.all ? 'All characters' : shown.name}. Pick another" onclick={toggle}>
         <span class="id">
           <b>{characters.all ? "All characters" : shown.name}</b>
           {#if characters.all}
