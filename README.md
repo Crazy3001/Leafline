@@ -38,7 +38,7 @@
 
 ### Getting around
 - **The map you're on:** its monsters, exits, NPCs, quests, shops and drops, plus your rates there and your own notes, with a picture of the map you can zoom that shows where each portal, NPC and spawn point is.
-- **Go here:** pick a map, NPC, monster or quest target, and a small bar shows the next step (which portal, taxi or return scroll) and moves on as you travel. Routes take the quickest walk, and the bar can list every step.
+- **Go here:** pick a map, NPC, monster or quest target, and a small bar shows the next step (which portal, taxi or return scroll) and moves on as you travel. Routes take the quickest walk, and the bar can list every step. On the desk, a compass at the top points the way to the next portal.
 - **Lookup:** search every item, monster, map, NPC, skill and crafting recipe, with filters. Any coloured name in Leafline opens a small card about it.
 
 ### Quests

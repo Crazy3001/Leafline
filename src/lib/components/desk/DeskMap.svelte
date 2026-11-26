@@ -54,7 +54,15 @@
   const stale = $derived(!reading && card != null);
   const seenAt = $derived(reading ? null : who.seenAt);
   const mobs = $derived(card ? [...card.mobs].sort((a, b) => b.count - a.count).slice(0, wide ? 6 : 5) : []);
-  const exits = $derived(card ? card.exits.filter((e) => !e.hidden && e.to.known).slice(0, 6) : []);
+  /** Ways out, once each: two portals to the same map the same way (a dungeon's two doors) are one. */
+  const exits = $derived(
+    card
+      ? card.exits
+          .filter((e) => !e.hidden && e.to.known)
+          .filter((e, i, all) => all.findIndex((o) => o.to.id === e.to.id && o.direction === e.direction) === i)
+          .slice(0, 6)
+      : [],
+  );
   let pictured = $state(false);
 
   /** The most likely drops of the monsters here, a few at most, from the drop list on this PC. */
@@ -122,7 +130,8 @@
           <div class="group">
             <span class="lab">Ways out</span>
             <div class="list">
-              {#each exits as e (e.to.id)}
+              <!-- Two ways out can lead to the same map, one across and one through a door. -->
+              {#each exits as e (`${e.to.id}:${e.direction}`)}
                 <span class="thing">{#if WAY[e.direction]}<span class="faint">{WAY[e.direction]}</span>{/if}<Ref kind="map" id={e.to.id} name={e.to.name} /></span>
               {/each}
             </div>
