@@ -113,7 +113,7 @@
             <span class="lab">Monsters</span>
             <div class="list">
               {#each mobs as m (m.id)}
-                <span class="thing"><Pic kind="mob" id={m.id} size={22} /><Ref kind="mob" id={m.id} name={m.name} /><span class="faint tabular">Lv {m.level}</span></span>
+                <span class="thing"><Pic kind="mob" id={m.id} size={22} /><Ref kind="mob" id={m.id} name={m.name} icon={false} /><span class="faint tabular">Lv {m.level}</span></span>
               {/each}
             </div>
           </div>
@@ -122,7 +122,7 @@
           <div class="group">
             <span class="lab">Drops</span>
             <div class="list">
-              {#each drops as d (d)}<span class="thing"><Pic kind="item" name={d} size={20} /><Ref kind="item" name={d} /></span>{/each}
+              {#each drops as d (d)}<span class="thing"><Pic kind="item" name={d} size={20} /><Ref kind="item" name={d} icon={false} /></span>{/each}
             </div>
           </div>
         {/if}
