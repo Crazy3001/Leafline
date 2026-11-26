@@ -5,13 +5,14 @@
   import { FilterBoxState } from "$lib/filterbox.svelte";
   import SaveSpot from "$lib/components/SaveSpot.svelte";
   import { mapPlace } from "$lib/destination.svelte";
-  import { ArrowLeft, LoaderCircle } from "@lucide/svelte";
+  import { LoaderCircle } from "@lucide/svelte";
   import { untrack } from "svelte";
 
   import Chips from "./Chips.svelte";
   import FilterBox from "./FilterBox.svelte";
   import KindTabs from "./KindTabs.svelte";
   import LookupRow from "./LookupRow.svelte";
+  import LookupSplit from "./LookupSplit.svelte";
   import MobChips from "./MobChips.svelte";
   import SearchBar from "./SearchBar.svelte";
   import Card from "../Card.svelte";
@@ -170,8 +171,8 @@
     {/if}
   </div>
 
-  {#if mapView.id != null}
-    <button class="back" class:pinned onclick={back}><ArrowLeft size={12} />Back</button>
+  <LookupSplit open={mapView.id != null} onback={back} {pinned}>
+    {#snippet detail()}
     {#if details}
       <Card title="Map" plain={pinned}>
         {#if details.map.street}<p class="street">{details.map.street}</p>{/if}
@@ -182,13 +183,15 @@
         {/key}
       </Card>
     {/if}
-  {:else}
+    {/snippet}
+    {#snippet empty()}<p class="pick">Pick a map to see it here.</p>{/snippet}
+    {#snippet list()}
     <div class="list" class:pinned>
       {#if !browsing && here}
         <p class="heading">You're here</p>
         <ul class="rows">
           <li>
-            <LookupRow name={here.card.map.name} picture={{ kind: "mark", id: here.card.map.id }} line={here.card.map.street} aside={levels(here.card.levelRange)} onclick={() => open(here!.card.map.id)} />
+            <LookupRow name={here.card.map.name} picture={{ kind: "mark", id: here.card.map.id }} line={here.card.map.street} aside={levels(here.card.levelRange)} selected={mapView.id === here.card.map.id} onclick={() => open(here!.card.map.id)} />
           </li>
         </ul>
         <p class="heading">Every map</p>
@@ -200,7 +203,7 @@
           <ul class="rows">
             {#each page.maps as row (row.map.id)}
               <li>
-                <LookupRow name={row.map.name} picture={{ kind: "mark", id: row.map.id }} line={line(row)} aside={levels(row.levelRange)} onclick={() => open(row.map.id)}>
+                <LookupRow name={row.map.name} picture={{ kind: "mark", id: row.map.id }} line={line(row)} aside={levels(row.levelRange)} selected={mapView.id === row.map.id} onclick={() => open(row.map.id)}>
                   {#snippet below()}{#if row.mobs?.length}<MobChips mobs={row.mobs} />{/if}{/snippet}
                 </LookupRow>
               </li>
@@ -214,7 +217,8 @@
         <p class="quiet"><span class="spin"><LoaderCircle size={13} /></span> Searching…</p>
       {/if}
     </div>
-  {/if}
+    {/snippet}
+  </LookupSplit>
 {/if}
 
 <style>
@@ -298,8 +302,7 @@
     outline: none;
   }
 
-  .back.inline,
-  .back.pinned {
+  .back.inline {
     margin-inline: 0;
   }
 
@@ -324,4 +327,11 @@
     }
   }
 
+  .pick {
+    margin: 0;
+    padding: var(--space-8) var(--space-3);
+    color: var(--faint);
+    font-size: var(--text-md);
+    text-align: center;
+  }
 </style>

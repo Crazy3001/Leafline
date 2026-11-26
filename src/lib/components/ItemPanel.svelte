@@ -11,6 +11,7 @@
   import FilterBox from "./lookup/FilterBox.svelte";
   import GearFinder from "./lookup/GearFinder.svelte";
   import KindTabs from "./lookup/KindTabs.svelte";
+  import LookupSplit from "./lookup/LookupSplit.svelte";
   import SearchBar from "./lookup/SearchBar.svelte";
   import Chips from "./lookup/Chips.svelte";
   import MapDataPanel from "./map/MapDataPanel.svelte";
@@ -18,7 +19,7 @@
   import BagCheck from "./item/BagCheck.svelte";
   import { backend } from "$lib/api";
   import Pic from "$lib/ui/Pic.svelte";
-  import { JOBS, blankQuery, gearView, gives, itemSlot, itemView, lastLine, watchItems } from "$lib/items.svelte";
+  import { JOBS, blankQuery, gearView, gives, itemSlot, itemView, lastLine, watchItems, wearers } from "$lib/items.svelte";
   import { mapData, watchMapData } from "$lib/mapdata.svelte";
   import { live } from "$lib/readings.svelte";
   import { display, hotkey } from "$lib/settings.svelte";
@@ -144,7 +145,7 @@
   /** What a row says under the name. */
   function line(item: ItemRecord) {
     if (item.kind === "equip") {
-      const parts = [item.weaponType ?? item.slot, item.reqLevel ? `Lv ${item.reqLevel}` : null, gives(item)];
+      const parts = [item.weaponType ?? item.slot, item.reqLevel ? `Lv ${item.reqLevel}` : null, wearers(item), gives(item)];
       return parts.filter(Boolean).join(" · ");
     }
     if (item.scroll) return lastLine(item).replace("Success rate: ", "");
@@ -258,18 +259,18 @@
   {/if}
   </div>
 
-  {#if itemView.id != null}
-    {#if browsing}
-      <button class="back" class:pinned onclick={() => (itemView.id = null)}><ArrowLeft size={12} />Back to results</button>
-    {/if}
-    {#if record}
-      <ItemCard item={null} {record} {map} plain={pinned} />
-    {/if}
-  {:else if finding}
+  {#if browsing}
+    <LookupSplit open={itemView.id != null} onback={() => (itemView.id = null)} {pinned}>
+      {#snippet detail()}
+        {#if record}<ItemCard item={null} {record} {map} plain={pinned} />{/if}
+      {/snippet}
+      {#snippet empty()}<p class="pick">Pick an item to see it here.</p>{/snippet}
+      {#snippet list()}
+    {#if finding}
     <div class="list" class:pinned>
       <GearFinder {level} {character} {job} slots={filters?.slots ?? []} slot={query.slot} onslot={(slot) => setQuery({ slot })} />
     </div>
-  {:else if browsing}
+    {:else}
     <div class="list" class:pinned>
     {#if page}
       {#if page.closest}<p class="quiet">Nothing by that name. The closest:</p>{/if}
@@ -278,7 +279,7 @@
         <ul class="results">
           {#each page.items as item (item.id)}
             <li>
-              <button class="nav-row" onclick={() => (itemView.id = item.id)}>
+              <button class="nav-row" class:on={itemView.id === item.id} aria-current={itemView.id === item.id} onclick={() => (itemView.id = item.id)}>
                 <span class="row-name"
                   ><Pic kind="item" id={item.id} size={18} class="row-pic" />{item.name}{#if gender(item)}<small>{gender(item)}</small>{/if}</span
                 >
@@ -297,6 +298,11 @@
       <p class="quiet"><span class="spin"><LoaderCircle size={13} /></span> Searching…</p>
     {/if}
     </div>
+    {/if}
+      {/snippet}
+    </LookupSplit>
+  {:else if itemView.id != null}
+    {#if record}<ItemCard item={null} {record} {map} plain={pinned} />{/if}
   {:else}
     {#if checks.length}
       <button class="back" class:pinned onclick={() => (checkClosed = true)}
@@ -392,6 +398,18 @@
   .results button:focus-visible {
     background: var(--surface-3);
     outline: none;
+  }
+
+  .results button.on {
+    background: var(--accent-soft);
+  }
+
+  .pick {
+    margin: 0;
+    padding: var(--space-8) var(--space-3);
+    color: var(--faint);
+    font-size: var(--text-md);
+    text-align: center;
   }
 
   .row-name :global(.row-pic) {

@@ -39,31 +39,6 @@
   </button>
 {/snippet}
 
-{#if shops.length}
-  <div class="group">
-    {@render head("Sold by", shops.length, shopsOpen, () => (shopsOpen = !shopsOpen))}
-    {#if shopsOpen}
-      <ul class="quests">
-        {#each shops as shop, i (i)}
-          <li>
-            <span class="shop-line">
-              {#if shop.npcId != null}<Ref kind="npc" id={shop.npcId} name={shop.npc} />{:else}{shop.npc}{/if}
-              <span class="price tabular">{formatNumber(shop.price)} mesos</span>
-            </span>
-            <span class="who">
-              {#if shop.map}<Ref kind="map" id={shop.map!.id}>{shop.map.name}</Ref
-                >{:else}{shop.mapName}{/if}{#if shop.hops != null && shop.hops > 0}{" · "}{shop.hops} portal{shop.hops === 1
-                  ? ""
-                  : "s"}{/if}{#if shop.needs}{" · "}<span class="needs">{shop.needs}</span>{/if}
-              {#if shop.map && shop.hops !== 0}<GoButton place={mapPlace(shop.map)} />{/if}
-            </span>
-          </li>
-        {/each}
-      </ul>
-    {/if}
-  </div>
-{/if}
-
 {#if known.length || unknown.length}
   <div class="group">
     {@render head("Dropped by", drops.hunts.length, dropsOpen, () => (dropsOpen = !dropsOpen))}
@@ -111,15 +86,41 @@
       </ul>
     {/if}
   </div>
-{:else if drops.lookedUp}
-  <p class="note">No known monster drops for this item.</p>
 {:else}
-  <p class="note">The drop table isn't downloaded yet.</p>
+  <div class="group">
+    <p class="group-head static"><span class="group-title">Dropped by</span></p>
+    <p class="note">{drops.lookedUp ? "No monster is known to drop it." : "The drop table isn't downloaded yet."}</p>
+  </div>
+{/if}
+
+{#if shops.length}
+  <div class="group">
+    {@render head("Sold by", shops.length, shopsOpen, () => (shopsOpen = !shopsOpen))}
+    {#if shopsOpen}
+      <ul class="quests">
+        {#each shops as shop, i (i)}
+          <li>
+            <span class="shop-line">
+              {#if shop.npcId != null}<Ref kind="npc" id={shop.npcId} name={shop.npc} />{:else}{shop.npc}{/if}
+              <span class="price tabular">{formatNumber(shop.price)} mesos</span>
+            </span>
+            <span class="who">
+              {#if shop.map}<Ref kind="map" id={shop.map!.id}>{shop.map.name}</Ref
+                >{:else}{shop.mapName}{/if}{#if shop.hops != null && shop.hops > 0}{" · "}{shop.hops} portal{shop.hops === 1
+                  ? ""
+                  : "s"}{/if}{#if shop.needs}{" · "}<span class="needs">{shop.needs}</span>{/if}
+              {#if shop.map && shop.hops !== 0}<GoButton place={mapPlace(shop.map)} />{/if}
+            </span>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+  </div>
 {/if}
 
 {#if quests.length}
   <div class="group">
-    {@render head("Quest reward", quests.length, questsOpen, () => (questsOpen = !questsOpen))}
+    {@render head("From quests", quests.length, questsOpen, () => (questsOpen = !questsOpen))}
     {#if questsOpen}
       <ul class="quests">
         {#each quests as quest (quest.quest.id)}
@@ -170,6 +171,11 @@
 
   .group-head {
     border-bottom: 1px solid var(--border);
+  }
+
+  p.group-head.static {
+    margin: 0;
+    cursor: default;
   }
 
   .group-title {

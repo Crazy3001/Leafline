@@ -15,7 +15,7 @@
   import { reportUrl } from "$lib/feedback";
   import { formatSigned, titleCase } from "$lib/format";
   import { mapData } from "$lib/mapdata.svelte";
-  import { checkItem, nameMatch, statRows, tooltipOf } from "$lib/items.svelte";
+  import { checkItem, nameMatch, statRows, tooltipOf, wearers } from "$lib/items.svelte";
   import type { ItemRecord, ItemTooltip, MapReading, Requirements } from "$lib/types";
 
   let {
@@ -165,6 +165,11 @@
         : null,
     ].filter(Boolean),
   );
+  /** Who can wear it, from the data, under the name. */
+  const who = $derived.by(() => {
+    const data = record ?? matched;
+    return data ? wearers(data) : null;
+  });
   /** Something on the card is a guess or couldn't be confirmed, so the picture may be the problem. */
   const doubtful = $derived(
     !!read && (trust === "close" || trust === "likely" || unconfirmed.length > 0 || !!checked?.slotsNote || stats.some((s) => s.note)),
@@ -237,6 +242,7 @@
       {#if summary.length}
         <p class="summary">{summary.join(" · ")}</p>
       {/if}
+      {#if who}<p class="who">{who}</p>{/if}
     </div>
   </div>
   {#if scrolling?.line}
@@ -433,6 +439,16 @@
   .summary {
     margin: var(--space-0-5) 0 var(--space-2);
     color: var(--muted);
+    font-size: var(--text-md);
+  }
+
+  .summary:has(+ .who) {
+    margin-bottom: 0;
+  }
+
+  .who {
+    margin: 0 0 var(--space-2);
+    color: var(--text);
     font-size: var(--text-md);
   }
 

@@ -5,6 +5,12 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
 
 ## Unreleased
 
+- **Look up shows the list and the open card side by side** on a wide window, for items,
+  monsters, maps, NPCs and skills; the picked row stays marked. A narrow window opens the card in
+  the list's place, with a way back, as before.
+- Equipment names the classes that can wear it under its name, in Look up's list and on its card.
+- An item's **Where to get it** groups its sources: Dropped by, Sold by, From quests and Crafted
+  from. Scrolling odds come after it.
 - **Weapons have their Attack again.** The map data names weapon attack differently now. Leafline
   reads the new name, but map data downloaded earlier kept no Attack, so weapons showed none and
   the build planner's weapon path passed over most planned weapons. The map data downloads once

@@ -210,6 +210,17 @@
   </div>
   {#if pieceError}<p class="piece-error">{pieceError}</p>{/if}
 
+  <Section title="Where to get it">
+    {#if found}
+      <ItemSources {found} />
+    {:else if error}
+      <p class="note">{error}</p>
+    {:else if loading}
+      <p class="note"><span class="spin"><LoaderCircle size={13} /></span> Looking it up…</p>
+    {/if}
+    <ItemCraftingView id={shown.id} part="made" />
+  </Section>
+
   {#if shown.kind === "scroll" && shown.scroll}
     {@const raise = shown.stats.find((s) => s.value > 0) ?? null}
     <Section title="Odds" open={false}>
@@ -221,17 +232,7 @@
     </Section>
   {/if}
 
-  <Section title="Where to get it">
-    {#if found}
-      <ItemSources {found} />
-    {:else if error}
-      <p class="note">{error}</p>
-    {:else if loading}
-      <p class="note"><span class="spin"><LoaderCircle size={13} /></span> Looking it up…</p>
-    {/if}
-  </Section>
-
-  <ItemCraftingView id={shown.id} />
+  <ItemCraftingView id={shown.id} part="used" />
 {/if}
 
 <style>

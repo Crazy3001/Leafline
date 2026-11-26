@@ -13,6 +13,7 @@
     aside = null,
     small = null,
     goal = false,
+    selected = false,
     below,
     onclick,
   }: {
@@ -25,6 +26,8 @@
     small?: string | null;
     /** One of the build's own goals. */
     goal?: boolean;
+    /** The one open beside the list. */
+    selected?: boolean;
     /** More under the line, such as a map's monsters. */
     below?: Snippet;
     onclick: () => void;
@@ -34,7 +37,7 @@
   const wearing = $derived(picture?.kind === "item" && isWorn(picture.id, name));
 </script>
 
-<button class="row nav-row" {onclick}>
+<button class="row nav-row" class:selected aria-current={selected} {onclick}>
   <span use:clipped class="name" class:goal class:wearing
     >{#if picture}<Pic kind={picture.kind} id={picture.id} size={18} class="row-pic" />{/if}{name}{#if small}<small>{small}</small>{/if}{#if wearing}<small class="worn-tag">Wearing</small>{/if}</span
   >
@@ -62,6 +65,10 @@
   .row:focus-visible {
     background: var(--surface-3);
     outline: none;
+  }
+
+  .row.selected {
+    background: var(--accent-soft);
   }
 
   .name :global(.row-pic) {

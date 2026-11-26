@@ -3,7 +3,7 @@
   // a search of every monster in the map data by name, drop or map.
   import { clipped, tip } from "$lib/tip.svelte";
   import { FilterBoxState } from "$lib/filterbox.svelte";
-  import { ArrowLeft, LoaderCircle, Skull } from "@lucide/svelte";
+  import { LoaderCircle, Skull } from "@lucide/svelte";
   import { untrack } from "svelte";
 
   import Card from "./Card.svelte";
@@ -13,6 +13,7 @@
   import SearchBar from "./lookup/SearchBar.svelte";
   import MapDataPanel from "./map/MapDataPanel.svelte";
   import MonsterCard from "./MonsterCard.svelte";
+  import LookupSplit from "./lookup/LookupSplit.svelte";
   import Section from "./map/Section.svelte";
   import { backend } from "$lib/api";
   import Pic from "$lib/ui/Pic.svelte";
@@ -170,7 +171,7 @@
   <ul class="rows">
     {#each list as mob (mob.id)}
       <li>
-        <button class="row nav-row" onclick={() => openMonster(mob.id)}>
+        <button class="row nav-row" class:selected={monsterView.id === mob.id} aria-current={monsterView.id === mob.id} onclick={() => openMonster(mob.id)}>
           {@render name(mob)}
           {@render numbers(mob)}
           {#if mob.note}<span class="note">{mob.note}</span>{/if}
@@ -185,7 +186,7 @@
   <ul class="rows">
     {#each list as mob (mob.id)}
       <li>
-        <button class="row nav-row" onclick={() => openMonster(mob.id)}>
+        <button class="row nav-row" class:selected={monsterView.id === mob.id} aria-current={monsterView.id === mob.id} onclick={() => openMonster(mob.id)}>
           {@render name(mob)}
           {@render numbers(mob)}
         </button>
@@ -249,10 +250,12 @@
     {/if}
   </div>
 
-  {#if monsterView.id != null}
-    <button class="back" class:pinned onclick={backFromMonster}><ArrowLeft size={12} />Back</button>
-    <MonsterCard id={monsterView.id} {map} {level} {quest} {session} plain={pinned} />
-  {:else}
+  <LookupSplit open={monsterView.id != null} onback={backFromMonster} {pinned}>
+    {#snippet detail()}
+      {#if monsterView.id != null}<MonsterCard id={monsterView.id} {map} {level} {quest} {session} plain={pinned} />{/if}
+    {/snippet}
+    {#snippet empty()}<p class="pick">Pick a monster to see it here.</p>{/snippet}
+    {#snippet list()}
     <div class="list" class:pinned>
       {#if !browsing}
         {#if here?.card.mobs.length}
@@ -285,7 +288,8 @@
         <p class="quiet"><span class="spin"><LoaderCircle size={13} /></span> Searching…</p>
       {/if}
     </div>
-  {/if}
+    {/snippet}
+  </LookupSplit>
 {/if}
 
 <style>
@@ -343,6 +347,10 @@
     color: var(--muted);
     font-size: var(--text-md);
     text-align: right;
+  }
+
+  .row.selected {
+    background: var(--accent-soft);
   }
 
   button.row {
@@ -443,8 +451,7 @@
     outline: none;
   }
 
-  .back.inline,
-  .back.pinned {
+  .back.inline {
     margin-inline: 0;
   }
 
@@ -469,4 +476,11 @@
     }
   }
 
+  .pick {
+    margin: 0;
+    padding: var(--space-8) var(--space-3);
+    color: var(--faint);
+    font-size: var(--text-md);
+    text-align: center;
+  }
 </style>

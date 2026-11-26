@@ -1,7 +1,7 @@
 <script lang="ts">
   // The NPCs half of the Lookup tab: who is on this map, and a search of every NPC in the data by
   // name, quest or map.
-  import { ArrowLeft, LoaderCircle } from "@lucide/svelte";
+  import { LoaderCircle } from "@lucide/svelte";
   import { FilterBoxState } from "$lib/filterbox.svelte";
   import { untrack } from "svelte";
 
@@ -9,6 +9,7 @@
   import FilterBox from "./FilterBox.svelte";
   import KindTabs from "./KindTabs.svelte";
   import LookupRow from "./LookupRow.svelte";
+  import LookupSplit from "./LookupSplit.svelte";
   import NpcCard from "./NpcCard.svelte";
   import SearchBar from "./SearchBar.svelte";
   import Card from "../Card.svelte";
@@ -141,16 +142,18 @@
     {/if}
   </div>
 
-  {#if npcView.id != null}
-    <button class="back" class:pinned onclick={() => (npcView.id = null)}><ArrowLeft size={12} />Back</button>
-    <NpcCard id={npcView.id} {map} plain={pinned} />
-  {:else}
+  <LookupSplit open={npcView.id != null} onback={() => (npcView.id = null)} {pinned}>
+    {#snippet detail()}
+      {#if npcView.id != null}<NpcCard id={npcView.id} {map} plain={pinned} />{/if}
+    {/snippet}
+    {#snippet empty()}<p class="pick">Pick an NPC to see it here.</p>{/snippet}
+    {#snippet list()}
     <div class="list" class:pinned>
       {#if !browsing && here?.card.npcs.length}
         <p class="heading">On this map</p>
         <ul class="rows">
           {#each here.card.npcs as npc (npc.id)}
-            <li><LookupRow name={npc.name} picture={{ kind: "npc", id: npc.id }} aside={quests(npc.quests.length)} onclick={() => (npcView.id = npc.id)} /></li>
+            <li><LookupRow name={npc.name} picture={{ kind: "npc", id: npc.id }} aside={quests(npc.quests.length)} selected={npcView.id === npc.id} onclick={() => (npcView.id = npc.id)} /></li>
           {/each}
         </ul>
         <p class="heading">Everyone</p>
@@ -161,7 +164,7 @@
           {#if !page.closest}<p class="count tabular">{page.total.toLocaleString()} {page.total === 1 ? "NPC" : "NPCs"}</p>{/if}
           <ul class="rows">
             {#each page.npcs as row (row.id)}
-              <li><LookupRow name={row.name} picture={{ kind: "npc", id: row.id }} line={line(row)} aside={quests(row.quests)} onclick={() => (npcView.id = row.id)} /></li>
+              <li><LookupRow name={row.name} picture={{ kind: "npc", id: row.id }} line={line(row)} aside={quests(row.quests)} selected={npcView.id === row.id} onclick={() => (npcView.id = row.id)} /></li>
             {/each}
           </ul>
           {#if page.npcs.length < page.total}<button class="back inline" onclick={more}>Show more</button>{/if}
@@ -172,7 +175,8 @@
         <p class="quiet"><span class="spin"><LoaderCircle size={13} /></span> Searching…</p>
       {/if}
     </div>
-  {/if}
+    {/snippet}
+  </LookupSplit>
 {/if}
 
 <style>
@@ -238,8 +242,7 @@
     outline: none;
   }
 
-  .back.inline,
-  .back.pinned {
+  .back.inline {
     margin-inline: 0;
   }
 
@@ -264,4 +267,11 @@
     }
   }
 
+  .pick {
+    margin: 0;
+    padding: var(--space-8) var(--space-3);
+    color: var(--faint);
+    font-size: var(--text-md);
+    text-align: center;
+  }
 </style>
