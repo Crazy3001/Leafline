@@ -39,9 +39,15 @@ struct Raw {
     job: u32,
     name: String,
     summary: String,
-    /// Why to pick the path and what it gives up, for a plan written for Leafline.
+    /// The skills the plan builds on, to show on its card: its attacks and what it maxes first.
     #[serde(default)]
-    note: String,
+    key: Vec<String>,
+    /// What the path does well and what it gives up, a few words each, for a plan written for
+    /// Leafline. A guide's plan has none: its guide says.
+    #[serde(default)]
+    pros: Vec<String>,
+    #[serde(default)]
+    cons: Vec<String>,
     /// The roll the plan counts from at Lv 1: STR, DEX, INT and LUK, 25 points with each 4 to 12.
     start: [u32; 4],
     /// The 1st-job skills, by key in `openings`.
@@ -85,9 +91,15 @@ pub struct Starter {
     pub id: String,
     pub job: u32,
     pub name: String,
+    /// One line on what the plan does.
     pub summary: String,
-    /// Why to pick it and what it gives up. Empty for a guide's plan, whose guide says.
-    pub note: String,
+    /// What the path does well and what it gives up. Empty for a guide's plan, whose guide says.
+    pub pros: Vec<String>,
+    pub cons: Vec<String>,
+    /// The attacks the plan builds on, at the level it takes them to, to show at a glance.
+    pub key_skills: Vec<Featured>,
+    /// The weapons it plans, by the level each is worn from.
+    pub weapons: Vec<Featured>,
     /// The Lv 1 stats the plan counts from. A different roll changes when each step lands.
     pub start: Stats,
     pub plan: Plan,
@@ -96,6 +108,19 @@ pub struct Starter {
     pub source: Option<Source>,
     pub reading: Option<Source>,
 }
+
+/// A skill or weapon shown on a plan's card: its level for a skill, the level it's worn from for
+/// a weapon.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct Featured {
+    pub id: u32,
+    pub name: String,
+    pub level: u32,
+}
+
+/// The most key skills a card shows.
+#[cfg(test)]
+const KEY_SKILLS: usize = 4;
 
 /// Every plan, in job order.
 pub fn all(catalog: &Catalog, rules: &Rules) -> Vec<Starter> {
@@ -116,13 +141,30 @@ fn resolve(raw: &Raw, catalog: &Catalog, rules: &Rules) -> Starter {
             None => missing.push(name.clone()),
         }
     }
+    // Each at the highest level the plan takes it to.
+    let key_skills = raw
+        .key
+        .iter()
+        .filter_map(|name| {
+            let skill = catalog.skill_named(name, &jobs)?;
+            let level = skills.iter().filter(|s| s.skill_id == skill.id).map(|s| s.level).max()?;
+            Some(Featured { id: skill.id, name: skill.name.clone(), level })
+        })
+        .collect();
     let mut gear = Vec::new();
+    let mut weapons = Vec::new();
     for name in &raw.gear {
         match catalog.item_named(name) {
-            Some(item) => gear.push(item.id),
+            Some(item) => {
+                gear.push(item.id);
+                if item.slot == "Weapon" {
+                    weapons.push(Featured { id: item.id, name: item.name.clone(), level: item.req_level });
+                }
+            }
             None => missing.push(name.clone()),
         }
     }
+    weapons.sort_by_key(|w| w.level);
     let plan = Plan { job: raw.job, skills, stats: stat_goals(raw, rules), gear, plan_to: PLAN_TO };
     let [str, dex, int, luk] = raw.start;
     Starter {
@@ -130,7 +172,10 @@ fn resolve(raw: &Raw, catalog: &Catalog, rules: &Rules) -> Starter {
         job: raw.job,
         name: raw.name.clone(),
         summary: raw.summary.clone(),
-        note: raw.note.clone(),
+        pros: raw.pros.clone(),
+        cons: raw.cons.clone(),
+        key_skills,
+        weapons,
         start: Stats { str, dex, int, luk },
         plan,
         missing,
@@ -423,7 +468,7 @@ mod tests {
     #[test]
     fn plans_written_for_leafline_say_why_and_link_a_guide_only_as_reading() {
         for raw in FILE.plans.iter().filter(|p| p.source.is_none()) {
-            assert!(!raw.note.is_empty() && !raw.summary.is_empty(), "{}", raw.id);
+            assert!(!raw.summary.is_empty() && !raw.pros.is_empty() && !raw.cons.is_empty(), "{}", raw.id);
             assert!(raw.ap.is_empty(), "{}: a plan of our own steps its secondary stat to its gear", raw.id);
             if let Some(reading) = &raw.reading {
                 assert!(reading.url.starts_with("https://meowdb.com/msclassic/guides/"), "{}", raw.id);
@@ -431,7 +476,20 @@ mod tests {
             }
         }
         for raw in FILE.plans.iter().filter(|p| p.source.is_some()) {
-            assert!(raw.reading.is_none() && raw.note.is_empty(), "{}: its guide says why", raw.id);
+            assert!(raw.reading.is_none() && raw.pros.is_empty() && raw.cons.is_empty(), "{}: its guide says why", raw.id);
+        }
+    }
+
+    /// Each card shows the attacks a plan builds on and its weapons, which takes the real data.
+    #[test]
+    fn every_card_shows_its_attacks_and_weapons() {
+        let Some(catalog) = real_catalog() else { return };
+        for starter in all(&catalog, &Rules::default()) {
+            let names = |list: &[Featured]| list.iter().map(|f| format!("{} {}", f.name, f.level)).collect::<Vec<_>>();
+            println!("{}: {:?} | {:?}", starter.id, names(&starter.key_skills), names(&starter.weapons));
+            assert!(!starter.key_skills.is_empty() && starter.key_skills.len() <= KEY_SKILLS, "{}", starter.id);
+            assert!(!starter.weapons.is_empty(), "{}", starter.id);
+            assert!(starter.weapons.windows(2).all(|w| w[0].level <= w[1].level), "{}", starter.id);
         }
     }
 
@@ -525,6 +583,17 @@ mod tests {
     }
 
     #[test]
+    fn every_key_skill_is_one_the_plan_takes() {
+        for raw in &FILE.plans {
+            assert!((1..=KEY_SKILLS).contains(&raw.key.len()), "{}", raw.id);
+            let opening = FILE.openings.get(&raw.opening).map_or(&[][..], Vec::as_slice);
+            for name in &raw.key {
+                assert!(opening.iter().chain(&raw.skills).any(|(n, _)| n == name), "{}: {name}", raw.id);
+            }
+        }
+    }
+
+    #[test]
     fn steps_only_ever_rise() {
         for raw in &FILE.plans {
             assert!(raw.steps.windows(2).all(|w| w[0].0 < w[1].0 && w[0].1 < w[1].1), "{}", raw.name);
@@ -538,7 +607,9 @@ mod tests {
             job: 410,
             name: "Test".into(),
             summary: String::new(),
-            note: String::new(),
+            key: Vec::new(),
+            pros: Vec::new(),
+            cons: Vec::new(),
             start: [4, 4, 4, 13],
             opening: String::new(),
             skills: Vec::new(),

@@ -2,8 +2,8 @@
   // A new build in three choices: the second job, a ready-made plan or a blank one, and a name.
   // Everything can be changed later in the planner's tabs.
   import { backend } from "$lib/api";
-  import { STATS } from "$lib/builds.svelte";
-  import type { BaseStats, BuildCatalog, BuildPlan, StarterPlan } from "$lib/types";
+  import StarterCard from "$lib/components/planner/StarterCard.svelte";
+  import type { BuildCatalog, BuildPlan, StarterPlan } from "$lib/types";
 
   let {
     catalog,
@@ -55,8 +55,7 @@
   let error = $state<string | null>(null);
   let busy = $state(false);
 
-  const count = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-  const roll = (stats: BaseStats) => STATS.map((s) => `${s.label} ${stats[s.id]}`).join(" · ");
+  const jobName = $derived(catalog.jobs.find((j) => j.id === job)?.name ?? "");
   /** A new character starts from the plan's roll; one already levelled enters their own. */
   const fresh = $derived((level ?? 1) <= 1);
 
@@ -117,30 +116,19 @@
 
   <section>
     <h2>2 · Start from</h2>
+    {#if plans.length}
+      <p class="help">
+        Plans run to Lv 70 and nobody has played them yet.{#if fresh}
+          Each counts from the Lv 1 roll shown; if yours differs, change it in the plan.{/if}
+      </p>
+    {/if}
     <div class="starts">
       {#each plans as plan (plan.id)}
-        <button class="choice start" class:on={from === plan.id} aria-pressed={from === plan.id} onclick={() => (from = plan.id)}>
-          <span class="start-name">
-            {plan.name}
-            <span class="faint">· {plan.source ? `from ${plan.source.name}'s guide` : "ready-made"}, to Lv {plan.plan.planTo}</span>
-          </span>
-          <span class="roll">Lv 1 stats: {roll(plan.start)}</span>
-          <span class="muted">{plan.summary}</span>
-          {#if plan.note}<span class="muted">{plan.note}</span>{/if}
-          <span class="muted">
-            {count(plan.plan.skills.length, "skill goal")}, {count(plan.plan.stats.length, "stat goal")},
-            {count(plan.plan.gear.length, "piece", "pieces")} of gear.
-          </span>
-          {#if plan.missing.length}<span class="warn">Not in this data: {plan.missing.join(", ")}</span>{/if}
-          {#if plan.source}<span class="muted">{plan.source.credit} The guide's link is saved with the build.</span>{/if}
-          {#if plan.reading}<span class="muted">Further reading: {plan.reading.credit} The planner links it.</span>{/if}
-          {#if fresh}<span class="faint">The plan counts from these stats: 25 points, 4 to 12 each. If yours differ, change them in the plan.</span>{/if}
-          <span class="warn">Untested in game: a starting point to change.</span>
-        </button>
+        <StarterCard {plan} {jobName} selected={from === plan.id} onpick={() => (from = plan.id)} />
       {/each}
-      <button class="choice start" class:on={from === "blank"} aria-pressed={from === "blank"} onclick={() => (from = "blank")}>
+      <button class="choice blank" class:on={from === "blank"} aria-pressed={from === "blank"} onclick={() => (from = "blank")}>
         <span class="start-name">Blank plan</span>
-        <span class="muted">No goals yet. Add skills, stats and gear yourself, or from a guide.</span>
+        <span class="muted">No goals yet. Add your own skills, stats and gear.</span>
       </button>
     </div>
   </section>
@@ -169,9 +157,8 @@
       </label>
     </div>
     <p class="help">
-      {#if character}Character and level are read from the game.{:else}No character read yet: the build follows whoever you name.{/if}
-      Stats and skills fill in the next time Leafline reads your Character Stat and Skill windows. Gear slots the plan leaves
-      empty get an upgrade every 10 levels from the item data, to change in the Gear tab.
+      {#if character}Read from the game.{:else}No character read yet: the build follows whoever you name.{/if}
+      Your stats and skills fill in when Leafline reads your Stat and Skill windows.
     </p>
   </section>
 
@@ -190,7 +177,7 @@
     flex-direction: column;
     gap: var(--space-5);
     min-width: 0;
-    max-width: 860px;
+    max-width: 960px;
     padding: var(--space-6) var(--space-10) var(--space-8);
     overflow-y: auto;
   }
@@ -268,26 +255,28 @@
 
   .starts {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: var(--space-2);
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: var(--space-3);
   }
 
-  .start {
+  .blank {
     display: grid;
     align-content: start;
     gap: var(--space-1);
     padding: var(--space-3) var(--space-4);
+    border-style: dashed;
+    border-radius: var(--radius);
+  }
+
+  .blank.on {
+    border-style: solid;
   }
 
   .start-name {
     font-weight: var(--weight-strong);
   }
 
-  .roll {
-    font-variant-numeric: tabular-nums;
-  }
-
-  .start.on .muted {
+  .blank.on .muted {
     color: var(--text);
   }
 
@@ -298,11 +287,6 @@
   .faint {
     color: var(--faint);
     font-weight: var(--weight-body);
-  }
-
-  .warn {
-    color: var(--warn);
-    font-size: var(--text-md);
   }
 
   .names {

@@ -32,6 +32,7 @@
   import LevelInspector from "$lib/components/planner/LevelInspector.svelte";
   import NewBuild from "$lib/components/planner/NewBuild.svelte";
   import PlanChart from "$lib/components/planner/PlanChart.svelte";
+  import StarterCard from "$lib/components/planner/StarterCard.svelte";
   import Timeline from "$lib/components/planner/Timeline.svelte";
   import Segmented from "$lib/ui/Segmented.svelte";
   import { guideLinks } from "$lib/guides";
@@ -1161,42 +1162,18 @@
           {#if jobPlans.length}
             <section>
               <h2 class="group">Ready-made plans</h2>
-              <p class="help">
-                Some follow one written guide and credit it; the rest Leafline worked out from the skill and item data. All
-                untested in game. Using one replaces your goals; your stats stay.
-              </p>
-              <ul class="plans">
+              <p class="help">Using one replaces your goals; your stats stay.</p>
+              <div class="plans">
                 {#each jobPlans as starter (starter.id)}
-                  <li>
-                    <span class="goal-name">
-                      <span>{starter.name}</span>
-                      <small class="tabular">Lv 1 stats: {STATS.map((s) => `${s.label} ${starter.start[s.id]}`).join(" · ")}</small>
-                      <small>{starter.summary}</small>
-                      {#if starter.note}<small>{starter.note}</small>{/if}
-                      {#if starter.source}
-                        <small>
-                          {starter.source.credit}
-                          <button class="btn" onclick={() => starter.source && backend.openGuide(starter.source.url)}>
-                            Open {starter.source.name}'s guide
-                          </button>
-                        </small>
-                      {/if}
-                      {#if starter.reading}
-                        <small>
-                          {starter.reading.credit}
-                          <button class="btn" onclick={() => starter.reading && backend.openGuide(starter.reading.url)}>
-                            Further reading: {starter.reading.name}
-                          </button>
-                        </small>
-                      {/if}
-                      {#if starter.missing.length}<small class="warn">Not in this data: {starter.missing.join(", ")}</small>{/if}
-                    </span>
-                    <button class="btn" class:danger={confirmStarter === starter.id} onclick={() => useStarter(starter)}>
-                      {confirmStarter === starter.id ? "Replace my goals?" : "Use this plan"}
-                    </button>
-                  </li>
+                  <StarterCard plan={starter} jobName={jobName(starter.job)}>
+                    {#snippet action()}
+                      <button class="btn sm" class:danger={confirmStarter === starter.id} onclick={() => useStarter(starter)}>
+                        {confirmStarter === starter.id ? "Replace my goals?" : "Use this plan"}
+                      </button>
+                    {/snippet}
+                  </StarterCard>
                 {/each}
-              </ul>
+              </div>
             </section>
           {/if}
 
@@ -1947,24 +1924,8 @@
 
   .plans {
     display: grid;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .plans li {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    padding: var(--space-1-5) 0;
-  }
-
-  .plans li + li {
-    border-top: 1px solid var(--border);
-  }
-
-  small.warn {
-    color: var(--warn);
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: var(--space-3);
   }
 
   .actions {

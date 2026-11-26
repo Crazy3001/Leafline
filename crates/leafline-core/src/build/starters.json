@@ -44,6 +44,7 @@
     {
       "id": "fighter-niadb", "job": 110, "name": "Fighter (axe), NiaDB guide",
       "summary": "Axe Mastery and Final Attack first, Rage to 30 by Lv 48, Rush last.",
+      "key": ["Power Strike", "Slash Blast", "Final Attack: Axe", "Rage"],
       "start": [12, 5, 4, 4],
       "source": {
         "name": "NiaDB",
@@ -71,6 +72,7 @@
     {
       "id": "fighter-sword-niadb", "job": 110, "name": "Fighter (sword), NiaDB guide",
       "summary": "The same order with Sword Mastery, Final Attack: Sword and Sword Booster. Steadier damage rolls and more Accuracy.",
+      "key": ["Power Strike", "Slash Blast", "Final Attack: Sword", "Rage"],
       "start": [12, 5, 4, 4],
       "source": {
         "name": "NiaDB",
@@ -98,6 +100,7 @@
     {
       "id": "page-niadb", "job": 120, "name": "Page (blunt), NiaDB guide",
       "summary": "Blunt Weapon Mastery and Final Attack first, Threaten to 30 by Lv 57.",
+      "key": ["Power Strike", "Slash Blast", "Final Attack: Blunt Weapon", "Threaten"],
       "start": [12, 5, 4, 4],
       "source": {
         "name": "NiaDB",
@@ -125,6 +128,7 @@
     {
       "id": "page-sword-niadb", "job": 120, "name": "Page (sword), NiaDB guide",
       "summary": "The same order with Sword Mastery, Final Attack: Sword and Sword Booster. More predictable minimum damage.",
+      "key": ["Power Strike", "Slash Blast", "Final Attack: Sword", "Threaten"],
       "start": [12, 5, 4, 4],
       "source": {
         "name": "NiaDB",
@@ -152,6 +156,7 @@
     {
       "id": "spearman-niadb", "job": 130, "name": "Spearman (spear), NiaDB guide",
       "summary": "Spear Mastery and Final Attack first, Booster and Rush next, Iron Will last.",
+      "key": ["Power Strike", "Slash Blast", "Final Attack: Spear", "Rush"],
       "start": [12, 5, 4, 4],
       "source": {
         "name": "NiaDB",
@@ -178,6 +183,7 @@
     {
       "id": "spearman-polearm-niadb", "job": 130, "name": "Spearman (polearm), NiaDB guide",
       "summary": "The same order with Polearm Mastery, Final Attack: Polearm and Polearm Booster. More Power Strike damage and +20 Movement Speed.",
+      "key": ["Power Strike", "Slash Blast", "Final Attack: Polearm", "Rush"],
       "start": [12, 5, 4, 4],
       "source": {
         "name": "NiaDB",
@@ -204,6 +210,7 @@
     {
       "id": "fp-wizard-niadb", "job": 210, "name": "F/P Wizard, NiaDB guide",
       "summary": "Fire Arrow to 30 by Lv 40, Poison Breath by Lv 50, then Meditation, MP Eater and Teleport.",
+      "key": ["Magic Claw", "Fire Arrow", "Poison Breath", "Meditation"],
       "start": [4, 4, 12, 5],
       "source": {
         "name": "NiaDB",
@@ -228,6 +235,7 @@
     {
       "id": "fp-wizard-energybolt-niadb", "job": 210, "name": "F/P Wizard, Energy Bolt start, NiaDB guide",
       "summary": "The same Lv 30-70 skills; Lv 1-30 follows the Energy Bolt plan instead of Magic Claw.",
+      "key": ["Energy Bolt", "Fire Arrow", "Poison Breath", "Meditation"],
       "start": [4, 4, 12, 5],
       "source": {
         "name": "NiaDB",
@@ -252,6 +260,7 @@
     {
       "id": "il-wizard-niadb", "job": 220, "name": "I/L Wizard, NiaDB guide",
       "summary": "Cold Beam to 30 by Lv 41, Meditation, Teleport, then Thunder Bolt to 30 by Lv 64.",
+      "key": ["Magic Claw", "Cold Beam", "Thunder Bolt", "Meditation"],
       "start": [4, 4, 12, 5],
       "source": {
         "name": "NiaDB",
@@ -278,6 +287,7 @@
     {
       "id": "il-wizard-energybolt-niadb", "job": 220, "name": "I/L Wizard, Energy Bolt start, NiaDB guide",
       "summary": "The same Lv 30-70 skills; Lv 1-30 follows the Energy Bolt plan instead of Magic Claw.",
+      "key": ["Energy Bolt", "Cold Beam", "Thunder Bolt", "Meditation"],
       "start": [4, 4, 12, 5],
       "source": {
         "name": "NiaDB",
@@ -304,6 +314,7 @@
     {
       "id": "cleric-niadb", "job": 230, "name": "Cleric (Party Support), NiaDB guide",
       "summary": "Heal to 30 by Lv 41, Bless, Teleport and Invincible next, Holy Arrow last.",
+      "key": ["Magic Claw", "Heal", "Bless", "Holy Arrow"],
       "start": [4, 4, 12, 5],
       "source": {
         "name": "NiaDB",
@@ -329,6 +340,7 @@
     {
       "id": "cleric-energybolt-niadb", "job": 230, "name": "Cleric, Energy Bolt start, NiaDB guide",
       "summary": "The same Lv 30-70 skills; Lv 1-30 follows the Energy Bolt plan instead of Magic Claw.",
+      "key": ["Energy Bolt", "Heal", "Bless", "Holy Arrow"],
       "start": [4, 4, 12, 5],
       "source": {
         "name": "NiaDB",
@@ -354,6 +366,7 @@
     {
       "id": "cleric-mesosaver-niadb", "job": 230, "name": "Cleric (Meso Saver), NiaDB guide",
       "summary": "For solo grinding: Holy Arrow first, MP Eater to 20, Teleport stays at 1.",
+      "key": ["Energy Bolt", "Holy Arrow", "Heal", "MP Eater"],
       "start": [4, 4, 12, 5],
       "source": {
         "name": "NiaDB",
@@ -380,6 +393,7 @@
     {
       "id": "hunter-niadb", "job": 310, "name": "Hunter, NiaDB guide",
       "summary": "Mastery and Booster first, Arrow Bomb to 30 by Lv 49, then Final Attack and Soul Arrow.",
+      "key": ["Arrow Blow", "Arrow Bomb", "Bow Mastery", "Final Attack: Bow"],
       "start": [5, 12, 4, 4],
       "source": {
         "name": "NiaDB",
@@ -409,6 +423,7 @@
     {
       "id": "hunter-doubleshot-niadb", "job": 310, "name": "Hunter, Double Shot start, NiaDB guide",
       "summary": "Double Shot 20 and Arrow Blow 1 at Lv 30 instead of Arrow Blow 20. Needs an SP Reset Scroll unless planned from Lv 10.",
+      "key": ["Double Shot", "Arrow Bomb", "Bow Mastery", "Final Attack: Bow"],
       "start": [5, 12, 4, 4],
       "source": {
         "name": "NiaDB",
@@ -438,6 +453,7 @@
     {
       "id": "crossbowman-niadb", "job": 320, "name": "Crossbowman, NiaDB guide",
       "summary": "Mastery and Booster first, Iron Arrow maxed by Lv 49, STR only as far as the next crossbow needs.",
+      "key": ["Arrow Blow", "Iron Arrow", "Crossbow Mastery", "Final Attack: Crossbow"],
       "start": [5, 12, 4, 4],
       "source": {
         "name": "NiaDB",
@@ -468,6 +484,7 @@
     {
       "id": "crossbowman-doubleshot-niadb", "job": 320, "name": "Crossbowman, Double Shot start, NiaDB guide",
       "summary": "Double Shot 20 and Arrow Blow 1 at Lv 30 instead of Arrow Blow 20. Needs an SP Reset Scroll unless planned from Lv 10.",
+      "key": ["Double Shot", "Iron Arrow", "Crossbow Mastery", "Final Attack: Crossbow"],
       "start": [5, 12, 4, 4],
       "source": {
         "name": "NiaDB",
@@ -498,6 +515,7 @@
     {
       "id": "assassin-niadb", "job": 410, "name": "Assassin, NiaDB guide",
       "summary": "Mastery, then Critical Throw to 30 by Lv 47, Haste, Booster and Critical Recovery, Drain last.",
+      "key": ["Lucky Seven", "Critical Throw", "Claw Mastery", "Haste"],
       "start": [4, 5, 4, 12],
       "source": {
         "name": "NiaDB",
@@ -523,6 +541,7 @@
     {
       "id": "bandit-niadb", "job": 420, "name": "Bandit (no reset, STR daggers), NiaDB guide",
       "summary": "Mastery, then Savage Blow to 30 by Lv 47, Haste, Nimble Recovery and Steal, Booster last. No SP reset.",
+      "key": ["Double Stab", "Savage Blow", "Dagger Mastery", "Steal"],
       "start": [4, 5, 4, 12],
       "source": {
         "name": "NiaDB",
@@ -548,8 +567,16 @@
     },
     {
       "id": "bandit-sindit", "job": 420, "name": "Bandit, Sindit (claws to Lv 34, then DEX daggers)",
-      "summary": "Lucky Seven on a claw (Meba from Lv 25) through Lv 34 while Savage Blow reaches its 5th hit, then DEX daggers from Lv 35. DEX only as far as each weapon needs, counting what worn gear adds. No SP reset: Lucky Seven stays and Double Stab is skipped.",
-      "note": "Why: Lucky Seven hits from range and goes by LUK, so Lv 10-30 needs no Double Stab, and Savage Blow needs no 1st-job skill. Trade-off: those 20 SP do nothing with a dagger in hand, though a claw still uses them. Sindit guides often reset SP near Lv 40 to move them; Leafline can't plan a reset. Claws ask for as much DEX as their level, more than DEX daggers do, and throwing stars cost mesos. Haste 1 comes at Lv 30, Haste 5 by Lv 42 (Steal needs it) and Haste 20 by Lv 57.",
+      "summary": "Lucky Seven on a claw to Lv 34, then DEX daggers from Lv 35. No SP reset.",
+      "key": ["Lucky Seven", "Savage Blow", "Dagger Mastery", "Steal"],
+      "pros": [
+        "Lucky Seven hits from range, so Lv 10-34 needs no Double Stab.",
+        "DEX only as far as each weapon needs, counting worn gear."
+      ],
+      "cons": [
+        "Lucky Seven's 20 SP sit idle once a dagger is in hand. Leafline can't plan the SP reset many Sindits use.",
+        "Claws ask for DEX equal to their level, and stars cost mesos."
+      ],
       "start": [4, 5, 4, 12],
       "reading": {
         "name": "NiaDB",
@@ -573,8 +600,15 @@
     },
     {
       "id": "bandit-dex", "job": 420, "name": "Bandit, DEX daggers",
-      "summary": "Double Stab for 1st job, then Savage Blow and Steal. DEX only as far as the next DEX dagger needs, counting what worn gear adds; the rest into LUK.",
-      "note": "Why: thief armour asks for DEX as well (DEX 60 at Lv 70), so one stat covers both, and DEX adds Accuracy. Trade-off: the item data lists DEX daggers one attack-speed step slower than STR daggers of the same level, for 1 more attack. Savage Blow goes to 11 early, where the data gives it a 5th hit and it passes Double Stab 20, then to 21 for a 6th. Haste 1 comes at Lv 30, Haste 5 by Lv 42 (Steal needs it) and Haste 20 by Lv 57.",
+      "summary": "Double Stab, then Savage Blow and Steal, on DEX daggers. The rest of the AP into LUK.",
+      "key": ["Double Stab", "Savage Blow", "Dagger Mastery", "Steal"],
+      "pros": [
+        "Thief armour asks for DEX too, so one stat covers both.",
+        "DEX adds Accuracy."
+      ],
+      "cons": [
+        "The item data lists DEX daggers one attack-speed step slower than STR daggers of the same level."
+      ],
       "start": [4, 5, 4, 12],
       "reading": {
         "name": "NiaDB",
@@ -598,8 +632,15 @@
     },
     {
       "id": "bandit-str", "job": 420, "name": "Bandit, STR daggers (LUK main)",
-      "summary": "Double Stab for 1st job, then Savage Blow and Steal. STR only as far as the next STR dagger needs, counting what worn gear adds; the rest into LUK. Not a STR-main build: LUK stays the damage stat.",
-      "note": "Why: the item data lists STR daggers one attack-speed step faster. Trade-off: thief armour past Lv 15 asks for DEX this plan doesn't add (DEX 60 at Lv 70), so it plans Lv 15 thief pieces and all-class capes and earrings. Add DEX yourself to wear more. STR adds no Accuracy. The spare point of the roll goes into STR. Skills as the DEX plan: Haste 1 at Lv 30, 5 by Lv 42, 20 by Lv 57.",
+      "summary": "Double Stab, then Savage Blow and Steal, on STR daggers. LUK stays the main stat.",
+      "key": ["Double Stab", "Savage Blow", "Dagger Mastery", "Steal"],
+      "pros": [
+        "The item data lists STR daggers one attack-speed step faster."
+      ],
+      "cons": [
+        "No DEX for thief armour past Lv 15: the plan picks Lv 15 thief pieces and all-class capes and earrings.",
+        "STR adds no Accuracy."
+      ],
       "start": [5, 4, 4, 12],
       "reading": {
         "name": "NiaDB",

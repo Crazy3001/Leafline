@@ -5,6 +5,10 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
 
 ## Unreleased
 
+- **Shorter ready-made build plans.** Each plan card, in New build and in the planner's Settings,
+  now shows one line on what the plan does, the Lv 1 stats, its key skills and weapons, and for
+  Leafline's own plans a few short pros and cons. A guide plan names its guide in one linked line,
+  with the full credit on the link.
 - **Every quest in one list.** Quests → Quest log now lists every quest by region, marked done,
   in progress, ready to hand in, can take, or not yet with why (the level it needs, or the quest
   to finish first). Quests before one you're on or have done count as done, and a quest the game
