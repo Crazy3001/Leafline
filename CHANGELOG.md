@@ -5,6 +5,15 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
 
 ## Unreleased
 
+- **A compass at the top of every desk page** says where you're heading and the one thing to do
+  next from the map you're on: an arrow and the portal to take, how many maps are left and any
+  rides. It heads for the place set with Go here; with none set it offers the first Next up step
+  that has somewhere to go, which Go sets. Click it for the whole route; × stops. On a phone it's
+  one line under the header. The arrow is from the portal you come out of, by the map data; on
+  the map you start from only the portal's side of the map is known. When the minimap's name is
+  out of view for a few seconds it says the way is from the map you were last seen on.
+- On the website, Go here now follows you on the desk too (it only did in the phone view).
+- Now's This map no longer stops updating on a map with two ways out to the same map.
 - **Search as you type.** The search box at the top of every page drops down matches as you type:
   items, monsters, maps, NPCs and quests, each with its picture and a line (an item's type, a
   monster's level, a quest's level and region), with chips and counts to show one kind. Arrow

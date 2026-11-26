@@ -1,144 +1,17 @@
 <script lang="ts">
-  // Next up: a short list of what's worth doing now, the best first, each with one button. Built
-  // only from what Leafline already reads and knows: quests whose steps are all done (to hand in),
-  // AP the Character Stat window shows unspent, and the next quest objective with the map that has
-  // most of it. Suggestions to act on, never alerts.
+  // Next up: a short list of what's worth doing now, the best first, each with one button (see
+  // nextup.svelte.ts for what goes in it). Suggestions to act on, never alerts.
   import { Footprints, Gift, Plus, Sparkles } from "@lucide/svelte";
-  import { untrack } from "svelte";
 
-  import { backend } from "$lib/api";
   import GoButton from "$lib/components/GoButton.svelte";
   import Ref from "$lib/components/Ref.svelte";
-  import { damage, followDamage } from "$lib/damage.svelte";
-  import { mapPlace, npcPlace } from "$lib/destination.svelte";
-  import { groundDistance, questTitle } from "$lib/format";
-  import { mapData, watchMapData } from "$lib/mapdata.svelte";
-  import { readyToHandIn, questLog, watchQuestLog } from "$lib/questlog.svelte";
-  import { huntOrder, orderGrounds } from "$lib/quests.svelte";
-  import { live } from "$lib/readings.svelte";
-  import type { Destination, Guide, MapRef, QuestSheet } from "$lib/types";
+  import { nextSteps, watchNextUp } from "$lib/nextup.svelte";
   import TitledCard from "$lib/ui/TitledCard.svelte";
 
   let { onme }: { onme: () => void } = $props();
 
-  watchMapData();
-  watchQuestLog();
-
-  const ready = $derived(mapData.status?.ready ?? false);
-  const analysis = $derived(live.analysis);
-  const map = $derived(analysis?.map ?? null);
-  const name = $derived(analysis?.hud?.name ?? live.session?.name ?? null);
-
-  $effect(() => {
-    const who = name;
-    untrack(() => followDamage(who));
-  });
-
-  // ---- Where each tracked quest's objectives are, and who takes it in.
-  const tracked = $derived((analysis?.quest?.quests ?? []).filter((q) => q.title));
-  let guide = $state<Guide | null>(null);
-  const guideKey = $derived(JSON.stringify([tracked.map((q) => [q.title, q.objectives.map((o) => o.target)]), map?.name, map?.street, map?.twin]));
-  $effect(() => {
-    const key = guideKey;
-    void mapData.status?.dataUpdatedAt;
-    if (!ready || !tracked.length) {
-      guide = null;
-      return;
-    }
-    const asked = tracked.map((q) => ({ title: q.title, objectives: q.objectives.map((o) => o.target) }));
-    untrack(() =>
-      backend
-        .questGuide(asked, map?.name ?? null, map?.street ?? null, map?.twin ?? null, [])
-        .then((g) => {
-          if (key === guideKey) guide = g;
-        })
-        .catch(() => (guide = null)),
-    );
-  });
-
-  // ---- Quest log entries ready to hand in, with who takes them.
-  const logReady = $derived((questLog.log?.quests ?? []).filter(readyToHandIn).slice(0, 2));
-  let sheets = $state<Record<number, QuestSheet>>({});
-  const readyKey = $derived(logReady.map((q) => q.questId ?? "").join(","));
-  $effect(() => {
-    const asked = readyKey;
-    if (!ready) return;
-    untrack(() => {
-      const ids = logReady.map((q) => q.questId).filter((id): id is number => id != null && !sheets[id]);
-      Promise.all(ids.map((id) => backend.questSheet(id, null, null, null)))
-        .then((found) => {
-          if (asked !== readyKey) return;
-          const next = { ...sheets };
-          found.forEach((w) => {
-            if (w) next[w.sheet.row.id] = w.sheet;
-          });
-          sheets = next;
-        })
-        .catch(() => {});
-    });
-  });
-
-  type Step = {
-    key: string;
-    kind: "handin" | "ap" | "hunt";
-    title: string;
-    npc?: string | null;
-    map?: MapRef | null;
-    detail?: string;
-    place?: Destination | null;
-  };
-
-  const steps = $derived.by(() => {
-    const out: Step[] = [];
-    const seen = new Set<string>();
-
-    // Quests the Quest Helper shows with every step done.
-    tracked.forEach((q, i) => {
-      const done = q.objectives.length > 0 && q.objectives.every((o) => !o.unread && o.current >= o.required);
-      if (!done) return;
-      const info = guide?.quests[i]?.quest ?? null;
-      const npc = info?.turnIn ?? info?.giver ?? null;
-      const maps = info?.turnIn ? info.turnInMaps : (info?.giverMaps ?? []);
-      seen.add(q.title.toLowerCase());
-      out.push({ key: `h:${q.title}`, kind: "handin", title: `Hand in ${questTitle(info?.quest.name ?? q.title).name}`, npc, map: maps[0] ?? null, place: npc ? npcPlace(npc, maps) : null });
-    });
-    // And the quest log's, as of the last look at the Quest window.
-    for (const q of logReady) {
-      if (seen.has(q.title.toLowerCase())) continue;
-      const info = q.questId != null ? sheets[q.questId]?.info : null;
-      const npc = info?.turnIn ?? info?.giver ?? null;
-      const maps = info?.turnIn ? info.turnInMaps : (info?.giverMaps ?? []);
-      out.push({ key: `l:${q.key}`, kind: "handin", title: `Hand in ${questTitle(q.title).name}`, npc, map: maps[0] ?? null, place: npc ? npcPlace(npc, maps) : null });
-    }
-
-    // AP the Character Stat window last showed unspent.
-    const stats = damage.name && name && damage.name.toLowerCase() === name.toLowerCase() ? damage.stats : null;
-    const ap = stats?.sheet?.abilityPoints ?? stats?.base?.abilityPoints ?? null;
-    if (ap && ap > 0) out.push({ key: "ap", kind: "ap", title: `Spend ${ap} AP`, detail: "Your build on Me says where" });
-
-    // The next objective still to do, with the map that has the most of it.
-    outer: for (const [i, q] of tracked.entries()) {
-      for (const o of q.objectives) {
-        if (o.unread || o.current >= o.required) continue;
-        const g = guide?.quests[i]?.objectives.find((x) => x.target === o.target);
-        const hunt = g?.hunts.find((h) => h.monster.known && h.maps.length);
-        if (!g || !hunt) continue;
-        const best = orderGrounds(hunt.maps, huntOrder.value)[0];
-        const left = o.required - o.current;
-        const verb = g.kind === "item" ? "Collect" : "Defeat";
-        out.push({
-          key: `o:${q.title}:${o.target}`,
-          kind: "hunt",
-          title: `${verb} ${left} more ${o.target}`,
-          map: best.map,
-          detail: best.hops === 0 ? "On this map" : groundDistance(best, guide?.from != null),
-          place: best.hops === 0 ? null : mapPlace(best.map),
-        });
-        break outer;
-      }
-    }
-    return out.slice(0, 4);
-  });
+  watchNextUp();
+  const steps = $derived(nextSteps());
 
   const ICONS = { handin: Gift, ap: Plus, hunt: Footprints };
 </script>

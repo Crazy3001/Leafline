@@ -9,7 +9,7 @@
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BinaryHeap, HashMap};
 
-use super::atlas::{Atlas, Direction, Route, RouteStep, TravelStep};
+use super::atlas::{Atlas, Direction, Route, RouteStep, Toward, TravelStep};
 use super::layout::WALK_SPEED;
 use super::osms::{MapRecord, PointKind};
 use super::travel::{Travel, TravelKind, TravelLink};
@@ -197,7 +197,7 @@ impl Atlas {
         let mut steps = Vec::new();
         let mut node = end;
         while let Some((prev, hop)) = reached.get(&node).and_then(|r| r.prev) {
-            steps.push(self.step(prev.0, node.0, hop));
+            steps.push(self.step(prev.0, prev.1, node.0, hop));
             node = prev;
         }
         steps.reverse();
@@ -213,7 +213,8 @@ impl Atlas {
         })
     }
 
-    fn step(&self, from: u32, to: u32, hop: Hop) -> RouteStep {
+    /// A step of the route, from `at` on map `from` (the portal the route came out of there).
+    fn step(&self, from: u32, at: At, to: u32, hop: Hop) -> RouteStep {
         match hop {
             Hop::Ride(link) => RouteStep {
                 from: self.map_ref(from),
@@ -223,9 +224,15 @@ impl Atlas {
                 portal: None,
                 hidden: false,
                 travel: Some(TravelStep { kind: link.kind, service: link.service.clone(), fare: link.fare }),
+                toward: None,
             },
             Hop::Spot(i) => {
-                let name = &self.spots[&from][i].name;
+                let spots = &self.spots[&from];
+                let name = &spots[i].name;
+                let toward = at.and_then(|a| spots.get(a)).map(|here| Toward {
+                    dx: spots[i].x - here.x,
+                    dy: spots[i].y - here.y,
+                });
                 let exits = self.exits.get(&from).into_iter().flatten();
                 let exit = exits.clone().find(|e| e.to.id == to && e.portals.contains(name));
                 let (direction, hidden) = Direction::of_portal(name);
@@ -237,6 +244,7 @@ impl Atlas {
                     portal: Some(name.clone()),
                     hidden: exit.map_or(hidden, |e| e.hidden),
                     travel: None,
+                    toward,
                 }
             }
             Hop::Unplaced(dest) => {
@@ -249,6 +257,7 @@ impl Atlas {
                     portal: exit.and_then(|e| e.portals.first().cloned()),
                     hidden: exit.is_some_and(|e| e.hidden),
                     travel: None,
+                    toward: None,
                 }
             }
         }
@@ -295,6 +304,15 @@ mod tests {
         // 1200 px, then 200 across and 400 up counted double from east00 to h_out00, and two portals.
         let expected = (1200.0 + 200.0 + 800.0) / WALK_SPEED + 2.0 * PORTAL_SECONDS;
         assert!((route.walk_seconds.unwrap() - expected).abs() < 1e-6, "{:?}", route.walk_seconds);
+    }
+
+    #[test]
+    fn a_step_says_where_its_portal_is_from_where_the_last_one_comes_out() {
+        let route = world().route(1, 3).unwrap();
+        // Where the player stands on Start isn't known.
+        assert_eq!(route.steps[0].toward, None);
+        // Out of Lane's east00 at x 100; h_out00 stands 200 across and 400 up.
+        assert_eq!(route.steps[1].toward, Some(Toward { dx: 200, dy: -400 }));
     }
 
     #[test]

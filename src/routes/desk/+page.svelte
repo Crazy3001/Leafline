@@ -9,6 +9,7 @@
   import { onMount, tick, untrack } from "svelte";
 
   import { backend } from "$lib/api";
+  import Compass from "$lib/components/desk/Compass.svelte";
   import DeskColumns from "$lib/components/desk/DeskColumns.svelte";
   import DeskBar from "$lib/components/desk/DeskBar.svelte";
   import DeskSidebar from "$lib/components/desk/DeskSidebar.svelte";
@@ -23,7 +24,6 @@
   import BagCheck from "$lib/components/item/BagCheck.svelte";
   import CraftingPanel from "$lib/components/item/CraftingPanel.svelte";
   import TrackedItems from "$lib/components/item/TrackedItems.svelte";
-  import NextStep from "$lib/components/NextStep.svelte";
   import PanelView from "$lib/components/PanelView.svelte";
   import TimersCard from "$lib/components/TimersCard.svelte";
   import TrainingLog from "$lib/components/TrainingLog.svelte";
@@ -60,7 +60,7 @@
   import { live, watchLive } from "$lib/readings.svelte";
   import { watchSettings } from "$lib/settings.svelte";
   import { watchTyping } from "$lib/typing";
-  import { followTrip } from "$lib/wayfinder.svelte";
+  import { followTrip, startWayfinder } from "$lib/wayfinder.svelte";
   import type { PinStatus } from "$lib/types";
   import { can, isWeb } from "$lib/platform";
 
@@ -118,7 +118,10 @@
     watchMonsters();
     watchPlaces();
     watchQuests();
-    followTrip();
+    // In the program the overlay window follows the trip and this one shows it; the website has
+    // no overlay beside the desk, so the desk follows it itself.
+    if (isWeb) startWayfinder();
+    else followTrip();
     backend.deskStatus().then((s) => (onTop = s.onTop));
     backend.pinStatus().then((s) => (pins = s));
     const unpins = backend.onPins((s) => (pins = s));
@@ -340,7 +343,8 @@
       {#if view !== "lookup"}
         <DeskSearch bind:this={deskSearch} onopen={openFound} onwords={searchWords} />
       {/if}
-      <div class="step"><NextStep /></div>
+      <!-- Where you're heading and the next step from here, in the middle of the row. -->
+      <div class="compass-slot"><Compass onpick={() => go("map")} /></div>
       <ShareButton />
       {#if can.popOut}<button
         class="pill"
@@ -448,14 +452,24 @@
     padding: var(--space-3) var(--space-4);
   }
 
-  /* The Go here bar fills what's left; it hides itself with no trip. */
-  .step {
+  /* The compass takes the middle of what's left. */
+  .compass-slot {
+    display: flex;
     flex: 1;
+    justify-content: center;
     min-width: 0;
   }
 
-  .step :global(.bar) {
-    margin: 0;
+  /* A narrow window: the compass gets a line of its own under the row. */
+  @container desk-main (max-width: 640px) {
+    .top {
+      flex-wrap: wrap;
+    }
+
+    .compass-slot {
+      flex-basis: 100%;
+      order: 10;
+    }
   }
 
   .pill {
