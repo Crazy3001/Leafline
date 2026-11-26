@@ -51,9 +51,9 @@
     const unique = [...new Set(list)];
     return unique.slice(0, LIST).join(", ") + (unique.length > LIST ? ` and ${unique.length - LIST} more` : "");
   };
-  const requires = (r: { classes: string[]; reqStr: number; reqDex: number; reqInt: number; reqLuk: number }) =>
+  /** The stats an item asks for; its classes show under its name. */
+  const requires = (r: { reqStr: number; reqDex: number; reqInt: number; reqLuk: number }) =>
     [
-      r.classes.join(" / "),
       ...(
         [
           ["STR", r.reqStr],
@@ -69,7 +69,7 @@
       .join(" · ");
 </script>
 
-{#snippet head(kind: "item" | "mob" | "npc" | "skill" | null, id: number | null, name: string, sub: string)}
+{#snippet head(kind: "item" | "mob" | "npc" | "skill" | null, id: number | null, name: string, sub: string, who: string = "")}
   <div class="head">
     {#if kind}
       <span class="pic"><Pic {kind} {id} {name} size={32} /></span>
@@ -77,6 +77,7 @@
     <span class="titles">
       <b class="name">{name}</b>
       {#if sub}<span class="sub">{sub}</span>{/if}
+      {#if who}<span class="who">{who}</span>{/if}
     </span>
   </div>
 {/snippet}
@@ -88,16 +89,22 @@
 <div class="hover">
   {#if data?.kind === "item"}
     {@const r = data.record}
-    {@render head("item", r.id, r.name, r.kind === "equip" ? `Lv ${r.reqLevel} · ${r.weaponType ?? itemSlot(r)}` : itemSlot(r))}
-    {#if r.kind === "equip" && (r.stats.length || r.attackSpeed != null || r.upgradeSlots != null)}
-      <div class="rows">
+    {@render head(
+      "item",
+      r.id,
+      r.name,
+      r.kind === "equip" ? `Lv ${r.reqLevel} · ${r.weaponType ?? itemSlot(r)}` : itemSlot(r),
+      r.kind === "equip" ? (r.classes.length ? r.classes.join(" / ") : "Any class") : "",
+    )}
+    {#if r.kind !== "equip" && lastLine(r)}<p class="text">{lastLine(r)}</p>{/if}
+    <div class="rows">
+      {#if r.kind === "equip"}
         {#each r.stats as stat (stat.label)}{@render row(stat.label, formatSigned(stat.value))}{/each}
         {#if r.attackSpeed != null}{@render row("Speed", attackSpeedText(r.attackSpeed))}{/if}
         {#if r.upgradeSlots != null}{@render row("Slots", String(r.upgradeSlots))}{/if}
-      </div>
-    {:else if lastLine(r)}
-      <p class="text">{lastLine(r)}</p>
-    {/if}
+      {/if}
+      {#if r.price != null}{@render row("NPC sell price", `${formatMesos(r.price)} mesos`)}{/if}
+    </div>
     {#if r.kind === "equip" && requires(r)}<p class="line"><span class="label">Requires</span> {requires(r)}</p>{/if}
     {#if data.origin}
       {@const o = data.origin}
@@ -218,6 +225,10 @@
 
   .sub {
     color: var(--muted);
+  }
+
+  .who {
+    color: var(--text);
   }
 
   .rows {

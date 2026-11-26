@@ -3,6 +3,7 @@
   // Everything can be changed later in the planner's tabs.
   import { backend } from "$lib/api";
   import StarterCard from "$lib/components/planner/StarterCard.svelte";
+  import Segmented from "$lib/ui/Segmented.svelte";
   import type { BuildCatalog, BuildPlan, StarterPlan } from "$lib/types";
 
   let {
@@ -52,6 +53,13 @@
   const shownName = $derived(named ? name : suggested);
   let who = $state<string | null>(null);
   const forWho = $derived(who ?? character ?? "");
+  /** Who the gear is made for: "" for either, until the character's worn gear says. */
+  let gender = $state("");
+  const GENDERS = [
+    { id: "", label: "Either" },
+    { id: "male", label: "Male" },
+    { id: "female", label: "Female" },
+  ];
   let error = $state<string | null>(null);
   let busy = $state(false);
 
@@ -76,7 +84,14 @@
         name: shownName.trim() || suggested,
         character: forWho.trim() || null,
         guide: starter?.source?.url ?? "",
-        start: { level: level ?? 1, stats: starter && fresh ? { ...starter.start } : null, ap: 0, sp: 0, skills: [] },
+        start: {
+          level: level ?? 1,
+          stats: starter && fresh ? { ...starter.start } : null,
+          ap: 0,
+          sp: 0,
+          skills: [],
+          gender: gender || null,
+        },
         plan,
       });
       // Slots the plan leaves empty get an upgrade path from the data, as Fill empty slots does.
@@ -156,6 +171,11 @@
         <input class="number" readonly value={`Lv ${level ?? 1}`} />
       </label>
     </div>
+    <div class="gender">
+      <span class="field-label">Gear made for</span>
+      <Segmented label="Gear made for" size="sm" options={GENDERS} value={gender} onchange={(g) => (gender = g)} />
+      <span class="faint">Some hats, tops and shoes are made for one. Change it later in the Gear tab.</span>
+    </div>
     <p class="help">
       {#if character}Read from the game.{:else}No character read yet: the build follows whoever you name.{/if}
       Your stats and skills fill in when Leafline reads your Stat and Skill windows.
@@ -163,10 +183,17 @@
   </section>
 
   {#if error}<p class="error" role="alert">{error}</p>{/if}
+  <!-- Always in view at the bottom, saying what it will make. -->
   <div class="actions">
     <button class="create" disabled={!job || busy} onclick={create}>Create build</button>
     {#if canCancel}<button class="cancel" onclick={onCancel}>Cancel</button>{/if}
-    {#if !job}<span class="faint">Pick a second job first.</span>{/if}
+    {#if !job}
+      <span class="faint">Pick a second job first.</span>
+    {:else}
+      <span class="choice-summary">
+        {jobName} · {starter ? starter.name : "Blank plan"}
+      </span>
+    {/if}
   </div>
 </main>
 
@@ -342,9 +369,35 @@
   }
 
   .actions {
+    position: sticky;
+    bottom: calc(-1 * var(--space-8));
+    z-index: 2;
     display: flex;
     align-items: center;
     gap: var(--space-3);
+    margin: 0 calc(-1 * var(--space-10)) calc(-1 * var(--space-8));
+    padding: var(--space-3) var(--space-10);
+    border-top: 1px solid var(--border);
+    background: var(--surface-raised);
+  }
+
+  .choice-summary {
+    overflow: hidden;
+    color: var(--muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .gender {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+  }
+
+  .field-label {
+    color: var(--muted);
+    font-size: var(--text-md);
   }
 
   .create {

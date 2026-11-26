@@ -619,6 +619,8 @@
     rulesTimer = setTimeout(() => changeSettings({ buildRules: next }), SAVE_DELAY);
   }
 
+  /** Slots whose passed-over goals are shown; folded into a count otherwise. */
+  let openPassed = $state<string[]>([]);
   const GENDERS = [
     { id: "", label: "Either" },
     { id: "male", label: "Male" },
@@ -630,7 +632,7 @@
   const rulesChanged = $derived(JSON.stringify(display.buildRules) !== JSON.stringify(DEFAULT_RULES));
   const pathSummary = $derived(
     draft
-      ? `${jobPath} · ${draft.character ? `${draft.character}, ` : ""}Lv ${draft.start.level}${genderWord ? ` · ${genderWord}` : ""} · planned to Lv ${draft.plan.planTo}`
+      ? `${jobPath} · Lv ${draft.start.level}${genderWord ? ` · ${genderWord}` : ""} · planned to Lv ${draft.plan.planTo}`
       : "",
   );
 </script>
@@ -728,10 +730,33 @@
           {/if}
           <input class="name" maxlength="80" aria-label="Build name" bind:value={draft.name} />
           <p class="path">{pathSummary}</p>
+          <!-- Which character the build follows: Leafline uses it whenever it reads that name. -->
+          <p class="who">
+            {#if draft.character}
+              <span>Used when Leafline reads <b>{draft.character}</b></span>
+            {:else}
+              <span>For any character without a build of their own</span>
+            {/if}
+            {#if character && draft.character?.toLowerCase() !== character.toLowerCase()}
+              <button class="btn sm" onclick={() => draft && (draft.character = character)}>Use for {character}</button>
+            {/if}
+            {#if draft.character}
+              <button class="btn sm ghost" onclick={() => draft && (draft.character = null)}>Use for anyone</button>
+            {/if}
+          </p>
         </div>
-        <button class="btn" onclick={copyCode}>
-          <ClipboardCopy size={13} />{copied ? "Copied" : "Copy plan code"}
-        </button>
+        <div class="top-actions">
+          <button class="btn" onclick={copyCode}>
+            <ClipboardCopy size={13} />{copied ? "Copied" : "Copy plan code"}
+          </button>
+          <button class="icon-btn sm" aria-label="Duplicate build" use:tip={"Duplicate build"} onclick={duplicate}><Plus size={14} /></button>
+          {#if confirmDelete}
+            <button class="btn danger" onclick={remove}><Trash2 size={13} />Really delete?</button>
+            <button class="btn ghost" onclick={() => (confirmDelete = false)}>Keep</button>
+          {:else}
+            <button class="icon-btn sm" aria-label="Delete build" use:tip={"Delete build"} onclick={remove}><Trash2 size={14} /></button>
+          {/if}
+        </div>
       </header>
 
       <div class="tabs" role="tablist" aria-label="Plan">
@@ -1018,14 +1043,24 @@
                       {/if}
                     </span>
                   {/each}
-                  {#each path?.passed ?? [] as item (item.id)}
-                    {@const below = item.reqLevel <= gearFrom}
-                    <span class="chip passed" use:tip={below ? `Needs Lv ${item.reqLevel}: you're past it, and the path has a better piece` : "A better piece of this tier or a higher one comes as soon"}>
-                      <b class="warn">{below ? `below Lv ${gearFrom}` : "passed over"}</b>
-                      <Ref kind="item" id={item.id} name={item.name} />
-                      <button class="icon-btn xs icon small" aria-label="Stop aiming for {item.name}" onclick={() => dropGoal(item.id)}><X size={11} /></button>
-                    </span>
-                  {/each}
+                  {#if path?.passed.length && !openPassed.includes(slot)}
+                    <button
+                      class="chip more"
+                      use:tip={"Goals the path skips: outgrown, or a better piece comes as soon"}
+                      onclick={() => (openPassed = [...openPassed, slot])}
+                    >
+                      {path.passed.length} passed over
+                    </button>
+                  {:else}
+                    {#each path?.passed ?? [] as item (item.id)}
+                      {@const below = item.reqLevel <= gearFrom}
+                      <span class="chip passed" use:tip={below ? `Needs Lv ${item.reqLevel}: you're past it, and the path has a better piece` : "A better piece of this tier or a higher one comes as soon"}>
+                        <b class="warn">{below ? `below Lv ${gearFrom}` : "passed over"}</b>
+                        <Ref kind="item" id={item.id} name={item.name} />
+                        <button class="icon-btn xs icon small" aria-label="Stop aiming for {item.name}" onclick={() => dropGoal(item.id)}><X size={11} /></button>
+                      </span>
+                    {/each}
+                  {/if}
                   {#each stuckBySlot.get(slot) ?? [] as check (check.item.id)}
                     <span class="chip passed">
                       <b class="warn">{check.usable ? "out of reach" : "wrong job"}</b>
@@ -1466,6 +1501,28 @@
     font-size: var(--text-md);
   }
 
+  .who {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1-5) var(--space-2);
+    margin: var(--space-1) 0 0;
+    color: var(--faint);
+    font-size: var(--text-md);
+  }
+
+  .who b {
+    color: var(--text);
+    font-weight: var(--weight-strong);
+  }
+
+  .top-actions {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: var(--space-1-5);
+  }
+
   .tabs {
     display: flex;
     padding: 0 var(--space-6);
@@ -1799,6 +1856,19 @@
 
   .chip.passed {
     opacity: 0.75;
+  }
+
+  .chip.more {
+    padding-right: var(--space-2);
+    border-style: dashed;
+    color: var(--faint);
+    font: inherit;
+    font-size: var(--text-xs);
+    cursor: pointer;
+  }
+
+  .chip.more:hover {
+    color: var(--text);
   }
 
   .chip b {

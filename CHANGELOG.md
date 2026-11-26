@@ -5,6 +5,17 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
 
 ## Unreleased
 
+- **Weapons have their Attack again.** The map data names weapon attack differently now; Leafline
+  read it from 0.5.x on, but data downloaded before kept no Attack, so weapons showed none and the
+  build planner's weapon path passed over most planned weapons. The map data downloads once more
+  to pick it up.
+- Tooltips and hover cards sit beside the mouse, follow it, and stay inside the window. An
+  equipment card names the classes that can use it under its level, and shows its NPC sell price.
+- **Build planner:** the Create build button stays in view at the bottom of New build, and says
+  what it will make. New build asks who the gear is made for. A build's header says which
+  character it follows, with a button to use it for the character Leafline reads, and has
+  duplicate and delete buttons. Goals the gear path passes over fold into one "N passed over"
+  button per slot. Leafline's own ready-made plans no longer link a guide.
 - **Hover cards on every link.** Rest the mouse on a coloured name or a linked picture (an item,
   monster, NPC, map, quest or skill) and a small card shows what it is: an item's level, stats,
   requirements and where it comes from; a monster's level, HP, EXP, elements, maps and drops; an

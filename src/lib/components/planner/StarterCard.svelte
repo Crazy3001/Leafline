@@ -31,7 +31,6 @@
 
   /** The stat that takes whatever AP is left: the plan's main stat. */
   const main = $derived(plan.plan.stats.find((s) => s.target == null)?.stat ?? null);
-  const guide = $derived(plan.source ?? plan.reading);
   const firstWeapon = $derived(plan.weapons[0]?.level);
   const lastWeapon = $derived(plan.weapons.at(-1)?.level);
 </script>
@@ -104,16 +103,16 @@
   </div>
   <footer>
     {#if !plan.source}<span class="faint">Leafline's plan</span>{/if}
-    {#if guide}
+    {#if plan.source}
       <button
         class="credit"
-        use:tip={guide.credit}
+        use:tip={plan.source.credit}
         onclick={(e) => {
           e.stopPropagation();
-          backend.openGuide(guide.url);
+          if (plan.source) backend.openGuide(plan.source.url);
         }}
       >
-        {plan.source ? `From ${guide.name}'s ${jobName} guide` : `Read ${guide.name}'s guide`}
+        From {plan.source.name}'s {jobName} guide
         <ExternalLink size={12} />
       </button>
     {/if}
