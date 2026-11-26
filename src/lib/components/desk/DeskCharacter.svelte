@@ -7,6 +7,7 @@
 
   import SessionControls from "$lib/components/SessionControls.svelte";
   import { formatClockIn, formatCompact, formatDuration, formatNumber } from "$lib/format";
+  import { ago, shownCharacter, watchProfile } from "$lib/profile.svelte";
   import { live } from "$lib/readings.svelte";
   import { mesosCoverage } from "$lib/training";
   import LeafSprite from "$lib/ui/LeafSprite.svelte";
@@ -14,14 +15,18 @@
 
   let { ongo }: { ongo: () => void } = $props();
 
-  const hud = $derived(live.analysis?.hud ?? null);
-  const session = $derived(live.session);
+  watchProfile();
+
+  // Read now when this character is on screen; else what was read of them last, faded and dated.
+  // The session and its rates are only ever the one on screen's.
+  const who = $derived(shownCharacter());
+  const session = $derived(who.onScreen ? live.session : null);
   const tracking = $derived(session != null && session.activeSeconds > 0);
   const percentOnly = $derived(session?.percentOnly ?? false);
-  const level = $derived(hud?.level ?? session?.level ?? null);
-  const percent = $derived(hud?.exp?.percent ?? hud?.expPercent ?? session?.percent ?? null);
-  const name = $derived(hud?.name ?? session?.name ?? null);
-  const job = $derived(hud?.job ?? session?.job ?? null);
+  const level = $derived(who.level.value);
+  const percent = $derived(who.percent.value);
+  const name = $derived(who.name);
+  const job = $derived(who.job.value);
   const toLevel = $derived(tracking && session && !session.paused ? session.secondsToLevel : null);
   const at = $derived(formatClockIn(toLevel));
 
@@ -51,18 +56,23 @@
   <div class="who">
     <div class="avatar">
       <LeafSprite size={84} />
-      {#if level != null}<span class="lv">Lv {level}</span>{/if}
+      {#if level != null}<span class="lv" class:stale={who.level.at != null}>Lv {level}</span>{/if}
     </div>
     <div class="info">
       <div class="name">{name ?? "Your character"}</div>
-      <div class="job">{job ?? (level == null ? "Level not read yet" : "")}</div>
-      <div class="exp">
+      <div class="job">
+        <span class:stale={who.job.at != null}>{job ?? (level == null ? "Level not read yet" : "")}</span>
+        {#if who.seenAt != null}<span class="seen" use:tip={"What Leafline read of them last. Reading the game brings it up to date."}
+            >last seen {ago(who.seenAt)}{#if who.lastMap}, on {who.lastMap}{/if}</span
+          >{/if}
+      </div>
+      <div class="exp" class:stale={who.percent.at != null}>
         <span class="pct">{percent != null ? `${percent.toFixed(percent >= 100 ? 0 : 1)}%` : "—"}</span>
         {#if toLevel != null && level != null}
           <span class="eta" use:tip={at ? `About ${at} at this pace` : null}>Lv {level + 1} in <b>{formatDuration(toLevel)}</b></span>
         {/if}
       </div>
-      <div class="track" aria-hidden="true"><span style:width="{Math.max(0, Math.min(100, percent ?? 0))}%"></span></div>
+      <div class="track" class:stale={who.percent.at != null} aria-hidden="true"><span style:width="{Math.max(0, Math.min(100, percent ?? 0))}%"></span></div>
     </div>
   </div>
 
@@ -142,6 +152,16 @@
 
   .job {
     color: var(--muted);
+  }
+
+  .seen {
+    margin-left: var(--space-1-5);
+    font-size: var(--text-xs);
+  }
+
+  /* Remembered from an earlier read, not read now. */
+  .stale {
+    opacity: 0.6;
   }
 
   .exp {

@@ -36,7 +36,7 @@ import type {
   TravelInfo,
   Guide,
   History,
-  KnownMesos,
+  KnownCharacter,
   LoggedDrop,
   NewDrop,
   MapDataDownload,
@@ -301,9 +301,15 @@ export interface Backend {
   /** Asks where to save, then writes a PNG the app drew. False if cancelled. */
   saveImage(png: Uint8Array, name: string): Promise<boolean>;
 
-  /** The mesos last read for a character, or with no name, for the character seen last. */
-  knownMesos(name: string | null): Promise<KnownMesos | null>;
-  onKnownMesos(handler: () => void): Promise<UnlistenFn>;
+  /** What was last read of a character, or with no name, of the character seen last. */
+  knownCharacter(name: string | null): Promise<KnownCharacter | null>;
+  /** A character's last check of each bag tab, kept between runs, the newest first; with no name,
+   *  those of the character whose bag was read last. */
+  knownBags(name: string | null): Promise<BagCheck[]>;
+  /** Every character Leafline has a record of, the one seen last first. */
+  knownCharacters(): Promise<string[]>;
+  /** What was last read of some character (or their bag) changed. */
+  onKnownCharacter(handler: () => void): Promise<UnlistenFn>;
 
   sessionHistory(): Promise<History>;
   /** The EXP each level takes, as far as the player's HUD has shown it, lowest first. */

@@ -6,6 +6,7 @@
 
   import SessionControls from "$lib/components/SessionControls.svelte";
   import { formatClockIn, formatCompact, formatDuration, formatNumber, partyLabel } from "$lib/format";
+  import { ago, shownCharacter, watchProfile } from "$lib/profile.svelte";
   import { live } from "$lib/readings.svelte";
   import { place, regionHue, watchRegion } from "$lib/region.svelte";
   import { mesosCoverage } from "$lib/training";
@@ -15,17 +16,23 @@
   watchRegion();
   const hue = $derived(regionHue(place.region));
 
-  const hud = $derived(live.analysis?.hud ?? null);
-  const session = $derived(live.session);
+  watchProfile();
+
+  // Read now when this character is on screen; else what was read of them last, faded and dated.
+  // The session and its rates are only ever the one on screen's.
+  const who = $derived(shownCharacter());
+  const session = $derived(who.onScreen ? live.session : null);
   const tracking = $derived(session != null && session.activeSeconds > 0);
   const percentOnly = $derived(session?.percentOnly ?? false);
-  const level = $derived(hud?.level ?? session?.level ?? null);
-  const percent = $derived(hud?.exp?.percent ?? hud?.expPercent ?? session?.percent ?? null);
-  const name = $derived(hud?.name ?? session?.name ?? null);
-  const job = $derived(hud?.job ?? session?.job ?? null);
-  const points = $derived(hud?.exp?.points ?? session?.exp?.points ?? null);
-  /** The map's own name, without its street, which the Map view gives. */
-  const mapName = $derived(live.analysis?.map?.name ?? session?.map?.split(" : ").pop() ?? null);
+  const level = $derived(who.level.value);
+  const percent = $derived(who.percent.value);
+  const name = $derived(who.name);
+  const job = $derived(who.job.value);
+  const points = $derived(who.points);
+  /** The map's own name, without its street, which the Map view gives; or the one they were last on. */
+  const mapName = $derived(
+    (who.onScreen ? (live.analysis?.map?.name ?? session?.map?.split(" : ").pop()) : null) ?? who.lastMap,
+  );
   const where = $derived([mapName, partyLabel(session?.party)].filter(Boolean).join(" · "));
   const reading = $derived(live.liveStatus.state === "reading");
 
@@ -65,20 +72,21 @@
 
 <section class="bar" class:washed={hue != null} style:--region-hue={hue} aria-label="Your character and this session">
   <div class="cell ident">
-    <LevelRing {level} {percent} size={46}><span class="num lv-none">?</span></LevelRing>
+    <span class="ring" class:stale={who.level.at != null}><LevelRing {level} {percent} size={46}><span class="num lv-none">?</span></LevelRing></span>
     <div class="who">
       <div class="name-row">
         <b class="name">{name ?? "Your character"}</b>
         <span class="status {status.tone}" use:tip={status.tip}><span class="dot" aria-hidden="true"></span>{status.text}</span>
       </div>
-      <div class="sub">
+      <div class="sub" class:stale={who.seenAt != null}>
         {#if level != null}Lv {level}{job ? ` ${job}` : ""}{:else}Level not read yet{/if}{#if where}<span class="where" use:tip={place.region}> · {where}</span>{/if}
       </div>
+      {#if who.seenAt != null}<div class="seen">last seen {ago(who.seenAt)}</div>{/if}
     </div>
   </div>
 
   <div class="cell level">
-    <div class="level-row">
+    <div class="level-row" class:stale={who.percent.at != null}>
       <span class="num pct" class:dim={!reading}>{percent != null ? `${percent.toFixed(percent >= 100 ? 0 : 1)}%` : "—"}</span>
       {#if points != null}
         <span class="points num">{formatNumber(points)}{session?.expNeeded ? ` / ${formatNumber(session.expNeeded)}` : ""}</span>
@@ -127,6 +135,25 @@
 </section>
 
 <style>
+  /* Remembered from an earlier read, not read now. */
+  .stale {
+    opacity: 0.6;
+  }
+
+  .ring {
+    display: contents;
+  }
+
+  .ring.stale {
+    display: block;
+    flex: none;
+  }
+
+  .seen {
+    color: var(--muted);
+    font-size: var(--text-xs);
+  }
+
   .bar {
     position: relative;
     isolation: isolate;

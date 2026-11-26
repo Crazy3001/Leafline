@@ -50,6 +50,7 @@
 
 ### Your character
 - **Me tab:** level, job, HP, MP, EXP and mesos at a glance, with what your build plan says to do at this level.
+- **Remembers each character:** every character Leafline has read is in the character picker. With the game closed, or for another character you pick, it shows what it last read of them (level, job, EXP, mesos, last map, stats, quest log and each bag tab, each with its own age), faded and dated, until it reads the game again. Once it reads the name on screen, it switches to that character by itself.
 - **Stats and buffs:** every number your Character Stat window shows, read from the game, and switches for the buffs you have running, counted in the stats and the training estimates.
 - **Build planner:** a job and a list of goals in order ("this skill to 20, DEX to 25, the rest into LUK"), laid out level by level. It warns when a goal comes too late or SP would be lost at a job advancement. Ready-made plans for each 2nd job, each following one credited guide.
 - **Follows your real character:** open your Stat or Skill window in game and the plan picks up from where you really are.

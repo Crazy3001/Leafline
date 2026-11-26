@@ -85,6 +85,8 @@ thread_local! {
     static ITEM_PICTURES: RefCell<HashMap<String, image::RgbaImage>> = RefCell::new(HashMap::new());
     /// The last inventory tab read and its check, for "Look further" and a page that opens later.
     static LAST_BAG: RefCell<(Option<BagRead>, Option<BagCheck>)> = const { RefCell::new((None, None)) };
+    /// What the HUD showed of the character, written down as live reading goes.
+    static CHARACTER: RefCell<records::CharacterMemory> = RefCell::new(records::CharacterMemory::default());
     /// The Quest window's views put together, kept strictly (see `service::questwindow`).
     static QUEST_WINDOW: RefCell<Option<QuestWindow>> = const { RefCell::new(None) };
 }
@@ -301,6 +303,18 @@ fn own(host: &WebHost, name: &str, args: serde_json::Value) -> Option<Reply> {
             None => Err("Open your inventory in game first.".into()),
         },
         "last_bag" => reply(LAST_BAG.with(|b| b.borrow().1.clone())),
+        // What the live reading's HUD showed of the character (platform/live.ts), remembered as the
+        // program's live loop does, for showing until the game is read again.
+        "note_character" => {
+            #[derive(Deserialize)]
+            struct Seen {
+                seen: Option<leafline_core::userdata::characters::SeenCharacter>,
+            }
+            match parse::<Seen>(args) {
+                Ok(Seen { seen }) => reply_result(CHARACTER.with(|c| c.borrow_mut().note(host, seen))),
+                Err(err) => Err(err),
+            }
+        }
         "follow_quest_log" => match parse::<QuestLog>(args) {
             Ok(QuestLog { name, reading, fresh }) => reply_result(QUEST_WINDOW.with(|w| {
                 let mut w = w.borrow_mut();
@@ -329,6 +343,8 @@ fn own(host: &WebHost, name: &str, args: serde_json::Value) -> Option<Reply> {
 fn check_bag(host: &WebHost, read: BagRead, wide: bool) -> BagCheck {
     let check = bag::name_items(host, &Downloads, &read, wide).unwrap_or_else(|err| BagCheck::failed(err.to_string()));
     LAST_BAG.with(|b| *b.borrow_mut() = (Some(read), Some(check.clone())));
+    // Kept as the character's last check; a failure to keep it shouldn't spoil the check.
+    let _ = records::keep_bag(host, &check);
     emit(host, BAG_EVENT, &check);
     check
 }

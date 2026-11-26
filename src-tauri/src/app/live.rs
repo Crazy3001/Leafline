@@ -18,7 +18,7 @@ use tauri::{AppHandle, Emitter, Manager};
 
 use super::host::AppHost;
 use super::mapdata::MapDataState;
-use super::records::{self, HISTORY_EVENT, MESOS_EVENT, UserDataState};
+use super::records::{self, HISTORY_EVENT, UserDataState};
 use super::builds;
 use super::fighter;
 use super::report;
@@ -72,12 +72,6 @@ const SAVE_AFTER_ACTIVE: f64 = 300.0;
 /// is left alone: the player said they are coming back.
 const BREAK_ENDS_SESSION: Duration = Duration::from_secs(30 * 60);
 const SAVE_EVERY: Duration = Duration::from_secs(30);
-/// A meso amount is remembered for its character only while it is on screen, at most this long
-/// after it was last read.
-const MESOS_FRESH: f64 = 5.0;
-/// How often an unchanged amount still on screen refreshes when it was last seen.
-const MESOS_SEEN_EVERY: Duration = Duration::from_secs(60);
-
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", rename_all_fields = "camelCase", tag = "state")]
 pub enum LiveStatus {
@@ -503,35 +497,6 @@ impl Estimates {
     }
 }
 
-/// Remembers each character's mesos between runs, once the tracker has confirmed both the name
-/// and the amount.
-#[derive(Default)]
-struct MesoMemory {
-    saved: Option<(String, u64)>,
-    saved_at: Option<Instant>,
-}
-
-impl MesoMemory {
-    fn note(&mut self, app: &AppHandle, session: &SessionSummary) {
-        let (Some(name), Some(mesos)) = (&session.name, session.mesos) else { return };
-        if session.mesos_age.is_none_or(|age| age > MESOS_FRESH) {
-            return;
-        }
-        let same = self.saved.as_ref().is_some_and(|(n, m)| n == name && *m == mesos);
-        if same && self.saved_at.is_some_and(|at| at.elapsed() < MESOS_SEEN_EVERY) {
-            return;
-        }
-        match app.state::<UserDataState>().with(|db| db.save_mesos(name, mesos, records::now())) {
-            Ok(()) => {
-                self.saved = Some((name.clone(), mesos));
-                self.saved_at = Some(Instant::now());
-                let _ = app.emit(MESOS_EVENT, ());
-            }
-            Err(err) => report::note(format!("Couldn't remember the mesos: {err}")),
-        }
-    }
-}
-
 /// Where saved game pictures go: the player's chosen folder, or else `frames` in the app's local
 /// data folder. Not Pictures, which OneDrive often syncs, and saved pictures must stay on this PC
 /// unless the player moves them.
@@ -594,7 +559,7 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
         keeper.id = id;
         resumed = true;
     }
-    let mut memory = MesoMemory::default();
+    let mut memory = records::CharacterMemory::default();
     let mut titles = QuestTitles::default();
     let mut names = NameSnap::new(app.state::<UserDataState>().with(|db| db.character_names()).unwrap_or_default());
     let mut windows = Watch::default();
@@ -806,7 +771,9 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
                     keeper.save(app, &session);
                 }
                 keeper.checkpoint(app, &tracker, false);
-                memory.note(app, &session);
+                if let Err(err) = memory.note(&AppHost::new(app), records::seen_of(&session)) {
+                    report::note(format!("Couldn't remember the character: {err}"));
+                }
 
                 frames += 1;
                 if frames.is_multiple_of(HDR_CHECK_EVERY) {

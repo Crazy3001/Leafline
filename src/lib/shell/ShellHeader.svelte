@@ -8,6 +8,7 @@
 
   import Logo from "$lib/components/Logo.svelte";
   import { formatClockIn, formatCompact, formatDuration, formatNumber } from "$lib/format";
+  import { ago, lastKnown, profile, watchProfile } from "$lib/profile.svelte";
   import { live } from "$lib/readings.svelte";
   import { place, regionHue, watchRegion } from "$lib/region.svelte";
   import { hotkey, keyHint } from "$lib/settings.svelte";
@@ -45,16 +46,28 @@
     ontools: () => void;
   } = $props();
 
+  watchProfile();
+
+  // Read now when this character is on screen; else what was read of them last, faded and dated.
+  const hud = $derived(profile.live ? (live.analysis?.hud ?? null) : null);
+  const session = $derived(profile.live ? live.session : null);
+  const known = $derived(profile.known);
+  const levelShown = $derived(lastKnown(hud?.level ?? session?.level, known?.level, known?.seenAt));
+  const level = $derived(levelShown.value);
+  const name = $derived(session?.name ?? hud?.name ?? profile.name);
+  const job = $derived(lastKnown(hud?.job ?? session?.job, known?.job, known?.seenAt));
+  const percentShown = $derived(
+    lastKnown(hud?.exp?.percent ?? hud?.expPercent ?? session?.percent, known?.expPercent, known?.seenAt),
+  );
+  const percent = $derived(percentShown.value);
+  const exp = $derived(
+    percentShown.at == null ? (hud?.exp ?? session?.exp ?? null) : known?.expPoints != null ? { points: known.expPoints } : null,
+  );
+  /** When what is shown was read, for a character not on screen now. */
+  const seenAt = $derived(levelShown.at ?? percentShown.at);
+
   watchRegion();
   const hue = $derived(regionHue(place.region));
-
-  const hud = $derived(live.analysis?.hud ?? null);
-  const session = $derived(live.session);
-  const level = $derived(hud?.level ?? session?.level ?? null);
-  const name = $derived(session?.name ?? hud?.name ?? null);
-  const job = $derived(hud?.job ?? session?.job ?? null);
-  const exp = $derived(hud?.exp ?? session?.exp ?? null);
-  const percent = $derived(hud?.exp?.percent ?? hud?.expPercent ?? session?.percent ?? null);
   const state = $derived(live.liveStatus.state);
   const liveOn = $derived(state === "reading" || state === "waiting");
   const locked = $derived(live.status.clickThrough);
@@ -85,11 +98,12 @@
 
 <header class:washed={hue != null} style:--region-hue={hue} data-tauri-drag-region>
   <div class="top" data-tauri-drag-region>
-    <LevelRing {level} {percent}><Logo size={20} /></LevelRing>
+    <span class="ring" class:stale={levelShown.at != null}><LevelRing {level} {percent}><Logo size={20} /></LevelRing></span>
     <div class="who" data-tauri-drag-region>
       <div class="name" data-tauri-drag-region>{name ?? "Leafline"}</div>
       <div class="under" data-tauri-drag-region>
-        {#if job}<span data-tauri-drag-region>{job}</span>{/if}
+        {#if job.value}<span class:stale={job.at != null} data-tauri-drag-region>{job.value}</span>{/if}
+        {#if seenAt != null}<span class="stale" use:tip={`Last read ${ago(seenAt)}. Live reading brings it up to date.`} data-tauri-drag-region>{ago(seenAt)}</span>{/if}
         {#if can.liveReading}<button class="live" class:on={state === "reading"} class:waiting={state === "waiting"} use:tip={liveTitle} onclick={onlive}>
           <span class="dot" aria-hidden="true"></span>{liveOn ? "Live" : "Offline"}
         </button>{/if}
@@ -110,7 +124,7 @@
   </div>
 
   {#if percent != null}
-    <div class="exp" data-tauri-drag-region>
+    <div class="exp" class:stale={percentShown.at != null} data-tauri-drag-region>
       <span class="amount" data-tauri-drag-region>
         <span class="pct">{percent.toFixed(percent >= 100 ? 0 : 1)}%</span>
         {#if rateLine}
@@ -144,6 +158,20 @@
     color: var(--header-text);
     user-select: none;
     cursor: grab;
+  }
+
+  /* Remembered from an earlier read, not read now. */
+  .stale {
+    opacity: 0.55;
+  }
+
+  .ring {
+    display: contents;
+  }
+
+  .ring.stale {
+    display: block;
+    flex: none;
   }
 
   /* The region you're in, as a soft glow from the top left, fading to the next when you travel. */

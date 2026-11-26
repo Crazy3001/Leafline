@@ -1,6 +1,6 @@
 //! What the player records themselves: prices they saw or paid, notes on items, sessions they
 //! saved, training spots they picked, builds they planned, drops they logged, the potions they
-//! hunt with, each character's last known mesos, and each character's quest log as the game's
+//! hunt with, each character's last known level, EXP, map, mesos and bag, and each character's quest log as the game's
 //! Quest window last showed it. Kept in its own SQLite file, apart from
 //! the map data cache, because that cache can be thrown away and downloaded again while these
 //! records cannot.
@@ -249,6 +249,22 @@ CREATE TABLE quest_log_looks (
     seen_at INTEGER NOT NULL,
     whole_at INTEGER,
     PRIMARY KEY (character, tab));
+",
+    "
+CREATE TABLE character_profiles (
+    name TEXT PRIMARY KEY COLLATE NOCASE,
+    level INTEGER,
+    job TEXT,
+    exp_percent REAL,
+    exp_points INTEGER,
+    map TEXT,
+    seen_at INTEGER);
+CREATE TABLE character_bags (
+    name TEXT NOT NULL COLLATE NOCASE,
+    tab TEXT NOT NULL,
+    bag TEXT NOT NULL,
+    read_at INTEGER NOT NULL,
+    PRIMARY KEY (name, tab));
 ",
 ];
 

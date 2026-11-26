@@ -42,22 +42,38 @@ const picked = $state<{ name: string | null; liveWas: string | null; all: boolea
 
 const liveName = () => live.session?.name ?? null;
 
+/** The HUD still shows what it showed at the pick: the same name, or still none (the game closed,
+ *  or not shared yet). Once it reads a name the pick wasn't made under, the HUD's character wins. */
+const stillAsPicked = () => {
+  const now = liveName();
+  return picked.liveWas == null ? now == null : same(picked.liveWas, now);
+};
+
+/** Every character the records know (a session, a HUD read, mesos or a bag look), seen last first. */
+const recorded = $state<{ names: string[] }>({ names: [] });
+
+/** Sets the characters the records know; profile.svelte.ts loads them. */
+export function setRecordedCharacters(names: string[]) {
+  recorded.names = names;
+}
+
 export const characters = {
-  /** Everyone with a saved session, plus the one on screen now. */
+  /** Everyone the records know, plus the one on screen now. */
   get known(): string[] {
     const saved = charactersOf(history.value?.sessions ?? []);
+    for (const name of recorded.names) if (!saved.some((c) => same(c, name))) saved.push(name);
     const now = liveName();
     return now && !saved.some((c) => same(c, now)) ? [now, ...saved] : saved;
   },
   /** The one character a goal or a set of potions belongs to, or null before any is known. */
   get active(): string | null {
     const now = liveName();
-    if (picked.name && !picked.all && same(picked.liveWas, now)) return picked.name;
+    if (picked.name && !picked.all && stillAsPicked()) return picked.name;
     return now ?? this.known[0] ?? null;
   },
   /** Looking at every character at once. Ends when the HUD shows a different name. */
   get all(): boolean {
-    return picked.all && same(picked.liveWas, liveName());
+    return picked.all && stillAsPicked();
   },
   /** The character the blended views are narrowed to: null for all of them. */
   get viewing(): string | null {

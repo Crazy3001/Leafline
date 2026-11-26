@@ -6,11 +6,13 @@ use std::sync::{Mutex, MutexGuard};
 
 use serde::{Deserialize, Serialize};
 
+use super::bag::BagCheck;
 use super::host::{Host, emit};
 
 use crate::error::{Error, Result};
+use crate::session::SessionSummary;
 use crate::userdata::{RecordsSummary, UserData};
-use crate::userdata::characters::KnownMesos;
+use crate::userdata::characters::{KnownCharacter, SeenCharacter};
 use crate::userdata::drops::{LoggedDrop, NewDrop};
 use crate::userdata::notes::{ItemNote, MapNote};
 use crate::userdata::potions::{PotionSlot, SessionPotion};
@@ -23,8 +25,9 @@ pub const BACKUP_FOLDER: &str = "backups";
 /// Emitted to every window when a session is saved or deleted.
 pub const HISTORY_EVENT: &str = "history";
 
-/// Emitted to every window when a character's mesos are remembered.
-pub const MESOS_EVENT: &str = "known-mesos";
+/// Emitted to every window when what was last read of a character (level, EXP, map, mesos, bag)
+/// is remembered.
+pub const KNOWN_EVENT: &str = "known-character";
 
 /// The user's records, or why they couldn't be opened. A damaged file must not stop the app;
 /// the commands report it instead.
@@ -113,9 +116,90 @@ impl UserDataState {
 /// them is out of date.
 pub const RECORDS_REPLACED_EVENT: &str = "records-replaced";
 
-/// The mesos last read for a character, or with no name, for the one seen last.
-pub fn known_mesos(h: &dyn Host, name: Option<String>) -> Result<Option<KnownMesos>> {
-    h.records().with(|db| db.known_mesos(name.as_deref()))
+/// What was last read of a character (level, job, EXP, map, mesos, each with when), or with no
+/// name, of the one seen last. For showing until the game is read again: never for a rate.
+pub fn known_character(h: &dyn Host, name: Option<String>) -> Result<Option<KnownCharacter>> {
+    h.records().with(|db| db.known_character(name.as_deref()))
+}
+
+/// Every character Leafline has a record of (a session, a HUD read, mesos or a bag look), the one
+/// seen last first, for the character picker before the game is read.
+pub fn known_characters(h: &dyn Host) -> Result<Vec<String>> {
+    h.records().with(|db| db.character_names())
+}
+
+/// A character's last check of each bag tab, the newest first, or with no name, those of the one
+/// whose bag was read last. A check that no longer reads as one (from an older Leafline) is left out.
+pub fn known_bags(h: &dyn Host, name: Option<String>) -> Result<Vec<BagCheck>> {
+    let texts = h.records().with(|db| db.known_bags(name.as_deref()))?;
+    Ok(texts.iter().filter_map(|t| serde_json::from_str(t).ok()).collect())
+}
+
+/// Keeps a finished bag check as its character's last one of that tab. A check with no character
+/// or tab, still under way or that failed isn't kept.
+pub fn keep_bag(h: &dyn Host, check: &BagCheck) -> Result<()> {
+    let Some(name) = check.character.as_deref().filter(|_| !check.busy && check.problem.is_none()) else {
+        return Ok(());
+    };
+    let Some(tab) = check.tab.and_then(|t| serde_json::to_value(t).ok()).and_then(|v| v.as_str().map(str::to_owned)) else {
+        return Ok(());
+    };
+    let text = serde_json::to_string(check).map_err(|err| Error::Invalid(err.to_string()))?;
+    h.records().with(|db| db.save_bag(name, &tab, &text, check.at))?;
+    emit(h, KNOWN_EVENT, &());
+    Ok(())
+}
+
+/// Seconds the mesos may have gone unseen and still count as just read.
+const MESOS_FRESH: f64 = 5.0;
+/// How often what the HUD shows is written down while only the EXP or mesos move.
+const SEEN_EVERY: i64 = 60;
+
+/// What the session shows of the character now, to remember: once its name is settled.
+pub fn seen_of(session: &SessionSummary) -> Option<SeenCharacter> {
+    let name = session.name.clone()?;
+    Some(SeenCharacter {
+        name,
+        level: session.level,
+        job: session.job.clone(),
+        exp_percent: session.exp.as_ref().map(|e| e.percent).or(session.percent),
+        exp_points: session.exp.as_ref().map(|e| e.points),
+        map: session.map.clone().filter(|_| !session.map_hidden),
+        mesos: session.mesos.filter(|_| session.mesos_age.is_some_and(|age| age <= MESOS_FRESH)),
+    })
+}
+
+/// Writes down what the HUD shows of the character as live reading goes: at once when the
+/// character, level, job or map changes, else once a minute. Only for showing who they were when
+/// the game is next closed; nothing read back from it feeds a rate or a session.
+#[derive(Default)]
+pub struct CharacterMemory {
+    saved: Option<(SeenCharacter, i64)>,
+}
+
+impl CharacterMemory {
+    /// `true` when it was written down.
+    pub fn note(&mut self, h: &dyn Host, seen: Option<SeenCharacter>) -> Result<bool> {
+        let Some(seen) = seen else { return Ok(false) };
+        let now = now();
+        if let Some((last, at)) = &self.saved {
+            // A part that wasn't read this time (the minimap hidden, say) isn't a change.
+            fn changed<T: PartialEq>(was: &Option<T>, now: &Option<T>) -> bool {
+                now.is_some() && was != now
+            }
+            let moved = last.name != seen.name
+                || changed(&last.level, &seen.level)
+                || changed(&last.job, &seen.job)
+                || changed(&last.map, &seen.map);
+            if !moved && now - at < SEEN_EVERY {
+                return Ok(false);
+            }
+        }
+        h.records().with(|db| db.save_seen(&seen, now))?;
+        self.saved = Some((seen, now));
+        emit(h, KNOWN_EVENT, &());
+        Ok(true)
+    }
 }
 
 /// Emitted to every window when the saved training spots change, with the new list.

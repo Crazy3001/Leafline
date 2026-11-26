@@ -6,6 +6,7 @@
   import { can } from "$lib/platform";
   import BuildSection from "./BuildSection.svelte";
   import CharacterCard from "./CharacterCard.svelte";
+  import KnownBag from "./item/KnownBag.svelte";
   import LookupPanel from "./LookupPanel.svelte";
   import MapCard from "./MapCard.svelte";
   import QuestPanel from "./QuestPanel.svelte";
@@ -14,6 +15,7 @@
   import NowScreen from "$lib/shell/NowScreen.svelte";
   import { tabInfo } from "$lib/shell/tabs";
   import { openPanel } from "$lib/nav.svelte";
+  import { profile } from "$lib/profile.svelte";
   import type { Analysis, Panel, SessionSummary } from "$lib/types";
 
   let {
@@ -51,8 +53,10 @@
 {:else if panel === "character"}
   <!-- One card for who the character is and where the build plan has them, so the level shows once. -->
   <CharacterCard hud={analysis?.hud ?? null} mesos={analysis?.mesos ?? null} {session} remember plain={pinned} linkTrain={!pinned} trim={shelled} bare={wide && !pinned}>
-    <BuildSection level={analysis?.hud?.level ?? session?.level ?? null} character={analysis?.hud?.name ?? null} glance={pinned} whole={wide && !pinned} />
+    <BuildSection level={analysis?.hud?.level ?? session?.level ?? null} character={profile.live ? (analysis?.hud?.name ?? profile.name) : profile.name} glance={pinned} whole={wide && !pinned} />
   </CharacterCard>
+  <!-- Each bag tab as last read, for the character looked at. -->
+  {#if !pinned}<KnownBag />{/if}
 {:else if panel === "map"}
   {#if analysis?.map}
     <MapCard map={analysis.map} {session} variant={pinned ? "glance" : "compact"} plain={pinned} />

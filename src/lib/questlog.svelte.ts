@@ -3,13 +3,17 @@
 // when it was seen. Every window shares one copy, reloaded whenever the log changes.
 
 import { backend } from "./api";
+import { characters } from "./characters.svelte";
 import { following } from "./quests.svelte";
 import type { LoggedQuest, QuestLog, QuestTab, RegionTotal } from "./types";
 
 export const questLog = $state<{ log: QuestLog | null; totals: RegionTotal[] }>({ log: null, totals: [] });
 
-/** Whose log to show: the character read last, or failing that, whoever's Quest window was read last. */
-const whose = () => following.character;
+/**
+ * Whose log to show: the character looked at (on screen, or picked in the character picker), else
+ * the character read last, or failing that, whoever's Quest window was read last.
+ */
+const whose = () => characters.active ?? following.character;
 
 let loading: string | null | undefined = undefined;
 
@@ -37,7 +41,7 @@ export function watchQuestLog() {
   });
   $effect.root(() => {
     $effect(() => {
-      void following.character;
+      void whose();
       void load();
     });
   });

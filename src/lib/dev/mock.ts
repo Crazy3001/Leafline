@@ -85,7 +85,10 @@ interface Preview {
   /** Start with no readings at all, as on first launch. */
   empty?: boolean;
 }
-const preview = (globalThis as { __LEAFLINE_PREVIEW__?: Preview }).__LEAFLINE_PREVIEW__;
+// `?empty` in the address does the same as `{ empty: true }`: Leafline opened with the game closed.
+const preview =
+  (globalThis as { __LEAFLINE_PREVIEW__?: Preview }).__LEAFLINE_PREVIEW__ ??
+  (typeof location !== "undefined" && new URLSearchParams(location.search).has("empty") ? { empty: true } : undefined);
 const sampleAnalysis = preview?.analysis ?? (sample as unknown as Analysis);
 const sampleSessionSummary = preview?.session ?? withTimeline(sampleSession as unknown as SessionSummary);
 
@@ -891,8 +894,34 @@ export const mockBackend: Backend = {
   async setPageZoom(zoom) {
     document.documentElement.style.zoom = String(zoom);
   },
-  knownMesos: async () => ({ name: "Mossbank", mesos: 36_644, seenAt: Math.floor(Date.now() / 1000) - 26 * 3600 }),
-  onKnownMesos: async () => () => {},
+  knownCharacter: async (name) => ({
+    name: name ?? "Mossbank",
+    level: 23,
+    job: "Archer",
+    expPercent: 41.2,
+    expPoints: 2_210,
+    map: "Victoria Road : Henesys Hunting Ground I",
+    seenAt: Math.floor(Date.now() / 1000) - 26 * 3600,
+    mesos: 36_644,
+    mesosSeenAt: Math.floor(Date.now() / 1000) - 26 * 3600,
+  }),
+  knownBags: async (name) => [
+    { ...sampleBag, character: name ?? "Mossbank", at: Math.floor(Date.now() / 1000) - 26 * 3600 },
+    {
+      ...sampleBag,
+      tab: "use",
+      character: name ?? "Mossbank",
+      at: Math.floor(Date.now() / 1000) - 3 * 86400,
+      unknown: [],
+      items: [
+        { slot: 0, count: 140, ids: [9101], name: "Red Tonic", price: 25, priceRange: null, untradable: false, keep: [], wantedBy: [] },
+        { slot: 1, count: 62, ids: [9102], name: "Blue Tonic", price: 100, priceRange: null, untradable: false, keep: [], wantedBy: [] },
+        { slot: 2, count: 2, ids: [9103], name: "Return Scroll", price: 200, priceRange: null, untradable: false, keep: [], wantedBy: [] },
+      ],
+    },
+  ],
+  knownCharacters: async () => ["Mossbank", "Fernwick"],
+  onKnownCharacter: async () => () => {},
   async setSessionNote(id, note) {
     savedSessions = savedSessions.map((s) => (s.id === id ? { ...s, note } : s));
     historyHandlers.forEach((h) => h());
@@ -1264,7 +1293,7 @@ export const mockBackend: Backend = {
     const wide = { ...sampleBag, wide: true, more: 0, unknown: [] };
     bagHandlers.forEach((h) => h(wide));
   },
-  lastBag: async () => sampleBag,
+  lastBag: async () => (preview?.empty ? null : sampleBag),
   async onBag(handler) {
     bagHandlers.push(handler);
     return () => {};

@@ -5,18 +5,22 @@
   import { MapPin } from "@lucide/svelte";
 
   import { formatClockIn } from "$lib/format";
+  import { ago, shownCharacter, watchProfile } from "$lib/profile.svelte";
   import { live } from "$lib/readings.svelte";
   import { place, regionHue, watchRegion } from "$lib/region.svelte";
   import Pic from "$lib/ui/Pic.svelte";
 
   watchRegion();
+  watchProfile();
 
-  const hud = $derived(live.analysis?.hud ?? null);
-  const session = $derived(live.session);
-  const name = $derived(hud?.name ?? session?.name ?? null);
-  const level = $derived(hud?.level ?? session?.level ?? null);
-  const map = $derived(live.analysis?.map ?? null);
-  const mapName = $derived(map?.name ?? session?.map?.split(" : ").pop() ?? null);
+  // The character looked at, read now or remembered; with no map read now, the one they were last on.
+  const who = $derived(shownCharacter());
+  const session = $derived(who.onScreen ? live.session : null);
+  const name = $derived(who.name);
+  const level = $derived(who.level.value);
+  const map = $derived(who.onScreen ? (live.analysis?.map ?? null) : null);
+  const readMap = $derived(map?.name ?? session?.map?.split(" : ").pop() ?? null);
+  const mapName = $derived(readMap ?? who.lastMap);
   const toLevel = $derived(session && !session.paused && session.activeSeconds > 0 ? session.secondsToLevel : null);
   const at = $derived(formatClockIn(toLevel));
   const hue = $derived(regionHue(place.region) ?? 142);
@@ -33,9 +37,10 @@
   <div class="words">
     <h1>{name ? `Welcome back, ${name}` : "Welcome to Leafline"}</h1>
     <p>
-      {#if mapName}<span class="pill"><MapPin size={13} />{mapName}</span>{/if}
-      {#if place.region}<span class="pill">{place.region}</span>{/if}
+      {#if mapName}<span class="pill" class:stale={readMap == null}><MapPin size={13} />{mapName}</span>{/if}
+      {#if place.region && readMap != null}<span class="pill">{place.region}</span>{/if}
       {#if toLevel != null && level != null && at}<span class="line">On track for Lv {level + 1} by {at}</span>
+      {:else if readMap == null && who.seenAt != null}<span class="line">Last seen {ago(who.seenAt)}{level != null ? ` at Lv ${level}` : ""}.</span>
       {:else if !mapName}<span class="line">Share or start the game and Leafline follows along.</span>{/if}
     </p>
   </div>
@@ -123,5 +128,11 @@
     background: rgba(255, 255, 255, 0.16);
     color: #fff;
     font-size: var(--text-xs);
+  }
+
+  /* The map they were last on, not read now. */
+  .pill.stale {
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.75);
   }
 </style>
