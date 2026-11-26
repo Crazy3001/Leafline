@@ -35,7 +35,9 @@ export type ToLive =
   | ({ op: "settings" } & ReadingChoice)
   | { op: "held"; held: boolean }
   | { op: "reset" }
-  | { op: "stop" };
+  | { op: "stop" }
+  /** The last picture fully read, as a PNG, for "This misread". */
+  | { op: "picture" };
 
 /** What the player chose in Settings about reading. */
 export interface ReadingChoice {
@@ -83,7 +85,9 @@ export type FromLive =
   | { type: "windows"; reads: WindowReads }
   | { type: "snapshot"; tracker: string }
   | { type: "ended" }
-  | { type: "error"; message: string };
+  | { type: "error"; message: string }
+  /** The last picture fully read, for "This misread"; null before any. */
+  | { type: "picture"; png: Blob | null };
 
 const post = (message: FromLive) => self.postMessage(message);
 
@@ -104,6 +108,8 @@ const now = () => performance.timeOrigin + performance.now();
 
 /** The last full read's picture signature, and how many full reads in a row have had it. */
 let lastSig = -1;
+/** The last picture fully read, kept until the next, for "This misread". Only in memory. */
+let lastPicture: { data: Uint8Array; width: number; height: number } | null = null;
 let stillFor = 0;
 
 /**
@@ -146,6 +152,7 @@ async function handle(frame: VideoFrame) {
       return;
     }
     const before = live.summary();
+    lastPicture = { data, width, height };
     const text = live.read(data, width, height, at / 1000);
     const items = live.take_items();
     const windows = live.take_windows();
@@ -207,6 +214,17 @@ self.onmessage = async ({ data }: MessageEvent<ToLive>) => {
       live?.reset();
       if (live) post({ type: "summary", session: JSON.parse(live.summary()) as SessionSummary });
       break;
+    case "picture": {
+      let png: Blob | null = null;
+      if (lastPicture) {
+        const { data: rgba, width, height } = lastPicture;
+        const canvas = new OffscreenCanvas(width, height);
+        canvas.getContext("2d")!.putImageData(new ImageData(new Uint8ClampedArray(rgba.buffer as ArrayBuffer, rgba.byteOffset, rgba.byteLength), width, height), 0, 0);
+        png = await canvas.convertToBlob({ type: "image/png" });
+      }
+      post({ type: "picture", png });
+      break;
+    }
     case "stop":
       reading?.cancel();
       reading = null;

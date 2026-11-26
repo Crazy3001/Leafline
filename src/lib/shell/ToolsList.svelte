@@ -1,8 +1,13 @@
+<script lang="ts" module>
+  export type WindowAction = "desk" | "compact" | "frame" | "misread" | "settings" | "hide";
+</script>
+
 <script lang="ts">
   // The Tools list: everything that isn't a tab, as a grid of named tiles, and the window's own
   // controls under it. Search finds the same tools by name.
-  import { Camera, EyeOff, Minimize2, MonitorUp, Settings } from "@lucide/svelte";
+  import { Bug, Camera, EyeOff, Minimize2, MonitorUp, Settings } from "@lucide/svelte";
 
+  import { can } from "$lib/platform";
   import { hotkey } from "$lib/settings.svelte";
 
   import { TOOLS, type ToolInfo } from "./tabs";
@@ -15,13 +20,15 @@
     /** Live reading is on, so there is a picture to save. */
     canSaveFrame: boolean;
     ontool: (tool: ToolInfo) => void;
-    onwindow: (action: "desk" | "compact" | "frame" | "settings" | "hide") => void;
+    onwindow: (action: WindowAction) => void;
   } = $props();
 
   const WINDOW = $derived([
     { id: "desk" as const, title: "Desk view", icon: MonitorUp, key: "" },
     { id: "compact" as const, title: "Compact", icon: Minimize2, key: hotkey("ToggleCompact") },
-    ...(canSaveFrame ? [{ id: "frame" as const, title: "Save frame", icon: Camera, key: hotkey("SaveFrame") }] : []),
+    // The website can't save a picture by itself; This misread downloads one with what was read.
+    ...(canSaveFrame && can.liveReading ? [{ id: "frame" as const, title: "Save frame", icon: Camera, key: hotkey("SaveFrame") }] : []),
+    ...(canSaveFrame ? [{ id: "misread" as const, title: "This misread", icon: Bug, key: "" }] : []),
     { id: "settings" as const, title: "Settings", icon: Settings, key: "" },
     { id: "hide" as const, title: "Hide", icon: EyeOff, key: hotkey("ToggleOverlay") },
   ]);

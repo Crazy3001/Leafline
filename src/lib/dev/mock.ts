@@ -634,6 +634,7 @@ export const mockBackend: Backend = {
   },
   liveWindows: async () => mockWindows,
   saveItemPicture: async () => "C:\Users\you\AppData\Local\app.leafline.overlay\frames\leafline-item-2026-10-30_13-05-09.png",
+  saveMisread: async () => "C:\\Users\\you\\AppData\\Local\\app.leafline.overlay\\frames\\misread-2026-10-30_13-05-09",
   saveLiveFrame: async () => "C:\\Users\\you\\AppData\\Local\\app.leafline.overlay\\frames\\leafline-2026-10-30_13-05-09.png",
   // What Leafline sees: a run ten minutes old that has read the HUD, with two readings left out.
   // None in an empty preview. While the mock reads, the HUD keeps reading and the map doesn't.

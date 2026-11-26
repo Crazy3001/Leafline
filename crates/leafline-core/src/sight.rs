@@ -206,6 +206,41 @@ pub fn mostly_dark(frame: &Frame) -> bool {
     n > 0 && sum / n < 8
 }
 
+/// What "This misread" saves beside the picture: what Leafline read from it, the session's view of
+/// the character, and what each reader has seen, for the player to attach to a bug report. Saved
+/// on their PC only, never sent. The whole-frame text pass (`overview`), which can hold chat, and
+/// the timings are left out; the session keeps only what describes the reading.
+pub fn misread_report(
+    version: &str,
+    saved_at: f64,
+    analysis: Option<serde_json::Value>,
+    session: Option<serde_json::Value>,
+    sight: Option<serde_json::Value>,
+) -> serde_json::Value {
+    let read = analysis.map(|mut a| {
+        if let Some(fields) = a.as_object_mut() {
+            fields.remove("overview");
+            fields.remove("timings");
+        }
+        a
+    });
+    const SESSION_KEPT: &[&str] = &[
+        "frames", "level", "exp", "percent", "percentOnly", "expNeeded", "job", "map", "mapHidden", "town", "mesos", "mesosAge",
+        "party", "rejected", "paused", "held",
+    ];
+    let session = session.and_then(|s| s.as_object().cloned()).map(|fields| {
+        serde_json::Value::Object(fields.into_iter().filter(|(k, _)| SESSION_KEPT.contains(&k.as_str())).collect())
+    });
+    serde_json::json!({
+        "about": "What Leafline read from picture.png when you pressed This misread. Saved on your PC only: Leafline never sends it. It shows your game and character, so check it before you attach it to a bug report.",
+        "leafline": version,
+        "savedAt": saved_at,
+        "read": read,
+        "session": session,
+        "sight": sight,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -244,6 +279,18 @@ mod tests {
         // Counted once.
         sight.session(3.0, &session, &analysis);
         assert_eq!(sight.rejected.len(), 2);
+    }
+
+    #[test]
+    fn a_misread_report_leaves_out_the_whole_frame_text_and_most_of_the_session() {
+        let analysis = serde_json::json!({ "hud": { "level": 12 }, "overview": [{ "text": "chat line" }], "timings": [] });
+        let session = serde_json::json!({ "level": 12, "map": "Victoria Road : Henesys", "timeline": [1, 2, 3], "lines": [] });
+        let report = misread_report("0.5.0", 10.0, Some(analysis), Some(session), None);
+        assert_eq!(report["read"]["hud"]["level"], 12);
+        assert!(report["read"].get("overview").is_none());
+        assert!(!report.to_string().contains("chat line"));
+        assert_eq!(report["session"]["map"], "Victoria Road : Henesys");
+        assert!(report["session"].get("timeline").is_none());
     }
 
     #[test]

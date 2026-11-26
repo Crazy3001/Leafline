@@ -3,7 +3,7 @@
   // it; and a check that watches for a few seconds with the game in front and ticks off what it
   // reads. The check only looks: the player never teaches Leafline anything. The readings left out
   // as doubtful are listed below, with why. All of it stays on this PC.
-  import { Check, CircleAlert, Clock, Minus, Play } from "@lucide/svelte";
+  import { Bug, Check, CircleAlert, Clock, Minus, Play } from "@lucide/svelte";
 
   import { backend } from "$lib/api";
   import { can } from "$lib/platform";
@@ -55,6 +55,23 @@
       }
     }
     checkFrom = Date.now() / 1000;
+  }
+
+  // "This misread": the last picture with what was read from it, saved for a bug report.
+  let misread = $state<{ text: string; warn: boolean } | null>(null);
+  async function saveMisread() {
+    misread = null;
+    try {
+      const where = await backend.saveMisread();
+      misread = {
+        text: can.liveReading
+          ? `Saved to ${where}: the picture, what was read from it, and a note. Attach them to a bug report; look at them first, as they show your game.`
+          : `Saved ${where}.png and .json to your downloads. Attach them to a bug report; look at them first, as they show your game.`,
+        warn: false,
+      };
+    } catch (err) {
+      misread = { text: String(err), warn: true };
+    }
   }
 
   const ICON: Record<Tone, typeof Check> = { good: Check, stale: Clock, bad: CircleAlert, quiet: Minus };
@@ -120,6 +137,14 @@
       </li>
     {/each}
   </ul>
+
+  {#if !setup}
+    <div class="misread">
+      <Button size="sm" variant="ghost" onclick={saveMisread} disabled={live.liveStatus.state !== "reading"}><Bug size={12} />This misread</Button>
+      <span class="help">Something read wrong? Saves the game picture with what Leafline read from it, on this PC only, to attach to a bug report.</span>
+    </div>
+    {#if misread}<p class:warn={misread.warn} class:note={!misread.warn}>{misread.text}</p>{/if}
+  {/if}
 
   {#if rejected.length}
     <details>
@@ -234,6 +259,13 @@
 
   li.quiet .icon {
     color: var(--faint);
+  }
+
+  .misread {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
   }
 
   details summary {

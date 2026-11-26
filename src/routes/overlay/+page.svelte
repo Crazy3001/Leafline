@@ -32,7 +32,7 @@
   import SearchSheet from "$lib/shell/SearchSheet.svelte";
   import ShellHeader from "$lib/shell/ShellHeader.svelte";
   import { TABS, tabId, tabInfo, tabOfPanel, toolPageTitle, type Tab, type ToolInfo, type ToolPage } from "$lib/shell/tabs";
-  import ToolsList from "$lib/shell/ToolsList.svelte";
+  import ToolsList, { type WindowAction } from "$lib/shell/ToolsList.svelte";
   import PotionPage from "$lib/shell/PotionPage.svelte";
   import RoutePage from "$lib/shell/RoutePage.svelte";
   import SharePage from "$lib/shell/SharePage.svelte";
@@ -211,6 +211,9 @@
       const changed = result.changes.length ? `${build} updated: ${result.changes.join(", ")}.` : `${build} already matches your windows.`;
       return { tone: "good", text: changed + unknown };
     }
+    if (misreadSaved) return { tone: "good", text: `Saved ${misreadSaved}.png and .json to your downloads, for a bug report. Look at them before you post them.` };
+    if (live.savedFrame && fileName(live.savedFrame).startsWith("misread-"))
+      return { tone: "good", text: `Saved ${fileName(live.savedFrame)}: the picture and what was read from it, for a bug report. Settings → Data opens the folder.` };
     if (live.savedFrame) return { tone: "good", text: `Saved ${fileName(live.savedFrame)}. Settings → Data opens the folder.` };
     if (s.state === "waiting") return { tone: "quiet", text: s.reason };
     if (s.state === "reading" && s.hdr)
@@ -260,11 +263,30 @@
     }
   }
 
-  function windowAction(action: "desk" | "compact" | "frame" | "settings" | "hide") {
+  /** "This misread": the picture and what was read from it, saved for a bug report. */
+  async function saveMisread() {
+    liveError = null;
+    try {
+      const where = await backend.saveMisread();
+      // The program says where by its saved-picture event; the website's are downloads.
+      if (isWeb) misreadSaved = where;
+    } catch (e) {
+      liveError = String(e);
+    }
+  }
+  let misreadSaved = $state<string | null>(null);
+  $effect(() => {
+    if (!misreadSaved) return;
+    const timer = setTimeout(() => (misreadSaved = null), 5000);
+    return () => clearTimeout(timer);
+  });
+
+  function windowAction(action: WindowAction) {
     over = null;
     if (action === "desk") void backend.showDesk();
     else if (action === "compact") void backend.setCompact(true);
     else if (action === "frame") void saveFrame();
+    else if (action === "misread") void saveMisread();
     else if (action === "settings") void backend.showSettings();
     else void backend.hideOverlay();
   }
