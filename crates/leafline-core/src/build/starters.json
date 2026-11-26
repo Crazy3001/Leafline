@@ -1,6 +1,14 @@
 {
   "beginner": [["Three Snails", 3], ["Recovery", 3], ["Nimble Feet", 3]],
   "openings": {
+    "thief-sindit": [
+      ["Lucky Seven", 20], ["Nimble Body", 3], ["Keen Eyes", 3], ["Nimble Body", 15], ["Disorder", 3],
+      ["Dark Sight", 20]
+    ],
+    "thief-dagger": [
+      ["Double Stab", 20], ["Disorder", 3], ["Dark Sight", 1], ["Nimble Body", 15], ["Dark Sight", 20],
+      ["Disorder", 6]
+    ],
     "bowman-niadb": [
       ["Arrow Blow", 6], ["The Eye of Amazon", 1], ["Arrow Blow", 13], ["The Eye of Amazon", 3],
       ["Arrow Blow", 20], ["Critical Shot", 15], ["The Eye of Amazon", 15], ["Focus", 10],
@@ -37,6 +45,7 @@
     {
       "id": "fighter-niadb", "job": 110, "name": "Fighter (axe), NiaDB guide",
       "summary": "Axe Mastery and Final Attack first, Rage to 30 by Lv 48, Rush last.",
+      "start": [12, 5, 4, 4],
       "source": {
         "name": "NiaDB",
         "url": "https://meowdb.com/msclassic/guides/fighter-class-guide",
@@ -63,6 +72,7 @@
     {
       "id": "fighter-sword-niadb", "job": 110, "name": "Fighter (sword), NiaDB guide",
       "summary": "The same order with Sword Mastery, Final Attack: Sword and Sword Booster. Steadier damage rolls and more Accuracy.",
+      "start": [12, 5, 4, 4],
       "source": {
         "name": "NiaDB",
         "url": "https://meowdb.com/msclassic/guides/fighter-class-guide",
@@ -89,6 +99,7 @@
     {
       "id": "page-niadb", "job": 120, "name": "Page (blunt), NiaDB guide",
       "summary": "Blunt Weapon Mastery and Final Attack first, Threaten to 30 by Lv 57.",
+      "start": [12, 5, 4, 4],
       "source": {
         "name": "NiaDB",
         "url": "https://meowdb.com/msclassic/guides/page-class-guide",
@@ -115,6 +126,7 @@
     {
       "id": "page-sword-niadb", "job": 120, "name": "Page (sword), NiaDB guide",
       "summary": "The same order with Sword Mastery, Final Attack: Sword and Sword Booster. More predictable minimum damage.",
+      "start": [12, 5, 4, 4],
       "source": {
         "name": "NiaDB",
         "url": "https://meowdb.com/msclassic/guides/page-class-guide",
@@ -141,6 +153,7 @@
     {
       "id": "spearman-niadb", "job": 130, "name": "Spearman (spear), NiaDB guide",
       "summary": "Spear Mastery and Final Attack first, Booster and Rush next, Iron Will last.",
+      "start": [12, 5, 4, 4],
       "source": {
         "name": "NiaDB",
         "url": "https://meowdb.com/msclassic/guides/spearman-class-guide",
@@ -166,6 +179,7 @@
     {
       "id": "spearman-polearm-niadb", "job": 130, "name": "Spearman (polearm), NiaDB guide",
       "summary": "The same order with Polearm Mastery, Final Attack: Polearm and Polearm Booster. More Power Strike damage and +20 Movement Speed.",
+      "start": [12, 5, 4, 4],
       "source": {
         "name": "NiaDB",
         "url": "https://meowdb.com/msclassic/guides/spearman-class-guide",
@@ -191,6 +205,7 @@
     {
       "id": "fp-wizard-niadb", "job": 210, "name": "F/P Wizard, NiaDB guide",
       "summary": "Fire Arrow to 30 by Lv 40, Poison Breath by Lv 50, then Meditation, MP Eater and Teleport.",
+      "start": [4, 4, 12, 5],
       "source": {
         "name": "NiaDB",
         "url": "https://meowdb.com/msclassic/guides/fp-wizard-class-guide",
@@ -214,6 +229,7 @@
     {
       "id": "fp-wizard-energybolt-niadb", "job": 210, "name": "F/P Wizard, Energy Bolt start, NiaDB guide",
       "summary": "The same Lv 30-70 skills; Lv 1-30 follows the Energy Bolt plan instead of Magic Claw.",
+      "start": [4, 4, 12, 5],
       "source": {
         "name": "NiaDB",
         "url": "https://meowdb.com/msclassic/guides/fp-wizard-class-guide",
@@ -237,6 +253,7 @@
     {
       "id": "il-wizard-niadb", "job": 220, "name": "I/L Wizard, NiaDB guide",
       "summary": "Cold Beam to 30 by Lv 41, Meditation, Teleport, then Thunder Bolt to 30 by Lv 64.",
+      "start": [4, 4, 12, 5],
       "source": {
         "name": "NiaDB",
         "url": "https://meowdb.com/msclassic/guides/il-wizard-class-guide",
@@ -262,6 +279,7 @@
     {
       "id": "il-wizard-energybolt-niadb", "job": 220, "name": "I/L Wizard, Energy Bolt start, NiaDB guide",
       "summary": "The same Lv 30-70 skills; Lv 1-30 follows the Energy Bolt plan instead of Magic Claw.",
+      "start": [4, 4, 12, 5],
       "source": {
         "name": "NiaDB",
         "url": "https://meowdb.com/msclassic/guides/il-wizard-class-guide",
@@ -287,6 +305,7 @@
     {
       "id": "cleric-niadb", "job": 230, "name": "Cleric (Party Support), NiaDB guide",
       "summary": "Heal to 30 by Lv 41, Bless, Teleport and Invincible next, Holy Arrow last.",
+      "start": [4, 4, 12, 5],
       "source": {
         "name": "NiaDB",
         "url": "https://meowdb.com/msclassic/guides/cleric-class-guide",
@@ -311,6 +330,7 @@
     {
       "id": "cleric-energybolt-niadb", "job": 230, "name": "Cleric, Energy Bolt start, NiaDB guide",
       "summary": "The same Lv 30-70 skills; Lv 1-30 follows the Energy Bolt plan instead of Magic Claw.",
+      "start": [4, 4, 12, 5],
       "source": {
         "name": "NiaDB",
         "url": "https://meowdb.com/msclassic/guides/cleric-class-guide",
@@ -335,6 +355,7 @@
     {
       "id": "cleric-mesosaver-niadb", "job": 230, "name": "Cleric (Meso Saver), NiaDB guide",
       "summary": "For solo grinding: Holy Arrow first, MP Eater to 20, Teleport stays at 1.",
+      "start": [4, 4, 12, 5],
       "source": {
         "name": "NiaDB",
         "url": "https://meowdb.com/msclassic/guides/cleric-class-guide",
@@ -360,6 +381,7 @@
     {
       "id": "hunter-niadb", "job": 310, "name": "Hunter, NiaDB guide",
       "summary": "Mastery and Booster first, Arrow Bomb to 30 by Lv 49, then Final Attack and Soul Arrow.",
+      "start": [5, 12, 4, 4],
       "source": {
         "name": "NiaDB",
         "url": "https://meowdb.com/msclassic/guides/hunter-class-guide",
@@ -388,6 +410,7 @@
     {
       "id": "hunter-doubleshot-niadb", "job": 310, "name": "Hunter, Double Shot start, NiaDB guide",
       "summary": "Double Shot 20 and Arrow Blow 1 at Lv 30 instead of Arrow Blow 20. Needs an SP Reset Scroll unless planned from Lv 10.",
+      "start": [5, 12, 4, 4],
       "source": {
         "name": "NiaDB",
         "url": "https://meowdb.com/msclassic/guides/hunter-class-guide",
@@ -416,6 +439,7 @@
     {
       "id": "crossbowman-niadb", "job": 320, "name": "Crossbowman, NiaDB guide",
       "summary": "Mastery and Booster first, Iron Arrow maxed by Lv 49, STR only as far as the next crossbow needs.",
+      "start": [5, 12, 4, 4],
       "source": {
         "name": "NiaDB",
         "url": "https://meowdb.com/msclassic/guides/crossbowman-class-guide",
@@ -445,6 +469,7 @@
     {
       "id": "crossbowman-doubleshot-niadb", "job": 320, "name": "Crossbowman, Double Shot start, NiaDB guide",
       "summary": "Double Shot 20 and Arrow Blow 1 at Lv 30 instead of Arrow Blow 20. Needs an SP Reset Scroll unless planned from Lv 10.",
+      "start": [5, 12, 4, 4],
       "source": {
         "name": "NiaDB",
         "url": "https://meowdb.com/msclassic/guides/crossbowman-class-guide",
@@ -474,6 +499,7 @@
     {
       "id": "assassin-niadb", "job": 410, "name": "Assassin, NiaDB guide",
       "summary": "Mastery, then Critical Throw to 30 by Lv 47, Haste, Booster and Critical Recovery, Drain last.",
+      "start": [4, 5, 4, 12],
       "source": {
         "name": "NiaDB",
         "url": "https://meowdb.com/msclassic/guides/assassin-class-guide",
@@ -498,6 +524,7 @@
     {
       "id": "bandit-niadb", "job": 420, "name": "Bandit (no reset, STR daggers), NiaDB guide",
       "summary": "Mastery, then Savage Blow to 30 by Lv 47, Haste, Nimble Recovery and Steal, Booster last. No SP reset.",
+      "start": [4, 5, 4, 12],
       "source": {
         "name": "NiaDB",
         "url": "https://meowdb.com/msclassic/guides/bandit-class-guide",
@@ -518,6 +545,80 @@
         "Golden River", "Pan Lid", "Stolen Fence", "Green Icarus Cape", "Green Napoleon", "White Nightfox",
         "Dark Studded Top", "Dark Studded Pants", "Gold Rover", "Blue Mystique Shoes", "Black Gaia Cape",
         "Metal Silver Earrings"
+      ]
+    },
+    {
+      "id": "bandit-sindit", "job": 420, "name": "Bandit, Sindit (claws to Lv 30, then DEX daggers)",
+      "summary": "Lucky Seven on a claw for 1st job, then Savage Blow on DEX daggers from Lv 30. No SP reset: Lucky Seven stays and Double Stab is skipped.",
+      "note": "Why: Lucky Seven hits from range and goes by LUK, so Lv 10-30 needs no Double Stab, and Savage Blow needs no 1st-job skill. Trade-off: those 20 SP do nothing with a dagger in hand, though a claw still uses them. Sindit guides often reset SP near Lv 40 to move them; Leafline can't plan a reset. Claws ask for as much DEX as their level, more than DEX daggers do.",
+      "start": [4, 5, 4, 12],
+      "reading": {
+        "name": "NiaDB",
+        "url": "https://meowdb.com/msclassic/guides/bandit-class-guide",
+        "credit": "NiaDB's Bandit guide by Nia Meow covers these paths in its own words and numbers. Leafline's plan was worked out from the skill and item data and doesn't follow it."
+      },
+      "opening": "thief-sindit",
+      "skills": [
+        ["Savage Blow", 10], ["Dagger Mastery", 5], ["Dagger Booster", 1], ["Savage Blow", 15], ["Dagger Mastery", 20],
+        ["Haste", 5], ["Steal", 20], ["Savage Blow", 30], ["Steal", 30], ["Haste", 20], ["Dagger Booster", 10],
+        ["Nimble Recovery", 11]
+      ],
+      "primary": "luk", "secondary": "dex",
+      "steps": [[15, 15], [20, 20], [25, 25], [30, 35], [35, 40], [45, 50], [55, 60], [65, 70]],
+      "gear": [
+        "Garnier", "Steel Titans", "Steel Igor", "Meba", "Reef Claw", "Halfmoon Zamadar", "Gephart", "Shinkita",
+        "Deadly Fin", "Kandine", "Black Thief Hood", "Dark Guise", "Dark Pilfer", "Brown Sonata", "Dark Identity", "White Nightfox",
+        "Black Duo", "Steel Sylvia", "Dark Cleave", "Brown Moon Gloves", "Gold Pow", "Gold Rover",
+        "Black Justice Cape", "Black Napoleon", "Black Gaia Cape", "Metal Silver Earrings"
+      ]
+    },
+    {
+      "id": "bandit-dex", "job": 420, "name": "Bandit, DEX daggers",
+      "summary": "Double Stab for 1st job, then Savage Blow and Steal. DEX only as far as the next DEX dagger needs, the rest into LUK.",
+      "note": "Why: thief armour asks for DEX as well (DEX 60 at Lv 70), so one stat covers both, and DEX adds Accuracy. Trade-off: the item data lists DEX daggers one attack-speed step slower than STR daggers of the same level, for 1 more attack.",
+      "start": [4, 5, 4, 12],
+      "reading": {
+        "name": "NiaDB",
+        "url": "https://meowdb.com/msclassic/guides/bandit-class-guide#daggers",
+        "credit": "NiaDB's Bandit guide by Nia Meow covers these paths in its own words and numbers. Leafline's plan was worked out from the skill and item data and doesn't follow it."
+      },
+      "opening": "thief-dagger",
+      "skills": [
+        ["Dagger Mastery", 5], ["Dagger Booster", 1], ["Savage Blow", 15], ["Dagger Mastery", 20], ["Haste", 5],
+        ["Steal", 20], ["Savage Blow", 30], ["Steal", 30], ["Haste", 20], ["Dagger Booster", 10],
+        ["Nimble Recovery", 11]
+      ],
+      "primary": "luk", "secondary": "dex",
+      "steps": [[10, 15], [15, 20], [20, 25], [22, 27], [25, 30], [30, 35], [35, 40], [45, 50], [55, 60], [65, 70]],
+      "gear": [
+        "Triangular Zamadar", "Field Dagger", "Coconut Knife", "Iron Dagger", "Forked Dagger", "Reef Claw",
+        "Halfmoon Zamadar", "Gephart", "Shinkita", "Deadly Fin", "Kandine", "Black Thief Hood", "Dark Guise", "Dark Pilfer", "Brown Sonata", "Dark Identity", "White Nightfox",
+        "Black Duo", "Steel Sylvia", "Dark Cleave", "Brown Moon Gloves", "Gold Pow", "Gold Rover",
+        "Black Justice Cape", "Black Napoleon", "Black Gaia Cape", "Metal Silver Earrings"
+      ]
+    },
+    {
+      "id": "bandit-str", "job": 420, "name": "Bandit, STR daggers (LUK main)",
+      "summary": "Double Stab for 1st job, then Savage Blow and Steal. STR only as far as the next STR dagger needs, the rest into LUK. Not a STR-main build: LUK stays the damage stat.",
+      "note": "Why: the item data lists STR daggers one attack-speed step faster. Trade-off: thief armour past Lv 15 asks for DEX this plan doesn't add (DEX 60 at Lv 70), so it plans Lv 15 thief pieces and all-class capes and earrings. Add DEX yourself to wear more. STR adds no Accuracy.",
+      "start": [4, 5, 4, 12],
+      "reading": {
+        "name": "NiaDB",
+        "url": "https://meowdb.com/msclassic/guides/bandit-class-guide#daggers",
+        "credit": "NiaDB's Bandit guide by Nia Meow covers these paths in its own words and numbers. Leafline's plan was worked out from the skill and item data and doesn't follow it."
+      },
+      "opening": "thief-dagger",
+      "skills": [
+        ["Dagger Mastery", 5], ["Dagger Booster", 1], ["Savage Blow", 15], ["Dagger Mastery", 20], ["Haste", 5],
+        ["Steal", 20], ["Savage Blow", 30], ["Steal", 30], ["Haste", 20], ["Dagger Booster", 10],
+        ["Nimble Recovery", 11]
+      ],
+      "primary": "luk", "secondary": "str",
+      "steps": [[11, 17], [17, 22], [25, 30], [40, 45], [45, 50], [55, 60], [65, 70]],
+      "gear": [
+        "Triangular Zamadar", "Triple-Tipped Zamadar", "Stinger", "Cass", "Korean Fan", "Bazlud", "Sai",
+        "Serpent's Coil", "Golden River", "Black Thief Hood", "Black Duo", "Black Justice Cape", "Black Napoleon",
+        "Black Magic Cape", "Black Gaia Cape", "Metal Silver Earrings"
       ]
     }
   ]

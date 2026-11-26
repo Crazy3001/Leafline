@@ -230,6 +230,13 @@ pub fn gear_paths(build: &Build, expansion: &Expansion, rules: &Rules, catalog: 
         }
         let is_worn = |item: &ItemRecord| worn.as_ref().is_some_and(|p| p.is_copy_of(item, catalog));
         let is_goal = |item: &ItemRecord| goals.iter().any(|g| g.id == item.id);
+        // Weapons of two kinds don't compare by Attack: a claw's stars add to it, a dagger has no
+        // stars. So between its weapon goals, a plan is offered only the kind it holds by then,
+        // as a claw to Lv 30 and daggers after.
+        let kind_at = |at: u32| -> Option<&str> {
+            let held = goals.iter().filter(|g| g.req_level <= at).max_by_key(|g| g.req_level);
+            held.or_else(|| goals.iter().min_by_key(|g| g.req_level)).and_then(|g| g.weapon_type.as_deref())
+        };
         let mut candidates: Vec<&ItemRecord> = goals.clone();
         if !optional {
             candidates.extend(
@@ -254,6 +261,7 @@ pub fn gear_paths(build: &Build, expansion: &Expansion, rules: &Rules, catalog: 
                 .copied()
                 .filter(|i| {
                     wearer.old_enough(i)
+                        && (is_goal(i) || kind_at(*at).is_none_or(|kind| i.weapon_type.as_deref() == Some(kind)))
                         && floor.is_none_or(|f| scorer.of(i) > f)
                         && pair.is_none_or(|p| scorer.of(i) > p)
                         && tier.is_none_or(|t| if first { i.req_level >= t } else { i.req_level > t })
@@ -459,6 +467,33 @@ mod tests {
         assert!(!weapon.suggested_planned);
         assert_eq!(weapon.next.map(|n| (n.item.name, n.level)), Some(("Iron Dagger".into(), Some(25))));
         assert!(!weapon.planned);
+    }
+
+    #[test]
+    fn a_plan_that_switches_from_claws_to_daggers_keeps_each_kind_in_its_levels() {
+        let claw = |id, name, level, attack| {
+            let mut c = dagger(id, name, level, attack);
+            c.weapon_type = Some("Claw".into());
+            c
+        };
+        // A dagger out-hits a claw on Attack alone, since a claw's stars add to it.
+        let catalog = Catalog::new(
+            vec![skill(1, "Double Stab", 400, 20, &[])],
+            vec![
+                claw(1, "Old Claw", 10, 10),
+                claw(2, "Mid Claw", 20, 16),
+                dagger(3, "Field Dagger", 15, 30),
+                dagger(4, "Late Dagger", 30, 48),
+                dagger(5, "Later Dagger", 35, 53),
+            ],
+        );
+        let build = bandit(1, vec![1, 2, 4], Vec::new());
+        let rules = Rules::default();
+        let e = expand(&build, &rules, &catalog);
+        let paths = gear_paths(&build, &e, &rules, &catalog, 1);
+        let weapon = paths.iter().find(|p| p.slot == "Weapon").unwrap();
+        let steps: Vec<(&str, u32)> = weapon.now.iter().chain(&weapon.steps).map(|s| (s.item.name.as_str(), s.level)).collect();
+        assert_eq!(steps, [("Old Claw", 10), ("Mid Claw", 20), ("Late Dagger", 30), ("Later Dagger", 35)]);
     }
 
     #[test]

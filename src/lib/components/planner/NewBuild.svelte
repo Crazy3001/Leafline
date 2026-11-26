@@ -2,7 +2,8 @@
   // A new build in three choices: the second job, a ready-made plan or a blank one, and a name.
   // Everything can be changed later in the planner's tabs.
   import { backend } from "$lib/api";
-  import type { BuildCatalog, BuildPlan, StarterPlan } from "$lib/types";
+  import { STATS } from "$lib/builds.svelte";
+  import type { BaseStats, BuildCatalog, BuildPlan, StarterPlan } from "$lib/types";
 
   let {
     catalog,
@@ -55,6 +56,9 @@
   let busy = $state(false);
 
   const count = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+  const roll = (stats: BaseStats) => STATS.map((s) => `${s.label} ${stats[s.id]}`).join(" · ");
+  /** A new character starts from the plan's roll; one already levelled enters their own. */
+  const fresh = $derived((level ?? 1) <= 1);
 
   function pickJob(id: number) {
     touched = true;
@@ -73,7 +77,7 @@
         name: shownName.trim() || suggested,
         character: forWho.trim() || null,
         guide: starter?.source?.url ?? "",
-        start: { level: level ?? 1, stats: null, ap: 0, sp: 0, skills: [] },
+        start: { level: level ?? 1, stats: starter && fresh ? { ...starter.start } : null, ap: 0, sp: 0, skills: [] },
         plan,
       });
       // Slots the plan leaves empty get an upgrade path from the data, as Fill empty slots does.
@@ -120,13 +124,17 @@
             {plan.name}
             <span class="faint">· {plan.source ? `from ${plan.source.name}'s guide` : "ready-made"}, to Lv {plan.plan.planTo}</span>
           </span>
+          <span class="roll">Lv 1 stats: {roll(plan.start)}</span>
           <span class="muted">{plan.summary}</span>
+          {#if plan.note}<span class="muted">{plan.note}</span>{/if}
           <span class="muted">
             {count(plan.plan.skills.length, "skill goal")}, {count(plan.plan.stats.length, "stat goal")},
             {count(plan.plan.gear.length, "piece", "pieces")} of gear.
           </span>
           {#if plan.missing.length}<span class="warn">Not in this data: {plan.missing.join(", ")}</span>{/if}
           {#if plan.source}<span class="muted">{plan.source.credit} The guide's link is saved with the build.</span>{/if}
+          {#if plan.reading}<span class="muted">Further reading: {plan.reading.credit} The planner links it.</span>{/if}
+          {#if fresh}<span class="faint">The plan counts from these stats. If your roll differs, change them in the plan.</span>{/if}
           <span class="warn">Untested in game: a starting point to change.</span>
         </button>
       {/each}
@@ -273,6 +281,10 @@
 
   .start-name {
     font-weight: var(--weight-strong);
+  }
+
+  .roll {
+    font-variant-numeric: tabular-nums;
   }
 
   .start.on .muted {

@@ -309,7 +309,7 @@ fn print_builds(catalog: Catalog) {
     // Each ready-made plan on a Lv 1 character. Anything printed under one needs fixing.
     for starter in starters::all(&catalog, &Rules::default()) {
         let build = Build {
-            start: Start { level: 1, stats: Some(Stats { str: 4, dex: 5, int: 4, luk: 12 }), ..Start::default() },
+            start: Start { level: 1, stats: Some(starter.start), ..Start::default() },
             plan: starter.plan.clone(),
             ..Build::default()
         };
@@ -361,7 +361,7 @@ fn print_gear(catalog: Catalog, level: u32) {
     let rules = Rules::default();
     for starter in starters::all(&catalog, &rules) {
         let build = Build {
-            start: Start { level: 1, stats: Some(Stats { str: 4, dex: 5, int: 4, luk: 12 }), ..Start::default() },
+            start: Start { level: 1, stats: Some(starter.start), ..Start::default() },
             plan: starter.plan.clone(),
             ..Build::default()
         };
