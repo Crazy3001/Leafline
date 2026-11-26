@@ -55,7 +55,7 @@ mod tests {
         Plan {
             job: 420,
             skills: vec![SkillLevel { skill_id: 999_999, level: 5 }],
-            stats: vec![StatGoal { stat: Stat::Luk, target: None, from_level: Some(11) }],
+            stats: vec![StatGoal { stat: Stat::Luk, target: None, from_level: Some(11), with_gear: false }],
             gear: vec![7],
             plan_to: 90,
         }

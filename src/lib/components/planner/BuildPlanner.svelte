@@ -337,6 +337,8 @@
     draft.plan = JSON.parse(JSON.stringify(starter.plan));
     // A plan that follows a guide brings its link, unless the build already has one.
     if (starter.source && !draft.guide.trim()) draft.guide = starter.source.url;
+    // A Lv 1 character with no stats entered yet starts from the plan's roll.
+    if (!draft.start.stats && draft.start.level <= 1) draft.start.stats = { ...starter.start };
   }
 
   // Skills.
@@ -878,7 +880,10 @@
           </label>
           {#if !firstJob}<p class="help">Choose a job in Settings to add its skills.</p>{/if}
         {:else if tab === "stats"}
-          <p class="help">Each level's AP goes to the first goal that can take it. End with one goal that takes the rest.</p>
+          <p class="help">
+            Each level's AP goes to the first goal that can take it. End with one goal that takes the rest. A goal "with gear"
+            counts what your worn gear and the plan's gear add, so no AP goes where gear already covers it.
+          </p>
           {#if draft.plan.stats.length}
             <ol class="goals">
               {#each draft.plan.stats as goal, i}
@@ -897,6 +902,12 @@
                   </select>
                   {#if goal.target != null}
                     <input class="number" aria-label="Target" type="number" min="0" bind:value={goal.target} />
+                  {/if}
+                  {#if goal.target != null}
+                    <label class="inline" use:tip={"Count what worn gear adds, as the game does for requirements"}>
+                      <input type="checkbox" checked={goal.withGear ?? false} onchange={(e) => (goal.withGear = e.currentTarget.checked)} />
+                      <span>with gear</span>
+                    </label>
                   {/if}
                   <label class="inline">
                     <span>from Lv</span>
@@ -1151,20 +1162,30 @@
             <section>
               <h2 class="group">Ready-made plans</h2>
               <p class="help">
-                Each follows one written guide and credits it. Untested in game. Using one replaces your goals; your stats
-                stay.
+                Some follow one written guide and credit it; the rest Leafline worked out from the skill and item data. All
+                untested in game. Using one replaces your goals; your stats stay.
               </p>
               <ul class="plans">
                 {#each jobPlans as starter (starter.id)}
                   <li>
                     <span class="goal-name">
                       <span>{starter.name}</span>
+                      <small class="tabular">Lv 1 stats: {STATS.map((s) => `${s.label} ${starter.start[s.id]}`).join(" · ")}</small>
                       <small>{starter.summary}</small>
+                      {#if starter.note}<small>{starter.note}</small>{/if}
                       {#if starter.source}
                         <small>
                           {starter.source.credit}
                           <button class="btn" onclick={() => starter.source && backend.openGuide(starter.source.url)}>
                             Open {starter.source.name}'s guide
+                          </button>
+                        </small>
+                      {/if}
+                      {#if starter.reading}
+                        <small>
+                          {starter.reading.credit}
+                          <button class="btn" onclick={() => starter.reading && backend.openGuide(starter.reading.url)}>
+                            Further reading: {starter.reading.name}
                           </button>
                         </small>
                       {/if}

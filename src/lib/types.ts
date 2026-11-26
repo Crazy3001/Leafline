@@ -1482,6 +1482,8 @@ export interface StatGoal {
   target: number | null;
   /** Waits for this level. */
   fromLevel: number | null;
+  /** The target counts what worn gear adds, as a requirement does. Absent means the points put in. */
+  withGear?: boolean;
 }
 
 /** Where the character is now, as its windows show it. */
@@ -1546,11 +1548,17 @@ export interface StarterPlan {
   job: number;
   name: string;
   summary: string;
+  /** Why to pick it and what it gives up. Empty for a guide's plan, whose guide says. */
+  note: string;
+  /** The Lv 1 roll the plan counts from. */
+  start: BaseStats;
   plan: BuildGoals;
   /** Names the data doesn't have, left out of the plan. */
   missing: string[];
   /** The guide a plan follows, to credit and link. `null` for a plan written for Leafline. */
   source: StarterSource | null;
+  /** A guide to read beside a plan written for Leafline, which it doesn't follow. */
+  reading: StarterSource | null;
 }
 
 export interface StarterSource {

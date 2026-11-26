@@ -929,6 +929,8 @@ export const mockBackend: Backend = {
             job: 420,
             name: "Dagger Fernblade",
             summary: "A made-up plan, to design the page with.",
+            note: "Why: a made-up reason to pick it. Trade-off: what it gives up.",
+            start: { str: 4, dex: 5, int: 4, luk: 12 },
             plan: {
               job: 420,
               skills: [{ skillId: 1, level: 3 }, { skillId: 10, level: 20 }, { skillId: 20, level: 30 }],
@@ -938,12 +940,15 @@ export const mockBackend: Backend = {
             },
             missing: [],
             source: null,
+            reading: { name: "NiaDB", url: "https://meowdb.com/msclassic/guides/example", credit: "A made-up guide to read beside it." },
           },
           {
             id: "fernblade-guide",
             job: 420,
             name: "Dagger Fernblade, example guide",
             summary: "A made-up plan that follows a made-up guide.",
+            note: "",
+            start: { str: 4, dex: 5, int: 4, luk: 12 },
             plan: {
               job: 420,
               skills: [{ skillId: 1, level: 3 }, { skillId: 10, level: 20 }],
@@ -953,6 +958,7 @@ export const mockBackend: Backend = {
             },
             missing: [],
             source: { name: "NiaDB", url: "https://meowdb.com/msclassic/guides/example", credit: "Example guide by Someone, 2026-01-01." },
+            reading: null,
           },
         ]
       : [],

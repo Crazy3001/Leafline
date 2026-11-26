@@ -1,7 +1,8 @@
-//! Ready-made plans, Lv 1 to 70. Most were written for Leafline, one for each second job, from
-//! reading what each skill does and what each weapon asks for. A plan with a `source` follows
-//! one written guide instead, and says so with a credit. Nobody has played any of them yet, so they
-//! are places to start and the app says so.
+//! Ready-made plans, Lv 1 to 70. A plan with a `source` follows one written guide and says so with
+//! a credit. The rest were written for Leafline from the downloaded skill and item data: what each
+//! skill does at each level and what each weapon asks for. They may link a guide as further
+//! reading, but nothing in them is taken from it. Nobody has played any of them yet, so they are
+//! places to start and the app says so.
 //!
 //! The file holds names and levels only. Names become ids from the downloaded data when a plan is
 //! offered, so no game data ships, and a name the data no longer has is reported.
@@ -12,13 +13,16 @@ use std::sync::LazyLock;
 use serde::{Deserialize, Serialize};
 
 use super::catalog::{Catalog, path_of};
-use super::plan::{Plan, SkillLevel, Stat, StatGoal};
+use super::plan::{Plan, SkillLevel, Stat, StatGoal, Stats};
 use super::rules::Rules;
 
 /// The plans run to here.
 const PLAN_TO: u32 = 70;
 /// What a secondary stat is taken to start at: the lowest seen, so a step is never late.
 const LOWEST_START: u32 = 4;
+/// The most a stat can start at: a new character splits 25 points, 4 to 12 each.
+#[cfg(test)]
+const HIGHEST_START: u32 = 12;
 
 type Goals = Vec<(String, u32)>;
 
@@ -35,6 +39,11 @@ struct Raw {
     job: u32,
     name: String,
     summary: String,
+    /// Why to pick the path and what it gives up, for a plan written for Leafline.
+    #[serde(default)]
+    note: String,
+    /// The roll the plan counts from at Lv 1: STR, DEX, INT and LUK, 25 points with each 4 to 12.
+    start: [u32; 4],
     /// The 1st-job skills, by key in `openings`.
     opening: String,
     /// The 2nd-job skills.
@@ -52,6 +61,9 @@ struct Raw {
     /// The guide this plan follows, if it follows one.
     #[serde(default)]
     source: Option<Source>,
+    /// A guide worth reading beside a plan written for Leafline, which it doesn't follow.
+    #[serde(default)]
+    reading: Option<Source>,
 }
 
 /// Where a plan comes from, to credit and link.
@@ -74,10 +86,15 @@ pub struct Starter {
     pub job: u32,
     pub name: String,
     pub summary: String,
+    /// Why to pick it and what it gives up. Empty for a guide's plan, whose guide says.
+    pub note: String,
+    /// The Lv 1 stats the plan counts from. A different roll changes when each step lands.
+    pub start: Stats,
     pub plan: Plan,
     /// Names the data doesn't have, left out of the plan.
     pub missing: Vec<String>,
     pub source: Option<Source>,
+    pub reading: Option<Source>,
 }
 
 /// Every plan, in job order.
@@ -107,14 +124,18 @@ fn resolve(raw: &Raw, catalog: &Catalog, rules: &Rules) -> Starter {
         }
     }
     let plan = Plan { job: raw.job, skills, stats: stat_goals(raw, rules), gear, plan_to: PLAN_TO };
+    let [str, dex, int, luk] = raw.start;
     Starter {
         id: raw.id.clone(),
         job: raw.job,
         name: raw.name.clone(),
         summary: raw.summary.clone(),
+        note: raw.note.clone(),
+        start: Stats { str, dex, int, luk },
         plan,
         missing,
         source: raw.source.clone(),
+        reading: raw.reading.clone(),
     }
 }
 
@@ -125,15 +146,18 @@ fn stat_goals(raw: &Raw, rules: &Rules) -> Vec<StatGoal> {
     let mut have = LOWEST_START;
     let mut goals = Vec::with_capacity(raw.steps.len() + raw.ap.len() + 1);
     for &(stat, target, from) in &raw.ap {
-        goals.push(StatGoal { stat, target: Some(target), from_level: Some(from) });
+        goals.push(StatGoal { stat, target: Some(target), from_level: Some(from), with_gear: false });
     }
     for &(target, by) in &raw.steps {
         let levels = target.saturating_sub(have).div_ceil(per_level);
         let from = (by + 1).saturating_sub(levels).max(2);
-        goals.push(StatGoal { stat: raw.secondary, target: Some(target), from_level: Some(from) });
+        // A plan of our own aims at the stat as requirements count it, worn gear and all, so a
+        // hat's DEX saves AP for LUK. A guide's steps are the points it puts in.
+        let with_gear = raw.source.is_none();
+        goals.push(StatGoal { stat: raw.secondary, target: Some(target), from_level: Some(from), with_gear });
         have = target;
     }
-    goals.push(StatGoal { stat: raw.primary, target: None, from_level: None });
+    goals.push(StatGoal { stat: raw.primary, target: None, from_level: None, with_gear: false });
     goals
 }
 
@@ -397,6 +421,110 @@ mod tests {
     }
 
     #[test]
+    fn plans_written_for_leafline_say_why_and_link_a_guide_only_as_reading() {
+        for raw in FILE.plans.iter().filter(|p| p.source.is_none()) {
+            assert!(!raw.note.is_empty() && !raw.summary.is_empty(), "{}", raw.id);
+            assert!(raw.ap.is_empty(), "{}: a plan of our own steps its secondary stat to its gear", raw.id);
+            if let Some(reading) = &raw.reading {
+                assert!(reading.url.starts_with("https://meowdb.com/msclassic/guides/"), "{}", raw.id);
+                assert!(!reading.url.ends_with("/guides/") && !reading.url.ends_with("/guides"), "not the index page");
+            }
+        }
+        for raw in FILE.plans.iter().filter(|p| p.source.is_some()) {
+            assert!(raw.reading.is_none() && raw.note.is_empty(), "{}: its guide says why", raw.id);
+        }
+    }
+
+    /// A new character splits 25 points with each stat from 4 to 12, and the guides' rolls agree.
+    #[test]
+    fn every_plan_starts_from_a_lv_1_roll_and_guide_plans_from_their_guides() {
+        let checks: HashMap<String, Checks> = serde_json::from_str(include_str!("starters_check.json")).unwrap();
+        for raw in &FILE.plans {
+            assert_eq!(raw.start.iter().sum::<u32>(), 25, "{}", raw.id);
+            assert!(raw.start.iter().all(|&stat| (LOWEST_START..=HIGHEST_START).contains(&stat)), "{}", raw.id);
+            if let Some(want) = checks.get(&raw.id) {
+                assert_eq!(raw.start, want.start, "{}: the guide's own roll", raw.id);
+            }
+        }
+    }
+
+    /// SP a character has had by the end of `level`, all jobs together.
+    fn sp_by(level: u32, rules: &Rules) -> u32 {
+        let beginner = level.min(rules.first_job_level).saturating_sub(1) * rules.beginner_sp_per_level;
+        let job = |from: u32, to: u32| {
+            if level < from { 0 } else { rules.advancement_sp + (level.min(to) - from) * rules.sp_per_level }
+        };
+        beginner + job(rules.first_job_level, rules.second_job_level) + job(rules.second_job_level, PLAN_TO)
+    }
+
+    /// The plans written for Leafline, played from their own roll: skills never take more SP than
+    /// there is, each stat step lands by its level, nothing is out of reach and nothing is left
+    /// over. With `LEAFLINE_OSMS` set, against the real data: every name resolves, skill caps and
+    /// prerequisites hold, and every gear goal's STR, DEX and LUK are met at the level the item
+    /// asks for, by the plan's points and the gear worn the level before.
+    #[test]
+    fn each_plan_written_for_leafline_works_out_level_by_level() {
+        use super::super::plan::{Build, Severity, Start, expand};
+
+        let rules = Rules::default();
+        let real = real_catalog();
+        assert!(real.is_some() || std::env::var_os("LEAFLINE_OSMS").is_none(), "LEAFLINE_OSMS is set but its skills or items didn't load");
+        let plans: Vec<&Raw> = FILE.plans.iter().filter(|p| p.source.is_none()).collect();
+        assert!(plans.len() >= 3);
+        for raw in plans {
+            let made_up;
+            let catalog = match &real {
+                Some(catalog) => catalog,
+                None => {
+                    made_up = made_up_catalog(raw);
+                    &made_up
+                }
+            };
+            let starter = resolve(raw, catalog, &rules);
+            if real.is_some() {
+                assert!(starter.missing.is_empty(), "{}: not in the data: {:?}", raw.id, starter.missing);
+                assert!(!starter.plan.gear.is_empty());
+            }
+            let start = Start { level: 1, stats: Some(starter.start), ..Start::default() };
+            let e = expand(&Build { start, plan: starter.plan, ..Build::default() }, &rules, catalog);
+            let warnings: Vec<&str> =
+                e.problems.iter().filter(|p| p.severity == Severity::Warning).map(|p| p.message.as_str()).collect();
+            assert!(warnings.is_empty(), "{}: {warnings:?}", raw.id);
+
+            let mut spent = 0;
+            for step in &e.steps {
+                spent += step.sp.iter().map(|gain| gain.to - gain.from).sum::<u32>();
+                assert!(spent <= sp_by(step.level, &rules), "{}: {spent} SP spent by Lv {}", raw.id, step.level);
+            }
+            assert_eq!(spent, sp_by(PLAN_TO, &rules), "{}: every point spent", raw.id);
+            assert_eq!(e.steps.last().map(|s| (s.ap_left, s.sp_left)), Some((0, 0)), "{}", raw.id);
+
+            let step_at = |level: u32| e.steps.iter().find(|s| s.level == level).unwrap();
+            let worn_at = |level: u32| {
+                e.steps.iter().find(|s| s.level == level).map_or_else(Stats::default, |s| {
+                    s.worn.iter().fold(Stats::default(), |total, w| total.plus(w.bonus))
+                })
+            };
+            for &(target, by) in &raw.steps {
+                let total = step_at(by).stats.plus(worn_at(by));
+                assert!(total.get(raw.secondary) >= target, "{}: {} {target} by Lv {by}", raw.id, raw.secondary.label());
+            }
+            for check in &e.gear {
+                let item = &check.item;
+                let s = step_at(item.req_level.max(1)).stats.plus(worn_at(item.req_level.saturating_sub(1)));
+                let need = [(s.str, item.req_str), (s.dex, item.req_dex), (s.int, item.req_int), (s.luk, item.req_luk)];
+                assert!(need.iter().all(|(have, need)| have >= need), "{}: {} at Lv {}: {s:?}", raw.id, item.name, item.req_level);
+                assert_eq!(check.level, Some(item.req_level.max(1)), "{}: {} the level it asks for", raw.id, item.name);
+                // Each weapon is one to get, so the level list shows it then.
+                if item.slot == "Weapon" {
+                    let step = e.steps.iter().find(|s| s.level == item.req_level.max(1)).unwrap();
+                    assert!(step.gear.contains(&item.name), "{}: {} not listed at Lv {}: {:?}", raw.id, item.name, step.level, step.gear);
+                }
+            }
+        }
+    }
+
+    #[test]
     fn steps_only_ever_rise() {
         for raw in &FILE.plans {
             assert!(raw.steps.windows(2).all(|w| w[0].0 < w[1].0 && w[0].1 < w[1].1), "{}", raw.name);
@@ -410,6 +538,8 @@ mod tests {
             job: 410,
             name: "Test".into(),
             summary: String::new(),
+            note: String::new(),
+            start: [4, 4, 4, 13],
             opening: String::new(),
             skills: Vec::new(),
             primary: Stat::Luk,
@@ -418,6 +548,7 @@ mod tests {
             ap: Vec::new(),
             gear: Vec::new(),
             source: None,
+            reading: None,
         }
     }
 
@@ -427,7 +558,7 @@ mod tests {
         let goals = stat_goals(&raw(vec![(15, 15), (20, 20)]), &Rules::default());
         assert_eq!(goals[0].from_level, Some(13));
         assert_eq!(goals[1].from_level, Some(20));
-        assert_eq!(goals[2], StatGoal { stat: Stat::Luk, target: None, from_level: None });
+        assert_eq!(goals[2], StatGoal { stat: Stat::Luk, target: None, from_level: None, with_gear: false });
     }
 
     #[test]
