@@ -1,5 +1,5 @@
 /*
- * The three looks beside Ember Dark. Each one only renames colours, fonts, corners and outlines that
+ * The looks beside Ember Dark. Each one only renames colours, fonts, corners and outlines that
  * app.css sets for Ember Dark on :root; no layout rule belongs here. The look is the `data-theme` on
  * <html>, set from the settings (see theme.svelte.ts).
  */
@@ -294,4 +294,223 @@
   color: var(--text);
   font-family: var(--font-sans);
   font-weight: var(--weight-body);
+}
+
+/*
+ * Focus Dark: forest ink with leaf green for what you can press, gold for EXP and orange for mesos.
+ * Text reads at 7:1 or better; every colour that carries words passes 4.5:1. The type is
+ * Atkinson Hyperlegible Next at a larger scale, and controls are taller.
+ */
+:root[data-theme="focus-dark"],
+[data-theme="focus-dark"] {
+  color-scheme: dark;
+
+  --font-sans: "Atkinson Hyperlegible Next", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Atkinson Hyperlegible Next", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  --weight-body: 400;
+  --weight-strong: 700;
+
+  /* Bigger type: nothing you read is under 13px, body is 15px, and numbers that matter are large. */
+  --text-2xs: 11px;
+  --text-xs: 13px;
+  --text-md: 15px;
+  --text-lg: 17px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+  --text-hero: 32px;
+
+  /* Rounder, and controls tall enough to hit easily. */
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 18px;
+  --control-h: 36px;
+  --control-h-sm: 28px;
+
+  --bg: #0f1412;
+  --surface: #161d1a;
+  --surface-2: #1d2622;
+  --surface-3: #26312c;
+  --surface-raised: #1a221e;
+  --glass: rgba(15, 20, 18, 0.95);
+  --track: #26312c;
+  --border: rgba(220, 240, 230, 0.10);
+  --border-strong: rgba(220, 240, 230, 0.18);
+  --line: rgba(220, 240, 230, 0.10);
+  --control-line: rgba(220, 240, 230, 0.2);
+  --well: rgba(0, 0, 0, 0.25);
+  --highlight: rgba(255, 255, 255, 0.04);
+  --hover: rgba(220, 240, 230, 0.07);
+  --press: rgba(220, 240, 230, 0.12);
+  --scrim: rgba(5, 9, 7, 0.62);
+
+  --text: #f2f5f3;
+  --muted: #b6c2bc;
+  --faint: #97a59e;
+
+  --accent: #7edc94;
+  --accent-strong: #9be8ab;
+  --accent-soft: rgba(126, 220, 148, 0.14);
+  --accent-ink: #0b1f12;
+  --accent-sub: #1f4a2b;
+  --accent-text: #7edc94;
+  --accent-text-strong: #9be8ab;
+
+  --hp: #e0524d;
+  --mp: #4f98e8;
+  --exp: #f2c94c;
+  --exp-text: #f2c94c;
+  --map: #f2c94c;
+  --travel: #6fe3c8;
+  --good: #7edc94;
+  --good-soft: rgba(126, 220, 148, 0.14);
+  --good-ink: #0b1f12;
+  --warn: #f5a55a;
+  --warn-soft: rgba(245, 165, 90, 0.14);
+  --bad: #ff8a80;
+  --bad-soft: rgba(255, 138, 128, 0.13);
+  --mesos: #f5a55a;
+
+  --ref-item: #8ec5ff;
+  --ref-mob: #ff9f8a;
+  --ref-npc: #6fe3c8;
+  --ref-map: #d7b8ff;
+  --ref-skill: #c9b2ff;
+
+  --header-bg: #161d1a;
+  --header-text: #f2f5f3;
+  --header-muted: #b6c2bc;
+  --header-faint: #97a59e;
+  --header-track: #26312c;
+  --header-hover: #1d2622;
+  --header-good: #7edc94;
+  --header-exp: #f2c94c;
+  --header-accent: #f5a55a;
+  --nav-bg: #121815;
+  --nav-text: #a9b6af;
+  --nav-line: rgba(220, 240, 230, 0.10);
+
+  --tile-1: #1d2622;
+  --tile-2: #1d2622;
+  --tile-text: #f2f5f3;
+  --tile-label: #b6c2bc;
+  --tile-border: transparent;
+  --tile-good: #7edc94;
+  --tile-mesos: #f5a55a;
+  --tile-exp-line: #f2c94c;
+  --tile-mesos-line: #f5a55a;
+  --window-line: rgba(220, 240, 230, 0.18);
+
+  --card-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 6px 18px rgba(0, 0, 0, 0.22);
+  --scroll-thumb: rgba(220, 240, 230, 0.12);
+  --scroll-thumb-hover: rgba(220, 240, 230, 0.22);
+}
+
+/*
+ * Focus Light: soft sage, never white, so it doesn't glare beside the game. The header and tab
+ * bar stay forest dark. Every colour that carries words passes 4.5:1 on the cards.
+ */
+:root[data-theme="focus-light"],
+[data-theme="focus-light"] {
+  color-scheme: light;
+
+  --font-sans: "Atkinson Hyperlegible Next", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Atkinson Hyperlegible Next", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  --weight-body: 400;
+  --weight-strong: 700;
+
+  /* Bigger type: nothing you read is under 13px, body is 15px, and numbers that matter are large. */
+  --text-2xs: 11px;
+  --text-xs: 13px;
+  --text-md: 15px;
+  --text-lg: 17px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+  --text-hero: 32px;
+
+  /* Rounder, and controls tall enough to hit easily. */
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 18px;
+  --control-h: 36px;
+  --control-h-sm: 28px;
+
+  --bg: #dfe6df;
+  --surface: #f4f6f1;
+  --surface-2: #e8ede6;
+  --surface-3: #d6ded5;
+  --surface-raised: #f7f9f5;
+  --glass: rgba(223, 230, 223, 0.96);
+  --track: #d0d9cf;
+  --border: rgba(20, 40, 28, 0.12);
+  --border-strong: rgba(20, 40, 28, 0.22);
+  --line: rgba(20, 40, 28, 0.12);
+  --control-line: rgba(20, 40, 28, 0.24);
+  --well: rgba(20, 40, 28, 0.06);
+  --highlight: rgba(255, 255, 255, 0.6);
+  --hover: rgba(20, 40, 28, 0.06);
+  --press: rgba(20, 40, 28, 0.1);
+  --scrim: rgba(20, 30, 24, 0.45);
+
+  --text: #14201a;
+  --muted: #45554c;
+  --faint: #5a6a62;
+
+  --accent: #1a6e34;
+  --accent-strong: #145a2a;
+  --accent-soft: rgba(26, 110, 52, 0.11);
+  --accent-ink: #ffffff;
+  --accent-sub: #cfe8d5;
+  --accent-text: #1a6e34;
+  --accent-text-strong: #145a2a;
+
+  --hp: #c43c37;
+  --mp: #2f6fb8;
+  --exp: #e2b630;
+  --exp-text: #7a5a00;
+  --map: #7a5a00;
+  --travel: #0f6e5c;
+  --good: #1a6e34;
+  --good-soft: rgba(26, 110, 52, 0.11);
+  --good-ink: #ffffff;
+  --warn: #9a4a08;
+  --warn-soft: rgba(154, 74, 8, 0.1);
+  --bad: #b23a24;
+  --bad-soft: rgba(178, 58, 36, 0.1);
+  --mesos: #9a4a08;
+
+  --ref-item: #1f5fa8;
+  --ref-mob: #b23a24;
+  --ref-npc: #0f6e5c;
+  --ref-map: #6b3fb0;
+  --ref-skill: #5b3fa0;
+
+  --header-bg: #22302a;
+  --header-text: #f2f5f3;
+  --header-muted: #c3cec8;
+  --header-faint: #a7b4ad;
+  --header-track: #34433b;
+  --header-hover: #2c3b34;
+  --header-good: #7edc94;
+  --header-exp: #f2c94c;
+  --header-accent: #f5a55a;
+  --nav-bg: #22302a;
+  --nav-text: #c3cec8;
+  --nav-line: transparent;
+
+  --tile-1: #e8ede6;
+  --tile-2: #e8ede6;
+  --tile-text: #14201a;
+  --tile-label: #45554c;
+  --tile-border: transparent;
+  --tile-good: #1a6e34;
+  --tile-mesos: #9a4a08;
+  --tile-exp-line: #b88a12;
+  --tile-mesos-line: #9a4a08;
+  --window-line: rgba(20, 40, 28, 0.25);
+
+  --card-shadow: 0 1px 2px rgba(20, 40, 28, 0.08), 0 6px 16px rgba(20, 40, 28, 0.06);
+  --shadow: 0 4px 14px rgba(20, 40, 28, 0.16);
+  --shadow-lg: 0 18px 48px rgba(20, 40, 28, 0.22), 0 2px 8px rgba(20, 40, 28, 0.12);
+  --scroll-thumb: rgba(20, 40, 28, 0.18);
+  --scroll-thumb-hover: rgba(20, 40, 28, 0.3);
 }

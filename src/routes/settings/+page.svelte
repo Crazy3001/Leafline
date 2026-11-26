@@ -515,7 +515,7 @@
               {/each}
             </select>
             <button
-              class="button icon-only"
+              class="btn icon-only"
               use:tip={"Look for windows again"}
               aria-label="Look for windows again"
               onclick={loadWindows}
@@ -553,7 +553,7 @@
             </span>
           </div>
           <div class="control">
-            <button class="button" onclick={toggleLive}>
+            <button class="btn" onclick={toggleLive}>
               {#if liveRunning}<Square size={13} />Stop{:else}<Play size={13} />Start{/if}
             </button>
           </div>
@@ -956,7 +956,7 @@
       {#if travel?.file}
         <details class="connections">
           <summary>
-            The connections ({travel.file.services.length}){#if travel.origin === "custom"}<span class="tag">your copy</span>{/if}
+            The connections ({travel.file.services.length}){#if travel.origin === "custom"}<span class="badge travel tag">your copy</span>{/if}
           </summary>
           <ul>
             {#each travel.file.services as service (service.name)}
@@ -998,7 +998,7 @@
             </span>
           </div>
           <div class="control">
-            <button class="button" onclick={editTravel}><FilePenLine size={13} />Edit file</button>
+            <button class="btn" onclick={editTravel}><FilePenLine size={13} />Edit file</button>
           </div>
         </div>
         {/if}
@@ -1083,9 +1083,9 @@
         </p>
       {/if}
       <div class="reset-keys">
-        <button class="button" onclick={useSuggested}>Use the suggested keys</button>
+        <button class="btn" onclick={useSuggested}>Use the suggested keys</button>
         {#if Object.values(display.hotkeys.keys).some(Boolean)}
-          <button class="button" onclick={() => setHotkeys({ keys: {} })}>Clear all</button>
+          <button class="btn" onclick={() => setHotkeys({ keys: {} })}>Clear all</button>
         {/if}
       </div>
     </section>
@@ -1101,7 +1101,7 @@
           <span class="help">Your saved sessions, as CSV for a spreadsheet.</span>
         </div>
         <div class="control exports">
-          <button class="button" onclick={() => exportCsv("sessions")}><Download size={13} />Sessions</button>
+          <button class="btn" onclick={() => exportCsv("sessions")}><Download size={13} />Sessions</button>
         </div>
       </div>
       {#if exported}<p class="note">{exported}</p>{/if}
@@ -1115,8 +1115,8 @@
           </span>
         </div>
         <div class="control exports">
-          <button class="button" onclick={saveRecords} disabled={recordsBusy}><Download size={13} />Save</button>
-          <button class="button" onclick={pickRecords} disabled={recordsBusy}><Upload size={13} />Open…</button>
+          <button class="btn" onclick={saveRecords} disabled={recordsBusy}><Download size={13} />Save</button>
+          <button class="btn" onclick={pickRecords} disabled={recordsBusy}><Upload size={13} />Open…</button>
         </div>
       </div>
       {#if pickedRecords}
@@ -1125,8 +1125,8 @@
             That file holds {describeRecords(pickedRecords)}. Use it in place of the records here? The ones here now are
             kept aside, not deleted.
           </span>
-          <button class="button" onclick={useRecords} disabled={recordsBusy}>Use these records</button>
-          <button class="button" onclick={() => (pickedRecords = null)} disabled={recordsBusy}>Cancel</button>
+          <button class="btn" onclick={useRecords} disabled={recordsBusy}>Use these records</button>
+          <button class="btn" onclick={() => (pickedRecords = null)} disabled={recordsBusy}>Cancel</button>
         </div>
       {/if}
       {#if recordsNote}<p class="note" class:warn={recordsWarn}>{recordsNote}</p>{/if}
@@ -1138,7 +1138,7 @@
           <span class="help">Your records, settings and the last 7 daily backups of your records.</span>
         </div>
         <div class="control">
-          <button class="button" onclick={() => backend.openDataFolder()}><FolderOpen size={13} />Open</button>
+          <button class="btn" onclick={() => backend.openDataFolder()}><FolderOpen size={13} />Open</button>
         </div>
       </div>
 
@@ -1151,11 +1151,11 @@
           </span>
         </div>
         <div class="control exports">
-          <button class="button" onclick={() => backend.openFramesFolder()}><FolderOpen size={13} />Open</button>
-          <button class="button" onclick={pickFramesFolder}>Change…</button>
+          <button class="btn" onclick={() => backend.openFramesFolder()}><FolderOpen size={13} />Open</button>
+          <button class="btn" onclick={pickFramesFolder}>Change…</button>
           {#if display.framesFolder}
             <button
-              class="button icon-only"
+              class="btn icon-only"
               use:tip={"Back to the local folder"}
               aria-label="Back to the local folder"
               onclick={() => changeSettings({ framesFolder: null })}><RotateCcw size={13} /></button
@@ -1184,7 +1184,7 @@
           <span class="help">A misread, a crash, or something that doesn't do what it says.</span>
         </div>
         <div class="control">
-          <button class="button" onclick={() => backend.openLink(reportUrl(version))}>
+          <button class="btn" onclick={() => backend.openLink(reportUrl(version))}>
             Open the form<ExternalLink size={11} />
           </button>
         </div>
@@ -1198,7 +1198,7 @@
           </span>
         </div>
         <div class="control">
-          <button class="button" onclick={copyReport}><ClipboardCopy size={13} />Copy</button>
+          <button class="btn" onclick={copyReport}><ClipboardCopy size={13} />Copy</button>
         </div>
       </div>
       {#if copiedReport}<p class="note">{copiedReport}</p>{/if}
@@ -1213,7 +1213,7 @@
           </span>
         </div>
         <div class="control">
-          <button class="button" onclick={() => backend.openFramesFolder()}><FolderOpen size={13} />Open</button>
+          <button class="btn" onclick={() => backend.openFramesFolder()}><FolderOpen size={13} />Open</button>
         </div>
       </div>
       {/if}
@@ -1228,7 +1228,7 @@
           </span>
         </div>
         <div class="control">
-          <button class="button" onclick={() => import("$lib/capture/program").then((p) => p.openCaptureTest())}>
+          <button class="btn" onclick={() => import("$lib/capture/program").then((p) => p.openCaptureTest())}>
             Open
           </button>
         </div>
@@ -1241,7 +1241,7 @@
           <span class="help">Something you'd like Leafline to do.</span>
         </div>
         <div class="control">
-          <button class="button" onclick={() => backend.openLink(IDEA_URL)}>Open the form<ExternalLink size={11} /></button>
+          <button class="btn" onclick={() => backend.openLink(IDEA_URL)}>Open the form<ExternalLink size={11} /></button>
         </div>
       </div>
     </section>
@@ -1258,7 +1258,7 @@
         <div class="update" role="status">
           <span>Leafline {update.latest} is out. You have {update.current}.</span>
           {#if update.installable}
-            <button class="button" onclick={installNow}><Download size={12} />Download and install</button>
+            <button class="btn" onclick={installNow}><Download size={12} />Download and install</button>
           {/if}
           <button class="link" onclick={() => backend.openLink(notes)}>Release notes<ExternalLink size={11} /></button>
           <span class="update-note">
@@ -1329,7 +1329,7 @@
         </label>
         <div class="control">
           {#if display.updateCheck}
-            <button class="button" onclick={checkNow} disabled={update.state === "checking"}>Check now</button>
+            <button class="btn" onclick={checkNow} disabled={update.state === "checking"}>Check now</button>
           {/if}
           <input
             id="update-check"
@@ -1348,7 +1348,7 @@
           <span class="help">Hotkeys, game settings that help Leafline read, how to show it, and the map data.</span>
         </div>
         <div class="control">
-          <button class="button" onclick={() => backend.showSetup()}>Run setup again</button>
+          <button class="btn" onclick={() => backend.showSetup()}>Run setup again</button>
         </div>
       </div>
       {/if}
@@ -1385,16 +1385,16 @@
   .received {
     display: inline-flex;
     align-items: center;
-    gap: 3px;
-    margin-left: 8px;
+    gap: var(--space-0-5);
+    margin-left: var(--space-2);
     color: var(--good);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .reset-keys {
     display: flex;
-    gap: 6px;
-    margin-top: 8px;
+    gap: var(--space-1-5);
+    margin-top: var(--space-2);
   }
 
   .path {
@@ -1413,8 +1413,8 @@
   .nav {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    padding: 18px 10px;
+    gap: var(--space-0-5);
+    padding: var(--space-4) var(--space-3);
     border-right: 1px solid var(--border);
     background: var(--header-bg);
     color: var(--header-text);
@@ -1423,14 +1423,14 @@
   .brand {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin: 0 8px 14px;
+    gap: var(--space-2);
+    margin: 0 var(--space-2) var(--space-3);
     font-family: var(--font-display);
     font-weight: var(--weight-strong);
   }
 
   .nav a {
-    padding: 6px 10px;
+    padding: var(--space-1-5) var(--space-3);
     border-radius: var(--radius-pill);
     color: var(--header-muted);
     text-decoration: none;
@@ -1451,12 +1451,12 @@
 
   main {
     overflow-y: auto;
-    padding: 6px 28px 40px;
+    padding: var(--space-1-5) var(--space-8) var(--space-10);
     scroll-behavior: smooth;
   }
 
   section {
-    padding: 22px 0 10px;
+    padding: var(--space-5) 0 var(--space-2);
     border-bottom: 1px solid var(--border);
   }
 
@@ -1465,20 +1465,20 @@
   }
 
   h2 {
-    margin: 0 0 4px;
+    margin: 0 0 var(--space-1);
     font-family: var(--font-display);
     font-size: var(--text-xl);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   h3 {
-    margin: 18px 0 8px;
+    margin: var(--space-4) 0 var(--space-2);
     font-size: var(--text-md);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .lead {
-    margin: 0 0 14px;
+    margin: 0 0 var(--space-3);
     color: var(--muted);
   }
 
@@ -1486,8 +1486,8 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 20px;
-    padding: 12px 0;
+    gap: var(--space-5);
+    padding: var(--space-3) 0;
   }
 
   .row + .row {
@@ -1497,16 +1497,16 @@
   .row label,
   .label {
     display: grid;
-    gap: 2px;
+    gap: var(--space-0-5);
   }
 
   .name {
-    font-weight: 500;
+    font-weight: var(--weight-body);
   }
 
   .help {
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .control {
@@ -1516,7 +1516,7 @@
   .slider {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-2);
   }
 
   .slider input {
@@ -1532,13 +1532,13 @@
 
   .segmented {
     display: flex;
-    padding: 2px;
+    padding: var(--space-0-5);
     border-radius: var(--radius-sm);
     background: var(--hover);
   }
 
   .segmented button {
-    padding: 5px 12px;
+    padding: var(--space-1) var(--space-3);
     border: 0;
     border-radius: var(--radius-sm);
     background: transparent;
@@ -1610,17 +1610,17 @@
 
   /* Settings most players never need, folded away. */
   .advanced {
-    margin: 4px 0 0;
+    margin: var(--space-1) 0 0;
     border-top: 1px solid var(--border);
   }
 
   .advanced > summary {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 10px 0;
+    gap: var(--space-1-5);
+    padding: var(--space-2) 0;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     cursor: pointer;
     list-style: none;
   }
@@ -1649,8 +1649,8 @@
 
   .kinds {
     display: grid;
-    gap: 2px;
-    margin: 0 0 6px;
+    gap: var(--space-0-5);
+    margin: 0 0 var(--space-1-5);
     padding: 0;
     border: 0;
   }
@@ -1662,13 +1662,13 @@
   .kind {
     display: flex;
     align-items: flex-start;
-    gap: 9px;
-    padding: 6px 0;
+    gap: var(--space-2);
+    padding: var(--space-1-5) 0;
     cursor: pointer;
   }
 
   .kind input {
-    margin: 2px 0 0;
+    margin: var(--space-0-5) 0 0;
     accent-color: var(--accent);
   }
 
@@ -1685,8 +1685,8 @@
   }
 
   .connections {
-    margin: 4px 0 2px;
-    padding: 8px 12px;
+    margin: var(--space-1) 0 var(--space-0-5);
+    padding: var(--space-2) var(--space-3);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
   }
@@ -1698,8 +1698,8 @@
 
   .connections ul {
     display: grid;
-    gap: 10px;
-    margin: 10px 0 0;
+    gap: var(--space-2);
+    margin: var(--space-2) 0 0;
     padding: 0;
     list-style: none;
   }
@@ -1712,22 +1712,22 @@
   .service-head {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
   }
 
   .source {
     margin-left: auto;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .connections .help,
   .route-line {
-    margin: 2px 0 0 18px;
+    margin: var(--space-0-5) 0 0 18px;
   }
 
   .route-line {
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .route-line .from {
@@ -1735,12 +1735,7 @@
   }
 
   .tag {
-    margin-left: 8px;
-    padding: 1px 6px;
-    border-radius: var(--radius-sm);
-    background: color-mix(in srgb, var(--travel) 16%, transparent);
-    color: var(--travel);
-    font-size: var(--text-xs);
+    margin-left: var(--space-2);
   }
 
   .note.warn {
@@ -1754,11 +1749,6 @@
     }
   }
 
-  .button:disabled {
-    opacity: 0.6;
-    cursor: default;
-  }
-
   .sr-only {
     position: absolute;
     width: 1px;
@@ -1769,55 +1759,34 @@
 
   .exports {
     display: flex;
-    gap: 6px;
+    gap: var(--space-1-5);
   }
 
   .confirm {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 8px;
-  }
-
-  .button {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 5px 12px;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--text);
-    cursor: pointer;
-  }
-
-  .button:hover {
-    border-color: var(--accent);
-  }
-
-  .button:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 1px;
+    gap: var(--space-2);
   }
 
   .preview {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin: 6px 0 12px;
-    padding: 10px 12px;
+    margin: var(--space-1-5) 0 var(--space-3);
+    padding: var(--space-2) var(--space-3);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius);
     background: var(--glass);
   }
 
   .sample {
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .keys {
     display: grid;
-    gap: 2px;
+    gap: var(--space-0-5);
     margin: 0;
   }
 
@@ -1825,7 +1794,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 7px 0;
+    padding: var(--space-1-5) 0;
   }
 
   .keys div + div {
@@ -1839,21 +1808,21 @@
   dd {
     display: flex;
     align-items: center;
-    gap: 3px;
+    gap: var(--space-0-5);
     margin: 0;
   }
 
   .note {
-    margin: 10px 0 12px;
+    margin: var(--space-2) 0 var(--space-3);
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
 
   .policy {
     display: flex;
-    gap: 10px;
-    padding: 12px;
+    gap: var(--space-2);
+    padding: var(--space-3);
     border: 1px solid color-mix(in srgb, var(--good) 30%, transparent);
     border-radius: var(--radius);
     background: var(--good-soft);
@@ -1862,7 +1831,7 @@
 
   .policy :global(svg) {
     flex: none;
-    margin-top: 2px;
+    margin-top: var(--space-0-5);
     color: var(--good);
   }
 
@@ -1888,12 +1857,12 @@
 
   .picker {
     display: flex;
-    gap: 6px;
+    gap: var(--space-1-5);
   }
 
   .picker select {
     width: 260px;
-    padding: 5px 8px;
+    padding: var(--space-1) var(--space-2);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--surface-2);
@@ -1907,18 +1876,18 @@
   }
 
   .icon-only {
-    padding: 5px 8px;
+    padding: var(--space-1) var(--space-2);
   }
 
   .status {
     display: inline-block;
-    margin-right: 6px;
-    padding: 0 7px;
+    margin-right: var(--space-1-5);
+    padding: 0 var(--space-2);
     border-radius: var(--radius-sm);
     background: var(--hover);
     color: var(--muted);
     font-size: var(--text-xs);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .status.on {
@@ -1934,12 +1903,12 @@
   .lists {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 20px;
+    gap: var(--space-5);
   }
 
   ul {
     display: grid;
-    gap: 7px;
+    gap: var(--space-1-5);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -1947,7 +1916,7 @@
 
   li {
     display: flex;
-    gap: 8px;
+    gap: var(--space-2);
     color: var(--muted);
     font-size: var(--text-md);
   }
@@ -1978,7 +1947,7 @@
   }
 
   .credits td {
-    padding: 6px 0;
+    padding: var(--space-1-5) 0;
     border-top: 1px solid var(--border);
     color: var(--muted);
   }
@@ -1988,7 +1957,7 @@
   }
 
   .credits td + td {
-    padding-left: 12px;
+    padding-left: var(--space-3);
     white-space: nowrap;
   }
 
@@ -2000,7 +1969,7 @@
   .link {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--space-1);
     padding: 0;
     border: 0;
     background: transparent;
@@ -2035,9 +2004,9 @@
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
-    gap: 4px 12px;
-    margin: 0 0 14px;
-    padding: 8px 12px;
+    gap: var(--space-1) var(--space-3);
+    margin: 0 0 var(--space-3);
+    padding: var(--space-2) var(--space-3);
     border-left: 2px solid var(--accent);
     background: var(--accent-soft);
     font-size: var(--text-md);
@@ -2046,7 +2015,7 @@
   .update-note {
     flex-basis: 100%;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .update-note.warn {
@@ -2054,12 +2023,12 @@
   }
 
   .help.status {
-    margin-top: 4px;
+    margin-top: var(--space-1);
     color: var(--faint);
   }
 
   .help.warn {
-    margin-top: 4px;
+    margin-top: var(--space-1);
     color: var(--warn);
   }
 </style>

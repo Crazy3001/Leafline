@@ -10,25 +10,25 @@
 <style>
   .filters {
     display: grid;
-    gap: 5px;
-    margin-bottom: 8px;
-    padding: 8px;
+    gap: var(--space-1);
+    margin-bottom: var(--space-2);
+    padding: var(--space-2);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .filters :global(label),
   .filters :global(.levels) {
     display: grid;
-    grid-template-columns: 48px 1fr;
+    grid-template-columns: 60px 1fr;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     color: var(--muted);
   }
 
   .filters :global(.levels) {
-    grid-template-columns: 48px 1fr auto 1fr;
+    grid-template-columns: 60px 1fr auto 1fr;
   }
 
   .filters :global(.to) {
@@ -39,7 +39,7 @@
   .filters :global(input:not([type="checkbox"])) {
     min-width: 0;
     height: 24px;
-    padding: 0 4px;
+    padding: 0 var(--space-1);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--surface);

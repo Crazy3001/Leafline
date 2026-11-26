@@ -19,6 +19,7 @@
     plain = false,
     linkTrain = false,
     trim = false,
+    bare = false,
     children,
   }: {
     hud: HudReading | null;
@@ -33,6 +34,8 @@
     /** Under the main window's header, which already shows the level, name, job, EXP and time to
      *  level: only the mesos, HP and MP, and what follows as a card of its own. */
     trim?: boolean;
+    /** No card around the content, which brings its own (the desk view's wide build). */
+    bare?: boolean;
     /** More about the character under the rates, in the same card: the overlay puts the build plan here. */
     children?: Snippet;
   } = $props();
@@ -95,15 +98,15 @@
 {/snippet}
 
 {#if trim}
-  <!-- HP, MP and mesos come from reading the HUD, which the website doesn't. -->
-  {#if can.liveReading}<section class="card vitals" aria-label="Mesos, HP and MP">
-    <div class="gauges two">
-      <Gauge label="HP" color="var(--hp)" fraction={fraction(read?.hp)} value={gaugeText(read?.hp)} />
-      <Gauge label="MP" color="var(--mp)" fraction={fraction(read?.mp)} value={gaugeText(read?.mp)} />
-    </div>
-    {@render purse()}
+  <!--
+    The header above has who you are and the level; the game shows HP and MP. Here: the mesos you
+    carry (read from the HUD, which the website doesn't, or remembered from an earlier read), then
+    the build and stats.
+  -->
+  {#if children || can.liveReading || coins.at != null}<section class="more" class:card={!bare} class:bare>
+    {#if can.liveReading || coins.at != null}<div class="purse-line">{@render purse()}</div>{/if}
+    {#if children}{@render children()}{/if}
   </section>{/if}
-  {#if children}<section class="card more">{@render children()}</section>{/if}
 {:else}
 <Card title="Character" {plain}>
   {#snippet aside()}
@@ -165,11 +168,11 @@
     gap: var(--space-2);
     width: 100%;
     margin-top: var(--space-3);
-    padding: var(--space-2) 10px;
+    padding: var(--space-2) var(--space-3);
     border: 0;
     background: var(--surface-2);
     color: var(--text);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     text-align: left;
     cursor: pointer;
   }
@@ -187,11 +190,11 @@
     display: inline-flex;
     flex: none;
     align-items: center;
-    gap: 2px;
+    gap: var(--space-0-5);
   }
 
   .strong {
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .muted {
@@ -200,14 +203,14 @@
 
   .rate-line {
     margin: var(--space-3) 0 0;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .identity {
     display: flex;
     align-items: center;
-    gap: 12px;
-    margin-bottom: 12px;
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
   }
 
   .level {
@@ -220,29 +223,29 @@
     border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
     font-family: var(--font-display);
     font-size: var(--text-xl);
-    font-weight: 700;
+    font-weight: var(--weight-strong);
     line-height: 1;
     color: var(--text);
   }
 
   .lv {
     font-size: var(--text-xs);
-    font-weight: 400;
+    font-weight: var(--weight-body);
     color: var(--muted);
   }
 
   .name {
     font-family: var(--font-display);
     font-size: var(--text-lg);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .mesos {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .seen {
@@ -261,10 +264,10 @@
   }
 
   .name .seen {
-    margin-left: 6px;
+    margin-left: var(--space-1-5);
     font-family: var(--font-sans);
     font-size: var(--text-xs);
-    font-weight: 400;
+    font-weight: var(--weight-body);
   }
 
   .coin {
@@ -276,23 +279,21 @@
 
   .gauges {
     display: grid;
-    gap: 8px;
+    gap: var(--space-2);
   }
 
   /* Under the window's header: the frame is the shared .card. */
-  .vitals,
   .more {
-    margin: 0 10px 10px;
-    padding: 12px 14px 14px;
+    margin: 0 var(--space-3) var(--space-2);
+    padding: var(--space-3) var(--space-4) var(--space-3);
   }
 
-  .vitals {
-    display: grid;
-    gap: 10px;
+  .more.bare {
+    margin: 0;
+    padding: 0;
   }
 
-  .gauges.two {
-    grid-template-columns: 1fr 1fr;
-    gap: 14px;
+  .purse-line {
+    margin-bottom: var(--space-3);
   }
 </style>

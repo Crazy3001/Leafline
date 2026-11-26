@@ -1,5 +1,5 @@
 //! What Leafline remembers about each character between runs: the level, job, EXP, map and mesos
-//! last read for them, and their last bag check, so the Character tab can show who they were
+//! last read for them, and the last check of each bag tab, so the Character tab can show who they were
 //! before the game is read again. Each value keeps when it was read. These are for showing only:
 //! nothing that works out a rate, a forecast or a session starts from them.
 
@@ -118,37 +118,43 @@ impl UserData {
         Ok(found)
     }
 
-    /// Keeps a character's last bag check (as JSON) and when it was read.
-    pub fn save_bag(&mut self, name: &str, check: &str, read_at: i64) -> Result<()> {
+    /// Keeps a character's last check of one bag tab (as JSON) and when it was read. Each tab keeps
+    /// its own, so a look at Use leaves the last look at Etc as it was.
+    pub fn save_bag(&mut self, name: &str, tab: &str, check: &str, read_at: i64) -> Result<()> {
         self.conn.execute(
-            "INSERT INTO character_profiles (name, bag, bag_read_at) VALUES (?1, ?2, ?3)
-             ON CONFLICT (name) DO UPDATE SET bag = excluded.bag, bag_read_at = excluded.bag_read_at",
-            params![name, check, read_at],
+            "INSERT INTO character_bags (name, tab, bag, read_at) VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT (name, tab) DO UPDATE SET bag = excluded.bag, read_at = excluded.read_at",
+            params![name, tab, check, read_at],
         )?;
         Ok(())
     }
 
-    /// The last bag check kept for `name`, or with no name, the one read last.
-    pub fn known_bag(&self, name: Option<&str>) -> Result<Option<String>> {
-        let found = self
-            .conn
-            .query_row(
-                "SELECT bag FROM character_profiles WHERE bag IS NOT NULL AND (?1 IS NULL OR name = ?1)
-                 ORDER BY bag_read_at DESC LIMIT 1",
-                [name],
-                |row| row.get(0),
-            )
-            .optional()?;
-        Ok(found)
+    /// The last check of each bag tab kept for `name`, the newest first; with no name, those of the
+    /// character whose bag was read last.
+    pub fn known_bags(&self, name: Option<&str>) -> Result<Vec<String>> {
+        let whose: Option<String> = match name {
+            Some(name) => Some(name.to_owned()),
+            None => self
+                .conn
+                .query_row("SELECT name FROM character_bags ORDER BY read_at DESC LIMIT 1", [], |row| row.get(0))
+                .optional()?,
+        };
+        let Some(whose) = whose else { return Ok(Vec::new()) };
+        let mut stmt = self.conn.prepare("SELECT bag FROM character_bags WHERE name = ?1 ORDER BY read_at DESC")?;
+        let bags = stmt.query_map([whose], |row| row.get(0))?.collect::<std::result::Result<_, _>>()?;
+        Ok(bags)
     }
 
     /// Every character Leafline has a record for, the one seen last first.
     pub fn character_names(&self) -> Result<Vec<String>> {
         let mut stmt = self.conn.prepare(
-            "SELECT n.name FROM (SELECT name FROM character_profiles UNION SELECT name FROM characters) n
+            "SELECT n.name FROM (SELECT name FROM character_profiles UNION SELECT name FROM characters
+                                 UNION SELECT name FROM character_bags) n
              LEFT JOIN character_profiles p ON p.name = n.name COLLATE NOCASE
              LEFT JOIN characters c ON c.name = n.name COLLATE NOCASE
-             ORDER BY MAX(COALESCE(p.seen_at, p.bag_read_at, 0), COALESCE(c.mesos_seen_at, 0)) DESC",
+             ORDER BY MAX(COALESCE(p.seen_at, 0), COALESCE(c.mesos_seen_at, 0),
+                          COALESCE((SELECT MAX(b.read_at) FROM character_bags b WHERE b.name = n.name), 0)) DESC",
+
         )?;
         let names = stmt.query_map([], |row| row.get(0))?.collect::<std::result::Result<_, _>>()?;
         Ok(names)
@@ -232,15 +238,20 @@ mod tests {
     }
 
     #[test]
-    fn keeps_each_characters_last_bag_check() {
+    fn keeps_each_characters_last_check_of_each_bag_tab() {
         let mut db = UserData::open_in_memory().unwrap();
-        assert_eq!(db.known_bag(None).unwrap(), None);
+        assert!(db.known_bags(None).unwrap().is_empty());
         db.save_seen(&seen("Mossbank", 12, None), 100).unwrap();
-        db.save_bag("mossbank", r#"{"at":1}"#, 110).unwrap();
-        db.save_bag("Fernwick", r#"{"at":2}"#, 120).unwrap();
-        assert_eq!(db.known_bag(Some("MOSSBANK")).unwrap().as_deref(), Some(r#"{"at":1}"#));
-        assert_eq!(db.known_bag(None).unwrap().as_deref(), Some(r#"{"at":2}"#));
-        // Keeping the bag leaves what the HUD showed alone.
+        db.save_bag("mossbank", "use", r#"{"at":1}"#, 110).unwrap();
+        db.save_bag("Mossbank", "etc", r#"{"at":2}"#, 115).unwrap();
+        db.save_bag("Fernwick", "use", r#"{"at":3}"#, 120).unwrap();
+        // A newer look at a tab replaces only that tab's.
+        db.save_bag("MOSSBANK", "use", r#"{"at":4}"#, 130).unwrap();
+        assert_eq!(db.known_bags(Some("Mossbank")).unwrap(), vec![r#"{"at":4}"#, r#"{"at":2}"#]);
+        assert_eq!(db.known_bags(None).unwrap(), vec![r#"{"at":4}"#, r#"{"at":2}"#]);
+        assert_eq!(db.known_bags(Some("Nobody")).unwrap(), Vec::<String>::new());
+        // Keeping the bag leaves what the HUD showed alone, and counts as seeing the character.
         assert_eq!(db.known_character(Some("Mossbank")).unwrap().unwrap().level, Some(12));
+        assert_eq!(db.character_names().unwrap(), vec!["Mossbank", "Fernwick"]);
     }
 }

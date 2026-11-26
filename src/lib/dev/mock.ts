@@ -3,6 +3,7 @@
 
 import type { Backend } from "../api";
 import type {
+  WholeQuest,
   Analysis,
   BagCheck,
   BaseStats,
@@ -245,7 +246,7 @@ let displaySettings: DisplaySettings = {
   setupDone: true,
   updateCheck: false,
   showPictures: true,
-  theme: "ember-dark",
+  theme: "focus-dark",
   buildRules: { apPerLevel: 5, spPerLevel: 3, beginnerSpPerLevel: 1, advancementSp: 1, firstJobLevel: 10, secondJobLevel: 30 },
 };
 
@@ -904,7 +905,22 @@ export const mockBackend: Backend = {
     mesos: 36_644,
     mesosSeenAt: Math.floor(Date.now() / 1000) - 26 * 3600,
   }),
-  knownBag: async (name) => ({ ...sampleBag, character: name ?? "Mossbank", at: Math.floor(Date.now() / 1000) - 26 * 3600 }),
+  knownBags: async (name) => [
+    { ...sampleBag, character: name ?? "Mossbank", at: Math.floor(Date.now() / 1000) - 26 * 3600 },
+    {
+      ...sampleBag,
+      tab: "use",
+      character: name ?? "Mossbank",
+      at: Math.floor(Date.now() / 1000) - 3 * 86400,
+      unknown: [],
+      items: [
+        { slot: 0, count: 140, ids: [9101], name: "Red Tonic", price: 25, priceRange: null, untradable: false, keep: [], wantedBy: [] },
+        { slot: 1, count: 62, ids: [9102], name: "Blue Tonic", price: 100, priceRange: null, untradable: false, keep: [], wantedBy: [] },
+        { slot: 2, count: 2, ids: [9103], name: "Return Scroll", price: 200, priceRange: null, untradable: false, keep: [], wantedBy: [] },
+      ],
+    },
+  ],
+  knownCharacters: async () => ["Mossbank", "Fernwick"],
   onKnownCharacter: async () => () => {},
   async setSessionNote(id, note) {
     savedSessions = savedSessions.map((s) => (s.id === id ? { ...s, note } : s));
@@ -942,6 +958,11 @@ export const mockBackend: Backend = {
             job: 420,
             name: "Dagger Fernblade",
             summary: "A made-up plan, to design the page with.",
+            pros: ["A made-up reason to pick it.", "Another one, a little longer, to see how it wraps."],
+            cons: ["What it gives up."],
+            keySkills: [{ id: 11, name: "Twin Throw", level: 20 }, { id: 20, name: "Fern Stab", level: 30 }],
+            weapons: [{ id: 500, name: "Fern Dagger", level: 30 }],
+            start: { str: 4, dex: 5, int: 4, luk: 12 },
             plan: {
               job: 420,
               skills: [{ skillId: 1, level: 3 }, { skillId: 10, level: 20 }, { skillId: 20, level: 30 }],
@@ -951,12 +972,18 @@ export const mockBackend: Backend = {
             },
             missing: [],
             source: null,
+            reading: { name: "NiaDB", url: "https://meowdb.com/msclassic/guides/example", credit: "A made-up guide to read beside it." },
           },
           {
             id: "fernblade-guide",
             job: 420,
             name: "Dagger Fernblade, example guide",
             summary: "A made-up plan that follows a made-up guide.",
+            pros: [],
+            cons: [],
+            keySkills: [{ id: 10, name: "Quick Step", level: 20 }, { id: 20, name: "Fern Stab", level: 30 }],
+            weapons: [{ id: 500, name: "Fern Dagger", level: 30 }],
+            start: { str: 4, dex: 5, int: 4, luk: 12 },
             plan: {
               job: 420,
               skills: [{ skillId: 1, level: 3 }, { skillId: 10, level: 20 }],
@@ -966,6 +993,7 @@ export const mockBackend: Backend = {
             },
             missing: [],
             source: { name: "NiaDB", url: "https://meowdb.com/msclassic/guides/example", credit: "Example guide by Someone, 2026-01-01." },
+            reading: null,
           },
         ]
       : [],
@@ -1156,6 +1184,37 @@ export const mockBackend: Backend = {
     { region: "Fern Isle", quests: 1 },
     { region: "Mossbank", quests: 3 },
   ],
+  async wholeQuestLog(_name, level) {
+    const row = (q: (typeof mockQuests)[number], stand: WholeQuest["stand"], extra: Partial<WholeQuest> = {}): WholeQuest => ({
+      questId: q.id,
+      title: q.name,
+      stand,
+      inferred: false,
+      series: null,
+      notYet: null,
+      levelMin: q.levelMin,
+      giver: q.giver,
+      repeat: q.repeat,
+      seenAt: Date.now() / 1000 - 600,
+      ...extra,
+    });
+    const [first, ...rest] = mockQuests;
+    const quests = rest.map((q, i) =>
+      i === 0
+        ? row(q, "inProgress", { series: "Moss Errands" })
+        : i === 1
+          ? row(q, "notYet", { notYet: { level: (level ?? 1) + 5, after: [{ id: first.id, name: first.name, levelMin: first.levelMin }], notOfferedAt: null } })
+          : row(q, "canTake", { seenAt: null }),
+    );
+    return {
+      seen: true,
+      level,
+      regions: [
+        { region: "Fern Isle", done: 1, total: 1, quests: [row(first, "done", { inferred: true })] },
+        { region: "Mossbank", done: 0, total: quests.length, quests },
+      ],
+    };
+  },
   onQuestLog: async () => () => {},
   async questSheet(id) {
     const row = mockQuests.find((q) => q.id === id);

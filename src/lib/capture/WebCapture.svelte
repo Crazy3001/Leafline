@@ -108,9 +108,9 @@
   <h2>Shared window</h2>
   <div class="controls">
     {#if capture.sharing}
-      <button class="button" onclick={stopSharing}>Stop sharing</button>
+      <button class="btn" onclick={stopSharing}>Stop sharing</button>
     {:else}
-      <button class="button primary" onclick={share} disabled={!canRead}>Share a window…</button>
+      <button class="btn primary" onclick={share} disabled={!canRead}>Share a window…</button>
     {/if}
     <span class="muted">{capture.sharing ? capture.label || "Shared" : "Nothing shared"}</span>
   </div>
@@ -139,14 +139,14 @@
   <ol>
     <li>
       Open the pattern: in the program, Settings › Feedback › Capture test › Show the pattern (a dev build), or here:
-      <button class="button" onclick={openPattern}>Open a pattern window</button>
+      <button class="btn" onclick={openPattern}>Open a pattern window</button>
     </li>
     <li>Share that window above. Keep it uncovered and its zoom at 100%.</li>
   </ol>
   <div class="controls">
-    <button class="button" onclick={toggleMeasure}>{capture.measuring ? "Stop measuring" : "Measure"}</button>
+    <button class="btn" onclick={toggleMeasure}>{capture.measuring ? "Stop measuring" : "Measure"}</button>
     {#if capture.measure}
-      <button class="button" onclick={() => copy(JSON.stringify({ format: stats?.format, colorSpace: stats?.colorSpace, readIn: capture.readIn, fps: stats?.fps, measure: capture.measure }, null, 1), "Results")}>
+      <button class="btn" onclick={() => copy(JSON.stringify({ format: stats?.format, colorSpace: stats?.colorSpace, readIn: capture.readIn, fps: stats?.fps, measure: capture.measure }, null, 1), "Results")}>
         Copy results
       </button>
     {/if}
@@ -173,11 +173,11 @@
   {/if}
   <div class="controls">
     {#if support.folder}
-      <button class="button" onclick={pickFolder}>
+      <button class="btn" onclick={pickFolder}>
         {capture.folder ? `Folder: ${capture.folder.name}` : "Pick a folder…"}
       </button>
     {:else if support.ownStorage}
-      <button class="button" onclick={useOwnStorage} disabled={capture.folderIsOwn}>
+      <button class="btn" onclick={useOwnStorage} disabled={capture.folderIsOwn}>
         {capture.folderIsOwn ? "Saving in this browser" : "Save in this browser"}
       </button>
     {/if}
@@ -189,9 +189,9 @@
       </select>
     </label>
     {#if capture.savingOn}
-      <button class="button" onclick={() => setSaving(false)}>Stop saving</button>
+      <button class="btn" onclick={() => setSaving(false)}>Stop saving</button>
     {:else}
-      <button class="button primary" onclick={() => setSaving(true)} disabled={!capture.folder || !capture.sharing}>
+      <button class="btn primary" onclick={() => setSaving(true)} disabled={!capture.folder || !capture.sharing}>
         Start saving
       </button>
     {/if}
@@ -204,10 +204,10 @@
   {/if}
   {#if capture.folderIsOwn && !capture.savingOn && (stats?.saved || capture.leftover)}
     <div class="controls">
-      <button class="button" onclick={downloadOwnFrames} disabled={!!capture.downloading && capture.downloading.done < capture.downloading.total}>
+      <button class="btn" onclick={downloadOwnFrames} disabled={!!capture.downloading && capture.downloading.done < capture.downloading.total}>
         Download the frames
       </button>
-      <button class="button" onclick={clearOwnFrames}>Delete them here</button>
+      <button class="btn" onclick={clearOwnFrames}>Delete them here</button>
       {#if capture.downloading}
         <span class="muted">{capture.downloading.done} of {capture.downloading.total} downloaded</span>
       {/if}
@@ -237,17 +237,17 @@
   </p>
   <div class="controls">
     {#if capture.endurance}
-      <button class="button" onclick={() => setEndurance(false)}>Stop</button>
+      <button class="btn" onclick={() => setEndurance(false)}>Stop</button>
       <span>{minutes} min</span>
     {:else}
-      <button class="button primary" onclick={() => setEndurance(true)} disabled={!capture.sharing}>Start</button>
+      <button class="btn primary" onclick={() => setEndurance(true)} disabled={!capture.sharing}>Start</button>
     {/if}
-    <button class="button" onclick={toggleReaders} disabled={!!capture.endurance}>
+    <button class="btn" onclick={toggleReaders} disabled={!!capture.endurance}>
       {capture.reading || capture.endurance ? "Readers on" : "Try the readers"}
     </button>
     {#if capture.rows.length}
-      <button class="button" onclick={() => download(enduranceCsv(), "leafline-endurance.csv")}>Save the log</button>
-      <button class="button" onclick={() => copy(enduranceCsv(), "Log")}>Copy the log</button>
+      <button class="btn" onclick={() => download(enduranceCsv(), "leafline-endurance.csv")}>Save the log</button>
+      <button class="btn" onclick={() => copy(enduranceCsv(), "Log")}>Copy the log</button>
     {/if}
   </div>
   {#if capture.read}
@@ -300,7 +300,7 @@
 <style>
   table {
     width: 100%;
-    margin-top: 8px;
+    margin-top: var(--space-2);
     border-collapse: collapse;
     font-variant-numeric: tabular-nums;
   }
@@ -308,12 +308,12 @@
   th {
     text-align: left;
     color: var(--muted);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   th,
   td {
-    padding: 3px 8px 3px 0;
+    padding: var(--space-0-5) var(--space-2) var(--space-0-5) 0;
     border-bottom: var(--line-w) solid var(--line);
   }
 </style>

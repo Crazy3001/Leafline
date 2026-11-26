@@ -3,6 +3,7 @@
 use super::host::{Host, emit};
 use crate::error::Result;
 use crate::mapdata::questlog::RegionTotal;
+use crate::mapdata::wholelog::WholeLog;
 use crate::userdata::questlog::QuestLog;
 
 /// Emitted to every window when a character's quest log changes, with the character's name.
@@ -23,4 +24,13 @@ pub fn forget_quest_log(h: &dyn Host, name: String) -> Result<()> {
 /// How many quests the data files under each region.
 pub fn quest_region_totals(h: &dyn Host) -> Vec<RegionTotal> {
     h.map().atlas().map(|atlas| atlas.quest_region_totals()).unwrap_or_default()
+}
+
+/// Every quest in the data with where it stands for a character at `level`, from their quest log
+/// as last seen and the quests their Quest Helper shows now (`helper`, by title). Empty without
+/// map data.
+pub fn whole_quest_log(h: &dyn Host, name: Option<String>, level: Option<u32>, helper: Vec<String>) -> Result<WholeLog> {
+    let Some(atlas) = h.map().atlas() else { return Ok(WholeLog::default()) };
+    let log = h.records().with(|db| db.quest_log(name.as_deref()))?;
+    Ok(atlas.whole_quest_log(&log, level, &helper))
 }

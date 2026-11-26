@@ -73,16 +73,16 @@
 <style>
   .page {
     display: grid;
-    gap: 8px;
-    margin: 0 10px 10px;
-    padding: 12px 14px 14px;
+    gap: var(--space-2);
+    margin: 0 var(--space-3) var(--space-2);
+    padding: var(--space-3) var(--space-4) var(--space-3);
   }
 
   .lead,
   .quiet {
     margin: 0;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   ul {
@@ -98,9 +98,9 @@
   li button {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-2);
     width: 100%;
-    padding: 8px 4px;
+    padding: var(--space-2) var(--space-1);
     border: 0;
     border-radius: var(--radius-sm);
     background: transparent;
@@ -135,7 +135,7 @@
   .name {
     overflow: hidden;
     color: var(--text);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -152,8 +152,8 @@
     background: transparent;
     color: var(--accent-text);
     font: inherit;
-    font-size: var(--text-sm);
-    font-weight: 600;
+    font-size: var(--text-md);
+    font-weight: var(--weight-strong);
     cursor: pointer;
   }
 

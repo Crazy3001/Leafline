@@ -582,7 +582,7 @@
                               {:else}Not placed on a map{/if}
                               {#if l.map}
                                 {@const map = l.map}
-                                <button class="pen" use:tip={"Rename"} aria-label="Rename map" onclick={() => startRename(map)}
+                                <button class="icon-btn xs pen" use:tip={"Rename"} aria-label="Rename map" onclick={() => startRename(map)}
                                   ><PenLine size={11} /></button
                                 >
                               {/if}
@@ -912,17 +912,17 @@
 
 <style>
   .drops {
-    margin: 0 0 12px;
+    margin: 0 0 var(--space-3);
     padding: 0;
     list-style: none;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .drops li {
     display: flex;
     justify-content: space-between;
-    gap: 8px;
-    padding: 3px 0;
+    gap: var(--space-2);
+    padding: var(--space-0-5) 0;
     border-top: 1px solid var(--border);
   }
 
@@ -971,14 +971,14 @@
   .brand {
     display: inline-flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-2);
     margin-right: var(--space-3);
   }
 
   h1 {
     margin: 0;
     font-size: var(--text-lg);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   h2,
@@ -986,13 +986,13 @@
     margin: 0;
     font-family: var(--font-display);
     font-size: var(--text-md);
-    font-weight: 400;
+    font-weight: var(--weight-body);
     color: var(--muted);
   }
 
   h2.big {
     font-size: var(--text-xl);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     color: var(--text);
   }
 
@@ -1000,32 +1000,32 @@
     display: inline-flex;
     align-items: center;
     gap: var(--space-2);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     color: var(--muted);
   }
 
   select {
     height: var(--control-h);
-    padding: 0 6px;
+    padding: 0 var(--space-1-5);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--surface-2);
     color: var(--text);
     font: inherit;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .short {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     cursor: pointer;
   }
 
   .who {
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     color: var(--muted);
   }
 
@@ -1045,7 +1045,7 @@
     display: flex;
     flex: 1 1 140px;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--space-0-5);
     max-width: 180px;
   }
 
@@ -1069,7 +1069,7 @@
   .nav[aria-current="page"] {
     background: var(--surface-3);
     color: var(--text);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   main {
@@ -1091,7 +1091,7 @@
   .panel {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: var(--space-2);
     padding: var(--space-3);
     border: var(--line-w) solid var(--line);
     border-radius: var(--radius-lg);
@@ -1123,12 +1123,12 @@
     gap: var(--space-2);
     align-items: center;
     width: 100%;
-    padding: 9px var(--space-3);
+    padding: var(--space-2) var(--space-3);
     border: 0;
     border-top: 1px solid var(--border);
     background: transparent;
     color: var(--text);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     text-align: left;
     cursor: pointer;
   }
@@ -1143,7 +1143,7 @@
 
   .srow.head {
     padding-top: 0;
-    padding-bottom: 6px;
+    padding-bottom: var(--space-1-5);
     border-top: 0;
     font-size: var(--text-xs);
     color: var(--faint);
@@ -1180,7 +1180,7 @@
   }
 
   .strong {
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .muted {
@@ -1204,8 +1204,8 @@
   }
 
   .detail-head p {
-    margin: 4px 0 0;
-    font-size: var(--text-sm);
+    margin: var(--space-1) 0 0;
+    font-size: var(--text-md);
   }
 
   .actions {
@@ -1230,7 +1230,7 @@
   /* Overview: best maps, each run's average as a bar with a mark at its best. */
   .bests {
     display: grid;
-    gap: 10px;
+    gap: var(--space-2);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -1239,7 +1239,7 @@
   .bests li {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
-    gap: 4px 10px;
+    gap: var(--space-1) var(--space-2);
     align-items: baseline;
   }
 
@@ -1251,7 +1251,7 @@
   }
 
   .best-rate {
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .best-bar {
@@ -1288,10 +1288,10 @@
   .recent button {
     display: grid;
     grid-template-columns: 64px minmax(0, 1fr) 70px 60px;
-    gap: 10px;
+    gap: var(--space-2);
     align-items: center;
     width: 100%;
-    padding: 8px 4px;
+    padding: var(--space-2) var(--space-1);
     border: 0;
     border-top: 1px solid var(--border);
     background: transparent;
@@ -1316,8 +1316,8 @@
     background: transparent;
     color: var(--accent-text);
     font: inherit;
-    font-size: var(--text-sm);
-    font-weight: 600;
+    font-size: var(--text-md);
+    font-weight: var(--weight-strong);
     cursor: pointer;
   }
 
@@ -1339,7 +1339,7 @@
   .key {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     color: var(--muted);
   }
 
@@ -1383,8 +1383,8 @@
   }
 
   .picked p {
-    margin: 2px 0 0;
-    font-size: var(--text-sm);
+    margin: var(--space-0-5) 0 0;
+    font-size: var(--text-md);
   }
 
   textarea {
@@ -1394,14 +1394,14 @@
     background: var(--surface);
     color: var(--text);
     font: inherit;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     resize: vertical;
   }
 
   table {
     width: 100%;
     border-collapse: collapse;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     font-variant-numeric: tabular-nums;
   }
 
@@ -1414,15 +1414,15 @@
   }
 
   th {
-    padding: 0 0 6px;
+    padding: 0 0 var(--space-1-5);
     font-size: var(--text-xs);
-    font-weight: 400;
+    font-weight: var(--weight-body);
     color: var(--faint);
     text-align: right;
   }
 
   td {
-    padding: 7px 0;
+    padding: var(--space-1-5) 0;
     border-top: 1px solid var(--border);
     text-align: right;
   }
@@ -1433,18 +1433,8 @@
   }
 
   .pen {
-    display: inline-grid;
-    place-items: center;
-    width: 20px;
-    height: 20px;
-    margin-left: 4px;
-    padding: 0;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--faint);
+    margin-left: var(--space-1);
     vertical-align: middle;
-    cursor: pointer;
     opacity: 0;
   }
 
@@ -1453,14 +1443,10 @@
     opacity: 1;
   }
 
-  .pen:hover {
-    color: var(--text);
-  }
-
   .rename {
     width: 100%;
     height: 24px;
-    padding: 0 6px;
+    padding: 0 var(--space-1-5);
     border: 1px solid var(--accent);
     border-radius: var(--radius-sm);
     background: var(--surface);
@@ -1477,23 +1463,23 @@
   .figure {
     display: flex;
     align-items: baseline;
-    gap: 10px;
+    gap: var(--space-2);
   }
 
   .huge {
     font-size: var(--text-hero);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .panel p {
     margin: 0;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .empty {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--space-1);
     padding: var(--space-5);
     border: 1px solid var(--border);
     border-radius: var(--radius);
@@ -1508,7 +1494,7 @@
 
   .quiet {
     margin: 0;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     color: var(--faint);
   }
 
@@ -1517,6 +1503,6 @@
     padding: var(--space-2) var(--space-3);
     background: var(--bad-soft);
     color: var(--bad);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 </style>

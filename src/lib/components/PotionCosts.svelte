@@ -212,8 +212,7 @@
     <div class="body">
       {#if editing}
         <p class="muted">
-          Name the potions you hunt with and what one costs you. Prices are yours; nothing is filled in for you. Pick the
-          quick slot a potion sits on and Leafline counts what you drink from the number the game shows there.
+          Name each potion, what one costs you and its quick slot. Leafline counts what you drink from that slot.
         </p>
         <div class="edit">
           {#each draft as d, i (i)}
@@ -224,7 +223,7 @@
                 <option value="">Type counts</option>
                 {#each QUICK_SLOTS as label, q (q)}<option value={String(q)}>{label}</option>{/each}
               </select>
-              <button class="icon" aria-label="Remove {d.name || 'this potion'}" onclick={() => (draft = draft.filter((_, j) => j !== i))}>
+              <button class="icon-btn xs icon" aria-label="Remove {d.name || 'this potion'}" onclick={() => (draft = draft.filter((_, j) => j !== i))}>
                 <X size={12} />
               </button>
             </div>
@@ -314,20 +313,20 @@
   .potions {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--space-1-5);
   }
 
   .head {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     width: 100%;
-    padding: 4px 0;
+    padding: var(--space-1) 0;
     border: 0;
     background: transparent;
     color: var(--text);
     font: inherit;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     text-align: left;
     cursor: pointer;
   }
@@ -337,7 +336,7 @@
   }
 
   .title {
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .chevron {
@@ -355,13 +354,13 @@
   }
 
   .totals strong {
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .body {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--space-2);
   }
 
   .muted {
@@ -370,7 +369,7 @@
 
   p {
     margin: 0;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   p.small {
@@ -387,7 +386,7 @@
 
   select.where {
     height: var(--control-h);
-    padding: 0 4px;
+    padding: 0 var(--space-1);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--surface-2);
@@ -399,19 +398,19 @@
   table {
     width: 100%;
     border-collapse: collapse;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   th {
-    padding: 0 0 4px;
+    padding: 0 0 var(--space-1);
     font-size: var(--text-xs);
-    font-weight: 400;
+    font-weight: var(--weight-body);
     color: var(--faint);
     text-align: right;
   }
 
   td {
-    padding: 3px 0;
+    padding: var(--space-0-5) 0;
     border-top: 1px solid var(--border);
     text-align: right;
   }
@@ -437,13 +436,13 @@
 
   input {
     height: 22px;
-    padding: 0 4px;
+    padding: 0 var(--space-1);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--surface);
     color: var(--text);
     font: inherit;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   input.count {
@@ -455,19 +454,19 @@
     display: flex;
     flex-wrap: wrap;
     justify-content: space-between;
-    gap: 8px;
-    font-size: var(--text-sm);
+    gap: var(--space-2);
+    font-size: var(--text-md);
   }
 
   .edit {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--space-1);
   }
 
   .edit-row {
     display: flex;
-    gap: 4px;
+    gap: var(--space-1);
   }
 
   .edit-row .name {
@@ -480,28 +479,10 @@
     text-align: right;
   }
 
-  .icon {
-    display: grid;
-    place-items: center;
-    width: 22px;
-    height: 22px;
-    padding: 0;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--muted);
-    cursor: pointer;
-  }
-
-  .icon:hover {
-    background: var(--hover);
-    color: var(--text);
-  }
-
   .actions {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
   }
 
   @media (prefers-reduced-motion: reduce) {

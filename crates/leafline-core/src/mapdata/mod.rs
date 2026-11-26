@@ -28,6 +28,7 @@ pub mod training;
 pub mod travel;
 pub mod turnins;
 pub mod walking;
+pub mod wholelog;
 
 pub use atlas::{Atlas, MapCard, MapMatch, MapRef, Route};
 pub use bestiary::{MonsterFilters, MonsterPage, MonsterQuery, MonsterRow, MonsterSheet};

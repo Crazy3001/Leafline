@@ -329,6 +329,12 @@ export function checkItem(read: ItemTooltip, record: ItemRecord): CheckedItem {
 const formatSignedPlain = (value: number) => (value >= 0 ? `+${value}` : String(value));
 
 /** The item's slot, or its group for items that have none. */
+/** Who can wear a piece of equipment, as one short line; null for anything else. */
+export function wearers(item: ItemRecord): string | null {
+  if (item.kind !== "equip") return null;
+  return item.classes.length ? item.classes.join(" / ") : "Any class";
+}
+
 export function itemSlot(item: ItemRecord): string {
   const groups = { equip: item.slot, use: "Use", scroll: "Scroll", setup: "Set-up", etc: "Etc" };
   return groups[item.kind];

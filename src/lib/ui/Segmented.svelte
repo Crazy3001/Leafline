@@ -34,33 +34,33 @@
     display: inline-flex;
     flex: none;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: var(--space-1-5);
   }
 
   .stretch {
     display: flex;
     flex: 1;
     flex-wrap: nowrap;
-    gap: 4px;
+    gap: var(--space-1);
   }
 
   .stretch button {
     flex: 1;
     min-width: 0;
-    padding: 0 4px;
+    padding: 0 var(--space-1);
     overflow: hidden;
     text-overflow: ellipsis;
   }
 
   button {
     height: calc(var(--control-h) - 2px);
-    padding: 0 12px;
+    padding: 0 var(--space-3);
     border: var(--line-w) solid var(--control-line);
     border-radius: var(--radius-pill);
     background: var(--surface);
     color: var(--muted);
-    font-size: var(--text-sm);
-    font-weight: 500;
+    font-size: var(--text-md);
+    font-weight: var(--weight-body);
     white-space: nowrap;
     cursor: pointer;
     transition:
@@ -70,7 +70,7 @@
 
   .sm button {
     height: var(--control-h-sm);
-    padding: 0 9px;
+    padding: 0 var(--space-2);
     font-size: var(--text-xs);
   }
 

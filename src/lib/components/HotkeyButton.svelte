@@ -101,16 +101,16 @@
   .hotkey {
     display: inline-flex;
     align-items: center;
-    gap: 2px;
+    gap: var(--space-0-5);
     min-width: 54px;
     justify-content: center;
-    padding: 2px 6px;
+    padding: var(--space-0-5) var(--space-1-5);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--muted);
     font: inherit;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     cursor: pointer;
   }
 
@@ -152,7 +152,7 @@
   }
 
   kbd {
-    padding: 0 4px;
+    padding: 0 var(--space-1);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--surface-2);

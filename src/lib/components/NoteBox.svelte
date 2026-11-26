@@ -91,12 +91,17 @@
   }
 </script>
 
-{#if key != null}
+{#if key != null && loaded && !note && !editing}
+  <div class="notes bare" class:flush>
+    <button class="btn sm ghost" onclick={edit}><Plus size={12} /> Add a note</button>
+    {#if error}<p class="error">{error}</p>{/if}
+  </div>
+{:else if key != null}
   <div class="notes" class:flush>
     <div class="head">
       <span class="eyebrow">{title}</span>
       {#if loaded && !editing}
-        <button class="add" onclick={edit}>
+        <button class="btn sm" onclick={edit}>
           {#if note}<PenLine size={12} /> Edit{:else}<Plus size={12} /> Add a note{/if}
         </button>
       {/if}
@@ -128,9 +133,15 @@
 
 <style>
   .notes {
-    margin-top: 12px;
-    padding-top: 10px;
+    margin-top: var(--space-3);
+    padding-top: var(--space-2);
     border-top: 1px solid var(--border);
+  }
+
+  .notes.bare {
+    margin-top: var(--space-1-5);
+    padding-top: 0;
+    border-top: 0;
   }
 
   .flush {
@@ -143,27 +154,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 4px;
-  }
-
-  .add {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 2px 8px;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--muted);
-    font-size: var(--text-sm);
-    cursor: pointer;
-  }
-
-  .add:hover,
-  .add:focus-visible {
-    background: var(--surface-2);
-    color: var(--text);
-    outline: none;
+    margin-bottom: var(--space-1);
   }
 
   .text {
@@ -174,7 +165,7 @@
   }
 
   .when {
-    margin: 2px 0 0;
+    margin: var(--space-0-5) 0 0;
     color: var(--faint);
     font-size: var(--text-xs);
   }
@@ -182,7 +173,7 @@
   textarea {
     display: block;
     width: 100%;
-    padding: 6px 8px;
+    padding: var(--space-1-5) var(--space-2);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--well);
@@ -200,8 +191,8 @@
   .actions {
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-top: 6px;
+    gap: var(--space-2);
+    margin-top: var(--space-1-5);
   }
 
   .keys {
@@ -215,7 +206,7 @@
     border: 0;
     background: transparent;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     cursor: pointer;
   }
 
@@ -225,13 +216,13 @@
 
   .save {
     height: var(--control-h-sm);
-    padding: 0 12px;
+    padding: 0 var(--space-3);
     border: 1px solid var(--accent);
     border-radius: var(--radius-sm);
     background: var(--accent);
     color: var(--accent-ink);
-    font-size: var(--text-sm);
-    font-weight: 600;
+    font-size: var(--text-md);
+    font-weight: var(--weight-strong);
     cursor: pointer;
   }
 
@@ -241,8 +232,8 @@
   }
 
   .error {
-    margin: 6px 0 0;
+    margin: var(--space-1-5) 0 0;
     color: var(--bad);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 </style>

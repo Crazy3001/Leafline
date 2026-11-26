@@ -3,7 +3,7 @@
   // the last read, and the buffs the player says are on. With buffs on, each number they change
   // shows as it is with them, the number read beside it. The training estimates use the same.
   import { can } from "$lib/platform";
-  import { RefreshCw } from "@lucide/svelte";
+  import { Info, RefreshCw } from "@lucide/svelte";
   import { onMount, untrack } from "svelte";
 
   import Ref from "./Ref.svelte";
@@ -65,25 +65,26 @@
   type Key = keyof StatSheet;
   type Cell = { label: string; key: Key; suffix?: string };
 
-  const GROUPS: Cell[][] = [
-    [
-      { label: "Max HP", key: "maxHp" },
-      { label: "Max MP", key: "maxMp" },
-      { label: "Fame", key: "fame" },
-      { label: "AP left", key: "abilityPoints" },
-    ],
-    [
-      { label: "Weapon Def.", key: "weaponDef" },
-      { label: "Magic", key: "magic" },
-      { label: "Magic Def.", key: "magicDef" },
-      { label: "Accuracy", key: "accuracy" },
-      { label: "Evasion", key: "evasion" },
-      { label: "Crit. rate", key: "critRate", suffix: "%" },
-      { label: "Crit. damage", key: "critDamage", suffix: "%" },
-      { label: "Speed", key: "speed", suffix: "%" },
-      { label: "Jump", key: "jump", suffix: "%" },
-    ],
+  /** What decides a fight, beside the attack range. */
+  const FIGHT: Cell[] = [
+    { label: "Magic", key: "magic" },
+    { label: "Accuracy", key: "accuracy" },
+    { label: "Evasion", key: "evasion" },
+    { label: "Crit. rate", key: "critRate", suffix: "%" },
+    { label: "Crit. damage", key: "critDamage", suffix: "%" },
   ];
+  /** The rest of the window, folded away until asked for. */
+  const MORE: Cell[] = [
+    { label: "Max HP", key: "maxHp" },
+    { label: "Max MP", key: "maxMp" },
+    { label: "Fame", key: "fame" },
+    { label: "Weapon Def.", key: "weaponDef" },
+    { label: "Magic Def.", key: "magicDef" },
+    { label: "Speed", key: "speed", suffix: "%" },
+    { label: "Jump", key: "jump", suffix: "%" },
+  ];
+  const BUFF_HELP =
+    "Turn on the ones you have running. Each counts at its level. When the Character Stat window shows a buff in red, its switch follows.";
 
   const BASE: { label: string; key: "str" | "dex" | "int" | "luk"; gear: "gearStr" | "gearDex" | "gearInt" | "gearLuk" }[] = [
     { label: "STR", key: "str", gear: "gearStr" },
@@ -125,6 +126,24 @@
   const anyOn = $derived(buffs.some((b) => b.on));
 </script>
 
+{#snippet pair(cell: Cell)}
+  {@const read = value(sheet, cell.key)}
+  {@const now = changed(cell.key)}
+  <div>
+    <dt>{cell.label}</dt>
+    <dd class="tabular">
+      {#if read == null}
+        —
+      {:else if now != null}
+        <span class:up={now > read} class:down={now < read}>{formatNumber(now)}{cell.suffix ?? ""}</span>
+        <span class="small">{formatNumber(read)}{cell.suffix ?? ""}</span>
+      {:else}
+        {formatNumber(read)}{cell.suffix ?? ""}
+      {/if}
+    </dd>
+  </div>
+{/snippet}
+
 <section class="sheet" aria-label="Character stats">
   <div class="top">
     <span class="when">
@@ -142,9 +161,9 @@
   {#if !sheet}
     <p class="quiet-line">
       {#if can.liveReading}
-        Open your Character Stat window in the game and press Detail, then Read. Leafline also reads it by itself while it is open.
+        Open your Character Stat window in game and press Detail. Leafline reads it while it's open.
       {:else}
-        Share the game window on Now (Read the game), then open your Character Stat window and press Detail: the website reads it once it holds still. Stats the Windows program read also come along in a records file (Settings, Data).
+        Share the game window on Now, then open your Character Stat window and press Detail.
       {/if}
     </p>
   {:else}
@@ -152,31 +171,25 @@
       <p class="quiet-line">With your buffs on. Each number they change has the one without them beside it.</p>
     {/if}
 
-    <dl class="grid four">
-      {#each GROUPS[0] as cell (cell.key)}
-        {@const read = value(sheet, cell.key)}
-        <div>
-          <dt>{cell.label}</dt>
-          <dd class="tabular">{read == null ? "—" : formatNumber(read)}</dd>
-        </div>
-      {/each}
-    </dl>
-
-    <dl class="grid four">
+    <!-- The four stats you put AP into, with what your gear adds, and the AP still to spend. -->
+    <dl class="main">
       {#each BASE as stat (stat.key)}
         {@const own = sheet[stat.key]}
         {@const gear = sheet[stat.gear]}
         <div>
           <dt>{stat.label}</dt>
-          <dd class="tabular">
-            {#if own == null}—{:else if gear}{own + gear} <span class="small">({own}+{gear})</span>{:else}{own}{/if}
-          </dd>
+          <dd class="num">{own == null ? "—" : own + (gear ?? 0)}</dd>
+          {#if own != null && gear}<span class="small gear" use:tip={`${own} you put in, +${gear} from gear`}>+{gear} gear</span>{/if}
         </div>
       {/each}
+      <div class="ap" class:spend={(sheet.abilityPoints ?? 0) > 0}>
+        <dt>AP left</dt>
+        <dd class="num">{sheet.abilityPoints ?? "—"}</dd>
+      </div>
     </dl>
 
-    <dl class="grid">
-      <div class="wide">
+    <dl class="pairs">
+      <div>
         <dt>Attack</dt>
         <dd class="tabular">
           {#if sheet.attackMin == null || sheet.attackMax == null}
@@ -189,40 +202,27 @@
           {/if}
         </dd>
       </div>
-      {#each GROUPS[1] as cell (cell.key)}
-        {@const read = value(sheet, cell.key)}
-        {@const now = changed(cell.key)}
-        <div>
-          <dt>{cell.label}</dt>
-          <dd class="tabular">
-            {#if read == null}
-              —
-            {:else if now != null}
-              <span class:up={now > read} class:down={now < read}>{formatNumber(now)}{cell.suffix ?? ""}</span>
-              <span class="small">{formatNumber(read)}{cell.suffix ?? ""}</span>
-            {:else}
-              {formatNumber(read)}{cell.suffix ?? ""}
-            {/if}
-          </dd>
-        </div>
-      {/each}
+      {#each FIGHT as cell (cell.key)}{@render pair(cell)}{/each}
     </dl>
 
+    <details class="more">
+      <summary>More stats</summary>
+      <dl class="pairs">
+        {#each MORE as cell (cell.key)}{@render pair(cell)}{/each}
+      </dl>
+    </details>
   {/if}
 
-  <h4 class="sub">Buffs</h4>
+  <h4 class="sub">Buffs{#if buffs.length}<span class="help" use:tip={BUFF_HELP}><Info size={12} aria-label="How buffs count" /></span>{/if}</h4>
   {#if !buffs.length}
     <p class="quiet-line">
       {#if sheet}
-        No buffs known yet. Open your Skill window, or choose a job in your build, and your buffs show here.
+        No buffs known yet. Open your Skill window, or pick a job in your build.
       {:else}
-        Your buffs show here once your Skill window has been read or your build has a job.
+        Your buffs show here once your Skill window is read or your build has a job.
       {/if}
     </p>
   {:else}
-    <p class="quiet-line">
-      Turn on the ones you have running. Each counts at its level. When the Character Stat window shows a buff in red, its switch follows.
-    </p>
     <ul class="buffs">
       {#each buffs as b (b.id)}
         {@const effect = effectText(b)}
@@ -259,31 +259,31 @@
 <style>
   .sheet {
     display: grid;
-    gap: 2px;
+    gap: var(--space-0-5);
   }
 
   .top {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin-bottom: 4px;
+    gap: var(--space-2);
+    margin-bottom: var(--space-1);
   }
 
   .when {
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .link {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--space-1);
     margin-left: auto;
     padding: 0;
     border: 0;
     background: transparent;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     cursor: pointer;
   }
 
@@ -299,37 +299,96 @@
   }
 
   .problem {
-    margin: 0 0 4px;
+    margin: 0 0 var(--space-1);
     color: var(--warn);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .quiet-line {
-    margin: 0 0 4px;
+    margin: 0 0 var(--space-1);
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
-  .grid {
+  /* The four stats you raise, big enough to read at a glance, and the AP to spend. */
+  .main {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
-    gap: 6px;
-    margin: 6px 0 4px;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    margin: var(--space-1-5) 0 var(--space-2);
   }
 
-  .grid.four {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  .grid div {
+  .main div {
+    display: flex;
+    flex-direction: column;
     min-width: 0;
-    padding: 5px 8px;
-    border-radius: var(--radius-sm);
-    background: var(--hover);
+    padding: 0 var(--space-2);
+    border-left: 1px solid var(--border);
   }
 
-  .grid .wide {
-    grid-column: span 2;
+  .main div:first-child {
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .main dd {
+    font-size: var(--text-xl);
+    line-height: 1.2;
+  }
+
+  .main .gear {
+    cursor: help;
+  }
+
+  /* AP waiting to be spent: the one thing here to act on. */
+  .ap.spend dd,
+  .ap.spend dt {
+    color: var(--accent-text);
+  }
+
+  /* Label and number on one line, split by rules: no box per number. */
+  .pairs {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    column-gap: var(--space-5);
+    margin: 0;
+  }
+
+  .pairs div {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-2);
+    min-width: 0;
+    padding: var(--space-1-5) 0;
+    border-top: 1px solid var(--border);
+  }
+
+  .pairs dt {
+    font-size: var(--text-md);
+    color: var(--muted);
+  }
+
+  .more {
+    margin-top: var(--space-1);
+  }
+
+  .more summary {
+    padding: var(--space-1-5) 0;
+    color: var(--faint);
+    font-size: var(--text-md);
+    cursor: pointer;
+  }
+
+  .more summary:hover {
+    color: var(--text);
+  }
+
+  .help {
+    display: inline-flex;
+    margin-left: var(--space-1-5);
+    color: var(--faint);
+    vertical-align: -1px;
+    cursor: help;
   }
 
   dt {
@@ -339,7 +398,7 @@
 
   dd {
     margin: 0;
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -348,7 +407,7 @@
   .small {
     color: var(--faint);
     font-size: var(--text-xs);
-    font-weight: 400;
+    font-weight: var(--weight-body);
   }
 
   .up {
@@ -364,17 +423,17 @@
   }
 
   .sub {
-    margin: 12px 0 6px;
+    margin: var(--space-3) 0 var(--space-1-5);
     font-family: var(--font-display);
-    font-size: var(--text-sm);
-    font-weight: 400;
+    font-size: var(--text-md);
+    font-weight: var(--weight-body);
     color: var(--muted);
   }
 
   .buffs {
     display: grid;
-    gap: 4px;
-    margin: 4px 0 0;
+    gap: 0;
+    margin: var(--space-1) 0 0;
     padding: 0;
     list-style: none;
   }
@@ -383,12 +442,11 @@
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
-    column-gap: 8px;
+    column-gap: var(--space-2);
     row-gap: 1px;
-    padding: 6px 8px;
-    border-radius: var(--radius-sm);
-    background: var(--hover);
-    font-size: var(--text-sm);
+    padding: var(--space-1-5) 0;
+    border-top: 1px solid var(--border);
+    font-size: var(--text-md);
   }
 
   .buffs li.off .buff-effect {

@@ -38,10 +38,10 @@
   .picker {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 6px 12px;
+    gap: var(--space-2);
+    padding: var(--space-1-5) var(--space-3);
     border-bottom: 1px solid var(--border-strong);
-    font-size: var(--text-sm, 12px);
+    font-size: var(--text-md);
   }
   label {
     color: var(--muted);

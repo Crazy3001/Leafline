@@ -113,7 +113,7 @@
     position: relative;
     display: block;
     width: 100%;
-    margin-top: 6px;
+    margin-top: var(--space-1-5);
     padding: 0;
     overflow: hidden;
     border: 1px solid var(--border);

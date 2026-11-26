@@ -120,7 +120,7 @@ mod tests {
             plan: Plan {
                 job: 420,
                 skills: vec![SkillLevel { skill_id: 9, level: 5 }],
-                stats: vec![StatGoal { stat: Stat::Luk, target: None, from_level: None }],
+                stats: vec![StatGoal { stat: Stat::Luk, target: None, from_level: None, with_gear: false }],
                 ..Plan::default()
             },
             ..Build::default()

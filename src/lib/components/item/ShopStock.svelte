@@ -28,14 +28,14 @@
     margin: 0;
     padding: 0;
     list-style: none;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .stock li {
     display: flex;
     align-items: baseline;
-    gap: 6px;
-    padding: 3px 0;
+    gap: var(--space-1-5);
+    padding: var(--space-0-5) 0;
     border-top: 1px solid var(--border);
   }
 
