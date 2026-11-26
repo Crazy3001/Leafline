@@ -4,6 +4,7 @@
   import { backend } from "$lib/api";
   import StarterCard from "$lib/components/planner/StarterCard.svelte";
   import Segmented from "$lib/ui/Segmented.svelte";
+  import { tip } from "$lib/tip.svelte";
   import type { BuildCatalog, BuildPlan, StarterPlan } from "$lib/types";
 
   let {
@@ -148,51 +149,37 @@
     </div>
   </section>
 
-  <section>
-    <h2>3 · Name it</h2>
-    <div class="names">
-      <label class="grow">
-        <span>Build name</span>
-        <input
-          maxlength="80"
-          value={shownName}
-          oninput={(e) => {
-            named = true;
-            name = e.currentTarget.value;
-          }}
-        />
-      </label>
-      <label>
-        <span>For character</span>
-        <input maxlength="30" placeholder="Any" value={forWho} oninput={(e) => (who = e.currentTarget.value)} />
-      </label>
-      <label>
-        <span>Starts at</span>
-        <input class="number" readonly value={`Lv ${level ?? 1}`} />
-      </label>
-    </div>
-    <div class="gender">
-      <span class="field-label">Gear made for</span>
-      <Segmented label="Gear made for" size="sm" options={GENDERS} value={gender} onchange={(g) => (gender = g)} />
-      <span class="faint">Some hats, tops and shoes are made for one. Change it later in the Gear tab.</span>
-    </div>
-    <p class="help">
-      {#if character}Read from the game.{:else}No character read yet: the build follows whoever you name.{/if}
-      Your stats and skills fill in when Leafline reads your Stat and Skill windows.
-    </p>
-  </section>
-
   {#if error}<p class="error" role="alert">{error}</p>{/if}
-  <!-- Always in view at the bottom, saying what it will make. -->
+  <!-- Always in view at the bottom: the build's name, to change right there, and Create. -->
   <div class="actions">
+    <label class="bar-name">
+      <span>Name</span>
+      <input
+        maxlength="80"
+        aria-label="Build name"
+        value={shownName}
+        oninput={(e) => {
+          named = true;
+          name = e.currentTarget.value;
+        }}
+      />
+    </label>
+    <label class="bar-field" use:tip={character ? "Read from the game. The build is used whenever Leafline reads this name." : "The build is used whenever Leafline reads this name; empty for anyone."}>
+      <span>For</span>
+      <input class="who" maxlength="30" placeholder="Any character" value={forWho} oninput={(e) => (who = e.currentTarget.value)} />
+    </label>
+    <span class="bar-field" use:tip={"The level the plan starts from: the character's, when Leafline has read it"}>
+      <span>Starts at</span><b class="tabular">Lv {level ?? 1}</b>
+    </span>
+    <span class="bar-field" use:tip={"Some hats, tops and shoes are made for one. Change it later in the Gear tab."}>
+      <span>Gear for</span>
+      <Segmented label="Gear made for" size="sm" options={GENDERS} value={gender} onchange={(g) => (gender = g)} />
+    </span>
+    <span class="push"></span>
     <button class="create" disabled={!job || busy} onclick={create}>Create build</button>
     {#if canCancel}<button class="cancel" onclick={onCancel}>Cancel</button>{/if}
     {#if !job}
       <span class="faint">Pick a second job first.</span>
-    {:else}
-      <span class="choice-summary">
-        {jobName} · {starter ? starter.name : "Blank plan"}
-      </span>
     {/if}
   </div>
 </main>
@@ -316,12 +303,6 @@
     font-weight: var(--weight-body);
   }
 
-  .names {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-3);
-    max-width: 640px;
-  }
 
   label {
     display: grid;
@@ -330,10 +311,6 @@
     font-size: var(--text-md);
   }
 
-  .grow {
-    flex: 1;
-    min-width: 200px;
-  }
 
   input {
     padding: var(--space-1) var(--space-2);
@@ -350,9 +327,6 @@
     outline: none;
   }
 
-  .number {
-    width: 70px;
-  }
 
   .help {
     margin: 0;
@@ -369,6 +343,8 @@
   }
 
   .actions {
+    flex-wrap: wrap;
+    row-gap: var(--space-2);
     position: sticky;
     bottom: calc(-1 * var(--space-8));
     z-index: 2;
@@ -381,24 +357,40 @@
     background: var(--surface-raised);
   }
 
-  .choice-summary {
-    overflow: hidden;
-    color: var(--muted);
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .gender {
+  .bar-name,
+  .bar-field {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    gap: var(--space-2) var(--space-3);
-  }
-
-  .field-label {
+    gap: var(--space-1-5);
+    min-width: 0;
     color: var(--muted);
     font-size: var(--text-md);
   }
+
+  .bar-name {
+    flex: 1 1 240px;
+    max-width: 380px;
+  }
+
+  .bar-field b {
+    color: var(--text);
+    font-weight: var(--weight-strong);
+  }
+
+  .who {
+    width: 130px;
+  }
+
+  .push {
+    flex: 1;
+  }
+
+  .bar-name input {
+    flex: 1;
+    min-width: 0;
+  }
+
+
 
   .create {
     height: 32px;
