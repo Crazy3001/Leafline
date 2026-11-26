@@ -4,11 +4,13 @@
 
 <script lang="ts">
   // The Tools list: everything that isn't a tab, as a grid of named tiles, and the window's own
-  // controls under it. Search finds the same tools by name.
-  import { Bug, Camera, EyeOff, Minimize2, MonitorUp, Settings } from "@lucide/svelte";
+  // controls under it, with the light/dark switch. Search finds the same tools by name.
+  import { Bug, Camera, EyeOff, Minimize2, MonitorUp, Moon, Settings, Sun } from "@lucide/svelte";
 
   import { can } from "$lib/platform";
-  import { hotkey } from "$lib/settings.svelte";
+  import { changeSettings, hotkey } from "$lib/settings.svelte";
+  import { tip } from "$lib/tip.svelte";
+  import { darkLook, lightSwitch } from "$lib/ui/theme.svelte";
 
   import { TOOLS, type ToolInfo } from "./tabs";
 
@@ -32,6 +34,7 @@
     { id: "settings" as const, title: "Settings", icon: Settings, key: "" },
     { id: "hide" as const, title: "Hide", icon: EyeOff, key: hotkey("ToggleOverlay") },
   ]);
+  const flip = $derived(lightSwitch());
 </script>
 
 <div class="tools">
@@ -62,6 +65,12 @@
         </button>
       </li>
     {/each}
+    <li>
+      <button class="win" aria-label={flip.label} use:tip={flip.label} onclick={() => void changeSettings({ theme: flip.to })}>
+        {#if darkLook()}<Sun size={17} />{:else}<Moon size={17} />{/if}
+        <span>{darkLook() ? "Light" : "Dark"}</span>
+      </button>
+    </li>
   </ul>
 </div>
 

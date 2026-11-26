@@ -1,8 +1,8 @@
 <script lang="ts">
   // The website's way into live reading, on the desk's top row: share the game window and Leafline
-  // reads the game from it (platform/live.ts); Stop reading while it does. Its state is the same
-  // live status the sidebar shows. What it reads and how to share well is in its tooltip; the ban
-  // risk line is in the sidebar's foot.
+  // reads the game from it (platform/live.ts); Stop reading while it does. It is where the website
+  // says whether it's reading; the player bar leaves that to it. What it reads and how to share
+  // well is in its tooltip; the ban risk line is in the sidebar's foot.
   import { MonitorPlay, Square } from "@lucide/svelte";
   import { onMount } from "svelte";
 
