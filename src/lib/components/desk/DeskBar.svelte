@@ -130,7 +130,7 @@
   <div class="cell">
     <span class="label">Session{session?.held ? " · paused" : session?.paused && tracking ? " · idle" : ""}</span>
     <span class="num fig" class:held={session?.held}>{session && tracking ? clock(session.activeSeconds) : "0:00"}</span>
-    <div class="controls"><SessionControls /></div>
+    <SessionControls compact />
   </div>
 </section>
 
@@ -418,10 +418,6 @@
 
   .sub.down {
     color: var(--warn);
-  }
-
-  .controls {
-    margin-top: var(--space-0-5);
   }
 
   /* A narrower desk window: who you are and the level on one row, the three figures under them. */

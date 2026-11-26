@@ -2086,6 +2086,21 @@ export interface WholeQuest {
   giver: string | null;
   repeat: string | null;
   seenAt: number | null;
+  /** The questline it is a step of, when the data chains it with others. */
+  line: LineStep | null;
+  /** The counts the Quest window's detail pane last showed, while it is in progress. */
+  counters: { name: string; have: number; need: number }[];
+}
+
+/** A quest's place in its questline. */
+export interface LineStep {
+  /** The line's first quest, which tells it apart from every other line. */
+  head: number;
+  /** The series' name in the data, or the first quest's for a line the data doesn't name. */
+  name: string;
+  /** Which step, from 1; 0 for a row the game listed by the line's name that no step stood for. */
+  step: number;
+  of: number;
 }
 
 export interface WholeRegion {

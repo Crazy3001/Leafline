@@ -97,13 +97,14 @@
         {#if tracking}<div class="d plain">{coverage?.partial ? `counted ${coverage.label}` : session?.mesosGained ? `${session.mesosGained > 0 ? "+" : ""}${formatNumber(session.mesosGained)} so far` : ""}</div>{/if}
       </div>
     </div>
-    <div class="tile">
+    <!-- The buttons take the tile's whole width under the clock, so they wrap rather than overrun it. -->
+    <div class="tile session">
       <span class="ic blue" aria-hidden="true"><Clock3 size={18} /></span>
-      <div>
+      <div class="body">
         <div class="l">Session{session?.held ? " · paused" : ""}</div>
         <div class="v" class:held={session?.held}>{session && tracking ? clock(session.activeSeconds) : "0:00"}</div>
-        <div class="controls"><SessionControls /></div>
       </div>
+      <div class="controls"><SessionControls compact /></div>
     </div>
   </div>
 </TitledCard>
@@ -284,8 +285,18 @@
     color: var(--warn);
   }
 
+  .tile.session {
+    flex-wrap: wrap;
+    row-gap: var(--space-2);
+  }
+
+  .body {
+    min-width: 0;
+  }
+
   .controls {
-    margin-top: var(--space-1-5);
+    flex-basis: 100%;
+    min-width: 0;
   }
 
   /* A narrow card: the three figures stack. */

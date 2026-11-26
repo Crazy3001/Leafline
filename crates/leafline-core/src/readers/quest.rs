@@ -670,7 +670,8 @@ fn settle_counters(
         let (Row::Objective { counters, .. }, Some(glyphs), None) = (row, glyphs, &counter) else { continue };
         let read = |masks: &[Mask]| digits.read(masks).filter(|t| !t.is_empty())?.parse::<u32>().ok();
         *counter = match (read(&glyphs.current), read(&glyphs.required)) {
-            (Some(current), Some(required)) if required > 0 && current <= required => Some((current, required)),
+            // Past its target too (`28 / 20` items held): the quest's lines decide whether it stands.
+            (Some(current), Some(required)) if required > 0 => Some((current, required)),
             _ => counters.first().copied(),
         };
     }

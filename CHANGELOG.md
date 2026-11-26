@@ -5,6 +5,21 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
 
 ## Unreleased
 
+- **Quests is one list.** Every quest, region by region with "x of y done", and what's ready to
+  hand in first: who takes it, where, and Go. Quests in progress show their counts from the Quest
+  Helper or the Quest window. The filter chips stay; On now, Quest log and To take are gone, and a
+  pinned Quests window still shows what you're on.
+- **Questlines fold into one row** that opens: the line's name, how far along you are (1 of 4)
+  and the quest you're on, marked. On by default; the Questlines switch shows every quest flat,
+  and is remembered. A quest the game lists by its series' name (the Quest window's "Collecting
+  For Maya" for "Maya's First Collection") lands on its step instead of "Not in the map data".
+- **A quest opens beside the list** on a wide window, with its questline on top (done, on now,
+  next) and the quest under it: its counts, where to hunt, who gives and takes it, and what it
+  pays. On a phone it opens full screen with Back.
+- Item counts past their target (28 / 20 held) are kept, when the target reads as the data has it.
+- **The Session buttons fit.** On Now's Session tile and in the player bar, Pause and New sit
+  under the clock and wrap instead of running past the edge, at any text size. "Autosaves" is an
+  info mark now.
 - **Pick a character from any page.** The desk sidebar keeps the character switch above the
   reading status: who Leafline shows, their level and job, and "as of …" when it was read
   earlier. It opens a list of every character this copy has seen, each with a last-seen line

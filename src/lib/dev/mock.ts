@@ -373,7 +373,23 @@ const mockQuests: QuestRow[] = [
   // Made-up stand-ins for the job advancement quests the checklist looks for.
   { id: 90, name: "The Drifter's Next Journey", region: "Mossbank", levelMin: 30, giver: "Warden Ilse", repeat: null, exp: 0, mesos: 0 },
   { id: 91, name: "Finding the Instructor", region: "Mossbank", levelMin: 30, giver: "Warden Ilse", repeat: null, exp: 0, mesos: 0 },
+  // A made-up questline: a series of four lanterns, and a pair the data chains by prerequisite.
+  { id: 80, name: "Wren's First Lantern", region: "Mossbank", levelMin: 8, giver: "Lamplighter Wren", repeat: null, exp: 400, mesos: 1000 },
+  { id: 81, name: "Wren's Second Lantern", region: "Mossbank", levelMin: 10, giver: "Lamplighter Wren", repeat: null, exp: 650, mesos: 1500 },
+  { id: 82, name: "Oil for the Wicks", region: "Mossbank", levelMin: 12, giver: "Lamplighter Wren", repeat: null, exp: 900, mesos: 2000 },
+  { id: 83, name: "The Lantern Festival", region: "Mossbank", levelMin: 40, giver: "Lamplighter Wren", repeat: null, exp: 4000, mesos: 8000 },
+  { id: 85, name: "Ferry Fare", region: "Fern Isle", levelMin: 4, giver: "Ferryman Oto", repeat: null, exp: 120, mesos: 300 },
+  { id: 86, name: "Ferry Fare Returned", region: "Fern Isle", levelMin: 6, giver: "Ferryman Oto", repeat: null, exp: 240, mesos: 600 },
 ];
+/** The made-up lines, in step order. */
+const mockLines = [
+  { name: "Lights of Mossbank", ids: [80, 81, 82, 83] },
+  { name: "Ferry Fare", ids: [85, 86] },
+];
+const mockLine = (id: number): WholeQuest["line"] => {
+  const line = mockLines.find((l) => l.ids.includes(id));
+  return line ? { head: line.ids[0], name: line.name, step: line.ids.indexOf(id) + 1, of: line.ids.length } : null;
+};
 const characterHandlers: ((read: CharacterRead) => void)[] = [];
 
 /** A made-up quest log, as if the Quest window had been looked through an hour ago. */
@@ -420,6 +436,26 @@ const mockQuestLog = (): QuestLog => ({
     }),
     loggedQuest({ title: "Finding the Instructor", questId: 91, region: "Mossbank", state: "available" }),
     loggedQuest({ title: "A Lantern for the Ferry", region: "Fern Isle", state: "inProgress", icon: "arrow" }),
+    loggedQuest({ title: "Wren's First Lantern", questId: 80, region: "Mossbank", done: true, doneSeenAt: hourAgo() }),
+    // The game lists this step by its series' name, which no quest in the data is called.
+    loggedQuest({
+      title: "Lights of Mossbank",
+      region: "Mossbank",
+      state: "inProgress",
+      counters: [
+        { name: "Wax Drop", have: 28, need: 20 },
+        { name: "Wick Thread", have: 20, need: 20 },
+      ],
+      detailSeenAt: hourAgo(),
+    }),
+    loggedQuest({
+      title: "Ferry Fare",
+      questId: 85,
+      region: "Fern Isle",
+      state: "inProgress",
+      counters: [{ name: "Moss Slime", have: 3, need: 10 }],
+      detailSeenAt: hourAgo(),
+    }),
   ],
   regions: [
     { tab: "completed", region: "Mossbank", count: 1, seenAt: hourAgo() },
@@ -1257,22 +1293,39 @@ export const mockBackend: Backend = {
       giver: q.giver,
       repeat: q.repeat,
       seenAt: Date.now() / 1000 - 600,
+      line: mockLine(q.id),
+      counters: [],
       ...extra,
     });
-    const [first, ...rest] = mockQuests;
-    const quests = rest.map((q, i) =>
-      i === 0
-        ? row(q, "inProgress", { series: "Moss Errands" })
-        : i === 1
-          ? row(q, "notYet", { notYet: { level: (level ?? 1) + 5, after: [{ id: first.id, name: first.name, levelMin: first.levelMin }], notOfferedAt: null } })
-          : row(q, "canTake", { seenAt: null }),
-    );
+    const at = level ?? 1;
+    const byId = (id: number) => mockQuests.find((q) => q.id === id)!;
+    const after = (id: number) => [{ id, name: byId(id).name, levelMin: byId(id).levelMin }];
+    const fern = [
+      row(byId(71), "ready", { counters: [{ name: "Moss Slime", have: 5, need: 5 }] }),
+      row(byId(85), "inProgress", { counters: [{ name: "Moss Slime", have: 3, need: 10 }] }),
+      row(byId(86), "notYet", { notYet: { level: null, after: after(85), notOfferedAt: null } }),
+    ];
+    const moss = [
+      row(byId(70), "done", { inferred: true }),
+      row(byId(80), "done"),
+      row(byId(81), "ready", {
+        series: "Lights of Mossbank",
+        counters: [
+          { name: "Wax Drop", have: 28, need: 20 },
+          { name: "Wick Thread", have: 20, need: 20 },
+        ],
+      }),
+      row(byId(82), "notYet", { notYet: { level: null, after: after(81), notOfferedAt: null } }),
+      row(byId(83), "notYet", { notYet: { level: at < 40 ? 40 : null, after: after(82), notOfferedAt: null } }),
+      row(byId(90), at >= 30 ? "canTake" : "notYet", { seenAt: null, notYet: at >= 30 ? null : { level: 30, after: [], notOfferedAt: null } }),
+      row(byId(91), "canTake", { seenAt: null }),
+    ];
     return {
       seen: true,
       level,
       regions: [
-        { region: "Fern Isle", done: 1, total: 1, quests: [row(first, "done", { inferred: true })] },
-        { region: "Mossbank", done: 0, total: quests.length, quests },
+        { region: "Fern Isle", done: 0, total: fern.length, quests: fern },
+        { region: "Mossbank", done: 2, total: moss.length, quests: moss },
       ],
     };
   },

@@ -1,7 +1,7 @@
 <script lang="ts">
   // The character's quest log at a glance, as the game's Quest window last showed it: what is
-  // ready to hand in and to whom, and what else is in progress. Every quest, region by region, is
-  // on the card below it.
+  // ready to hand in and to whom, and what else is in progress. Shown only until the map data is
+  // downloaded; after that the Quests page's list (QuestBook) says all this for every quest.
   // Only true as of the last look, which the card says.
   import { untrack } from "svelte";
   import { CircleCheck } from "@lucide/svelte";

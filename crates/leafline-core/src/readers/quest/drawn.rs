@@ -173,9 +173,9 @@ pub fn read(
             // A counter whose digits couldn't be cut out (the UI drawn smoothed) still reads as
             // one in the text, as the program reads its own.
             if let Some((target, counters)) = super::objective(std::slice::from_ref(&text)) {
-                // Read from text alone, a count past its target (`56 / 20` items) can't be told
-                // from a misread one (`231 / 29` for `23 / 20`), so only counts up to it stand.
-                let counters: Vec<(u32, u32)> = counters.into_iter().filter(|(current, required)| current <= required).collect();
+                // A count past its target (`28 / 20` items) is kept: only a clear slash lets the
+                // text give one, and the quest's own lines say whether it can stand (kills stop at
+                // the target; items held can pass it, when the target is read as the data has it).
                 rows.push(Row::Objective { y, target: past_counter_debris(&target), counters });
                 drawn.push(None);
                 checks.push(None);

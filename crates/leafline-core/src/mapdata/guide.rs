@@ -256,12 +256,14 @@ fn pair_lines(known: &[Objective], read: &[Objective]) -> Vec<(usize, usize)> {
 /// Takes the counts read into a quest's lines from the data, whose names and targets stay. A
 /// line not read keeps its count. A kill count above its line's target is a misread, since the
 /// game stops counting there, but an item line counts what the inventory holds, so `9 / 5
-/// Leather` is right: `items` names those lines. Once a reading shows every line, the lines
-/// take its order, the Quest Helper's.
+/// Leather` is right: `items` names those lines. A count past its target stands only with the
+/// target read as the data has it, since a misread counter (`231 / 29` for `23 / 20`) gets both
+/// wrong. Once a reading shows every line, the lines take its order, the Quest Helper's.
 fn fill_counts(lines: &mut [Objective], read: &[Objective], falling: &mut Vec<(String, u32)>, items: &[String]) {
     let pairs = pair_lines(lines, read);
     for &(r, k) in &pairs {
-        if read[r].current <= lines[k].required || items.contains(&lines[k].target) {
+        let over = read[r].current > lines[k].required;
+        if !over || (items.contains(&lines[k].target) && read[r].required == lines[k].required) {
             take_count(&mut lines[k], read[r].current, falling);
             lines[k].unread = false;
         }
@@ -1056,6 +1058,9 @@ mod tests {
         let over = quest("Shell Sorting", &[("Pebble Snail", 9, 8), ("Burrow Rat", 2, 2), ("Snail Shell", 9, 5)]);
         let read = held(&mut titles, &atlas, reading(vec![over], None)).unwrap();
         assert_eq!(read.quests[0].objectives[0].current, 8, "kills still stop at the target");
+        let misread = quest("Shell Sorting", &[("Pebble Snail", 8, 8), ("Burrow Rat", 2, 2), ("Snail Shell", 91, 50)]);
+        let read = held(&mut titles, &atlas, reading(vec![misread], None)).unwrap();
+        assert_eq!(read.quests[0].objectives[2].current, 9, "a count past a target read wrong is a misread");
     }
 
     #[test]
