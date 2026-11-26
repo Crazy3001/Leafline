@@ -16,13 +16,15 @@
     /** "made": the recipes that make it, a group under Where to get it. "used": what it goes into. */
     part: "made" | "used";
   } = $props();
-  let madeOpen = $state(true);
+  /** Folded, like the other ways to get it, for each item opened. */
+  let madeOpen = $state(false);
 
   let crafting = $state<ItemCrafting | null>(null);
 
   $effect(() => {
     const wanted = id;
     crafting = null;
+    madeOpen = false;
     backend
       .itemCrafting(wanted)
       .then((found) => {

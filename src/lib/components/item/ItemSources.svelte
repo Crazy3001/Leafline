@@ -14,14 +14,23 @@
   const drops = $derived(found.origin.drops);
   const quests = $derived(found.origin.quests);
   const shops = $derived(found.origin.shops ?? []);
-  let shopsOpen = $state(true);
+  // Every group starts folded, with its count, for each item opened.
+  let shopsOpen = $state(false);
   const known = $derived(drops.hunts.filter((h) => h.monster.known));
   const unknown = $derived(drops.hunts.filter((h) => !h.monster.known));
 
-  let dropsOpen = $state(true);
-  let questsOpen = $state(true);
+  let dropsOpen = $state(false);
+  let questsOpen = $state(false);
   /** Monsters opened to their maps. */
   let opened = $state<string[]>([]);
+
+  $effect(() => {
+    void found;
+    shopsOpen = false;
+    dropsOpen = false;
+    questsOpen = false;
+    opened = [];
+  });
   const isOpen = (hunt: Hunt) => opened.includes(hunt.monster.name);
 
   function toggle(hunt: Hunt) {
@@ -88,8 +97,10 @@
   </div>
 {:else}
   <div class="group">
-    <p class="group-head static"><span class="group-title">Dropped by</span></p>
-    <p class="note">{drops.lookedUp ? "No monster is known to drop it." : "The drop table isn't downloaded yet."}</p>
+    {@render head("Dropped by", 0, dropsOpen, () => (dropsOpen = !dropsOpen))}
+    {#if dropsOpen}
+      <p class="note">{drops.lookedUp ? "No monster is known to drop it." : "The drop table isn't downloaded yet."}</p>
+    {/if}
   </div>
 {/if}
 
@@ -171,11 +182,6 @@
 
   .group-head {
     border-bottom: 1px solid var(--border);
-  }
-
-  p.group-head.static {
-    margin: 0;
-    cursor: default;
   }
 
   .group-title {
