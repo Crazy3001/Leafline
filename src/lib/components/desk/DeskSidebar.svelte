@@ -23,6 +23,7 @@
   import { backend } from "$lib/api";
   import Logo from "$lib/components/Logo.svelte";
   import { DESK_TOOL_PAGES, ZOOMS, type DeskView } from "$lib/desk";
+  import { can } from "$lib/platform";
   import { live } from "$lib/readings.svelte";
   import { changeSettings, display } from "$lib/settings.svelte";
 
@@ -64,7 +65,12 @@
     if (s.state === "reading") return { tone: "good", text: "Reading live", line: s.window || "The game window" };
     if (s.state === "waiting") return { tone: "warn", text: "Waiting", line: s.reason };
     if (s.state === "failed") return { tone: "bad", text: "Stopped", line: s.message };
-    return { tone: "quiet", text: "Not reading", line: "Turn reading on in the overlay" };
+    // The program reads by itself once live reading is on; the website, once the game window is shared.
+    return {
+      tone: "quiet",
+      text: "Not reading",
+      line: can.liveReading ? "Turn reading on in the overlay" : "Share the game window on Now",
+    };
   });
   const lightLook = $derived(display.theme === "focus-light" || display.theme === "ember-light" || display.theme === "sprout-light");
 
