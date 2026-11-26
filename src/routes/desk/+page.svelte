@@ -340,12 +340,13 @@
       {#if from}
         <button class="pill" onclick={back}><ArrowLeft size={14} />Back to {viewName(from)}</button>
       {/if}
+      <!-- Reading first: the one button that starts everything, ahead of search. -->
+      <ShareButton />
       {#if view !== "lookup"}
         <DeskSearch bind:this={deskSearch} onopen={openFound} onwords={searchWords} />
       {/if}
       <!-- Where you're heading and the next step from here, in the middle of the row. -->
       <div class="compass-slot"><Compass onpick={() => go("map")} /></div>
-      <ShareButton />
       {#if can.popOut}<button
         class="pill"
         aria-pressed={poppedOut}
