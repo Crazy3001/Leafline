@@ -1191,7 +1191,7 @@ export interface LoggedDrop extends NewDrop {
 export type CompactShape = "card" | "wide" | "bar";
 
 /** The look every window is drawn in (src/lib/ui/themes.css). */
-export type Theme = "ember-dark" | "ember-light" | "sprout-light" | "sprout-dark";
+export type Theme = "focus-dark" | "focus-light" | "ember-dark" | "ember-light" | "sprout-light" | "sprout-dark";
 
 export interface HotkeyChoice {
   enabled: boolean;
