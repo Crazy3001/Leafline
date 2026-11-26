@@ -15,7 +15,9 @@
   import NowScreen from "$lib/shell/NowScreen.svelte";
   import { tabInfo } from "$lib/shell/tabs";
   import { openPanel } from "$lib/nav.svelte";
-  import { profile } from "$lib/profile.svelte";
+  import { ago, profile } from "$lib/profile.svelte";
+  import { live } from "$lib/readings.svelte";
+  import { splitMapLabel } from "$lib/format";
   import type { Analysis, Panel, SessionSummary } from "$lib/types";
 
   let {
@@ -38,6 +40,10 @@
     /** A whole wide window, as a desk view: parts that take turns elsewhere sit side by side. */
     wide?: boolean;
   } = $props();
+
+  /** The map the character was last read on, while the minimap isn't in view. */
+  const lastMap = $derived(profile.known?.map ? splitMapLabel(profile.known.map).name : null);
+  const lastMapAt = $derived(profile.known?.seenAt ?? null);
 </script>
 
 {#snippet empty(text: string)}
@@ -62,9 +68,12 @@
     <MapCard map={analysis.map} {session} variant={pinned ? "glance" : "compact"} plain={pinned} />
   {:else}
     {@render empty(
-      can.liveReading
-        ? "The minimap isn't in view. Its map's details show here when it is."
-        : "Search for a map to see its portals, monsters and drops.",
+      (can.liveReading
+        ? live.liveStatus.state === "reading"
+          ? "Open your minimap in game: Leafline reads the map's name from its title, and the map's portals, monsters and drops show here."
+          : "Leafline isn't reading the game. Once it is, open your minimap and the map you're on shows here."
+        : "Search for a map to see its portals, monsters and drops, or share the game on Now and open your minimap.") +
+        (lastMap ? ` Last seen on ${lastMap}, ${ago(lastMapAt!)}.` : ""),
     )}
   {/if}
 {:else if panel === "train"}

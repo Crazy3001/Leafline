@@ -377,11 +377,11 @@
         {:else if view === "drops"}
           <DropLogView character={characters.viewing ?? ""} />
         {:else if view === "timers"}
-          <TimersCard />
+          <TimersCard explain />
         {:else if view === "sell"}
           <BagCheck />
         {:else if view === "tracked"}
-          <TrackedItems map={live.analysis?.map ?? null} />
+          <TrackedItems map={live.analysis?.map ?? null} explain />
         {:else if view === "potions"}
           <PotionPage />
         {:else if view === "route"}
