@@ -5,6 +5,9 @@
 //! name stands for the step the player is on. The data has levels and earlier quests but not every
 //! condition (jobs, events), so "can take" from the data alone is a guess, and the Available tab,
 //! once looked through, says which of those the game doesn't offer.
+//!
+//! Quests the data chains together are put in questlines: a series' steps, with a quest that leads
+//! into it alone. Two series the data names apart stay apart, as the game's Quest window lists them.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -12,7 +15,7 @@ use serde::Serialize;
 
 use super::atlas::{Atlas, QuestRef, fold};
 use super::osms::QuestRecord;
-use crate::readers::questlog::{QuestTab, RowIcon};
+use crate::readers::questlog::{DetailCounter, QuestTab, RowIcon};
 use crate::userdata::questlog::{LogState, LoggedQuest, QuestLog};
 
 /// Where a quest stands for the character.
@@ -61,16 +64,71 @@ pub struct WholeQuest {
     pub repeat: Option<String>,
     /// When the Quest window last showed where it stands.
     pub seen_at: Option<i64>,
+    /// The questline it is a step of, when the data chains it with others.
+    pub line: Option<LineStep>,
+    /// The counts the Quest window's detail pane last showed, while it is in progress.
+    pub counters: Vec<DetailCounter>,
+}
+
+/// A quest's place in its questline.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LineStep {
+    /// The line's first quest, which tells it apart from every other line.
+    pub head: u32,
+    /// The series' name in the data, or the first quest's for a line the data doesn't name.
+    pub name: String,
+    /// Which step this is, from 1; 0 for a row the game listed by the line's name that couldn't be
+    /// put on a step.
+    pub step: usize,
+    /// How many steps the line has.
+    pub of: usize,
+}
+
+/// Joins quests into lines, keeping two the data names as different series apart.
+struct Lines {
+    parent: HashMap<u32, u32>,
+    /// A line's series key (its folded name and region), by its root.
+    series: HashMap<u32, String>,
+}
+
+impl Lines {
+    fn root(&mut self, mut id: u32) -> u32 {
+        while let Some(&up) = self.parent.get(&id).filter(|&&up| up != id) {
+            let top = self.parent.get(&up).copied().unwrap_or(up);
+            self.parent.insert(id, top);
+            id = up;
+        }
+        id
+    }
+
+    fn join(&mut self, a: u32, b: u32) {
+        let (ra, rb) = (self.root(a), self.root(b));
+        if ra == rb {
+            return;
+        }
+        let (sa, sb) = (self.series.get(&ra).cloned(), self.series.get(&rb).cloned());
+        if sa.is_some() && sb.is_some() && sa != sb {
+            return;
+        }
+        self.parent.insert(ra, rb);
+        if let Some(key) = sb.or(sa) {
+            self.series.insert(rb, key);
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WholeRegion {
     pub region: String,
-    /// What is done there: the Completed tab's own count when its bar was read, which can count
-    /// quests the data lacks, otherwise the quests here that stand done.
+    /// The quests here the Quest window showed done, or handed in; not those only taken to be done.
     pub done: usize,
+    /// The quests the data and the log have here.
     pub total: usize,
+    /// The count the game's Completed tab showed for the region, when read. The game counts a
+    /// questline once and a repeated quest each time, so it is a check, not a count of quests.
+    pub completed_tab: Option<usize>,
     pub quests: Vec<WholeQuest>,
 }
 
@@ -169,6 +227,10 @@ impl Atlas {
         let available_whole = log.looks.iter().find(|l| l.tab == QuestTab::Available).and_then(|l| l.whole_at);
         let available_at = |q: &LoggedQuest| q.state == LogState::Available;
 
+        let lines = self.questlines();
+        // A row the game listed by a line's name, that no step could stand for, still goes with it.
+        let named_lines: HashMap<String, &LineStep> = lines.values().filter(|l| l.step == 1).map(|l| (fold(&l.name), l)).collect();
+
         let mut regions: BTreeMap<String, Vec<WholeQuest>> = BTreeMap::new();
         for quest in self.quests.values() {
             let entry = placed.get(&quest.id);
@@ -194,6 +256,8 @@ impl Atlas {
                 giver: quest.npc_id.and_then(|npc| self.npc_names.get(&npc).cloned()),
                 repeat: quest.repeat.clone(),
                 seen_at: logged.and_then(|q| if q.done { q.done_seen_at.or(q.state_seen_at) } else { q.state_seen_at }),
+                line: lines.get(&quest.id).cloned(),
+                counters: logged.filter(|q| q.state == LogState::InProgress).map(|q| q.counters.clone()).unwrap_or_default(),
             };
             regions.entry(quest.region.clone().unwrap_or_else(|| "Other".into())).or_default().push(row);
         }
@@ -218,6 +282,8 @@ impl Atlas {
                 giver: None,
                 repeat: None,
                 seen_at: q.state_seen_at,
+                line: named_lines.get(&fold(&q.title)).map(|l| LineStep { step: 0, ..(*l).clone() }),
+                counters: if q.state == LogState::InProgress { q.counters.clone() } else { Vec::new() },
             });
         }
 
@@ -231,12 +297,108 @@ impl Atlas {
             .into_iter()
             .map(|(region, mut quests)| {
                 quests.sort_by(|a, b| a.level_min.unwrap_or(0).cmp(&b.level_min.unwrap_or(0)).then_with(|| a.title.cmp(&b.title)));
-                let standing = quests.iter().filter(|q| matches!(q.stand, Stand::Done | Stand::Gone)).count();
-                let done = counted.get(region.as_str()).copied().unwrap_or(0).max(standing);
-                WholeRegion { total: quests.len().max(done), done, region, quests }
+                let done = quests.iter().filter(|q| matches!(q.stand, Stand::Done | Stand::Gone) && !q.inferred).count();
+                let completed_tab = counted.get(region.as_str()).copied();
+                WholeRegion { total: quests.len(), done, completed_tab, region, quests }
             })
             .collect();
         WholeLog { regions, seen: !log.looks.is_empty(), level }
+    }
+
+    /// Every quest in a line of two or more, with its place there. A series' steps make a line;
+    /// so do a quest and the next one it leads to, and a quest with the one quest it alone needs
+    /// first, when nothing else needs that one. Lines never join two series the data names apart.
+    pub fn questlines(&self) -> HashMap<u32, LineStep> {
+        let series_key = |q: &QuestRecord| q.chain.as_deref().map(|c| format!("{}|{}", fold(c), q.region.as_deref().unwrap_or("")));
+        let mut lines = Lines { parent: self.quests.keys().map(|&id| (id, id)).collect(), series: HashMap::new() };
+        let mut by_series: BTreeMap<String, Vec<u32>> = BTreeMap::new();
+        for q in self.quests.values() {
+            if let Some(key) = series_key(q) {
+                lines.series.insert(q.id, key.clone());
+                by_series.entry(key).or_default().push(q.id);
+            }
+        }
+        for ids in by_series.values() {
+            for &id in &ids[1..] {
+                lines.join(ids[0], id);
+            }
+        }
+        // What each quest leads on to: its next quest, and the quests that need it first.
+        let mut leads: HashMap<u32, Vec<u32>> = HashMap::new();
+        let mut before: HashMap<u32, Vec<u32>> = HashMap::new();
+        for q in self.quests.values() {
+            let earlier: Vec<u32> = q.follows.iter().copied().filter(|id| *id != q.id && self.quests.contains_key(id)).collect();
+            for &e in &earlier {
+                let next = leads.entry(e).or_default();
+                if !next.contains(&q.id) {
+                    next.push(q.id);
+                }
+            }
+            before.insert(q.id, earlier);
+            if let Some(next) = q.next_quest_id.filter(|n| *n != q.id && self.quests.contains_key(n)) {
+                let after = leads.entry(q.id).or_default();
+                if !after.contains(&next) {
+                    after.push(next);
+                }
+            }
+        }
+        for q in self.quests.values() {
+            if let Some(next) = q.next_quest_id.filter(|n| *n != q.id && self.quests.contains_key(n)) {
+                lines.join(q.id, next);
+            }
+            if let [only] = before[&q.id][..]
+                && leads.get(&only).is_some_and(|l| l.len() == 1)
+            {
+                lines.join(only, q.id);
+            }
+        }
+
+        let mut members: BTreeMap<u32, Vec<u32>> = BTreeMap::new();
+        for &id in self.quests.keys() {
+            let root = lines.root(id);
+            members.entry(root).or_default().push(id);
+        }
+        let mut out = HashMap::new();
+        for ids in members.into_values().filter(|ids| ids.len() > 1) {
+            let order = self.line_order(&ids, &leads);
+            let head = order[0];
+            let name = order.iter().find_map(|id| self.quests[id].chain.clone()).unwrap_or_else(|| self.quests[&head].name.clone());
+            for (i, &id) in order.iter().enumerate() {
+                out.insert(id, LineStep { head, name: name.clone(), step: i + 1, of: order.len() });
+            }
+        }
+        out
+    }
+
+    /// A line's quests in the order they're done: each after the ones leading to it, the lower
+    /// level first where the data doesn't say. A loop in the data ends the walk; the rest follow.
+    fn line_order(&self, ids: &[u32], leads: &HashMap<u32, Vec<u32>>) -> Vec<u32> {
+        let inside: HashSet<u32> = ids.iter().copied().collect();
+        let mut waiting: HashMap<u32, usize> = ids.iter().map(|&id| (id, 0)).collect();
+        for id in ids {
+            for next in leads.get(id).into_iter().flatten().filter(|n| inside.contains(n)) {
+                *waiting.get_mut(next).unwrap() += 1;
+            }
+        }
+        let rank = |id: &u32| (self.quests[id].level_min.unwrap_or(0), *id);
+        let mut order: Vec<u32> = Vec::with_capacity(ids.len());
+        let mut free: Vec<u32> = ids.iter().copied().filter(|id| waiting[id] == 0).collect();
+        while !free.is_empty() && order.len() < CHAIN_LIMIT {
+            free.sort_by_key(|id| std::cmp::Reverse(rank(id)));
+            let id = free.pop().unwrap();
+            order.push(id);
+            for next in leads.get(&id).into_iter().flatten().filter(|n| inside.contains(n)) {
+                let left = waiting.get_mut(next).unwrap();
+                *left -= 1;
+                if *left == 0 {
+                    free.push(*next);
+                }
+            }
+        }
+        let mut rest: Vec<u32> = ids.iter().copied().filter(|id| !order.contains(id)).collect();
+        rest.sort_by_key(rank);
+        order.extend(rest);
+        order
     }
 
     /// Whether a quest not in the log can be taken, as far as the data and the Available tab say.
@@ -382,7 +544,46 @@ mod tests {
             ]
         );
         let meadow = whole.regions.iter().find(|r| r.region == "Meadow").unwrap();
-        assert_eq!((meadow.done, meadow.total), (7, 7), "the game's own count, which can count quests the data lacks");
+        assert_eq!((meadow.done, meadow.total), (1, 4), "only what the Quest window showed done; Baskets One is taken to be");
+        assert_eq!(meadow.completed_tab, Some(7), "the game's own count, kept as a check");
+    }
+
+    #[test]
+    fn a_series_and_the_quest_leading_into_it_make_one_line_and_named_series_stay_apart() {
+        let mut atlas_quests = vec![quest(10, "Lead In", "Town", 2)];
+        let mut a = quest(11, "Bells One", "Town", 3);
+        a.chain = Some("Ringing Bells".into());
+        a.follows = vec![10];
+        let mut b = quest(12, "Bells Two", "Town", 3);
+        b.chain = Some("Ringing Bells".into());
+        let mut c = quest(13, "Bells Again", "Town", 9);
+        c.chain = Some("More Bells".into());
+        c.follows = vec![12];
+        atlas_quests.extend([a, b, c, quest(14, "Alone", "Town", 1)]);
+        let atlas = Atlas::new(Dataset { quests: atlas_quests, ..Dataset::default() });
+        let lines = atlas.questlines();
+        let step = |id: u32| lines.get(&id).map(|l| (l.head, l.name.as_str(), l.step, l.of));
+        assert_eq!(step(10), Some((10, "Ringing Bells", 1, 3)), "the quest leading in starts the line, named for its series");
+        assert_eq!(step(11), Some((10, "Ringing Bells", 2, 3)));
+        assert_eq!(step(12), Some((10, "Ringing Bells", 3, 3)));
+        assert_eq!(step(13), None, "a series of one, named apart, is no line");
+        assert_eq!(step(14), None);
+
+        // Real data has a series the game lists by its own name: it lands on its step, in its line.
+        let mut first = quest(20, "Maya's First Collection", "Henesys", 30);
+        first.chain = Some("Collecting For Maya".into());
+        let mut second = quest(21, "Maya's Second Collection", "Henesys", 30);
+        second.chain = Some("Collecting For Maya".into());
+        let atlas = Atlas::new(Dataset { quests: vec![first, second], ..Dataset::default() });
+        let mut row = logged(None, "Collecting For Maya", "Henesys", LogState::InProgress, false);
+        row.counters = vec![DetailCounter { name: "Cap".into(), have: 28, need: 20 }];
+        let log = QuestLog { character: Some("Tester".into()), looks: Vec::new(), quests: vec![row], regions: Vec::new() };
+        let whole = atlas.whole_quest_log(&log, Some(34), &["Maya's First Collection".into()]);
+        let on = of(&whole, "Maya's First Collection");
+        assert_eq!(on.stand, Stand::Ready, "a count past its target is kept, and full");
+        assert_eq!(on.counters[0].have, 28);
+        assert_eq!(on.line.as_ref().map(|l| (l.name.as_str(), l.step, l.of)), Some(("Collecting For Maya", 1, 2)));
+        assert!(whole.regions.iter().flat_map(|r| &r.quests).all(|q| q.quest_id.is_some()), "nothing left out as not in the data");
     }
 
     #[test]

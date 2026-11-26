@@ -5,7 +5,7 @@
 import { backend } from "./api";
 import { characters } from "./characters.svelte";
 import { following } from "./quests.svelte";
-import type { LoggedQuest, QuestLog, QuestTab, RegionTotal } from "./types";
+import type { LoggedQuest, QuestLog, QuestTab, RegionTotal, WholeLog } from "./types";
 
 export const questLog = $state<{ log: QuestLog | null; totals: RegionTotal[] }>({ log: null, totals: [] });
 
@@ -52,10 +52,27 @@ export function refreshRegionTotals() {
   backend.questRegionTotals().then((t) => (questLog.totals = t)).catch(() => {});
 }
 
-/** What the log knows of a quest in the data, if anything. */
+/**
+ * Quests the game's Quest window lists by their series' name, by the step of the data each stands
+ * for: the whole quest log works that out, and `noteSeriesSteps` keeps it here.
+ */
+const seriesSteps = $state<{ byId: Record<number, string> }>({ byId: {} });
+
+/** Keeps which step each series row stands for, from the whole quest log. */
+export function noteSeriesSteps(whole: WholeLog | null) {
+  const byId: Record<number, string> = {};
+  for (const r of whole?.regions ?? []) for (const q of r.quests) if (q.questId != null && q.series) byId[q.questId] = q.series;
+  seriesSteps.byId = byId;
+}
+
+/** What the log knows of a quest in the data, if anything, including a row listed by its series' name. */
 export function logged(id: number | null | undefined): LoggedQuest | null {
   if (id == null) return null;
-  return questLog.log?.quests.find((q) => q.questId === id) ?? null;
+  const quests = questLog.log?.quests ?? [];
+  const own = quests.find((q) => q.questId === id);
+  if (own) return own;
+  const series = seriesSteps.byId[id];
+  return series ? (quests.find((q) => q.questId == null && fold(q.title) === fold(series)) ?? null) : null;
 }
 
 /** The quests the log shows done, by id. */

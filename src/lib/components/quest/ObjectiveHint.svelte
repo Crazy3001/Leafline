@@ -78,7 +78,7 @@
           <span class="tabular mesos">{formatMesos(shop.price)} mesos</span>{#if left && left > 1}<span class="muted tabular"
               >&nbsp;each, {formatMesos(shop.price * left)} for {left}</span
             >{/if}
-          {#if shop.needs}<span class="muted"> · {shop.needs}</span>{/if}
+          {#if shop.needs}<span class="muted">{" · "}{shop.needs}</span>{/if}
         </span>
         {#if shop.map && shop.hops != null}<span class="far tabular">{shop.hops === 0 ? "here" : `${shop.hops} portal${shop.hops === 1 ? "" : "s"}`}</span>{/if}
       </p>

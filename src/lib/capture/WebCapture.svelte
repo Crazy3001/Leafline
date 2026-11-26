@@ -121,7 +121,7 @@
         x {stats.codedHeight}, shown {stats.displayWidth} x {stats.displayHeight} · {capture.readIn === "video" ? "taken from a video of the stream" : `read in the ${capture.readIn}`}{capture.readInWhy
           ? ` (the browser wouldn't hand the stream to the worker: ${capture.readInWhy})`
           : ""}
-        {#if quiet > 3}<span class="warn"> · no frame for {quiet} s</span>{/if}
+        {#if quiet > 3}<span class="warn">{" · "}no frame for {quiet} s</span>{/if}
       {:else}
         Waiting for the first frame…
       {/if}
@@ -224,7 +224,7 @@
       {stats.saved} saved{stats.dropped ? `, ${stats.dropped} skipped (saving fell behind)` : ""}{stats.saving
         ? `, ${stats.saving} being written`
         : ""}
-      {#if stats.saveProblem}<span class="bad"> · {stats.saveProblem}</span>{/if}
+      {#if stats.saveProblem}<span class="bad">{" · "}{stats.saveProblem}</span>{/if}
     </p>
   {/if}
 </section>

@@ -13,8 +13,6 @@
   import DeskBar from "$lib/components/desk/DeskBar.svelte";
   import DeskSidebar from "$lib/components/desk/DeskSidebar.svelte";
   import DeskTools from "$lib/components/desk/DeskTools.svelte";
-  import DeskCharacter from "$lib/components/desk/DeskCharacter.svelte";
-  import DeskHero from "$lib/components/desk/DeskHero.svelte";
   import DeskMap from "$lib/components/desk/DeskMap.svelte";
   import DeskQuests from "$lib/components/desk/DeskQuests.svelte";
   import NextUp from "$lib/components/desk/NextUp.svelte";
@@ -298,8 +296,8 @@
   />
 
   <div class="main">
-    <!-- On Now the character card has these numbers; everywhere else the bar keeps them in view. -->
-    {#if view !== "now"}<DeskBar />{/if}
+    <!-- Who you are, the level and the session's numbers, over every view, Now too. -->
+    <DeskBar />
     <div class="top">
       {#if from}
         <button class="pill" onclick={back}><ArrowLeft size={14} />Back to {viewName(from)}</button>
@@ -328,16 +326,15 @@
     <div class="view" class:narrow={narrowViews.includes(view)} class:full={view === "planner" || view === "layout"} aria-label={viewName(view)}>
       {#key view}
         {#if view === "now"}
-          <DeskHero />
           {#if isWeb}<ReadWindowCard />{/if}
-          <!-- Who you are and what to do next on top; the session, your quests and this map under them. -->
+          <!-- The bar above says who you are and the session's numbers. Under it: what to do next
+               and your quests, then the session's chart and this map. -->
           <div class="now-r1">
-            <DeskCharacter ongo={() => go("me")} />
             <NextUp onme={() => go("me")} />
+            <DeskQuests ongo={() => go("quests")} />
           </div>
           <div class="now-r2">
             <TrainPanel {level} map={live.analysis?.map ?? null} session={live.session} only="chart" />
-            <DeskQuests ongo={() => go("quests")} />
             <DeskMap ongo={() => go("map")} />
           </div>
           <!-- Without live reading, a session can be typed in. -->
@@ -566,12 +563,12 @@
     margin-right: 0;
   }
 
-  /* Now: the character and Next up side by side, then three cards. Narrow windows stack them. */
+  /* Now: Next up and Quests side by side, then the chart and this map. Narrow windows stack them. */
   .now-r1 {
     display: grid;
     grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
     gap: var(--space-4);
-    align-items: stretch;
+    align-items: start;
   }
 
   .now-r2 {

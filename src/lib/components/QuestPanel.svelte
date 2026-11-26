@@ -1,7 +1,9 @@
 <script lang="ts">
-  // The Quests tab: what the Quest Helper is tracking, the character's quest log as the game's
-  // Quest window last showed it, and a book of every quest in the map data. The book needs nothing
-  // from the game, so it works with live reading off.
+  // The Quests tab: every quest in the map data, region by region, with where each stands for the
+  // character as the game's Quest window and Quest Helper last showed it, what is ready to hand in
+  // first and questlines folded into one row. A quest picked opens beside the list (in place of it
+  // in a narrow window). The list needs nothing from the game, so it works with live reading off.
+  // A pinned window shows only what you're on now.
   import { can } from "$lib/platform";
   import { clipped, tip } from "$lib/tip.svelte";
   import { FilterBoxState } from "$lib/filterbox.svelte";
@@ -9,21 +11,23 @@
   import { untrack } from "svelte";
 
   import Card from "./Card.svelte";
-  import Segmented from "$lib/ui/Segmented.svelte";
+  import LookupSplit from "./lookup/LookupSplit.svelte";
   import MapDataPanel from "./map/MapDataPanel.svelte";
   import QuestCard from "./QuestCard.svelte";
   import QuestSheetCard from "./QuestSheetCard.svelte";
   import FollowedQuests from "./quest/FollowedQuests.svelte";
   import LoggedQuests from "./quest/LoggedQuests.svelte";
   import QuestLogCard from "./quest/QuestLogCard.svelte";
-  import WholeLogCard from "./quest/WholeLogCard.svelte";
+  import QuestBook from "./quest/QuestBook.svelte";
+  import QuestLine from "./quest/QuestLine.svelte";
   import QuestMark from "./quest/QuestMark.svelte";
   import { backend } from "$lib/api";
+  import { characters } from "$lib/characters.svelte";
   import { formatCompact } from "$lib/format";
   import { mapData, watchMapData } from "$lib/mapdata.svelte";
-  import { blankSearch, followedQuests, noteCharacter, questView, watchQuests } from "$lib/quests.svelte";
-  import { doneIds, hasLog, logged, questLog, refreshRegionTotals, watchQuestLog } from "$lib/questlog.svelte";
-  import type { MapReading, QuestPage, QuestReading, QuestRow, QuestSearch, SessionSummary } from "$lib/types";
+  import { blankSearch, followedQuests, following, noteCharacter, questView, watchQuests } from "$lib/quests.svelte";
+  import { doneIds, hasLog, noteSeriesSteps, questLog, refreshRegionTotals, watchQuestLog } from "$lib/questlog.svelte";
+  import type { MapReading, QuestPage, QuestReading, QuestRow, QuestSearch, SessionSummary, WholeLog } from "$lib/types";
 
   let {
     quest = null,
@@ -70,38 +74,6 @@
   /** The quests the log shows done, as a key: a search asks again when it changes. */
   const done = $derived(doneIds());
   const doneKey = $derived(done.join(","));
-  /** How many quests to take now the tab names before "Show all". */
-  const TAKE_NOW = 6;
-
-  // The tab shows one of three things at a time, picked by chips: what you're on now, the
-  // whole quest log, or what to pick up next. A pinned window shows only what you're on.
-  type View = "now" | "log" | "take";
-  const VIEW_KEY = "leafline.quests.view";
-  const VIEWS: { id: View; label: string }[] = [
-    { id: "now", label: "On now" },
-    { id: "log", label: "Quest log" },
-    { id: "take", label: "To take" },
-  ];
-  function storedView(): View {
-    try {
-      const saved = localStorage.getItem(VIEW_KEY);
-      if (VIEWS.some((v) => v.id === saved)) return saved as View;
-    } catch {
-      // Starts on what you're on now.
-    }
-    return "now";
-  }
-  let view = $state<View>(storedView());
-  function setView(next: View) {
-    view = next;
-    try {
-      localStorage.setItem(VIEW_KEY, next);
-    } catch {
-      // A convenience only.
-    }
-  }
-  /** What shows: a pinned window, or a tab with no map data to list quests from, has only the first. */
-  const showing = $derived<View>(pinned || !ready ? "now" : view);
   const browsing = $derived(search.text.trim() !== "" || narrowed > 0);
   const asked = $derived(JSON.stringify(search));
 
@@ -133,27 +105,31 @@
     return () => clearTimeout(timer);
   });
 
-  // Quests the character can start at their level that need no other quest first, or none they
-  // haven't done, the nearest to their level first. The quest log says which they've done, as of
-  // the last look at the Quest window; without it some may be done.
-  let takeNow = $state<QuestPage | null>(null);
+  // Every quest with where it stands, asked again whenever the log, the level, the Quest Helper
+  // or the map data changes. Whose: the character looked at, as the quest log goes by.
+  let whole = $state<WholeLog | null>(null);
+  const helperTitles = $derived((quest?.quests ?? []).map((q) => q.title).filter(Boolean));
+  const wholeKey = $derived(`${characters.active ?? following.character}|${level}|${helperTitles.join("\n")}`);
   $effect(() => {
+    void questLog.log;
     void mapData.status?.dataUpdatedAt;
-    void doneKey;
-    const at = level;
-    if (!ready || at == null || pinned) {
-      takeNow = null;
-      return;
-    }
-    untrack(() => backend.searchQuests({ ...blankSearch(), atLevel: at, noPrior: true, done, hideDone: true })).then(
-      (found) => {
-        if (level === at) takeNow = found;
-      },
+    const asked = wholeKey;
+    if (pinned || !ready) return;
+    untrack(() =>
+      backend
+        .wholeQuestLog(characters.active ?? following.character ?? null, level, helperTitles)
+        .then((found) => {
+          if (asked !== wholeKey) return;
+          whole = found;
+          noteSeriesSteps(found);
+        })
+        .catch(() => {}),
     );
   });
 
-  /** Quests to take, less those the log shows taken already. */
-  const toTake = $derived((takeNow?.quests ?? []).filter((row) => logged(row.id)?.state !== "inProgress"));
+  function pick(id: number) {
+    questView.id = id;
+  }
 
   async function more() {
     if (!page) return;
@@ -187,8 +163,8 @@
 {#snippet rows(list: QuestRow[])}
   <ul class="results">
     {#each list as row (row.id)}
-      <li>
-        <button onclick={() => (questView.id = row.id)}>
+      <li class:picked={row.id === questView.id}>
+        <button aria-current={row.id === questView.id || undefined} onclick={() => (questView.id = row.id)}>
           <span class="row-name">{row.name}<QuestMark id={row.id} label /></span>
           <span use:clipped class="row-line">{line(row)}{#if row.exp}{line(row) ? " · " : ""}<span class="exp tabular">{formatCompact(row.exp)} EXP</span>{/if}</span>
         </button>
@@ -263,32 +239,45 @@
   </div>
 {/if}
 
-{#if ready && questView.id != null}
-  <button class="back" class:pinned onclick={() => (questView.id = null)}><ArrowLeft size={12} />Back</button>
-  <QuestSheetCard id={questView.id} {map} plain={pinned} />
-{:else if ready && browsing}
-  <div class="list" class:pinned>
-    {#if page}
-      {#if page.quests.length}
-        <p class="count tabular">{page.total.toLocaleString()} {page.total === 1 ? "quest" : "quests"}</p>
-        {@render rows(page.quests)}
-        {#if page.quests.length < page.total}<button class="back inline" onclick={more}>Show more</button>{/if}
+{#if ready && !pinned}
+  <LookupSplit open={questView.id != null} onback={() => (questView.id = null)}>
+    {#snippet list()}
+      {#if browsing}
+        <div class="list">
+          {#if page}
+            {#if page.quests.length}
+              <p class="count tabular">{page.total.toLocaleString()} {page.total === 1 ? "quest" : "quests"}</p>
+              {@render rows(page.quests)}
+              {#if page.quests.length < page.total}<button class="back inline" onclick={more}>Show more</button>{/if}
+            {:else}
+              <p class="quiet">No quests match.</p>
+            {/if}
+          {:else if searching}
+            <p class="quiet"><span class="spin"><LoaderCircle size={13} /></span> Searching…</p>
+          {/if}
+        </div>
       {:else}
-        <p class="quiet">No quests match.</p>
+        <QuestBook {whole} helper={quest} selected={questView.id} onpick={pick} />
       {/if}
-    {:else if searching}
-      <p class="quiet"><span class="spin"><LoaderCircle size={13} /></span> Searching…</p>
-    {/if}
-  </div>
+    {/snippet}
+    {#snippet detail()}
+      {#if questView.id != null}
+        <!-- The line first: it is short, and its steps open in the card under it. -->
+        <QuestLine {whole} id={questView.id} helper={quest} onpick={pick} />
+        <QuestSheetCard id={questView.id} {map} {quest} />
+      {/if}
+    {/snippet}
+    {#snippet empty()}
+      <p class="empty">Pick a quest: what it asks, where to go and what it pays show here.</p>
+    {/snippet}
+  </LookupSplit>
+{:else if ready && questView.id != null}
+  <button class="back" class:pinned onclick={() => (questView.id = null)}><ArrowLeft size={12} />Back</button>
+  <QuestSheetCard id={questView.id} {map} {quest} plain={pinned} />
 {:else}
-  {#if ready && !pinned}
-    <div class="views"><Segmented label="Which quests" options={VIEWS} value={view} onchange={setView} /></div>
-  {/if}
-  <!-- What can be handed in now comes first. -->
-  {#if ready && showing === "now"}<LoggedQuests handIn tracked={quest} {map} {session} plain={pinned} />{/if}
-  {#if showing !== "now"}
-    <!-- The log or the list to take, below. -->
-  {:else if quest}
+  <!-- A pinned window: what can be handed in now first, then what the Quest Helper tracks. -->
+  {#if ready}<LoggedQuests handIn tracked={quest} {map} {session} plain={pinned} />{/if}
+  {#if quest}
     <QuestCard {quest} {map} {session} plain={pinned} />
   {:else if !(ready && (followedQuests().length || questLog.log?.quests.some((q) => q.state === "inProgress")))}
     <p class="empty">
@@ -299,34 +288,9 @@
       {/if}
     </p>
   {/if}
-  {#if ready && showing === "now"}<FollowedQuests tracked={quest} {map} {session} plain={pinned} />{/if}
-  {#if ready && showing === "now"}<LoggedQuests handIn={false} tracked={quest} {map} {session} plain={pinned} />{/if}
-  {#if !pinned && (showing === "log" || !ready)}<QuestLogCard />{/if}
-  {#if ready && !pinned && showing === "log"}<WholeLogCard {level} helper={(quest?.quests ?? []).map((q) => q.title)} />{/if}
-  {#if showing === "take" && (level == null || !toTake.length)}
-    <p class="empty">
-      {level == null ? "Leafline needs to read your level from the HUD to say which quests you can take." : `Nothing new to take at Lv ${level}.`}
-    </p>
-  {/if}
-  {#if ready && showing === "take" && level != null && toTake.length}
-    <Card title={`Quests to take at Lv ${level}`}>
-      <p class="lead">
-        {#if hasLog()}
-          Quests your level can start, the nearest to your level first, leaving out what your quest log shows done as of the
-          last look at the Quest window.
-        {:else}
-          Quests your level can start that need no other quest first, the nearest to your level first. Open the Quest window
-          in game so Leafline can leave out the ones you've done.
-        {/if}
-      </p>
-      {@render rows(toTake.slice(0, TAKE_NOW))}
-      {#if (takeNow?.total ?? 0) > TAKE_NOW}
-        <button class="back inline" onclick={() => setSearch({ atLevel: level, noPrior: true, hideDone: hasLog() || undefined })}
-          >Show all {(takeNow?.total ?? 0).toLocaleString()}</button
-        >
-      {/if}
-    </Card>
-  {/if}
+  {#if ready}<FollowedQuests tracked={quest} {map} {session} plain={pinned} />{/if}
+  {#if ready}<LoggedQuests handIn={false} tracked={quest} {map} {session} plain={pinned} />{/if}
+  {#if !pinned && !ready}<QuestLogCard />{/if}
   {#if !ready && !pinned}
     <Card title="Quest search" plain={pinned}>
       <p class="lead">Search every quest once the map data is downloaded.</p>
@@ -347,11 +311,6 @@
   }
 
   /* A card pads itself; these sit beside cards, so they match it. A pinned window pads its body. */
-  .views {
-    display: flex;
-    padding: 0 var(--space-3) var(--space-2);
-  }
-
   .controls {
     padding: var(--space-2) var(--space-3) 0;
   }
@@ -360,8 +319,7 @@
     padding: 0 var(--space-3) var(--space-2);
   }
 
-  .controls.pinned,
-  .list.pinned {
+  .controls.pinned {
     padding: 0;
   }
 
@@ -490,6 +448,10 @@
     background: transparent;
     text-align: left;
     cursor: pointer;
+  }
+
+  .results li.picked button {
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
   }
 
   .results button:hover,

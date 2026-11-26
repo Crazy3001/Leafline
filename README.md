@@ -44,7 +44,7 @@
 ### Quests
 - **Quest Helper, read live:** your tracked quests with their counters and rewards. Open one for its steps, directions to each monster, and who takes it in.
 - **Quest log, read from the Quest window** while you have it open: which quests you've done, which are in progress with their counts, and which you can take, kept for each character. The quests to take at your level leave out what you've done, and quests ready to hand in say who takes them.
-- **Quest search** across every quest by name, NPC, monster or region, the quests your level can take now, and the rest of each quest's chain.
+- **Every quest in one list**, region by region, with where each stands for you and questlines folded into one row that shows how far along you are. Search by name, NPC, monster or region; a quest opens beside the list with its steps and the rest of its line.
 
 ![The desk view with Quests, Map and Lookup: each quest's steps with directions, the map's exits and NPCs, and where a monster lives and what it drops](.github/screenshots/desk-questing.png)
 

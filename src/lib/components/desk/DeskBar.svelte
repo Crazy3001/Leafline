@@ -1,9 +1,11 @@
 <script lang="ts">
   // The desk view's player bar, over every view: who you are and whether Leafline is reading,
   // how far through the level and when the next one comes, the two rates and the session's clock.
-  // These numbers live here and nowhere else on the desk, so the views under it don't repeat them.
+  // These numbers live here and nowhere else on the desk, Now included, so the views under it
+  // don't repeat them.
   import { tip } from "$lib/tip.svelte";
 
+  import Ref from "$lib/components/Ref.svelte";
   import SessionControls from "$lib/components/SessionControls.svelte";
   import { formatClockIn, formatCompact, formatDuration, formatNumber, partyLabel } from "$lib/format";
   import { ago, shownCharacter, watchProfile } from "$lib/profile.svelte";
@@ -33,7 +35,7 @@
   const mapName = $derived(
     (who.onScreen ? (live.analysis?.map?.name ?? session?.map?.split(" : ").pop()) : null) ?? who.lastMap,
   );
-  const where = $derived([mapName, partyLabel(session?.party)].filter(Boolean).join(" · "));
+  const party = $derived(partyLabel(session?.party));
   const reading = $derived(live.liveStatus.state === "reading");
 
   const status = $derived.by(() => {
@@ -79,8 +81,14 @@
         <span class="status {status.tone}" use:tip={status.tip}><span class="dot" aria-hidden="true"></span>{status.text}</span>
       </div>
       <div class="sub" class:stale={who.seenAt != null}>
-        {#if level != null}Lv {level}{job ? ` ${job}` : ""}{:else}Level not read yet{/if}{#if where}<span class="where" use:tip={place.region}> · {where}</span>{/if}
+        {#if level != null}Lv {level}{job ? ` ${job}` : ""}{:else}Level not read yet{/if}
       </div>
+      <!-- The map on a line of its own, whole: it wraps rather than being cut off. -->
+      {#if mapName}
+        <div class="where" class:stale={who.seenAt != null}>
+          <Ref kind="map" name={mapName} />{#if who.onScreen && place.region}<span class="party">{` · ${place.region}`}</span>{/if}{#if party}<span class="party">{` · ${party}`}</span>{/if}
+        </div>
+      {/if}
       {#if who.seenAt != null}<div class="seen">last seen {ago(who.seenAt)}</div>{/if}
     </div>
   </div>
@@ -95,7 +103,7 @@
     <div class="track" aria-hidden="true"><span class:dim={!reading} style:width="{Math.max(0, Math.min(100, percent ?? 0))}%"></span></div>
     {#if toLevel != null && level != null}
       <span class="when" use:tip={clockAt ? `About ${clockAt} at this pace` : null}>
-        Lv {level + 1} in <b>{formatDuration(toLevel)}</b>{#if clockAt}<span class="at"> · about {clockAt}</span>{/if}
+        Lv {level + 1} in <b>{formatDuration(toLevel)}</b>{#if clockAt}<span class="at">{" · "}about {clockAt}</span>{/if}
       </span>
     {/if}
   </div>
@@ -130,7 +138,7 @@
   <div class="cell">
     <span class="label">Session{session?.held ? " · paused" : session?.paused && tracking ? " · idle" : ""}</span>
     <span class="num fig" class:held={session?.held}>{session && tracking ? clock(session.activeSeconds) : "0:00"}</span>
-    <div class="controls"><SessionControls /></div>
+    <SessionControls compact />
   </div>
 </section>
 
@@ -245,7 +253,13 @@
   }
 
   .where {
-    color: var(--ref-map);
+    font-size: var(--text-xs);
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+  }
+
+  .party {
+    color: var(--muted);
   }
 
   .label {
@@ -418,10 +432,6 @@
 
   .sub.down {
     color: var(--warn);
-  }
-
-  .controls {
-    margin-top: var(--space-0-5);
   }
 
   /* A narrower desk window: who you are and the level on one row, the three figures under them. */
