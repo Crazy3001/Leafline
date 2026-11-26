@@ -65,6 +65,7 @@ pub struct BagFollow {
 impl BagFollow {
     pub fn follow(&mut self, app: &AppHandle, frame: &Frame, analysis: &Analysis, session: &SessionSummary) {
         let Some(seen) = self.watch.settled_in(frame, inventory::read) else { return };
+        live::see(app, crate::sight::Reader::Inventory);
         let hud = analysis.hud.as_ref();
         let read = Read {
             inventory: seen.clone(),

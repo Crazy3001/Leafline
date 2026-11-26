@@ -37,6 +37,7 @@ import type {
   Guide,
   History,
   KnownCharacter,
+  Sight,
   LoggedDrop,
   NewDrop,
   MapDataDownload,
@@ -130,6 +131,9 @@ export interface Backend {
   /** Saves the last item check's picture, with `reading` (what was read) beside it. */
   saveItemPicture(reading: string | null): Promise<string>;
   onLive(handler: (status: LiveStatus) => void): Promise<UnlistenFn>;
+  /** What Leafline sees: each reader's last reading and the readings left out. Null before reading starts. */
+  readerSight(): Promise<Sight | null>;
+  onSight(handler: (sight: Sight) => void): Promise<UnlistenFn>;
   onFrameSaved(handler: (path: string) => void): Promise<UnlistenFn>;
   /** An item check from the hotkey has ended. */
   onItemRead(handler: (read: ItemRead) => void): Promise<UnlistenFn>;

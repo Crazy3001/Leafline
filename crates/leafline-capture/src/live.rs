@@ -19,6 +19,7 @@ use leafline_core::pipeline::{self, Analysis};
 use leafline_core::readers::pickup::{self, PickupReader};
 use leafline_core::readers::ui;
 use leafline_core::session::{Sample, SessionSummary, SessionTracker, TrackerConfig};
+use leafline_core::sight::{Reader, Sight};
 use leafline_core::vision::{Frame, Ocr};
 
 use std::sync::Arc;
@@ -59,6 +60,8 @@ pub struct LiveRead {
     /// What the HUD shows of the character, for the records to remember between visits (shown
     /// only, never fed back into a rate).
     pub seen: Option<leafline_core::userdata::characters::SeenCharacter>,
+    /// What each reader has read since reading started, and what was left out.
+    pub sight: Sight,
 }
 
 /// What the game's windows gave since this was last asked, for the page to keep: each is read once
@@ -154,6 +157,8 @@ pub struct LiveReader {
     tracker: SessionTracker,
     idle_after: f64,
     held: bool,
+    /// "What Leafline sees", kept as it reads.
+    sight: Sight,
 }
 
 fn config(idle_after: f64) -> TrackerConfig {
@@ -197,6 +202,7 @@ impl LiveReader {
             tracker,
             idle_after,
             held: false,
+            sight: Sight::new(leafline_core::clock::now_f64()),
         }
     }
 
@@ -316,13 +322,20 @@ impl LiveReader {
             self.tracker.push(&sample);
         }
         self.look(frame, at);
-        self.follow_windows(frame, &analysis);
+        self.follow_windows(frame, &analysis, at);
         analysis.tooltips.clone_from(&self.items);
         let hud = analysis.hud.is_some();
         let ms = started.elapsed().as_secs_f32() * 1000.0;
         let session = self.tracker.summary();
         let seen = leafline_core::service::records::seen_of(&session);
-        Some((LiveRead { analysis, session, hud, ms, seen }, other))
+        let smoothed = self.ui_scale.is_some_and(|s| (s - s.round()).abs() > 0.02);
+        // The browser can't say whether HDR is on for the game's display; the page adds what it can.
+        self.sight.picture(at, frame, &analysis, false, smoothed);
+        if !self.held {
+            self.sight.session(at, &session, &analysis);
+        }
+        let sight = self.sight.clone();
+        Some((LiveRead { analysis, session, hud, ms, seen, sight }, other))
     }
 }
 
@@ -339,6 +352,7 @@ impl LiveReader {
         let read = self.pickups.read(at, frame, self.ui_scale, &self.ocr);
         if read.layout.is_some() {
             self.tracker.watching_loot();
+            self.sight.saw(Reader::PickupLog, at);
         }
         if read.arrivals.is_empty() {
             return false;
@@ -464,7 +478,7 @@ impl LiveReader {
 
     /// Follows the game's windows on a full read, as the program's live loop does: each is read
     /// once it has shown the same twice in a row, and again only when that changes.
-    fn follow_windows(&mut self, frame: &Frame, analysis: &Analysis) {
+    fn follow_windows(&mut self, frame: &Frame, analysis: &Analysis, at: f64) {
         let hud = analysis.hud.as_ref();
         let name = hud.and_then(|h| h.name.clone());
         let level = hud.and_then(|h| h.level);
@@ -479,12 +493,14 @@ impl LiveReader {
                 && let Some(windows) = self.read_character_windows(frame, Some(layout))
             {
                 self.windows.reads.character = Some(CharacterScan { name: name.clone(), level, windows });
+                self.sight.saw(Reader::CharacterWindows, at);
             }
         }
         if self.choice.bag
             && let Some(seen) = self.windows.bag.settled_in(frame, inventory::read_video)
         {
             self.windows.reads.bag = Some(SeenBag::new(&seen, name.clone(), level));
+            self.sight.saw(Reader::Inventory, at);
             self.windows.bag.checked(seen);
         }
         if self.choice.quest_log && self.text.is_some() {
@@ -503,6 +519,7 @@ impl LiveReader {
             {
                 let fresh = std::mem::take(&mut self.windows.quest_fresh);
                 self.windows.reads.quest_log = Some(QuestLogSeen { name, reading, fresh });
+                self.sight.saw(Reader::QuestWindow, at);
             }
         }
     }

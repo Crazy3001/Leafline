@@ -8,7 +8,7 @@
 // @ts-ignore
 import init, * as built from "../capture/wasm/leafline_capture.js";
 
-import type { Analysis, ItemTooltip, SessionSummary } from "../types";
+import type { Analysis, ItemTooltip, SessionSummary, Sight } from "../types";
 import { followTrack, frameRgba, type FrameMessage } from "./capture";
 
 interface Live {
@@ -66,6 +66,8 @@ export interface LiveRead {
   session: SessionSummary;
   /** What the HUD shows of the character, for the records to remember between visits. */
   seen: unknown | null;
+  /** What each reader has read, and what was left out. */
+  sight: Sight;
   hud: boolean;
   ms: number;
 }

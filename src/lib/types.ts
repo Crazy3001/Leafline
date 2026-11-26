@@ -226,6 +226,41 @@ export type LiveStatus =
     }
   | { state: "failed"; message: string };
 
+/** One part of the game Leafline reads (`crates/leafline-core/src/sight.rs`). */
+export type Reader =
+  | "statusBar"
+  | "level"
+  | "exp"
+  | "name"
+  | "mesos"
+  | "map"
+  | "questHelper"
+  | "pickupLog"
+  | "itemTooltip"
+  | "characterWindows"
+  | "inventory"
+  | "questWindow";
+
+/** What Leafline sees: each reader's last reading kept, the last picture, the readings left out. */
+export interface Sight {
+  /** Unix seconds each reader last read. */
+  seen: { reader: Reader; at: number }[];
+  /** Left out as doubtful, the newest first. */
+  rejected: { reader: Reader; at: number; reason: string }[];
+  picture: {
+    at: number;
+    width: number;
+    height: number;
+    statusBar: boolean;
+    hdr: boolean;
+    smoothedUi: boolean;
+    dark: boolean;
+    still: boolean;
+  } | null;
+  /** When reading started. */
+  since: number;
+}
+
 /** How the chosen game window is recognised again. */
 export interface WindowChoice {
   title: string;

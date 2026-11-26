@@ -28,6 +28,7 @@ use super::hover::ItemHover;
 use super::questlog::QuestLogFollow;
 use super::{overlay, pins, readings, recovery};
 use crate::capture::{self, Capturer, GameWindow, Grab};
+use crate::sight::{Reader, SIGHT_EVENT, Sight};
 use crate::build::catalog::Catalog;
 use crate::error::{Error, Result};
 use crate::loot::Pickup;
@@ -128,6 +129,24 @@ pub struct LiveState {
     status: Mutex<LiveStatus>,
     /// The last picture read, kept in memory only, for "Save frame".
     frame: Mutex<Option<Arc<Frame>>>,
+    /// What each reader has read since reading started, and what was left out (in memory only).
+    sight: Mutex<Sight>,
+}
+
+/// Notes that `reader` gave a reading just now, for "What Leafline sees".
+pub fn see(app: &AppHandle, reader: Reader) {
+    app.state::<LiveState>().sight.lock().expect("live lock").saw(reader, unix_seconds(SystemTime::now()));
+}
+
+fn publish_sight(app: &AppHandle) {
+    let sight = app.state::<LiveState>().sight.lock().expect("live lock").clone();
+    let _ = app.emit(SIGHT_EVENT, &sight);
+}
+
+/// What Leafline sees: each reader's last reading, the last picture, the readings left out.
+#[tauri::command]
+pub fn reader_sight(app: AppHandle) -> Sight {
+    app.state::<LiveState>().sight.lock().expect("live lock").clone()
 }
 
 pub fn running(app: &AppHandle) -> bool {
@@ -322,6 +341,9 @@ fn follow_windows(app: &AppHandle, watch: &mut Watch, frame: &Frame, analysis: &
     let read = character::read(frame, Some(layout), ocr).and_then(|windows| {
         builds::catch_up(&AppHost::new(app), pipeline::CharacterScan { name, level: hud.and_then(|h| h.level), windows })
     });
+    if read.is_ok() {
+        see(app, Reader::CharacterWindows);
+    }
     match read {
         Ok(read) if read.changed() => {
             let _ = app.emit(CHARACTER_READ_EVENT, &read.on_its_own());
@@ -547,6 +569,8 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
         |idle_after| SessionTracker::new(TrackerConfig { confirmations: 2, idle_after, ..TrackerConfig::default() });
     let mut tracker = fresh_tracker(app.state::<SettingsState>().get().live.pause_after);
     let mut keeper = Keeper::default();
+    *state.sight.lock().expect("live lock") = Sight::new(unix_seconds(SystemTime::now()));
+    publish_sight(app);
     // A crash, a closed app or a restart within the break that ends a session carries on with
     // the session that was going, so the rates and the log entry continue.
     let mut resumed = false;
@@ -747,6 +771,15 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
                     read_pickups(app, &mut pickups, &mut tracker, &frame, ui_scale, &ocr);
                 }
                 let session = tracker.summary();
+                {
+                    let at = unix_seconds(SystemTime::now());
+                    let smoothed = ui_scale.is_some_and(|s| (s - s.round()).abs() > 0.02);
+                    let mut sight = state.sight.lock().expect("live lock");
+                    sight.picture(at, &frame, &analysis, *hdr, smoothed);
+                    if !held {
+                        sight.session(at, &session, &analysis);
+                    }
+                }
                 if !held {
                     estimates.follow(app, &mut tracker, &session);
                 }
@@ -793,6 +826,7 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
                     },
                 );
                 *state.frame.lock().expect("live lock") = Some(frame);
+                publish_sight(app);
             }
             // The same picture again proves nothing, so it is not read twice: a misread would
             // otherwise confirm itself. A long quiet spell then pauses the clock like any idle time.
@@ -852,6 +886,7 @@ fn read_pickups(
     let read = reader.read(unix_seconds(SystemTime::now()), frame, ui_scale, ocr);
     if read.layout.is_some() {
         tracker.watching_loot();
+        see(app, Reader::PickupLog);
     }
     if read.arrivals.is_empty() {
         return false;

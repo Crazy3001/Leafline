@@ -27,6 +27,7 @@
   import { base } from "$app/paths";
   import HotkeyButton from "$lib/components/HotkeyButton.svelte";
   import Logo from "$lib/components/Logo.svelte";
+  import ReaderStatus from "$lib/components/ReaderStatus.svelte";
   import DataSources from "$lib/components/DataSources.svelte";
   import { IDEA_URL, reportUrl } from "$lib/feedback";
   import { DROPS_URL, OSMS_URL, WIKI_URL } from "$lib/mapdata.svelte";
@@ -711,6 +712,8 @@
       <p class="note">
         Works windowed and in Full Screen. Pictures stay in memory unless you save one{keyHint("SaveFrame")}.
       </p>
+      <h3 id="sees">What Leafline sees</h3>
+      <ReaderStatus />
     </section>
     {/if}
 
@@ -815,6 +818,8 @@
           />
         </div>
       </div>
+      <h3 id="sees">What Leafline sees</h3>
+      <ReaderStatus />
     </section>
     {/if}
 
