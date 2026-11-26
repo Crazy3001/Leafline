@@ -51,6 +51,8 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
   half. The "Not reading" card is gone: the player bar says whether Leafline is reading (on the
   website, the Share button does). Folded,
   the character is a round button with their first letter.
+- On the website, the Share button turns amber and says "Can't read the picture" when the shared
+  picture is black, frozen or washed out by Windows HDR; its tooltip says what to do.
 - **Look up shows the list and the open card side by side** on a wide window, for items,
   monsters, maps, NPCs and skills; the picked row stays marked. A narrow window opens the card in
   the list's place, with a way back, as before.
