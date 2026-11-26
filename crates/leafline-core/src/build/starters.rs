@@ -146,15 +146,18 @@ fn stat_goals(raw: &Raw, rules: &Rules) -> Vec<StatGoal> {
     let mut have = LOWEST_START;
     let mut goals = Vec::with_capacity(raw.steps.len() + raw.ap.len() + 1);
     for &(stat, target, from) in &raw.ap {
-        goals.push(StatGoal { stat, target: Some(target), from_level: Some(from) });
+        goals.push(StatGoal { stat, target: Some(target), from_level: Some(from), with_gear: false });
     }
     for &(target, by) in &raw.steps {
         let levels = target.saturating_sub(have).div_ceil(per_level);
         let from = (by + 1).saturating_sub(levels).max(2);
-        goals.push(StatGoal { stat: raw.secondary, target: Some(target), from_level: Some(from) });
+        // A plan of our own aims at the stat as requirements count it, worn gear and all, so a
+        // hat's DEX saves AP for LUK. A guide's steps are the points it puts in.
+        let with_gear = raw.source.is_none();
+        goals.push(StatGoal { stat: raw.secondary, target: Some(target), from_level: Some(from), with_gear });
         have = target;
     }
-    goals.push(StatGoal { stat: raw.primary, target: None, from_level: None });
+    goals.push(StatGoal { stat: raw.primary, target: None, from_level: None, with_gear: false });
     goals
 }
 
@@ -457,8 +460,8 @@ mod tests {
     /// The plans written for Leafline, played from their own roll: skills never take more SP than
     /// there is, each stat step lands by its level, nothing is out of reach and nothing is left
     /// over. With `LEAFLINE_OSMS` set, against the real data: every name resolves, skill caps and
-    /// prerequisites hold, and every gear goal's STR, DEX and LUK are met by the plan's own points
-    /// at the level the item asks for, before any worn gear helps.
+    /// prerequisites hold, and every gear goal's STR, DEX and LUK are met at the level the item
+    /// asks for, by the plan's points and the gear worn the level before.
     #[test]
     fn each_plan_written_for_leafline_works_out_level_by_level() {
         use super::super::plan::{Build, Severity, Start, expand};
@@ -496,13 +499,19 @@ mod tests {
             assert_eq!(spent, sp_by(PLAN_TO, &rules), "{}: every point spent", raw.id);
             assert_eq!(e.steps.last().map(|s| (s.ap_left, s.sp_left)), Some((0, 0)), "{}", raw.id);
 
-            let stats_at = |level: u32| e.steps.iter().find(|s| s.level == level).unwrap().stats;
+            let step_at = |level: u32| e.steps.iter().find(|s| s.level == level).unwrap();
+            let worn_at = |level: u32| {
+                e.steps.iter().find(|s| s.level == level).map_or_else(Stats::default, |s| {
+                    s.worn.iter().fold(Stats::default(), |total, w| total.plus(w.bonus))
+                })
+            };
             for &(target, by) in &raw.steps {
-                assert!(stats_at(by).get(raw.secondary) >= target, "{}: {} {target} by Lv {by}", raw.id, raw.secondary.label());
+                let total = step_at(by).stats.plus(worn_at(by));
+                assert!(total.get(raw.secondary) >= target, "{}: {} {target} by Lv {by}", raw.id, raw.secondary.label());
             }
             for check in &e.gear {
                 let item = &check.item;
-                let s = stats_at(item.req_level.max(1));
+                let s = step_at(item.req_level.max(1)).stats.plus(worn_at(item.req_level.saturating_sub(1)));
                 let need = [(s.str, item.req_str), (s.dex, item.req_dex), (s.int, item.req_int), (s.luk, item.req_luk)];
                 assert!(need.iter().all(|(have, need)| have >= need), "{}: {} at Lv {}: {s:?}", raw.id, item.name, item.req_level);
                 assert_eq!(check.level, Some(item.req_level.max(1)), "{}: {} the level it asks for", raw.id, item.name);
@@ -549,7 +558,7 @@ mod tests {
         let goals = stat_goals(&raw(vec![(15, 15), (20, 20)]), &Rules::default());
         assert_eq!(goals[0].from_level, Some(13));
         assert_eq!(goals[1].from_level, Some(20));
-        assert_eq!(goals[2], StatGoal { stat: Stat::Luk, target: None, from_level: None });
+        assert_eq!(goals[2], StatGoal { stat: Stat::Luk, target: None, from_level: None, with_gear: false });
     }
 
     #[test]

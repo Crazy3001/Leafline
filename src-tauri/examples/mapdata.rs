@@ -342,7 +342,7 @@ fn print_builds(catalog: Catalog) {
             plan: Plan {
                 job: job.id,
                 skills,
-                stats: vec![StatGoal { stat: job.primary.unwrap_or(Stat::Luk), target: None, from_level: None }],
+                stats: vec![StatGoal { stat: job.primary.unwrap_or(Stat::Luk), target: None, from_level: None, with_gear: false }],
                 plan_to: 120,
                 ..Plan::default()
             },

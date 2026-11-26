@@ -880,7 +880,10 @@
           </label>
           {#if !firstJob}<p class="help">Choose a job in Settings to add its skills.</p>{/if}
         {:else if tab === "stats"}
-          <p class="help">Each level's AP goes to the first goal that can take it. End with one goal that takes the rest.</p>
+          <p class="help">
+            Each level's AP goes to the first goal that can take it. End with one goal that takes the rest. A goal "with gear"
+            counts what your worn gear and the plan's gear add, so no AP goes where gear already covers it.
+          </p>
           {#if draft.plan.stats.length}
             <ol class="goals">
               {#each draft.plan.stats as goal, i}
@@ -899,6 +902,12 @@
                   </select>
                   {#if goal.target != null}
                     <input class="number" aria-label="Target" type="number" min="0" bind:value={goal.target} />
+                  {/if}
+                  {#if goal.target != null}
+                    <label class="inline" use:tip={"Count what worn gear adds, as the game does for requirements"}>
+                      <input type="checkbox" checked={goal.withGear ?? false} onchange={(e) => (goal.withGear = e.currentTarget.checked)} />
+                      <span>with gear</span>
+                    </label>
                   {/if}
                   <label class="inline">
                     <span>from Lv</span>

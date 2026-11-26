@@ -400,7 +400,7 @@ mod tests {
             start: Start { level, stats: Some(Stats { str: 4, dex: 25, int: 4, luk: 40 }), pieces, ..Start::default() },
             plan: Plan {
                 job: 400,
-                stats: vec![StatGoal { stat: Stat::Luk, target: None, from_level: None }],
+                stats: vec![StatGoal { stat: Stat::Luk, target: None, from_level: None, with_gear: false }],
                 gear,
                 plan_to: 40,
                 ..Plan::default()
@@ -716,7 +716,7 @@ mod tests {
         );
         let build = Build {
             start: Start { level: 35, stats: Some(Stats { str: 30, dex: 120, int: 4, luk: 4 }), ..Start::default() },
-            plan: Plan { job: 320, stats: vec![StatGoal { stat: Stat::Dex, target: None, from_level: None }], plan_to: 70, ..Plan::default() },
+            plan: Plan { job: 320, stats: vec![StatGoal { stat: Stat::Dex, target: None, from_level: None, with_gear: false }], plan_to: 70, ..Plan::default() },
             ..Build::default()
         };
         let outfit = at(&build, &catalog, 35);
@@ -740,7 +740,7 @@ mod tests {
         let catalog = Catalog::new(vec![skill(1, "Iron Arrow", 320, 20, &[])], items);
         let build = Build {
             start: Start { level: 33, stats: Some(Stats { str: 30, dex: 160, int: 4, luk: 4 }), pieces: vec![worn(30, &catalog), worn(92, &catalog)], ..Start::default() },
-            plan: Plan { job: 320, stats: vec![StatGoal { stat: Stat::Dex, target: None, from_level: None }], gear: vec![40, 50, 70, 90, 91], plan_to: 70, ..Plan::default() },
+            plan: Plan { job: 320, stats: vec![StatGoal { stat: Stat::Dex, target: None, from_level: None, with_gear: false }], gear: vec![40, 50, 70, 90, 91], plan_to: 70, ..Plan::default() },
             ..Build::default()
         };
         let outfit = at(&build, &catalog, 33);

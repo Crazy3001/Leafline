@@ -1482,6 +1482,8 @@ export interface StatGoal {
   target: number | null;
   /** Waits for this level. */
   fromLevel: number | null;
+  /** The target counts what worn gear adds, as a requirement does. Absent means the points put in. */
+  withGear?: boolean;
 }
 
 /** Where the character is now, as its windows show it. */

@@ -312,8 +312,8 @@ mod tests {
             plan: Plan {
                 job: 410,
                 stats: vec![
-                    StatGoal { stat: Stat::Dex, target: Some(60), from_level: None },
-                    StatGoal { stat: Stat::Luk, target: None, from_level: None },
+                    StatGoal { stat: Stat::Dex, target: Some(60), from_level: None, with_gear: false },
+                    StatGoal { stat: Stat::Luk, target: None, from_level: None, with_gear: false },
                 ],
                 plan_to: 40,
                 ..Plan::default()
