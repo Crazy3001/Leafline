@@ -23,12 +23,15 @@
   let {
     focus = false,
     landed = 0,
+    seed = "",
     ontool,
   }: {
     /** Put the cursor in the box on opening: for the search button, not for a result that opens by itself. */
     focus?: boolean;
     /** Counts up each time something outside opens a page here, so the lists show instead of results. */
     landed?: number;
+    /** Words to start with, handed over from a search box elsewhere. */
+    seed?: string;
     ontool: (tool: ToolInfo) => void;
   } = $props();
 
@@ -44,7 +47,7 @@
   }
 
   let box = $state<HTMLInputElement>();
-  let text = $state("");
+  let text = $state(untrack(() => seed));
   /** A page or a kind's list is showing over the results, which Back returns to. */
   let browsing = $state(false);
   let found = $state<Found | null>(null);
