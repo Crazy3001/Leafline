@@ -31,6 +31,9 @@
   import { live } from "$lib/readings.svelte";
   import { changeSettings, display } from "$lib/settings.svelte";
 
+  /** What the ban risk is, in the README's FAQ. */
+  const RISK_URL = "https://github.com/Crazy3001/Leafline#is-it-allowed-can-i-get-banned";
+
   let {
     view,
     onview,
@@ -73,7 +76,7 @@
     return {
       tone: "quiet",
       text: "Not reading",
-      line: can.liveReading ? "Turn reading on in the overlay" : "Share the game window on Now",
+      line: can.liveReading ? "Turn reading on in the overlay" : "Share the game window at the top",
     };
   });
   const lightLook = $derived(display.theme === "focus-light" || display.theme === "ember-light" || display.theme === "sprout-light");
@@ -163,7 +166,11 @@
         </button>
       {/if}
     </div>
-    {#if !folded}<p class="credits">Unofficial, not approved by Nexon.</p>{/if}
+    <!-- The ban-risk line, kept in view on every page (see README's FAQ). -->
+    {#if !folded}<p class="credits">
+        Unofficial, and Nexon hasn't approved overlays. Use at your own risk.
+        <button class="risk" onclick={() => backend.openLink(RISK_URL)}>Details</button>
+      </p>{/if}
   </div>
 </aside>
 
@@ -414,6 +421,21 @@
     font-size: var(--text-2xs);
   }
 
+
+  .risk {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    font: inherit;
+    text-decoration: underline;
+    text-decoration-color: var(--border-strong);
+    cursor: pointer;
+  }
+
+  .risk:hover {
+    color: var(--text);
+  }
 
   .credits {
     margin: var(--space-1-5) 0 0;

@@ -5,6 +5,17 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
 
 ## Unreleased
 
+- **Search as you type.** The search box at the top of every page drops down matches as you type:
+  items, monsters, maps, NPCs and quests, each with its picture and a line (an item's type, a
+  monster's level, a quest's level and region), with chips and counts to show one kind. Arrow
+  keys move, Enter opens it in Look up (a quest on Quests), Esc closes, and / still jumps there.
+- **Share the game window sits by the search box** on the website, and says "Reading live" with
+  Stop while it reads. The Read the game card is gone from Now; what it said is in the button's
+  tooltip, and the sidebar's foot says it all: unofficial, Nexon hasn't approved overlays, use at
+  your own risk, with a link to the details.
+- **Now leads with the map you're on**, with its monsters, drops and ways out, and the session's
+  chart beside it; Next up and Quests come under them. Not reading, it shows the map you were last
+  on, marked Last seen. Typing a session in moved to Train.
 - **Quests is one list.** Every quest, region by region with "x of y done", and what's ready to
   hand in first: who takes it, where, and Go. Quests in progress show their counts from the Quest
   Helper or the Quest window. The filter chips stay; On now, Quest log and To take are gone, and a

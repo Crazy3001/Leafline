@@ -5,7 +5,7 @@
   // It reads what the overlay reads and follows the overlay's "Go here" trip. A link opens its
   // view here, with a way back to where you were.
   import { tip } from "$lib/tip.svelte";
-  import { ArrowLeft, PictureInPicture2, Pin, PinOff, Search } from "@lucide/svelte";
+  import { ArrowLeft, PictureInPicture2, Pin, PinOff } from "@lucide/svelte";
   import { onMount, tick, untrack } from "svelte";
 
   import { backend } from "$lib/api";
@@ -14,6 +14,8 @@
   import DeskSidebar from "$lib/components/desk/DeskSidebar.svelte";
   import DeskTools from "$lib/components/desk/DeskTools.svelte";
   import DeskMap from "$lib/components/desk/DeskMap.svelte";
+  import DeskSearch, { type Kind as FoundKind } from "$lib/components/desk/DeskSearch.svelte";
+  import ShareButton from "$lib/components/desk/ShareButton.svelte";
   import DeskQuests from "$lib/components/desk/DeskQuests.svelte";
   import NextUp from "$lib/components/desk/NextUp.svelte";
   import Segmented from "$lib/ui/Segmented.svelte";
@@ -50,6 +52,7 @@
   import { characters } from "$lib/characters.svelte";
   import { blankQuery, gearView, itemView, lookup, watchItems } from "$lib/items.svelte";
   import { monsterView, watchMonsters } from "$lib/monsters.svelte";
+  import { mapView, npcView } from "$lib/places.svelte";
   import { deskWindow, logRequest, plannerRequest, tabRequest } from "$lib/nav.svelte";
   import { placeLinks, watchPlaces } from "$lib/places.svelte";
   import { questView, watchQuests } from "$lib/quests.svelte";
@@ -60,7 +63,6 @@
   import { followTrip } from "$lib/wayfinder.svelte";
   import type { PinStatus } from "$lib/types";
   import { can, isWeb } from "$lib/platform";
-  import ReadWindowCard from "$lib/components/ReadWindowCard.svelte";
 
   // Links to the training log and the planner open here, not in windows of their own.
   deskWindow.active = true;
@@ -179,6 +181,34 @@
     document.querySelector<HTMLInputElement>(".lookup-view input")?.focus();
   }
 
+  let deskSearch = $state<DeskSearch>();
+  /** Words the top row's search hands to Look up when nothing in its list was picked. */
+  let seedWords = $state("");
+
+  /** A match picked in the top row's search: its page in Look up, or a quest on Quests. */
+  function openFound(kind: FoundKind, id: number) {
+    if (kind === "quests") {
+      questView.id = id;
+      go("quests");
+      return;
+    }
+    lookup.mode = kind;
+    if (kind === "items") itemView.id = id;
+    else if (kind === "monsters") {
+      monsterView.trail = [];
+      monsterView.id = id;
+    } else if (kind === "maps") {
+      mapView.trail = [];
+      mapView.id = id;
+    } else npcView.id = id;
+    land();
+  }
+
+  async function searchWords(words: string) {
+    seedWords = words;
+    await openSearch();
+  }
+
   /** A tool picked in Look up's results. */
   function openTool(tool: ToolInfo) {
     const action = tool.action;
@@ -264,7 +294,8 @@
     if (typing || event.ctrlKey || event.altKey || event.metaKey) return;
     if (event.key === "/") {
       event.preventDefault();
-      void openSearch();
+      if (view === "lookup" || !deskSearch) void openSearch();
+      else deskSearch.focus();
     } else if (/^[1-5]$/.test(event.key)) {
       event.preventDefault();
       pick(NUMBERED[Number(event.key) - 1]);
@@ -272,6 +303,10 @@
   }
 
   const level = $derived(live.analysis?.hud?.level ?? live.session?.level ?? null);
+  /** Reading the game times the session, so there's nothing to type in. */
+  const typedHidden = $derived(
+    can.liveReading ? live.liveStatus.state !== "off" : live.liveStatus.state === "reading" || live.liveStatus.state === "waiting",
+  );
   /** Views that are one page wide and read better not stretched across a big screen. */
   const narrowViews: DeskView[] = ["lookup", "tools", "crafting", "drops", "timers", "sell", "tracked", "potions", "route", "share"];
 </script>
@@ -303,11 +338,10 @@
         <button class="pill" onclick={back}><ArrowLeft size={14} />Back to {viewName(from)}</button>
       {/if}
       {#if view !== "lookup"}
-        <button class="search" onclick={openSearch}>
-          <Search size={15} /><span>Search items, monsters, maps, NPCs, quests…</span><kbd>/</kbd>
-        </button>
+        <DeskSearch bind:this={deskSearch} onopen={openFound} onwords={searchWords} />
       {/if}
       <div class="step"><NextStep /></div>
+      <ShareButton />
       {#if can.popOut}<button
         class="pill"
         aria-pressed={poppedOut}
@@ -326,21 +360,17 @@
     <div class="view" class:narrow={narrowViews.includes(view)} class:full={view === "planner" || view === "layout"} aria-label={viewName(view)}>
       {#key view}
         {#if view === "now"}
-          {#if isWeb}<ReadWindowCard />{/if}
-          <!-- The bar above says who you are and the session's numbers. Under it: what to do next
-               and your quests, then the session's chart and this map. -->
+          <!-- The bar above says who you are and the session's numbers. The map you're on comes first,
+               where the eye goes while playing, with the session's chart beside it; then what to do
+               next and your quests. Typing a session in is on Train. -->
+          <div class="now-top">
+            <DeskMap ongo={() => go("map")} />
+            <TrainPanel {level} map={live.analysis?.map ?? null} session={live.session} only="chart" />
+          </div>
           <div class="now-r1">
             <NextUp onme={() => go("me")} />
             <DeskQuests ongo={() => go("quests")} />
           </div>
-          <div class="now-r2">
-            <TrainPanel {level} map={live.analysis?.map ?? null} session={live.session} only="chart" />
-            <DeskMap ongo={() => go("map")} />
-          </div>
-          <!-- Without live reading, a session can be typed in. -->
-          {#if can.liveReading ? live.liveStatus.state === "off" : live.liveStatus.state !== "reading" && live.liveStatus.state !== "waiting"}
-            <div class="typed"><TypedSessionCard /></div>
-          {/if}
         {:else if view === "quests"}
           <div class="stack"><PanelView panel="quests" analysis={live.analysis} session={live.session} roomy /></div>
         {:else if view === "map"}
@@ -354,13 +384,15 @@
           {:else if trainPage === "where"}
             <div class="stack"><TrainPanel {level} map={live.analysis?.map ?? null} session={live.session} only="where" /></div>
           {:else}
+            <!-- Without live reading, a session can be typed in. -->
+            {#if !typedHidden}<div class="typed"><TypedSessionCard /></div>{/if}
             <div class="flow two"><TrainPanel {level} map={live.analysis?.map ?? null} session={live.session} only="session" glanced /></div>
           {/if}
         {:else if view === "tools"}
           <DeskTools ontool={openTool} />
         {:else if view === "lookup"}
           <div class="lookup-view">
-            {#key searchFocus}<SearchSheet focus={searchFocus > 0} {landed} ontool={openTool} />{/key}
+            {#key searchFocus}<SearchSheet focus={searchFocus > 0} {landed} seed={seedWords} ontool={openTool} />{/key}
           </div>
         {:else if view === "planner"}
           <div class="pane full-pane"><BuildPlanner embedded /></div>
@@ -416,45 +448,6 @@
     padding: var(--space-3) var(--space-4);
   }
 
-  .search {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    flex: 0 1 340px;
-    min-width: 180px;
-    height: var(--control-h);
-    padding: 0 var(--space-3);
-    border: var(--line-w) solid var(--control-line);
-    border-radius: var(--radius);
-    background: var(--surface);
-    color: var(--faint);
-    font: inherit;
-    font-size: var(--text-md);
-    text-align: left;
-    cursor: text;
-  }
-
-  .search span {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .search:hover {
-    border-color: var(--border-strong);
-  }
-
-  kbd {
-    padding: 1px var(--space-1-5);
-    border-radius: 5px;
-    background: var(--surface-3);
-    color: var(--muted);
-    font-family: var(--font-display);
-    font-size: var(--text-xs);
-  }
-
   /* The Go here bar fills what's left; it hides itself with no trip. */
   .step {
     flex: 1;
@@ -497,7 +490,6 @@
     color: var(--accent-ink);
   }
 
-  .search:focus-visible,
   .pill:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 1px;
@@ -563,7 +555,14 @@
     margin-right: 0;
   }
 
-  /* Now: Next up and Quests side by side, then the chart and this map. Narrow windows stack them. */
+  /* Now: this map and the session's chart side by side, then Next up and Quests. Narrow windows stack them. */
+  .now-top {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--space-4);
+    align-items: start;
+  }
+
   .now-r1 {
     display: grid;
     grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
@@ -571,20 +570,14 @@
     align-items: start;
   }
 
-  .now-r2 {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-    gap: var(--space-4);
-    align-items: start;
-  }
-
   /* Panels' own side margins are for the overlay; the rows space them here. */
-  .now-r1 :global(.card),
-  .now-r2 :global(.card) {
+  .now-top :global(.card),
+  .now-r1 :global(.card) {
     margin: 0;
   }
 
   @container desk-main (max-width: 1000px) {
+    .now-top,
     .now-r1 {
       grid-template-columns: minmax(0, 1fr);
     }
