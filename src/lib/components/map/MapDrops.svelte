@@ -138,10 +138,10 @@
     }
   }
 
-  /** A dropper's picture says nothing alone: its name, and for mesos how many. */
+  /** For mesos, how many, under the dropper's hover card, which names it. */
   function dropperTip(source: MapItem["sources"][number], meso = false) {
     const amount = meso ? quantity(source).replace(" ×", "") : "";
-    return meso && amount ? `${source.monster}\n${amount} mesos` : source.monster;
+    return meso && amount ? `${amount} mesos` : source.monster;
   }
 
   function percent(value: number | null) {

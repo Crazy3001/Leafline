@@ -8,7 +8,8 @@
   import { backend } from "$lib/api";
   import { STATS } from "$lib/builds.svelte";
   import { tip } from "$lib/tip.svelte";
-  import Pic from "$lib/ui/Pic.svelte";
+  import IconRef from "$lib/components/IconRef.svelte";
+  import Ref from "$lib/components/Ref.svelte";
   import type { StarterPlan } from "$lib/types";
 
   let {
@@ -35,12 +36,15 @@
   const lastWeapon = $derived(plan.weapons.at(-1)?.level);
 </script>
 
-{#snippet body()}
+{#snippet top()}
   <span class="head">
     <span class="name">{plan.name}</span>
     <span class="badge warn" use:tip={"Nobody has played this plan yet: a place to start, to change as you go"}>Untested</span>
   </span>
   <span class="summary">{plan.summary}</span>
+{/snippet}
+
+{#snippet body()}
 
   <span class="line">
     <span class="label">Lv 1</span>
@@ -56,7 +60,7 @@
       <span class="label">Skills</span>
       <span class="chips">
         {#each plan.keySkills as skill (skill.id)}
-          <span class="skill"><Pic kind="skill" id={skill.id} size={18} />{skill.name} <b>{skill.level}</b></span>
+          <span class="skill"><Ref kind="skill" id={skill.id} name={skill.name} /> <b>{skill.level}</b></span>
         {/each}
       </span>
     </span>
@@ -70,11 +74,7 @@
       </span>
       <span class="weapons">
         {#each plan.weapons as weapon (weapon.id)}
-          <span class="weapon" use:tip={`${weapon.name}, Lv ${weapon.level}`}>
-            <Pic kind="item" id={weapon.id} size={24}>
-              {#snippet fallback()}<span class="no-pic"></span>{/snippet}
-            </Pic>
-          </span>
+          <IconRef kind="item" id={weapon.id} name={weapon.name} size={24} />
         {/each}
       </span>
     </span>
@@ -90,23 +90,36 @@
   {#if plan.missing.length}<span class="warn-text">Not in this data: {plan.missing.join(", ")}</span>{/if}
 {/snippet}
 
-<article class="card" class:on={selected}>
-  {#if onpick}
-    <button class="body pick" aria-pressed={selected} onclick={onpick}>{@render body()}</button>
-  {:else}
-    <div class="body">{@render body()}</div>
-  {/if}
+<!-- A click anywhere on the card picks it; the name is the button for the keyboard. Links inside
+     open their own cards and don't pick it. -->
+<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+<div class="card" class:on={selected} class:choice={!!onpick} onclick={onpick}>
+  <div class="body">
+    {#if onpick}
+      <button class="pick" aria-pressed={selected} onclick={(e) => (e.stopPropagation(), onpick())}>{@render top()}</button>
+    {:else}
+      {@render top()}
+    {/if}
+    {@render body()}
+  </div>
   <footer>
     {#if !plan.source}<span class="faint">Leafline's plan</span>{/if}
     {#if guide}
-      <button class="credit" use:tip={guide.credit} onclick={() => backend.openGuide(guide.url)}>
+      <button
+        class="credit"
+        use:tip={guide.credit}
+        onclick={(e) => {
+          e.stopPropagation();
+          backend.openGuide(guide.url);
+        }}
+      >
         {plan.source ? `From ${guide.name}'s ${jobName} guide` : `Read ${guide.name}'s guide`}
         <ExternalLink size={12} />
       </button>
     {/if}
     {#if action}<span class="action">{@render action()}</span>{/if}
   </footer>
-</article>
+</div>
 
 <style>
   .card {
@@ -138,17 +151,26 @@
     text-align: left;
   }
 
+  .card.choice {
+    cursor: pointer;
+  }
+
   .pick {
+    display: grid;
+    gap: var(--space-2);
+    padding: 0;
     border: 0;
-    border-radius: var(--radius) var(--radius) 0 0;
     background: transparent;
+    color: inherit;
     font: inherit;
+    text-align: left;
     cursor: pointer;
   }
 
   .pick:focus-visible {
+    border-radius: var(--radius-sm);
     outline: 2px solid var(--accent);
-    outline-offset: -2px;
+    outline-offset: 2px;
   }
 
   .head {
@@ -211,6 +233,10 @@
     font-variant-numeric: tabular-nums;
   }
 
+  .skill :global(.ref) {
+    font-size: inherit;
+  }
+
   .stat.main {
     background: var(--accent-soft);
     color: var(--accent-text);
@@ -227,20 +253,8 @@
     gap: var(--space-0-5);
   }
 
-  .weapon {
-    display: grid;
-    place-items: center;
-    width: 26px;
-    height: 26px;
-    border-radius: var(--radius-sm);
+  .weapons :global(.icon-ref) {
     background: var(--hover);
-  }
-
-  .no-pic {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--faint);
   }
 
   .range {

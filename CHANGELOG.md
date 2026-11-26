@@ -5,6 +5,12 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
 
 ## Unreleased
 
+- **Hover cards on every link.** Rest the mouse on a coloured name or a linked picture (an item,
+  monster, NPC, map, quest or skill) and a small card shows what it is: an item's level, stats,
+  requirements and where it comes from; a monster's level, HP, EXP, elements, maps and drops; an
+  NPC's map, shop and quests; a map's monsters and NPCs; a quest's giver and rewards; a skill's
+  job, max level and what it does. A click still opens the full card. The ready-made plan cards'
+  key skills and weapons are links now too.
 - **Shorter ready-made build plans.** Each plan card, in New build and in the planner's Settings,
   now shows one line on what the plan does, the Lv 1 stats, its key skills and weapons, and for
   Leafline's own plans a few short pros and cons. A guide plan names its guide in one linked line,

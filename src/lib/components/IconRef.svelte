@@ -4,6 +4,7 @@
   import { openPeek, type PeekKind } from "$lib/peek.svelte";
   import { tip, type Tip } from "$lib/tip.svelte";
   import Pic from "$lib/ui/Pic.svelte";
+  import HoverCard from "./peek/HoverCard.svelte";
 
   let {
     kind,
@@ -16,15 +17,20 @@
     id?: number | null;
     name: string;
     size?: number;
-    /** What the tooltip says; the name by default, since a picture alone doesn't. */
+    /** A line under its hover card, or a tooltip of its own in place of the card. */
     title?: Tip;
   } = $props();
+
+  const own = $derived(title && typeof title !== "string" ? title : null);
+  const note = $derived(typeof title === "string" && title !== name ? title : null);
 </script>
+
+{#snippet hover()}<HoverCard target={{ kind, id, name }} {note} />{/snippet}
 
 <button
   class="icon-ref"
   aria-label={name}
-  use:tip={title ?? name}
+  use:tip={own ?? hover}
   onclick={(e) => {
     e.stopPropagation();
     openPeek({ kind, id, name }, e.currentTarget);
