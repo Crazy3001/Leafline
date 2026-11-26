@@ -149,19 +149,8 @@
   </section>
 
   <section>
-    <h2>3 · Name it</h2>
+    <h2>3 · Who it's for</h2>
     <div class="names">
-      <label class="grow">
-        <span>Build name</span>
-        <input
-          maxlength="80"
-          value={shownName}
-          oninput={(e) => {
-            named = true;
-            name = e.currentTarget.value;
-          }}
-        />
-      </label>
       <label>
         <span>For character</span>
         <input maxlength="30" placeholder="Any" value={forWho} oninput={(e) => (who = e.currentTarget.value)} />
@@ -183,16 +172,24 @@
   </section>
 
   {#if error}<p class="error" role="alert">{error}</p>{/if}
-  <!-- Always in view at the bottom, saying what it will make. -->
+  <!-- Always in view at the bottom: the build's name, to change right there, and Create. -->
   <div class="actions">
+    <label class="bar-name">
+      <span>Name</span>
+      <input
+        maxlength="80"
+        aria-label="Build name"
+        value={shownName}
+        oninput={(e) => {
+          named = true;
+          name = e.currentTarget.value;
+        }}
+      />
+    </label>
     <button class="create" disabled={!job || busy} onclick={create}>Create build</button>
     {#if canCancel}<button class="cancel" onclick={onCancel}>Cancel</button>{/if}
     {#if !job}
       <span class="faint">Pick a second job first.</span>
-    {:else}
-      <span class="choice-summary">
-        {jobName} · {starter ? starter.name : "Blank plan"}
-      </span>
     {/if}
   </div>
 </main>
@@ -330,10 +327,6 @@
     font-size: var(--text-md);
   }
 
-  .grow {
-    flex: 1;
-    min-width: 200px;
-  }
 
   input {
     padding: var(--space-1) var(--space-2);
@@ -381,11 +374,18 @@
     background: var(--surface-raised);
   }
 
-  .choice-summary {
-    overflow: hidden;
-    color: var(--muted);
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  .bar-name {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+    max-width: 420px;
+  }
+
+  .bar-name input {
+    flex: 1;
+    min-width: 0;
   }
 
   .gender {
