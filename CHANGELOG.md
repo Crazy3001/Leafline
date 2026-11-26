@@ -3,6 +3,48 @@
 What changed in each release of Leafline. Leafline is a work in progress: if something reads
 wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?template=bug_report.yml).
 
+## Unreleased
+
+- **Look up shows the list and the open card side by side** on a wide window, for items,
+  monsters, maps, NPCs and skills; the picked row stays marked. A narrow window opens the card in
+  the list's place, with a way back, as before.
+- Equipment names the classes that can wear it under its name, in Look up's list and on its card.
+- An item's **Where to get it** groups its sources: Dropped by, Sold by, From quests and Crafted
+  from, each folded with its count when an item opens. Scrolling odds come after it.
+- **New build:** the bar at the bottom holds the build's name, who it's for, the level it starts
+  at and who its gear is made for, beside Create build.
+- **Weapons have their Attack again.** The map data names weapon attack differently now. Leafline
+  reads the new name, but map data downloaded earlier kept no Attack, so weapons showed none and
+  the build planner's weapon path passed over most planned weapons. The map data downloads once
+  more to pick it up.
+- Tooltips and hover cards sit beside the mouse, follow it, and stay inside the window, at any
+  text size on the website (at 125% they used to land well away from the mouse; link cards too). An
+  equipment card names the classes that can use it under its level, and shows its NPC sell price.
+- **Build planner:** the Create build button stays in view at the bottom of New build, and says
+  what it will make. New build asks who the gear is made for. A build's header says which
+  character it follows, with a button to use it for the character Leafline reads, and has
+  duplicate and delete buttons. Goals the gear path passes over fold into one "N passed over"
+  button per slot. Leafline's own ready-made plans no longer link a guide.
+- **Hover cards on every link.** Rest the mouse on a coloured name or a linked picture (an item,
+  monster, NPC, map, quest or skill) and a small card shows what it is: an item's level, stats,
+  requirements and where it comes from; a monster's level, HP, EXP, elements, maps and drops; an
+  NPC's map, shop and quests; a map's monsters and NPCs; a quest's giver and rewards; a skill's
+  job, max level and what it does. A click still opens the full card. The ready-made plan cards'
+  key skills and weapons are links now too.
+- **Shorter ready-made build plans.** Each plan card, in New build and in the planner's Settings,
+  now shows one line on what the plan does, the Lv 1 stats, its key skills and weapons, and for
+  Leafline's own plans a few short pros and cons. A guide plan names its guide in one linked line,
+  with the full credit on the link.
+- **Every quest in one list.** Quests → Quest log now lists every quest by region, marked done,
+  in progress, ready to hand in, can take, or not yet with why (the level it needs, or the quest
+  to finish first). Quests before one you're on or have done count as done, and a quest the game
+  lists under its series' name shows as the step you're on. "Can take" comes from the quest data,
+  which doesn't know every condition; looking through your Available tab corrects it.
+- Quest window rows the game lists under a series' name, such as Collecting For Maya, are kept.
+- The Quest window is read even when the picture wobbles a little, as a shared window's does.
+- The website says why the game isn't being read: Firefox sharing a still picture of the game's
+  window (share the screen instead), a black picture, or Windows HDR.
+
 ## 0.5.0 (2026-11-24)
 
 ### The website

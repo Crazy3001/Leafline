@@ -28,43 +28,12 @@
   } = $props();
 </script>
 
-<button class="ib {tone} {size}" class:active aria-label={label} aria-pressed={active || undefined} use:tip={title ?? label} {onclick}>
+<button class="icon-btn {tone}" class:sm={size === "sm"} class:active aria-label={label} aria-pressed={active || undefined} use:tip={title ?? label} {onclick}>
   {@render children()}
 </button>
 
 <style>
-  .ib {
-    display: grid;
-    flex: none;
-    place-items: center;
-    width: 34px;
-    height: 34px;
-    padding: 0;
-    border: 0;
-    border-radius: var(--radius);
-    background: transparent;
-    color: var(--muted);
-    cursor: pointer;
-    transition:
-      background 0.12s ease,
-      color 0.12s ease;
-  }
-
-  .sm {
-    width: 28px;
-    height: 28px;
-    border-radius: var(--radius-sm);
-  }
-
-  .ib:hover {
-    background: var(--hover);
-    color: var(--text);
-  }
-
-  .ib.active {
-    color: var(--accent-text);
-  }
-
+  /* The look is the global `.icon-btn` in app.css; the header's own colours stay here. */
   .header {
     color: var(--header-muted);
   }
@@ -76,10 +45,5 @@
 
   .header.active {
     color: var(--header-accent);
-  }
-
-  .ib:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: -2px;
   }
 </style>

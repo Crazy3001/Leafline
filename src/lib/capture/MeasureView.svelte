@@ -140,14 +140,14 @@
 <style>
   .facts {
     display: grid;
-    gap: 6px;
-    margin: 0 0 12px;
+    gap: var(--space-1-5);
+    margin: 0 0 var(--space-3);
   }
 
   .facts div {
     display: grid;
     grid-template-columns: 140px 1fr;
-    gap: 12px;
+    gap: var(--space-3);
   }
 
   dt {
@@ -159,31 +159,31 @@
   }
 
   .channel {
-    margin-right: 14px;
+    margin-right: var(--space-4);
     white-space: nowrap;
   }
 
   h4 {
-    margin: 16px 0 6px;
+    margin: var(--space-4) 0 var(--space-1-5);
     font-family: var(--font-display);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   table {
     width: 100%;
     border-collapse: collapse;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   th {
     text-align: left;
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     color: var(--muted);
   }
 
   th,
   td {
-    padding: 4px 8px 4px 0;
+    padding: var(--space-1) var(--space-2) var(--space-1) 0;
     border-bottom: var(--line-w) solid var(--line);
   }
 
@@ -196,7 +196,7 @@
     display: inline-block;
     width: 14px;
     height: 14px;
-    margin-right: 4px;
+    margin-right: var(--space-1);
     border: 1px solid var(--border-strong);
     border-radius: 3px;
     vertical-align: -2px;
@@ -208,12 +208,12 @@
   }
 
   .hint {
-    margin: 4px 0 0;
+    margin: var(--space-1) 0 0;
     font-size: var(--text-xs);
   }
 
   .note {
-    margin: 4px 0;
+    margin: var(--space-1) 0;
   }
 
   .good {

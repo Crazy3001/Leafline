@@ -90,6 +90,10 @@ pub struct StatGoal {
     pub stat: Stat,
     pub target: Option<u32>,
     pub from_level: Option<u32>,
+    /// The target is the stat with worn gear's added, as a requirement counts it: what the
+    /// character wears and the plan's gear on by then. Otherwise it is the points put in.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub with_gear: bool,
 }
 
 /// Where the character is now, as its windows show it. It differs by character, so the player
@@ -403,6 +407,9 @@ pub fn expand(build: &Build, rules: &Rules, catalog: &Catalog) -> Expansion {
         sp.beginner = build.start.sp;
     }
 
+    let mut gear = gear_goals(build, catalog, branch, &mut problems);
+    let mut worn = start_worn(build, catalog);
+    let known = build.start.stats.is_some();
     let mut steps = Vec::with_capacity((end - start + 1) as usize);
     for level in start..=end {
         let new_level = level > start;
@@ -423,7 +430,7 @@ pub fn expand(build: &Build, rules: &Rules, catalog: &Catalog) -> Expansion {
                 }
             }
         }
-        let ap_gains = spend_ap(&mut ap, &mut stats, &build.plan.stats, level);
+        let ap_gains = spend_ap(&mut ap, &mut stats, &build.plan.stats, level, &bonus_of_worn(&worn));
         let mut sp_gains = Vec::new();
         spend_sp(&mut sp, &mut skills, &goals, catalog, &mut sp_gains);
         // This level's SP goes on the old job first, then the advancement leaves it behind.
@@ -441,7 +448,7 @@ pub fn expand(build: &Build, rules: &Rules, catalog: &Catalog) -> Expansion {
                 spend_sp(&mut sp, &mut skills, &goals, catalog, &mut sp_gains);
             }
         }
-        steps.push(LevelStep {
+        let mut step = LevelStep {
             level,
             advance,
             ap: ap_gains,
@@ -451,11 +458,15 @@ pub fn expand(build: &Build, rules: &Rules, catalog: &Catalog) -> Expansion {
             stats,
             ap_left: ap,
             sp_left: sp.left(),
-        });
+        };
+        wear_new(&mut step, &mut gear, &mut worn, known);
+        steps.push(step);
     }
 
-    let gear = check_gear(build, catalog, branch, &mut steps, &mut problems);
-    problems.extend(end_notes(build, &goals, &skills, &stats, catalog, end, ap, sp.left()));
+    for check in gear.iter().filter(|c| c.usable && c.level.is_none()) {
+        problems.push(Problem::warning(None, format!("{} is out of reach by Lv {end} on this plan.", check.item.name)));
+    }
+    problems.extend(end_notes(build, &goals, &skills, &stats, &bonus_of_worn(&worn), catalog, end, ap, sp.left()));
     let mut skills: Vec<SkillLevel> = skills.into_iter().map(|(skill_id, level)| SkillLevel { skill_id, level }).collect();
     skills.sort_by_key(|s| s.skill_id);
     let mut expansion = Expansion { steps, problems, gear, skills };
@@ -542,7 +553,8 @@ fn start_notes(build: &Build, branch: Option<Branch>, rules: &Rules) -> Vec<Prob
 }
 
 /// Gives each point of AP to the first goal that can use it. A "the rest" goal takes all of it.
-fn spend_ap(ap: &mut u32, stats: &mut Stats, goals: &[StatGoal], level: u32) -> Vec<StatGain> {
+/// A goal counting gear counts `worn` toward its target.
+fn spend_ap(ap: &mut u32, stats: &mut Stats, goals: &[StatGoal], level: u32, worn: &Stats) -> Vec<StatGain> {
     let mut gains: Vec<StatGain> = Vec::new();
     for goal in goals {
         if *ap == 0 {
@@ -551,8 +563,9 @@ fn spend_ap(ap: &mut u32, stats: &mut Stats, goals: &[StatGoal], level: u32) -> 
         if goal.from_level.is_some_and(|from| level < from) {
             continue;
         }
+        let from_gear = if goal.with_gear { worn.get(goal.stat) } else { 0 };
         let amount = match goal.target {
-            Some(target) => target.saturating_sub(stats.get(goal.stat)).min(*ap),
+            Some(target) => target.saturating_sub(stats.get(goal.stat) + from_gear).min(*ap),
             None => *ap,
         };
         if amount == 0 {
@@ -628,16 +641,15 @@ pub(super) fn piece_bonus(stats: &[(String, i64)]) -> Stats {
     bonus
 }
 
-/// Marks the level each goal item comes within reach, walking up the levels so gear already
-/// worn can help with the next piece. A new piece replaces what was in its slot, but the piece it
-/// replaces still counts toward its requirements, and an item's own stats never do.
-fn check_gear(
-    build: &Build,
-    catalog: &Catalog,
-    branch: Option<Branch>,
-    steps: &mut [LevelStep],
-    problems: &mut Vec<Problem>,
-) -> Vec<GearCheck> {
+/// What the worn pieces add to the four stats together.
+fn bonus_of_worn(worn: &[Worn]) -> Stats {
+    worn.iter().fold(Stats::default(), |total, w| total.plus(w.bonus))
+}
+
+/// The goal items still to get. A goal already worn is done, scrolled or not. Nor is one the
+/// character has outgrown: lower level than what is worn in its slot, or the same level and no
+/// better.
+fn gear_goals(build: &Build, catalog: &Catalog, branch: Option<Branch>, problems: &mut Vec<Problem>) -> Vec<GearCheck> {
     let scorer = Scorer::new(build);
     let mut gear = Vec::with_capacity(build.plan.gear.len());
     for &id in &build.plan.gear {
@@ -645,9 +657,6 @@ fn check_gear(
             problems.push(Problem::warning(None, format!("A gear goal names an item Leafline doesn't know ({id}).")));
             continue;
         };
-        // A goal already worn is done: it isn't new gear to look for, scrolled or not. Nor is one
-        // the character has outgrown: lower level than what is worn in its slot, or the same level
-        // and no better.
         let slot = &item.slot;
         let outgrown = |piece: &Piece| {
             let level = piece.req_level(catalog);
@@ -665,51 +674,41 @@ fn check_gear(
         }
         gear.push(GearCheck { item: item.clone(), level: None, usable });
     }
-
-    let known = build.start.stats.is_some();
-    // What the character wears now counts from the start, with its own stats. Worn gear's
-    // stats count toward other gear's requirements, never an item's own.
-    let mut worn: Vec<Worn> = build
-        .start
-        .pieces
-        .iter()
-        .map(|piece| Worn { slot: piece.slot(catalog), bonus: piece_bonus(&piece.data_stats(catalog)) })
-        .collect();
-    for step in steps.iter_mut() {
-        loop {
-            let wearable: Vec<usize> = (0..gear.len())
-                .filter(|&i| {
-                    let check = &gear[i];
-                    // Everything worn counts, the piece this would replace too: the game's hover
-                    // shows a requirement met by it as met.
-                    let stats = worn.iter().fold(step.stats, |total, w| total.plus(w.bonus));
-                    check.usable && check.level.is_none() && meets(&check.item, step.level, &stats, known)
-                })
-                .collect();
-            // Of the goals for one slot that come within reach together, only the best is worth
-            // listing: the character goes straight to it, so the older ones are passed over rather
-            // than shown as things to get. They count as reached.
-            let Some(&best) = wearable.iter().max_by_key(|&&i| (gear[i].item.req_level, std::cmp::Reverse(i))) else { break };
-            for &i in &wearable {
-                let same_slot = gear[i].item.slot == gear[best].item.slot;
-                if i != best && same_slot && gear[i].item.req_level <= gear[best].item.req_level {
-                    gear[i].level = Some(step.level);
-                }
-            }
-            let check = &mut gear[best];
-            check.level = Some(step.level);
-            step.gear.push(check.item.name.clone());
-            worn.retain(|w| !Piece::clashes(&w.slot, &check.item.slot));
-            worn.push(Worn { slot: check.item.slot.clone(), bonus: bonus_of(&check.item) });
-        }
-        step.worn = worn.clone();
-    }
-
-    let end = steps.last().map_or(0, |s| s.level);
-    for check in gear.iter().filter(|c| c.usable && c.level.is_none()) {
-        problems.push(Problem::warning(None, format!("{} is out of reach by Lv {end} on this plan.", check.item.name)));
-    }
     gear
+}
+
+/// What the character wears now, with its own stats, counted from the start.
+fn start_worn(build: &Build, catalog: &Catalog) -> Vec<Worn> {
+    build.start.pieces.iter().map(|piece| Worn { slot: piece.slot(catalog), bonus: piece_bonus(&piece.data_stats(catalog)) }).collect()
+}
+
+/// Puts on the goal gear that comes within reach at `step`, after its AP, so gear already worn
+/// can help with the next piece. Worn gear's stats count toward other gear's requirements, never
+/// an item's own. A new piece replaces what was in its slot, but the piece it replaces still
+/// counts toward its requirements: the game's hover shows a requirement met by it as met.
+fn wear_new(step: &mut LevelStep, gear: &mut [GearCheck], worn: &mut Vec<Worn>, known: bool) {
+    loop {
+        let stats = step.stats.plus(bonus_of_worn(worn));
+        let wearable: Vec<usize> = (0..gear.len())
+            .filter(|&i| gear[i].usable && gear[i].level.is_none() && meets(&gear[i].item, step.level, &stats, known))
+            .collect();
+        // Of the goals for one slot that come within reach together, only the best is worth
+        // listing: the character goes straight to it, so the older ones are passed over rather
+        // than shown as things to get. They count as reached.
+        let Some(&best) = wearable.iter().max_by_key(|&&i| (gear[i].item.req_level, std::cmp::Reverse(i))) else { break };
+        for &i in &wearable {
+            let same_slot = gear[i].item.slot == gear[best].item.slot;
+            if i != best && same_slot && gear[i].item.req_level <= gear[best].item.req_level {
+                gear[i].level = Some(step.level);
+            }
+        }
+        let check = &mut gear[best];
+        check.level = Some(step.level);
+        step.gear.push(check.item.name.clone());
+        worn.retain(|w| !Piece::clashes(&w.slot, &check.item.slot));
+        worn.push(Worn { slot: check.item.slot.clone(), bonus: bonus_of(&check.item) });
+    }
+    step.worn = worn.clone();
 }
 
 /// Stats aren't compared until the player has entered theirs.
@@ -728,6 +727,7 @@ fn end_notes(
     goals: &[SkillGoal],
     skills: &HashMap<u32, u32>,
     stats: &Stats,
+    worn: &Stats,
     catalog: &Catalog,
     end: u32,
     ap: u32,
@@ -744,7 +744,7 @@ fn end_notes(
         }
     }
     for goal in &build.plan.stats {
-        let have = stats.get(goal.stat);
+        let have = stats.get(goal.stat) + if goal.with_gear { worn.get(goal.stat) } else { 0 };
         if let Some(target) = goal.target
             && have < target
         {
@@ -808,7 +808,7 @@ mod tests {
     }
 
     fn stat(stat: Stat, target: Option<u32>) -> StatGoal {
-        StatGoal { stat, target, from_level: None }
+        StatGoal { stat, target, from_level: None, with_gear: false }
     }
 
     /// A thief at Lv 11 with stats entered, before the level's SP. Rules are Leafline's defaults.
@@ -975,10 +975,42 @@ mod tests {
 
     #[test]
     fn a_stat_goal_can_wait_for_a_level() {
-        let waiting = StatGoal { stat: Stat::Dex, target: Some(35), from_level: Some(12) };
+        let waiting = StatGoal { stat: Stat::Dex, target: Some(35), from_level: Some(12), with_gear: false };
         let e = run(&build(Vec::new(), vec![waiting, stat(Stat::Luk, None)], 12));
         assert_eq!(step(&e, 11).ap[0].stat, Stat::Luk, "points don't wait for it");
         assert_eq!(step(&e, 12).ap[0].stat, Stat::Dex);
+    }
+
+    #[test]
+    fn a_goal_counting_gear_takes_no_ap_the_gear_already_gives() {
+        // 28 DEX put in and a hat that gives 2: a dagger asking 30 DEX can be worn, so no AP goes
+        // to DEX. Counting only the points put in, 2 would.
+        let mut hat = item(50, "Dex Hat", 10, &[]);
+        hat.slot = "Hat".into();
+        hat.stats = vec![ItemStat { label: "DEX".into(), value: 2 }];
+        let mut dagger = item(51, "Fern Dagger", 30, &[]);
+        dagger.slot = "Weapon".into();
+        dagger.req_dex = 30;
+        let catalog = Catalog::new(Vec::new(), vec![hat, dagger]);
+        let mut plan = build(Vec::new(), Vec::new(), 30);
+        plan.start = Start {
+            level: 29,
+            stats: Some(Stats { str: 4, dex: 28, int: 4, luk: 100 }),
+            pieces: vec![Piece::of_item(catalog.item(50).unwrap())],
+            ..Start::default()
+        };
+        plan.plan.gear = vec![51];
+        let goals = |with_gear| vec![StatGoal { stat: Stat::Dex, target: Some(30), from_level: None, with_gear }, stat(Stat::Luk, None)];
+
+        plan.plan.stats = goals(true);
+        let e = expand(&plan, &Rules::default(), &catalog);
+        assert_eq!(step(&e, 30).ap, [StatGain { stat: Stat::Luk, amount: 5, total: 105 }]);
+        assert_eq!(step(&e, 30).gear, ["Fern Dagger"]);
+        assert!(!messages(&e).iter().any(|m| m.contains("only reaches")), "{:?}", messages(&e));
+
+        plan.plan.stats = goals(false);
+        let e = expand(&plan, &Rules::default(), &catalog);
+        assert_eq!(step(&e, 30).ap[0], StatGain { stat: Stat::Dex, amount: 2, total: 30 });
     }
 
     #[test]

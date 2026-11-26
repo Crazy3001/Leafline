@@ -70,7 +70,8 @@ impl QuestWindow {
             .quests()
             .iter()
             .map(|g| seen_quest(atlas, &g.quest, g.region.as_deref(), strict))
-            .filter(|s| !strict || s.quest_id.is_some())
+            .filter(|(_, settled)| !strict || *settled)
+            .map(|(seen, _)| seen)
             .collect();
         let mut regions = gathered.regions();
         let whole = if strict {
@@ -114,31 +115,57 @@ fn matched_items(atlas: Option<&Atlas>, items: &[LogItem]) -> Vec<LogItem> {
                 region.clone().map(|name| LogItem::Region { name, count: *count })
             }
             LogItem::Quest(quest) => {
-                let readings: Vec<&str> =
-                    std::iter::once(quest.title.as_str()).chain(quest.readings.iter().map(String::as_str)).collect();
-                let id = atlas.log_quest(&readings, quest.cut, region.as_deref())?;
-                let title = atlas.quest_name(id)?;
+                let title = match settle(atlas, quest, region.as_deref())? {
+                    Settled::Quest(id) => atlas.quest_name(id)?,
+                    Settled::Series(name) => name,
+                };
                 Some(LogItem::Quest(LogQuest { title, readings: Vec::new(), cut: false, ..quest.clone() }))
             }
         })
         .collect()
 }
 
-/// A row ready to keep: matched to the data when its title fits a quest there, and then named as
-/// the data names it, since the game may have cut it short.
-fn seen_quest(atlas: Option<&Atlas>, quest: &LogQuest, region: Option<&str>, strict: bool) -> SeenQuest {
+/// What a row's title settles on in the data.
+enum Settled {
+    Quest(u32),
+    /// A series the game lists under its own name, with more than one quest it could be.
+    Series(String),
+}
+
+/// The quest a row is, or the series it names: the game lists a quest that is part of a series
+/// under the series' name, which is that quest when the series has only the one in its region.
+fn settle(atlas: &Atlas, quest: &LogQuest, region: Option<&str>) -> Option<Settled> {
     let readings: Vec<&str> = std::iter::once(quest.title.as_str()).chain(quest.readings.iter().map(String::as_str)).collect();
-    let id = atlas.and_then(|a| a.log_quest(&readings, quest.cut, region));
-    let data_name = id.and_then(|id| atlas?.quest_name(id));
+    if let Some(id) = atlas.log_quest(&readings, quest.cut, region) {
+        return Some(Settled::Quest(id));
+    }
+    let (name, quests) = atlas.log_series(&readings, quest.cut, region)?;
+    Some(match quests[..] {
+        [one] => Settled::Quest(one),
+        _ => Settled::Series(name),
+    })
+}
+
+/// A row ready to keep: matched to the data when its title fits a quest there, and then named as
+/// the data names it, since the game may have cut it short; or named as the data names the series
+/// it stands for. Also says whether it settled on the data either way.
+fn seen_quest(atlas: Option<&Atlas>, quest: &LogQuest, region: Option<&str>, strict: bool) -> (SeenQuest, bool) {
+    let settled = atlas.and_then(|a| settle(a, quest, region));
+    let (id, data_name) = match &settled {
+        Some(Settled::Quest(id)) => (Some(*id), atlas.and_then(|a| a.quest_name(*id))),
+        Some(Settled::Series(name)) => (None, Some(name.clone())),
+        None => (None, None),
+    };
     let region_like = |r: &str| atlas.and_then(|a| a.quest_region_like(r));
-    SeenQuest {
+    let seen = SeenQuest {
         title: data_name.clone().unwrap_or_else(|| quest.title.clone()),
         cut: quest.cut && data_name.is_none(),
         quest_id: id,
         region: region.and_then(|r| if strict { region_like(r) } else { Some(region_like(r).unwrap_or_else(|| r.to_string())) }),
         icon: quest.icon,
         on_helper: quest.on_helper,
-    }
+    };
+    (seen, data_name.is_some())
 }
 
 /// Which quest the detail pane shows: the picked row's, or else the one whose title its own

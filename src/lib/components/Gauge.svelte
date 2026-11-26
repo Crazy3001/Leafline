@@ -30,13 +30,13 @@
     display: flex;
     justify-content: space-between;
     align-items: baseline;
-    margin-bottom: 4px;
+    margin-bottom: var(--space-1);
   }
 
   .label {
-    font-size: var(--text-xs);
-    font-weight: 700;
     color: var(--muted);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-body);
   }
 
   .value {

@@ -373,7 +373,7 @@
 <style>
   .search {
     display: flex;
-    gap: 6px;
+    gap: var(--space-1-5);
     padding: var(--space-3) var(--space-3) 0;
   }
 
@@ -381,10 +381,10 @@
     display: flex;
     flex: 1;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
     min-width: 0;
     height: 38px;
-    padding: 0 12px;
+    padding: 0 var(--space-3);
     border: var(--line-w) solid var(--control-line);
     border-radius: var(--radius-lg);
     background: var(--surface);
@@ -407,7 +407,7 @@
     background: transparent;
     color: var(--text);
     font: inherit;
-    font-size: 14px;
+    font-size: var(--text-lg);
   }
 
   input::placeholder {
@@ -449,7 +449,7 @@
   }
 
   .results {
-    padding: 4px var(--space-3) var(--space-3);
+    padding: var(--space-1) var(--space-3) var(--space-3);
   }
 
   ul {
@@ -462,30 +462,29 @@
     display: flex;
     align-items: baseline;
     justify-content: space-between;
-    gap: 10px;
-    margin: 12px 2px 4px;
+    gap: var(--space-2);
+    margin: var(--space-3) var(--space-0-5) var(--space-1);
   }
 
   h3 {
     margin: 0;
-    color: var(--faint);
-    font-family: var(--font-display);
-    font-size: var(--text-sm);
-    font-weight: 600;
+    color: var(--muted);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-strong);
   }
 
   .all,
   .back {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: var(--space-1);
     padding: 0;
     border: 0;
     background: transparent;
     color: var(--accent-text);
     font: inherit;
-    font-size: var(--text-sm);
-    font-weight: 600;
+    font-size: var(--text-md);
+    font-weight: var(--weight-strong);
     cursor: pointer;
   }
 
@@ -497,16 +496,16 @@
   }
 
   .back {
-    margin: 10px var(--space-3) 0;
+    margin: var(--space-2) var(--space-3) 0;
   }
 
   .tool {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);
     align-items: center;
-    gap: 0 9px;
+    gap: 0 var(--space-2);
     width: 100%;
-    padding: 6px 24px 6px 6px;
+    padding: var(--space-1-5) var(--space-6) var(--space-1-5) var(--space-1-5);
     border: 0;
     border-radius: var(--radius-sm);
     background: transparent;
@@ -547,8 +546,8 @@
   }
 
   .quiet {
-    margin: 14px 2px 0;
+    margin: var(--space-3) var(--space-0-5) 0;
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 </style>

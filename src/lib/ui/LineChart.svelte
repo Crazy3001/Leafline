@@ -175,7 +175,7 @@
   }
 
   .tick {
-    font-size: 10px;
+    font-size: var(--text-2xs);
     fill: var(--faint);
     font-variant-numeric: tabular-nums;
   }
@@ -209,7 +209,7 @@
     display: flex;
     flex-direction: column;
     max-width: 150px;
-    padding: 5px 8px;
+    padding: var(--space-1) var(--space-2);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--surface-3);
@@ -218,7 +218,7 @@
   }
 
   .tip-value {
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     color: var(--text);
   }
 

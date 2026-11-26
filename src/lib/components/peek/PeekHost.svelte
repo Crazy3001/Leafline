@@ -6,6 +6,7 @@
   import { isTauri } from "@tauri-apps/api/core";
 
   import { backend } from "$lib/api";
+  import { pageZoom } from "$lib/zoom";
   import CardContent from "./CardContent.svelte";
 
   import { setContext } from "svelte";
@@ -46,8 +47,10 @@
   let card = $state<HTMLElement | null>(null);
   let viewport = $state({ width: 0, height: 0 });
 
+  /** The window in the page's own units, as cards are placed in them (see `pageZoom`). */
   function measure() {
-    viewport = { width: window.innerWidth, height: window.innerHeight };
+    const z = pageZoom();
+    viewport = { width: window.innerWidth / z, height: window.innerHeight / z };
   }
 
   /** Below the link when there is room, else above it; always inside the window. */
@@ -74,8 +77,9 @@
     if (e.button !== 0 || (e.target as Element).closest("button")) return;
     const header = e.currentTarget as HTMLElement;
     const start = { x: e.clientX, y: e.clientY };
+    const z = pageZoom();
     header.setPointerCapture(e.pointerId);
-    const onMove = (m: PointerEvent) => move(m.clientX - start.x, m.clientY - start.y);
+    const onMove = (m: PointerEvent) => move((m.clientX - start.x) / z, (m.clientY - start.y) / z);
     const onUp = (up: PointerEvent) => {
       header.removeEventListener("pointermove", onMove);
       header.removeEventListener("pointerup", onUp);
@@ -144,7 +148,7 @@
     const target = peek.stack.at(-1);
     if (!box || !target) return;
     if (canPopOut) popOutAt(target, box.left, box.top, closePeek);
-    else pinPeek(box.left, box.top);
+    else pinPeek(box.left / pageZoom(), box.top / pageZoom());
   }
 
   let openCard = $state<HTMLElement | null>(null);
@@ -294,8 +298,8 @@
     min-width: 0;
     overflow: hidden;
     color: var(--text);
-    font-size: var(--text-sm);
-    font-weight: 600;
+    font-size: var(--text-md);
+    font-weight: var(--weight-strong);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -304,9 +308,9 @@
     display: flex;
     flex: none;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     min-height: 36px;
-    padding: 4px 6px 4px 12px;
+    padding: var(--space-1) var(--space-1-5) var(--space-1) var(--space-3);
     border-bottom: 1px solid var(--border);
     background: var(--surface-2);
   }
@@ -315,7 +319,7 @@
     color: var(--ref, var(--accent));
     font-family: var(--font-display);
     font-size: var(--text-xs);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     letter-spacing: 0.04em;
     text-transform: uppercase;
   }
@@ -332,7 +336,7 @@
   .full {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: var(--space-1);
     height: 26px;
     border: 0;
     border-radius: var(--radius-sm);
@@ -347,7 +351,7 @@
   }
 
   .full {
-    padding: 0 9px;
+    padding: 0 var(--space-2);
     font-size: var(--text-xs);
   }
 
@@ -361,7 +365,7 @@
     flex: 1;
     min-height: 0;
     overflow-y: auto;
-    padding: 12px 14px 14px;
+    padding: var(--space-3) var(--space-4) var(--space-3);
     overscroll-behavior: contain;
   }
 </style>

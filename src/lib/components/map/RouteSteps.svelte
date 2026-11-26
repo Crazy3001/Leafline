@@ -87,7 +87,7 @@
   /* A vertical line of stops: each step a dot on the rail, the last one filled, where it ends. */
   .steps {
     display: grid;
-    margin: 8px 0 0;
+    margin: var(--space-2) 0 0;
     padding: 0;
     list-style: none;
   }
@@ -96,10 +96,10 @@
     position: relative;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-2);
     min-height: 28px;
-    padding: 3px 0;
-    font-size: var(--text-sm);
+    padding: var(--space-0-5) 0;
+    font-size: var(--text-md);
   }
 
   .steps li::before {
@@ -138,7 +138,7 @@
     background: var(--surface-2);
     color: var(--map);
     font-size: var(--text-xs);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .end .n {
@@ -173,14 +173,14 @@
   }
 
   .now .text {
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .text {
     display: inline-flex;
     flex-wrap: wrap;
     align-items: baseline;
-    gap: 4px;
+    gap: var(--space-1);
     min-width: 0;
   }
 
@@ -201,9 +201,9 @@
   .service {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--space-1);
     color: var(--travel);
-    font-weight: 500;
+    font-weight: var(--weight-body);
   }
 
   .service :global(svg) {
@@ -232,11 +232,11 @@
 
   .map,
   .text :global(.step-map) {
-    font-weight: 500;
+    font-weight: var(--weight-body);
   }
 
   .note {
-    margin: 6px 0 0;
+    margin: var(--space-1-5) 0 0;
     font-size: var(--text-xs);
     color: var(--faint);
   }

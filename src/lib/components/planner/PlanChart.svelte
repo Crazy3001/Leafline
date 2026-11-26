@@ -316,14 +316,14 @@
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 6px 12px;
-    margin-bottom: 8px;
+    gap: var(--space-1-5) var(--space-3);
+    margin-bottom: var(--space-2);
   }
 
   .legend {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px 12px;
+    gap: var(--space-1) var(--space-3);
     color: var(--muted);
     font-size: var(--text-xs);
   }
@@ -331,7 +331,7 @@
   .legend span {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: var(--space-1);
   }
 
   .legend i {
@@ -361,9 +361,9 @@
 
   .label {
     min-width: 0;
-    padding-right: 10px;
+    padding-right: var(--space-3);
     overflow: hidden;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -385,7 +385,7 @@
     position: absolute;
     top: 0;
     height: 18px;
-    padding: 0 7px;
+    padding: 0 var(--space-2);
     overflow: hidden;
     border-radius: 6px;
     background: var(--surface-2);
@@ -413,7 +413,7 @@
   }
 
   .hover-at {
-    padding: 0 5px;
+    padding: 0 var(--space-1-5);
     border-radius: 4px;
     background: var(--text);
     color: var(--bg);
@@ -483,12 +483,12 @@
     position: absolute;
     top: -12px;
     left: 50%;
-    padding: 1px 7px;
+    padding: 1px var(--space-2);
     border-radius: 5px;
     background: var(--accent);
     color: var(--accent-ink);
-    font-size: 10.5px;
-    font-weight: 600;
+    font-size: var(--text-2xs);
+    font-weight: var(--weight-strong);
     white-space: nowrap;
     transform: translateX(-50%);
   }
@@ -514,8 +514,8 @@
     overflow: hidden;
     border-radius: 6px;
     font-family: var(--font-display);
-    font-size: 10.5px;
-    font-weight: 600;
+    font-size: var(--text-2xs);
+    font-weight: var(--weight-strong);
     white-space: nowrap;
   }
 
@@ -531,7 +531,7 @@
 
   .in {
     position: relative;
-    padding: 0 7px;
+    padding: 0 var(--space-2);
     overflow: hidden;
     text-overflow: ellipsis;
   }
@@ -583,8 +583,8 @@
     height: 18px;
     color: var(--muted);
     font-family: var(--font-display);
-    font-size: 10.5px;
-    font-weight: 600;
+    font-size: var(--text-2xs);
+    font-weight: var(--weight-strong);
     line-height: 18px;
     white-space: nowrap;
   }
@@ -599,7 +599,7 @@
 
   .out.note {
     color: var(--faint);
-    font-weight: 400;
+    font-weight: var(--weight-body);
   }
 
   .mark {
@@ -613,7 +613,7 @@
 
   .mark b {
     color: var(--muted);
-    font-size: 10px;
+    font-size: var(--text-2xs);
   }
 
   .dot {
@@ -626,7 +626,7 @@
   }
 
   .key {
-    margin: 8px 0 0;
+    margin: var(--space-2) 0 0;
     color: var(--faint);
     font-size: var(--text-xs);
   }

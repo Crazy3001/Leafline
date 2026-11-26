@@ -127,21 +127,30 @@ pub fn known_character(h: &dyn Host, name: Option<String>) -> Result<Option<Know
     h.records().with(|db| db.known_character(name.as_deref()))
 }
 
-/// A character's last bag check, or with no name, the one read last. A check that no longer
-/// reads as one (from an older Leafline) is left out.
-pub fn known_bag(h: &dyn Host, name: Option<String>) -> Result<Option<BagCheck>> {
-    let text = h.records().with(|db| db.known_bag(name.as_deref()))?;
-    Ok(text.and_then(|t| serde_json::from_str(&t).ok()))
+/// Every character Leafline has a record of (a session, a HUD read, mesos or a bag look), the one
+/// seen last first, for the character picker before the game is read.
+pub fn known_characters(h: &dyn Host) -> Result<Vec<String>> {
+    h.records().with(|db| db.character_names())
 }
 
-/// Keeps a finished bag check as its character's last one. A check with no character, still
-/// under way or that failed isn't kept.
+/// A character's last check of each bag tab, the newest first, or with no name, those of the one
+/// whose bag was read last. A check that no longer reads as one (from an older Leafline) is left out.
+pub fn known_bags(h: &dyn Host, name: Option<String>) -> Result<Vec<BagCheck>> {
+    let texts = h.records().with(|db| db.known_bags(name.as_deref()))?;
+    Ok(texts.iter().filter_map(|t| serde_json::from_str(t).ok()).collect())
+}
+
+/// Keeps a finished bag check as its character's last one of that tab. A check with no character
+/// or tab, still under way or that failed isn't kept.
 pub fn keep_bag(h: &dyn Host, check: &BagCheck) -> Result<()> {
     let Some(name) = check.character.as_deref().filter(|_| !check.busy && check.problem.is_none()) else {
         return Ok(());
     };
+    let Some(tab) = check.tab.and_then(|t| serde_json::to_value(t).ok()).and_then(|v| v.as_str().map(str::to_owned)) else {
+        return Ok(());
+    };
     let text = serde_json::to_string(check).map_err(|err| Error::Invalid(err.to_string()))?;
-    h.records().with(|db| db.save_bag(name, &text, check.at))?;
+    h.records().with(|db| db.save_bag(name, &tab, &text, check.at))?;
     emit(h, KNOWN_EVENT, &());
     Ok(())
 }

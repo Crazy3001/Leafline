@@ -17,12 +17,15 @@
     map = null,
     session = null,
     plain = false,
+    handIn = null,
   }: {
     /** What the Quest Helper shows now. */
     tracked?: QuestReading | null;
     map?: MapReading | null;
     session?: SessionSummary | null;
     plain?: boolean;
+    /** Only quests ready to hand in (true), only the rest (false), or all of them. */
+    handIn?: boolean | null;
   } = $props();
 
   watchQuestLog();
@@ -72,9 +75,16 @@
     };
   }
 
-  const ready = $derived(shown.filter((q) => sheets[q.questId!]));
+  const finished = (q: Quest) => q.objectives.length > 0 && q.objectives.every((o) => !o.unread && o.current >= o.required);
+  const listed = $derived(
+    shown
+      .filter((q) => sheets[q.questId!])
+      .map((q) => ({ q, lines: lines(sheets[q.questId!], q) }))
+      .filter((x) => handIn == null || finished(x.lines) === handIn),
+  );
+  const ready = $derived(listed.map((x) => x.q));
   const reading = $derived<QuestReading>({
-    quests: ready.map((q) => lines(sheets[q.questId!], q)),
+    quests: listed.map((x) => x.lines),
     page: null,
     panel: { x: 0, y: 0, w: 0, h: 0 },
   });
@@ -84,7 +94,7 @@
 {#if ready.length}
   <QuestCard
     quest={reading}
-    heading="In your quest log"
+    heading={handIn ? "Ready to hand in" : "In your quest log"}
     note={seenAt ? `Counts as of ${formatAgo(Date.now() / 1000 - seenAt)}` : "No counts"}
     {map}
     {session}

@@ -119,7 +119,7 @@ mod tests {
             start: Start { level: 10, stats: Some(Stats { str: 4, dex: 25, int: 4, luk: 4 }), ..Start::default() },
             plan: Plan {
                 job: 400,
-                stats: vec![StatGoal { stat: Stat::Dex, target: None, from_level: None }],
+                stats: vec![StatGoal { stat: Stat::Dex, target: None, from_level: None, with_gear: false }],
                 plan_to: 20,
                 ..Plan::default()
             },

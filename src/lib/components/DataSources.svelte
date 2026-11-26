@@ -173,13 +173,13 @@
   .about {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--space-0-5);
     min-width: 0;
   }
 
   .name {
     font-size: var(--text-md);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .help {

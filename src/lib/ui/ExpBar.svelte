@@ -69,10 +69,10 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 3px;
+    gap: var(--space-0-5);
     color: #fff;
-    font-size: 10.5px;
-    font-weight: 600;
+    font-size: var(--text-2xs);
+    font-weight: var(--weight-strong);
     letter-spacing: 0.02em;
     text-shadow:
       0 0 2px #000,
@@ -83,6 +83,6 @@
   .text b {
     color: #ffe680;
     font-style: italic;
-    font-weight: 800;
+    font-weight: var(--weight-strong);
   }
 </style>

@@ -59,15 +59,15 @@
   .picker {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
+    gap: var(--space-2);
     outline: none;
   }
 
   .choice {
     position: relative;
     display: grid;
-    gap: 8px;
-    padding: 8px 8px 9px;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-2) var(--space-2);
     border: var(--line-w) solid var(--line);
     border-radius: var(--radius-lg);
     background: var(--surface);
@@ -94,7 +94,7 @@
 
   .words {
     display: grid;
-    padding: 0 4px;
+    padding: 0 var(--space-1);
   }
 
   .name {
@@ -143,8 +143,8 @@
   .m-head {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 7px 8px 6px;
+    gap: var(--space-1-5);
+    padding: var(--space-1-5) var(--space-2) var(--space-1-5);
     background: var(--header-bg);
     border-radius: var(--header-radius);
   }
@@ -160,7 +160,7 @@
 
   .m-lines {
     display: grid;
-    gap: 3px;
+    gap: var(--space-0-5);
   }
 
   .m-lines i {
@@ -179,12 +179,12 @@
     display: grid;
     flex: 1;
     align-content: center;
-    gap: 5px;
-    padding: 5px 7px;
+    gap: var(--space-1);
+    padding: var(--space-1) var(--space-2);
   }
 
   .m-go {
-    padding: 4px 6px;
+    padding: var(--space-1) var(--space-1-5);
     border: var(--line-w) solid var(--tile-border);
     border-radius: 6px;
     background: var(--accent);
@@ -200,17 +200,17 @@
   .m-tiles {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 5px;
+    gap: var(--space-1);
   }
 
   .m-tiles b {
-    padding: 2px 5px;
+    padding: var(--space-0-5) var(--space-1-5);
     border: var(--line-w) solid var(--tile-border);
     border-radius: 6px;
     color: var(--tile-text);
     font-family: var(--font-display);
-    font-size: 10px;
-    font-weight: 600;
+    font-size: var(--text-2xs);
+    font-weight: var(--weight-strong);
     line-height: 14px;
   }
 
@@ -226,8 +226,8 @@
   .m-nav {
     display: flex;
     align-items: center;
-    gap: 5px;
-    padding: 5px 7px;
+    gap: var(--space-1);
+    padding: var(--space-1) var(--space-2);
     border-top: var(--line-w) solid var(--nav-line);
     background: var(--nav-bg);
   }

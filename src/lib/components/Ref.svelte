@@ -10,6 +10,7 @@
   import { splitMapLabel } from "$lib/format";
   import { isWorn } from "$lib/builds.svelte";
   import Pic from "$lib/ui/Pic.svelte";
+  import HoverCard from "./peek/HoverCard.svelte";
   import QuestMark from "./quest/QuestMark.svelte";
   import type { PictureKind } from "$lib/pictures";
 
@@ -18,6 +19,7 @@
     id = null,
     name = null,
     icon = true,
+    mark = true,
     class: extra = "",
     title,
     children,
@@ -28,8 +30,10 @@
     name?: string | null;
     /** Show its picture, when it has one. */
     icon?: boolean;
+    /** For a quest, show where it stands in the quest log. */
+    mark?: boolean;
     class?: string;
-    /** More about it on hover, never that it opens a card. */
+    /** More about it on hover, never that it opens a card. Words go under its hover card. */
     title?: Tip;
     /** The text shown, when it isn't the name. */
     children?: Snippet;
@@ -41,15 +45,20 @@
   const pictureName = $derived(kind === "map" && name ? splitMapLabel(name).name : name);
   /** Gear the character wears has a colour of its own, wherever its name shows. */
   const wearing = $derived(kind === "item" && isWorn(id, name));
+  /** A tooltip of its own replaces the hover card; words join it. */
+  const own = $derived(title && typeof title !== "string" ? title : null);
+  const note = $derived(typeof title === "string" && title ? title : wearing ? "You're wearing this" : null);
 </script>
+
+{#snippet hover()}<HoverCard target={{ kind, id, name }} {note} />{/snippet}
 
 <button
   class="ref ref-{kind} {extra}"
   class:with-pic={!!picture}
   class:worn={wearing}
-  use:tip={title ?? (wearing ? "You're wearing this" : undefined)}
+  use:tip={own ?? hover}
   onclick={(e) => {
     e.stopPropagation();
     openPeek({ kind, id, name }, e.currentTarget);
   }}
->{#if picture}<Pic kind={picture} {id} name={pictureName} size={kind === "map" ? 14 : 18} class="ref-pic" />{/if}{#if children}{@render children()}{:else}{name}{/if}{#if kind === "quest" && id != null}<QuestMark {id} />{/if}</button>
+>{#if picture}<Pic kind={picture} {id} name={pictureName} size={kind === "map" ? 14 : 18} class="ref-pic" />{/if}{#if children}{@render children()}{:else}{name}{/if}{#if kind === "quest" && id != null && mark}<QuestMark {id} />{/if}</button>

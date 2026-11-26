@@ -72,12 +72,16 @@ impl Default for Settings {
     }
 }
 
-/// The four looks. One layout; a look changes colours, fonts, corners and outlines only.
+/// The six looks. One layout; a look changes colours, fonts, type sizes, corners and outlines.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Theme {
-    /// Dark graphite and amber.
+    /// Forest ink and leaf green, with a larger, very legible type. The default since 2026-11-25.
     #[default]
+    FocusDark,
+    /// The same on soft sage, with the header and tab bar kept dark.
+    FocusLight,
+    /// Dark graphite and amber.
     EmberDark,
     /// Ember on warm stone, with the header and tab bar kept dark.
     EmberLight,

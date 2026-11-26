@@ -31,20 +31,20 @@
   .chips {
     display: flex;
     flex-wrap: wrap;
-    gap: 3px;
-    margin-bottom: 8px;
+    gap: var(--space-0-5);
+    margin-bottom: var(--space-2);
   }
 
   .caption {
     align-self: center;
-    margin-right: 3px;
+    margin-right: var(--space-1);
     color: var(--faint);
     font-size: var(--text-xs);
   }
 
   button {
     height: 20px;
-    padding: 0 6px;
+    padding: 0 var(--space-1-5);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     background: transparent;

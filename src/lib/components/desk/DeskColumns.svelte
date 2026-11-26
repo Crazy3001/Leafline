@@ -217,7 +217,7 @@
   .layout {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: var(--space-3);
     height: 100%;
     min-height: 0;
   }
@@ -236,7 +236,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     min-width: 0;
   }
 
@@ -246,23 +246,23 @@
 
   .faint {
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .tab,
   .rename {
     height: calc(var(--control-h) - 2px);
-    padding: 0 14px;
+    padding: 0 var(--space-4);
     border: var(--line-w) solid var(--control-line);
     border-radius: var(--radius-pill);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     white-space: nowrap;
   }
 
   .tab {
     background: var(--surface);
     color: var(--muted);
-    font-weight: 500;
+    font-weight: var(--weight-body);
     cursor: pointer;
   }
 
@@ -288,9 +288,9 @@
   button.small {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: var(--space-1);
     height: var(--control-h-sm);
-    padding: 0 10px;
+    padding: 0 var(--space-3);
     border: var(--line-w) solid var(--control-line);
     border-radius: var(--radius-pill);
     background: var(--surface);
@@ -308,13 +308,13 @@
     flex: 1;
     min-height: 0;
     display: grid;
-    gap: 12px;
+    gap: var(--space-3);
   }
 
   .column {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: var(--space-3);
     min-width: 0;
     min-height: 0;
   }
@@ -348,10 +348,10 @@
   h2 {
     display: inline-flex;
     align-items: center;
-    gap: 7px;
+    gap: var(--space-1-5);
     margin: 0;
     font-family: var(--font-display);
-    font-size: 15px;
+    font-size: var(--text-lg);
     font-weight: var(--weight-strong);
   }
 
@@ -365,7 +365,7 @@
     right: var(--space-3);
     z-index: 10;
     width: 260px;
-    padding: 6px;
+    padding: var(--space-1-5);
     background: var(--surface-raised);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius);
@@ -374,13 +374,13 @@
 
   .menu-label {
     margin: 0;
-    padding: 4px 12px;
+    padding: var(--space-1) var(--space-3);
     font-size: var(--text-xs);
     color: var(--faint);
   }
 
   .menu-rule {
-    margin: 6px 0;
+    margin: var(--space-1-5) 0;
     border-top: 1px solid var(--border);
   }
 
@@ -390,7 +390,7 @@
     justify-content: space-between;
     width: 100%;
     height: 32px;
-    padding: 0 10px;
+    padding: 0 var(--space-3);
     border: 0;
     border-radius: var(--radius-sm);
     background: transparent;
@@ -403,7 +403,7 @@
   .item span {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
   }
 
   .item:hover {

@@ -27,7 +27,7 @@ export const display = $state<DisplaySettings>({
   setupDone: false,
   updateCheck: false,
   showPictures: true,
-  theme: "ember-dark",
+  theme: "focus-dark",
 });
 
 const NUMPAD: Record<string, string> = { Add: "+", Subtract: "-", Multiply: "*", Divide: "/", Decimal: ".", Enter: "Enter" };
