@@ -1,4 +1,5 @@
-// The region the player is in, by the map data, for the colour washed behind the player bar.
+// The region and map the player is in, by the map data: for the colour washed behind the player
+// bar and the desk's banner picture.
 // Each region gets a steady hue from its name, so the same place always looks the same and a new
 // one changes the colour; nothing here knows the game's regions by name. Until the minimap's map
 // is matched (or with no map data) the last region stays, so the colour doesn't flicker.
@@ -6,8 +7,13 @@
 import { backend } from "./api";
 import { mapData, watchMapData } from "./mapdata.svelte";
 import { live } from "./readings.svelte";
+import type { MapDetails } from "./types";
 
-export const place = $state<{ region: string | null }>({ region: null });
+export const place = $state<{ region: string | null; mapId: number | null; card: MapDetails | null }>({
+  region: null,
+  mapId: null,
+  card: null,
+});
 
 /** Hues that sit well under text on every look: greens, teals, blues, violet, rose, amber, rust. */
 const HUES = [142, 168, 196, 218, 262, 318, 34, 14];
@@ -39,7 +45,11 @@ export function watchRegion() {
       backend
         .findMap(map.name, map.street ?? null, map.twin ?? null)
         .then((found) => {
-          if (key === asked && found && found.score >= 0.85) place.region = found.card.region ?? null;
+          if (key === asked && found && found.score >= 0.85) {
+            place.region = found.card.region ?? null;
+            place.mapId = found.card.map.id;
+            place.card = found.card;
+          }
         })
         .catch(() => {
           // Keeps the last region.

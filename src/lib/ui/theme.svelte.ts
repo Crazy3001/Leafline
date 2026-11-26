@@ -1,5 +1,5 @@
-// The look every window is drawn in: one of four sets of colours, fonts, corners and outlines
-// over the same layout (app.css for Ember Dark, ui/themes.css for the rest).
+// The look every window is drawn in: one of six sets of colours, fonts, corners and outlines
+// over the same layout (app.css for Ember Dark, ui/themes.css for the rest). Focus is the default.
 
 import { display, settingsLoad, watchSettings } from "$lib/settings.svelte";
 import type { Theme } from "$lib/types";
@@ -13,6 +13,8 @@ export interface ThemeChoice {
 }
 
 export const THEMES: ThemeChoice[] = [
+  { id: "focus-dark", name: "Focus Dark", line: "Forest and leaf, big clear type", dark: true },
+  { id: "focus-light", name: "Focus Light", line: "Soft sage, big clear type", dark: false },
   { id: "ember-dark", name: "Ember Dark", line: "Graphite and amber", dark: true },
   { id: "ember-light", name: "Ember Light", line: "Warm stone, dark header", dark: false },
   { id: "sprout-light", name: "Sprout Light", line: "Cream, ink and stickers", dark: false },
@@ -55,7 +57,7 @@ export function followTheme() {
   if (first) document.documentElement.dataset.theme = first;
   watchSettings();
   $effect(() => {
-    const theme = known(display.theme) ? display.theme : "ember-dark";
+    const theme = known(display.theme) ? display.theme : "focus-dark";
     if (settingsLoad.done || !first) apply(theme);
   });
 }

@@ -12,8 +12,10 @@
     PanelLeftClose,
     PanelLeftOpen,
     Search,
+    Moon,
     Settings,
     Shapes,
+    Sun,
     Type,
     UserRound,
   } from "@lucide/svelte";
@@ -22,6 +24,7 @@
   import Logo from "$lib/components/Logo.svelte";
   import { DESK_TOOL_PAGES, ZOOMS, type DeskView } from "$lib/desk";
   import { live } from "$lib/readings.svelte";
+  import { changeSettings, display } from "$lib/settings.svelte";
 
   let {
     view,
@@ -55,12 +58,22 @@
   /** A tool's page or the build planner is under Tools. */
   const current = $derived<DeskView>(view === "planner" || (DESK_TOOL_PAGES as string[]).includes(view) ? "tools" : view);
 
+  /** What live reading is doing, said in the sidebar's foot. */
+  const status = $derived.by(() => {
+    const s = live.liveStatus;
+    if (s.state === "reading") return { tone: "good", text: "Reading live", line: s.window || "The game window" };
+    if (s.state === "waiting") return { tone: "warn", text: "Waiting", line: s.reason };
+    if (s.state === "failed") return { tone: "bad", text: "Stopped", line: s.message };
+    return { tone: "quiet", text: "Not reading", line: "Turn reading on in the overlay" };
+  });
+  const lightLook = $derived(display.theme === "focus-light" || display.theme === "ember-light" || display.theme === "sprout-light");
+
   /** The next text size, round and round. */
   const nextZoom = $derived(ZOOMS[(ZOOMS.indexOf(zoom) + 1) % ZOOMS.length]);
 
 </script>
 
-{#snippet item(entry: { id: DeskView; title: string; icon: typeof House }, count?: string | null)}
+{#snippet item(entry: { id: DeskView; title: string; icon: typeof House }, count?: string | null, key?: string)}
   {@const Icon = entry.icon}
   <button
     class="nav"
@@ -71,7 +84,7 @@
     onclick={() => onview(entry.id)}
   >
     <Icon size={16} />
-    {#if !folded}<span class="label">{entry.title}</span>{#if count}<span class="count num">{count}</span>{/if}{/if}
+    {#if !folded}<span class="label">{entry.title}</span>{#if count}<span class="count num">{count}</span>{/if}{#if key}<kbd class="key" aria-hidden="true">{key}</kbd>{/if}{/if}
   </button>
 {/snippet}
 
@@ -84,8 +97,8 @@
   </div>
 
   <nav aria-label="Views">
-    {#each VIEWS as v (v.id)}
-      {@render item(v, v.id === "quests" ? String((live.analysis?.quest?.quests ?? []).length || "") || null : null)}
+    {#each VIEWS as v, i (v.id)}
+      {@render item(v, v.id === "quests" ? String((live.analysis?.quest?.quests ?? []).length || "") || null : null, String(i + 1))}
     {/each}
     <span class="rule"></span>
     {#each MORE as v (v.id)}
@@ -94,6 +107,16 @@
   </nav>
 
   <div class="foot">
+    {#if !folded}
+      <div class="status {status.tone}" use:tip={status.line}>
+        <b><span class="dot" aria-hidden="true"></span>{status.text}</b>
+        <span class="sline">{status.line}</span>
+      </div>
+      <div class="look" role="radiogroup" aria-label="Light or dark">
+        <button role="radio" aria-checked={lightLook} aria-label="Light" use:tip={"Focus Light"} class:on={lightLook} onclick={() => void changeSettings({ theme: "focus-light" })}><Sun size={16} /></button>
+        <button role="radio" aria-checked={!lightLook} aria-label="Dark" use:tip={"Focus Dark"} class:on={!lightLook} onclick={() => void changeSettings({ theme: "focus-dark" })}><Moon size={16} /></button>
+      </div>
+    {/if}
     <div class="foot-row">
       <button class="nav" aria-label={folded ? "Settings" : undefined} use:tip={folded ? "Settings" : undefined} onclick={() => backend.showSettings()}>
         <Settings size={16} />{#if !folded}<span class="label">Settings</span>{/if}
@@ -236,6 +259,100 @@
     width: 100%;
     margin-top: auto;
     padding-top: var(--space-2);
+  }
+
+  .key {
+    margin-left: auto;
+    min-width: 20px;
+    padding: 0 var(--space-1);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    color: var(--faint);
+    font-family: var(--font-sans);
+    font-size: var(--text-2xs);
+    line-height: 18px;
+    text-align: center;
+  }
+
+  .count + .key {
+    margin-left: var(--space-1-5);
+  }
+
+  /* Whether Leafline is reading, where it's easy to glance at. */
+  .status {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-0-5);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius);
+    background: var(--surface-2);
+    color: var(--faint);
+    font-size: var(--text-xs);
+  }
+
+  .status b {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1-5);
+    color: var(--muted);
+    font-size: var(--text-md);
+  }
+
+  .status.good b {
+    color: var(--good);
+  }
+
+  .status.warn b {
+    color: var(--warn);
+  }
+
+  .status.bad b {
+    color: var(--bad);
+  }
+
+  .status .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+
+  .sline {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .look {
+    display: inline-flex;
+    align-self: center;
+    gap: var(--space-1);
+    margin: var(--space-1) 0;
+    padding: var(--space-1);
+    border-radius: var(--radius-pill);
+    background: var(--surface-2);
+  }
+
+  .look button {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+  }
+
+  .look button.on {
+    background: var(--accent);
+    color: var(--accent-ink);
+  }
+
+  .look button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
   }
 
   .foot-row {

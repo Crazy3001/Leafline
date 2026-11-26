@@ -13,7 +13,11 @@
   import DeskBar from "$lib/components/desk/DeskBar.svelte";
   import DeskSidebar from "$lib/components/desk/DeskSidebar.svelte";
   import DeskTools from "$lib/components/desk/DeskTools.svelte";
-  import NowScreen from "$lib/shell/NowScreen.svelte";
+  import DeskCharacter from "$lib/components/desk/DeskCharacter.svelte";
+  import DeskHero from "$lib/components/desk/DeskHero.svelte";
+  import DeskMap from "$lib/components/desk/DeskMap.svelte";
+  import DeskQuests from "$lib/components/desk/DeskQuests.svelte";
+  import NextUp from "$lib/components/desk/NextUp.svelte";
   import Segmented from "$lib/ui/Segmented.svelte";
   import CharacterPicker from "$lib/components/CharacterPicker.svelte";
   import DropLogView from "$lib/components/DropLogView.svelte";
@@ -251,12 +255,22 @@
     }
   });
 
-  /** "/" puts the cursor in the search box, as on many sites, unless you're typing somewhere. */
+  /** The five tabs by number, in the sidebar's order. */
+  const NUMBERED: DeskView[] = ["now", "train", "quests", "map", "me"];
+
+  /**
+   * "/" puts the cursor in the search box, as on many sites, and 1 to 5 open the five tabs, unless
+   * you're typing somewhere. Keys in this window only; the game's never see them.
+   */
   function keys(event: KeyboardEvent) {
     const typing = (event.target as Element | null)?.closest?.("input, textarea, select, [contenteditable]");
-    if (event.key === "/" && !typing && !event.ctrlKey && !event.altKey && !event.metaKey) {
+    if (typing || event.ctrlKey || event.altKey || event.metaKey) return;
+    if (event.key === "/") {
       event.preventDefault();
       void openSearch();
+    } else if (/^[1-5]$/.test(event.key)) {
+      event.preventDefault();
+      pick(NUMBERED[Number(event.key) - 1]);
     }
   }
 
@@ -285,7 +299,8 @@
   />
 
   <div class="main">
-    <DeskBar />
+    <!-- On Now the character card has these numbers; everywhere else the bar keeps them in view. -->
+    {#if view !== "now"}<DeskBar />{/if}
     <div class="top">
       {#if from}
         <button class="pill" onclick={back}><ArrowLeft size={14} />Back to {viewName(from)}</button>
@@ -314,21 +329,23 @@
     <div class="view" class:narrow={narrowViews.includes(view)} class:full={view === "planner" || view === "layout"} aria-label={viewName(view)}>
       {#key view}
         {#if view === "now"}
+          <DeskHero />
           <CharacterPicker />
           {#if isWeb}<ReadWindowCard />{/if}
+          <!-- Who you are and what to do next on top; the session, your quests and this map under them. -->
+          <div class="now-r1">
+            <DeskCharacter ongo={() => go("me")} />
+            <NextUp onme={() => go("me")} />
+          </div>
+          <div class="now-r2">
+            <TrainPanel {level} map={live.analysis?.map ?? null} session={live.session} only="chart" />
+            <DeskQuests ongo={() => go("quests")} />
+            <DeskMap ongo={() => go("map")} />
+          </div>
+          <!-- Without live reading, a session can be typed in. -->
           {#if can.liveReading ? live.liveStatus.state === "off" : live.liveStatus.state !== "reading" && live.liveStatus.state !== "waiting"}
             <div class="typed"><TypedSessionCard /></div>
           {/if}
-          <!-- What you're doing on the left, how this map compares on the right. The player bar has the rates. -->
-          <div class="now-grid">
-            <div class="col">
-              <NowScreen analysis={live.analysis} session={live.session} ongo={(t) => go(t)} desk />
-              <TrainPanel {level} map={live.analysis?.map ?? null} session={live.session} only="chart" />
-            </div>
-            <div class="col">
-              <TrainPanel {level} map={live.analysis?.map ?? null} session={live.session} only="maps" />
-            </div>
-          </div>
         {:else if view === "quests"}
           <div class="stack"><PanelView panel="quests" analysis={live.analysis} session={live.session} roomy /></div>
         {:else if view === "map"}
@@ -558,30 +575,29 @@
     margin-right: 0;
   }
 
-  /* Now: two columns, the wider one for what you're doing. Narrow windows stack them. */
-  .now-grid {
+  /* Now: the character and Next up side by side, then three cards. Narrow windows stack them. */
+  .now-r1 {
     display: grid;
-    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
-    gap: var(--space-3);
+    grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+    gap: var(--space-4);
+    align-items: stretch;
+  }
+
+  .now-r2 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: var(--space-4);
     align-items: start;
   }
 
-  .col {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
-    min-width: 0;
+  /* Panels' own side margins are for the overlay; the rows space them here. */
+  .now-r1 :global(.card),
+  .now-r2 :global(.card) {
+    margin: 0;
   }
 
-  /* Panels' own side margins are for the overlay; the columns space them here. */
-  .col :global(.card) {
-    margin-left: 0;
-    margin-right: 0;
-    margin-bottom: 0;
-  }
-
-  @container desk-main (max-width: 900px) {
-    .now-grid {
+  @container desk-main (max-width: 1000px) {
+    .now-r1 {
       grid-template-columns: minmax(0, 1fr);
     }
   }
