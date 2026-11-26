@@ -6,6 +6,7 @@
   import { isTauri } from "@tauri-apps/api/core";
 
   import { backend } from "$lib/api";
+  import { pageZoom } from "$lib/zoom";
   import CardContent from "./CardContent.svelte";
 
   import { setContext } from "svelte";
@@ -46,8 +47,10 @@
   let card = $state<HTMLElement | null>(null);
   let viewport = $state({ width: 0, height: 0 });
 
+  /** The window in the page's own units, as cards are placed in them (see `pageZoom`). */
   function measure() {
-    viewport = { width: window.innerWidth, height: window.innerHeight };
+    const z = pageZoom();
+    viewport = { width: window.innerWidth / z, height: window.innerHeight / z };
   }
 
   /** Below the link when there is room, else above it; always inside the window. */
@@ -74,8 +77,9 @@
     if (e.button !== 0 || (e.target as Element).closest("button")) return;
     const header = e.currentTarget as HTMLElement;
     const start = { x: e.clientX, y: e.clientY };
+    const z = pageZoom();
     header.setPointerCapture(e.pointerId);
-    const onMove = (m: PointerEvent) => move(m.clientX - start.x, m.clientY - start.y);
+    const onMove = (m: PointerEvent) => move((m.clientX - start.x) / z, (m.clientY - start.y) / z);
     const onUp = (up: PointerEvent) => {
       header.removeEventListener("pointermove", onMove);
       header.removeEventListener("pointerup", onUp);
@@ -144,7 +148,7 @@
     const target = peek.stack.at(-1);
     if (!box || !target) return;
     if (canPopOut) popOutAt(target, box.left, box.top, closePeek);
-    else pinPeek(box.left, box.top);
+    else pinPeek(box.left / pageZoom(), box.top / pageZoom());
   }
 
   let openCard = $state<HTMLElement | null>(null);
