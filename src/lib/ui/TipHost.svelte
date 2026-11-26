@@ -5,6 +5,7 @@
   import { untrack } from "svelte";
 
   import { hideTip, tipState } from "$lib/tip.svelte";
+  import { pageZoom } from "$lib/zoom";
 
   const MARGIN = 6;
   const GAP = 6;
@@ -14,10 +15,14 @@
   let box = $state<HTMLElement | null>(null);
   let place = $state<{ left: number; top: number } | null>(null);
 
-  /** Where a box of this size goes, wholly inside the window. */
-  function placeFor(anchor: HTMLElement, at: { x: number; y: number } | null, width: number, height: number) {
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
+  /** Where the tooltip goes, wholly inside the window, in the page's units (see `pageZoom`). */
+  function placeFor(anchor: HTMLElement, mouse: { x: number; y: number } | null, tipBox: HTMLElement) {
+    const z = pageZoom();
+    const width = tipBox.offsetWidth;
+    const height = tipBox.offsetHeight;
+    const vw = window.innerWidth / z;
+    const vh = window.innerHeight / z;
+    const at = mouse && { x: mouse.x / z, y: mouse.y / z };
     let left: number;
     let top: number;
     if (at) {
@@ -25,7 +30,8 @@
       left = at.x + FROM_MOUSE.x + width <= vw - MARGIN ? at.x + FROM_MOUSE.x : at.x - FROM_MOUSE.x - width;
       top = at.y + FROM_MOUSE.y + height <= vh - MARGIN ? at.y + FROM_MOUSE.y : at.y - GAP - height;
     } else {
-      const a = anchor.getBoundingClientRect();
+      const r = anchor.getBoundingClientRect();
+      const a = { left: r.left / z, top: r.top / z, bottom: r.bottom / z, width: r.width / z };
       left = a.left + a.width / 2 - width / 2;
       const below = a.bottom + GAP;
       top = below + height <= vh - MARGIN || a.top - GAP - height < MARGIN ? below : a.top - GAP - height;
@@ -44,8 +50,7 @@
     const tipBox = box;
     const measure = () => {
       if (!anchor.isConnected) return hideTip();
-      const { width, height } = tipBox.getBoundingClientRect();
-      place = placeFor(anchor, tipState.at, width, height);
+      place = placeFor(anchor, tipState.at, tipBox);
     };
     const frame = requestAnimationFrame(measure);
     // A hover card fills in once its lookup answers, and grows: placed again to stay in the window.
@@ -62,8 +67,7 @@
     const at = tipState.at;
     const anchor = tipState.anchor;
     if (!at || !anchor || !box || !untrack(() => place)) return;
-    const { width, height } = box.getBoundingClientRect();
-    place = placeFor(anchor, at, width, height);
+    place = placeFor(anchor, at, box);
   });
 
   $effect(() => {

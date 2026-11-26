@@ -9,7 +9,8 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
   reads the new name, but map data downloaded earlier kept no Attack, so weapons showed none and
   the build planner's weapon path passed over most planned weapons. The map data downloads once
   more to pick it up.
-- Tooltips and hover cards sit beside the mouse, follow it, and stay inside the window. An
+- Tooltips and hover cards sit beside the mouse, follow it, and stay inside the window, at any
+  text size on the website (at 125% they used to land well away from the mouse; link cards too). An
   equipment card names the classes that can use it under its level, and shows its NPC sell price.
 - **Build planner:** the Create build button stays in view at the bottom of New build, and says
   what it will make. New build asks who the gear is made for. A build's header says which
