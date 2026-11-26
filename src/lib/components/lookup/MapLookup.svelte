@@ -5,13 +5,14 @@
   import { FilterBoxState } from "$lib/filterbox.svelte";
   import SaveSpot from "$lib/components/SaveSpot.svelte";
   import { mapPlace } from "$lib/destination.svelte";
-  import { ArrowLeft, LoaderCircle } from "@lucide/svelte";
+  import { LoaderCircle } from "@lucide/svelte";
   import { untrack } from "svelte";
 
   import Chips from "./Chips.svelte";
   import FilterBox from "./FilterBox.svelte";
   import KindTabs from "./KindTabs.svelte";
   import LookupRow from "./LookupRow.svelte";
+  import LookupSplit from "./LookupSplit.svelte";
   import MobChips from "./MobChips.svelte";
   import SearchBar from "./SearchBar.svelte";
   import Card from "../Card.svelte";
@@ -170,8 +171,8 @@
     {/if}
   </div>
 
-  {#if mapView.id != null}
-    <button class="back" class:pinned onclick={back}><ArrowLeft size={12} />Back</button>
+  <LookupSplit open={mapView.id != null} onback={back} {pinned}>
+    {#snippet detail()}
     {#if details}
       <Card title="Map" plain={pinned}>
         {#if details.map.street}<p class="street">{details.map.street}</p>{/if}
@@ -182,13 +183,15 @@
         {/key}
       </Card>
     {/if}
-  {:else}
+    {/snippet}
+    {#snippet empty()}<p class="pick">Pick a map to see it here.</p>{/snippet}
+    {#snippet list()}
     <div class="list" class:pinned>
       {#if !browsing && here}
         <p class="heading">You're here</p>
         <ul class="rows">
           <li>
-            <LookupRow name={here.card.map.name} picture={{ kind: "mark", id: here.card.map.id }} line={here.card.map.street} aside={levels(here.card.levelRange)} onclick={() => open(here!.card.map.id)} />
+            <LookupRow name={here.card.map.name} picture={{ kind: "mark", id: here.card.map.id }} line={here.card.map.street} aside={levels(here.card.levelRange)} selected={mapView.id === here.card.map.id} onclick={() => open(here!.card.map.id)} />
           </li>
         </ul>
         <p class="heading">Every map</p>
@@ -200,7 +203,7 @@
           <ul class="rows">
             {#each page.maps as row (row.map.id)}
               <li>
-                <LookupRow name={row.map.name} picture={{ kind: "mark", id: row.map.id }} line={line(row)} aside={levels(row.levelRange)} onclick={() => open(row.map.id)}>
+                <LookupRow name={row.map.name} picture={{ kind: "mark", id: row.map.id }} line={line(row)} aside={levels(row.levelRange)} selected={mapView.id === row.map.id} onclick={() => open(row.map.id)}>
                   {#snippet below()}{#if row.mobs?.length}<MobChips mobs={row.mobs} />{/if}{/snippet}
                 </LookupRow>
               </li>
@@ -214,27 +217,28 @@
         <p class="quiet"><span class="spin"><LoaderCircle size={13} /></span> Searching…</p>
       {/if}
     </div>
-  {/if}
+    {/snippet}
+  </LookupSplit>
 {/if}
 
 <style>
   .save-row {
-    margin: 2px 0 8px;
+    margin: var(--space-0-5) 0 var(--space-2);
   }
 
   .lead {
-    margin: 0 0 10px;
+    margin: 0 0 var(--space-2);
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   /* A card pads itself; these sit beside cards, so they match it. A pinned window pads its body. */
   .controls {
-    padding: 8px 12px 0;
+    padding: var(--space-2) var(--space-3) 0;
   }
 
   .list {
-    padding: 0 12px 10px;
+    padding: 0 var(--space-3) var(--space-2);
   }
 
   .controls.pinned,
@@ -243,7 +247,7 @@
   }
 
   .heading {
-    margin: 8px 0 3px;
+    margin: var(--space-2) 0 var(--space-0-5);
     color: var(--muted);
     font-family: var(--font-display);
     font-size: var(--text-md);
@@ -252,19 +256,19 @@
   .street {
     margin: 0;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .name {
     margin: 0;
     font-family: var(--font-display);
     font-size: var(--text-lg);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     line-height: 1.25;
   }
 
   .count {
-    margin: 0 0 4px;
+    margin: 0 0 var(--space-1);
     color: var(--faint);
     font-size: var(--text-xs);
   }
@@ -282,13 +286,13 @@
   .back {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    margin: 2px 12px 6px;
+    gap: var(--space-1);
+    margin: var(--space-0-5) var(--space-3) var(--space-1-5);
     padding: 0;
     border: 0;
     background: transparent;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     cursor: pointer;
   }
 
@@ -298,19 +302,18 @@
     outline: none;
   }
 
-  .back.inline,
-  .back.pinned {
+  .back.inline {
     margin-inline: 0;
   }
 
   .back.inline {
-    margin-top: 6px;
+    margin-top: var(--space-1-5);
   }
 
   .quiet {
-    margin: 10px 0 6px;
+    margin: var(--space-2) 0 var(--space-1-5);
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .spin {
@@ -324,4 +327,11 @@
     }
   }
 
+  .pick {
+    margin: 0;
+    padding: var(--space-8) var(--space-3);
+    color: var(--faint);
+    font-size: var(--text-md);
+    text-align: center;
+  }
 </style>

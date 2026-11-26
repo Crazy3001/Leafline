@@ -38,15 +38,15 @@
   .welcome {
     display: grid;
     justify-items: center;
-    gap: 6px;
-    margin: var(--space-3) 10px;
-    padding: 24px 18px 18px;
+    gap: var(--space-1-5);
+    margin: var(--space-3) var(--space-3);
+    padding: var(--space-6) var(--space-5) var(--space-4);
     text-align: center;
     color: var(--muted);
   }
 
   h1 {
-    margin: 6px 0 0;
+    margin: var(--space-1-5) 0 0;
     color: var(--text);
     font-family: var(--font-display);
     font-size: var(--text-lg);
@@ -57,22 +57,22 @@
     max-width: 260px;
     margin: 0;
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   ol {
     display: grid;
-    gap: 10px;
-    margin: 12px 0 6px;
+    gap: var(--space-2);
+    margin: var(--space-3) 0 var(--space-1-5);
     padding: 0;
     list-style: none;
     text-align: left;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   li {
     display: flex;
-    gap: 9px;
+    gap: var(--space-2);
   }
 
   .n {
@@ -86,7 +86,7 @@
     color: var(--accent-text);
     font-family: var(--font-display);
     font-size: var(--text-xs);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .inline {
@@ -95,7 +95,7 @@
     background: transparent;
     color: var(--accent-text);
     font: inherit;
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     cursor: pointer;
   }
 
@@ -107,12 +107,12 @@
 
   .inline.small {
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     font-weight: inherit;
   }
 
   kbd {
-    padding: 0 4px;
+    padding: 0 var(--space-1);
     border: 1px solid var(--border-strong);
     border-bottom-width: 2px;
     border-radius: var(--radius-sm);

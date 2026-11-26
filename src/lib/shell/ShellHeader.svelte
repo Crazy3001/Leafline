@@ -1,14 +1,16 @@
 <script lang="ts">
   // The window's header: who you are and how far through the level, with four actions. The level
   // sits in a ring that fills with EXP; under it one quiet line gives the exact numbers and when
-  // the level comes. The whole header drags the window.
+  // the level comes. On tabs that don't show the session, that line gives the two rates in place
+  // of the exact EXP, so they're always in view. The whole header drags the window.
   import { can } from "$lib/platform";
   import { LayoutGrid, Lock, LockOpen, Pin, PinOff, Search } from "@lucide/svelte";
 
   import Logo from "$lib/components/Logo.svelte";
-  import { formatClockIn, formatDuration, formatNumber } from "$lib/format";
+  import { formatClockIn, formatCompact, formatDuration, formatNumber } from "$lib/format";
   import { ago, lastKnown, profile, watchProfile } from "$lib/profile.svelte";
   import { live } from "$lib/readings.svelte";
+  import { place, regionHue, watchRegion } from "$lib/region.svelte";
   import { hotkey, keyHint } from "$lib/settings.svelte";
   import { tip } from "$lib/tip.svelte";
   import IconButton from "$lib/ui/IconButton.svelte";
@@ -20,6 +22,7 @@
     pinTitle,
     searching,
     tooling,
+    rates = false,
     onlive,
     onsearch,
     onpin,
@@ -34,6 +37,8 @@
     searching: boolean;
     /** The Tools list is open. */
     tooling: boolean;
+    /** Show the session's two rates, for a tab that doesn't show them itself. */
+    rates?: boolean;
     onlive: () => void;
     onsearch: () => void;
     onpin: () => void;
@@ -60,12 +65,28 @@
   );
   /** When what is shown was read, for a character not on screen now. */
   const seenAt = $derived(levelShown.at ?? percentShown.at);
+
+  watchRegion();
+  const hue = $derived(regionHue(place.region));
   const state = $derived(live.liveStatus.state);
   const liveOn = $derived(state === "reading" || state === "waiting");
   const locked = $derived(live.status.clickThrough);
 
   /** When the level comes at this pace; nothing while paused or before a pace is known. */
   const toLevel = $derived(session && !session.paused && session.secondsToLevel != null ? session.secondsToLevel : null);
+  /** The session's EXP and mesos an hour, short, once a session is under way. */
+  const rateLine = $derived.by(() => {
+    if (!rates || !session || session.activeSeconds <= 0) return null;
+    const exp = session.percentOnly
+      ? session.percentPerHour != null
+        ? `${session.percentPerHour.toFixed(1)}%`
+        : null
+      : session.expPerHour != null
+        ? formatCompact(session.expPerHour)
+        : null;
+    const mesos = session.mesosPerHour != null ? formatCompact(session.mesosPerHour) : null;
+    return exp || mesos ? { exp, mesos, levelRate: session.percentOnly } : null;
+  });
   const lockTitle = $derived(
     locked
       ? hotkey("ToggleClickThrough")
@@ -75,7 +96,7 @@
   );
 </script>
 
-<header data-tauri-drag-region>
+<header class:washed={hue != null} style:--region-hue={hue} data-tauri-drag-region>
   <div class="top" data-tauri-drag-region>
     <span class="ring" class:stale={levelShown.at != null}><LevelRing {level} {percent}><Logo size={20} /></LevelRing></span>
     <div class="who" data-tauri-drag-region>
@@ -106,7 +127,12 @@
     <div class="exp" class:stale={percentShown.at != null} data-tauri-drag-region>
       <span class="amount" data-tauri-drag-region>
         <span class="pct">{percent.toFixed(percent >= 100 ? 0 : 1)}%</span>
-        {#if exp}
+        {#if rateLine}
+          <span class="points rates">
+            {#if rateLine.exp}<span><b>{rateLine.exp}</b> {rateLine.levelRate ? "a level" : "EXP"}/hr</span>{/if}
+            {#if rateLine.mesos}<span><b class="mesos">{rateLine.mesos}</b> mesos/hr</span>{/if}
+          </span>
+        {:else if exp}
           <span class="points">
             {formatNumber(exp.points)}{#if session?.expNeeded}{" "}/ {formatNumber(session.expNeeded)}{/if} EXP
           </span>
@@ -123,6 +149,8 @@
 
 <style>
   header {
+    position: relative;
+    isolation: isolate;
     flex: none;
     margin-bottom: var(--header-gap);
     border-radius: var(--header-radius);
@@ -146,11 +174,30 @@
     flex: none;
   }
 
+  /* The region you're in, as a soft glow from the top left, fading to the next when you travel. */
+  header::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: radial-gradient(90% 140% at 0% 0%, hsl(var(--region-hue) 62% 52% / 0.22), transparent 70%);
+    opacity: 0;
+    transition:
+      opacity 0.8s ease,
+      --region-hue 1.2s ease;
+    pointer-events: none;
+  }
+
+  header.washed::before {
+    opacity: 1;
+  }
+
   .top {
     display: flex;
     align-items: center;
-    gap: 11px;
-    padding: 12px 8px 10px 14px;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-2) var(--space-2) 14px;
   }
 
   .who {
@@ -171,10 +218,10 @@
   .under {
     display: flex;
     align-items: center;
-    gap: 7px;
+    gap: var(--space-1-5);
     margin-top: 1px;
     color: var(--header-muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     white-space: nowrap;
   }
 
@@ -182,15 +229,15 @@
   .live {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    padding: 1px 6px 1px 4px;
+    gap: var(--space-1);
+    padding: 1px var(--space-1-5) 1px var(--space-1);
     margin-left: -4px;
     border: 0;
     border-radius: var(--radius-pill);
     background: transparent;
     color: var(--header-faint);
     font: inherit;
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     cursor: pointer;
   }
 
@@ -237,24 +284,24 @@
     display: flex;
     align-items: baseline;
     justify-content: space-between;
-    gap: 10px;
-    padding: 0 14px 11px;
-    font-size: 11.5px;
+    gap: var(--space-2);
+    padding: 0 var(--space-4) var(--space-3);
+    font-size: var(--text-xs);
     white-space: nowrap;
   }
 
   .amount {
     display: flex;
     align-items: baseline;
-    gap: 8px;
+    gap: var(--space-2);
     min-width: 0;
   }
 
   .pct {
     color: var(--header-exp);
     font-family: var(--font-display);
-    font-size: 14px;
-    font-weight: 600;
+    font-size: var(--text-lg);
+    font-weight: var(--weight-strong);
     font-variant-numeric: tabular-nums;
   }
 
@@ -265,13 +312,30 @@
     text-overflow: ellipsis;
   }
 
+  .rates {
+    display: flex;
+    gap: var(--space-3);
+    color: var(--header-muted);
+  }
+
+  .rates b {
+    color: var(--header-text);
+    font-family: var(--font-display);
+    font-weight: var(--weight-strong);
+  }
+
+  /* The header stays dark in the light looks, so the mesos take the header's own amber. */
+  .rates b.mesos {
+    color: var(--header-accent);
+  }
+
   .when {
     color: var(--header-muted);
   }
 
   .when b {
     color: var(--header-text);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   /* Dragged narrow: the exact points give way before the time to level does. */

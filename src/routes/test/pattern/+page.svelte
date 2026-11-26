@@ -118,7 +118,7 @@
   }
 
   .note {
-    margin: 4px 8px;
+    margin: var(--space-1) var(--space-2);
     color: #eee;
     font: 12px/1.4 var(--font-sans);
   }

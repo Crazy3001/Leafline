@@ -7,17 +7,19 @@ import { characters } from "./characters.svelte";
 import { live } from "./readings.svelte";
 import { followedQuests } from "./quests.svelte";
 import { isTracked } from "./tracked.svelte";
-import type { BagCheck, BagItem } from "./types";
+import type { BagCheck, BagItem, BagTab } from "./types";
 
 export const bag = $state<{
   /** The check made this run. */
   check: BagCheck | null;
   seq: number;
-  /** The last check kept for the character looked at, from an earlier run. */
-  known: BagCheck | null;
+  /** The last check of each tab kept for the character looked at, from earlier runs, newest first. */
+  known: BagCheck[];
+  /** The kept tab picked to look at; the newest with none picked. */
+  knownTab: BagTab | null;
   /** The player closed the kept one. */
   knownClosed: boolean;
-}>({ check: null, seq: 0, known: null, knownClosed: false });
+}>({ check: null, seq: 0, known: [], knownTab: null, knownClosed: false });
 
 const same = (a: string | null | undefined, b: string | null | undefined) =>
   a != null && b != null && a.trim().toLowerCase() === b.trim().toLowerCase();
@@ -30,8 +32,14 @@ export function shownBag(): { check: BagCheck; kept: boolean } | null {
   const active = characters.active;
   const mine = bag.check && (bag.check.busy || !bag.check.character || !active || same(bag.check.character, active));
   if (bag.check && mine) return { check: bag.check, kept: false };
-  if (bag.known && !bag.knownClosed) return { check: bag.known, kept: true };
+  const kept = keptBag();
+  if (kept && !bag.knownClosed) return { check: kept, kept: true };
   return null;
+}
+
+/** The kept check of the tab picked, else the newest kept. */
+export function keptBag(): BagCheck | null {
+  return bag.known.find((c) => c.tab === bag.knownTab) ?? bag.known[0] ?? null;
 }
 
 let asked = 0;
@@ -39,11 +47,13 @@ let asked = 0;
 function loadKnown(name: string | null) {
   const ask = ++asked;
   backend
-    .knownBag(name)
-    .then((check) => {
-      if (ask === asked) bag.known = check;
+    .knownBags(name)
+    .then((checks) => {
+      if (ask === asked) bag.known = checks;
     })
-    .catch(() => {});
+    .catch(() => {
+      if (ask === asked) bag.known = [];
+    });
 }
 
 let watching = false;
@@ -55,6 +65,7 @@ export function watchBag() {
     $effect(() => {
       const name = characters.active;
       bag.knownClosed = false;
+      bag.knownTab = null;
       loadKnown(name);
     });
   });

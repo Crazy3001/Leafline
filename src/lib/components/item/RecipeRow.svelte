@@ -48,10 +48,10 @@
 <style>
   .recipe {
     display: grid;
-    gap: 4px;
-    padding: 8px 0;
+    gap: var(--space-1);
+    padding: var(--space-2) 0;
     border-top: 1px solid var(--border);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .recipe:first-child {
@@ -62,19 +62,19 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
+    gap: var(--space-2);
   }
 
   .makes {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: var(--space-1);
     min-width: 0;
   }
 
   .makes strong,
   .ing strong {
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .times {
@@ -94,22 +94,22 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 4px;
+    gap: var(--space-1);
     font-size: var(--text-xs);
   }
 
   .ing {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 1px 7px 1px 4px;
+    gap: var(--space-1);
+    padding: 1px var(--space-2) 1px var(--space-1);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     background: var(--surface);
   }
 
   .cost {
-    margin-left: 2px;
+    margin-left: var(--space-0-5);
     color: var(--mesos);
   }
 </style>

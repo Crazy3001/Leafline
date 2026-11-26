@@ -10,6 +10,7 @@ import { backend } from "./api";
 import { showItemNamed } from "./items.svelte";
 import { showMonsterNamed } from "./monsters.svelte";
 import { showMapNamed, showNpcNamed } from "./places.svelte";
+import { pageZoom } from "./zoom";
 
 export type PeekKind = "item" | "mob" | "npc" | "map" | "quest" | "skill";
 
@@ -118,10 +119,12 @@ function showInWindow(target: PeekTarget, from: Element | null): boolean {
   return true;
 }
 
+/** Where the link is, in the page's own units, as the card is placed in them. */
 function anchorOf(from: Element | null): PeekAnchor | null {
   if (!from) return null;
   const r = from.getBoundingClientRect();
-  return { left: r.left, top: r.top, bottom: r.bottom, width: r.width };
+  const z = pageZoom();
+  return { left: r.left / z, top: r.top / z, bottom: r.bottom / z, width: r.width / z };
 }
 
 /** Opens a card for `target` beside the link `from`, or over the open card when the link is in it. */

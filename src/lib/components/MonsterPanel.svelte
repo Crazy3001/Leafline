@@ -3,7 +3,7 @@
   // a search of every monster in the map data by name, drop or map.
   import { clipped, tip } from "$lib/tip.svelte";
   import { FilterBoxState } from "$lib/filterbox.svelte";
-  import { ArrowLeft, LoaderCircle, Skull } from "@lucide/svelte";
+  import { LoaderCircle, Skull } from "@lucide/svelte";
   import { untrack } from "svelte";
 
   import Card from "./Card.svelte";
@@ -13,6 +13,7 @@
   import SearchBar from "./lookup/SearchBar.svelte";
   import MapDataPanel from "./map/MapDataPanel.svelte";
   import MonsterCard from "./MonsterCard.svelte";
+  import LookupSplit from "./lookup/LookupSplit.svelte";
   import Section from "./map/Section.svelte";
   import { backend } from "$lib/api";
   import Pic from "$lib/ui/Pic.svelte";
@@ -142,7 +143,7 @@
     <Pic kind="mob" id={mob.id} size={20} />
     <span use:clipped class="label">{monsterLabel(mob.name)}</span>
     {#if mob.boss}<span class="boss" use:tip={"Boss"}><Skull size={11} /></span>{/if}
-    {#if mob.undead}<span class="tag">undead</span>{/if}
+    {#if mob.undead}<span class="badge tag">undead</span>{/if}
   </span>
 {/snippet}
 
@@ -170,7 +171,7 @@
   <ul class="rows">
     {#each list as mob (mob.id)}
       <li>
-        <button class="row nav-row" onclick={() => openMonster(mob.id)}>
+        <button class="row nav-row" class:selected={monsterView.id === mob.id} aria-current={monsterView.id === mob.id} onclick={() => openMonster(mob.id)}>
           {@render name(mob)}
           {@render numbers(mob)}
           {#if mob.note}<span class="note">{mob.note}</span>{/if}
@@ -185,7 +186,7 @@
   <ul class="rows">
     {#each list as mob (mob.id)}
       <li>
-        <button class="row nav-row" onclick={() => openMonster(mob.id)}>
+        <button class="row nav-row" class:selected={monsterView.id === mob.id} aria-current={monsterView.id === mob.id} onclick={() => openMonster(mob.id)}>
           {@render name(mob)}
           {@render numbers(mob)}
         </button>
@@ -249,10 +250,12 @@
     {/if}
   </div>
 
-  {#if monsterView.id != null}
-    <button class="back" class:pinned onclick={backFromMonster}><ArrowLeft size={12} />Back</button>
-    <MonsterCard id={monsterView.id} {map} {level} {quest} {session} plain={pinned} />
-  {:else}
+  <LookupSplit open={monsterView.id != null} onback={backFromMonster} {pinned}>
+    {#snippet detail()}
+      {#if monsterView.id != null}<MonsterCard id={monsterView.id} {map} {level} {quest} {session} plain={pinned} />{/if}
+    {/snippet}
+    {#snippet empty()}<p class="pick">Pick a monster to see it here.</p>{/snippet}
+    {#snippet list()}
     <div class="list" class:pinned>
       {#if !browsing}
         {#if here?.card.mobs.length}
@@ -285,23 +288,24 @@
         <p class="quiet"><span class="spin"><LoaderCircle size={13} /></span> Searching…</p>
       {/if}
     </div>
-  {/if}
+    {/snippet}
+  </LookupSplit>
 {/if}
 
 <style>
   .lead {
-    margin: 0 0 10px;
+    margin: 0 0 var(--space-2);
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   /* A card pads itself; these sit beside cards, so they match it. A pinned window pads its body. */
   .controls {
-    padding: 8px 12px 0;
+    padding: var(--space-2) var(--space-3) 0;
   }
 
   .list {
-    padding: 0 12px 10px;
+    padding: 0 var(--space-3) var(--space-2);
   }
 
   .controls.pinned,
@@ -310,7 +314,7 @@
   }
 
   .count {
-    margin: 10px 0 4px;
+    margin: var(--space-2) 0 var(--space-1);
     color: var(--faint);
     font-size: var(--text-xs);
   }
@@ -333,16 +337,20 @@
   .row {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 26px 46px 44px;
-    column-gap: 6px;
+    column-gap: var(--space-1-5);
     align-items: baseline;
     width: 100%;
-    padding: 4px 24px 4px 4px;
+    padding: var(--space-1) var(--space-6) var(--space-1) var(--space-1);
     border: 0;
     border-radius: var(--radius-sm);
     background: transparent;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     text-align: right;
+  }
+
+  .row.selected {
+    background: var(--accent-soft);
   }
 
   button.row {
@@ -360,10 +368,10 @@
   }
 
   .head {
-    padding-block: 0 3px;
+    padding-block: 0 var(--space-0-5);
     color: var(--faint);
     font-size: var(--text-xs);
-    font-weight: 500;
+    font-weight: var(--weight-body);
   }
 
   .head > :first-child {
@@ -393,11 +401,11 @@
   .name {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     min-width: 0;
     color: var(--text);
-    font-size: var(--text-sm);
-    font-weight: 500;
+    font-size: var(--text-md);
+    font-weight: var(--weight-body);
     text-align: left;
   }
 
@@ -414,16 +422,6 @@
     color: var(--bad);
   }
 
-  .tag {
-    flex: none;
-    padding: 0 4px;
-    border-radius: var(--radius-sm);
-    background: var(--hover);
-    color: var(--faint);
-    font-size: var(--text-xs);
-    font-weight: 400;
-  }
-
   .note {
     grid-column: 1 / -1;
     overflow: hidden;
@@ -437,13 +435,13 @@
   .back {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    margin: 2px 12px 6px;
+    gap: var(--space-1);
+    margin: var(--space-0-5) var(--space-3) var(--space-1-5);
     padding: 0;
     border: 0;
     background: transparent;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     cursor: pointer;
   }
 
@@ -453,19 +451,18 @@
     outline: none;
   }
 
-  .back.inline,
-  .back.pinned {
+  .back.inline {
     margin-inline: 0;
   }
 
   .back.inline {
-    margin-top: 6px;
+    margin-top: var(--space-1-5);
   }
 
   .quiet {
-    margin: 10px 0 6px;
+    margin: var(--space-2) 0 var(--space-1-5);
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .spin {
@@ -479,4 +476,11 @@
     }
   }
 
+  .pick {
+    margin: 0;
+    padding: var(--space-8) var(--space-3);
+    color: var(--faint);
+    font-size: var(--text-md);
+    text-align: center;
+  }
 </style>

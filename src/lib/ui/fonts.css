@@ -1,5 +1,5 @@
 /*
- * The four typefaces, packed inside Leafline so nothing is fetched while it runs. All are under
+ * The five typefaces, packed inside Leafline so nothing is fetched while it runs. All are under
  * the SIL Open Font License 1.1; each licence sits beside its file in ./fonts.
  * Latin only, one variable file each.
  */
@@ -34,4 +34,13 @@
   font-weight: 300 700;
   font-display: swap;
   src: url("./fonts/fredoka.woff2") format("woff2-variations");
+}
+
+/* Focus: made by the Braille Institute so letters that look alike can't be mixed up. */
+@font-face {
+  font-family: "Atkinson Hyperlegible Next";
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url("./fonts/atkinson-hyperlegible-next.woff2") format("woff2-variations");
 }

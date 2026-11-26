@@ -52,7 +52,7 @@
     gap: var(--space-3);
     align-items: center;
     width: 100%;
-    padding: 6px var(--space-2);
+    padding: var(--space-1-5) var(--space-2);
     border: 0;
     background: transparent;
     text-align: left;
@@ -79,8 +79,8 @@
 
   .name {
     overflow: hidden;
-    font-size: var(--text-sm);
-    font-weight: 600;
+    font-size: var(--text-md);
+    font-weight: var(--weight-strong);
     white-space: nowrap;
     text-overflow: ellipsis;
   }
@@ -108,8 +108,8 @@
   }
 
   .value {
-    font-size: var(--text-sm);
-    font-weight: 600;
+    font-size: var(--text-md);
+    font-weight: var(--weight-strong);
     white-space: nowrap;
   }
 </style>

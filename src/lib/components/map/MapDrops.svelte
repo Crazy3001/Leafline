@@ -138,10 +138,10 @@
     }
   }
 
-  /** A dropper's picture says nothing alone: its name, and for mesos how many. */
+  /** For mesos, how many, under the dropper's hover card, which names it. */
   function dropperTip(source: MapItem["sources"][number], meso = false) {
     const amount = meso ? quantity(source).replace(" ×", "") : "";
-    return meso && amount ? `${source.monster}\n${amount} mesos` : source.monster;
+    return meso && amount ? `${amount} mesos` : source.monster;
   }
 
   function percent(value: number | null) {
@@ -172,7 +172,7 @@
             <ul class="wrap">
               {#each entry.drops.filter((d) => !isMeso(d)) as drop (drop.item)}
                 <li>
-                  <Ref kind="item" name={drop.item} />{#if drop.quest}<span class="tag">quest</span>{/if}
+                  <Ref kind="item" name={drop.item} />{#if drop.quest}<span class="badge tag">quest</span>{/if}
                 </li>
               {/each}
             </ul>
@@ -195,7 +195,7 @@
         {#each group.items as item (item.name)}
           <li>
             <span class="item" use:tip={itemTip}
-              ><Ref kind="item" id={item.id} name={item.name} />{#if item.quest}<span class="tag">quest</span>{/if}</span
+              ><Ref kind="item" id={item.id} name={item.name} />{#if item.quest}<span class="badge tag">quest</span>{/if}</span
             >
             <span class="droppers">
               {#each item.sources as source (source.monster)}<IconRef kind="mob" name={source.monster} title={dropperTip(source)} />{/each}
@@ -227,7 +227,7 @@
 
 {:else if error}
   <p class="error">{error}</p>
-  <button class="load" onclick={load} disabled={loading}><RefreshCw size={13} />Try again</button>
+  <button class="btn" onclick={load} disabled={loading}><RefreshCw size={13} />Try again</button>
 {:else}
   <p class="note"><span class="spin"><LoaderCircle size={13} /></span> Loading drops…</p>
 {/if}
@@ -237,18 +237,15 @@
   .kind {
     display: flex;
     align-items: baseline;
-    gap: 6px;
-    margin: 10px 0 2px;
-    color: var(--faint);
-    font-family: var(--font-display);
+    gap: var(--space-1-5);
+    margin: var(--space-2) 0 var(--space-0-5);
+    color: var(--muted);
     font-size: var(--text-xs);
-    font-weight: 600;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
+    font-weight: var(--weight-strong);
   }
 
   .kind span {
-    font-weight: 400;
+    font-weight: var(--weight-body);
     letter-spacing: 0;
   }
 
@@ -264,9 +261,9 @@
   .meso-line {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
     min-height: 30px;
-    padding: 2px 0;
+    padding: var(--space-0-5) 0;
   }
 
   .items > li + li {
@@ -277,10 +274,10 @@
     display: flex;
     flex: 1;
     align-items: center;
-    gap: 4px;
+    gap: var(--space-1);
     min-width: 0;
     overflow: hidden;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     white-space: nowrap;
   }
 
@@ -295,7 +292,7 @@
     flex: none;
     flex-wrap: wrap;
     justify-content: flex-end;
-    gap: 2px;
+    gap: var(--space-0-5);
     max-width: 55%;
   }
 
@@ -305,8 +302,8 @@
 
   .meso-line .mesos {
     flex: 1;
-    font-size: var(--text-sm);
-    font-weight: 600;
+    font-size: var(--text-md);
+    font-weight: var(--weight-strong);
   }
 
   .mesos {
@@ -314,31 +311,31 @@
   }
 
   .view {
-    margin-bottom: 6px;
+    margin-bottom: var(--space-1-5);
   }
 
   .monsters {
     display: grid;
-    gap: 8px;
+    gap: var(--space-2);
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
   .monsters > li + li {
-    padding-top: 8px;
+    padding-top: var(--space-2);
     border-top: 1px solid var(--border);
   }
 
   .mob-head {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     min-height: 26px;
   }
 
   .mob-head :global(.ref.mob-name) {
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .empty .summary {
@@ -355,11 +352,11 @@
   .wrap {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px 12px;
-    margin: 2px 0 0;
-    padding: 0 0 0 4px;
+    gap: var(--space-1) var(--space-3);
+    margin: var(--space-0-5) 0 0;
+    padding: 0 0 0 var(--space-1);
     list-style: none;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .wrap li {
@@ -369,45 +366,18 @@
   }
 
   .tag {
-    margin-left: 4px;
-    padding: 0 4px;
-    border-radius: var(--radius-sm);
-    background: var(--surface-3);
-    color: var(--muted);
-    font-size: var(--text-xs);
+    margin-left: var(--space-1);
   }
 
 
   .note {
     margin: 0;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     color: var(--faint);
   }
 
   .none {
-    margin-top: 8px;
-  }
-
-  .load {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    height: 28px;
-    padding: 0 10px;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
-    background: transparent;
-    font-size: var(--text-sm);
-    cursor: pointer;
-  }
-
-  .load:hover:not(:disabled) {
-    background: var(--surface-3);
-  }
-
-  .load:disabled {
-    color: var(--muted);
-    cursor: default;
+    margin-top: var(--space-2);
   }
 
   .spin {
@@ -422,8 +392,8 @@
   }
 
   .error {
-    margin: 0 0 6px;
-    font-size: var(--text-sm);
+    margin: 0 0 var(--space-1-5);
+    font-size: var(--text-md);
     color: var(--bad);
   }
 </style>

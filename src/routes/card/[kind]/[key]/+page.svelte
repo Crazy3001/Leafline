@@ -134,9 +134,9 @@
     display: flex;
     flex: none;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     min-height: 36px;
-    padding: 4px 6px 4px 12px;
+    padding: var(--space-1) var(--space-1-5) var(--space-1) var(--space-3);
     border-bottom: 1px solid var(--border);
     background: var(--surface-2);
     cursor: grab;
@@ -147,7 +147,7 @@
     color: var(--ref, var(--accent));
     font-family: var(--font-display);
     font-size: var(--text-xs);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     letter-spacing: 0.04em;
     text-transform: uppercase;
   }
@@ -165,7 +165,7 @@
   .full {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: var(--space-1);
     height: 26px;
     border: 0;
     border-radius: var(--radius-sm);
@@ -180,7 +180,7 @@
   }
 
   .full {
-    padding: 0 9px;
+    padding: 0 var(--space-2);
     font-size: var(--text-xs);
   }
 
@@ -194,7 +194,7 @@
     flex: 1;
     min-height: 0;
     overflow-y: auto;
-    padding: 12px 14px 14px;
+    padding: var(--space-3) var(--space-4) var(--space-3);
     overscroll-behavior: contain;
   }
 </style>

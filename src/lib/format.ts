@@ -84,6 +84,15 @@ export function groundDistance(ground: { hops: number | null; travel: { hops: nu
   return ground.hops == null && !located ? "" : walk;
 }
 
+/**
+ * A quest's name apart from the bracketed series or kind the game writes in front of it, such as
+ * `[Event] Halloween Candies`, so the tag can be shown small beside the name.
+ */
+export function questTitle(name: string): { tag: string | null; name: string } {
+  const m = /^\[([^\]]+)\]\s*(.+)$/.exec(name.trim());
+  return m ? { tag: m[1].trim(), name: m[2] } : { tag: null, name };
+}
+
 /** A party size as the log shows it: `Solo`, `4 ppl`. Null when it wasn't read. */
 export function partyLabel(size: number | null | undefined): string | null {
   if (size == null) return null;

@@ -1236,7 +1236,7 @@ export interface LoggedDrop extends NewDrop {
 export type CompactShape = "card" | "wide" | "bar";
 
 /** The look every window is drawn in (src/lib/ui/themes.css). */
-export type Theme = "ember-dark" | "ember-light" | "sprout-light" | "sprout-dark";
+export type Theme = "focus-dark" | "focus-light" | "ember-dark" | "ember-light" | "sprout-light" | "sprout-dark";
 
 export interface HotkeyChoice {
   enabled: boolean;
@@ -1527,6 +1527,8 @@ export interface StatGoal {
   target: number | null;
   /** Waits for this level. */
   fromLevel: number | null;
+  /** The target counts what worn gear adds, as a requirement does. Absent means the points put in. */
+  withGear?: boolean;
 }
 
 /** Where the character is now, as its windows show it. */
@@ -1590,12 +1592,31 @@ export interface StarterPlan {
   id: string;
   job: number;
   name: string;
+  /** One line on what the plan does. */
   summary: string;
+  /** What the path does well and what it gives up. Empty for a guide's plan, whose guide says. */
+  pros: string[];
+  cons: string[];
+  /** The skills the plan builds on, at the level it takes them to. */
+  keySkills: FeaturedPick[];
+  /** The weapons it plans, by the level each is worn from. */
+  weapons: FeaturedPick[];
+  /** The Lv 1 roll the plan counts from. */
+  start: BaseStats;
   plan: BuildGoals;
   /** Names the data doesn't have, left out of the plan. */
   missing: string[];
   /** The guide a plan follows, to credit and link. `null` for a plan written for Leafline. */
   source: StarterSource | null;
+  /** A guide to read beside a plan written for Leafline, which it doesn't follow. */
+  reading: StarterSource | null;
+}
+
+/** A skill or weapon shown on a plan's card: a skill's level, or the level a weapon is worn from. */
+export interface FeaturedPick {
+  id: number;
+  name: string;
+  level: number;
 }
 
 export interface StarterSource {
@@ -2046,6 +2067,39 @@ export interface QuestLog {
 export interface RegionTotal {
   region: string;
   quests: number;
+}
+
+/** Where a quest stands for a character: from their Quest window, or else from the data. */
+export type Stand = "ready" | "inProgress" | "canTake" | "notYet" | "done" | "gone";
+
+export interface WholeQuest {
+  /** The quest in the data; null for one the game listed that the data lacks. */
+  questId: number | null;
+  title: string;
+  stand: Stand;
+  /** Done because a quest that needs it is in progress or done. */
+  inferred: boolean;
+  /** The game listed it under this series' name; this is the step the player is likely on. */
+  series: string | null;
+  notYet: { level: number | null; after: QuestRef[]; notOfferedAt: number | null } | null;
+  levelMin: number | null;
+  giver: string | null;
+  repeat: string | null;
+  seenAt: number | null;
+}
+
+export interface WholeRegion {
+  region: string;
+  done: number;
+  total: number;
+  quests: WholeQuest[];
+}
+
+export interface WholeLog {
+  regions: WholeRegion[];
+  /** The Quest window has been read; without it everything is from the data. */
+  seen: boolean;
+  level: number | null;
 }
 
 export interface QuestRow {

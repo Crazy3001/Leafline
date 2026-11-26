@@ -92,17 +92,17 @@
     z-index: 50;
     display: grid;
     place-items: center;
-    padding: 24px;
+    padding: var(--space-6);
     background: rgba(0, 0, 0, 0.6);
   }
 
   .dialog {
     display: grid;
-    gap: 12px;
+    gap: var(--space-3);
     width: min(760px, 100%);
     max-height: 100%;
     overflow: auto;
-    padding: 16px;
+    padding: var(--space-4);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-lg);
     background: var(--surface);
@@ -119,7 +119,7 @@
     margin: 0;
     font-family: var(--font-display);
     font-size: var(--text-lg);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .close {
@@ -150,15 +150,15 @@
   .options {
     display: flex;
     flex-wrap: wrap;
-    gap: 16px;
-    font-size: var(--text-sm);
+    gap: var(--space-4);
+    font-size: var(--text-md);
     color: var(--muted);
   }
 
   .options label {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     cursor: pointer;
   }
 
@@ -168,13 +168,13 @@
 
   footer {
     display: grid;
-    gap: 8px;
+    gap: var(--space-2);
   }
 
   .actions {
     display: flex;
     justify-content: flex-end;
-    gap: 8px;
+    gap: var(--space-2);
   }
 
   .quiet {
@@ -186,6 +186,6 @@
   .problem {
     margin: 0;
     color: var(--bad);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 </style>

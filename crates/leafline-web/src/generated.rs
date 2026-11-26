@@ -734,6 +734,7 @@ mod quests {
     use leafline_core::service::host::{Host, emit};
     use leafline_core::error::Result;
     use leafline_core::mapdata::questlog::RegionTotal;
+    use leafline_core::mapdata::wholelog::WholeLog;
     use leafline_core::userdata::questlog::QuestLog;
 
     use crate::reply::{Reply, parse, reply, reply_result};
@@ -765,6 +766,20 @@ mod quests {
                 reply_result(service::quests::forget_quest_log(host, name))
             }
             "quest_region_totals" => reply(service::quests::quest_region_totals(host)),
+            "whole_quest_log" => {
+                #[derive(serde::Deserialize)]
+                #[serde(rename_all = "camelCase")]
+                struct Args {
+                name: Option<String>,
+                level: Option<u32>,
+                helper: Vec<String>,
+                }
+                let Args { name, level, helper } = match parse(args) {
+                    Ok(args) => args,
+                    Err(err) => return Some(Err(err)),
+                };
+                reply_result(service::quests::whole_quest_log(host, name, level, helper))
+            }
             _ => return None,
         })
     }
@@ -805,7 +820,8 @@ mod records {
                 };
                 reply_result(service::records::known_character(host, name))
             }
-            "known_bag" => {
+            "known_characters" => reply_result(service::records::known_characters(host)),
+            "known_bags" => {
                 #[derive(serde::Deserialize)]
                 #[serde(rename_all = "camelCase")]
                 struct Args {
@@ -815,7 +831,7 @@ mod records {
                     Ok(args) => args,
                     Err(err) => return Some(Err(err)),
                 };
-                reply_result(service::records::known_bag(host, name))
+                reply_result(service::records::known_bags(host, name))
             }
             "saved_spots" => reply_result(service::records::saved_spots(host)),
             "set_spot_saved" => {

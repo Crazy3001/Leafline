@@ -123,7 +123,7 @@
   .split {
     display: grid;
     grid-template-columns: minmax(240px, 1fr) minmax(0, 2fr);
-    gap: 16px;
+    gap: var(--space-4);
     align-items: start;
   }
 
@@ -150,9 +150,9 @@
         "item item act"
         "mob map act"
         "when when act";
-      gap: 1px 6px;
+      gap: 1px var(--space-1-5);
       align-items: center;
-      padding: 7px 0;
+      padding: var(--space-1-5) 0;
       border-top: 1px solid var(--border);
     }
 
@@ -172,7 +172,7 @@
 
     td:nth-child(2) {
       grid-area: item;
-      font-weight: 600;
+      font-weight: var(--weight-strong);
     }
 
     td:nth-child(3) {
@@ -201,7 +201,7 @@
   }
 
   .panel {
-    padding: 12px 14px;
+    padding: var(--space-3) var(--space-4);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background: var(--surface);
@@ -210,14 +210,14 @@
   .head {
     display: flex;
     align-items: baseline;
-    gap: 8px;
-    margin-bottom: 8px;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
   }
 
   h2 {
     margin: 0;
     font-size: var(--text-lg);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .grow {
@@ -226,7 +226,7 @@
 
   /* Each monster's drops in a block of their own, framed as the Quests tab frames a quest. */
   .monster {
-    padding: 6px 8px;
+    padding: var(--space-1-5) var(--space-2);
     border: 1px solid var(--border-strong);
     border-left: 3px solid var(--accent);
     border-radius: var(--radius-sm);
@@ -234,22 +234,22 @@
   }
 
   .monster + .monster {
-    margin-top: 6px;
+    margin-top: var(--space-1-5);
   }
 
   .mrow {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
   }
 
   .mname {
     flex: 1;
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   ul {
-    margin: 4px 0 0;
+    margin: var(--space-1) 0 0;
     padding: 0;
     list-style: none;
   }
@@ -257,28 +257,27 @@
   li {
     display: flex;
     justify-content: space-between;
-    gap: 8px;
+    gap: var(--space-2);
     padding: 1px 0;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   table {
     width: 100%;
     border-collapse: collapse;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   th {
-    padding: 4px 6px;
+    padding: var(--space-1) var(--space-1-5);
+    text-align: left;
     color: var(--faint);
     font-size: var(--text-xs);
-    font-weight: 600;
-    text-align: left;
-    text-transform: uppercase;
+    font-weight: var(--weight-body);
   }
 
   td {
-    padding: 5px 6px;
+    padding: var(--space-1) var(--space-1-5);
     border-top: 1px solid var(--border);
   }
 
@@ -297,11 +296,11 @@
   .quiet {
     margin: 0;
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .caption {
-    margin: 10px 0 0;
+    margin: var(--space-2) 0 0;
     color: var(--faint);
     font-size: var(--text-xs);
   }
@@ -310,9 +309,9 @@
   .report {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--space-1);
     height: var(--control-h-sm);
-    padding: 0 6px;
+    padding: 0 var(--space-1-5);
     border: 0;
     border-radius: var(--radius-sm);
     background: transparent;
@@ -330,9 +329,9 @@
 
   .empty {
     display: grid;
-    gap: 6px;
+    gap: var(--space-1-5);
     max-width: 520px;
-    margin: 40px auto;
+    margin: var(--space-10) auto;
     color: var(--muted);
     text-align: center;
   }

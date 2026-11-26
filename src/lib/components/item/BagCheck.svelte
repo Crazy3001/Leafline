@@ -64,6 +64,15 @@
 
     {#if kept}
       <p class="quiet">Your bag as Leafline last checked it{check.character ? ` for ${check.character}` : ""}. Open the inventory in game to check it again.</p>
+      {#if bag.known.length > 1}
+        <div class="tabs" role="group" aria-label="Bag tabs kept">
+          {#each bag.known as k (k.tab)}
+            <button class:on={k === check} aria-pressed={k === check} onclick={() => (bag.knownTab = k.tab)}
+              >{k.tab ? TABS[k.tab] : "Bag"} <span class="muted">{formatAgo(Date.now() / 1000 - k.at)}</span></button
+            >
+          {/each}
+        </div>
+      {/if}
     {/if}
     <div class="body" class:stale={kept}>
     {#if check.busy}
@@ -151,15 +160,38 @@
     opacity: 0.6;
   }
 
+  .tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+    margin-bottom: var(--space-2);
+  }
+
+  .tabs button {
+    padding: var(--space-0-5) var(--space-2);
+    border: var(--line-w) solid var(--line);
+    border-radius: var(--radius-pill);
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: var(--text-xs);
+    cursor: pointer;
+  }
+
+  .tabs button.on {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+  }
+
   .aside {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
   }
 
   .icon {
     display: inline-grid;
-    padding: 2px;
+    padding: var(--space-0-5);
     border: 0;
     background: transparent;
     color: var(--faint);
@@ -173,27 +205,25 @@
   .sum {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px 16px;
-    font-size: var(--text-sm);
+    gap: var(--space-1) var(--space-4);
+    font-size: var(--text-md);
   }
 
   .sum strong {
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   h4 {
-    margin: 10px 0 4px;
-    font-size: var(--text-xs);
-    font-weight: 600;
+    margin: var(--space-2) 0 var(--space-1);
     color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
+    font-size: var(--text-xs);
+    font-weight: var(--weight-strong);
   }
 
   ul {
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: var(--space-0-5);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -203,8 +233,8 @@
     display: grid;
     grid-template-columns: 18px 1fr auto 64px;
     align-items: center;
-    gap: 8px;
-    font-size: var(--text-sm);
+    gap: var(--space-2);
+    font-size: var(--text-md);
   }
 
   .pic {
@@ -216,7 +246,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
-    gap: 2px 6px;
+    gap: var(--space-0-5) var(--space-1-5);
     min-width: 0;
   }
 
@@ -235,24 +265,24 @@
 
   .quiet,
   .hint {
-    margin: 6px 0 0;
-    font-size: var(--text-sm);
+    margin: var(--space-1-5) 0 0;
+    font-size: var(--text-md);
     color: var(--faint);
   }
 
   .hint {
-    margin: 10px 0 0;
+    margin: var(--space-2) 0 0;
     font-size: var(--text-xs);
   }
 
   .warn {
     margin: 0;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     color: var(--warn);
   }
 
   .caption {
-    margin: 8px 0 0;
+    margin: var(--space-2) 0 0;
     font-size: var(--text-xs);
     color: var(--faint);
   }

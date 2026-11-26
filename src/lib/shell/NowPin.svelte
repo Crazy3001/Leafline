@@ -83,18 +83,18 @@
 <style>
   .pin {
     display: grid;
-    gap: 8px;
-    font-size: var(--text-sm);
+    gap: var(--space-2);
+    font-size: var(--text-md);
   }
 
   .head {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
-    gap: 10px;
-    color: var(--faint);
+    gap: var(--space-2);
+    color: var(--muted);
     font-size: var(--text-xs);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .where {
@@ -106,7 +106,7 @@
 
   .strong {
     color: var(--text);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     font-weight: var(--weight-strong);
   }
 
@@ -123,12 +123,12 @@
     display: flex;
     align-items: flex-end;
     justify-content: space-between;
-    gap: 12px;
+    gap: var(--space-3);
   }
 
   .rate {
-    font-size: 30px;
-    font-weight: 600;
+    font-size: var(--text-hero);
+    font-weight: var(--weight-strong);
     line-height: 32px;
     white-space: nowrap;
   }
@@ -145,17 +145,17 @@
   .label {
     color: var(--faint);
     font-size: var(--text-xs);
-    font-weight: 500;
+    font-weight: var(--weight-body);
   }
 
   .row {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px 14px;
+    gap: var(--space-1) var(--space-3);
   }
 
   .row b {
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .mesos {
@@ -177,19 +177,19 @@
 
   .quest {
     display: grid;
-    padding-top: 8px;
+    padding-top: var(--space-2);
     border-top: 1px solid var(--border);
   }
 
   .head.q {
-    margin-bottom: 6px;
+    margin-bottom: var(--space-1-5);
   }
 
   .objective {
     display: flex;
     justify-content: space-between;
-    gap: 10px;
-    margin-bottom: 4px;
+    gap: var(--space-2);
+    margin-bottom: var(--space-1);
   }
 
   .target {
@@ -201,7 +201,7 @@
 
   .count {
     flex: none;
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .count.done {
@@ -210,7 +210,7 @@
 
   .of {
     color: var(--faint);
-    font-weight: 500;
+    font-weight: var(--weight-body);
   }
 
   .count.done .of {
@@ -219,7 +219,7 @@
 
   .bar {
     height: 5px;
-    margin-bottom: 8px;
+    margin-bottom: var(--space-2);
     border-radius: var(--radius-pill);
     background: var(--track);
     overflow: hidden;

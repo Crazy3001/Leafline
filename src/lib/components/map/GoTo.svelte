@@ -127,9 +127,9 @@
   .field {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     height: 26px;
-    padding: 0 8px;
+    padding: 0 var(--space-2);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--surface);
@@ -148,7 +148,7 @@
     background: transparent;
     color: var(--text);
     font: inherit;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   input::-webkit-search-cancel-button {
@@ -163,7 +163,7 @@
     right: 0;
     max-height: 240px;
     margin: 0;
-    padding: 4px;
+    padding: var(--space-1);
     overflow-y: auto;
     list-style: none;
     border: 1px solid var(--border-strong);
@@ -175,7 +175,7 @@
   .results button {
     display: grid;
     width: 100%;
-    padding: 4px 8px;
+    padding: var(--space-1) var(--space-2);
     border: 0;
     border-radius: var(--radius-sm);
     background: transparent;
@@ -191,8 +191,8 @@
   .name {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    font-size: var(--text-sm);
+    gap: var(--space-1-5);
+    font-size: var(--text-md);
   }
 
   .name :global(svg) {
@@ -205,13 +205,13 @@
   }
 
   .empty {
-    padding: 6px 8px;
+    padding: var(--space-1-5) var(--space-2);
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .error {
-    margin: 4px 0 0;
+    margin: var(--space-1) 0 0;
     color: var(--warn);
     font-size: var(--text-xs);
   }
@@ -219,17 +219,17 @@
   .recent {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
-    margin: 6px 0 0;
+    gap: var(--space-1-5);
+    margin: var(--space-1-5) 0 0;
     padding: 0;
     list-style: none;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .recent li {
     display: inline-flex;
     align-items: center;
-    gap: 2px;
+    gap: var(--space-0-5);
     min-width: 0;
   }
 
@@ -237,17 +237,17 @@
   .chip {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: var(--space-1);
     max-width: 100%;
     height: 24px;
-    padding: 0 10px;
+    padding: 0 var(--space-3);
     overflow: hidden;
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-pill);
     background: var(--surface-2);
     color: var(--text);
     font-size: var(--text-xs);
-    font-weight: 500;
+    font-weight: var(--weight-body);
     white-space: nowrap;
     text-overflow: ellipsis;
     cursor: pointer;

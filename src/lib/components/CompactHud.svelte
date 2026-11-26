@@ -184,21 +184,21 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 6px 12px;
+    gap: var(--space-1-5) var(--space-3);
     min-height: 44px;
-    padding: 6px 6px 6px 14px;
+    padding: var(--space-1-5) var(--space-1-5) var(--space-1-5) 14px;
     cursor: grab;
   }
 
   .lv {
     flex: none;
-    padding: 2px 7px;
+    padding: var(--space-0-5) var(--space-2);
     border: var(--line-w) solid var(--control-line);
     border-radius: var(--radius-pill);
     background: var(--accent);
     color: var(--accent-ink);
     font-size: var(--text-xs);
-    font-weight: 700;
+    font-weight: var(--weight-strong);
   }
 
   :global(:root:not([data-theme^="sprout"])) .lv {
@@ -222,13 +222,13 @@
     display: inline-flex;
     flex: none;
     align-items: baseline;
-    gap: 5px;
+    gap: var(--space-1);
     white-space: nowrap;
   }
 
   .stat b {
     font-size: var(--text-md);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .mesos {
@@ -263,11 +263,11 @@
   }
 
   .pace {
-    padding: 0 5px;
+    padding: 0 var(--space-1-5);
     border-radius: var(--radius-pill);
     background: var(--hover);
     color: var(--muted);
-    font-size: 10px;
+    font-size: var(--text-2xs);
     font-variant-numeric: tabular-nums;
   }
 
@@ -305,16 +305,16 @@
   }
 
   .quests {
-    padding: 4px 14px 10px;
+    padding: var(--space-1) var(--space-4) var(--space-2);
     border-top: 1px solid var(--border);
   }
 
   .quest-title {
-    margin: 4px 0 3px;
+    margin: var(--space-1) 0 var(--space-0-5);
     overflow: hidden;
     color: var(--faint);
-    font-size: 10px;
-    font-weight: 600;
+    font-size: var(--text-2xs);
+    font-weight: var(--weight-strong);
     letter-spacing: 0.03em;
     text-overflow: ellipsis;
     text-transform: uppercase;
@@ -325,7 +325,7 @@
   .counters {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 6px 18px;
+    gap: var(--space-1-5) var(--space-4);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -335,13 +335,13 @@
   .counters li {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
-    gap: 2px 8px;
+    gap: var(--space-0-5) var(--space-2);
   }
 
   .target {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--space-1);
     min-width: 0;
     overflow: hidden;
     white-space: nowrap;

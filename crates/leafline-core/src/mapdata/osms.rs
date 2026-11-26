@@ -726,8 +726,10 @@ pub struct SkillNeed {
     pub level: u32,
 }
 
-/// The file's equipment stats and the name each goes by on screen, in the order shown.
-const ITEM_STATS: [(&str, &str); 16] = [
+/// The file's equipment stats and the name each goes by on screen, in the order shown. Weapon
+/// attack is `incWAT` in today's files and was `incPAD` before; a record has one or the other.
+const ITEM_STATS: [(&str, &str); 17] = [
+    ("incWAT", "Attack"),
     ("incPAD", "Attack"),
     ("incMAD", "Magic"),
     ("incPDD", "Weapon Def."),
@@ -798,10 +800,14 @@ impl From<RawItem> for ItemRecord {
         let number = |key: &str| number_in(raw.stats.get(key)?);
         let need = |key: &str| number(key).map_or(0, |v| v.max(0) as u32);
         let flag = |key: &str| number(key).is_some_and(|v| v != 0) || raw.stats.get(key).and_then(|v| v.as_bool()) == Some(true);
-        let stats = ITEM_STATS
-            .iter()
-            .filter_map(|(key, label)| Some(ItemStat { label: (*label).to_string(), value: number(key)? }))
-            .collect();
+        let mut stats: Vec<ItemStat> = Vec::new();
+        for (key, label) in ITEM_STATS {
+            if let Some(value) = number(key)
+                && !stats.iter().any(|s| s.label == label)
+            {
+                stats.push(ItemStat { label: label.to_string(), value });
+            }
+        }
         let slot = raw.sub_category.clone().unwrap_or_default();
         let scroll = raw.scroll.as_ref().map(|s| ScrollInfo {
             fits: scroll_fits(s.slot.as_deref().unwrap_or_default(), &raw.name),
@@ -1234,10 +1240,18 @@ mod tests {
             {"id": 3, "name": "Red Berry", "category": "Consumable", "sub_category": "Consume",
              "description": " Restores 5 HP.\n", "stats": {"tradeBlock": 1}},
             {"id": 4, "name": "Bent Twig", "category": "Etc", "sub_category": "Etc", "stats": {"quest": 1}},
-            {"id": 5, "name": "Moss Stool", "category": "Setup", "sub_category": "Install"}]"#;
+            {"id": 5, "name": "Moss Stool", "category": "Setup", "sub_category": "Install"},
+            {"id": 6, "name": "Fern Dagger", "category": "Equipment", "sub_category": "Weapon",
+             "weapon": {"type": "Dagger"}, "stats": {"reqLevel": 30, "incWAT": 47, "incLUK": 1}},
+            {"id": 7, "name": "Old Fern Dagger", "category": "Equipment", "sub_category": "Weapon",
+             "weapon": {"type": "Dagger"}, "stats": {"reqLevel": 30, "incPAD": 45}}]"#;
         let Records::Items(items) = Records::parse("items.json", json).unwrap() else { panic!() };
         let kinds: Vec<_> = items.iter().map(|i| i.kind).collect();
-        assert_eq!(kinds, [ItemKind::Equip, ItemKind::Equip, ItemKind::Use, ItemKind::Etc, ItemKind::Setup]);
+        assert_eq!(kinds[..5], [ItemKind::Equip, ItemKind::Equip, ItemKind::Use, ItemKind::Etc, ItemKind::Setup]);
+        // Weapon attack under today's name and the older one.
+        let attack = |i: &ItemRecord| i.stats.iter().map(|s| (s.label.clone(), s.value)).collect::<Vec<_>>();
+        assert_eq!(attack(&items[5]), [("Attack".to_string(), 47), ("LUK".to_string(), 1)]);
+        assert_eq!(attack(&items[6]), [("Attack".to_string(), 45)]);
         let wand = &items[0];
         assert_eq!((wand.req_level, wand.req_int, wand.req_str, wand.req_fame), (8, 20, 0, 2));
         assert_eq!(wand.weapon_type.as_deref(), Some("Wand"));

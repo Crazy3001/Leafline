@@ -25,7 +25,7 @@
         {:else}
           <Ref kind="item" name={drop.item} />
         {/if}
-        {#if drop.quest}<span class="tag">quest</span>{/if}
+        {#if drop.quest}<span class="badge tag">quest</span>{/if}
         {#if quantity(drop)}<span class="rate tabular">{quantity(drop)}</span>{/if}
       </li>
     {/each}
@@ -47,9 +47,9 @@
   li {
     display: flex;
     align-items: baseline;
-    gap: 5px;
-    padding: 2px 0;
-    font-size: var(--text-sm);
+    gap: var(--space-1);
+    padding: var(--space-0-5) 0;
+    font-size: var(--text-md);
   }
 
   li + li {
@@ -58,7 +58,7 @@
 
   li :global(.ref) {
     min-width: 0;
-    font-weight: 500;
+    font-weight: var(--weight-body);
   }
 
   .mesos {
@@ -68,24 +68,16 @@
   .rate {
     margin-left: auto;
     color: var(--text);
-    font-weight: 600;
-    font-size: var(--text-sm);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
+    font-size: var(--text-md);
+    font-weight: var(--weight-strong);
     white-space: nowrap;
-  }
-
-  .tag {
-    padding: 0 4px;
-    border-radius: var(--radius-sm);
-    background: var(--surface-3);
-    color: var(--muted);
-    font-size: var(--text-xs);
   }
 
   .note {
     margin: 0;
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
 </style>

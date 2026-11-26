@@ -55,8 +55,8 @@
   .head {
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-bottom: 8px;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
   }
 
   .pic {
@@ -74,42 +74,42 @@
     margin: 0;
     font-family: var(--font-display);
     font-size: var(--text-lg);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .facts {
-    margin: 2px 0 0;
+    margin: var(--space-0-5) 0 0;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .about {
-    margin: 0 0 8px;
+    margin: 0 0 var(--space-2);
     color: var(--text);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     line-height: 1.5;
     white-space: pre-line;
   }
 
   .needs {
-    margin: 0 0 8px;
+    margin: 0 0 var(--space-2);
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .levels {
     display: grid;
-    gap: 3px;
+    gap: var(--space-0-5);
     margin: 0;
     padding: 0;
     list-style: none;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .levels li {
     display: grid;
     grid-template-columns: 40px minmax(0, 1fr);
-    gap: 6px;
+    gap: var(--space-1-5);
   }
 
   .lv {

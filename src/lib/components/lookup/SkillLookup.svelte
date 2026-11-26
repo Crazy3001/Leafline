@@ -1,10 +1,9 @@
 <script lang="ts">
   // Lookup → Skills: every skill in the map data, by job, searchable by name or what it does.
   // A row opens the skill here; skill names elsewhere open its card.
-  import { ArrowLeft } from "@lucide/svelte";
-
   import Chips from "./Chips.svelte";
   import LookupRow from "./LookupRow.svelte";
+  import LookupSplit from "./LookupSplit.svelte";
   import SearchBar from "./SearchBar.svelte";
   import SkillCard from "../SkillCard.svelte";
   import { loadSkills, skillById, skillData, skillView } from "$lib/skills.svelte";
@@ -47,16 +46,17 @@
       skillView.id = null;
     }}
   />
-  {#if !open}
-    <Chips label="Job" options={jobs} value={job} onselect={(j) => (job = j)} />
-  {/if}
+  <Chips label="Job" options={jobs} value={job} onselect={(j) => (job = j)} />
 </div>
 
+<LookupSplit open={open != null} onback={() => (skillView.id = null)} {pinned}>
+  {#snippet detail()}
+    {#if open}<div class="list" class:pinned><SkillCard skill={open} /></div>{/if}
+  {/snippet}
+    {#snippet empty()}<p class="pick">Pick a skill to see it here.</p>{/snippet}
+  {#snippet list()}
 <div class="list" class:pinned>
-  {#if open}
-    <button class="back" onclick={() => (skillView.id = null)}><ArrowLeft size={12} />Back</button>
-    <SkillCard skill={open} />
-  {:else if !skillData.loaded}
+  {#if !skillData.loaded}
     <p class="quiet">Loading skills…</p>
   {:else if !skillData.skills.length}
     <p class="quiet">Skills come with the map data. Download it in Settings → Data.</p>
@@ -72,6 +72,7 @@
             picture={{ kind: "skill", id: skill.id }}
             line={`${skill.className}${skill.jobTier && skill.jobTier !== skill.className ? ` · ${skill.jobTier}` : ""}${skill.passive ? " · passive" : ""}`}
             aside={`max ${skill.maxLevel}`}
+            selected={skillView.id === skill.id}
             onclick={() => (skillView.id = skill.id)}
           />
         </li>
@@ -79,14 +80,16 @@
     </ul>
   {/if}
 </div>
+  {/snippet}
+</LookupSplit>
 
 <style>
   .controls {
-    padding: 8px 12px 0;
+    padding: var(--space-2) var(--space-3) 0;
   }
 
   .list {
-    padding: 0 12px 10px;
+    padding: 0 var(--space-3) var(--space-2);
   }
 
   .controls.pinned,
@@ -100,28 +103,19 @@
     list-style: none;
   }
 
-  .back {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    margin: 0 0 8px;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--muted);
-    font: inherit;
-    font-size: var(--text-sm);
-    cursor: pointer;
-  }
-
-  .back:hover {
-    color: var(--text);
-  }
 
   .count,
   .quiet {
-    margin: 0 0 4px;
+    margin: 0 0 var(--space-1);
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
+  }
+
+  .pick {
+    margin: 0;
+    padding: var(--space-8) var(--space-3);
+    color: var(--faint);
+    font-size: var(--text-md);
+    text-align: center;
   }
 </style>

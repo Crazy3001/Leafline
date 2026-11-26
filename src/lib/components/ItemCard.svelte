@@ -15,7 +15,7 @@
   import { reportUrl } from "$lib/feedback";
   import { formatSigned, titleCase } from "$lib/format";
   import { mapData } from "$lib/mapdata.svelte";
-  import { checkItem, nameMatch, statRows, tooltipOf } from "$lib/items.svelte";
+  import { checkItem, nameMatch, statRows, tooltipOf, wearers } from "$lib/items.svelte";
   import type { ItemRecord, ItemTooltip, MapReading, Requirements } from "$lib/types";
 
   let {
@@ -165,6 +165,11 @@
         : null,
     ].filter(Boolean),
   );
+  /** Who can wear it, from the data, under the name. */
+  const who = $derived.by(() => {
+    const data = record ?? matched;
+    return data ? wearers(data) : null;
+  });
   /** Something on the card is a guess or couldn't be confirmed, so the picture may be the problem. */
   const doubtful = $derived(
     !!read && (trust === "close" || trust === "likely" || unconfirmed.length > 0 || !!checked?.slotsNote || stats.some((s) => s.note)),
@@ -237,6 +242,7 @@
       {#if summary.length}
         <p class="summary">{summary.join(" · ")}</p>
       {/if}
+      {#if who}<p class="who">{who}</p>{/if}
     </div>
   </div>
   {#if scrolling?.line}
@@ -335,8 +341,8 @@
   .title-row {
     display: flex;
     align-items: center;
-    gap: 12px;
-    margin-bottom: 10px;
+    gap: var(--space-3);
+    margin-bottom: var(--space-2);
   }
 
   .title-text {
@@ -351,7 +357,7 @@
     margin: 0;
     font-family: var(--font-display);
     font-size: var(--text-lg);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     line-height: 1.25;
   }
 
@@ -360,10 +366,10 @@
   }
 
   .notice {
-    margin: 0 0 8px;
-    padding: 6px 8px;
+    margin: 0 0 var(--space-2);
+    padding: var(--space-1-5) var(--space-2);
     border-radius: var(--radius-sm);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     color: var(--muted);
     border: 1px solid var(--border);
   }
@@ -380,19 +386,19 @@
   }
 
   .notice.small {
-    margin: 4px 0;
-    padding: 3px 8px;
+    margin: var(--space-1) 0;
+    padding: var(--space-0-5) var(--space-2);
     font-size: var(--text-xs);
   }
 
   .tip {
-    margin: 0 0 8px;
-    padding: 7px 10px;
+    margin: 0 0 var(--space-2);
+    padding: var(--space-1-5) var(--space-3);
     border-left: 3px solid var(--accent-strong);
     background: var(--warn-soft);
     color: var(--text);
-    font-size: var(--text-sm);
-    font-weight: 500;
+    font-size: var(--text-md);
+    font-weight: var(--weight-body);
   }
 
   .tip b {
@@ -401,28 +407,28 @@
 
   .actions {
     display: flex;
-    gap: 6px;
-    margin-bottom: 8px;
+    gap: var(--space-1-5);
+    margin-bottom: var(--space-2);
   }
 
   .doubt .actions {
     display: flex;
-    gap: 6px;
+    gap: var(--space-1-5);
   }
 
   .saved {
-    margin: 6px 0 0;
+    margin: var(--space-1-5) 0 0;
     font-size: var(--text-xs);
     word-break: break-all;
   }
 
   .fix {
-    padding: 5px 10px;
+    padding: var(--space-1) var(--space-3);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     background: var(--hover);
     color: var(--text);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     cursor: pointer;
   }
 
@@ -431,22 +437,32 @@
   }
 
   .summary {
-    margin: 2px 0 10px;
+    margin: var(--space-0-5) 0 var(--space-2);
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
+  }
+
+  .summary:has(+ .who) {
+    margin-bottom: 0;
+  }
+
+  .who {
+    margin: 0 0 var(--space-2);
+    color: var(--text);
+    font-size: var(--text-md);
   }
 
   .slots {
-    margin: -8px 0 10px;
+    margin: -8px 0 var(--space-2);
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .verdict {
-    padding: 2px 8px;
+    padding: var(--space-0-5) var(--space-2);
     border-radius: var(--radius-sm);
     font-size: var(--text-xs);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     color: var(--good);
     background: var(--good-soft);
   }
@@ -459,7 +475,7 @@
   .stats {
     width: 100%;
     border-collapse: collapse;
-    margin-bottom: 8px;
+    margin-bottom: var(--space-2);
   }
 
   .stats tr + tr {
@@ -468,16 +484,16 @@
 
   .stats th {
     width: 100%;
-    padding: 5px 0;
+    padding: var(--space-1) 0;
     text-align: left;
-    font-weight: 500;
+    font-weight: var(--weight-body);
     color: var(--muted);
   }
 
   .stats .value {
-    padding: 5px 8px;
+    padding: var(--space-1) var(--space-2);
     text-align: right;
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     white-space: nowrap;
   }
 
@@ -486,11 +502,11 @@
     text-align: right;
     white-space: nowrap;
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .bonus {
-    margin-left: 2px;
+    margin-left: var(--space-0-5);
     color: var(--good);
   }
 
@@ -501,7 +517,7 @@
   .property {
     display: flex;
     justify-content: space-between;
-    margin: 0 0 6px;
+    margin: 0 0 var(--space-1-5);
   }
 
   .property span {
@@ -511,12 +527,12 @@
   .chips {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px;
-    margin-top: 8px;
+    gap: var(--space-1);
+    margin-top: var(--space-2);
   }
 
   .chip {
-    padding: 2px 7px;
+    padding: var(--space-0-5) var(--space-2);
     border-radius: var(--radius-sm);
     background: var(--hover);
     border: 1px solid var(--border);
@@ -525,14 +541,14 @@
   }
 
   .req b {
-    margin-left: 5px;
+    margin-left: var(--space-1-5);
     color: var(--text);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .req.zero b {
     color: var(--faint);
-    font-weight: 500;
+    font-weight: var(--weight-body);
   }
 
   .req.unread {

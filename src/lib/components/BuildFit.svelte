@@ -55,12 +55,12 @@
 
 <style>
   .fit {
-    margin: 10px 0 0;
-    padding: 5px 8px;
+    margin: var(--space-2) 0 0;
+    padding: var(--space-1) var(--space-2);
     border-left: 2px solid var(--border-strong);
     background: var(--hover);
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .fit.good {
@@ -74,7 +74,7 @@
   }
 
   .unread {
-    margin-left: 4px;
+    margin-left: var(--space-1);
     color: var(--faint);
   }
 </style>

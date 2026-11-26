@@ -29,8 +29,13 @@ pub fn known_character(app: AppHandle, name: Option<String>) -> Result<Option<Kn
 }
 
 #[tauri::command]
-pub fn known_bag(app: AppHandle, name: Option<String>) -> Result<Option<BagCheck>> {
-    service::records::known_bag(&AppHost(app), name)
+pub fn known_characters(app: AppHandle) -> Result<Vec<String>> {
+    service::records::known_characters(&AppHost(app))
+}
+
+#[tauri::command]
+pub fn known_bags(app: AppHandle, name: Option<String>) -> Result<Vec<BagCheck>> {
+    service::records::known_bags(&AppHost(app), name)
 }
 
 #[tauri::command]
