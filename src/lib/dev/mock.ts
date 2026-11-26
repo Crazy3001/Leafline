@@ -929,7 +929,10 @@ export const mockBackend: Backend = {
             job: 420,
             name: "Dagger Fernblade",
             summary: "A made-up plan, to design the page with.",
-            note: "Why: a made-up reason to pick it. Trade-off: what it gives up.",
+            pros: ["A made-up reason to pick it.", "Another one, a little longer, to see how it wraps."],
+            cons: ["What it gives up."],
+            keySkills: [{ id: 11, name: "Twin Throw", level: 20 }, { id: 20, name: "Fern Stab", level: 30 }],
+            weapons: [{ id: 500, name: "Fern Dagger", level: 30 }],
             start: { str: 4, dex: 5, int: 4, luk: 12 },
             plan: {
               job: 420,
@@ -947,7 +950,10 @@ export const mockBackend: Backend = {
             job: 420,
             name: "Dagger Fernblade, example guide",
             summary: "A made-up plan that follows a made-up guide.",
-            note: "",
+            pros: [],
+            cons: [],
+            keySkills: [{ id: 10, name: "Quick Step", level: 20 }, { id: 20, name: "Fern Stab", level: 30 }],
+            weapons: [{ id: 500, name: "Fern Dagger", level: 30 }],
             start: { str: 4, dex: 5, int: 4, luk: 12 },
             plan: {
               job: 420,

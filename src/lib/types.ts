@@ -1547,9 +1547,15 @@ export interface StarterPlan {
   id: string;
   job: number;
   name: string;
+  /** One line on what the plan does. */
   summary: string;
-  /** Why to pick it and what it gives up. Empty for a guide's plan, whose guide says. */
-  note: string;
+  /** What the path does well and what it gives up. Empty for a guide's plan, whose guide says. */
+  pros: string[];
+  cons: string[];
+  /** The skills the plan builds on, at the level it takes them to. */
+  keySkills: FeaturedPick[];
+  /** The weapons it plans, by the level each is worn from. */
+  weapons: FeaturedPick[];
   /** The Lv 1 roll the plan counts from. */
   start: BaseStats;
   plan: BuildGoals;
@@ -1559,6 +1565,13 @@ export interface StarterPlan {
   source: StarterSource | null;
   /** A guide to read beside a plan written for Leafline, which it doesn't follow. */
   reading: StarterSource | null;
+}
+
+/** A skill or weapon shown on a plan's card: a skill's level, or the level a weapon is worn from. */
+export interface FeaturedPick {
+  id: number;
+  name: string;
+  level: number;
 }
 
 export interface StarterSource {
