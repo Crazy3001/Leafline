@@ -19,7 +19,6 @@
   import DeskQuests from "$lib/components/desk/DeskQuests.svelte";
   import NextUp from "$lib/components/desk/NextUp.svelte";
   import Segmented from "$lib/ui/Segmented.svelte";
-  import CharacterPicker from "$lib/components/CharacterPicker.svelte";
   import DropLogView from "$lib/components/DropLogView.svelte";
   import BagCheck from "$lib/components/item/BagCheck.svelte";
   import CraftingPanel from "$lib/components/item/CraftingPanel.svelte";
@@ -330,7 +329,6 @@
       {#key view}
         {#if view === "now"}
           <DeskHero />
-          <CharacterPicker />
           {#if isWeb}<ReadWindowCard />{/if}
           <!-- Who you are and what to do next on top; the session, your quests and this map under them. -->
           <div class="now-r1">
@@ -359,7 +357,6 @@
           {:else if trainPage === "where"}
             <div class="stack"><TrainPanel {level} map={live.analysis?.map ?? null} session={live.session} only="where" /></div>
           {:else}
-            <CharacterPicker />
             <div class="flow two"><TrainPanel {level} map={live.analysis?.map ?? null} session={live.session} only="session" glanced /></div>
           {/if}
         {:else if view === "tools"}
@@ -561,12 +558,6 @@
 
   .flow :global(.block) {
     margin: 0 0 var(--space-3);
-  }
-
-  /* The character switch for Now's cards, under the strip. */
-  .view > :global(.picker) {
-    margin: 0;
-    padding: 0 var(--space-1);
   }
 
   /* One card under another, as wide as the window: Quests, whose cards sit side by side inside. */

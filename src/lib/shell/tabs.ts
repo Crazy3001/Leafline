@@ -18,7 +18,6 @@ import {
   Shirt,
   Timer,
   UserRound,
-  Users,
 } from "@lucide/svelte";
 
 import type { Panel } from "$lib/types";
@@ -68,7 +67,7 @@ export function tabOfPanel(panel: Panel): Tab | "search" {
 }
 
 /** A tool that opens as a page over the tab. */
-export type ToolPage = "crafting" | "sell" | "timers" | "drops" | "tracked" | "potions" | "route" | "share" | "characters";
+export type ToolPage = "crafting" | "sell" | "timers" | "drops" | "tracked" | "potions" | "route" | "share";
 
 /** What picking a tool does: open its page, jump to where it lives, or open its own window. */
 export type ToolAction =
@@ -98,7 +97,6 @@ export const TOOLS: ToolInfo[] = [
   { id: "build", title: "Build planner", line: "Skills, stats and gear", icon: ListTree, action: { window: "build" } },
   { id: "share", title: "Share card", line: "A session's card to post", icon: Share2, action: { page: "share" } },
   { id: "route", title: "Route planner", line: "Any map to any map", icon: Route, action: { page: "route" } },
-  { id: "characters", title: "Characters", line: "Switch character", icon: Users, action: { page: "characters" } },
 ];
 
 export function toolPageTitle(page: ToolPage): string {

@@ -10,7 +10,6 @@
   import SessionControls from "./SessionControls.svelte";
   import { ArrowDown, Info } from "@lucide/svelte";
 
-  import CharacterPicker from "./CharacterPicker.svelte";
   import LevelGoal from "./LevelGoal.svelte";
   import PotionCosts from "./PotionCosts.svelte";
   import LootLog from "./LootLog.svelte";
@@ -293,7 +292,6 @@
   </Button>
 {/snippet}
 
-{#if !glance && !glanced && !only}<CharacterPicker />{/if}
 {#if !glance && !whole && !only}
   <div class="views"><Segmented label="Train shows" options={VIEWS} value={view} onchange={setView} /></div>
 {/if}
