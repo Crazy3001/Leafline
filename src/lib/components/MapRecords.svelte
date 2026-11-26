@@ -218,7 +218,7 @@
     display: inline-flex;
     align-items: center;
     gap: var(--space-2);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     color: var(--muted);
   }
 
@@ -228,19 +228,19 @@
 
   select {
     height: var(--control-h);
-    padding: 0 6px;
+    padding: 0 var(--space-1-5);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--surface-2);
     color: var(--text);
     font: inherit;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .panel {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: var(--space-2);
     padding: var(--space-3);
     border: 1px solid var(--border);
     border-radius: var(--radius);
@@ -255,20 +255,20 @@
     width: 100%;
     min-width: 560px;
     border-collapse: collapse;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     font-variant-numeric: tabular-nums;
   }
 
   th {
-    padding: 0 0 6px;
+    padding: 0 0 var(--space-1-5);
     font-size: var(--text-xs);
-    font-weight: 400;
+    font-weight: var(--weight-body);
     color: var(--faint);
     text-align: right;
   }
 
   td {
-    padding: 6px 0;
+    padding: var(--space-1-5) 0;
     text-align: right;
   }
 
@@ -278,7 +278,7 @@
   }
 
   tr.map td {
-    padding-top: 9px;
+    padding-top: var(--space-2);
     border-top: 1px solid var(--border-strong);
   }
 
@@ -287,7 +287,7 @@
   }
 
   tr.sub td {
-    padding: 3px 0;
+    padding: var(--space-0-5) 0;
     color: var(--muted);
   }
 
@@ -301,13 +301,13 @@
   }
 
   .strong {
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .fold {
     display: inline-flex;
     align-items: baseline;
-    gap: 8px;
+    gap: var(--space-2);
     padding: 0;
     border: 0;
     background: transparent;
@@ -318,7 +318,7 @@
   }
 
   .fold {
-    margin-left: 8px;
+    margin-left: var(--space-2);
     color: var(--muted);
   }
 
@@ -327,7 +327,7 @@
   }
 
   td :global(.ref.name) {
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .street {
@@ -343,7 +343,7 @@
 
   .quiet {
     margin: 0;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     color: var(--faint);
   }
 </style>

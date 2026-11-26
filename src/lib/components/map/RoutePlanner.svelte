@@ -42,7 +42,7 @@
     <Flag size={12} />
     <span class="to">To <strong>{target.name}</strong></span>
     <GoButton place={mapPlace(target)} />
-    <button class="clear" use:tip={"Clear the route"} onclick={() => (target = null)}><X size={12} /></button>
+    <button class="icon-btn xs clear" use:tip={"Clear the route"} onclick={() => (target = null)}><X size={12} /></button>
   </div>
   {#if route}
     <RouteSteps {route} />
@@ -67,9 +67,9 @@
   .target {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .to {
@@ -79,28 +79,11 @@
 
   .to strong {
     color: var(--text);
-    font-weight: 600;
-  }
-
-  .clear {
-    display: grid;
-    place-items: center;
-    width: 22px;
-    height: 22px;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--faint);
-    cursor: pointer;
-  }
-
-  .clear:hover {
-    background: var(--hover);
-    color: var(--text);
+    font-weight: var(--weight-strong);
   }
 
   .note {
-    margin: 6px 0 0;
+    margin: var(--space-1-5) 0 0;
     font-size: var(--text-xs);
     color: var(--faint);
   }

@@ -14,14 +14,23 @@
   const drops = $derived(found.origin.drops);
   const quests = $derived(found.origin.quests);
   const shops = $derived(found.origin.shops ?? []);
-  let shopsOpen = $state(true);
+  // Every group starts folded, with its count, for each item opened.
+  let shopsOpen = $state(false);
   const known = $derived(drops.hunts.filter((h) => h.monster.known));
   const unknown = $derived(drops.hunts.filter((h) => !h.monster.known));
 
-  let dropsOpen = $state(true);
-  let questsOpen = $state(true);
+  let dropsOpen = $state(false);
+  let questsOpen = $state(false);
   /** Monsters opened to their maps. */
   let opened = $state<string[]>([]);
+
+  $effect(() => {
+    void found;
+    shopsOpen = false;
+    dropsOpen = false;
+    questsOpen = false;
+    opened = [];
+  });
   const isOpen = (hunt: Hunt) => opened.includes(hunt.monster.name);
 
   function toggle(hunt: Hunt) {
@@ -38,31 +47,6 @@
     <span class="count tabular">{count}</span>
   </button>
 {/snippet}
-
-{#if shops.length}
-  <div class="group">
-    {@render head("Sold by", shops.length, shopsOpen, () => (shopsOpen = !shopsOpen))}
-    {#if shopsOpen}
-      <ul class="quests">
-        {#each shops as shop, i (i)}
-          <li>
-            <span class="shop-line">
-              {#if shop.npcId != null}<Ref kind="npc" id={shop.npcId} name={shop.npc} />{:else}{shop.npc}{/if}
-              <span class="price tabular">{formatNumber(shop.price)} mesos</span>
-            </span>
-            <span class="who">
-              {#if shop.map}<Ref kind="map" id={shop.map!.id}>{shop.map.name}</Ref
-                >{:else}{shop.mapName}{/if}{#if shop.hops != null && shop.hops > 0}{" · "}{shop.hops} portal{shop.hops === 1
-                  ? ""
-                  : "s"}{/if}{#if shop.needs}{" · "}<span class="needs">{shop.needs}</span>{/if}
-              {#if shop.map && shop.hops !== 0}<GoButton place={mapPlace(shop.map)} />{/if}
-            </span>
-          </li>
-        {/each}
-      </ul>
-    {/if}
-  </div>
-{/if}
 
 {#if known.length || unknown.length}
   <div class="group">
@@ -111,15 +95,43 @@
       </ul>
     {/if}
   </div>
-{:else if drops.lookedUp}
-  <p class="note">No known monster drops for this item.</p>
 {:else}
-  <p class="note">The drop table isn't downloaded yet.</p>
+  <div class="group">
+    {@render head("Dropped by", 0, dropsOpen, () => (dropsOpen = !dropsOpen))}
+    {#if dropsOpen}
+      <p class="note">{drops.lookedUp ? "No monster is known to drop it." : "The drop table isn't downloaded yet."}</p>
+    {/if}
+  </div>
+{/if}
+
+{#if shops.length}
+  <div class="group">
+    {@render head("Sold by", shops.length, shopsOpen, () => (shopsOpen = !shopsOpen))}
+    {#if shopsOpen}
+      <ul class="quests">
+        {#each shops as shop, i (i)}
+          <li>
+            <span class="shop-line">
+              {#if shop.npcId != null}<Ref kind="npc" id={shop.npcId} name={shop.npc} />{:else}{shop.npc}{/if}
+              <span class="price tabular">{formatNumber(shop.price)} mesos</span>
+            </span>
+            <span class="who">
+              {#if shop.map}<Ref kind="map" id={shop.map!.id}>{shop.map.name}</Ref
+                >{:else}{shop.mapName}{/if}{#if shop.hops != null && shop.hops > 0}{" · "}{shop.hops} portal{shop.hops === 1
+                  ? ""
+                  : "s"}{/if}{#if shop.needs}{" · "}<span class="needs">{shop.needs}</span>{/if}
+              {#if shop.map && shop.hops !== 0}<GoButton place={mapPlace(shop.map)} />{/if}
+            </span>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+  </div>
 {/if}
 
 {#if quests.length}
   <div class="group">
-    {@render head("Quest reward", quests.length, questsOpen, () => (questsOpen = !questsOpen))}
+    {@render head("From quests", quests.length, questsOpen, () => (questsOpen = !questsOpen))}
     {#if questsOpen}
       <ul class="quests">
         {#each quests as quest (quest.quest.id)}
@@ -138,13 +150,13 @@
 
 <style>
   .group + .group {
-    margin-top: 6px;
+    margin-top: var(--space-1-5);
   }
 
   .shop-line {
     display: flex;
     align-items: baseline;
-    gap: 6px;
+    gap: var(--space-1-5);
   }
 
   .shop-line .price {
@@ -159,9 +171,9 @@
   .mob-head {
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: var(--space-1);
     width: 100%;
-    padding: 4px 0;
+    padding: var(--space-1) 0;
     border: 0;
     background: transparent;
     text-align: left;
@@ -175,9 +187,7 @@
   .group-title {
     color: var(--muted);
     font-size: var(--text-xs);
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
+    font-weight: var(--weight-strong);
   }
 
   .count {
@@ -226,7 +236,7 @@
 
   .row-rest {
     flex: 1;
-    gap: 5px;
+    gap: var(--space-1);
     align-self: stretch;
   }
 
@@ -235,13 +245,13 @@
   }
 
   .mob-name {
-    font-size: var(--text-sm);
-    font-weight: 600;
+    font-size: var(--text-md);
+    font-weight: var(--weight-strong);
   }
 
   .missing .mob-name {
     color: var(--faint);
-    font-weight: 400;
+    font-weight: var(--weight-body);
   }
 
   .muted {
@@ -255,15 +265,15 @@
   }
 
   .maps {
-    gap: 3px;
-    padding: 0 0 7px 17px;
+    gap: var(--space-0-5);
+    padding: 0 0 var(--space-1-5) 17px;
   }
 
   .maps > li {
     display: flex;
     align-items: center;
-    gap: 6px;
-    font-size: var(--text-sm);
+    gap: var(--space-1-5);
+    font-size: var(--text-md);
   }
 
   .dist {
@@ -273,8 +283,8 @@
   }
 
   .quests {
-    gap: 6px;
-    padding: 6px 0 2px;
+    gap: var(--space-1-5);
+    padding: var(--space-1-5) 0 var(--space-0-5);
   }
 
   .quests li {
@@ -290,6 +300,6 @@
   .note {
     margin: 0;
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 </style>

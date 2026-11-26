@@ -65,16 +65,16 @@
 <style>
   .page {
     display: grid;
-    gap: 10px;
-    margin: 0 10px 10px;
-    padding: 12px 14px 14px;
+    gap: var(--space-2);
+    margin: 0 var(--space-3) var(--space-2);
+    padding: var(--space-3) var(--space-4) var(--space-3);
   }
 
   .from {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 4px 8px;
+    gap: var(--space-1) var(--space-2);
     color: var(--map);
   }
 
@@ -84,13 +84,13 @@
 
   .from strong {
     color: var(--ref-map);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .quiet,
   .from .quiet {
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .link {
@@ -100,13 +100,13 @@
     background: transparent;
     color: var(--accent-text);
     font: inherit;
-    font-size: var(--text-sm);
-    font-weight: 600;
+    font-size: var(--text-md);
+    font-weight: var(--weight-strong);
     cursor: pointer;
   }
 
   .plan {
-    padding-top: 10px;
+    padding-top: var(--space-2);
     border-top: 1px solid var(--border);
   }
 </style>

@@ -414,7 +414,7 @@
     display: flex;
     align-items: center;
     gap: 1px;
-    padding: 2px;
+    padding: var(--space-0-5);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: color-mix(in srgb, var(--bg) 82%, transparent);
@@ -617,12 +617,12 @@
     position: absolute;
     bottom: calc(100% - 1px);
     left: 50%;
-    padding: 0 4px;
+    padding: 0 var(--space-1);
     border-radius: var(--radius-sm);
     background: var(--accent-strong);
     color: var(--accent-ink);
-    font-size: 10px;
-    font-weight: 700;
+    font-size: var(--text-2xs);
+    font-weight: var(--weight-strong);
     line-height: 14px;
     white-space: nowrap;
     transform: translateX(-50%);
@@ -659,8 +659,8 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 4px 12px;
-    margin: 6px 0 0;
+    gap: var(--space-1) var(--space-3);
+    margin: var(--space-1-5) 0 0;
     color: var(--faint);
     font-size: var(--text-xs);
   }
@@ -668,7 +668,7 @@
   .legend span {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: var(--space-1);
   }
 
   .hint {
@@ -709,10 +709,10 @@
   .note {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     margin: 0;
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .spin {

@@ -270,8 +270,8 @@
   .title-row {
     display: flex;
     align-items: center;
-    gap: 12px;
-    margin-bottom: 10px;
+    gap: var(--space-3);
+    margin-bottom: var(--space-2);
   }
 
   .title-text {
@@ -283,28 +283,28 @@
   }
 
   .rank {
-    margin: 2px 0 0;
+    margin: var(--space-0-5) 0 0;
     color: var(--muted);
     font-size: var(--text-xs);
   }
 
   .rank b {
     color: var(--exp-text);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .name {
     margin: 0;
     font-family: var(--font-display);
     font-size: var(--text-lg);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     line-height: 1.25;
   }
 
   .meta {
-    margin: 2px 0 8px;
+    margin: var(--space-0-5) 0 var(--space-2);
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .soft {
@@ -314,21 +314,21 @@
   .boss {
     display: inline-flex;
     align-items: center;
-    gap: 3px;
+    gap: var(--space-0-5);
     color: var(--bad);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .facts {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 6px;
+    gap: var(--space-1-5);
     margin: 0;
   }
 
   .facts div {
     min-width: 0;
-    padding: 4px 7px;
+    padding: var(--space-1) var(--space-2);
     border-radius: var(--radius-sm);
     background: var(--hover);
   }
@@ -340,20 +340,20 @@
 
   dd {
     margin: 0;
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .kills {
-    margin: 6px 0 0;
+    margin: var(--space-1-5) 0 0;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .elements {
     display: grid;
     gap: 1px;
-    margin-top: 8px;
-    font-size: var(--text-sm);
+    margin-top: var(--space-2);
+    font-size: var(--text-md);
   }
 
   .good {
@@ -371,32 +371,32 @@
   .stats {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 0 14px;
-    margin: 8px 0 0;
+    gap: 0 var(--space-3);
+    margin: var(--space-2) 0 0;
   }
 
   .stats div {
     display: flex;
     justify-content: space-between;
-    gap: 8px;
-    padding: 2px 0;
+    gap: var(--space-2);
+    padding: var(--space-0-5) 0;
     border-top: 1px solid var(--border);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .stats dt {
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .stats dd {
-    font-weight: 500;
+    font-weight: var(--weight-body);
   }
 
   .traits {
-    margin: 6px 0 0;
+    margin: var(--space-1-5) 0 0;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .link {
@@ -417,8 +417,8 @@
   }
 
   .link.strong {
-    font-size: var(--text-sm);
-    font-weight: 600;
+    font-size: var(--text-md);
+    font-weight: var(--weight-strong);
   }
 
   .quests,
@@ -426,12 +426,12 @@
     margin: 0;
     padding: 0;
     list-style: none;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .quests li,
   .versions li {
-    padding: 3px 0;
+    padding: var(--space-0-5) 0;
   }
 
   .quests li + li,
@@ -442,7 +442,7 @@
   .quests li {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
-    column-gap: 8px;
+    column-gap: var(--space-2);
   }
 
   .quests .tabular {
@@ -451,7 +451,7 @@
 
   .quests .yours-now {
     color: var(--accent-text-strong);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .who {
@@ -464,16 +464,16 @@
   .links {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px;
-    margin-top: 12px;
+    gap: var(--space-1);
+    margin-top: var(--space-3);
   }
 
   .out {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--space-1);
     height: 24px;
-    padding: 0 8px;
+    padding: 0 var(--space-2);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     background: transparent;
@@ -489,7 +489,7 @@
 
   .credit {
     display: block;
-    margin-top: 8px;
+    margin-top: var(--space-2);
     padding: 0;
     border: 0;
     background: transparent;
@@ -507,7 +507,7 @@
 
   .note {
     margin: 0;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .spin {

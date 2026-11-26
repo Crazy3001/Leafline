@@ -143,15 +143,15 @@
     <span class="title" data-tauri-drag-region><Icon size={12} />{info.title}</span>
     <span class="actions">
       {#if sized}
-        <button class="action" use:tip={"Fit to contents"} onclick={fitToContent}><Minimize2 size={12} /></button>
+        <button class="icon-btn xs action" use:tip={"Fit to contents"} onclick={fitToContent}><Minimize2 size={12} /></button>
       {/if}
       <button
-        class="action"
+        class="icon-btn xs action"
         use:tip={panel === "route" ? "Open the Map tab" : `Open the ${info.title} tab`}
         onclick={() => backend.showPanel(panel)}
         ><AppWindow size={12} /></button
       >
-      <button class="action" use:tip={"Unpin"} onclick={() => backend.unpinPanel(panel)}><PinOff size={12} /></button>
+      <button class="icon-btn xs action" use:tip={"Unpin"} onclick={() => backend.unpinPanel(panel)}><PinOff size={12} /></button>
     </span>
   </header>
   <div class="body" class:scrolls={capped} bind:this={body}>
@@ -196,7 +196,7 @@
     align-items: center;
     justify-content: space-between;
     height: 24px;
-    padding: 0 4px 0 10px;
+    padding: 0 var(--space-1) 0 var(--space-3);
     user-select: none;
     cursor: grab;
   }
@@ -204,10 +204,10 @@
   .title {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: var(--space-1);
+    color: var(--muted);
     font-size: var(--text-xs);
-    font-weight: 600;
-    color: var(--faint);
+    font-weight: var(--weight-strong);
   }
 
   .actions {
@@ -215,16 +215,7 @@
   }
 
   .action {
-    display: grid;
-    place-items: center;
-    width: 20px;
-    height: 20px;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--faint);
     opacity: 0;
-    cursor: pointer;
     transition: opacity 0.15s ease;
   }
 
@@ -233,25 +224,20 @@
     opacity: 1;
   }
 
-  .action:hover {
-    background: var(--hover);
-    color: var(--text);
-  }
-
   .locked .action {
     display: none;
   }
 
   .body {
     min-height: 0;
-    padding: 2px 10px 10px;
+    padding: var(--space-0-5) var(--space-3) var(--space-2);
     overflow-y: hidden;
   }
 
   /* A pinned window is the card, so the sections inside it stay flat. */
   .body :global(.block.card) {
     margin: 0;
-    padding: 8px 0;
+    padding: var(--space-2) 0;
     border: 0;
     border-radius: 0;
     background: none;

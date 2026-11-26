@@ -8,7 +8,7 @@
   import { tip } from "$lib/tip.svelte";
   import Ref from "$lib/components/Ref.svelte";
   import SessionControls from "./SessionControls.svelte";
-  import { ArrowDown } from "@lucide/svelte";
+  import { ArrowDown, Info } from "@lucide/svelte";
 
   import CharacterPicker from "./CharacterPicker.svelte";
   import LevelGoal from "./LevelGoal.svelte";
@@ -56,6 +56,7 @@
     glance = false,
     whole = false,
     glanced = false,
+    only = null,
   }: {
     level: number | null;
     map?: MapReading | null;
@@ -65,8 +66,13 @@
     glance?: boolean;
     /** Where there is room, as in the desk view: every view stacked, with no chips. */
     whole?: boolean;
-    /** The desk view's Now strip shows the big rate, the level line and the session buttons. */
+    /** The desk view's player bar shows the big rate, the level line and the session buttons. */
     glanced?: boolean;
+    /**
+     * One part alone, for the desk view, which lays the parts out itself: the session's details,
+     * where to train, this map against your bests with the maps played, or the session's graph.
+     */
+    only?: "session" | "where" | "maps" | "chart" | null;
   } = $props();
 
   watchHistory();
@@ -102,9 +108,12 @@
     }
   }
   /** What shows. A pinned window has only the session; the desk view stacks all of it. */
-  const onSession = $derived(glance || whole || view === "session");
-  const onWhere = $derived(!glance && (whole || view === "where"));
-  const onHistory = $derived(!glance && (whole ? !tracking : view === "history"));
+  const onSession = $derived(only ? only === "session" : glance || whole || view === "session");
+  const onWhere = $derived(only ? only === "where" : !glance && (whole || view === "where"));
+  const onHistory = $derived(!only && !glance && (whole ? !tracking : view === "history"));
+  /** This map against your bests, and the maps played. */
+  const onMaps = $derived(only ? only === "session" || only === "maps" : onSession);
+  const onChart = $derived(only ? only === "session" || only === "chart" : onSession);
   const percentOnly = $derived(session?.percentOnly ?? false);
   const signed = (value: number) => (value > 0 ? `+${formatNumber(value)}` : formatNumber(value));
 
@@ -206,26 +215,9 @@
   const lootValueRate = $derived(session?.loot?.watched ? lootRate(session.loot.items, session.loot.seconds) : null);
   const reminder = $derived(session ? mesosReminder(session) : null);
 
-  // How Mesos / hr works, said once until the player dismisses it.
-  const MESOS_HINT_KEY = "leafline.train.mesosHintSeen";
-  let mesosHintSeen = $state(storedFlag(MESOS_HINT_KEY));
-
-  function storedFlag(key: string): boolean {
-    try {
-      return localStorage.getItem(key) === "1";
-    } catch {
-      return false;
-    }
-  }
-
-  function dismissMesosHint() {
-    mesosHintSeen = true;
-    try {
-      localStorage.setItem(MESOS_HINT_KEY, "1");
-    } catch {
-      // A convenience only.
-    }
-  }
+  /** How Mesos / hr is counted, behind the tile's info mark. */
+  const MESOS_HELP =
+    "Counts your mesos when you start and again before you spend. Your inventory or a shop window both count, and you don't need to keep either open.";
 
   const dropped = $derived(session ? session.rejected.exp + session.rejected.mesos : 0);
   /** About how much play the deaths undid, at this map's pace. */
@@ -289,32 +281,39 @@
   </p>
 {/snippet}
 
+{#snippet mapsNote()}
+  <span class="info" use:tip={"Each map's rate counts only your time on it. The session rate counts all of it, towns too."}
+    ><Info size={13} aria-label="How these rates are counted" /></span
+  >
+{/snippet}
+
 {#snippet jump()}
   <Button variant="ghost" size="sm" onclick={jumpToSpots}>
     Where to train <ArrowDown size={12} />
   </Button>
 {/snippet}
 
-{#if !glance && !glanced}<CharacterPicker />{/if}
-{#if !glance && !whole}
+{#if !glance && !glanced && !only}<CharacterPicker />{/if}
+{#if !glance && !whole && !only}
   <div class="views"><Segmented label="Train shows" options={VIEWS} value={view} onchange={setView} /></div>
 {/if}
-{#if onSession && !(glanced && tracking)}
-<Block title="Session">
-  {#snippet aside()}
-    {#if session?.held}
-      <span class="state paused">Paused</span>
-    {:else if tracking && session?.paused}
-      <span class="state idle">Idle</span>
-    {:else if tracking}
-      <span class="state running"><span class="square" aria-hidden="true"></span>Tracking</span>
-    {/if}
-    {#if tracking && session}
-      <span class="tabular">{formatDuration(session.activeSeconds)} active of {formatDuration(session.elapsedSeconds)}</span>
-    {/if}
-  {/snippet}
+{#snippet sessionState()}
+  {#if session?.held}
+    <span class="state paused">Paused</span>
+  {:else if tracking && session?.paused}
+    <span class="state idle">Idle</span>
+  {:else if tracking}
+    <span class="state running"><span class="square" aria-hidden="true"></span>Tracking</span>
+  {/if}
+  {#if tracking && session}
+    <span class="tabular">{formatDuration(session.activeSeconds)} active of {formatDuration(session.elapsedSeconds)}</span>
+  {/if}
+{/snippet}
 
-  {#if !glanced}<SessionControls trailing={tracking && whole && !glance ? jump : undefined} />{/if}
+<!-- Before a session: how it starts. Once one runs, its heading and buttons head the card below. -->
+{#if onSession && !(tracking && session && headline)}
+<Block title="Session" aside={sessionState}>
+  {#if !glanced}<SessionControls />{/if}
 
   {#if !tracking && glance}
     <p class="caption">Starts with your first EXP.</p>
@@ -339,8 +338,9 @@
 {/if}
 
 {#if tracking && session && headline && onSession}
-  <Block>
+  <Block title={glanced ? undefined : "Session"} aside={glanced ? undefined : sessionState}>
     {#if !glanced}
+    <SessionControls trailing={whole && !glance ? jump : undefined} />
     <div class="headline">
       <div class="big">
         <span class="label"
@@ -368,8 +368,11 @@
 
     {#if lv != null && percent != null}
       <div class="level">
-        <div class="level-line"><span class="muted">Lv {lv} to {lv + 1}</span><span class="tabular">{percent.toFixed(2)}%</span></div>
-        <ExpBar {percent} points={session.exp?.points ?? null} needed={session.expNeeded} />
+        <!-- The window's header has the level's bar; a pinned window has no header, so it draws its own. -->
+        {#if glance}
+          <div class="level-line"><span class="muted">Lv {lv} to {lv + 1}</span><span class="tabular">{percent.toFixed(2)}%</span></div>
+          <ExpBar {percent} points={session.exp?.points ?? null} needed={session.expNeeded} />
+        {/if}
         {#if toLevel || levelPace}
           <span class="muted tabular" use:tip={toLevel?.tip ?? ""}>
             {#if toLevel}{toLevel.line}{/if}{#if toLevel && levelPace}{" · "}{/if}{#if levelPace}{levelPace}{/if}
@@ -390,12 +393,14 @@
     {/if}
 
     <div class="tiles">
-      <Stat
+      <!-- On the desk, the player bar over the view has the rate. -->
+      {#if !glanced}<Stat
         label="Mesos / hr"
+        help={MESOS_HELP}
         value={formatCompact(mesosRate)}
         sub={mesosSub}
         faint={session.mesosPerHour != null && coverage?.partial && coverage.thin}
-      />
+      />{/if}
       <Stat
         label="EXP gained"
         value={signed(session.expGained)}
@@ -425,18 +430,17 @@
     {#if glance && session.mapHidden}
       <p class="attention">Can't see the minimap's name, so new gains may go to the wrong map.</p>
     {/if}
-    {#if !mesosHintSeen && !glance}
-      <div class="hint">
-        <span>
-          Mesos / hr needs a look at your mesos when you start and again before you spend. Your inventory or a shop window
-          both count, and you don't need to keep either open.
-        </span>
-        <Button size="sm" variant="ghost" onclick={dismissMesosHint}>Got it</Button>
-      </div>
-    {/if}
   </Block>
 
-  {#if !glance}
+{:else if onSession && !glance}
+  <!-- No session yet: how it starts, above, then the goal. -->
+  <Block title="Level goal">
+    <LevelGoal {level} percent={session?.percent ?? null} character={session?.name ?? characters.active} />
+  </Block>
+{/if}
+
+<!-- This map against your bests, and every map this session. -->
+{#if tracking && session && onMaps && !glance}
   {#if better && !here}
     <Block title="This map">
       {@render nudge(better)}
@@ -491,7 +495,7 @@
   {/if}
 
   {#if sessionMaps.length}
-    <Block title="Maps this session">
+    <Block title="Maps this session" aside={sessionMaps.length > 1 ? mapsNote : undefined}>
       <table>
         <thead><tr><th>Map</th><th>Time</th><th>EXP / hr</th><th>Mesos / hr</th></tr></thead>
         <tbody>
@@ -513,9 +517,6 @@
           {/each}
         </tbody>
       </table>
-      {#if sessionMaps.length > 1}
-        <p class="caption">Each map's rate counts only your time on it. The session rate at the top counts all of it, towns too.</p>
-      {/if}
       {#if session.deaths > 0 || session.mapHidden || dropped > 0 || session.mesosExcluded !== 0}
         <ul class="notes">
           {#if session.mapHidden}<li class="attention">Can't see the minimap's name, so new gains may go to the wrong map.</li>{/if}
@@ -534,22 +535,16 @@
       {/if}
     </Block>
   {/if}
-  {/if}
-{:else if onSession && !glance}
-  <!-- No session yet: how it starts, above, then the goal. -->
-  <Block title="Level goal">
-    <LevelGoal {level} percent={session?.percent ?? null} character={session?.name ?? characters.active} />
-  </Block>
 {/if}
 
-{#if !glance}
+{#if !glance && only !== "chart"}
   <!-- Stays in the page while another view shows: it works out the better-map line for This map. -->
   <div class="view" class:off={!onWhere}>
     <SpotList {level} {map} {session} bind:better bind:this={spotList} />
   </div>
 {/if}
 
-{#if tracking && session && headline && onSession && !glance}
+{#if tracking && session && headline && onChart && !glance}
   <Block title="This session">
     {#snippet aside()}
       <Segmented
@@ -575,9 +570,11 @@
         label="{metric === 'exp' ? 'EXP' : 'Mesos'} per hour over this session"
       />
       <p class="caption">
-        Each point is the rate over the 5 minutes before it; the first 2½ minutes are left out.
-        {#if metric === "mesos"}Mesos are spread evenly between your looks at them, so the line reaches only your last look.{/if}
-        {#if session.events?.length}Green dots are level-ups, red ones deaths.{/if}
+        {#if session.events?.length}Green dots are level-ups, red ones deaths.{" "}{/if}<span
+          class="info"
+          use:tip={`Each point is the rate over the 5 minutes before it; the first 2½ minutes are left out.${metric === "mesos" ? " Mesos are spread evenly between your looks at them, so the line reaches only your last look." : ""}`}
+          ><Info size={12} aria-label="How the graph is drawn" /></span
+        >
       </p>
     {:else}
       <p class="caption">The graph starts after 5 minutes of play.</p>
@@ -635,21 +632,20 @@
   {:else if !whole}
     <Block title="Past sessions">
       <p class="caption">
-        Nothing saved yet. A session is saved when it ends; your best maps and your last sessions then show here, and
-        all of them in the training log.
+        Nothing saved yet. Sessions save when they end, and your best maps show here.
       </p>
       <div><Button onclick={openTrainingLog}>Training log</Button></div>
     </Block>
   {/if}
 {/if}
 
-{#if onSession}<TimersCard />{/if}
+{#if onSession && !only}<TimersCard />{/if}
 
 <style>
   /* A block pads itself; the chips sit beside blocks, so they match it. */
   .views {
     display: flex;
-    padding: 0 10px 10px;
+    padding: 0 var(--space-3) var(--space-2);
   }
 
   .view {
@@ -663,7 +659,7 @@
   .state {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: var(--space-1);
     font-size: var(--text-xs);
   }
 
@@ -689,10 +685,10 @@
   .empty {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--space-1);
     padding: var(--space-3);
     background: var(--surface-2);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     color: var(--muted);
   }
 
@@ -712,7 +708,7 @@
   .recent {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--space-0-5);
   }
 
   .recent {
@@ -740,13 +736,13 @@
 
   .hero {
     font-size: var(--text-hero);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     line-height: 1;
   }
 
   .recent .num {
     font-size: var(--text-lg);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .pace {
@@ -765,8 +761,8 @@
   .level {
     display: flex;
     flex-direction: column;
-    gap: 5px;
-    font-size: var(--text-sm);
+    gap: var(--space-1);
+    font-size: var(--text-md);
   }
 
   .level-line {
@@ -780,31 +776,41 @@
 
   .tiles {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 6px;
+    grid-auto-columns: minmax(0, 1fr);
+    grid-auto-flow: column;
+    padding: var(--space-2) 0;
+    border-block: 1px solid var(--border);
+  }
+
+  /* Figures on the card itself, split by hairlines: no box inside the box. */
+  .tiles :global(.stat) {
+    padding: 0 var(--space-3);
+    border: 0;
+    border-left: 1px solid var(--border);
+    border-radius: 0;
+    background: none;
+  }
+
+  .tiles :global(.stat:first-child) {
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .info {
+    display: inline-flex;
+    color: var(--faint);
+    cursor: help;
   }
 
   .reminder {
     margin: 0;
-    padding: 6px var(--space-2);
+    padding: var(--space-1-5) var(--space-2);
     border-left: 2px solid var(--warn);
     background: var(--surface-2);
     font-size: var(--text-xs);
     color: var(--text);
   }
 
-  .hint {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--space-2);
-    font-size: var(--text-xs);
-    color: var(--muted);
-  }
-
-  .hint span {
-    flex: 1;
-    min-width: 0;
-  }
 
   .caption {
     margin: 0;
@@ -817,9 +823,9 @@
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
-    gap: 4px var(--space-2);
+    gap: var(--space-1) var(--space-2);
     margin: 0 0 var(--space-2);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     color: var(--muted);
   }
 
@@ -844,17 +850,17 @@
   }
 
   .map-name {
-    font-size: var(--text-sm);
-    font-weight: 600;
+    font-size: var(--text-md);
+    font-weight: var(--weight-strong);
     color: var(--text);
   }
 
   .compare {
     display: grid;
     grid-template-columns: 96px minmax(0, 1fr) 44px;
-    gap: 6px var(--space-2);
+    gap: var(--space-1-5) var(--space-2);
     align-items: center;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .compare > :nth-child(3n) {
@@ -864,19 +870,19 @@
   table {
     width: 100%;
     border-collapse: collapse;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   th {
-    padding: 0 0 4px;
+    padding: 0 0 var(--space-1);
     font-size: var(--text-xs);
-    font-weight: 400;
+    font-weight: var(--weight-body);
     color: var(--faint);
     text-align: right;
   }
 
   td {
-    padding: 5px 0;
+    padding: var(--space-1) 0;
     border-top: 1px solid var(--border);
     text-align: right;
     white-space: nowrap;
@@ -903,7 +909,7 @@
     display: inline-block;
     width: 6px;
     height: 6px;
-    margin-right: 6px;
+    margin-right: var(--space-1-5);
     vertical-align: 1px;
     background: var(--accent);
   }
@@ -911,7 +917,7 @@
   .notes {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--space-1);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -932,9 +938,9 @@
   .recent-list li {
     display: flex;
     gap: var(--space-2);
-    padding: 7px 0;
+    padding: var(--space-1-5) 0;
     border-top: 1px solid var(--border);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .day {

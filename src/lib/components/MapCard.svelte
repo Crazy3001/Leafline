@@ -84,30 +84,6 @@
   // often, so a lone good match isn't worth a warning.
   const doubtful = $derived(!!found && !browsing && (found.score < 0.85 || found.alternatives.length > 0));
 
-  /** The parts of the map shown, for the chips that jump to them. */
-  const jumps = $derived.by(() => {
-    const d = shown;
-    if (!d) return [];
-    const some = d.mobs.length > 0;
-    return [
-      { id: "map-portals", label: "Portals", count: d.exits.length as number | null, show: true },
-      { id: "map-monsters", label: "Monsters", count: d.mobTotal, show: some },
-      { id: "map-drops", label: "Drops", count: null, show: some },
-      { id: "map-quests", label: "Quests", count: d.quests.length, show: d.quests.length > 0 },
-      { id: "map-npcs", label: "NPCs", count: d.npcs.length, show: d.npcs.length > 0 },
-      { id: "map-shops", label: "Shops", count: d.shops?.length ?? 0, show: (d.shops?.length ?? 0) > 0 },
-    ].filter((j) => j.show);
-  });
-
-  /** Opens a part if it is folded and brings it to the top. */
-  function jumpTo(id: string) {
-    const part = document.getElementById(id);
-    if (!part) return;
-    const head = part.querySelector<HTMLButtonElement>(":scope > button[aria-expanded]");
-    if (head?.getAttribute("aria-expanded") === "false") head.click();
-    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    requestAnimationFrame(() => part.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" }));
-  }
 </script>
 
 {#snippet heading()}
@@ -135,7 +111,6 @@
           <div class="name">{map.name}</div>
         {/if}
       </div>
-      {#if split && map?.collapsed && !browsing}<span class="source">Minimap title</span>{/if}
     </div>
     {#if split && shown}
       {@const facts = mapFacts(shown)}
@@ -176,8 +151,7 @@
 {/snippet}
 
 {#if split}
-  <!-- The tab: where to go on top, the map's own card, chips that jump to its parts, then each
-       part as a card. -->
+  <!-- The tab: where to go on top, the map's own card, then each part as a card. -->
   {#if ready}<div class="goto top"><GoTo /></div>{/if}
   <section class="card head">
     {@render heading()}
@@ -192,23 +166,12 @@
     {/if}
   </section>
   {#if shown}
-    {#if jumps.length > 1}
-      <nav class="jump" aria-label="Jump to a part of this map">
-        {#each jumps as j (j.id)}
-          <button onclick={() => jumpTo(j.id)}>{j.label}{#if j.count != null}<span class="tabular n">{j.count}</span>{/if}</button>
-        {/each}
-      </nav>
-    {/if}
     {#key shown.map.id}
       <MapDetailsView details={shown} {current} {variant} split onnavigate={navigate} />
     {/key}
   {/if}
 {:else}
   <Card title="Map" {plain}>
-    {#snippet aside()}
-      {#if map?.collapsed && !browsing}<span>Minimap title</span>{/if}
-    {/snippet}
-
     {@render heading()}
 
     <!-- Setting a place is done in the tab; a pinned window follows it in the Route pin. -->
@@ -243,29 +206,22 @@
   }
 
   .goto.top {
-    margin: 0 10px 10px;
+    margin: 0 var(--space-3) var(--space-2);
   }
 
   /* The map's own card in the tab; the frame is the shared .card. */
   .head {
-    margin: 0 10px 10px;
-    padding: 12px 14px 14px;
+    margin: 0 var(--space-3) var(--space-2);
+    padding: var(--space-3) var(--space-4) var(--space-3);
   }
 
-  .source {
-    align-self: flex-start;
-    margin-left: auto;
-    color: var(--faint);
-    font-size: var(--text-xs);
-    white-space: nowrap;
-  }
 
   .facts {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 4px 6px;
-    margin-top: 8px;
+    gap: var(--space-1) var(--space-1-5);
+    margin-top: var(--space-2);
     font-size: var(--text-xs);
   }
 
@@ -276,7 +232,7 @@
   .fact + .fact::before,
   .fact + .return::before {
     content: "·";
-    margin-right: 6px;
+    margin-right: var(--space-1-5);
     color: var(--faint);
   }
 
@@ -292,63 +248,15 @@
     font-size: var(--text-xs);
   }
 
-  /* Chips that lead to the parts below. In the overlay they stay in view while the map scrolls. */
-  .jump {
-    display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
-    padding: 0 10px 10px;
-  }
-
-  :global(#panel) .jump {
-    position: sticky;
-    top: 0;
-    z-index: 2;
-    padding-top: 6px;
-    margin-top: -6px;
-    background: var(--bg);
-  }
-
-  .jump button {
-    display: inline-flex;
-    flex: none;
-    align-items: center;
-    gap: 6px;
-    height: var(--control-h-sm);
-    padding: 0 10px;
-    border: var(--line-w) solid var(--control-line);
-    border-radius: var(--radius-pill);
-    background: var(--surface);
-    color: var(--muted);
-    font-size: var(--text-xs);
-    font-weight: 500;
-    white-space: nowrap;
-    cursor: pointer;
-  }
-
-  .jump button:hover {
-    background: var(--surface-2);
-    color: var(--text);
-  }
-
-  .jump button:focus-visible {
-    outline: 2px solid var(--accent-text);
-    outline-offset: 1px;
-  }
-
-  .jump .n {
-    color: var(--faint);
-    font-size: var(--text-xs);
-  }
 
   .save-row {
-    margin-top: 6px;
+    margin-top: var(--space-1-5);
   }
 
   .where {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-2);
   }
 
   .pin {
@@ -375,21 +283,21 @@
 
   .street {
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .name {
     font-family: var(--font-display);
     font-size: var(--text-xl);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     line-height: 1.2;
   }
 
   .here {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 6px;
-    margin: 10px 0 0;
+    gap: var(--space-1-5);
+    margin: var(--space-2) 0 0;
   }
 
   /* The same tiles as src/lib/ui/Stat.svelte. */
@@ -407,18 +315,18 @@
     margin: 0;
     font-family: var(--font-display);
     font-size: var(--text-lg);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     color: var(--text);
   }
 
   .empty {
     margin: 0;
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .miss {
-    margin-top: 8px;
+    margin-top: var(--space-2);
   }
 
   /* Stays in view while a long map scrolls under it. */
@@ -428,15 +336,15 @@
     z-index: 1;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1-5);
     width: 100%;
-    margin: -2px 0 10px;
-    padding: 6px 9px;
+    margin: -2px 0 var(--space-2);
+    padding: var(--space-1-5) var(--space-2);
     border: 1px solid color-mix(in srgb, var(--map) 45%, transparent);
     border-radius: var(--radius-sm);
     background: color-mix(in srgb, var(--map) 16%, var(--surface-3));
     color: var(--map);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     text-align: left;
     cursor: pointer;
     transition:
@@ -468,12 +376,12 @@
 
   .back-to strong {
     color: var(--text);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .doubt {
-    margin-top: 8px;
-    padding: 6px 8px;
+    margin-top: var(--space-2);
+    padding: var(--space-1-5) var(--space-2);
     border-radius: var(--radius-sm);
     background: var(--warn-soft);
     color: var(--muted);
@@ -481,8 +389,8 @@
   }
 
   .alt {
-    margin: 2px 2px 0 0;
-    padding: 0 6px;
+    margin: var(--space-0-5) var(--space-0-5) 0 0;
+    padding: 0 var(--space-1-5);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: transparent;
@@ -495,12 +403,12 @@
   }
 
   .setup {
-    margin-top: 10px;
-    padding-top: 10px;
+    margin-top: var(--space-2);
+    padding-top: var(--space-2);
     border-top: 1px solid var(--border);
   }
 
   .lookup {
-    margin-top: 12px;
+    margin-top: var(--space-3);
   }
 </style>

@@ -853,7 +853,7 @@
   .stepper {
     display: inline-flex;
     align-items: center;
-    gap: 3px;
+    gap: var(--space-0-5);
   }
 
   .stepper button {
@@ -872,13 +872,13 @@
   .stepper input {
     width: 34px;
     height: 20px;
-    padding: 0 2px;
+    padding: 0 var(--space-0-5);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--surface);
     color: var(--text);
     font: inherit;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     text-align: center;
     -moz-appearance: textfield;
     appearance: textfield;
@@ -905,7 +905,7 @@
   .line {
     display: flex;
     align-items: center;
-    gap: 2px;
+    gap: var(--space-0-5);
   }
 
   .row {
@@ -956,7 +956,7 @@
   .name {
     overflow: hidden;
     font-size: var(--text-md);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     white-space: nowrap;
     text-overflow: ellipsis;
   }
@@ -975,9 +975,9 @@
 
   .check-est {
     display: grid;
-    gap: 6px;
+    gap: var(--space-1-5);
     justify-items: start;
-    margin-top: 6px;
+    margin-top: var(--space-1-5);
   }
 
   .meta .try {
@@ -993,7 +993,7 @@
 
   .value {
     font-size: var(--text-lg);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     line-height: 1.2;
   }
 
@@ -1019,8 +1019,8 @@
   .detail {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    padding: 2px 0 var(--space-3) 22px;
+    gap: var(--space-2);
+    padding: var(--space-0-5) 0 var(--space-3) 22px;
   }
 
   .why,
@@ -1033,7 +1033,7 @@
   div.why {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--space-1);
   }
 
   .why p {
@@ -1041,14 +1041,14 @@
   }
 
   .why strong {
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     color: var(--text);
   }
 
   .sure {
     display: inline-flex;
-    gap: 2px;
-    margin-right: 5px;
+    gap: var(--space-0-5);
+    margin-right: var(--space-1-5);
     vertical-align: middle;
   }
 
@@ -1066,7 +1066,7 @@
   .assume {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--space-1-5);
     margin-top: var(--space-2);
     padding: var(--space-2);
     border: 1px solid var(--border);
@@ -1083,8 +1083,8 @@
   .assume label {
     display: flex;
     align-items: center;
-    gap: 6px;
-    font-size: var(--text-sm);
+    gap: var(--space-1-5);
+    font-size: var(--text-md);
   }
 
   .assume label > span:first-child {
@@ -1094,7 +1094,7 @@
   .assume select {
     max-width: 200px;
     height: 22px;
-    padding: 0 4px;
+    padding: 0 var(--space-1);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--surface);
@@ -1105,7 +1105,7 @@
   .assume input {
     width: 56px;
     height: 22px;
-    padding: 0 4px;
+    padding: 0 var(--space-1);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--surface);
@@ -1126,19 +1126,19 @@
   table {
     width: 100%;
     border-collapse: collapse;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   th {
-    padding: 0 0 4px;
+    padding: 0 0 var(--space-1);
     font-size: var(--text-xs);
-    font-weight: 400;
+    font-weight: var(--weight-body);
     color: var(--faint);
     text-align: right;
   }
 
   td {
-    padding: 4px 0;
+    padding: var(--space-1) 0;
     border-top: 1px solid var(--border);
     text-align: right;
   }
@@ -1162,8 +1162,8 @@
   .check {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    font-size: var(--text-sm);
+    gap: var(--space-1-5);
+    font-size: var(--text-md);
     color: var(--muted);
     cursor: pointer;
   }
@@ -1179,7 +1179,7 @@
 
   .quiet {
     margin: 0;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     color: var(--faint);
   }
 
@@ -1189,7 +1189,7 @@
 
   .warn {
     margin: 0;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
     color: var(--warn);
   }
 

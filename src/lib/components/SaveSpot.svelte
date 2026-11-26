@@ -63,7 +63,7 @@
     flex: none;
     align-items: center;
     justify-content: center;
-    gap: 5px;
+    gap: var(--space-1);
     min-width: 26px;
     height: 26px;
     padding: 0;
@@ -77,7 +77,7 @@
   }
 
   .save.text {
-    padding: 0 8px;
+    padding: 0 var(--space-2);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--surface-2);

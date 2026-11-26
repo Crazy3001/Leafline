@@ -19,15 +19,15 @@
   .chips {
     display: flex;
     flex-wrap: wrap;
-    gap: 3px;
+    gap: var(--space-0-5);
   }
 
   .chip {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--space-1);
     max-width: 100%;
-    padding: 1px 6px 1px 3px;
+    padding: 1px var(--space-1-5) 1px var(--space-1);
     border-radius: var(--radius-pill);
     background: color-mix(in srgb, var(--marker-mob) 12%, transparent);
     color: var(--muted);

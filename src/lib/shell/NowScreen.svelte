@@ -1,12 +1,17 @@
 <script lang="ts">
   // The Now tab: what matters while you play, with nothing to dig for. This session's two rates
-  // big enough to read mid-fight, the quest you're on, and one-line ways into the map you're in
-  // and your character. Everything here is also somewhere fuller; a row's arrow takes you there.
+  // big enough to read mid-fight, the quest you're on with where to hunt each objective, and the
+  // map you're in with what spawns there. Who you are and how far through the level are in the
+  // header, so nothing here repeats them. A row's arrow opens the fuller tab.
   import { ChevronRight } from "@lucide/svelte";
 
-  import { formatCompact, formatNumber, mapLabel, objectiveProgress, partyLabel } from "$lib/format";
+  import { backend } from "$lib/api";
+  import Ref from "$lib/components/Ref.svelte";
+  import { formatCompact, formatNumber, groundDistance, mapLabel, monsterLabel, objectiveProgress, partyLabel, questTitle } from "$lib/format";
+  import { mapData, watchMapData } from "$lib/mapdata.svelte";
+  import { huntOrder, orderGrounds } from "$lib/quests.svelte";
   import { mesosCoverage } from "$lib/training";
-  import type { Analysis, SessionSummary } from "$lib/types";
+  import type { Analysis, Guide, MobRow, Objective, SessionSummary } from "$lib/types";
   import Sparkline from "$lib/ui/Sparkline.svelte";
 
   import type { Tab } from "./tabs";
@@ -15,14 +20,21 @@
   import ReadWindowCard from "$lib/components/ReadWindowCard.svelte";
   import { can } from "$lib/platform";
   import { live } from "$lib/readings.svelte";
+  import { untrack } from "svelte";
 
   let {
     analysis,
     session,
     ongo,
-  }: { analysis: Analysis | null; session: SessionSummary | null; ongo: (tab: Tab) => void } = $props();
+    desk = false,
+  }: {
+    analysis: Analysis | null;
+    session: SessionSummary | null;
+    ongo: (tab: Tab) => void;
+    /** The desk view's form: the quest and this map, since its player bar and Train hold the rest. */
+    desk?: boolean;
+  } = $props();
 
-  const hud = $derived(analysis?.hud ?? null);
   const percentOnly = $derived(session?.percentOnly ?? false);
   const tracking = $derived(session != null && session.frames > 0);
 
@@ -54,27 +66,88 @@
 
   const coverage = $derived(session ? mesosCoverage(session) : null);
   const mesosTrend = $derived((session?.timeline ?? []).map((p) => p.mesosPerHour));
-  const mesosHeld = $derived(analysis?.mesos?.mesos ?? session?.mesos ?? null);
-  const where = $derived([partyLabel(session?.party), session?.map].filter(Boolean).join(" · "));
+  const party = $derived(partyLabel(session?.party));
 
   const quests = $derived((analysis?.quest?.quests ?? []).filter((q) => q.objectives.length));
   const quest = $derived(quests[0] ?? null);
+  /** Its name, with any bracketed series in front shown as a tag. */
+  const questName = $derived(quest ? questTitle(quest.title) : null);
   const map = $derived(analysis?.map ?? null);
-  const level = $derived(hud?.level ?? session?.level ?? null);
-  const job = $derived(hud?.job ?? session?.job ?? null);
+
+  // With map data, each objective of the quest shown gets its best place, and the map you're in
+  // its monsters. Both follow the text read, not each new reading, so nothing flickers.
+  watchMapData();
+  const ready = $derived(mapData.status?.ready ?? false);
+  let guide = $state<Guide | null>(null);
+  let mobs = $state<MobRow[]>([]);
+
+  const guideKey = $derived(
+    JSON.stringify([quest ? { title: quest.title, objectives: quest.objectives.map((o) => o.target) } : null, map?.name, map?.street, map?.twin]),
+  );
+  $effect(() => {
+    const key = guideKey;
+    void mapData.status?.dataUpdatedAt;
+    if (!ready || !quest) {
+      guide = null;
+      return;
+    }
+    const asked = { title: quest.title, objectives: quest.objectives.map((o) => o.target) };
+    untrack(() =>
+      backend
+        .questGuide([asked], map?.name ?? null, map?.street ?? null, map?.twin ?? null, [])
+        .then((g) => {
+          if (key === guideKey) guide = g;
+        })
+        .catch(() => (guide = null)),
+    );
+  });
+
+  const mapKey = $derived(JSON.stringify([map?.name, map?.street, map?.twin]));
+  $effect(() => {
+    const key = mapKey;
+    void mapData.status?.dataUpdatedAt;
+    if (!ready || !map?.name) {
+      mobs = [];
+      return;
+    }
+    untrack(() =>
+      backend
+        .findMap(map.name, map.street ?? null, map.twin ?? null)
+        .then((m) => {
+          if (key === mapKey) mobs = m && m.score >= 0.85 ? [...m.card.mobs].sort((a, b) => b.count - a.count).slice(0, 4) : [];
+        })
+        .catch(() => (mobs = [])),
+    );
+  });
+
+  /** Where to go for one objective: its best map, or that you're on it. */
+  function hintFor(o: Objective) {
+    const g = guide?.quests[0]?.objectives.find((x) => x.target === o.target);
+    const hunt = g?.hunts.find((h) => h.monster.known && h.maps.length);
+    if (!g || !hunt) return null;
+    const best = orderGrounds(hunt.maps, huntOrder.value)[0];
+    return {
+      map: best.map,
+      here: best.hops === 0,
+      mob: g.kind === "item" ? monsterLabel(hunt.monster.name) : null,
+      distance: groundDistance(best, guide?.from != null),
+    };
+  }
 </script>
 
-<div class="now">
+<div class="now" class:desk>
   <!-- The website reads the game only from a window the player shares with it. -->
-  {#if can.readWindow}<ReadWindowCard compact />{/if}
-  {#if !analysis && !session}
+  {#if can.readWindow && !desk}<ReadWindowCard compact />{/if}
+  {#if desk}
+    <!-- The desk view: the quest and this map. Its page shows how to start a session. -->
+  {:else if !analysis && !session}
     <!-- Without reading, you type the session in. So can the program, with live reading off. -->
     {#if can.liveReading}<Welcome />{/if}
     {#if can.liveReading ? live.liveStatus.state === "off" : live.liveStatus.state !== "reading" && live.liveStatus.state !== "waiting"}<TypedSessionCard />{/if}
   {:else}
     <section class="card session" aria-label="This session">
       <div class="head">
-        <span class="title">This session{#if where}<span class="where">{" "}· {where}</span>{/if}</span>
+        <span class="title">This session{#if party}<span class="where">{" "}· {party}</span>{/if}</span>
         {#if session}
           <span class="clock num" class:paused={session.paused}>{session.paused ? "Paused · " : ""}{clock(session.activeSeconds)}</span>
         {/if}
@@ -111,34 +184,23 @@
             </div>
           </div>
         </div>
-        <div class="cells">
-          <div class="cell">
-            <div class="label">Kills / hr</div>
-            <div class="num v">{session.killsPerHour != null ? formatCompact(session.killsPerHour) : "—"}</div>
-          </div>
-          <div class="cell">
-            <div class="label">{percentOnly ? "Levels gained" : "EXP gained"}</div>
-            <div class="num v">{percentOnly ? `${session.levelUps}` : formatCompact(session.expGained)}</div>
-          </div>
-          <div class="cell">
-            <div class="label">Mesos held</div>
-            <div class="num v"><span class="coin" aria-hidden="true"></span>{mesosHeld != null ? formatNumber(mesosHeld) : "—"}</div>
-          </div>
-        </div>
       {:else}
         <p class="quiet">Rates start once the EXP bar has moved. Hunt a little with the HUD in view.</p>
       {/if}
       <button class="more" onclick={() => ongo("train")}>Maps, goals, potions and loot<ChevronRight size={14} /></button>
     </section>
 
+  {/if}
+  {#if analysis || session}
     {#if quest}
       <section class="card quest" aria-label="Tracked quest">
         <button class="quest-head" onclick={() => ongo("quests")}>
-          <span class="quest-title">{quest.title}</span>
+          <span class="quest-title">{questName?.name}{#if questName?.tag}<span class="badge qtag">{questName.tag}</span>{/if}</span>
           <span class="label">{quests.length > 1 ? `1 of ${quests.length} tracked` : "Tracked"}<ChevronRight size={13} /></span>
         </button>
         {#each quest.objectives as o (o.target)}
           {@const done = !o.unread && o.current >= o.required}
+          {@const hint = done ? null : hintFor(o)}
           <div class="objective">
             <span class="target">{o.target}</span>
             {#if !o.unread}
@@ -146,26 +208,35 @@
             {/if}
           </div>
           <div class="bar"><span class:done style:width="{o.unread ? 0 : objectiveProgress(o) * 100}%"></span></div>
+          {#if hint}
+            <div class="hint">
+              {#if hint.mob}<Ref kind="mob" name={hint.mob} />{" "}drops it{#if !hint.here}{" "}· <Ref kind="map" id={hint.map.id} name={hint.map.name} />{/if}
+              {:else if hint.here}On this map
+              {:else}Most at <Ref kind="map" id={hint.map.id} name={hint.map.name} />{/if}
+              {#if hint.distance && !hint.here}<span class="far">{" "}· {hint.distance}</span>{/if}
+            </div>
+          {/if}
         {/each}
       </section>
     {/if}
 
-    <section class="card rows" aria-label="More">
+    <section class="card here" aria-label="This map">
       <button class="row" onclick={() => ongo("map")}>
         {#if map}
-          <span class="text"><span class="mapname">{mapLabel(map)}</span> <span class="dim">· exits, monsters and routes</span></span>
+          <span class="text"><span class="mapname">{mapLabel(map)}</span></span>
+          <span class="go">Map<ChevronRight size={14} /></span>
         {:else}
           <span class="text"><span class="dim">Map:</span> the minimap isn't in view</span>
+          <ChevronRight size={14} />
         {/if}
-        <ChevronRight size={14} />
       </button>
-      <button class="row" onclick={() => ongo("me")}>
-        <span class="text">
-          {#if level != null}<span class="dim">Lv {level}{job ? ` ${job}` : ""}:</span>{/if}
-          stats, build and gear
-        </span>
-        <ChevronRight size={14} />
-      </button>
+      {#if mobs.length}
+        <div class="mobs">
+          {#each mobs as m (m.id)}
+            <span class="mob"><Ref kind="mob" id={m.id} name={m.name} /><span class="lv num">Lv {m.level}</span></span>
+          {/each}
+        </div>
+      {/if}
     </section>
   {/if}
 </div>
@@ -174,36 +245,41 @@
   .now {
     display: grid;
     align-content: start;
-    gap: 10px;
-    padding: 0 10px 10px;
+    gap: var(--space-2);
+    padding: 0 var(--space-3) var(--space-2);
+  }
+
+  .now.desk {
+    gap: var(--space-3);
+    padding: 0;
   }
 
   .head {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 10px;
-    padding: 10px 14px 0;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-4) 0;
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .title {
     min-width: 0;
     overflow: hidden;
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   .where {
     color: var(--faint);
-    font-weight: 500;
+    font-weight: var(--weight-body);
   }
 
   .clock {
     flex: none;
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .clock.paused {
@@ -213,13 +289,13 @@
   .tiles {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-    padding: 10px 10px 0;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3) 0;
   }
 
   .tile {
     min-width: 0;
-    padding: 10px 12px;
+    padding: var(--space-2) var(--space-3);
     border: var(--line-w) solid var(--tile-border);
     border-radius: 12px;
     color: var(--tile-text);
@@ -240,7 +316,7 @@
   .rate {
     overflow: hidden;
     font-size: var(--text-hero);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     line-height: 34px;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -255,7 +331,7 @@
   }
 
   .note {
-    margin-top: 2px;
+    margin-top: var(--space-0-5);
     overflow: hidden;
     color: var(--tile-label);
     font-size: var(--text-xs);
@@ -265,47 +341,14 @@
 
   .note.good {
     color: var(--tile-good);
-    font-weight: 600;
-  }
-
-  .cells {
-    display: flex;
-    margin-top: 10px;
-    border-top: 1px solid var(--border);
-  }
-
-  .cell {
-    flex: 1;
-    min-width: 0;
-    padding: 9px 12px;
-    border-right: 1px solid var(--border);
-  }
-
-  .cell:last-child {
-    border-right: 0;
-  }
-
-  .v {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    font-size: var(--text-lg);
-    font-weight: 600;
-    white-space: nowrap;
-  }
-
-  .coin {
-    width: 9px;
-    height: 9px;
-    border-radius: 50%;
-    background: var(--accent);
+    font-weight: var(--weight-strong);
   }
 
   .quiet {
     margin: 0;
-    padding: 10px 14px 4px;
+    padding: var(--space-2) var(--space-4) var(--space-1);
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .more,
@@ -314,7 +357,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 10px;
+    gap: var(--space-2);
     width: 100%;
     border: 0;
     background: transparent;
@@ -325,11 +368,11 @@
   }
 
   .more {
-    padding: 8px 12px 9px 14px;
+    padding: var(--space-2) var(--space-3) var(--space-2) 14px;
     border-top: 1px solid var(--border);
     border-radius: 0 0 var(--radius-lg) var(--radius-lg);
     color: var(--faint);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .more:hover,
@@ -346,29 +389,35 @@
   }
 
   .quest {
-    padding: 12px 14px;
+    padding: var(--space-3) var(--space-4);
   }
 
   .quest-head {
     align-items: baseline;
-    margin-bottom: 10px;
+    margin-bottom: var(--space-2);
     padding: 0;
   }
 
   .quest-title {
     min-width: 0;
     overflow: hidden;
-    font-size: 14px;
+    font-size: var(--text-lg);
     font-weight: var(--weight-strong);
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .qtag {
+    margin-left: var(--space-1-5);
+    font-family: var(--font-sans);
+    vertical-align: 2px;
   }
 
   .quest-head .label {
     display: inline-flex;
     flex: none;
     align-items: center;
-    gap: 2px;
+    gap: var(--space-0-5);
   }
 
   .quest-head:hover .label {
@@ -378,8 +427,8 @@
   .objective {
     display: flex;
     justify-content: space-between;
-    gap: 10px;
-    margin-bottom: 5px;
+    gap: var(--space-2);
+    margin-bottom: var(--space-1);
   }
 
   .target {
@@ -391,7 +440,7 @@
 
   .count {
     flex: none;
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 
   .count.done {
@@ -400,7 +449,7 @@
 
   .of {
     color: var(--faint);
-    font-weight: 500;
+    font-weight: var(--weight-body);
   }
 
   .count.done .of {
@@ -409,7 +458,7 @@
 
   .bar {
     height: 6px;
-    margin-bottom: 10px;
+    margin-bottom: var(--space-2);
     border-radius: var(--radius-pill);
     background: var(--track);
     overflow: hidden;
@@ -431,18 +480,64 @@
     background: var(--good);
   }
 
-  .rows {
+  .hint {
+    margin: calc(-1 * var(--space-1)) 0 var(--space-2);
+    overflow: hidden;
+    color: var(--faint);
+    font-size: var(--text-xs);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .hint:last-child {
+    margin-bottom: 0;
+  }
+
+  .far {
+    color: var(--faint);
+  }
+
+  .here {
     padding: 0;
     overflow: hidden;
   }
 
-  .row {
-    padding: 10px 12px 10px 14px;
-    color: var(--muted);
+  .go {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: var(--space-0-5);
+    color: var(--faint);
+    font-size: var(--text-xs);
   }
 
-  .row + .row {
-    border-top: 1px solid var(--border);
+  .row:hover .go {
+    color: var(--text);
+  }
+
+  .mobs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1-5) var(--space-3);
+    padding: 0 var(--space-4) var(--space-3);
+    font-size: var(--text-md);
+  }
+
+  .mob {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--space-1);
+    min-width: 0;
+  }
+
+  .lv {
+    color: var(--faint);
+    font-size: var(--text-xs);
+  }
+
+  .row {
+    padding: var(--space-2) var(--space-3) var(--space-2) 14px;
+    color: var(--muted);
   }
 
   .text {
@@ -455,11 +550,11 @@
 
   .dim {
     color: var(--faint);
-    font-size: 11.5px;
+    font-size: var(--text-xs);
   }
 
   .mapname {
     color: var(--ref-map);
-    font-weight: 600;
+    font-weight: var(--weight-strong);
   }
 </style>

@@ -76,17 +76,17 @@
 
 <style>
   .section {
-    margin-top: 12px;
+    margin-top: var(--space-3);
   }
 
   /* A part inside a section: a band like the section's own, set in from its edges. */
   .head {
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: var(--space-1);
     width: 100%;
     min-height: 28px;
-    padding: 3px 10px 3px 6px;
+    padding: var(--space-0-5) var(--space-3) var(--space-0-5) var(--space-1-5);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     background: var(--surface-2);
@@ -111,8 +111,8 @@
 
   .title {
     font-family: var(--font-display);
-    font-size: var(--text-sm);
-    font-weight: 600;
+    font-size: var(--text-md);
+    font-weight: var(--weight-strong);
     letter-spacing: 0.01em;
     color: var(--text);
   }
@@ -128,7 +128,7 @@
   }
 
   .count {
-    padding: 0 7px;
+    padding: 0 var(--space-2);
     border-radius: var(--radius-pill);
     background: var(--hover);
     font-size: var(--text-xs);
@@ -142,18 +142,18 @@
   }
 
   .body {
-    margin-top: 8px;
+    margin-top: var(--space-2);
   }
 
   /* Standing as its own card: the heading is the card's title row, with no band around it. */
   .own {
-    margin: 0 10px 10px;
+    margin: 0 var(--space-3) var(--space-2);
     scroll-margin-top: 50px;
   }
 
   .own > .head {
     min-height: 42px;
-    padding: 8px 14px 8px 10px;
+    padding: var(--space-2) var(--space-4) var(--space-2) var(--space-3);
     border: 0;
     border-radius: calc(var(--radius-lg) - var(--line-w));
     background: none;
@@ -164,12 +164,12 @@
   }
 
   .own > .head .title {
-    font-size: 14px;
+    font-size: var(--text-lg);
     font-weight: var(--weight-strong);
   }
 
   .own > .body {
     margin: 0;
-    padding: 2px 14px 14px;
+    padding: var(--space-0-5) var(--space-4) var(--space-3);
   }
 </style>

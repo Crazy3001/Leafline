@@ -177,16 +177,16 @@
   .who {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) 72px;
-    gap: 4px;
-    margin-bottom: 4px;
+    gap: var(--space-1);
+    margin-bottom: var(--space-1);
   }
 
   .level {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--space-1);
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .level input {
@@ -197,33 +197,33 @@
   select {
     min-width: 0;
     height: 24px;
-    padding: 0 4px;
+    padding: 0 var(--space-1);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
     background: var(--surface);
     color: var(--text);
     font: inherit;
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .ahead {
     display: flex;
     align-items: center;
-    gap: 3px;
-    margin-bottom: 5px;
+    gap: var(--space-0-5);
+    margin-bottom: var(--space-1);
     color: var(--faint);
     font-size: var(--text-xs);
   }
 
   .ahead > div {
     display: flex;
-    gap: 3px;
+    gap: var(--space-0-5);
   }
 
   .ahead button {
     min-width: 30px;
     height: 20px;
-    padding: 0 5px;
+    padding: 0 var(--space-1-5);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     background: transparent;
@@ -245,7 +245,7 @@
   }
 
   .ahead .plain {
-    padding: 0 2px;
+    padding: 0 var(--space-0-5);
     border: 0;
   }
 
@@ -260,8 +260,8 @@
   }
 
   .more {
-    margin-top: 2px;
-    padding: 0 4px;
+    margin-top: var(--space-0-5);
+    padding: 0 var(--space-1);
     border: 0;
     background: transparent;
     color: var(--muted);
@@ -276,19 +276,19 @@
   }
 
   .count {
-    margin: 0 0 4px;
+    margin: 0 0 var(--space-1);
     color: var(--faint);
     font-size: var(--text-xs);
   }
 
   .note {
-    margin: 4px 0 6px;
+    margin: var(--space-1) 0 var(--space-1-5);
     color: var(--muted);
-    font-size: var(--text-sm);
+    font-size: var(--text-md);
   }
 
   .how {
-    margin: 10px 0 0;
+    margin: var(--space-2) 0 0;
     color: var(--faint);
     font-size: var(--text-xs);
   }

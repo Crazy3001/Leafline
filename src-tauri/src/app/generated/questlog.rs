@@ -10,6 +10,7 @@ use leafline_core::service::quests::*;
 use leafline_core::service::host::{Host, emit};
 use leafline_core::error::Result;
 use leafline_core::mapdata::questlog::RegionTotal;
+use leafline_core::mapdata::wholelog::WholeLog;
 use leafline_core::userdata::questlog::QuestLog;
 
 #[tauri::command]
@@ -25,4 +26,9 @@ pub fn forget_quest_log(app: AppHandle, name: String) -> Result<()> {
 #[tauri::command]
 pub fn quest_region_totals(app: AppHandle) -> Vec<RegionTotal> {
     service::quests::quest_region_totals(&AppHost(app))
+}
+
+#[tauri::command]
+pub fn whole_quest_log(app: AppHandle, name: Option<String>, level: Option<u32>, helper: Vec<String>) -> Result<WholeLog> {
+    service::quests::whole_quest_log(&AppHost(app), name, level, helper)
 }

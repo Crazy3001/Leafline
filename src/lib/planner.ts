@@ -117,11 +117,12 @@ export function skillReached(goal: SkillLevel, start: SkillLevel[], steps: Level
   return step ? { kind: "at", level: step.level } : { kind: "never", end: steps.at(-1)?.level ?? 0 };
 }
 
-/** When a stat goal with a target is met, by the plan's base stats. */
+/** When a stat goal with a target is met: by the plan's base stats, or with worn gear's added. */
 export function statReached(goal: StatGoal, start: BaseStats | null, steps: LevelStep[]): Reached {
   if (goal.target == null) return { kind: "never", end: steps.at(-1)?.level ?? 0 };
-  if ((start?.[goal.stat] ?? 0) >= goal.target) return { kind: "already" };
-  const step = steps.find((s) => s.stats[goal.stat] >= goal.target!);
+  const gear = (s: LevelStep | undefined) => (goal.withGear && s ? s.worn.reduce((sum, w) => sum + w.bonus[goal.stat], 0) : 0);
+  if ((start?.[goal.stat] ?? 0) + gear(steps[0]) >= goal.target) return { kind: "already" };
+  const step = steps.find((s) => s.stats[goal.stat] + gear(s) >= goal.target!);
   return step ? { kind: "at", level: step.level } : { kind: "never", end: steps.at(-1)?.level ?? 0 };
 }
 

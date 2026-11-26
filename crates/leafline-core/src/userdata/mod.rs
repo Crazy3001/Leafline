@@ -258,9 +258,13 @@ CREATE TABLE character_profiles (
     exp_percent REAL,
     exp_points INTEGER,
     map TEXT,
-    seen_at INTEGER,
-    bag TEXT,
-    bag_read_at INTEGER);
+    seen_at INTEGER);
+CREATE TABLE character_bags (
+    name TEXT NOT NULL COLLATE NOCASE,
+    tab TEXT NOT NULL,
+    bag TEXT NOT NULL,
+    read_at INTEGER NOT NULL,
+    PRIMARY KEY (name, tab));
 ",
 ];
 
