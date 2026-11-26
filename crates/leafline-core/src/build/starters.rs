@@ -493,6 +493,28 @@ mod tests {
         }
     }
 
+    /// A plan written for Leafline steps its stats to its weapons, so the gear path wears each of
+    /// them in turn and passes none over. Takes the real data: weapons compare by their Attack.
+    #[test]
+    fn leafline_plans_wear_every_weapon_they_plan() {
+        use super::super::outfit::gear_paths;
+        use super::super::plan::{Build, Start, expand};
+
+        let Some(catalog) = real_catalog() else { return };
+        let rules = Rules::default();
+        for raw in FILE.plans.iter().filter(|p| p.source.is_none()) {
+            let starter = resolve(raw, &catalog, &rules);
+            let start = Start { level: 1, stats: Some(starter.start), ..Start::default() };
+            let build = Build { start, plan: starter.plan, ..Build::default() };
+            let e = expand(&build, &rules, &catalog);
+            let paths = gear_paths(&build, &e, &rules, &catalog, 1);
+            let weapon = paths.iter().find(|p| p.slot == "Weapon").expect("a weapon path");
+            let passed: Vec<&str> = weapon.passed.iter().map(|i| i.name.as_str()).collect();
+            let worn: Vec<String> = weapon.now.iter().chain(&weapon.steps).map(|s| format!("{} {}", s.level, s.item.name)).collect();
+            assert!(passed.is_empty(), "{}: passes over {passed:?}; wears {worn:?}", raw.id);
+        }
+    }
+
     /// A new character splits 25 points with each stat from 4 to 12, and the guides' rolls agree.
     #[test]
     fn every_plan_starts_from_a_lv_1_roll_and_guide_plans_from_their_guides() {

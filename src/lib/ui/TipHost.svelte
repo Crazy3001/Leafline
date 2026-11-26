@@ -1,13 +1,40 @@
 <script lang="ts">
-  // The one tooltip a window shows, under the element the mouse rests on (above it when there is
-  // no room below), always inside the window. See `$lib/tip.svelte`.
+  // The one tooltip a window shows, just below and right of the mouse, following it across the
+  // element; flipped to the other side where there's no room, and always inside the window. Without
+  // a mouse place it sits under the element. See `$lib/tip.svelte`.
+  import { untrack } from "svelte";
+
   import { hideTip, tipState } from "$lib/tip.svelte";
 
   const MARGIN = 6;
   const GAP = 6;
+  /** How far from the mouse's tip: clear of the pointer, close enough to read as its own. */
+  const FROM_MOUSE = { x: 14, y: 18 };
 
   let box = $state<HTMLElement | null>(null);
   let place = $state<{ left: number; top: number } | null>(null);
+
+  /** Where a box of this size goes, wholly inside the window. */
+  function placeFor(anchor: HTMLElement, at: { x: number; y: number } | null, width: number, height: number) {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    let left: number;
+    let top: number;
+    if (at) {
+      // Right of the mouse, or left of it when that runs off; below, or above when that does.
+      left = at.x + FROM_MOUSE.x + width <= vw - MARGIN ? at.x + FROM_MOUSE.x : at.x - FROM_MOUSE.x - width;
+      top = at.y + FROM_MOUSE.y + height <= vh - MARGIN ? at.y + FROM_MOUSE.y : at.y - GAP - height;
+    } else {
+      const a = anchor.getBoundingClientRect();
+      left = a.left + a.width / 2 - width / 2;
+      const below = a.bottom + GAP;
+      top = below + height <= vh - MARGIN || a.top - GAP - height < MARGIN ? below : a.top - GAP - height;
+    }
+    return {
+      left: Math.max(Math.min(left, vw - width - MARGIN), MARGIN),
+      top: Math.max(Math.min(top, vh - height - MARGIN), MARGIN),
+    };
+  }
 
   $effect(() => {
     const anchor = tipState.anchor;
@@ -17,14 +44,8 @@
     const tipBox = box;
     const measure = () => {
       if (!anchor.isConnected) return hideTip();
-      const a = anchor.getBoundingClientRect();
       const { width, height } = tipBox.getBoundingClientRect();
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
-      const left = Math.min(Math.max(a.left + a.width / 2 - width / 2, MARGIN), vw - width - MARGIN);
-      const below = a.bottom + GAP;
-      const top = below + height <= vh - MARGIN || a.top - GAP - height < MARGIN ? below : a.top - GAP - height;
-      place = { left: Math.max(left, MARGIN), top: Math.max(Math.min(top, vh - height - MARGIN), MARGIN) };
+      place = placeFor(anchor, tipState.at, width, height);
     };
     const frame = requestAnimationFrame(measure);
     // A hover card fills in once its lookup answers, and grows: placed again to stay in the window.
@@ -34,6 +55,15 @@
       cancelAnimationFrame(frame);
       resized.disconnect();
     };
+  });
+
+  // Following the mouse: moved without hiding first, so it doesn't flicker.
+  $effect(() => {
+    const at = tipState.at;
+    const anchor = tipState.anchor;
+    if (!at || !anchor || !box || !untrack(() => place)) return;
+    const { width, height } = box.getBoundingClientRect();
+    place = placeFor(anchor, at, width, height);
   });
 
   $effect(() => {
