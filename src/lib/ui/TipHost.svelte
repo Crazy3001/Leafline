@@ -14,18 +14,26 @@
     void tipState.body;
     place = null;
     if (!anchor || !box) return;
-    const frame = requestAnimationFrame(() => {
-      if (!box || !anchor.isConnected) return hideTip();
+    const tipBox = box;
+    const measure = () => {
+      if (!anchor.isConnected) return hideTip();
       const a = anchor.getBoundingClientRect();
-      const { width, height } = box.getBoundingClientRect();
+      const { width, height } = tipBox.getBoundingClientRect();
       const vw = window.innerWidth;
       const vh = window.innerHeight;
       const left = Math.min(Math.max(a.left + a.width / 2 - width / 2, MARGIN), vw - width - MARGIN);
       const below = a.bottom + GAP;
       const top = below + height <= vh - MARGIN || a.top - GAP - height < MARGIN ? below : a.top - GAP - height;
       place = { left: Math.max(left, MARGIN), top: Math.max(Math.min(top, vh - height - MARGIN), MARGIN) };
-    });
-    return () => cancelAnimationFrame(frame);
+    };
+    const frame = requestAnimationFrame(measure);
+    // A hover card fills in once its lookup answers, and grows: placed again to stay in the window.
+    const resized = new ResizeObserver(() => place && measure());
+    resized.observe(tipBox);
+    return () => {
+      cancelAnimationFrame(frame);
+      resized.disconnect();
+    };
   });
 
   $effect(() => {
@@ -85,6 +93,7 @@
   /* A tooltip with a picture or a list reads as a small card. */
   .tip:not(.words) {
     min-width: 160px;
+    max-width: min(300px, calc(100vw - 12px));
     padding: var(--space-2) var(--space-3);
     border-radius: var(--radius);
   }
