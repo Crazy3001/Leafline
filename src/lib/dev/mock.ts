@@ -119,8 +119,25 @@ const notes = new Map<string, ItemNote>([
 ]);
 
 
+/**
+ * How many made-up characters the records know: `?characters=0`, `1` or `2` in the address
+ * (default 3), so the character switch can be designed with none, one and several.
+ */
+const MOCK_NAMES = ["Leafling", "Mossbank", "Fernwick"];
+const mockCount = (() => {
+  const n = typeof location !== "undefined" ? new URLSearchParams(location.search).get("characters") : null;
+  return n == null || Number.isNaN(Number(n)) ? MOCK_NAMES.length : Math.max(0, Math.min(MOCK_NAMES.length, Number(n)));
+})();
+const mockNames = MOCK_NAMES.slice(0, mockCount);
+/** What was last read of each made-up character. */
+const MOCK_KNOWN: Record<string, { level: number; job: string; expPercent: number; hoursAgo: number }> = {
+  Leafling: { level: 34, job: "Hunter", expPercent: 62.4, hoursAgo: 3 },
+  Mossbank: { level: 23, job: "Archer", expPercent: 41.2, hoursAgo: 26 },
+  Fernwick: { level: 15, job: "Magician", expPercent: 8.9, hoursAgo: 72 },
+};
+
 /** Saved sessions: a made-up week on the sample world's maps. */
-let savedSessions: SavedSession[] = [...sampleSavedSessions];
+let savedSessions: SavedSession[] = mockCount === 0 ? [] : [...sampleSavedSessions];
 /** The player's map notes; one to start with on Mossbank Meadow II. */
 const mapNotes = new Map<number, MapNote>([[3, { mapId: 3, map: "Mossbank Meadow II", note: "Left platform is best. Channel 4 is quiet after 9.", updatedAt: Date.now() / 1000 - 86400 }]]);
 const mapNoteHandlers: ((mapId: number) => void)[] = [];
@@ -553,7 +570,8 @@ function changeNav(next: NavState): NavState {
 /**
  * Dev-only controls for walking the sample world from the browser console, to try "Go here":
  * `__leafline.walk("Mossbank")` reads that map's header next, `walk(null)` hides the minimap,
- * `walk("Mosbank?")` reads a header too rough to trust, `finish()` fills the first quest's counters.
+ * `walk("Mosbank?")` reads a header too rough to trust, `finish()` fills the first quest's counters,
+ * `login("Fernwick")` reads the game as another character, as after logging in on them.
  */
 let liveAnalysis: Analysis = sampleAnalysis;
 function emitAnalysis(change: Partial<Analysis>) {
@@ -572,6 +590,11 @@ if (typeof window !== "undefined") {
       const [first, ...rest] = quest.quests;
       const done = { ...first, objectives: first.objectives.map((o) => ({ ...o, current: o.required })) };
       emitAnalysis({ quest: { ...quest, quests: [done, ...rest] } });
+    },
+    login(name: string) {
+      sessionHandlers.forEach((h) => h({ ...sampleSessionSummary, name }));
+      const hud = liveAnalysis.hud;
+      if (hud) emitAnalysis({ hud: { ...hud, name } });
     },
   };
 }
@@ -926,17 +949,23 @@ export const mockBackend: Backend = {
   async setPageZoom(zoom) {
     document.documentElement.style.zoom = String(zoom);
   },
-  knownCharacter: async (name) => ({
-    name: name ?? "Mossbank",
-    level: 23,
-    job: "Archer",
-    expPercent: 41.2,
-    expPoints: 2_210,
-    map: "Victoria Road : Henesys Hunting Ground I",
-    seenAt: Math.floor(Date.now() / 1000) - 26 * 3600,
-    mesos: 36_644,
-    mesosSeenAt: Math.floor(Date.now() / 1000) - 26 * 3600,
-  }),
+  knownCharacter: async (name) => {
+    const who = name ?? mockNames[0];
+    const known = who ? MOCK_KNOWN[who] : undefined;
+    if (!who || !known) return null;
+    const seenAt = Math.floor(Date.now() / 1000) - known.hoursAgo * 3600;
+    return {
+      name: who,
+      level: known.level,
+      job: known.job,
+      expPercent: known.expPercent,
+      expPoints: 2_210,
+      map: "Victoria Road : Henesys Hunting Ground I",
+      seenAt,
+      mesos: 36_644,
+      mesosSeenAt: seenAt,
+    };
+  },
   knownBags: async (name) => [
     { ...sampleBag, character: name ?? "Mossbank", at: Math.floor(Date.now() / 1000) - 26 * 3600 },
     {
@@ -952,7 +981,7 @@ export const mockBackend: Backend = {
       ],
     },
   ],
-  knownCharacters: async () => ["Mossbank", "Fernwick"],
+  knownCharacters: async () => mockNames.slice(1),
   onKnownCharacter: async () => () => {},
   async setSessionNote(id, note) {
     savedSessions = savedSessions.map((s) => (s.id === id ? { ...s, note } : s));

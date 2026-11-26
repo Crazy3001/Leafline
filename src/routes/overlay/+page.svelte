@@ -9,7 +9,7 @@
   import { backend, fileName } from "$lib/api";
   import { bag, watchBag } from "$lib/bag.svelte";
   import { characters } from "$lib/characters.svelte";
-  import CharacterPicker from "$lib/components/CharacterPicker.svelte";
+  import CharacterList from "$lib/components/CharacterList.svelte";
   import CompactHud from "$lib/components/CompactHud.svelte";
   import DropLogView from "$lib/components/DropLogView.svelte";
   import BagCheck from "$lib/components/item/BagCheck.svelte";
@@ -46,7 +46,7 @@
   const TAB_KEY = "leafline.overlay.tab.v2";
 
   /** What is open over the tab, if anything. */
-  type Over = { kind: "search"; focus: boolean } | { kind: "tools" } | { kind: "tool"; page: ToolPage };
+  type Over = { kind: "search"; focus: boolean } | { kind: "tools" } | { kind: "tool"; page: ToolPage } | { kind: "characters" };
 
   let tab = $state<Tab>(storedTab());
   let over = $state<Over | null>(null);
@@ -314,6 +314,8 @@
       rates={tab !== "now" && tab !== "train"}
       onlive={toggleLive}
       onsearch={() => toggleOver("search")}
+      choosing={over?.kind === "characters"}
+      onwho={() => (over = over?.kind === "characters" ? null : { kind: "characters" })}
       onpin={togglePin}
       onlock={toggleLock}
       ontools={() => toggleOver("tools")}
@@ -353,6 +355,10 @@
         <Sheet title="Search" onclose={() => (over = null)}>
           <SearchSheet focus={over.focus} {landed} ontool={openTool} />
         </Sheet>
+      {:else if over?.kind === "characters"}
+        <Sheet title="Characters" onclose={() => (over = null)}>
+          <div class="whose"><CharacterList onpick={() => (over = null)} /></div>
+        </Sheet>
       {:else if over?.kind === "tools"}
         <Sheet title="Tools" onclose={() => (over = null)}>
           <ToolsList canSaveFrame={live.liveStatus.state === "reading"} ontool={openTool} onwindow={windowAction} />
@@ -376,15 +382,6 @@
               <RoutePage />
             {:else if over.page === "share"}
               <SharePage />
-            {:else if over.page === "characters"}
-              {#if characters.known.length > 1}
-                <CharacterPicker />
-              {:else}
-                <p class="tool-note">
-                  {characters.active ? `Leafline has only seen ${characters.active} so far.` : "Leafline hasn't read a character's name yet."}
-                  Once it has sessions for a second character, pick here whose numbers the tabs show.
-                </p>
-              {/if}
             {/if}
           </div>
         </Sheet>
@@ -513,10 +510,13 @@
     margin-left: var(--space-3);
   }
 
-  .tool-note {
-    margin: var(--space-1) var(--space-4);
-    color: var(--muted);
+  /* The characters to pick from, opened from the name in the header. */
+  .whose {
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .whose :global(.none) {
+    padding: var(--space-2);
     font-size: var(--text-md);
-    line-height: 1.5;
   }
 </style>

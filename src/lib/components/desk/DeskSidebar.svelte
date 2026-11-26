@@ -1,7 +1,8 @@
 <script lang="ts">
   // The desk view's sidebar: the five tabs, then Look up, Tools (one page of every tool) and the
-  // player's own layout. Who you are and how the session goes are in the player bar over the
-  // views; the data's credits are in Settings. It folds to icons in a narrow window.
+  // player's own layout. Its foot keeps the character switch (whose numbers every page shows) over
+  // whether Leafline is reading; how the session goes is in the player bar over the views, and the
+  // data's credits are in Settings. It folds to icons in a narrow window.
   import { tip } from "$lib/tip.svelte";
   import {
     ChartLine,
@@ -23,6 +24,7 @@
 
   import { backend } from "$lib/api";
   import Logo from "$lib/components/Logo.svelte";
+  import CharacterSwitch from "./CharacterSwitch.svelte";
   import { DESK_TOOL_PAGES, ZOOMS, type DeskView } from "$lib/desk";
   import { can, isWeb } from "$lib/platform";
   import { noteRecordsSaved, recordsSavedAt } from "$lib/recordsfile";
@@ -135,6 +137,7 @@
   </nav>
 
   <div class="foot">
+    <CharacterSwitch {folded} onunfold={onfold} />
     {#if !folded}
       <div class="status {status.tone}" use:tip={status.line}>
         <b><span class="dot" aria-hidden="true"></span>{status.text}</b>

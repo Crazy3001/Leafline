@@ -2,11 +2,13 @@
   // The window's header: who you are and how far through the level, with four actions. The level
   // sits in a ring that fills with EXP; under it one quiet line gives the exact numbers and when
   // the level comes. On tabs that don't show the session, that line gives the two rates in place
-  // of the exact EXP, so they're always in view. The whole header drags the window.
+  // of the exact EXP, so they're always in view. The name opens the list of characters, to pick
+  // whose numbers the tabs show. The whole header drags the window.
   import { can } from "$lib/platform";
-  import { LayoutGrid, Lock, LockOpen, Pin, PinOff, Search } from "@lucide/svelte";
+  import { ChevronDown, LayoutGrid, Lock, LockOpen, Pin, PinOff, Search } from "@lucide/svelte";
 
   import Logo from "$lib/components/Logo.svelte";
+  import { characters, switched, watchSwitches } from "$lib/characters.svelte";
   import { formatClockIn, formatCompact, formatDuration, formatNumber } from "$lib/format";
   import { ago, lastKnown, profile, watchProfile } from "$lib/profile.svelte";
   import { live } from "$lib/readings.svelte";
@@ -22,9 +24,11 @@
     pinTitle,
     searching,
     tooling,
+    choosing = false,
     rates = false,
     onlive,
     onsearch,
+    onwho,
     onpin,
     onlock,
     ontools,
@@ -37,16 +41,23 @@
     searching: boolean;
     /** The Tools list is open. */
     tooling: boolean;
+    /** The list of characters is open. */
+    choosing?: boolean;
     /** Show the session's two rates, for a tab that doesn't show them itself. */
     rates?: boolean;
     onlive: () => void;
     onsearch: () => void;
+    /** Opens the list of characters. */
+    onwho: () => void;
     onpin: () => void;
     onlock: () => void;
     ontools: () => void;
   } = $props();
 
   watchProfile();
+  watchSwitches();
+  /** The HUD switched character by itself (a log-in): said for a few seconds. */
+  const fresh = $derived(switched.name != null && !characters.all && switched.name === characters.active);
 
   // Read now when this character is on screen; else what was read of them last, faded and dated.
   const hud = $derived(profile.live ? (live.analysis?.hud ?? null) : null);
@@ -100,9 +111,12 @@
   <div class="top" data-tauri-drag-region>
     <span class="ring" class:stale={levelShown.at != null}><LevelRing {level} {percent}><Logo size={20} /></LevelRing></span>
     <div class="who" data-tauri-drag-region>
-      <div class="name" data-tauri-drag-region>{name ?? "Leafline"}</div>
+      <button class="name" class:fresh aria-expanded={choosing} aria-label="{characters.all ? 'All characters' : (name ?? 'No character yet')}. Pick a character" onclick={onwho}>
+        <span>{characters.all ? "All characters" : (name ?? "Leafline")}</span><ChevronDown size={15} />
+      </button>
       <div class="under" data-tauri-drag-region>
-        {#if job.value}<span class:stale={job.at != null} data-tauri-drag-region>{job.value}</span>{/if}
+        {#if fresh}<span class="switched" use:tip={`The game shows ${name} now, so Leafline switched to them`} data-tauri-drag-region>Switched</span>
+        {:else if job.value}<span class:stale={job.at != null} data-tauri-drag-region>{job.value}</span>{/if}
         {#if seenAt != null}<span class="stale" use:tip={`Last read ${ago(seenAt)}. Live reading brings it up to date.`} data-tauri-drag-region>{ago(seenAt)}</span>{/if}
         {#if can.liveReading}<button class="live" class:on={state === "reading"} class:waiting={state === "waiting"} use:tip={liveTitle} onclick={onlive}>
           <span class="dot" aria-hidden="true"></span>{liveOn ? "Live" : "Offline"}
@@ -205,14 +219,55 @@
     min-width: 0;
   }
 
+  /* The name is the character switch: it opens the list of characters. */
   .name {
-    overflow: hidden;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    max-width: 100%;
+    margin: -2px 0 -2px calc(-1 * var(--space-1-5));
+    padding: 2px var(--space-1-5);
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: inherit;
     font-family: var(--font-display);
     font-size: var(--text-lg);
     font-weight: var(--weight-strong);
     line-height: 19px;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .name span {
+    overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .name :global(svg) {
+    flex: none;
+    color: var(--header-faint);
+  }
+
+  .name:hover,
+  .name[aria-expanded="true"] {
+    background: var(--header-hover);
+  }
+
+  .name:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+
+  /* A switch the HUD made by itself, outlined while it is said. */
+  .name.fresh {
+    box-shadow: inset 0 0 0 1px var(--header-accent);
+  }
+
+  .switched {
+    color: var(--header-good);
+    font-weight: var(--weight-strong);
   }
 
   .under {

@@ -42,6 +42,9 @@ const picked = $state<{ name: string | null; liveWas: string | null; all: boolea
 
 const liveName = () => live.session?.name ?? null;
 
+/** Counts picks made by hand, so a change of character can tell a pick from the HUD's switch. */
+const hand = $state({ seq: 0 });
+
 /** The HUD still shows what it showed at the pick: the same name, or still none (the game closed,
  *  or not shared yet). Once it reads a name the pick wasn't made under, the HUD's character wins. */
 const stillAsPicked = () => {
@@ -81,6 +84,7 @@ export const characters = {
   },
   /** Looks at another character; null goes back to following the HUD. */
   choose(name: string | null) {
+    hand.seq += 1;
     picked.all = false;
     if (name == null || same(name, liveName())) {
       picked.name = null;
@@ -92,6 +96,7 @@ export const characters = {
   },
   /** Looks at every character's sessions together. */
   chooseAll() {
+    hand.seq += 1;
     picked.name = null;
     picked.all = true;
     picked.liveWas = liveName();
@@ -105,3 +110,38 @@ export const characters = {
     return sessionsOf(sessions, this.viewing, this.known);
   },
 };
+
+/**
+ * The character the HUD switched to by itself (a log-in on another character, or the game read
+ * while another was picked), for a few seconds after, so the character switch can say so.
+ */
+export const switched = $state<{ name: string | null }>({ name: null });
+
+let watchingSwitches = false;
+
+/** Notes the HUD's switches in `switched`. Safe to call often. */
+export function watchSwitches() {
+  if (watchingSwitches) return;
+  watchingSwitches = true;
+  let before: string | null = null;
+  /** Since when `before` was shown: a name shown for a blink, while the records load, doesn't count. */
+  let since = 0;
+  let handSeen = 0;
+  let clear: ReturnType<typeof setTimeout> | undefined;
+  $effect.root(() => {
+    $effect(() => {
+      const now = characters.active;
+      const byHand = hand.seq !== handSeen;
+      handSeen = hand.seq;
+      // Only a change to the name on screen counts: records loading change who comes first too.
+      const changed = before != null && now != null && !same(before, now);
+      if (!byHand && changed && Date.now() - since > 1500 && same(now, liveName())) {
+        switched.name = now;
+        clearTimeout(clear);
+        clear = setTimeout(() => (switched.name = null), 8000);
+      } else if (byHand) switched.name = null;
+      if (!same(before, now)) since = Date.now();
+      before = now;
+    });
+  });
+}
