@@ -506,6 +506,11 @@ mod tests {
                 let need = [(s.str, item.req_str), (s.dex, item.req_dex), (s.int, item.req_int), (s.luk, item.req_luk)];
                 assert!(need.iter().all(|(have, need)| have >= need), "{}: {} at Lv {}: {s:?}", raw.id, item.name, item.req_level);
                 assert_eq!(check.level, Some(item.req_level.max(1)), "{}: {} the level it asks for", raw.id, item.name);
+                // Each weapon is one to get, so the level list shows it then.
+                if item.slot == "Weapon" {
+                    let step = e.steps.iter().find(|s| s.level == item.req_level.max(1)).unwrap();
+                    assert!(step.gear.contains(&item.name), "{}: {} not listed at Lv {}: {:?}", raw.id, item.name, step.level, step.gear);
+                }
             }
         }
     }
