@@ -146,13 +146,13 @@
       <button class="to-train" onclick={() => openPanel("train")}>
         <span>
           <span class="tabular strong">{rateLine}</span>
-          {#if now?.secondsToLevel != null && read?.level != null}<span class="muted"> · Lv {read.level + 1} in {formatDuration(now.secondsToLevel)}</span>{/if}
+          {#if now?.secondsToLevel != null && read?.level != null}<span class="muted">{" · "}Lv {read.level + 1} in {formatDuration(now.secondsToLevel)}</span>{/if}
         </span>
         <span class="muted go">Train <ChevronRight size={12} /></span>
       </button>
     {:else}
       <p class="rate-line tabular">
-        {rateLine}{#if now?.secondsToLevel != null}<span class="muted"> · {formatDuration(now.secondsToLevel)} to level</span>{/if}
+        {rateLine}{#if now?.secondsToLevel != null}<span class="muted">{" · "}{formatDuration(now.secondsToLevel)} to level</span>{/if}
       </p>
     {/if}
   {/if}

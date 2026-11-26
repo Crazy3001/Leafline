@@ -1324,8 +1324,8 @@ export const mockBackend: Backend = {
       seen: true,
       level,
       regions: [
-        { region: "Fern Isle", done: 0, total: fern.length, quests: fern },
-        { region: "Mossbank", done: 2, total: moss.length, quests: moss },
+        { region: "Fern Isle", done: 0, total: fern.length, completedTab: null, quests: fern },
+        { region: "Mossbank", done: 1, total: moss.length, completedTab: 3, quests: moss },
       ],
     };
   },

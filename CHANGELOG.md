@@ -16,10 +16,18 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
 - **A quest opens beside the list** on a wide window, with its questline on top (done, on now,
   next) and the quest under it: its counts, where to hunt, who gives and takes it, and what it
   pays. On a phone it opens full screen with Back.
+- **Each region's count goes the way the game's Completed tab does** with questlines on: a
+  questline counts once, when every step is done; flat, every quest counts. Only what the Quest
+  window showed done counts. Quests Leafline takes to be done because a later one is show
+  apart, as "likely" and "Probably done". Where the game's own count differs, it shows beside
+  Leafline's. The totals are what the quest data lists, which may include quests Classic
+  doesn't have.
 - Item counts past their target (28 / 20 held) are kept, when the target reads as the data has it.
-- **The Session buttons fit.** On Now's Session tile and in the player bar, Pause and New sit
-  under the clock and wrap instead of running past the edge, at any text size. "Autosaves" is an
-  info mark now.
+- **The player bar is on Now too**, and its Session buttons fit: Pause and New sit under the
+  clock and wrap instead of running past the window's edge, at any text size. "Autosaves" is an
+  info mark now. The map you're on has its own line under your level and job, whole, with its
+  region. Now drops the Welcome banner and the Your character card, which said the same things,
+  so Next up and Quests come first.
 - **Pick a character from any page.** The desk sidebar keeps the character switch above the
   reading status: who Leafline shows, their level and job, and "as of …" when it was read
   earlier. It opens a list of every character this copy has seen, each with a last-seen line

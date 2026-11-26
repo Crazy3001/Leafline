@@ -156,11 +156,42 @@
         for (const { line, home } of lines.values()) if (home === r.region && line.shown.length) items.push({ kind: "line", line });
         items.sort((a, b) => itemOrder(a) - itemOrder(b));
         const active = r.quests.filter((q) => GROUP[standOf(q)] === "inProgress").length;
-        return { ...r, items, active };
+        return { ...r, items, active, tally: tallyRegion(r.region, r.quests) };
       })
       .filter((r) => r.items.length)
       .sort((a, b) => b.active - a.active || a.region.localeCompare(b.region)),
   );
+
+  // How far through a region you are, the way the game's Completed tab counts with questlines on:
+  // a line once, done when every step is; flat, every quest. Done is what the Quest window showed;
+  // what Leafline only takes to be done (a later quest is) is counted apart. The filter doesn't
+  // change it.
+  const finished = (q: WholeQuest) => q.stand === "done" || q.stand === "gone";
+  function tallyRegion(region: string, quests: WholeQuest[]) {
+    const units: WholeQuest[][] = [];
+    for (const q of quests) if (!(q.line && lines.has(q.line.head))) units.push([q]);
+    for (const { line, home } of lines.values()) if (home === region) units.push(line.steps.filter((q) => q.questId != null));
+    let done = 0;
+    let likely = 0;
+    for (const steps of units) {
+      if (!steps.length || !steps.every(finished)) continue;
+      if (steps.some((q) => !q.inferred)) done += 1;
+      else likely += 1;
+    }
+    return { done, likely, total: units.length };
+  }
+
+  function tallyTip(r: { completedTab: number | null }, t: { done: number; likely: number; total: number }) {
+    const what = grouped
+      ? `${t.total} questlines and quests the quest data lists here; a questline counts once, as in the game's Completed tab.`
+      : `${t.total} quests the quest data lists here, each counted.`;
+    const likely = t.likely ? ` ${t.likely} more look done, since a later quest is, but the Quest window hasn't shown them done.` : "";
+    const game =
+      r.completedTab != null
+        ? ` Your Completed tab showed ${r.completedTab} (it counts a questline once and a repeated quest each time).`
+        : "";
+    return `${what} The data may list quests Classic doesn't have.${likely}${game}`;
+  }
 
   /** Regions and lines opened or closed by hand; the rest follow the filter and what's open. */
   let opened = $state<Record<string, boolean>>({});
@@ -222,7 +253,7 @@
   {@const stand = standOf(q)}
   {@const repeat = repeatLabel(q.repeat)}
   {@const shown = stand === "inProgress" || stand === "ready" ? counts(q) : []}
-  <li class="stand-{stand}" class:picked={q.questId != null && q.questId === selected}>
+  <li class="stand-{stand}" class:inferred={q.inferred} class:picked={q.questId != null && q.questId === selected}>
     {@render icon(stand)}
     <button class="pick" disabled={q.questId == null} aria-current={q.questId === selected || undefined} onclick={() => q.questId != null && onpick(q.questId)}>
       <span class="name">{#if inLine && q.line?.step}<span class="step tabular">{q.line.step}.</span>{/if}{q.title}</span>
@@ -232,8 +263,8 @@
         {#if q.notYet?.level != null}<span class="warn">Lv {q.notYet.level}</span>{/if}
         {#if q.notYet?.after.length && !inLine}<span>After {q.notYet.after.map((b) => b.name).join(", ")}</span>{/if}
         {#if q.notYet?.notOfferedAt != null}<span>Not on your Available tab {ago(q.notYet.notOfferedAt)}</span>{/if}
-        {#if q.inferred}<span>Done, since a later quest is</span>{/if}
-        {#if q.questId == null}<span>Not in the quest data</span>{/if}
+        {#if q.inferred}<span>Probably done: a later quest is</span>{/if}
+        {#if q.questId == null && q.line}<span>The game's name for {q.line.name}</span>{:else if q.questId == null}<span>Not in the quest data</span>{/if}
         {#if q.levelMin != null && q.notYet?.level == null && stand !== "done"}<span>Lv {q.levelMin}</span>{/if}
         {#if q.giver && (stand === "canTake" || stand === "notYet") && !inLine}<span>From {q.giver}</span>{/if}
         {#if repeat}<span>{repeat}</span>{/if}
@@ -303,12 +334,17 @@
 
     {#each regions as r (r.region)}
       {@const open = regionOpen(r.region, r.active)}
+      {@const t = r.tally}
       <section>
         <button class="region" aria-expanded={open} onclick={() => toggle(`r:${r.region}`, open)}>
           {#if open}<ChevronDown size={13} />{:else}<ChevronRight size={13} />{/if}
           <span class="region-name">{r.region}</span>
-          <span class="tabular done-count">{r.done}<span class="faint">{` of ${r.total} done`}</span></span>
-          <span class="bar"><span style:width="{r.total ? Math.min(100, (100 * r.done) / r.total) : 0}%"></span></span>
+          <span class="tabular done-count" use:tip={tallyTip(r, t)}
+            >{t.done}<span class="faint">{` of ${t.total} done`}</span>{#if t.likely}<span class="faint">{` · ${t.likely} likely`}</span>{/if}{#if r.completedTab != null && r.completedTab !== t.done}<span
+                class="game">{` · game ${r.completedTab}`}</span
+              >{/if}</span
+          >
+          <span class="bar"><span style:width="{t.total ? Math.min(100, (100 * t.done) / t.total) : 0}%"></span></span>
         </button>
         {#if open}
           <ul class="rows">
@@ -470,6 +506,20 @@
   .done-count,
   .line-count {
     font-size: var(--text-xs);
+  }
+
+  .done-count {
+    cursor: help;
+  }
+
+  /* The game's own count, where it differs from Leafline's. */
+  .game {
+    color: var(--warn);
+  }
+
+  /* Only taken to be done: a later quest is. */
+  li.inferred > .icon {
+    opacity: 0.55;
   }
 
   .bar {

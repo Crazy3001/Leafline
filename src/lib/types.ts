@@ -2105,8 +2105,11 @@ export interface LineStep {
 
 export interface WholeRegion {
   region: string;
+  /** Quests the Quest window showed done or handed in; not those only taken to be done. */
   done: number;
   total: number;
+  /** The game's Completed tab count, when read: a questline counts once there, a repeat each time. */
+  completedTab: number | null;
   quests: WholeQuest[];
 }
 

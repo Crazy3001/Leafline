@@ -122,10 +122,13 @@ impl Lines {
 #[serde(rename_all = "camelCase")]
 pub struct WholeRegion {
     pub region: String,
-    /// What is done there: the Completed tab's own count when its bar was read, which can count
-    /// quests the data lacks, otherwise the quests here that stand done.
+    /// The quests here the Quest window showed done, or handed in; not those only taken to be done.
     pub done: usize,
+    /// The quests the data and the log have here.
     pub total: usize,
+    /// The count the game's Completed tab showed for the region, when read. The game counts a
+    /// questline once and a repeated quest each time, so it is a check, not a count of quests.
+    pub completed_tab: Option<usize>,
     pub quests: Vec<WholeQuest>,
 }
 
@@ -294,9 +297,9 @@ impl Atlas {
             .into_iter()
             .map(|(region, mut quests)| {
                 quests.sort_by(|a, b| a.level_min.unwrap_or(0).cmp(&b.level_min.unwrap_or(0)).then_with(|| a.title.cmp(&b.title)));
-                let standing = quests.iter().filter(|q| matches!(q.stand, Stand::Done | Stand::Gone)).count();
-                let done = counted.get(region.as_str()).copied().unwrap_or(0).max(standing);
-                WholeRegion { total: quests.len().max(done), done, region, quests }
+                let done = quests.iter().filter(|q| matches!(q.stand, Stand::Done | Stand::Gone) && !q.inferred).count();
+                let completed_tab = counted.get(region.as_str()).copied();
+                WholeRegion { total: quests.len(), done, completed_tab, region, quests }
             })
             .collect();
         WholeLog { regions, seen: !log.looks.is_empty(), level }
@@ -541,7 +544,8 @@ mod tests {
             ]
         );
         let meadow = whole.regions.iter().find(|r| r.region == "Meadow").unwrap();
-        assert_eq!((meadow.done, meadow.total), (7, 7), "the game's own count, which can count quests the data lacks");
+        assert_eq!((meadow.done, meadow.total), (1, 4), "only what the Quest window showed done; Baskets One is taken to be");
+        assert_eq!(meadow.completed_tab, Some(7), "the game's own count, kept as a check");
     }
 
     #[test]
