@@ -134,7 +134,7 @@
           {#if plan.missing.length}<span class="warn">Not in this data: {plan.missing.join(", ")}</span>{/if}
           {#if plan.source}<span class="muted">{plan.source.credit} The guide's link is saved with the build.</span>{/if}
           {#if plan.reading}<span class="muted">Further reading: {plan.reading.credit} The planner links it.</span>{/if}
-          {#if fresh}<span class="faint">The plan counts from these stats. If your roll differs, change them in the plan.</span>{/if}
+          {#if fresh}<span class="faint">The plan counts from these stats: 25 points, 4 to 12 each. If yours differ, change them in the plan.</span>{/if}
           <span class="warn">Untested in game: a starting point to change.</span>
         </button>
       {/each}

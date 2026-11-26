@@ -550,7 +550,7 @@
     {
       "id": "bandit-sindit", "job": 420, "name": "Bandit, Sindit (claws to Lv 30, then DEX daggers)",
       "summary": "Lucky Seven on a claw for 1st job, then Savage Blow on DEX daggers from Lv 30. No SP reset: Lucky Seven stays and Double Stab is skipped.",
-      "note": "Why: Lucky Seven hits from range and goes by LUK, so Lv 10-30 needs no Double Stab, and Savage Blow needs no 1st-job skill. Trade-off: those 20 SP do nothing with a dagger in hand, though a claw still uses them. Sindit guides often reset SP near Lv 40 to move them; Leafline can't plan a reset. Claws ask for as much DEX as their level, more than DEX daggers do.",
+      "note": "Why: Lucky Seven hits from range and goes by LUK, so Lv 10-30 needs no Double Stab, and Savage Blow needs no 1st-job skill. Trade-off: those 20 SP do nothing with a dagger in hand, though a claw still uses them. Sindit guides often reset SP near Lv 40 to move them; Leafline can't plan a reset. Claws ask for as much DEX as their level, more than DEX daggers do, and throwing stars cost mesos. Savage Blow 11 is where the data gives it a 5th hit, so it leads 2nd job here.",
       "start": [4, 5, 4, 12],
       "reading": {
         "name": "NiaDB",
@@ -559,8 +559,8 @@
       },
       "opening": "thief-sindit",
       "skills": [
-        ["Savage Blow", 10], ["Dagger Mastery", 5], ["Dagger Booster", 1], ["Savage Blow", 15], ["Dagger Mastery", 20],
-        ["Haste", 5], ["Steal", 20], ["Savage Blow", 30], ["Steal", 30], ["Haste", 20], ["Dagger Booster", 10],
+        ["Savage Blow", 11], ["Dagger Mastery", 5], ["Dagger Booster", 1], ["Dagger Mastery", 20], ["Haste", 5],
+        ["Savage Blow", 21], ["Steal", 20], ["Savage Blow", 30], ["Steal", 30], ["Haste", 20], ["Dagger Booster", 10],
         ["Nimble Recovery", 11]
       ],
       "primary": "luk", "secondary": "dex",
@@ -575,7 +575,7 @@
     {
       "id": "bandit-dex", "job": 420, "name": "Bandit, DEX daggers",
       "summary": "Double Stab for 1st job, then Savage Blow and Steal. DEX only as far as the next DEX dagger needs, the rest into LUK.",
-      "note": "Why: thief armour asks for DEX as well (DEX 60 at Lv 70), so one stat covers both, and DEX adds Accuracy. Trade-off: the item data lists DEX daggers one attack-speed step slower than STR daggers of the same level, for 1 more attack.",
+      "note": "Why: thief armour asks for DEX as well (DEX 60 at Lv 70), so one stat covers both, and DEX adds Accuracy. Trade-off: the item data lists DEX daggers one attack-speed step slower than STR daggers of the same level, for 1 more attack. Savage Blow goes to 11 early, where the data gives it a 5th hit and it passes Double Stab 20, then to 21 for a 6th.",
       "start": [4, 5, 4, 12],
       "reading": {
         "name": "NiaDB",
@@ -584,8 +584,8 @@
       },
       "opening": "thief-dagger",
       "skills": [
-        ["Dagger Mastery", 5], ["Dagger Booster", 1], ["Savage Blow", 15], ["Dagger Mastery", 20], ["Haste", 5],
-        ["Steal", 20], ["Savage Blow", 30], ["Steal", 30], ["Haste", 20], ["Dagger Booster", 10],
+        ["Dagger Mastery", 5], ["Dagger Booster", 1], ["Savage Blow", 11], ["Dagger Mastery", 20], ["Haste", 5],
+        ["Savage Blow", 21], ["Steal", 20], ["Savage Blow", 30], ["Steal", 30], ["Haste", 20], ["Dagger Booster", 10],
         ["Nimble Recovery", 11]
       ],
       "primary": "luk", "secondary": "dex",
@@ -600,8 +600,8 @@
     {
       "id": "bandit-str", "job": 420, "name": "Bandit, STR daggers (LUK main)",
       "summary": "Double Stab for 1st job, then Savage Blow and Steal. STR only as far as the next STR dagger needs, the rest into LUK. Not a STR-main build: LUK stays the damage stat.",
-      "note": "Why: the item data lists STR daggers one attack-speed step faster. Trade-off: thief armour past Lv 15 asks for DEX this plan doesn't add (DEX 60 at Lv 70), so it plans Lv 15 thief pieces and all-class capes and earrings. Add DEX yourself to wear more. STR adds no Accuracy.",
-      "start": [4, 5, 4, 12],
+      "note": "Why: the item data lists STR daggers one attack-speed step faster. Trade-off: thief armour past Lv 15 asks for DEX this plan doesn't add (DEX 60 at Lv 70), so it plans Lv 15 thief pieces and all-class capes and earrings. Add DEX yourself to wear more. STR adds no Accuracy. The spare point of the roll goes into STR.",
+      "start": [5, 4, 4, 12],
       "reading": {
         "name": "NiaDB",
         "url": "https://meowdb.com/msclassic/guides/bandit-class-guide#daggers",
@@ -609,8 +609,8 @@
       },
       "opening": "thief-dagger",
       "skills": [
-        ["Dagger Mastery", 5], ["Dagger Booster", 1], ["Savage Blow", 15], ["Dagger Mastery", 20], ["Haste", 5],
-        ["Steal", 20], ["Savage Blow", 30], ["Steal", 30], ["Haste", 20], ["Dagger Booster", 10],
+        ["Dagger Mastery", 5], ["Dagger Booster", 1], ["Savage Blow", 11], ["Dagger Mastery", 20], ["Haste", 5],
+        ["Savage Blow", 21], ["Steal", 20], ["Savage Blow", 30], ["Steal", 30], ["Haste", 20], ["Dagger Booster", 10],
         ["Nimble Recovery", 11]
       ],
       "primary": "luk", "secondary": "str",

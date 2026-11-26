@@ -20,6 +20,9 @@ use super::rules::Rules;
 const PLAN_TO: u32 = 70;
 /// What a secondary stat is taken to start at: the lowest seen, so a step is never late.
 const LOWEST_START: u32 = 4;
+/// The most a stat can start at: a new character splits 25 points, 4 to 12 each.
+#[cfg(test)]
+const HIGHEST_START: u32 = 12;
 
 type Goals = Vec<(String, u32)>;
 
@@ -39,7 +42,7 @@ struct Raw {
     /// Why to pick the path and what it gives up, for a plan written for Leafline.
     #[serde(default)]
     note: String,
-    /// The roll the plan counts from at Lv 1: STR, DEX, INT and LUK.
+    /// The roll the plan counts from at Lv 1: STR, DEX, INT and LUK, 25 points with each 4 to 12.
     start: [u32; 4],
     /// The 1st-job skills, by key in `openings`.
     opening: String,
@@ -429,13 +432,13 @@ mod tests {
         }
     }
 
-    /// Every roll here is 25 points with none below 4, as each guide's is.
+    /// A new character splits 25 points with each stat from 4 to 12, and the guides' rolls agree.
     #[test]
     fn every_plan_starts_from_a_lv_1_roll_and_guide_plans_from_their_guides() {
         let checks: HashMap<String, Checks> = serde_json::from_str(include_str!("starters_check.json")).unwrap();
         for raw in &FILE.plans {
             assert_eq!(raw.start.iter().sum::<u32>(), 25, "{}", raw.id);
-            assert!(raw.start.iter().all(|&stat| stat >= LOWEST_START), "{}", raw.id);
+            assert!(raw.start.iter().all(|&stat| (LOWEST_START..=HIGHEST_START).contains(&stat)), "{}", raw.id);
             if let Some(want) = checks.get(&raw.id) {
                 assert_eq!(raw.start, want.start, "{}: the guide's own roll", raw.id);
             }
