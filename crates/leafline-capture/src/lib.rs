@@ -133,9 +133,10 @@ mod web {
         }
 
         /// The player's switches for the windows read when open: the Character Stat and Skill
-        /// windows, the inventory tab (sell or keep), the Quest window.
-        pub fn set_windows(&mut self, character: bool, bag: bool, quest_log: bool) {
-            self.0.set_windows(character, bag, quest_log);
+        /// windows, the inventory tab (sell or keep), the Quest window, and the Character Info
+        /// window for the character's look.
+        pub fn set_windows(&mut self, character: bool, bag: bool, quest_log: bool, look: bool) {
+            self.0.set_windows(character, bag, quest_log, look);
         }
 
         /// What the game's windows gave since this was last asked, as JSON (see

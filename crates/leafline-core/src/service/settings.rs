@@ -144,6 +144,9 @@ pub struct LiveChoice {
     pub bag_check: bool,
     /// The quest log is kept from the Quest window while it's open.
     pub quest_window: bool,
+    /// The character's look is taken from the Character Info window when it shows their own
+    /// character, and shown as their picture in Leafline. Off, none is read or shown.
+    pub character_look: bool,
 }
 
 impl Default for LiveChoice {
@@ -158,6 +161,7 @@ impl Default for LiveChoice {
             character_windows: true,
             bag_check: true,
             quest_window: true,
+            character_look: true,
         }
     }
 }

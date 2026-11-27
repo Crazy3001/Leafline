@@ -224,6 +224,8 @@ export function commandBackend(invoke: Invoke, listen: Listen, emit: Emit): Back
     knownBags: (name) => invoke("known_bags", { name }),
     knownCharacters: () => invoke("known_characters"),
     onKnownCharacter: (handler) => listen("known-character", () => handler()),
+    characterLooks: () => invoke("character_looks"),
+    forgetLooks: () => invoke("forget_looks"),
     setSessionNote: (id, note) => invoke("set_session_note", { id, note }),
     renameMap: (from, to) => invoke("rename_map", { from, to }),
     openDataFolder: () => invoke("open_data_folder"),

@@ -15,6 +15,7 @@ use leafline_core::service::host::{Host, emit};
 use leafline_core::error::{Error, Result};
 use leafline_core::session::SessionSummary;
 use leafline_core::userdata::{RecordsSummary, UserData};
+use leafline_core::readers::charinfo::SeenLook;
 use leafline_core::userdata::characters::{KnownCharacter, SeenCharacter};
 use leafline_core::userdata::drops::{LoggedDrop, NewDrop};
 use leafline_core::userdata::notes::{ItemNote, MapNote};
@@ -41,6 +42,21 @@ pub fn known_characters(app: AppHandle) -> Result<Vec<String>> {
 #[tauri::command]
 pub fn known_bags(app: AppHandle, name: Option<String>) -> Result<Vec<BagCheck>> {
     service::records::known_bags(&AppHost(app), name)
+}
+
+#[tauri::command]
+pub fn keep_look(app: AppHandle, look: SeenLook) -> Result<()> {
+    service::records::keep_look(&AppHost(app), look)
+}
+
+#[tauri::command]
+pub fn character_looks(app: AppHandle) -> Result<Vec<CharacterLook>> {
+    service::records::character_looks(&AppHost(app))
+}
+
+#[tauri::command]
+pub fn forget_looks(app: AppHandle) -> Result<()> {
+    service::records::forget_looks(&AppHost(app))
 }
 
 #[tauri::command]

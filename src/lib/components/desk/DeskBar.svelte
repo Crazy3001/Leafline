@@ -10,16 +10,21 @@
   import { formatClockIn, formatCompact, formatDuration, formatNumber, partyLabel } from "$lib/format";
   import { ago, shownCharacter, watchProfile } from "$lib/profile.svelte";
   import { can } from "$lib/platform";
+  import { display } from "$lib/settings.svelte";
   import { live } from "$lib/readings.svelte";
   import { place, regionHue, watchRegion } from "$lib/region.svelte";
   import { mesosCoverage } from "$lib/training";
   import LevelRing from "$lib/ui/LevelRing.svelte";
+  import LookPicture from "$lib/ui/LookPicture.svelte";
+  import { characters } from "$lib/characters.svelte";
+  import { LOOK_TIP, lookOf, watchLooks } from "$lib/looks.svelte";
   import Sparkline from "$lib/ui/Sparkline.svelte";
 
   watchRegion();
   const hue = $derived(regionHue(place.region));
 
   watchProfile();
+  watchLooks();
 
   // Read now when this character is on screen; else what was read of them last, faded and dated.
   // The session and its rates are only ever the one on screen's.
@@ -30,6 +35,11 @@
   const level = $derived(who.level.value);
   const percent = $derived(who.percent.value);
   const name = $derived(who.name);
+  /** Their look from the game's Character Info window, kept from an earlier read. */
+  const look = $derived(characters.all ? null : lookOf(name));
+  const lookTip = $derived(
+    look ? `${name}'s look, as of ${ago(look.readAt)}` : can.liveReading && display.live.characterLook !== false ? LOOK_TIP : null,
+  );
   const job = $derived(who.job.value);
   const points = $derived(who.points);
   /** The map's own name, without its street, which the Map view gives; or the one they were last on. */
@@ -79,7 +89,10 @@
 
 <section class="bar" class:washed={hue != null} style:--region-hue={hue} aria-label="Your character and this session">
   <div class="cell ident">
-    <span class="ring" class:stale={who.level.at != null}><LevelRing {level} {percent} size={46}><span class="num lv-none">?</span></LevelRing></span>
+    {#snippet pictured(inner: number)}{#if look}<LookPicture {look} size={inner} crop="bust" />{/if}{/snippet}
+    <span class="ring" class:stale={who.level.at != null} use:tip={lookTip}
+      ><LevelRing {level} {percent} size={46} picture={look ? pictured : undefined}><span class="num lv-none">?</span></LevelRing></span
+    >
     <div class="who">
       <div class="name-row">
         <b class="name">{name ?? "Your character"}</b>
@@ -155,10 +168,6 @@
   }
 
   .ring {
-    display: contents;
-  }
-
-  .ring.stale {
     display: block;
     flex: none;
   }

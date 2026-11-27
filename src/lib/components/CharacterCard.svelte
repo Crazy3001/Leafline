@@ -1,10 +1,14 @@
 <script lang="ts">
   import { can } from "$lib/platform";
+  import { tip } from "$lib/tip.svelte";
   import type { Snippet } from "svelte";
 
   import { ChevronRight } from "@lucide/svelte";
 
   import Card from "./Card.svelte";
+  import LookPicture from "$lib/ui/LookPicture.svelte";
+  import { LOOK_TIP, lookOf, watchLooks } from "$lib/looks.svelte";
+  import { display } from "$lib/settings.svelte";
   import Gauge from "./Gauge.svelte";
   import { openPanel } from "$lib/nav.svelte";
   import { ago, lastKnown, profile, watchProfile } from "$lib/profile.svelte";
@@ -41,6 +45,7 @@
   } = $props();
 
   watchProfile();
+  watchLooks();
 
   /** The readings are this character's: no other one picked, or a replay. */
   const onScreen = $derived(!remember || profile.live);
@@ -62,6 +67,11 @@
   const seenAt = $derived(level.at ?? expPercent.at);
   /** The map they were last on, while they aren't being read. */
   const lastMap = $derived(seenAt != null && known?.map ? splitMapLabel(known.map).name : null);
+
+  /** Their look from the game's Character Info window, kept from an earlier read; none in replays. */
+  const look = $derived(remember ? lookOf(displayName) : null);
+  /** With none kept, a line on how to get one, where the game can be read. */
+  const lookHint = $derived(remember && !look && can.liveReading && display.live.characterLook !== false && displayName != null);
 
   const fraction = (g: GaugeReading | null | undefined) => (g ? g.current / g.max : null);
   const gaugeText = (g: GaugeReading | null | undefined) =>
@@ -103,8 +113,15 @@
     carry (read from the HUD, which the website doesn't, or remembered from an earlier read), then
     the build and stats.
   -->
-  {#if children || can.liveReading || coins.at != null}<section class="more" class:card={!bare} class:bare>
+  {#if children || can.liveReading || coins.at != null || look}<section class="more" class:card={!bare} class:bare>
+    {#if look}
+      <div class="look-line">
+        <span class="portrait"><LookPicture {look} size={72} /></span>
+        <span class="look-text"><b>{displayName}</b><span class="seen">Look as of {ago(look.readAt)}</span></span>
+      </div>
+    {/if}
     {#if can.liveReading || coins.at != null}<div class="purse-line">{@render purse()}</div>{/if}
+    {#if lookHint}<p class="look-hint">{LOOK_TIP}</p>{/if}
     {#if children}{@render children()}{/if}
   </section>{/if}
 {:else}
@@ -114,6 +131,7 @@
   {/snippet}
 
   <div class="identity">
+    {#if look}<span class="portrait small" use:tip={`Look as of ${ago(look.readAt)}`}><LookPicture {look} size={48} crop="bust" /></span>{/if}
     <div class="level" class:stale={level.at != null}>
       <span class="lv">Lv</span>
       <span class="tabular">{level.value ?? "—"}</span>
@@ -295,5 +313,48 @@
 
   .purse-line {
     margin-bottom: var(--space-3);
+  }
+
+  /* The character's look on a soft floor, standing at the bottom. */
+  .look-line {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
+  }
+
+  .portrait {
+    display: grid;
+    flex: none;
+    place-items: end center;
+    overflow: hidden;
+    padding: var(--space-1);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+  }
+
+  .portrait.small {
+    padding: 0;
+    place-items: start center;
+  }
+
+  .look-text {
+    display: grid;
+    min-width: 0;
+  }
+
+  .look-text b {
+    font-size: var(--text-md);
+  }
+
+  .look-text .seen {
+    color: var(--faint);
+    font-size: var(--text-xs);
+  }
+
+  .look-hint {
+    margin: 0 0 var(--space-3);
+    color: var(--faint);
+    font-size: var(--text-xs);
   }
 </style>

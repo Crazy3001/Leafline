@@ -18,8 +18,14 @@
   import { ago, shownCharacter } from "$lib/profile.svelte";
   import { live } from "$lib/readings.svelte";
   import { clipped } from "$lib/tip.svelte";
+  import { lookOf, watchLooks } from "$lib/looks.svelte";
+  import LookPicture from "$lib/ui/LookPicture.svelte";
 
   let { onpick }: { onpick?: () => void } = $props();
+
+  watchLooks();
+  /** Once any character has a look kept, every row has a face (a letter where none is). */
+  const faces = $derived(characters.known.some((name) => lookOf(name) != null));
 
   const same = (a: string | null | undefined, b: string | null | undefined) =>
     a != null && b != null && a.trim().toLowerCase() === b.trim().toLowerCase();
@@ -113,6 +119,10 @@
       <!-- svelte-ignore a11y_click_events_have_key_events (the list's keydown picks with Enter or Space) -->
       <li class="row" class:on role="option" aria-selected={on} tabindex={on ? 0 : -1} onclick={() => pick(name)}>
         <span class="mark" aria-hidden="true">{#if on}<Check size={14} />{/if}</span>
+        {#if faces}
+          {@const look = lookOf(name)}
+          <span class="face" aria-hidden="true">{#if look}<LookPicture {look} size={30} crop="bust" />{:else}{name.trim().charAt(0).toUpperCase()}{/if}</span>
+        {/if}
         <span class="who">
           <b use:clipped>{name}</b>
           {#if seen.text || seen.playing}
@@ -205,6 +215,21 @@
   .who {
     display: grid;
     min-width: 0;
+  }
+
+  .face {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    overflow: hidden;
+    border-radius: 50%;
+    background: var(--surface-2);
+    color: var(--muted);
+    font-family: var(--font-display);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-strong);
   }
 
   .who b {

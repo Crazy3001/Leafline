@@ -179,6 +179,48 @@ impl UserData {
     }
 }
 
+/// A character's look, cut from the game's Character Info window when it was their own: a small
+/// PNG on a transparent ground, one pixel per game pixel. Kept on this PC only.
+#[derive(Debug, Clone, PartialEq)]
+pub struct KnownLook {
+    pub name: String,
+    pub png: Vec<u8>,
+    pub width: u32,
+    pub height: u32,
+    /// Unix seconds.
+    pub read_at: i64,
+}
+
+impl UserData {
+    /// Keeps `png` as `name`'s look, replacing the one kept before. Names match whatever their case.
+    pub fn save_look(&mut self, name: &str, png: &[u8], width: u32, height: u32, read_at: i64) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO character_looks (name, png, width, height, read_at) VALUES (?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT (name) DO UPDATE SET name = excluded.name, png = excluded.png, width = excluded.width,
+                 height = excluded.height, read_at = excluded.read_at",
+            params![name, png, width, height, read_at],
+        )?;
+        Ok(())
+    }
+
+    /// Every character's kept look, the newest first.
+    pub fn looks(&self) -> Result<Vec<KnownLook>> {
+        let mut stmt = self.conn.prepare("SELECT name, png, width, height, read_at FROM character_looks ORDER BY read_at DESC")?;
+        let looks = stmt
+            .query_map([], |row| {
+                Ok(KnownLook { name: row.get(0)?, png: row.get(1)?, width: row.get(2)?, height: row.get(3)?, read_at: row.get(4)? })
+            })?
+            .collect::<std::result::Result<_, _>>()?;
+        Ok(looks)
+    }
+
+    /// Forgets every kept look.
+    pub fn forget_looks(&mut self) -> Result<()> {
+        self.conn.execute("DELETE FROM character_looks", [])?;
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -253,5 +295,20 @@ mod tests {
         // Keeping the bag leaves what the HUD showed alone, and counts as seeing the character.
         assert_eq!(db.known_character(Some("Mossbank")).unwrap().unwrap().level, Some(12));
         assert_eq!(db.character_names().unwrap(), vec!["Mossbank", "Fernwick"]);
+    }
+
+    #[test]
+    fn keeps_one_look_per_character_and_forgets_them_all() {
+        let mut db = UserData::open_in_memory().unwrap();
+        assert!(db.looks().unwrap().is_empty());
+        db.save_look("Mossbank", &[1, 2, 3], 20, 60, 100).unwrap();
+        db.save_look("Fernwick", &[4], 18, 58, 150).unwrap();
+        db.save_look("mossbank", &[5, 6], 22, 62, 200).unwrap();
+        let looks = db.looks().unwrap();
+        assert_eq!(looks.len(), 2);
+        assert_eq!((looks[0].name.as_str(), looks[0].png.as_slice(), looks[0].width, looks[0].read_at), ("mossbank", &[5u8, 6][..], 22, 200));
+        assert_eq!(looks[1].name, "Fernwick");
+        db.forget_looks().unwrap();
+        assert!(db.looks().unwrap().is_empty());
     }
 }

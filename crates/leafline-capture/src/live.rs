@@ -29,6 +29,7 @@ use leafline_core::readers::tooltip::{self, ItemTooltip, NameLines};
 use leafline_core::vision::Rect;
 
 use leafline_core::pipeline::CharacterScan;
+use leafline_core::readers::charinfo::{self, SeenLook};
 use leafline_core::readers::{character, inventory, questlog};
 use leafline_core::readers::questlog::QuestLogReading;
 use leafline_core::service::bag::SeenBag;
@@ -79,11 +80,15 @@ pub struct WindowReads {
     /// The Quest window, for the character's quest log.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub quest_log: Option<QuestLogSeen>,
+    /// The character's look from the Character Info window, only ever when it named the HUD's
+    /// own character.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub look: Option<SeenLook>,
 }
 
 impl WindowReads {
     pub fn is_empty(&self) -> bool {
-        self.character.is_none() && self.bag.is_none() && self.quest_log.is_none()
+        self.character.is_none() && self.bag.is_none() && self.quest_log.is_none() && self.look.is_none()
     }
 }
 
@@ -103,6 +108,7 @@ struct WindowChoice {
     character: bool,
     bag: bool,
     quest_log: bool,
+    look: bool,
 }
 
 /// What follows the windows from one read to the next.
@@ -114,6 +120,7 @@ struct Windows {
     quest_log: questlog::Watch,
     quest_closed: u32,
     quest_fresh: bool,
+    look: charinfo::LookWatch,
     reads: WindowReads,
 }
 
@@ -181,7 +188,7 @@ impl LiveReader {
         Self {
             ocr: Ocr::none(),
             text: None,
-            choice: WindowChoice { character: true, bag: true, quest_log: true },
+            choice: WindowChoice { character: true, bag: true, quest_log: true, look: true },
             windows: Windows::default(),
             recogniser: None,
             tooltips: TooltipReader::default(),
@@ -463,10 +470,13 @@ impl LiveReader {
 impl LiveReader {
     /// The player's switches: update the build from the Character Stat and Skill windows; check
     /// the inventory tab that's open (sell or keep); keep the quest log from the Quest window.
-    pub fn set_windows(&mut self, character: bool, bag: bool, quest_log: bool) {
-        self.choice = WindowChoice { character, bag, quest_log };
+    pub fn set_windows(&mut self, character: bool, bag: bool, quest_log: bool, look: bool) {
+        self.choice = WindowChoice { character, bag, quest_log, look };
         if !bag {
             self.windows.bag = inventory::TabWatch::default();
+        }
+        if !look {
+            self.windows.look = charinfo::LookWatch::default();
         }
     }
 
@@ -502,6 +512,16 @@ impl LiveReader {
             self.windows.reads.bag = Some(SeenBag::new(&seen, name.clone(), level));
             self.sight.saw(Reader::Inventory, at);
             self.windows.bag.checked(seen);
+        }
+        if self.choice.look {
+            // Only the player's own window is cut out (the name under the picture must be the
+            // HUD's); another player's gives nothing, and nothing of it is kept.
+            let portrait = name.as_deref().and_then(|own| charinfo::read(frame, analysis.hud_layout.as_ref(), own, self.text.as_ref()));
+            if let Some(kept) = self.windows.look.follow(portrait)
+                && let Some(seen) = name.as_deref().and_then(|own| kept.seen(own))
+            {
+                self.windows.reads.look = Some(seen);
+            }
         }
         if self.choice.quest_log && self.text.is_some() {
             let glance = questlog::glance(frame, scale);
