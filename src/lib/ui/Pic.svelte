@@ -23,8 +23,11 @@
     size?: number | null;
     fit?: "contain" | "cover";
     class?: string;
-    /** Told whether the picture showed, for a frame that hides itself without one. */
-    onstate?: (shown: boolean) => void;
+    /**
+     * Told whether the picture showed, and its size, for a frame that hides itself without one.
+     * Such a picture loads at once: a lazy one in a hidden frame would never load.
+     */
+    onstate?: (shown: boolean, size: { width: number; height: number } | null) => void;
     /** Shown instead when there is no picture: pictures off, none in the data, or it failed. */
     fallback?: Snippet;
   } = $props();
@@ -32,9 +35,13 @@
   const src = $derived(pictureUrl(kind, id ?? name));
   let failed = $state<string | null>(null);
   let loaded = $state<string | null>(null);
+  let natural = $state<{ width: number; height: number } | null>(null);
   const shown = $derived(!!src && failed !== src && !pictureMissing(src));
 
-  $effect(() => onstate?.(shown && loaded === src));
+  $effect(() => {
+    const ready = shown && loaded === src;
+    onstate?.(ready, ready ? natural : null);
+  });
 </script>
 
 {#if shown && src}
@@ -47,10 +54,14 @@
     style:width={size == null ? "100%" : `${size}px`}
     style:height={size == null ? "auto" : `${size}px`}
     style:object-fit={fit}
-    loading="lazy"
+    loading={onstate ? "eager" : "lazy"}
     decoding="async"
     draggable="false"
-    onload={() => (loaded = src)}
+    onload={(e) => {
+      const img = e.currentTarget as HTMLImageElement;
+      natural = { width: img.naturalWidth, height: img.naturalHeight };
+      loaded = src;
+    }}
     onerror={() => {
       markMissing(src);
       failed = src;

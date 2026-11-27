@@ -578,6 +578,11 @@
       <p class="caption">The graph starts after 5 minutes of play.</p>
     {/if}
   </Block>
+{:else if only === "chart" && !glance}
+  <!-- Now keeps the card's place before a session, saying what fills it. -->
+  <Block title="This session">
+    <p class="caption">Starts with your first EXP. The graph follows after 5 minutes of play.</p>
+  </Block>
 {/if}
 
 {#if onHistory}
