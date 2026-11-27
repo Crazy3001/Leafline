@@ -51,17 +51,26 @@ const BOX_REACH: f32 = 140.0;
 const EDGE: u32 = 60;
 /// A border is at most this thick, from the box's outer edge to its ground.
 const MAX_BORDER: u32 = 16;
-/// The name box: under the avatar box, at most this tall.
-const NAME_BOX_H: f32 = 64.0;
+/// The name box, at the avatar box's foot: this tall, and filled this much by its own colour (the
+/// letters take the rest).
+const MIN_NAME_BOX: u32 = 16;
+const MAX_NAME_BOX: u32 = 120;
+const NAME_FILL: f32 = 0.55;
+/// How far one shade of a gradient can stand from the next few.
+const SHADE: u8 = 8;
 
 /// Pixels of the box's ground this close (any channel) to a colour sampled at its edges are keyed
 /// out when they join the edge; anywhere in the box when this close to the main one.
 const KEY_TOLERANCE: u8 = 16;
 const HOLE_TOLERANCE: u8 = 3;
+/// How far from the edge colours a shaded ground can drift and still be followed.
+const GRADIENT_REACH: u8 = 48;
+/// The share of the character's height, from the bottom, where the shadow under their feet lies.
+const SHADOW_BAND: u32 = 15;
 /// A colour counts as part of the ground with this share of the edge pixels.
 const GROUND_SHARE: f32 = 0.04;
 /// The ground's main colour must cover this share of the box's inside edge.
-const MIN_GROUND: f32 = 0.5;
+const MIN_GROUND: f32 = 0.3;
 /// A picture this big (design pixels) can't be a character.
 const MAX_LOOK: u32 = 200;
 /// Every this many pixels, a picture is checked for the label pink before anything else.
@@ -202,6 +211,11 @@ fn is_label(px: &Rgba<u8>) -> bool {
     near(px, LABEL, LABEL_TOLERANCE)
 }
 
+fn luminance(px: &Rgba<u8>) -> u8 {
+    let [r, g, b, _] = px.0;
+    ((u32::from(r) * 299 + u32::from(g) * 587 + u32::from(b) * 114) / 1000) as u8
+}
+
 fn rgb(px: &Rgba<u8>) -> [u8; 3] {
     [px.0[0], px.0[1], px.0[2]]
 }
@@ -304,9 +318,8 @@ fn window_at(view: &Frame, labels: [Rect; LABELS]) -> Option<InfoWindow> {
         (right.0 + 1) as f32,
         left.1.1.max(right.1.1) as f32,
     );
-    let portrait = ground_of(view, outer)?;
-    let name = Rect::from_edges(outer.x, outer.bottom(), outer.right(), (outer.bottom() + NAME_BOX_H).min(height as f32));
-    (name.h >= 16.0 && outer.right() <= width as f32).then_some(InfoWindow { labels, portrait, name })
+    let (portrait, name) = parts_of(view, outer)?;
+    (outer.right() <= width as f32).then_some(InfoWindow { labels, portrait, name })
 }
 
 /// The most common colour among `pixels`, and its share.
@@ -324,19 +337,23 @@ fn commonest(pixels: impl Iterator<Item = [u8; 3]>) -> Option<([u8; 3], f32)> {
     Some((colour, n as f32 / total as f32))
 }
 
-/// The box's ground inside its border: each side moves in past lines that aren't the ground's
-/// colour. `None` when the inside isn't mostly one colour, so it isn't the avatar box.
-fn ground_of(view: &Frame, outer: Rect) -> Option<Rect> {
+/// The box's ground inside its border, and the name box at its foot. Each side moves in past
+/// lines that aren't the ground's colour; the name box is the tallest band of rows near the bottom
+/// that one colour other than the ground fills (white letters on grey in the game). `None` when the
+/// inside isn't mostly one colour, so it isn't the avatar box, or has no name box.
+fn parts_of(view: &Frame, outer: Rect) -> Option<(Rect, Rect)> {
     let (x0, y0, w, h) = outer.to_pixels(view.width(), view.height());
     if w < MIN_BOX_W || h < MIN_BOX_H {
         return None;
     }
     let (x1, y1) = (x0 + w - 1, y0 + h - 1);
     let ring = MAX_BORDER;
-    // The ground's colour, from a ring well inside the border.
+    // The ground's colour, from the top two thirds of a ring well inside the border (the name box
+    // fills the foot).
+    let low = y0 + 2 * h / 3;
     let ring_pixels = (x0 + ring..=x1 - ring)
-        .flat_map(|x| [(x, y0 + ring), (x, y1 - ring)])
-        .chain((y0 + ring..=y1 - ring).flat_map(|y| [(x0 + ring, y), (x1 - ring, y)]))
+        .map(|x| (x, y0 + ring))
+        .chain((y0 + ring..=low).flat_map(|y| [(x0 + ring, y), (x1 - ring, y)]))
         .map(|(x, y)| rgb(view.get_pixel(x, y)));
     let (ground, share) = commonest(ring_pixels)?;
     if share < MIN_GROUND {
@@ -347,14 +364,39 @@ fn ground_of(view: &Frame, outer: Rect) -> Option<Rect> {
         let n = pixels.len().max(1);
         pixels.into_iter().filter(|&px| close(px, ground, KEY_TOLERANCE)).count() * 2 >= n
     };
-    let (mid_x, mid_y) = ((x0 + w / 4)..(x1 - w / 4), (y0 + h / 4)..(y1 - h / 4));
+    let (mid_x, mid_y) = ((x0 + w / 4)..(x1 - w / 4), (y0 + h / 4)..(y0 + h / 2));
     let column = |x: u32| is_ground(mid_y.clone().map(|y| rgb(view.get_pixel(x, y))).collect());
     let row = |y: u32| is_ground(mid_x.clone().map(|x| rgb(view.get_pixel(x, y))).collect());
     let left = (x0..x0 + ring).find(|&x| column(x))?;
     let right = (x1 - ring..=x1).rev().find(|&x| column(x))?;
     let top = (y0..y0 + ring).find(|&y| row(y))?;
-    let bottom = (y1 - ring..=y1).rev().find(|&y| row(y))?;
-    Some(Rect::from_edges(left as f32, top as f32, (right + 1) as f32, (bottom + 1) as f32))
+    // The name box: rows across the box's width that one colour other than the ground fills.
+    let across = (x0 + ring)..(x1 - ring);
+    // The game shades it top to bottom, so a row counts the shades near its commonest.
+    let boxed = |y: u32| {
+        let pixels: Vec<[u8; 3]> = across.clone().map(|x| rgb(view.get_pixel(x, y))).collect();
+        commonest(pixels.iter().copied()).is_some_and(|(colour, _)| {
+            let near = pixels.iter().filter(|&&px| close(px, colour, SHADE)).count();
+            near as f32 >= NAME_FILL * pixels.len() as f32 && !close(colour, ground, KEY_TOLERANCE)
+        })
+    };
+    let mut runs: Vec<(u32, u32)> = Vec::new();
+    for y in y1.saturating_sub(MAX_NAME_BOX)..=y1 {
+        if !boxed(y) {
+            continue;
+        }
+        match runs.last_mut() {
+            Some(run) if run.1 + 1 == y => run.1 = y,
+            _ => runs.push((y, y)),
+        }
+    }
+    let (name_top, name_bottom) = runs.into_iter().filter(|(t, b)| b - t + 1 >= MIN_NAME_BOX).max_by_key(|(t, b)| b - t)?;
+    if name_top <= top + MIN_BOX_H / 2 {
+        return None;
+    }
+    let portrait = Rect::from_edges(left as f32, top as f32, (right + 1) as f32, name_top as f32);
+    let name = Rect::from_edges(left as f32, name_top as f32, (right + 1) as f32, (name_bottom + 1) as f32);
+    Some((portrait, name))
 }
 
 /// The name under the avatar, read by the game's font and by OCR.
@@ -367,9 +409,20 @@ pub fn read_name(view: &Frame, area: Rect, ocr: Option<&Ocr>) -> NameRead {
     else {
         return NameRead::default();
     };
-    // Ink is whatever stands well off the box's ground, light on dark or dark on light.
-    let ink = move |px: &Rgba<u8>| distance(rgb(px), ground) >= 180;
-    let inked = |y: u32| (x0..x0 + w).any(|x| ink(view.get_pixel(x, y)));
+    // Light letters on a dark box, or dark on light: by the box's middle brightness. A row the ink
+    // spans most of is a rule along the box's edge, not letters.
+    let mut lums: Vec<u8> = (y0..y0 + h).flat_map(|y| (x0..x0 + w).map(move |x| (x, y))).map(|(x, y)| luminance(view.get_pixel(x, y))).collect();
+    lums.sort_unstable();
+    let dark_box = lums[lums.len() / 2] < 160;
+    let ink = move |px: &Rgba<u8>| {
+        let (l, [r, g, b]) = (luminance(px), rgb(px));
+        let grey = r.max(g).max(b) - r.min(g).min(b) <= 40;
+        if dark_box { l >= 230 && grey } else { l <= 70 }
+    };
+    let inked = |y: u32| {
+        let n = (x0..x0 + w).filter(|&x| ink(view.get_pixel(x, y))).count() as u32;
+        n > 0 && n * 10 < w * 6
+    };
     // The tallest run of inked rows is the name (a box's border is one or two rows).
     let mut runs: Vec<(u32, u32)> = Vec::new();
     for y in y0..y0 + h {
@@ -507,25 +560,34 @@ fn key_out(mut picture: RgbaImage) -> Option<RgbaImage> {
     let palette: Vec<[u8; 3]> =
         counts.iter().filter(|(_, n)| *n as f32 >= GROUND_SHARE * edge.len() as f32).map(|(c, _)| *c).collect();
     let is_ground = |px: [u8; 3]| palette.iter().any(|&c| close(px, c, KEY_TOLERANCE));
+    // The game shades the ground (lighter towards the top), so the fill also follows small steps
+    // from one ground pixel to the next while they stay pale like the ground. The character's dark
+    // outline stops it.
+    let pale = |px: [u8; 3]| palette.iter().any(|&c| close(px, c, GRADIENT_REACH));
     let mut clear = vec![false; (w * h) as usize];
-    let mut stack: Vec<(u32, u32)> = edge.into_iter().filter(|&(x, y)| is_ground(rgb(picture.get_pixel(x, y)))).collect();
-    while let Some((x, y)) = stack.pop() {
+    let mut stack: Vec<(u32, u32, [u8; 3])> = edge
+        .into_iter()
+        .map(|(x, y)| (x, y, rgb(picture.get_pixel(x, y))))
+        .filter(|&(_, _, px)| is_ground(px))
+        .collect();
+    while let Some((x, y, from)) = stack.pop() {
         let i = (y * w + x) as usize;
-        if clear[i] || !is_ground(rgb(picture.get_pixel(x, y))) {
+        let px = rgb(picture.get_pixel(x, y));
+        if clear[i] || !(is_ground(px) || (close(px, from, SHADE) && pale(px))) {
             continue;
         }
         clear[i] = true;
         if x > 0 {
-            stack.push((x - 1, y));
+            stack.push((x - 1, y, px));
         }
         if y > 0 {
-            stack.push((x, y - 1));
+            stack.push((x, y - 1, px));
         }
         if x + 1 < w {
-            stack.push((x + 1, y));
+            stack.push((x + 1, y, px));
         }
         if y + 1 < h {
-            stack.push((x, y + 1));
+            stack.push((x, y + 1, px));
         }
     }
     for y in 0..h {
@@ -536,7 +598,31 @@ fn key_out(mut picture: RgbaImage) -> Option<RgbaImage> {
             }
         }
     }
+    drop_shadow(&mut picture, main);
     Some(picture)
+}
+
+/// Clears the shadow the game draws under the character's feet: the ground darkened, each channel
+/// the ground's times one factor. Only near the bottom, where it lies; a grey in the character
+/// (neutral, not the ground's warm tint) stays.
+fn drop_shadow(picture: &mut RgbaImage, ground: [u8; 3]) {
+    let (w, h) = picture.dimensions();
+    let Some(bottom) = (0..h).rev().find(|&y| (0..w).any(|x| picture.get_pixel(x, y).0[3] != 0)) else { return };
+    let Some(top) = (0..h).find(|&y| (0..w).any(|x| picture.get_pixel(x, y).0[3] != 0)) else { return };
+    let band = ((bottom - top + 1) * SHADOW_BAND / 100).max(4);
+    let total = ground.iter().map(|&c| u32::from(c)).sum::<u32>().max(1) as f32;
+    let shaded = |px: [u8; 3]| {
+        let k = px.iter().map(|&c| u32::from(c)).sum::<u32>() as f32 / total;
+        (0.35..0.95).contains(&k) && px.iter().zip(ground).all(|(&c, g)| (f32::from(c) - k * f32::from(g)).abs() <= 3.0)
+    };
+    for y in bottom.saturating_sub(band)..=bottom {
+        for x in 0..w {
+            let px = picture.get_pixel_mut(x, y);
+            if px.0[3] != 0 && shaded(rgb(px)) {
+                *px = Rgba([0, 0, 0, 0]);
+            }
+        }
+    }
 }
 
 /// A group of touching opaque pixels: its bounds (right and bottom exclusive) and size.
@@ -642,7 +728,8 @@ mod tests {
 
     const BODY: [u8; 3] = [228, 229, 230];
     const BORDER: [u8; 3] = [91, 123, 158];
-    const GROUND: [u8; 3] = [246, 244, 232];
+    const GROUND: [u8; 3] = [224, 223, 212];
+    const NAME_GREY: [u8; 3] = [130, 130, 130];
     const OUTLINE: [u8; 3] = [30, 24, 20];
     const SHIRT: [u8; 3] = [60, 140, 90];
     const SKIN: [u8; 3] = [250, 214, 180];
@@ -661,17 +748,25 @@ mod tests {
         fill(frame, ox + 2 * x, oy + 2 * y, 2 * w, 2 * h, c);
     }
 
-    /// A 1280 x 720 picture of the scene with the window at (`wx`, `wy`); the box's top-left corner
-    /// is returned.
+    /// A 1280 x 720 picture of the scene with the window at (`wx`, `wy`), laid out as the game's:
+    /// the avatar box's ground lighter in a band near the top, the figure's shadow under its feet,
+    /// the round badge top right and the name box (white letters on grey) inside the box's foot.
+    /// The box's top-left corner is returned.
     fn scene(wx: u32, wy: u32, badge: bool) -> (Frame, (u32, u32)) {
         let mut frame = Frame::from_pixel(1280, 720, Rgba([120, 170, 220, 255]));
         fill(&mut frame, wx, wy, 520, 360, BODY);
-        // The avatar box: a 2-pixel border round a pale ground, 90 x 110 design pixels.
+        // The avatar box: a 2-pixel border round a pale ground, 90 x 130 design pixels.
         let (bx, by) = (wx + 20, wy + 40);
-        fill(&mut frame, bx, by, 180, 220, BORDER);
-        fill(&mut frame, bx + 4, by + 4, 172, 212, GROUND);
-        // A figure: an outlined head, a body and legs, standing near the bottom.
-        let (fx, fy) = (bx + 4 + 2 * 30, by + 4 + 2 * 40);
+        let ground = (bx + 4, by + 4);
+        fill(&mut frame, bx, by, 180, 260, BORDER);
+        fill(&mut frame, bx + 4, by + 4, 172, 252, GROUND);
+        for row in 4..30u32 {
+            let bump = 30 - (row.abs_diff(17) * 30 / 13) as u8;
+            dfill(&mut frame, ground, 0, row, 86, 1, GROUND.map(|c| c.saturating_add(bump)));
+        }
+        // A figure: an outlined head, a body and legs, with its shadow under its feet.
+        let (fx, fy) = (bx + 4 + 2 * 30, by + 4 + 2 * 30);
+        dfill(&mut frame, (fx, fy), 0, 60, 24, 4, GROUND.map(|c| (f32::from(c) * 0.6).round() as u8));
         dfill(&mut frame, (fx, fy), 0, 0, 22, 20, OUTLINE);
         dfill(&mut frame, (fx, fy), 1, 1, 20, 18, SKIN);
         dfill(&mut frame, (fx, fy), 3, 20, 16, 30, OUTLINE);
@@ -690,9 +785,9 @@ mod tests {
                 }
             }
         }
-        // The name box under it.
-        fill(&mut frame, bx, by + 224, 180, 36, BORDER);
-        fill(&mut frame, bx + 2, by + 226, 176, 32, [255, 255, 255]);
+        // The name box inside the box's foot: grey, with a white bar standing for the letters.
+        fill(&mut frame, bx + 8, by + 212, 164, 36, NAME_GREY);
+        fill(&mut frame, bx + 60, by + 222, 60, 14, [255, 255, 255]);
         // The labels to the right: four pink cells, 88 x 28 at a pitch of 36.
         for i in 0..4 {
             fill(&mut frame, bx + 220, by + 60 + 36 * i, 88, 28, LABEL);
@@ -711,8 +806,46 @@ mod tests {
         assert_eq!(found.len(), 1, "{found:?}");
         let window = found[0];
         assert_eq!((window.portrait.x, window.portrait.y), ((bx + 4) as f32, (by + 4) as f32));
-        assert_eq!((window.portrait.w, window.portrait.h), (172.0, 212.0));
-        assert!(window.name.y >= (by + 220) as f32 && window.name.y <= (by + 228) as f32, "{:?}", window.name);
+        assert_eq!((window.portrait.w, window.portrait.h), (172.0, 208.0));
+        assert_eq!((window.name.y, window.name.h), ((by + 212) as f32, 36.0));
+    }
+
+    /// Saved frames of the real window (`test-screenshots/charinfo`, beside the repository and never
+    /// committed: they are game pictures). Runs only where they are. The name is the HUD's own, read
+    /// from the frame; on Windows the name box must read as it with Windows OCR.
+    #[test]
+    fn reads_saved_frames_of_the_real_window() {
+        let Some(folder) = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .ancestors()
+            .map(|a| a.join("test-screenshots").join("charinfo"))
+            .find(|p| p.is_dir())
+        else {
+            return;
+        };
+        for entry in std::fs::read_dir(&folder).unwrap() {
+            let path = entry.unwrap().path();
+            if path.extension().is_none_or(|e| e != "png") {
+                continue;
+            }
+            let frame = crate::vision::load(&path).unwrap();
+            let layout = super::super::hud::locate(&frame).expect("the HUD");
+            let own = super::super::hud::identity_lines(&frame, &layout).get(1).map(|(t, _)| t.clone()).expect("the HUD's name");
+            let windows = find(&frame);
+            assert_eq!(windows.len(), 1, "{path:?}");
+            #[cfg(windows)]
+            {
+                let ocr = Ocr::new().unwrap();
+                let read = read_name(&frame, windows[0].name, Some(&ocr));
+                assert!(names_match(&read, &own), "{path:?}: {read:?}");
+                assert!(!names_match(&read, "Somebodyelse"), "{path:?}");
+            }
+            let portrait = read_with(&frame, Some(&layout), &own, |_, _| NameRead { glyphs: Some(own.clone()), ocr: None })
+                .unwrap_or_else(|| panic!("{path:?}: no picture"));
+            let (w, h) = portrait.image.dimensions();
+            assert!((24..=100).contains(&w) && (40..=110).contains(&h), "{path:?}: {w} x {h}");
+            let clear = portrait.image.pixels().filter(|p| p.0[3] == 0).count();
+            assert!(clear * 4 >= (w * h) as usize, "{path:?}: the ground wasn't keyed out");            println!("{}: {w} x {h}", path.display());
+        }
     }
 
     #[test]
@@ -730,7 +863,8 @@ mod tests {
         let (frame, _) = scene(300, 120, true);
         let portrait = read_with(&frame, None, "Mossbank", named("Mossbank")).expect("own window");
         let image = &portrait.image;
-        // The figure is 22 design pixels wide and 62 tall; the badge is left out.
+        // The figure is 22 design pixels wide and 62 tall: the badge, the lighter band and the
+        // shadow are left out.
         assert_eq!(image.dimensions(), (22, 62));
         assert_eq!(image.get_pixel(0, 0).0, [OUTLINE[0], OUTLINE[1], OUTLINE[2], 255]);
         assert_eq!(image.get_pixel(5, 10).0, [SKIN[0], SKIN[1], SKIN[2], 255]);
