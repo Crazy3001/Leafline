@@ -626,7 +626,8 @@ function changeNav(next: NavState): NavState {
  * `__leafline.walk("Mossbank")` reads that map's header next, `walk(null)` hides the minimap,
  * `walk("Mosbank?")` reads a header too rough to trust, `finish()` fills the first quest's counters,
  * `login("Fernwick")` reads the game as another character, as after logging in on them,
- * `picture({ still: true, statusBar: false })` makes the picture a bad one (`picture({})` mends it).
+ * `picture({ still: true, statusBar: false })` makes the picture a bad one (`picture({})` mends it),
+ * `live({ state: "failed", message: "…" })` sets where live reading stands.
  */
 let liveAnalysis: Analysis = sampleAnalysis;
 function emitAnalysis(change: Partial<Analysis>) {
@@ -649,6 +650,10 @@ if (typeof window !== "undefined") {
     picture(change: Partial<Sight["picture"]>) {
       pictureChange = change;
       sightHandlers.forEach((h) => h(mockSight(Date.now() / 1000)));
+    },
+    live(next: LiveStatus) {
+      clearInterval(liveTimer);
+      setLive(next);
     },
     login(name: string) {
       sessionHandlers.forEach((h) => h({ ...sampleSessionSummary, name }));

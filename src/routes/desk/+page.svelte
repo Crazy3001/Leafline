@@ -16,6 +16,7 @@
   import DeskTools from "$lib/components/desk/DeskTools.svelte";
   import DeskMap from "$lib/components/desk/DeskMap.svelte";
   import DeskSearch, { type Kind as FoundKind } from "$lib/components/desk/DeskSearch.svelte";
+  import ShareBanner from "$lib/components/desk/ShareBanner.svelte";
   import DeskQuests from "$lib/components/desk/DeskQuests.svelte";
   import NextUp from "$lib/components/desk/NextUp.svelte";
   import Segmented from "$lib/ui/Segmented.svelte";
@@ -346,6 +347,8 @@
   <div class="main">
     <!-- Who you are, the level and the session's numbers, over every view, Now too. -->
     <DeskBar />
+    <!-- The website, while it isn't reading the game: how to start, or what's in the way. -->
+    <ShareBanner />
     <div class="top">
       {#if from}
         <button class="pill" onclick={back}><ArrowLeft size={14} />Back to {viewName(from)}</button>
