@@ -231,17 +231,6 @@ pub struct RouteStep {
     pub hidden: bool,
     /// Set when the step is a ride or scroll rather than a portal.
     pub travel: Option<TravelStep>,
-    /// Where the portal stands from the one the route comes out of on this map, in the game's
-    /// pixels (y grows downward). `None` on the first map, where the player's place isn't known,
-    /// and where the data doesn't place both portals.
-    pub toward: Option<Toward>,
-}
-
-/// How far across and down a portal is from where the player comes out on its map.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
-pub struct Toward {
-    pub dx: i32,
-    pub dy: i32,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
