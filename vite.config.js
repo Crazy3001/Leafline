@@ -10,6 +10,9 @@ export default defineConfig(({ mode }) => ({
 
   // The website is Vite's "web" mode. A constant, so the program's build drops the website's code.
   define: { __LEAFLINE_WEB__: JSON.stringify(mode === "web") },
+  // Its own dependency cache, so the website's dev server (npm run dev:web) can run beside the
+  // program's without rewriting the pre-bundled packages under the program's open windows.
+  cacheDir: mode === "web" ? "node_modules/.vite-web" : "node_modules/.vite",
 
   // WebView2 and WKWebView both support top-level await, used to pick the backend.
   build: { target: "es2022" },
