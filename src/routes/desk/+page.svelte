@@ -345,8 +345,7 @@
       {#if view !== "lookup"}
         <DeskSearch bind:this={deskSearch} onopen={openFound} onwords={searchWords} />
       {/if}
-      <!-- Where you're heading and the next step from here, in the middle of the row. -->
-      <div class="compass-slot"><Compass onpick={() => go("map")} /></div>
+      <span class="spacer"></span>
       {#if can.popOut}<button
         class="pill"
         aria-pressed={poppedOut}
@@ -361,6 +360,9 @@
         onclick={toggleOnTop}>{#if onTop}<PinOff size={14} />{:else}<Pin size={14} />{/if}</button
       >{/if}
     </div>
+    <!-- The compass: the map you're on and its portals, the next one lit on a trip. A band of its
+         own, centred, so the names stay readable beside the search and buttons. -->
+    <div class="compass-row"><Compass onpick={() => go("map")} /></div>
 
     <div class="view" class:narrow={narrowViews.includes(view)} class:full={view === "planner" || view === "layout"} aria-label={viewName(view)}>
       {#key view}
@@ -453,24 +455,14 @@
     padding: var(--space-3) var(--space-4);
   }
 
-  /* The compass takes the middle of what's left. */
-  .compass-slot {
-    display: flex;
+  .spacer {
     flex: 1;
-    justify-content: center;
-    min-width: 0;
   }
 
-  /* A narrow window: the compass gets a line of its own under the row. */
-  @container desk-main (max-width: 640px) {
-    .top {
-      flex-wrap: wrap;
-    }
-
-    .compass-slot {
-      flex-basis: 100%;
-      order: 10;
-    }
+  .compass-row {
+    display: flex;
+    justify-content: center;
+    padding: 0 var(--space-4) var(--space-3);
   }
 
   .pill {

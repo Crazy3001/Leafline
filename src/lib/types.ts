@@ -642,12 +642,6 @@ export interface RouteStep {
   hidden: boolean;
   /** Set when the step is a ride or scroll rather than a portal. */
   travel: TravelStep | null;
-  /**
-   * Where the portal stands from the one the route comes out of on this map, in the game's pixels
-   * (y grows downward). Missing on the first map, where the player's place isn't known, and where
-   * the data doesn't place both portals.
-   */
-  toward?: { dx: number; dy: number } | null;
 }
 
 export interface MapRoute {
