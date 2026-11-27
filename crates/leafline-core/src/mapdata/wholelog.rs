@@ -198,10 +198,26 @@ impl Atlas {
         };
 
         // A series row stands for its step on the Quest Helper, or else the first step not done.
+        // On the Completed tab, and not under way, it stands for the whole line: the game lists a
+        // line there once, by its name, when it is finished. (Every series in the data is one
+        // quest after another, none a pick-one set, so every step of it was done.)
         let helped: HashSet<String> = helper.iter().map(|t| fold(t)).collect();
         for row in series_rows {
-            let known = started(&placed);
             let steps = self.series_quests(&row.title, row.region.as_deref());
+            if row.done && row.state != LogState::InProgress {
+                let mut stood = false;
+                for &id in &steps {
+                    if !placed.contains_key(&id) {
+                        placed.insert(id, Placed { logged: row, series: Some(row.title.clone()) });
+                        stood = true;
+                    }
+                }
+                if !stood {
+                    extras.push(row);
+                }
+                continue;
+            }
+            let known = started(&placed);
             let on_helper = steps.iter().find(|id| self.quests.get(id).is_some_and(|q| helped.contains(&fold(&q.name))));
             let step = on_helper.or_else(|| steps.iter().find(|id| !known.contains(id) && !placed.contains_key(id)));
             match step {
@@ -584,6 +600,30 @@ mod tests {
         assert_eq!(on.counters[0].have, 28);
         assert_eq!(on.line.as_ref().map(|l| (l.name.as_str(), l.step, l.of)), Some(("Collecting For Maya", 1, 2)));
         assert!(whole.regions.iter().flat_map(|r| &r.quests).all(|q| q.quest_id.is_some()), "nothing left out as not in the data");
+    }
+
+    #[test]
+    fn a_series_on_the_completed_tab_is_done_every_step() {
+        // The game's Completed tab lists a finished line once, by its name.
+        let log = QuestLog {
+            character: Some("Tester".into()),
+            looks: vec![TabLook { tab: QuestTab::Completed, seen_at: 100, whole_at: Some(100) }],
+            quests: vec![logged(None, "Baskets For Bea", "Meadow", LogState::None, true)],
+            regions: Vec::new(),
+        };
+        let whole = atlas().whole_quest_log(&log, Some(20), &["Baskets Two".into()]);
+        for title in ["Baskets One", "Baskets Two", "Baskets Three"] {
+            let q = of(&whole, title);
+            assert_eq!((q.stand, q.inferred), (Stand::Done, false), "{title} was shown done, by its line");
+            assert_eq!(q.series.as_deref(), Some("Baskets For Bea"));
+        }
+        let meadow = whole.regions.iter().find(|r| r.region == "Meadow").unwrap();
+        assert_eq!(meadow.done, 3);
+
+        // Listed under way as well, it stands for one step, as before.
+        let log = QuestLog { quests: vec![logged(None, "Baskets For Bea", "Meadow", LogState::InProgress, true)], ..log };
+        let whole = atlas().whole_quest_log(&log, Some(20), &[]);
+        assert_eq!(of(&whole, "Baskets Three").stand, Stand::NotYet);
     }
 
     #[test]

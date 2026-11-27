@@ -380,11 +380,27 @@ const mockQuests: QuestRow[] = [
   { id: 83, name: "The Lantern Festival", region: "Mossbank", levelMin: 40, giver: "Lamplighter Wren", repeat: null, exp: 4000, mesos: 8000 },
   { id: 85, name: "Ferry Fare", region: "Fern Isle", levelMin: 4, giver: "Ferryman Oto", repeat: null, exp: 120, mesos: 300 },
   { id: 86, name: "Ferry Fare Returned", region: "Fern Isle", levelMin: 6, giver: "Ferryman Oto", repeat: null, exp: 240, mesos: 600 },
+  // A made-up line the Quest window listed done by its name, so every step is done.
+  { id: 87, name: "Counting Crabs", region: "Fern Isle", levelMin: 5, giver: "Tidewatcher Pell", repeat: null, exp: 150, mesos: 200 },
+  { id: 88, name: "Tide Pool Samples", region: "Fern Isle", levelMin: 5, giver: "Tidewatcher Pell", repeat: null, exp: 180, mesos: 250 },
+  { id: 89, name: "The Tide Chart", region: "Fern Isle", levelMin: 7, giver: "Tidewatcher Pell", repeat: null, exp: 260, mesos: 400 },
+  // Made-up errands enough to make the list scroll.
+  ...Array.from({ length: 28 }, (_, i): QuestRow => ({
+    id: 200 + i,
+    name: `Cove Errand ${["Alpha", "Bravo", "Cedar", "Dune", "Ember", "Flint", "Gull"][i % 7]} ${Math.floor(i / 7) + 1}`,
+    region: "Driftwood Cove",
+    levelMin: 10 + i,
+    giver: "Harbourmaster Kell",
+    repeat: null,
+    exp: 300 + 40 * i,
+    mesos: 500,
+  })),
 ];
 /** The made-up lines, in step order. */
 const mockLines = [
   { name: "Lights of Mossbank", ids: [80, 81, 82, 83] },
   { name: "Ferry Fare", ids: [85, 86] },
+  { name: "Tide Pool Survey", ids: [87, 88, 89] },
 ];
 const mockLine = (id: number): WholeQuest["line"] => {
   const line = mockLines.find((l) => l.ids.includes(id));
@@ -1311,7 +1327,11 @@ export const mockBackend: Backend = {
       row(byId(71), "ready", { counters: [{ name: "Moss Slime", have: 5, need: 5 }] }),
       row(byId(85), "inProgress", { counters: [{ name: "Moss Slime", have: 3, need: 10 }] }),
       row(byId(86), "notYet", { notYet: { level: null, after: after(85), notOfferedAt: null } }),
+      ...[87, 88, 89].map((id) => row(byId(id), "done", { series: "Tide Pool Survey" })),
     ];
+    const cove = mockQuests
+      .filter((q) => q.region === "Driftwood Cove")
+      .map((q, i) => row(q, i < 9 ? "done" : q.levelMin! <= at ? "canTake" : "notYet", q.levelMin! > at ? { notYet: { level: q.levelMin, after: [], notOfferedAt: null } } : {}));
     const moss = [
       row(byId(70), "done", { inferred: true }),
       row(byId(80), "done"),
@@ -1331,7 +1351,8 @@ export const mockBackend: Backend = {
       seen: true,
       level,
       regions: [
-        { region: "Fern Isle", done: 0, total: fern.length, completedTab: null, quests: fern },
+        { region: "Fern Isle", done: 3, total: fern.length, completedTab: 1, quests: fern },
+        { region: "Driftwood Cove", done: 9, total: cove.length, completedTab: 9, quests: cove },
         { region: "Mossbank", done: 1, total: moss.length, completedTab: 3, quests: moss },
       ],
     };

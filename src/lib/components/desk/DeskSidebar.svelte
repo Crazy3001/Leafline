@@ -1,10 +1,10 @@
 <script lang="ts">
-  // The desk view's sidebar: the light/dark switch beside the fold button, the character switch
-  // (whose numbers every page shows) under the logo, then the five tabs, Look up, Tools (one page
-  // of every tool) and the player's own layout. Whether Leafline is reading is said by the player
-  // bar over the views (on the website, by the Share button), as is how the session goes; the
-  // data's credits are in Settings. Its foot keeps the ban-risk line. It folds to icons in a
-  // narrow window.
+  // The desk view's sidebar: the light/dark switch beside the fold button, on the website the Share
+  // button (whether Leafline is reading, and the way to start or stop) under the logo, then the
+  // character switch (whose numbers every page shows), the five tabs, Look up, Tools (one page of
+  // every tool) and the player's own layout. In the program the player bar over the views says
+  // whether it's reading, as it says how the session goes; the data's credits are in Settings. Its
+  // foot keeps the ban-risk line. It folds to icons in a narrow window.
   import { tip } from "$lib/tip.svelte";
   import {
     ChartLine,
@@ -27,8 +27,9 @@
   import { backend } from "$lib/api";
   import Logo from "$lib/components/Logo.svelte";
   import CharacterSwitch from "./CharacterSwitch.svelte";
+  import ShareButton from "./ShareButton.svelte";
   import { DESK_TOOL_PAGES, ZOOMS, type DeskView } from "$lib/desk";
-  import { isWeb } from "$lib/platform";
+  import { can, isWeb } from "$lib/platform";
   import { noteRecordsSaved, recordsSavedAt } from "$lib/recordsfile";
   import { live } from "$lib/readings.svelte";
   import { changeSettings } from "$lib/settings.svelte";
@@ -123,6 +124,9 @@
     </button>
   </div>
 
+  <!-- The one button that starts everything, first under the logo (the website only). -->
+  {#if can.readWindow}<div class="share-slot"><ShareButton {folded} /></div>{/if}
+
   <CharacterSwitch {folded} onunfold={onfold} />
 
   <nav aria-label="Views">
@@ -201,6 +205,14 @@
 
   .look {
     margin-left: auto;
+  }
+
+  .share-slot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    margin-bottom: var(--space-2);
   }
 
   .folded .look {
