@@ -674,6 +674,12 @@ export interface NavState {
 export interface Trip {
   /** The map the player was last read on, held through a missed or rough reading. */
   here: MapRef | null;
+  /**
+   * The map read before `here`, when the player went from one to the other: the way back to it is
+   * most likely where they came in. Not a position, and wrong after a scroll, taxi or death, so a
+   * map with no portal back to it shows nothing.
+   */
+  cameFrom: MapRef | null;
   /** The last reading was too rough to trust, so `here` may be out of date. */
   unsure: boolean;
   /** The way from where the route was worked out; `next` is the step to take now. */

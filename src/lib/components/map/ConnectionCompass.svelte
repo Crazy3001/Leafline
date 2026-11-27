@@ -20,6 +20,7 @@
     current = null,
     points = null,
     next = null,
+    came = null,
     lit = null,
     layout = "compass",
     hub,
@@ -38,6 +39,8 @@
     points?: ViewPoint[] | null;
     /** The portal the trip being followed takes next from this map. */
     next?: { portal: string | null; to: number } | null;
+    /** The map the player was on before this one: the way back to it is where they came in. */
+    came?: number | null;
     /** A map whose portal is pointed at on the picture. */
     lit?: number | null;
     layout?: "compass" | "list" | "strip";
@@ -130,6 +133,7 @@
   const sideMost = $derived(up.length || down.length ? Math.min(perSide, 1) : perSide);
 
   const isNext = (exit: MapExit) => next != null && exit.to.id === next.to;
+  const isCame = (exit: MapExit) => came != null && exit.to.id === came && !isNext(exit);
 
   /** More neighbours than this in one slot fold behind a "+N more" chip; the next portal never folds away. */
   const SHOWN = 3;
@@ -139,7 +143,7 @@
     // On the card the "+N more" chip takes a place; the strip's chip sits beside the ones shown.
     const keep = layout === "strip" ? most : most - 1;
     const first = list.slice(0, keep);
-    const kept = list.find((e, i) => i >= keep && isNext(e));
+    const kept = list.find((e, i) => i >= keep && isNext(e)) ?? list.find((e, i) => i >= keep && isCame(e));
     if (!kept) return first;
     // The strip has no room to add it: it takes the last place.
     return layout === "strip" ? [...first.slice(0, Math.max(keep - 1, 0)), kept] : [...first, kept];
@@ -164,6 +168,7 @@
       exit.hidden ? "The portal's name marks it as hidden: the game draws nothing there" : null,
       exit.to.id === current?.id ? "You are on this map" : null,
       isNext(exit) ? "Your next step on the trip" : null,
+      isCame(exit) ? "You came in this way" : null,
     ].filter(Boolean);
     return lines.length ? lines.join("\n") : undefined;
   }
@@ -193,6 +198,7 @@
     class="node {exit.direction}"
     class:yours
     class:next={isNext(exit)}
+    class:came={isCame(exit)}
     class:lit={lit === exit.to.id}
     class:unknown={!exit.to.known}
     class:hidden-exit={exit.hidden}
@@ -210,7 +216,7 @@
       {#if slot !== "left"}{@render locator(exit)}{/if}
     </span>
     <span class="label">{exit.to.name}</span>
-    {#if isNext(exit)}<span class="flag">Next</span>{:else if exit.hidden}<span class="hidden" aria-label="Hidden portal"
+    {#if isNext(exit)}<span class="flag">Next</span>{:else if isCame(exit)}<span class="flag came-flag">Came in</span>{:else if exit.hidden}<span class="hidden" aria-label="Hidden portal"
         ><EyeOff size={11} /></span
       >{/if}
   </button>
@@ -658,6 +664,17 @@
   .slot.west .hidden {
     right: auto;
     left: 4px;
+  }
+
+  /* Where you came in: a white edge and a quiet flag, below the way on. */
+  .node.came {
+    border-color: color-mix(in srgb, var(--text) 55%, transparent);
+  }
+
+  .flag.came-flag {
+    background: var(--surface-3);
+    color: var(--text);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 45%, transparent);
   }
 
   /* The trip's next portal: the accent edge and a small flag on the corner. */
