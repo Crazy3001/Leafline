@@ -7,14 +7,15 @@
 </script>
 
 <script lang="ts">
-  // The desk's compass, centred under the top row on every view: the map you're on, its picture
+  // The desk's compass, in the top row of every view: the map you're on, its picture
   // with every portal marked where it stands (CompassMap), or, as the player picks, a band of its
   // portals beside it with the small boxes that show where each stands. With a place set
   // by Go here, the portal to take next is a green ring and the line under the map says where it
   // leads and how far is left; without one, each portal opens its map's card, whose Go sets it.
   // The line opens every portal by name and the route. It follows the map the wayfinder last
   // placed you on (wayfinder.svelte.ts). Information only: Leafline never draws in the game, and
-  // the player walks the way themselves.
+  // the player walks the way themselves. In the top row (`bar`) it is one line, and the map or band
+  // floats under it, over the page, while the pointer is on it or it is open.
   import { tip } from "$lib/tip.svelte";
   import { Check, ChevronDown, Columns3, Image as Picture, MapPin, Navigation, X } from "@lucide/svelte";
 
@@ -36,11 +37,14 @@
   let {
     onpick,
     line = false,
+    bar = false,
   }: {
     /** Opens where a place is picked (the Map view's Go to…). */
     onpick: () => void;
     /** For a phone: a shorter map and a one-line footer. */
     line?: boolean;
+    /** For a row of buttons: the line alone, the map floating under it on hover or click. */
+    bar?: boolean;
   } = $props();
 
   watchDestination();
@@ -161,7 +165,7 @@
 <!-- The band's middle: where you are; the line under it names the map. -->
 {#snippet pin()}<span class="pin" use:tip={"You're on this map"}><MapPin size={14} /></span>{/snippet}
 
-<div class="compass" class:line class:portals={look === "portals"} class:going={dest && step} bind:this={root}>
+{#snippet view()}
   {#if here && look === "map"}
     <CompassMap
       map={here}
@@ -189,12 +193,59 @@
       onnavigate={portalCard}
     />
   {/if}
+{/snippet}
+
+{#snippet drawer()}
+      {#if here}
+        <p class="d-head">
+          Portals on <Ref kind="map" id={here.id} name={here.name} />{#if !reading}<span class="seen"> · last seen</span>{/if}
+        </p>
+        <ConnectionCompass
+          exits={card?.exits ?? []}
+          map={here}
+          current={reading ? here : null}
+          points={picture?.points ?? null}
+          {next}
+          onnavigate={portalCard}
+        />
+        <p class="note">Where each portal stands is from the map data. Leafline doesn't know where you stand.</p>
+      {/if}
+      {#if dest}
+        <p class="d-head route-head">
+          To <Ref kind={dest.kind === "npc" ? "npc" : "map"} id={dest.kind === "npc" ? null : dest.maps[0].id} name={dest.name} />{#if dest.kind === "npc" && route?.to}<span
+              class="faint">{` · on ${route.to.name}`}</span
+            >{/if}
+        </p>
+        {#if route && route.steps.length}
+          <RouteSteps {route} current={trip.next} note={false} />
+          <p class="note tabular">
+            {route.steps.length} {route.steps.length === 1 ? "step" : "steps"}{#if route.walkSeconds != null && !route.steps.some((s) => s.travel)}, about
+              {walkTime(route.walkSeconds)} on foot{/if}{#if fares} · {formatNumber(fares)} mesos in fares{/if}
+          </p>
+        {:else if trip.lost}
+          <p class="note">{display.travel.enabled ? "Some trips need a ship or an NPC." : "Taxis and scrolls may find a way."}</p>
+        {/if}
+        <div class="switch-row">
+          <span class="s-name">Taxis and return scrolls</span>
+          <Switch
+            checked={display.travel.enabled}
+            label="Taxis and return scrolls"
+            onchange={(on) => void changeSettings({ travel: { ...display.travel, enabled: on } })}
+          />
+        </div>
+      {:else}
+        <p class="note">Click a portal for its map, and Go to head there, or <button class="link" onclick={onpick}>pick a place</button> in the Map view.</p>
+      {/if}
+{/snippet}
+
+<div class="compass" class:line class:bar class:open class:portals={look === "portals"} class:going={dest && step} bind:this={root}>
+  {#if !bar}{@render view()}{/if}
   <div class="foot">
     <button
       class="hub-btn"
       aria-expanded={open}
       aria-controls={drawerId}
-      use:tip={open ? null : dest ? "Every portal here, and the whole route" : "Every portal here, by name"}
+      use:tip={open || bar ? null : dest ? "Every portal here, and the whole route" : "Every portal here, by name"}
       onclick={() => (open = !open)}
     >
       <span class="here-name">
@@ -244,49 +295,16 @@
     {/if}
   </div>
 
-  {#if open}
-    <div class="drawer" id={drawerId}>
-      {#if here}
-        <p class="d-head">
-          Portals on <Ref kind="map" id={here.id} name={here.name} />{#if !reading}<span class="seen"> · last seen</span>{/if}
-        </p>
-        <ConnectionCompass
-          exits={card?.exits ?? []}
-          map={here}
-          current={reading ? here : null}
-          points={picture?.points ?? null}
-          {next}
-          onnavigate={portalCard}
-        />
-        <p class="note">Where each portal stands is from the map data. Leafline doesn't know where you stand.</p>
-      {/if}
-      {#if dest}
-        <p class="d-head route-head">
-          To <Ref kind={dest.kind === "npc" ? "npc" : "map"} id={dest.kind === "npc" ? null : dest.maps[0].id} name={dest.name} />{#if dest.kind === "npc" && route?.to}<span
-              class="faint">{` · on ${route.to.name}`}</span
-            >{/if}
-        </p>
-        {#if route && route.steps.length}
-          <RouteSteps {route} current={trip.next} note={false} />
-          <p class="note tabular">
-            {route.steps.length} {route.steps.length === 1 ? "step" : "steps"}{#if route.walkSeconds != null && !route.steps.some((s) => s.travel)}, about
-              {walkTime(route.walkSeconds)} on foot{/if}{#if fares} · {formatNumber(fares)} mesos in fares{/if}
-          </p>
-        {:else if trip.lost}
-          <p class="note">{display.travel.enabled ? "Some trips need a ship or an NPC." : "Taxis and scrolls may find a way."}</p>
-        {/if}
-        <div class="switch-row">
-          <span class="s-name">Taxis and return scrolls</span>
-          <Switch
-            checked={display.travel.enabled}
-            label="Taxis and return scrolls"
-            onchange={(on) => void changeSettings({ travel: { ...display.travel, enabled: on } })}
-          />
-        </div>
-      {:else}
-        <p class="note">Click a portal for its map, and Go to head there, or <button class="link" onclick={onpick}>pick a place</button> in the Map view.</p>
-      {/if}
+  {#if bar && (here || open)}
+    <!-- Floats over the page from the line; its top padding bridges the gap so hover holds. -->
+    <div class="float">
+      {#if here}<div class="float-card">{@render view()}</div>{/if}
+      {#if open}<div class="drawer in-float" id={drawerId}>{@render drawer()}</div>{/if}
     </div>
+  {/if}
+
+  {#if open && !bar}
+    <div class="drawer" id={drawerId}>{@render drawer()}</div>
   {/if}
 </div>
 
@@ -318,6 +336,50 @@
     width: 100%;
     gap: var(--space-1);
     padding: var(--space-1);
+  }
+
+  /* In the top row: as tall as the row's buttons, as wide as the room between them allows. */
+  .compass.bar {
+    width: 100%;
+    justify-content: center;
+    min-height: var(--control-h);
+    padding: 2px var(--space-1-5) 2px var(--space-2);
+    border-radius: var(--radius-pill);
+  }
+
+  .compass.bar .hub-btn {
+    line-height: 1.2;
+  }
+
+  /* The map or band, under the line over the page, while pointed at or open. */
+  .float {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    z-index: 31;
+    display: none;
+    width: 460px;
+    max-width: calc(100vw - 2 * var(--space-3));
+    padding-top: var(--space-1-5);
+    transform: translateX(-50%);
+  }
+
+  .compass.portals .float {
+    width: 580px;
+  }
+
+  .compass.bar:hover .float,
+  .compass.bar:focus-within .float,
+  .compass.bar.open .float {
+    display: block;
+  }
+
+  .float-card {
+    padding: var(--space-1-5);
+    border: var(--line-w) solid var(--control-line);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    box-shadow: var(--card-shadow), 0 12px 32px rgb(0 0 0 / 0.18);
   }
 
   .foot {
@@ -505,6 +567,19 @@
     background: var(--surface);
     box-shadow: var(--card-shadow), 0 12px 32px rgb(0 0 0 / 0.18);
     transform: translateX(-50%);
+  }
+
+  /* Opened in the top row: under the floating map, in the same column. */
+  .drawer.in-float {
+    position: static;
+    width: auto;
+    max-height: min(60vh, 520px);
+    margin-top: var(--space-1-5);
+    transform: none;
+  }
+
+  .compass.bar.open .float {
+    width: 560px;
   }
 
   .d-head {
