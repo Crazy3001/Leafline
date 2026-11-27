@@ -36,6 +36,7 @@
   import { IDEA_URL, reportUrl } from "$lib/feedback";
   import { DROPS_URL, OSMS_URL, WIKI_URL } from "$lib/mapdata.svelte";
   import { live, watchLive } from "$lib/readings.svelte";
+  import { anyLook, forgetLooks, watchLooks } from "$lib/looks.svelte";
   import { changeSettings, display, hotkey, keyHint, keyName, usesNumpad, watchSettings } from "$lib/settings.svelte";
   import { watchTyping } from "$lib/typing";
   import Segmented from "$lib/ui/Segmented.svelte";
@@ -98,6 +99,17 @@
   const INTERVALS = [1, 2, 3, 5];
   let windows = $state<GameWindow[]>([]);
   let liveError = $state<string | null>(null);
+
+  watchLooks();
+  let forgetting = $state(false);
+  async function forgetLook() {
+    forgetting = true;
+    try {
+      await forgetLooks();
+    } finally {
+      forgetting = false;
+    }
+  }
 
   function setLive(change: Partial<LiveChoice>) {
     changeSettings({ live: { ...display.live, ...change } });
@@ -642,6 +654,27 @@
             />
           </div>
         </div>
+        <div class="row">
+          <label for="character-look">
+            <span class="name">Your character's look</span>
+            <span class="help"
+              >Open Character Info on your own character and hold it still, and Leafline uses the picture of them in it beside
+              their name. Only your own: another player's window is never kept. The picture stays on this PC and isn't put
+              on share cards.</span
+            >
+          </label>
+          <div class="control">
+            {#if anyLook()}<button class="btn" disabled={forgetting} onclick={forgetLook}>Forget saved look</button>{/if}
+            <input
+              id="character-look"
+              class="switch"
+              type="checkbox"
+              role="switch"
+              checked={display.live.characterLook !== false}
+              onchange={(e) => setLive({ characterLook: e.currentTarget.checked })}
+            />
+          </div>
+        </div>
 
         <div class="row">
           <label for="bag-check">
@@ -798,6 +831,27 @@
             role="switch"
             checked={display.live.characterWindows}
             onchange={(e) => setLive({ characterWindows: e.currentTarget.checked })}
+          />
+        </div>
+      </div>
+      <div class="row">
+        <label for="web-character-look">
+          <span class="name">Your character's look</span>
+          <span class="help"
+            >Open Character Info on your own character and hold it still, and Leafline uses the picture of them in it beside
+            their name. Only your own: another player's window is never kept. The picture stays on this PC and isn't put
+            on share cards.</span
+          >
+        </label>
+        <div class="control">
+          {#if anyLook()}<button class="btn" disabled={forgetting} onclick={forgetLook}>Forget saved look</button>{/if}
+          <input
+            id="web-character-look"
+            class="switch"
+            type="checkbox"
+            role="switch"
+            checked={display.live.characterLook !== false}
+            onchange={(e) => setLive({ characterLook: e.currentTarget.checked })}
           />
         </div>
       </div>

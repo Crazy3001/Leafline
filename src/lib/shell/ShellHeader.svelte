@@ -13,10 +13,12 @@
   import { ago, lastKnown, profile, watchProfile } from "$lib/profile.svelte";
   import { live } from "$lib/readings.svelte";
   import { place, regionHue, watchRegion } from "$lib/region.svelte";
-  import { hotkey, keyHint } from "$lib/settings.svelte";
+  import { display, hotkey, keyHint } from "$lib/settings.svelte";
   import { tip } from "$lib/tip.svelte";
   import IconButton from "$lib/ui/IconButton.svelte";
   import LevelRing from "$lib/ui/LevelRing.svelte";
+  import LookPicture from "$lib/ui/LookPicture.svelte";
+  import { LOOK_TIP, lookOf, watchLooks } from "$lib/looks.svelte";
 
   let {
     liveTitle,
@@ -55,6 +57,7 @@
   } = $props();
 
   watchProfile();
+  watchLooks();
   watchSwitches();
   /** The HUD switched character by itself (a log-in): said for a few seconds. */
   const fresh = $derived(switched.name != null && !characters.all && switched.name === characters.active);
@@ -66,6 +69,11 @@
   const levelShown = $derived(lastKnown(hud?.level ?? session?.level, known?.level, known?.seenAt));
   const level = $derived(levelShown.value);
   const name = $derived(session?.name ?? hud?.name ?? profile.name);
+  /** Their look from the game's Character Info window, kept from an earlier read. */
+  const look = $derived(characters.all ? null : lookOf(name));
+  const lookTip = $derived(
+    look ? `${name}'s look, as of ${ago(look.readAt)}` : can.liveReading && display.live.characterLook !== false ? LOOK_TIP : null,
+  );
   const job = $derived(lastKnown(hud?.job ?? session?.job, known?.job, known?.seenAt));
   const percentShown = $derived(
     lastKnown(hud?.exp?.percent ?? hud?.expPercent ?? session?.percent, known?.expPercent, known?.seenAt),
@@ -109,7 +117,10 @@
 
 <header class:washed={hue != null} style:--region-hue={hue} data-tauri-drag-region>
   <div class="top" data-tauri-drag-region>
-    <span class="ring" class:stale={levelShown.at != null}><LevelRing {level} {percent}><Logo size={20} /></LevelRing></span>
+    {#snippet pictured(inner: number)}{#if look}<LookPicture {look} size={inner} crop="bust" />{/if}{/snippet}
+    <span class="ring" class:stale={levelShown.at != null} use:tip={lookTip}
+      ><LevelRing {level} {percent} picture={look ? pictured : undefined}><Logo size={20} /></LevelRing></span
+    >
     <div class="who" data-tauri-drag-region>
       <button class="name" class:fresh aria-haspopup="dialog" aria-expanded={choosing} aria-label="{characters.all ? 'All characters' : (name ?? 'No character yet')}. Pick a character" onclick={onwho}>
         <span>{characters.all ? "All characters" : (name ?? "Leafline")}</span><ChevronDown size={15} />

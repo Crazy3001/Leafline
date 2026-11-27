@@ -122,6 +122,18 @@ export interface KnownCharacter {
   mesosSeenAt: number | null;
 }
 
+/** A character's look, cut from the game's Character Info window when it showed their own: a
+ *  small picture on a transparent ground at the game's own pixel size. Kept on this PC only. */
+export interface CharacterLook {
+  name: string;
+  /** A `data:image/png` URL. */
+  src: string;
+  width: number;
+  height: number;
+  /** When it was read, Unix seconds. */
+  readAt: number;
+}
+
 export interface MapReading {
   /** The street or area above the map's name, such as `Victoria Road`, when it was read. */
   street: string | null;
@@ -293,6 +305,9 @@ export interface LiveChoice {
   bagCheck: boolean;
   /** The website keeps the quest log from the Quest window while it's open. */
   questWindow: boolean;
+  /** The character's look is taken from the Character Info window when it shows their own, and
+   *  shown as their picture. Off, none is read or shown. */
+  characterLook: boolean;
 }
 
 export interface ShortcutInfo {

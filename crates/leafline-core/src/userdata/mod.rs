@@ -266,6 +266,14 @@ CREATE TABLE character_bags (
     read_at INTEGER NOT NULL,
     PRIMARY KEY (name, tab));
 ",
+    "
+CREATE TABLE character_looks (
+    name TEXT PRIMARY KEY COLLATE NOCASE,
+    png BLOB NOT NULL,
+    width INTEGER NOT NULL,
+    height INTEGER NOT NULL,
+    read_at INTEGER NOT NULL);
+",
 ];
 
 /// Daily copies of the records that are kept.

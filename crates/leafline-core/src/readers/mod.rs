@@ -2,6 +2,7 @@
 //! reads it with OCR and parses the text into structured data.
 
 pub mod character;
+pub mod charinfo;
 pub mod counts;
 mod digits;
 pub(crate) mod gamefont;

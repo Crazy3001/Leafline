@@ -23,7 +23,7 @@ interface Live {
   set_pickup_log(on: boolean): void;
   set_item_tooltips(on: boolean): void;
   take_items(): string;
-  set_windows(character: boolean, bag: boolean, questLog: boolean): void;
+  set_windows(character: boolean, bag: boolean, questLog: boolean, look: boolean): void;
   take_windows(): string;
   reset(): void;
 }
@@ -53,6 +53,8 @@ export interface ReadingChoice {
   bagCheck: boolean;
   /** Keep the quest log from the Quest window while it's open. */
   questWindow: boolean;
+  /** Take the character's look from the Character Info window when it shows their own. */
+  characterLook: boolean;
 }
 
 /** What the game's windows gave at a full read (crates/leafline-capture, live.rs WindowReads),
@@ -61,6 +63,8 @@ export interface WindowReads {
   character?: unknown;
   bag?: unknown;
   questLog?: { name: string; reading: unknown; fresh: boolean };
+  /** The character's look, only ever their own (the window's name matched the HUD's). */
+  look?: { name: string; png: string; width: number; height: number };
 }
 
 export interface LiveRead {
@@ -184,7 +188,7 @@ self.onmessage = async ({ data }: MessageEvent<ToLive>) => {
       live = new wasm.Live(data.idleAfter, data.saved);
       live.set_pickup_log(data.pickupLog);
       live.set_item_tooltips(data.itemTooltips);
-      live.set_windows(data.characterWindows, data.bagCheck, data.questWindow);
+      live.set_windows(data.characterWindows, data.bagCheck, data.questWindow, data.characterLook);
       post({ type: "summary", session: JSON.parse(live.summary()) as SessionSummary });
       void loadTextReading(live, data.textModel, data.dataSources);
       break;
@@ -193,7 +197,7 @@ self.onmessage = async ({ data }: MessageEvent<ToLive>) => {
       live?.set_idle_after(data.idleAfter);
       live?.set_pickup_log(data.pickupLog);
       live?.set_item_tooltips(data.itemTooltips);
-      live?.set_windows(data.characterWindows, data.bagCheck, data.questWindow);
+      live?.set_windows(data.characterWindows, data.bagCheck, data.questWindow, data.characterLook);
       if (live) {
         const items = live.take_items();
         if (items) post({ type: "items", tooltips: JSON.parse(items) as ItemTooltip[] });

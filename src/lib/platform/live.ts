@@ -98,6 +98,7 @@ type LiveSettings = {
     characterWindows?: boolean;
     bagCheck?: boolean;
     questWindow?: boolean;
+    characterLook?: boolean;
   };
 };
 
@@ -110,6 +111,7 @@ function choiceOf(s: LiveSettings): ReadingChoice {
     characterWindows: s.live?.characterWindows ?? true,
     bagCheck: s.live?.bagCheck ?? true,
     questWindow: s.live?.questWindow ?? true,
+    characterLook: s.live?.characterLook ?? true,
   };
 }
 
@@ -308,6 +310,7 @@ async function keepWindows(reads: WindowReads) {
   };
   if (reads.character) await run("character's windows", "catch_up_character", { scan: reads.character });
   if (reads.questLog) await run("quest log", "follow_quest_log", reads.questLog);
+  if (reads.look) await run("character's look", "keep_look", { look: reads.look });
   if (reads.bag) {
     const bag = reads.bag;
     await run("bag check", "check_bag", { bag, ...(await fetchBagPictures({ bag })) });

@@ -12,6 +12,7 @@ use super::host::{Host, emit};
 use crate::error::{Error, Result};
 use crate::session::SessionSummary;
 use crate::userdata::{RecordsSummary, UserData};
+use crate::readers::charinfo::SeenLook;
 use crate::userdata::characters::{KnownCharacter, SeenCharacter};
 use crate::userdata::drops::{LoggedDrop, NewDrop};
 use crate::userdata::notes::{ItemNote, MapNote};
@@ -151,6 +152,67 @@ pub fn keep_bag(h: &dyn Host, check: &BagCheck) -> Result<()> {
     };
     let text = serde_json::to_string(check).map_err(|err| Error::Invalid(err.to_string()))?;
     h.records().with(|db| db.save_bag(name, &tab, &text, check.at))?;
+    emit(h, KNOWN_EVENT, &());
+    Ok(())
+}
+
+/// A character's look as the page shows it: the picture as a `data:` URL, at the game's own pixel
+/// size, and when it was read.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CharacterLook {
+    pub name: String,
+    pub src: String,
+    pub width: u32,
+    pub height: u32,
+    /// Unix seconds.
+    pub read_at: i64,
+}
+
+/// The largest look kept, as PNG bytes and in pixels a side: a character is far smaller.
+const MAX_LOOK_BYTES: usize = 64 * 1024;
+const MAX_LOOK_SIDE: u32 = 200;
+
+/// Keeps a character's look, cut from the Character Info window by the live reading once it named
+/// the player's own character (`readers::charinfo`). Only on this PC: it moves only in the records
+/// file. A picture that isn't a small PNG isn't kept.
+pub fn keep_look(h: &dyn Host, look: SeenLook) -> Result<()> {
+    use base64::Engine as _;
+    let name = look.name.trim();
+    let png = base64::engine::general_purpose::STANDARD
+        .decode(look.png.as_bytes())
+        .map_err(|_| Error::Invalid("That look isn't a picture.".into()))?;
+    let fits = !name.is_empty()
+        && png.len() <= MAX_LOOK_BYTES
+        && image::load_from_memory_with_format(&png, image::ImageFormat::Png)
+            .is_ok_and(|p| p.width() == look.width && p.height() == look.height && p.width() <= MAX_LOOK_SIDE && p.height() <= MAX_LOOK_SIDE);
+    if !fits {
+        return Err(Error::Invalid("That look isn't a character's picture.".into()));
+    }
+    h.records().with(|db| db.save_look(name, &png, look.width, look.height, now()))?;
+    emit(h, KNOWN_EVENT, &());
+    Ok(())
+}
+
+/// Every character's kept look, the newest first.
+pub fn character_looks(h: &dyn Host) -> Result<Vec<CharacterLook>> {
+    use base64::Engine as _;
+    let looks = h.records().with(|db| db.looks())?;
+    Ok(looks
+        .into_iter()
+        .map(|look| CharacterLook {
+            name: look.name,
+            src: format!("data:image/png;base64,{}", base64::engine::general_purpose::STANDARD.encode(&look.png)),
+            width: look.width,
+            height: look.height,
+            read_at: look.read_at,
+        })
+        .collect())
+}
+
+/// Forgets every kept look ("Forget saved look" in Settings).
+pub fn forget_looks(h: &dyn Host) -> Result<()> {
+    h.records().with(|db| db.forget_looks())?;
     emit(h, KNOWN_EVENT, &());
     Ok(())
 }

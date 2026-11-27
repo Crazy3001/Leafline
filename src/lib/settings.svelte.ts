@@ -21,7 +21,7 @@ export const display = $state<DisplaySettings>({
   compactShape: "card",
   hotkeys: { enabled: true, keys: {} },
   travel: { enabled: false, cabs: true, vipCabs: false, scrolls: true },
-  live: { enabled: true, interval: 2, pauseAfter: 15, window: null, pickupLog: true, itemTooltips: true, characterWindows: true, bagCheck: true, questWindow: true },
+  live: { enabled: true, interval: 2, pauseAfter: 15, window: null, pickupLog: true, itemTooltips: true, characterWindows: true, bagCheck: true, questWindow: true, characterLook: true },
   buildRules: DEFAULT_RULES,
   framesFolder: null,
   setupDone: false,

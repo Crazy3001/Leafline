@@ -36,6 +36,7 @@ import type {
   TravelInfo,
   Guide,
   History,
+  CharacterLook,
   KnownCharacter,
   Backup,
   Sight,
@@ -318,6 +319,10 @@ export interface Backend {
   knownCharacters(): Promise<string[]>;
   /** What was last read of some character (or their bag) changed. */
   onKnownCharacter(handler: () => void): Promise<UnlistenFn>;
+  /** Every character's look kept from the Character Info window, the newest first. */
+  characterLooks(): Promise<CharacterLook[]>;
+  /** Forgets every kept look. */
+  forgetLooks(): Promise<void>;
 
   sessionHistory(): Promise<History>;
   /** The EXP each level takes, as far as the player's HUD has shown it, lowest first. */

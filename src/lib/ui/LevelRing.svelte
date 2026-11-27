@@ -1,6 +1,7 @@
 <script lang="ts">
   // The level inside a ring that fills with the level's EXP: the header's gauge. With no level
-  // read yet it shows whatever is put inside it (the leaf mark) in an empty ring.
+  // read yet it shows whatever is put inside it (the leaf mark) in an empty ring. Given a picture
+  // (the character's look), the picture fills the ring and the level sits in a pill at its foot.
   import type { Snippet } from "svelte";
 
   let {
@@ -8,6 +9,7 @@
     percent,
     size = 48,
     children,
+    picture,
   }: {
     level: number | null;
     /** EXP through the level, 0 to 100. */
@@ -15,6 +17,8 @@
     size?: number;
     /** Shown in place of the level when there is none. */
     children?: Snippet;
+    /** Fills the ring, given the size it has inside the ring; the level moves to a pill. */
+    picture?: Snippet<[number]>;
   } = $props();
 
   // A level gained lights the ring once. The first level read is not a level-up.
@@ -48,7 +52,10 @@
     {/if}
   </svg>
   <div class="inside" aria-hidden="true">
-    {#if level != null}
+    {#if picture}
+      <span class="pic">{@render picture(Math.round(size * 0.8))}</span>
+      {#if level != null}<span class="pill" class:long={level >= 100}>{level}</span>{/if}
+    {:else if level != null}
       <span class="lv">LV</span>
       <span class="n" class:long={level >= 100}>{level}</span>
     {:else}
@@ -113,6 +120,36 @@
     font-family: var(--font-display);
     line-height: 1;
     color: var(--header-text);
+  }
+
+  /* Inside the ring's stroke, round. */
+  .pic {
+    position: absolute;
+    inset: 10%;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    border-radius: 50%;
+  }
+
+  .pill {
+    position: absolute;
+    bottom: -5px;
+    left: 50%;
+    min-width: 20px;
+    padding: 2px 4px;
+    border-radius: 999px;
+    background: var(--exp);
+    color: #241a05;
+    font-size: 10px;
+    font-weight: var(--weight-strong);
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    transform: translateX(-50%);
+  }
+
+  .pill.long {
+    font-size: 9px;
   }
 
   .lv {

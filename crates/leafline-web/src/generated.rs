@@ -796,6 +796,7 @@ mod records {
     use leafline_core::error::{Error, Result};
     use leafline_core::session::SessionSummary;
     use leafline_core::userdata::{RecordsSummary, UserData};
+    use leafline_core::readers::charinfo::SeenLook;
     use leafline_core::userdata::characters::{KnownCharacter, SeenCharacter};
     use leafline_core::userdata::drops::{LoggedDrop, NewDrop};
     use leafline_core::userdata::notes::{ItemNote, MapNote};
@@ -834,6 +835,20 @@ mod records {
                 };
                 reply_result(service::records::known_bags(host, name))
             }
+            "keep_look" => {
+                #[derive(serde::Deserialize)]
+                #[serde(rename_all = "camelCase")]
+                struct Args {
+                look: SeenLook,
+                }
+                let Args { look } = match parse(args) {
+                    Ok(args) => args,
+                    Err(err) => return Some(Err(err)),
+                };
+                reply_result(service::records::keep_look(host, look))
+            }
+            "character_looks" => reply_result(service::records::character_looks(host)),
+            "forget_looks" => reply_result(service::records::forget_looks(host)),
             "saved_spots" => reply_result(service::records::saved_spots(host)),
             "set_spot_saved" => {
                 #[derive(serde::Deserialize)]

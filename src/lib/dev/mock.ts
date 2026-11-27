@@ -7,6 +7,7 @@ import type {
   Analysis,
   BagCheck,
   BaseStats,
+  CharacterLook,
   ItemNote,
   LoggedDrop,
   MapNote,
@@ -129,6 +130,75 @@ const mockCount = (() => {
   return n == null || Number.isNaN(Number(n)) ? MOCK_NAMES.length : Math.max(0, Math.min(MOCK_NAMES.length, Number(n)));
 })();
 const mockNames = MOCK_NAMES.slice(0, mockCount);
+/**
+ * A made-up little figure for a character's look, drawn here pixel by pixel (no game art): hair,
+ * a face, a shirt and legs in a dark outline, 18 x 34, on a clear ground.
+ */
+function fakeLook(hair: string, shirt: string): string {
+  if (typeof document === "undefined") return "";
+  const rows = [
+    "....oooooooooo....",
+    "...ohhhhhhhhhho...",
+    "..ohhhhhhhhhhhho..",
+    "..ohhhhhhhhhhhho..",
+    "..ohhsssssssshho..",
+    "..ohsssssssssho...",
+    "..osssoossoosso...",
+    "..osssoossoosso...",
+    "..ossssssssssso...",
+    "..osssssooossso...",
+    "...osssssssssoo...",
+    "....oooooooooo....",
+    ".....ossssso......",
+    "...oooccccccooo...",
+    "..occccccccccccco.",
+    ".ossocccccccccosso",
+    ".ossocccccccccosso",
+    ".ossocccccccccosso",
+    "..oooccccccccooo..",
+    "....occccccccco...",
+    "....occccccccco...",
+    "....occccccccco...",
+    "....oppppppppo....",
+    "....opppoopppo....",
+    "....opppoopppo....",
+    "....opppoopppo....",
+    "....opppoopppo....",
+    "....opppoopppo....",
+    "....opppoopppo....",
+    "....opppoopppo....",
+    "...obbbo..obbbo...",
+    "...obbbo..obbbo...",
+    "..obbbbo..obbbbo..",
+    "..oooooo..oooooo..",
+  ];
+  const colours: Record<string, string> = { o: "#2a1f1a", h: hair, s: "#f6d2b0", c: shirt, p: "#3b4a7a", b: "#5a3a24" };
+  const canvas = document.createElement("canvas");
+  canvas.width = rows[0].length;
+  canvas.height = rows.length;
+  const g = canvas.getContext("2d");
+  if (!g) return "";
+  rows.forEach((row, y) =>
+    [...row].forEach((ch, x) => {
+      if (!colours[ch]) return;
+      g.fillStyle = colours[ch];
+      g.fillRect(x, y, 1, 1);
+    }),
+  );
+  return canvas.toDataURL("image/png");
+}
+
+/** Looks kept for the made-up characters: Leafling's and Mossbank's, none for Fernwick. */
+let mockLooks: CharacterLook[] | null = null;
+function looksNow(): CharacterLook[] {
+  mockLooks ??= [
+    { name: "Leafling", src: fakeLook("#c9772e", "#4f9a5e"), width: 18, height: 34, readAt: Math.floor(Date.now() / 1000) - 3 * 3600 },
+    { name: "Mossbank", src: fakeLook("#3d3a38", "#b8483f"), width: 18, height: 34, readAt: Math.floor(Date.now() / 1000) - 5 * 86400 },
+  ];
+  return mockLooks.filter((l) => mockNames.includes(l.name));
+}
+const knownHandlers: (() => void)[] = [];
+
 /** What was last read of each made-up character. */
 const MOCK_KNOWN: Record<string, { level: number; job: string; expPercent: number; hoursAgo: number }> = {
   Leafling: { level: 34, job: "Hunter", expPercent: 62.4, hoursAgo: 3 },
@@ -259,7 +329,7 @@ let displaySettings: DisplaySettings = {
   compactShape: "card",
   hotkeys: { enabled: true, keys: {} },
   travel: { enabled: false, cabs: true, vipCabs: false, scrolls: true },
-  live: { enabled: true, interval: 2, pauseAfter: 15, window: null, pickupLog: true, itemTooltips: true, characterWindows: true, bagCheck: true, questWindow: true },
+  live: { enabled: true, interval: 2, pauseAfter: 15, window: null, pickupLog: true, itemTooltips: true, characterWindows: true, bagCheck: true, questWindow: true, characterLook: true },
   framesFolder: null,
   setupDone: true,
   updateCheck: false,
@@ -1046,7 +1116,15 @@ export const mockBackend: Backend = {
     },
   ],
   knownCharacters: async () => mockNames.slice(1),
-  onKnownCharacter: async () => () => {},
+  async onKnownCharacter(handler) {
+    knownHandlers.push(handler);
+    return () => knownHandlers.splice(knownHandlers.indexOf(handler) >>> 0, 1);
+  },
+  characterLooks: async () => looksNow(),
+  async forgetLooks() {
+    mockLooks = [];
+    knownHandlers.forEach((h) => h());
+  },
   async setSessionNote(id, note) {
     savedSessions = savedSessions.map((s) => (s.id === id ? { ...s, note } : s));
     historyHandlers.forEach((h) => h());

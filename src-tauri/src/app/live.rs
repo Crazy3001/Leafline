@@ -36,6 +36,7 @@ use crate::mapdata::QuestTitles;
 use crate::mapdata::loot::name_item;
 use crate::pipeline;
 use crate::readers::character::{self, Watch};
+use crate::readers::charinfo::{self, LookWatch};
 use crate::readers::npc;
 use crate::readers::pickup::{self, PickupReader};
 use crate::readers::tooltip::ItemTooltip;
@@ -353,6 +354,19 @@ fn follow_windows(app: &AppHandle, watch: &mut Watch, frame: &Frame, analysis: &
     }
 }
 
+/// Keeps the character's look from the Character Info window, once per opening, at a picture seen
+/// twice. Only when the name under the picture is the HUD's own: another player's window gives
+/// nothing, and nothing of it is kept past the frame.
+fn follow_look(app: &AppHandle, watch: &mut LookWatch, frame: &Frame, analysis: &pipeline::Analysis, ocr: &Ocr) {
+    let own = analysis.hud.as_ref().and_then(|h| h.name.as_deref());
+    let portrait = own.and_then(|own| charinfo::read(frame, analysis.hud_layout.as_ref(), own, Some(ocr)));
+    let Some(kept) = watch.follow(portrait) else { return };
+    let Some(look) = own.and_then(|own| kept.seen(own)) else { return };
+    if let Err(err) = records::keep_look(&AppHost::new(app), look) {
+        report::note(format!("Couldn't keep the character's look: {err}"));
+    }
+}
+
 /// Pauses or resumes tracking. Paused time doesn't count.
 pub fn set_held(app: &AppHandle, held: bool) {
     app.state::<LiveState>().held.store(held, Ordering::SeqCst);
@@ -624,6 +638,7 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
     let mut titles = QuestTitles::default();
     let mut names = NameSnap::new(app.state::<UserDataState>().with(|db| db.character_names()).unwrap_or_default());
     let mut windows = Watch::default();
+    let mut look = LookWatch::default();
     let mut quest_log = QuestLogFollow::default();
     let mut bags = BagFollow::default();
     let mut items = ItemHover::default();
@@ -828,6 +843,11 @@ fn read_until_stopped(app: &AppHandle) -> Result<()> {
                 }
                 if choice.character_windows {
                     follow_windows(app, &mut windows, &frame, &analysis, &ocr);
+                }
+                if choice.character_look {
+                    follow_look(app, &mut look, &frame, &analysis, &ocr);
+                } else {
+                    look = LookWatch::default();
                 }
                 if choice.quest_window {
                     quest_log.follow(app, &frame, &analysis, &ocr);
