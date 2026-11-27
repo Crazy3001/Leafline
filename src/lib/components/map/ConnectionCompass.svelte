@@ -5,10 +5,7 @@
   // the route bar uses); a portal without one is placed by its name. When the map's picture has
   // the portal's real spot, a small locator shows it and the portals in a slot follow their real
   // order. The pin only ever marks the map the player is on; the trip's next portal is flagged.
-  // Pointing at a portal lights it on the map picture, and the other way round. The strip is the
-  // same view one band high, for the desk's compass: the left and right portals beside the map,
-  // doors next to it, a few at most with the rest behind "+N".
-  import type { Snippet } from "svelte";
+  // Pointing at a portal lights it on the map picture, and the other way round.
   import { tip } from "$lib/tip.svelte";
   import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ArrowUpRight, EyeOff, MapPin } from "@lucide/svelte";
 
@@ -22,10 +19,6 @@
     next = null,
     lit = null,
     layout = "compass",
-    hub,
-    perSide = 2,
-    doors = 1,
-    onmore,
     onhover,
     onnavigate,
   }: {
@@ -40,18 +33,10 @@
     next?: { portal: string | null; to: number } | null;
     /** A map whose portal is pointed at on the picture. */
     lit?: number | null;
-    layout?: "compass" | "list" | "strip";
-    /** The map's box in the middle, in place of its name. */
-    hub?: Snippet;
-    /** How many portals the strip shows on each side before "+N". */
-    perSide?: number;
-    /** How many doors (portals in the middle of the map) the strip shows either side of it; the next one always shows. */
-    doors?: number;
-    /** The strip's "+N": show them all somewhere roomier. */
-    onmore?: () => void;
+    layout?: "compass" | "list";
     /** Pointing at a portal, or leaving it. */
     onhover?: (to: number | null) => void;
-    /** A portal clicked, with the button, to open its map's card beside it. */
+    /** A portal clicked, with its button, so a card can open beside it. */
     onnavigate: (id: number, from: Element) => void;
   } = $props();
 
@@ -126,23 +111,16 @@
     }),
   );
 
-  /** A map with doors gives them the room of a second portal each side. */
-  const sideMost = $derived(up.length || down.length ? Math.min(perSide, 1) : perSide);
-
   const isNext = (exit: MapExit) => next != null && exit.to.id === next.to;
 
   /** More neighbours than this in one slot fold behind a "+N more" chip; the next portal never folds away. */
   const SHOWN = 3;
   let expanded = $state<Partial<Record<Slot, boolean>>>({});
-  function shown(slot: Slot, list: MapExit[], most = SHOWN) {
-    if (expanded[slot] || list.length <= most) return list;
-    // On the card the "+N more" chip takes a place; the strip's chip sits beside the ones shown.
-    const keep = layout === "strip" ? most : most - 1;
-    const first = list.slice(0, keep);
-    const kept = list.find((e, i) => i >= keep && isNext(e));
-    if (!kept) return first;
-    // The strip has no room to add it: it takes the last place.
-    return layout === "strip" ? [...first.slice(0, Math.max(keep - 1, 0)), kept] : [...first, kept];
+  function shown(slot: Slot, list: MapExit[]) {
+    if (expanded[slot] || list.length <= SHOWN) return list;
+    const first = list.slice(0, SHOWN - 1);
+    const kept = list.find((e, i) => i >= SHOWN - 1 && isNext(e));
+    return kept ? [...first, kept] : first;
   }
 
   const icons = { left: ArrowLeft, right: ArrowRight, above: ArrowUp, below: ArrowDown, other: ArrowUpRight };
@@ -195,7 +173,6 @@
     class:next={isNext(exit)}
     class:lit={lit === exit.to.id}
     class:unknown={!exit.to.known}
-    class:hidden-exit={exit.hidden}
     disabled={!exit.to.known}
     use:tip={title(exit)}
     onclick={(e) => onnavigate(exit.to.id, e.currentTarget)}
@@ -216,28 +193,7 @@
   </button>
 {/snippet}
 
-{#snippet stripGroup(slot: Slot, list: MapExit[], most: number)}
-  {@const visible = shown(slot, list, most)}
-  {#each visible as exit}{@render node(exit, slot)}{/each}
-  {#if list.length > visible.length}
-    <button class="more" use:tip={"Every portal on this map"} onclick={() => onmore?.()}>+{list.length - visible.length}</button>
-  {/if}
-{/snippet}
-
-{#if layout === "strip"}
-  <div class="strip" class:away={!here}>
-    <div class="slot west">{@render stripGroup("left", left, sideMost)}</div>
-    <span class="wire h" class:none={!left.length}></span>
-    {#if up.length}<div class="slot doors">{@render stripGroup("above", up, doors)}</div>{/if}
-    <div class="hub">{#if hub}{@render hub()}{:else}{map.name}{/if}</div>
-    {#if down.length}<div class="slot doors">{@render stripGroup("below", down, doors)}</div>{/if}
-    <span class="wire h" class:none={!right.length && !other.length}></span>
-    <div class="slot east">
-      {@render stripGroup("right", right, sideMost)}
-      {#if other.length}<button class="more" use:tip={"Portals the data doesn't place"} onclick={() => onmore?.()}>+{other.length}</button>{/if}
-    </div>
-  </div>
-{:else if !exits.length}
+{#if !exits.length}
   <p class="none">No portals out of this map are listed.</p>
 {:else if layout === "list"}
   <ul class="list">
@@ -280,13 +236,9 @@
 
     <div class="slot west">{@render group("left", left)}</div>
     {#if left.length}<span class="wire h left"></span>{/if}
-    <div class="here" class:away={!here} class:has-hub={hub}>
-      {#if hub}
-        {@render hub()}
-      {:else}
-        {#if here}<MapPin size={13} />{/if}
-        <span>{map.name}</span>
-      {/if}
+    <div class="here" class:away={!here}>
+      {#if here}<MapPin size={13} />{/if}
+      <span>{map.name}</span>
     </div>
     {#if right.length}<span class="wire h right"></span>{/if}
     <div class="slot east">{@render group("right", right)}</div>
@@ -306,134 +258,6 @@
 {/if}
 
 <style>
-  /* One band high: left portals, the map (with its doors either side), right portals. */
-  .strip {
-    display: flex;
-    align-items: center;
-    gap: 0;
-    min-width: 0;
-    /* What still doesn't fit is cut rather than run under its neighbours; room kept for the flag. */
-    overflow: hidden;
-    margin: -8px 0 -3px;
-    padding: 8px 3px 3px;
-  }
-
-  .strip .slot {
-    flex-direction: row;
-    align-items: center;
-    gap: var(--space-1);
-    min-width: 0;
-  }
-
-  .strip .slot.west,
-  .strip .slot.east {
-    flex: 1 1 0;
-  }
-
-  .strip .slot.west {
-    justify-content: flex-end;
-  }
-
-  .strip .slot.doors {
-    flex: 0 1 auto;
-    margin: 0 var(--space-1);
-  }
-
-  .strip .wire {
-    flex: none;
-    width: 10px;
-  }
-
-  .strip .wire.none {
-    visibility: hidden;
-  }
-
-  .strip .node {
-    flex: 0 1 auto;
-    min-width: 56px;
-    max-width: 160px;
-    padding: 3px var(--space-1-5);
-  }
-
-  .strip .dir {
-    overflow: hidden;
-  }
-
-  .strip .slot.doors .node {
-    text-align: center;
-  }
-
-  .strip .slot.doors .dir {
-    justify-content: center;
-  }
-
-  .strip .label {
-    display: block;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    font-size: var(--text-sm, var(--text-md));
-  }
-
-  .strip .node.hidden-exit {
-    opacity: 0.65;
-  }
-
-  .strip .flag {
-    top: -6px;
-  }
-
-  /* The next portal on the trip: Leafline green, ringed, breathing slowly. */
-  .node.next {
-    animation: breathe 2.4s ease-in-out infinite;
-  }
-
-  .strip .node.next {
-    border-color: var(--accent);
-    background: color-mix(in srgb, var(--accent) 22%, var(--surface-3));
-    /* The one to take keeps its name whole; the others give way. */
-    flex-shrink: 0;
-    max-width: 220px;
-  }
-
-  @keyframes breathe {
-    0%,
-    100% {
-      box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent);
-    }
-    50% {
-      box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 15%, transparent);
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .node.next {
-      animation: none;
-      box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent);
-    }
-  }
-
-  .strip .more {
-    flex: none;
-    padding: var(--space-0-5) var(--space-1-5);
-  }
-
-  .hub {
-    flex: 0 1 auto;
-    min-width: 96px;
-    max-width: 300px;
-    padding: var(--space-1) var(--space-2);
-    border: 1px solid color-mix(in srgb, var(--map) 45%, transparent);
-    border-radius: var(--radius-sm);
-    background: color-mix(in srgb, var(--map) 14%, transparent);
-    text-align: center;
-  }
-
-  .strip.away .hub {
-    border-color: var(--border-strong);
-    background: transparent;
-  }
-
   .compass {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 12px auto 12px minmax(0, 1fr);
@@ -549,16 +373,6 @@
     line-height: 1.25;
     text-align: center;
     overflow-wrap: anywhere;
-  }
-
-  /* The desk's compass puts more in the map's box: its name and where the trip goes next. */
-  .here.has-hub {
-    min-width: 190px;
-    max-width: 320px;
-    min-width: 0;
-    padding: var(--space-1) var(--space-2);
-    font-size: inherit;
-    font-weight: inherit;
   }
 
   .here.away {

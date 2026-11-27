@@ -5,16 +5,17 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
 
 ## Unreleased
 
-- **A compass under the top row of every desk page** shows the map you're on and its portals,
-  laid out like the map card's Portals section: left and right portals beside the map, doors
-  above or below it, each with a small box showing where it stands, by the map data. With a
-  place set by Go here, the portal to take next is lit green with "Next", and the map's box
-  says where it leads and how many maps are left. Without one, click a portal for its map's
-  card and Go. Click the map's box for the whole route; × stops. On a phone it is one band
-  under the header: the map, and the next portal when you're heading somewhere. When the
-  minimap's name is out of view for a few seconds, it shows the map you were last seen on.
+- **A compass under the top row of every desk page** shows the map you're on as a small picture,
+  the whole map, with every portal out marked where it stands. With a place set by Go here, the
+  portal to take next is a green ring with its name, and the line under the map says where it
+  leads and how many maps are left. With none, the furthest left and right ways out carry their
+  names and doors are small dots, named on hover; click any portal for its map's card and Go.
+  The line under the map opens every portal by name and the whole route; × stops. It keeps its
+  size on every map, and on a phone sits under the header. Without the map's picture the marks
+  stand on a plain box. When the minimap's name is out of view for a few seconds, it shows the
+  map you were last seen on.
 - On the website, Go here now follows you on the desk too (it only did in the phone view).
-- Now's This map no longer lists the ways out: the compass above it shows them.
+- Now's This map no longer stops updating on a map with two ways out to the same map.
 - **Search as you type.** The search box at the top of every page drops down matches as you type:
   items, monsters, maps, NPCs and quests, each with its picture and a line (an item's type, a
   monster's level, a quest's level and region), with chips and counts to show one kind. Arrow

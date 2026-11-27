@@ -7,17 +7,17 @@
 </script>
 
 <script lang="ts">
-  // The desk's compass, centred under the top row on every view: the map you're on with its
-  // portals, as the map card's Portals section shows them (left and right portals beside it, doors
-  // above or below, each with a small box showing where it stands). With a place set by Go here,
-  // the portal to take next is lit and the map's box says where it leads and how far is left;
-  // without one, each portal opens its map's card, whose Go sets it. Clicking the map's box opens
-  // the route under it. On a phone it is one band, with every portal under the map's box. It
-  // follows the map the wayfinder last placed you on (wayfinder.svelte.ts). Information only:
-  // Leafline never draws in the game, and the player walks the way themselves.
+  // The desk's compass, centred under the top row on every view: the map you're on, its picture
+  // in a box of fixed size with every portal marked where it stands (CompassMap). With a place set
+  // by Go here, the portal to take next is a green ring and the line under the map says where it
+  // leads and how far is left; without one, each portal opens its map's card, whose Go sets it.
+  // The line opens every portal by name and the route. It follows the map the wayfinder last
+  // placed you on (wayfinder.svelte.ts). Information only: Leafline never draws in the game, and
+  // the player walks the way themselves.
   import { tip } from "$lib/tip.svelte";
   import { Check, ChevronDown, Navigation, X } from "@lucide/svelte";
 
+  import CompassMap from "$lib/components/map/CompassMap.svelte";
   import ConnectionCompass from "$lib/components/map/ConnectionCompass.svelte";
   import RouteSteps from "$lib/components/map/RouteSteps.svelte";
   import Ref from "$lib/components/Ref.svelte";
@@ -38,7 +38,7 @@
   }: {
     /** Opens where a place is picked (the Map view's Go to…). */
     onpick: () => void;
-    /** For a phone: one portal each side. */
+    /** For a phone: a shorter map and a one-line footer. */
     line?: boolean;
   } = $props();
 
@@ -108,12 +108,6 @@
     notReading ? (can.liveReading ? "Not reading the game" : "Share the game window to see this map's portals") : "Waiting to read the minimap",
   );
 
-  /**
-   * On a phone the band shows a map's portals when it has two at most; otherwise only the next
-   * one, with the rest counted either side.
-   */
-  const perSide = $derived((card?.exits.length ?? 0) <= 2 ? 1 : 0);
-
   let open = $state(false);
   let root = $state<HTMLElement>();
   const drawerId = "compass-view";
@@ -138,77 +132,58 @@
 
 <svelte:window onclick={outside} onkeydown={keys} />
 
-{#snippet hub()}
-  <button
-    class="hub-btn"
-    aria-expanded={open}
-    aria-controls={drawerId}
-    use:tip={open ? null : line ? (dest ? "The whole route and every portal here" : "Every portal here") : dest ? "The whole route" : "Where to head for"}
-    onclick={() => (open = !open)}
-  >
-    <span class="here-name">
-      {here?.name ?? waiting}{#if here && !reading}<span class="seen">last seen</span>{:else if here && trip.unsure}<span
-          class="seen">unclear</span
-        >{/if}
-    </span>
-    {#if trip.arrived}
-      <span class="sub good"><Check size={11} strokeWidth={3} />{trip.arrived}</span>
-    {:else if dest}
-      <span class="sub" class:warn={trip.lost}>
-        {#if step && line && next}
-          <!-- The lit portal beside it says where. -->
-          {left} {left === 1 ? "map" : "maps"} to {dest.name}
-        {:else if step}
-          <b>Next:</b>
-          {step.travel ? `${step.travel.service} →` : "→"}
-          {step.to.name}<span class="then">{line ? " · " : ""}{left} {left === 1 ? "map" : "maps"} to {dest.name}</span>
-        {:else if trip.lost}
-          No known way to {dest.name}
-        {:else if here}
-          Working out the way to {dest.name}…
-        {:else}
-          Heading for {dest.name}
-        {/if}
-      </span>
-    {:else if here?.street}
-      <span class="sub faint">{here.street}</span>
-    {/if}
-    <span class="chev" class:open aria-hidden="true"><ChevronDown size={11} /></span>
-  </button>
-{/snippet}
-
 <div class="compass" class:line class:going={dest && step} bind:this={root}>
   {#if here}
-    <!-- The map card's Portals view on the desk, which has the height for it; a band on a phone. -->
-    <ConnectionCompass
-      layout={line ? "strip" : "compass"}
-      exits={card?.exits ?? []}
-      map={here}
-      current={reading ? here : null}
-      points={picture?.points ?? null}
-      {next}
-      {perSide}
-      doors={0}
-      {hub}
-      onmore={() => (open = true)}
-      onnavigate={portalCard}
-    />
-  {:else}
-    <div class="lone">{@render hub()}</div>
+    <CompassMap map={here} {picture} exits={card?.exits ?? []} {next} height={line ? 72 : 112} onportal={portalCard} />
   {/if}
-  {#if dest}
-    <button class="end" aria-label={`Stop heading for ${dest.name}`} use:tip={"Stop heading there"} onclick={() => endTrip()}
-      ><X size={13} /></button
+  <div class="foot">
+    <button
+      class="hub-btn"
+      aria-expanded={open}
+      aria-controls={drawerId}
+      use:tip={open ? null : dest ? "Every portal here, and the whole route" : "Every portal here, by name"}
+      onclick={() => (open = !open)}
     >
-  {:else if !line}
-    <button class="end" aria-label="Pick a place to head for" use:tip={"Pick a place to head for"} onclick={onpick}
-      ><Navigation size={12} /></button
-    >
-  {/if}
+      <span class="here-name">
+        {here?.name ?? waiting}{#if here && !reading}<span class="seen">last seen</span>{:else if here && trip.unsure}<span
+            class="seen">unclear</span
+          >{/if}
+      </span>
+      {#if trip.arrived}
+        <span class="sub good"><Check size={11} strokeWidth={3} />{trip.arrived}</span>
+      {:else if dest}
+        <span class="sub" class:warn={trip.lost}>
+          {#if step}
+            <b>Next:</b>
+            {step.travel ? `${step.travel.service} →` : "→"}
+            {step.to.name} · {left} {left === 1 ? "map" : "maps"} to {dest.name}
+          {:else if trip.lost}
+            No known way to {dest.name}
+          {:else if here}
+            Working out the way to {dest.name}…
+          {:else}
+            Heading for {dest.name}
+          {/if}
+        </span>
+      {:else if here?.street && !line}
+        <span class="sub faint">{here.street}</span>
+      {/if}
+      <span class="chev" class:open aria-hidden="true"><ChevronDown size={12} /></span>
+    </button>
+    {#if dest}
+      <button class="end" aria-label={`Stop heading for ${dest.name}`} use:tip={"Stop heading there"} onclick={() => endTrip()}
+        ><X size={13} /></button
+      >
+    {:else}
+      <button class="end" aria-label="Pick a place to head for" use:tip={"Pick a place to head for"} onclick={onpick}
+        ><Navigation size={12} /></button
+      >
+    {/if}
+  </div>
 
   {#if open}
     <div class="drawer" id={drawerId}>
-      {#if here && line}
+      {#if here}
         <p class="d-head">
           Portals on <Ref kind="map" id={here.id} name={here.name} />{#if !reading}<span class="seen"> · last seen</span>{/if}
         </p>
@@ -220,7 +195,7 @@
           {next}
           onnavigate={portalCard}
         />
-        <p class="note">Boxes show where each portal stands on the map, from the map data. Leafline doesn't know where you stand.</p>
+        <p class="note">Where each portal stands is from the map data. Leafline doesn't know where you stand.</p>
       {/if}
       {#if dest}
         <p class="d-head route-head">
@@ -253,17 +228,17 @@
 </div>
 
 <style>
+  /* A card of fixed size: the map, and a line under it. */
   .compass {
     position: relative;
     display: flex;
-    align-items: center;
-    gap: var(--space-1);
-    width: 100%;
-    max-width: 1040px;
-    min-width: 0;
-    padding: 5px var(--space-1) 5px var(--space-1);
+    flex-direction: column;
+    gap: var(--space-1-5);
+    width: 460px;
+    max-width: 100%;
+    padding: var(--space-1-5);
     border: var(--line-w) solid var(--control-line);
-    border-radius: var(--radius);
+    border-radius: var(--radius-lg);
     background: var(--surface);
   }
 
@@ -271,33 +246,40 @@
     border-color: color-mix(in srgb, var(--accent) 50%, var(--control-line));
   }
 
-  /* The portals view (the card's layout, or the phone's band) fills the box. */
-  .compass > :global(.compass),
-  .compass > :global(.strip) {
-    flex: 1;
-    min-width: 0;
+  .compass.line {
+    width: 100%;
+    gap: var(--space-1);
+    padding: var(--space-1);
   }
 
-  .lone {
+  .foot {
     display: flex;
-    flex: 1;
-    justify-content: center;
+    align-items: center;
+    gap: var(--space-1);
     min-width: 0;
   }
 
   .hub-btn {
-    position: relative;
     display: flex;
+    flex: 1;
     flex-direction: column;
-    align-items: center;
-    max-width: 100%;
-    padding: 0 var(--space-3);
+    align-items: flex-start;
+    min-width: 0;
+    padding: 0 var(--space-5, 20px) 0 var(--space-1);
     border: 0;
+    border-radius: var(--radius-sm);
     background: none;
     color: var(--text);
     font: inherit;
-    line-height: 1.25;
+    line-height: 1.3;
+    text-align: left;
     cursor: pointer;
+    position: relative;
+  }
+
+  .hub-btn:hover .here-name {
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
   }
 
   .hub-btn:focus-visible,
@@ -308,6 +290,7 @@
 
   .here-name,
   .sub {
+    display: block;
     max-width: 100%;
     overflow: hidden;
     white-space: nowrap;
@@ -321,11 +304,6 @@
     font-weight: var(--weight-strong);
   }
 
-  .lone .here-name {
-    color: var(--muted);
-    font-weight: var(--weight-body);
-  }
-
   .seen {
     margin-left: var(--space-1);
     color: var(--warn);
@@ -335,7 +313,6 @@
   }
 
   .sub {
-    display: block;
     color: var(--muted);
     font-size: var(--text-xs);
   }
@@ -343,11 +320,6 @@
   .sub :global(svg) {
     margin-right: 3px;
     vertical-align: -1px;
-  }
-
-  /* The desk has the height: how far is left goes on a line of its own. */
-  .compass:not(.line) .then {
-    display: block;
   }
 
   .sub b {
@@ -385,8 +357,8 @@
     display: inline-grid;
     flex: none;
     place-items: center;
-    width: 24px;
-    height: 24px;
+    width: 26px;
+    height: 26px;
     border: var(--line-w) solid var(--control-line);
     border-radius: 50%;
     background: var(--surface);
@@ -457,40 +429,5 @@
   .s-name {
     color: var(--muted);
     font-size: var(--text-xs);
-  }
-
-  /* A phone: the map's street and the arrow labels make way for the names. */
-  .line {
-    padding: 3px var(--space-1);
-  }
-
-  /* Only the arrows say which side; the boxes and words make way for the names. */
-  .line :global(.strip .locator) {
-    display: none;
-  }
-
-  .line :global(.strip .dir) {
-    font-size: 0;
-  }
-
-  .line :global(.strip .slot.west),
-  .line :global(.strip .slot.east),
-  .line :global(.strip .slot.doors) {
-    flex: 0 1 auto;
-  }
-
-  .line :global(.strip .node) {
-    min-width: 44px;
-    max-width: 92px;
-  }
-
-  .line :global(.strip .hub) {
-    flex: 1 1 0;
-    min-width: 112px;
-  }
-
-
-  .line .hub-btn {
-    padding: 0 var(--space-2);
   }
 </style>
