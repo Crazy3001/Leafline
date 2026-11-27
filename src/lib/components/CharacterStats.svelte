@@ -163,7 +163,7 @@
       {#if can.liveReading}
         Open your Character Stat window in game and press Detail. Leafline reads it while it's open.
       {:else}
-        Share the game window on Now, then open your Character Stat window and press Detail.
+        Share the game window, then open your Character Stat window and press Detail.
       {/if}
     </p>
   {:else}

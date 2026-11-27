@@ -4,7 +4,7 @@
   // together fold into one questline row that opens, showing how far along it is and the quest
   // you're on; a switch shows them flat. Picking a quest opens it beside the list.
   // What the game's Quest window showed is only true as of the last look, which the card says.
-  import { untrack } from "svelte";
+  import { untrack, type Snippet } from "svelte";
   import { Check, ChevronDown, ChevronRight, CircleCheck, CircleDot, Info, Lock, Undo2 } from "@lucide/svelte";
 
   import Card from "../Card.svelte";
@@ -26,6 +26,8 @@
     helper = null,
     selected = null,
     onpick,
+    tools,
+    below,
   }: {
     whole: WholeLog | null;
     /** What the Quest Helper shows now: its counts are the freshest. */
@@ -33,6 +35,9 @@
     /** The quest open beside the list. */
     selected?: number | null;
     onpick: (id: number) => void;
+    /** More controls at the end of the chips' row, and what they open under it: the desk's filters. */
+    tools?: Snippet;
+    below?: Snippet;
   } = $props();
 
   watchQuestLog();
@@ -286,7 +291,7 @@
   {:else}
     <p class="lead">
       {#if !hasLog()}
-        {can.liveReading ? "Open your Quest window in game" : "Share the game window on Now and open your Quest window"}: Leafline marks what you've done and what you're on.
+        {can.liveReading ? "Open your Quest window in game" : "Share the game window and open your Quest window"}: Leafline marks what you've done and what you're on.
       {:else if unseenTabs.length}
         Scroll {unseenTabs.length > 1 ? `${unseenTabs.slice(0, -1).join(", ")} and ${unseenTabs.at(-1)}` : unseenTabs[0]} to the end in your Quest
         window to see every quest.
@@ -330,7 +335,9 @@
         <span>Questlines</span>
         <Switch checked={grouped} label="Group questlines" onchange={setGrouped} />
       </label>
+      {#if tools}<span class="tools">{@render tools()}</span>{/if}
     </div>
+    {@render below?.()}
 
     {#each regions as r (r.region)}
       {@const open = regionOpen(r.region, r.active)}
@@ -460,8 +467,14 @@
     scrollbar-width: none;
   }
 
+  .tools {
+    display: inline-flex;
+    gap: var(--space-1);
+  }
+
   .lines-switch {
     display: inline-flex;
+    margin-left: auto;
     align-items: center;
     gap: var(--space-1-5);
     color: var(--muted);

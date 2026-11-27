@@ -16,7 +16,7 @@
   import DeskTools from "$lib/components/desk/DeskTools.svelte";
   import DeskMap from "$lib/components/desk/DeskMap.svelte";
   import DeskSearch, { type Kind as FoundKind } from "$lib/components/desk/DeskSearch.svelte";
-  import ShareButton from "$lib/components/desk/ShareButton.svelte";
+  import ShareBanner from "$lib/components/desk/ShareBanner.svelte";
   import DeskQuests from "$lib/components/desk/DeskQuests.svelte";
   import NextUp from "$lib/components/desk/NextUp.svelte";
   import Segmented from "$lib/ui/Segmented.svelte";
@@ -207,6 +207,17 @@
     land();
   }
 
+  /** On Quests the top row's search filters the page's list: one search box, not two. */
+  const questFilter = $derived({
+    text: questView.search.text,
+    placeholder: "Search quests, people, monsters…",
+    label: "Search quests",
+    onchange: (text: string) => {
+      questView.search = { ...questView.search, text, offset: 0 };
+      questView.id = null;
+    },
+  });
+
   async function searchWords(words: string) {
     seedWords = words;
     await openSearch();
@@ -336,14 +347,14 @@
   <div class="main">
     <!-- Who you are, the level and the session's numbers, over every view, Now too. -->
     <DeskBar />
+    <!-- The website, while it isn't reading the game: how to start, or what's in the way. -->
+    <ShareBanner />
     <div class="top">
       {#if from}
         <button class="pill" onclick={back}><ArrowLeft size={14} />Back to {viewName(from)}</button>
       {/if}
-      <!-- Reading first: the one button that starts everything, ahead of search. -->
-      <ShareButton />
       {#if view !== "lookup"}
-        <DeskSearch bind:this={deskSearch} onopen={openFound} onwords={searchWords} />
+        <DeskSearch bind:this={deskSearch} onopen={openFound} onwords={searchWords} filter={view === "quests" ? questFilter : null} />
       {/if}
       <!-- Where you're heading and the next step from here, in the middle of the row. -->
       <div class="compass-slot"><Compass onpick={() => go("map")} /></div>
@@ -377,7 +388,7 @@
             <DeskQuests ongo={() => go("quests")} />
           </div>
         {:else if view === "quests"}
-          <div class="stack"><PanelView panel="quests" analysis={live.analysis} session={live.session} roomy /></div>
+          <div class="stack"><PanelView panel="quests" analysis={live.analysis} session={live.session} roomy topSearch /></div>
         {:else if view === "map"}
           <div class="flow two map-flow"><PanelView panel="map" analysis={live.analysis} session={live.session} roomy /></div>
         {:else if view === "me"}

@@ -74,7 +74,7 @@
 
   {#if !hasLog() && !can.liveReading}
     <p class="lead">
-      Share the game window on Now, then open your Quest window and scroll each tab to its end.
+      Share the game window, then open your Quest window and scroll each tab to its end.
     </p>
   {:else if !hasLog()}
     <p class="lead">Open your Quest window in game and scroll each tab to its end once. Leafline reads it while it's open.</p>

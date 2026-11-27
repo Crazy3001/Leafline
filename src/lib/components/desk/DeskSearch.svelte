@@ -3,6 +3,8 @@
   // by kind with a picture and a line each, and chips with counts narrow them to one kind. Arrow
   // keys move, Enter opens the pick in Look up (a quest on the Quests page), Esc closes. With
   // nothing picked, Enter takes the words to Look up. The same searches Look up runs, on this PC.
+  // On a page with a list of its own (Quests), it filters that list as you type instead, with no
+  // drop-down over the list; Enter, or the button in the box, takes the words to Look up.
   import { Flag, LoaderCircle, MapPin, Package, Search, Skull, UserRound, X } from "@lucide/svelte";
   import { untrack, type Component } from "svelte";
 
@@ -21,11 +23,14 @@
   let {
     onopen,
     onwords,
+    filter = null,
   }: {
     /** Opens one match: in Look up, or a quest on the Quests page. */
     onopen: (kind: Kind, id: number) => void;
     /** Takes the words to Look up's search, when nothing is picked. */
     onwords: (words: string) => void;
+    /** The page's own list, filtered by what's typed, in place of the drop-down's matches. */
+    filter?: { text: string; placeholder: string; label: string; onchange: (text: string) => void } | null;
   } = $props();
 
   watchMapData();
@@ -55,7 +60,13 @@
   let searching = $state(false);
   let asked = 0;
 
-  const words = $derived(text.trim());
+  /** What the box shows: the page's filter, or the words searched for everywhere. */
+  const typed = $derived(filter ? filter.text : text);
+  const words = $derived(typed.trim());
+  function setTyped(value: string) {
+    if (filter) filter.onchange(value);
+    else text = value;
+  }
   const ready = $derived(mapData.status?.ready ?? false);
   const level = $derived(live.analysis?.hud?.level ?? live.session?.level ?? null);
   const character = $derived(live.analysis?.hud?.name ?? null);
@@ -66,7 +77,7 @@
   // Every kind at once, a moment after the typing stops.
   $effect(() => {
     const q = words;
-    if (!q || !ready) {
+    if (!q || !ready || filter) {
       found = null;
       searching = false;
       return;
@@ -156,7 +167,7 @@
   /** Every row shown, in order, for the arrow keys. */
   const flat = $derived(groups.flatMap((g) => g.rows));
   const total = $derived(found ? KINDS.reduce((n, k) => n + found![k.id].total, 0) : 0);
-  const showing = $derived(open && words !== "");
+  const showing = $derived(open && words !== "" && !filter);
 
   function pick(row: Row) {
     onopen(row.kind, row.id);
@@ -172,11 +183,15 @@
   function keydown(event: KeyboardEvent) {
     if (event.key === "Escape") {
       event.preventDefault();
-      if (text && open) close();
+      if (typed && open) close();
       else {
-        text = "";
+        setTyped("");
         close();
       }
+    } else if (filter && event.key === "Enter") {
+      // Typing already filtered the list; Enter searches everything else.
+      event.preventDefault();
+      if (words) everywhere();
     } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       if (!flat.length) return;
       event.preventDefault();
@@ -192,6 +207,12 @@
         close();
       }
     }
+  }
+
+  /** The page's filter words, searched for everywhere in Look up. */
+  function everywhere() {
+    onwords(words);
+    close();
   }
 
   /** Focuses the box, from the "/" key. */
@@ -217,25 +238,27 @@
     <input
       bind:this={box}
       type="search"
-      placeholder="Search items, monsters, maps, NPCs, quests…"
-      aria-label="Search everything"
+      placeholder={filter?.placeholder ?? "Search items, monsters, maps, NPCs, quests…"}
+      aria-label={filter?.label ?? "Search everything"}
       role="combobox"
       aria-expanded={showing}
       aria-controls="desk-search-list"
       aria-activedescendant={active >= 0 ? `desk-search-${active}` : undefined}
       autocomplete="off"
       spellcheck="false"
-      value={text}
+      value={typed}
       oninput={(e) => {
-        text = e.currentTarget.value;
+        setTyped(e.currentTarget.value);
         open = true;
+        active = -1;
       }}
       onfocus={() => (open = true)}
       onkeydown={keydown}
     />
     {#if searching}<span class="spin" aria-hidden="true"><LoaderCircle size={14} /></span>{/if}
-    {#if text}
-      <button class="clear" aria-label="Clear the search" onclick={() => ((text = ""), box?.focus())}><X size={13} /></button>
+    {#if filter && words}<button class="everywhere" onclick={everywhere}>Search everything <kbd>↵</kbd></button>{/if}
+    {#if typed}
+      <button class="clear" aria-label="Clear the search" onclick={() => (setTyped(""), box?.focus())}><X size={13} /></button>
     {:else}
       <kbd>/</kbd>
     {/if}
@@ -347,6 +370,32 @@
     color: var(--faint);
     font-family: inherit;
     font-size: var(--text-xs);
+  }
+
+  .everywhere {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: var(--space-1);
+    padding: 2px var(--space-1) 2px var(--space-2);
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    color: var(--muted);
+    font: inherit;
+    font-size: var(--text-xs);
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .everywhere:hover,
+  .everywhere:focus-visible {
+    color: var(--text);
+    outline: none;
+  }
+
+  .everywhere kbd {
+    padding: 0 var(--space-1);
   }
 
   .clear {

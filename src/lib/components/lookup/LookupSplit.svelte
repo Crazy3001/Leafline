@@ -1,7 +1,9 @@
 <script lang="ts">
-  // A lookup's results and the one opened from them. Where there's room (the desk's Look up), they
-  // sit side by side: the list on the left, the open card on the right, kept in view while the list
-  // scrolls. In a narrow window the card takes the list's place, with a way back, as before.
+  // A lookup's results and the one opened from them. Where there's room (the desk's Look up and
+  // Quests), they sit side by side: the list on the left, the open card on the right, each filling
+  // the height left under what's above them and scrolling on its own, with its own scrollbar. A
+  // window too short for that scrolls as one, the card kept in view. In a narrow window the card
+  // takes the list's place, with a way back, as before.
   import { ArrowLeft } from "@lucide/svelte";
   import type { Snippet } from "svelte";
 
@@ -29,9 +31,14 @@
   let width = $state(0);
   const split = $derived(width >= SPLIT_FROM);
 
+  let host = $state<HTMLElement | null>(null);
   let detailBox = $state<HTMLElement | null>(null);
   /** The height the card side may take: what the scrolling panel shows, so it all can be reached. */
   let paneHeight = $state<number | null>(null);
+  /** The height both sides fill, down to the panel's foot, when that leaves them room. */
+  let fill = $state<number | null>(null);
+  /** Below this the two sides would be too short to scroll on their own: the panel scrolls instead. */
+  const FILL_FROM = 320;
 
   function scrollerOf(node: HTMLElement): HTMLElement | null {
     for (let el = node.parentElement; el; el = el.parentElement) {
@@ -42,13 +49,29 @@
   }
 
   $effect(() => {
-    if (!split || !detailBox) return;
-    const scroller = scrollerOf(detailBox);
-    if (!scroller) return;
-    const measure = () => (paneHeight = scroller.clientHeight);
+    if (!split || !host) return;
+    const scroller = scrollerOf(host);
+    if (!scroller) {
+      fill = null;
+      return;
+    }
+    const at = host;
+    const measure = () => {
+      paneHeight = scroller.clientHeight;
+      // Rects are in screen pixels and heights in the page's (text size zooms the page): the
+      // scroller's two heights give the ratio between them.
+      const ratio = scroller.getBoundingClientRect().height / (scroller.offsetHeight || 1) || 1;
+      const top = (at.getBoundingClientRect().top - scroller.getBoundingClientRect().top) / ratio + scroller.scrollTop;
+      const foot = parseFloat(getComputedStyle(scroller).paddingBottom) || 0;
+      const left = Math.floor(scroller.clientHeight - top - foot);
+      fill = left >= FILL_FROM ? left : null;
+    };
     measure();
+    // Whatever is above the sides growing or shrinking moves them, and every box between them and
+    // the panel grows with it.
     const resized = new ResizeObserver(measure);
     resized.observe(scroller);
+    for (let el = at.parentElement; el && el !== scroller; el = el.parentElement) resized.observe(el);
     return () => resized.disconnect();
   });
 
@@ -59,11 +82,11 @@
   });
 </script>
 
-<div class="host" bind:clientWidth={width}>
+<div class="host" bind:this={host} bind:clientWidth={width}>
   {#if split}
-    <div class="split">
+    <div class="split" class:fill={fill != null} style:height={fill != null ? `${fill}px` : null}>
       <div class="pane list-side">{@render list()}</div>
-      <div class="pane detail-side" bind:this={detailBox} style:max-height={paneHeight ? `${paneHeight - 16}px` : null}>
+      <div class="pane detail-side" bind:this={detailBox} style:max-height={fill == null && paneHeight ? `${paneHeight - 16}px` : null}>
         {#if open}
           {@render detail()}
         {:else if empty}
@@ -101,6 +124,22 @@
     top: var(--space-2);
     overflow-y: auto;
     overscroll-behavior: contain;
+  }
+
+  /* Filling the height: each side scrolls on its own, its scrollbar beside it. */
+  .split.fill {
+    align-items: stretch;
+  }
+
+  .split.fill .pane {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+
+  .split.fill .detail-side {
+    position: static;
   }
 
   .back {
