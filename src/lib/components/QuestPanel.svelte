@@ -36,6 +36,7 @@
     level = null,
     character = null,
     pinned = false,
+    topSearch = false,
   }: {
     quest?: QuestReading | null;
     /** The character read now, whose followed quests show. */
@@ -44,6 +45,8 @@
     session?: SessionSummary | null;
     level?: number | null;
     pinned?: boolean;
+    /** The desk's top row searches the list, so the page has no box of its own: its filters sit by the list. */
+    topSearch?: boolean;
   } = $props();
 
   const REPEATS = [
@@ -173,9 +176,63 @@
   </ul>
 {/snippet}
 
-<!-- A pinned window shows what is tracked, and a quest opened from a link; the book is in the tab. -->
-{#if ready && !pinned}
-  <div class="controls" class:pinned>
+{#snippet filterTools()}
+  <button
+    class="tool"
+    class:active={filterBox.open || narrowed > 0}
+    use:tip={"Filters"}
+    aria-label="Filters"
+    aria-expanded={filterBox.open}
+    onclick={() => (filterBox.open = !filterBox.open)}
+  >
+    <SlidersHorizontal size={13} />{#if narrowed}<span class="tabular">{narrowed}</span>{/if}
+  </button>
+  {#if browsing || (!topSearch && questView.id != null)}
+    <button class="tool" use:tip={"Clear the search"} aria-label="Clear the search" onclick={clear}><X size={13} /></button>
+  {/if}
+{/snippet}
+
+{#snippet filterPanel()}
+  {#if filterBox.open}
+    <div class="filters">
+      <label>
+        <span>Region</span>
+        <select value={search.region ?? ""} onchange={(e) => setSearch({ region: e.currentTarget.value || null })}>
+          <option value="">Any</option>
+          {#each regions as region (region)}<option value={region}>{region}</option>{/each}
+        </select>
+      </label>
+      <label>
+        <span>Repeats</span>
+        <select value={search.repeat ?? ""} onchange={(e) => setSearch({ repeat: e.currentTarget.value || null })}>
+          <option value="">Any</option>
+          {#each REPEATS as repeat (repeat.id)}<option value={repeat.id}>{repeat.label}</option>{/each}
+        </select>
+      </label>
+      {#if level != null}
+        <label class="check">
+          <input type="checkbox" checked={search.atLevel != null} onchange={(e) => setSearch({ atLevel: e.currentTarget.checked ? level : null })} />
+          <span>Only what Lv {level} can start</span>
+        </label>
+      {/if}
+      <label class="check">
+        <input type="checkbox" checked={!!search.noPrior} onchange={(e) => setSearch({ noPrior: e.currentTarget.checked || undefined })} />
+        <span>{hasLog() ? "Only quests you can start: none needed first, or only done ones" : "Only quests that need no other first"}</span>
+      </label>
+      {#if hasLog()}
+        <label class="check">
+          <input type="checkbox" checked={!!search.hideDone} onchange={(e) => setSearch({ hideDone: e.currentTarget.checked || undefined })} />
+          <span>Only quests not done</span>
+        </label>
+      {/if}
+    </div>
+  {/if}
+{/snippet}
+
+<!-- A pinned window shows what is tracked, and a quest opened from a link; the book is in the tab.
+     On the desk the top row's search is the box, and the filters sit by the list. -->
+{#if ready && !pinned && !topSearch}
+  <div class="controls">
     <div class="search">
       <label class="field">
         <Search size={13} />
@@ -187,55 +244,9 @@
           oninput={(e) => setSearch({ text: e.currentTarget.value })}
         />
       </label>
-      <button
-        class="tool"
-        class:active={filterBox.open || narrowed > 0}
-        use:tip={"Filters"}
-        aria-label="Filters"
-        aria-expanded={filterBox.open}
-        onclick={() => (filterBox.open = !filterBox.open)}
-      >
-        <SlidersHorizontal size={13} />{#if narrowed}<span class="tabular">{narrowed}</span>{/if}
-      </button>
-      {#if browsing || questView.id != null}
-        <button class="tool" use:tip={"Clear the search"} aria-label="Clear the search" onclick={clear}><X size={13} /></button>
-      {/if}
+      {@render filterTools()}
     </div>
-
-    {#if filterBox.open}
-      <div class="filters">
-        <label>
-          <span>Region</span>
-          <select value={search.region ?? ""} onchange={(e) => setSearch({ region: e.currentTarget.value || null })}>
-            <option value="">Any</option>
-            {#each regions as region (region)}<option value={region}>{region}</option>{/each}
-          </select>
-        </label>
-        <label>
-          <span>Repeats</span>
-          <select value={search.repeat ?? ""} onchange={(e) => setSearch({ repeat: e.currentTarget.value || null })}>
-            <option value="">Any</option>
-            {#each REPEATS as repeat (repeat.id)}<option value={repeat.id}>{repeat.label}</option>{/each}
-          </select>
-        </label>
-        {#if level != null}
-          <label class="check">
-            <input type="checkbox" checked={search.atLevel != null} onchange={(e) => setSearch({ atLevel: e.currentTarget.checked ? level : null })} />
-            <span>Only what Lv {level} can start</span>
-          </label>
-        {/if}
-        <label class="check">
-          <input type="checkbox" checked={!!search.noPrior} onchange={(e) => setSearch({ noPrior: e.currentTarget.checked || undefined })} />
-          <span>{hasLog() ? "Only quests you can start: none needed first, or only done ones" : "Only quests that need no other first"}</span>
-        </label>
-        {#if hasLog()}
-          <label class="check">
-            <input type="checkbox" checked={!!search.hideDone} onchange={(e) => setSearch({ hideDone: e.currentTarget.checked || undefined })} />
-            <span>Only quests not done</span>
-          </label>
-        {/if}
-      </div>
-    {/if}
+    {@render filterPanel()}
   </div>
 {/if}
 
@@ -244,9 +255,16 @@
     {#snippet list()}
       {#if browsing}
         <div class="list">
+          {#if topSearch}
+            <div class="list-head">
+              <p class="count tabular">{page ? `${page.total.toLocaleString()} ${page.total === 1 ? "quest" : "quests"}` : ""}</p>
+              {@render filterTools()}
+            </div>
+            {@render filterPanel()}
+          {/if}
           {#if page}
             {#if page.quests.length}
-              <p class="count tabular">{page.total.toLocaleString()} {page.total === 1 ? "quest" : "quests"}</p>
+              {#if !topSearch}<p class="count tabular">{page.total.toLocaleString()} {page.total === 1 ? "quest" : "quests"}</p>{/if}
               {@render rows(page.quests)}
               {#if page.quests.length < page.total}<button class="back inline" onclick={more}>Show more</button>{/if}
             {:else}
@@ -257,7 +275,7 @@
           {/if}
         </div>
       {:else}
-        <QuestBook {whole} helper={quest} selected={questView.id} onpick={pick} />
+        <QuestBook {whole} helper={quest} selected={questView.id} onpick={pick} tools={topSearch ? filterTools : undefined} below={topSearch ? filterPanel : undefined} />
       {/if}
     {/snippet}
     {#snippet detail()}
@@ -319,8 +337,16 @@
     padding: 0 var(--space-3) var(--space-2);
   }
 
-  .controls.pinned {
-    padding: 0;
+  .list-head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    margin-bottom: var(--space-1);
+  }
+
+  .list-head .count {
+    flex: 1;
+    margin: 0;
   }
 
   .search {
@@ -402,7 +428,7 @@
 
   .filters label {
     display: grid;
-    grid-template-columns: 48px 1fr;
+    grid-template-columns: 64px 1fr;
     align-items: center;
     gap: var(--space-1-5);
     color: var(--muted);

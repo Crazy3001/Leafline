@@ -75,9 +75,15 @@ export function logged(id: number | null | undefined): LoggedQuest | null {
   return series ? (quests.find((q) => q.questId == null && fold(q.title) === fold(series)) ?? null) : null;
 }
 
-/** The quests the log shows done, by id. */
+/** The quests the log shows done, by id, with the steps of a line it showed done by the line's name. */
 export function doneIds(): number[] {
-  return (questLog.log?.quests ?? []).filter((q) => q.done && q.questId != null).map((q) => q.questId!);
+  const quests = questLog.log?.quests ?? [];
+  const own = quests.filter((q) => q.done && q.questId != null).map((q) => q.questId!);
+  const lines = new Set(quests.filter((q) => q.done && q.questId == null && q.state !== "inProgress").map((q) => fold(q.title)));
+  const steps = Object.entries(seriesSteps.byId)
+    .filter(([, series]) => lines.has(fold(series)))
+    .map(([id]) => Number(id));
+  return [...new Set([...own, ...steps])];
 }
 
 /** Whether there is a log to go by: some tab has been looked at. */

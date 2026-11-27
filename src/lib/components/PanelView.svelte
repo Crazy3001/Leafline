@@ -28,6 +28,7 @@
     roomy = false,
     shelled = false,
     wide = false,
+    topSearch = false,
   }: {
     panel: Panel;
     analysis: Analysis | null;
@@ -39,6 +40,8 @@
     shelled?: boolean;
     /** A whole wide window, as a desk view: parts that take turns elsewhere sit side by side. */
     wide?: boolean;
+    /** The desk's top row searches this page's list, so it has no box of its own. */
+    topSearch?: boolean;
   } = $props();
 
   /** The map the character was last read on, while the minimap isn't in view. */
@@ -86,6 +89,7 @@
     level={analysis?.hud?.level ?? session?.level ?? null}
     character={session?.name ?? analysis?.hud?.name ?? null}
     {pinned}
+    {topSearch}
   />
 {:else if panel === "item"}
   <LookupPanel
