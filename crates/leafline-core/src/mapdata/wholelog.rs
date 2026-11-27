@@ -207,8 +207,8 @@ impl Atlas {
             if row.done && row.state != LogState::InProgress {
                 let mut stood = false;
                 for &id in &steps {
-                    if !placed.contains_key(&id) {
-                        placed.insert(id, Placed { logged: row, series: Some(row.title.clone()) });
+                    if let std::collections::hash_map::Entry::Vacant(free) = placed.entry(id) {
+                        free.insert(Placed { logged: row, series: Some(row.title.clone()) });
                         stood = true;
                     }
                 }
