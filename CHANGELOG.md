@@ -5,15 +5,16 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
 
 ## Unreleased
 
-- **A compass under the top row of every desk page** shows the map you're on as a small picture,
-  the whole map, with every portal out marked where it stands. With a place set by Go here, the
-  portal to take next is a green ring with its name, and the line under the map says where it
-  leads and how many maps are left. With none, the furthest left and right ways out carry their
-  names and doors are small dots, named on hover; click any portal for its map's card and Go.
-  The line under the map opens every portal by name and the whole route; × stops. It keeps its
-  size on every map, and on a phone sits under the header. Without the map's picture the marks
-  stand on a plain box. When the minimap's name is out of view for a few seconds, it shows the
-  map you were last seen on.
+- **A compass under the top row of every desk page** shows the map you're on, two ways, picked
+  with the switch on it and remembered: a small picture of the whole map with every portal out
+  marked where it stands, or a band of its portals beside it, each with the small box showing
+  where it stands. With a place set by Go here, the portal to take next is lit green with its
+  name, and the line under it says where it leads and how many maps are left. With none, the
+  furthest left and right ways out are named (doors are small dots, named on hover); click any
+  portal for its map's card and Go. A tall map (Ellinia's trees) gets a taller picture with its
+  names out beside it. The line under the compass opens every portal by name and the whole
+  route; × stops. On a phone it sits under the header. When the minimap's name is out of view
+  for a few seconds, it shows the map you were last seen on.
 - On the website, Go here now follows you on the desk too (it only did in the phone view).
 - Now's This map no longer stops updating on a map with two ways out to the same map.
 - **Search as you type.** The search box at the top of every page drops down matches as you type:

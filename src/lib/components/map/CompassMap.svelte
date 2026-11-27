@@ -3,9 +3,11 @@
   // out marked where it stands. The portal the trip takes next is a green ring with its name;
   // with no trip, the left-most and right-most ways out carry short names and the rest (doors,
   // buildings) are small dots named on hover. The whole map always shows, so every portal is in
-  // view: a wide map fills the box, a tall one stands in its middle. Without the picture (game pictures off, or not
-  // downloaded yet) the marks stand on a plain box in the same places; without the picture's
-  // marks, each portal sits in the third of the map the data names, and the box says so.
+  // view: a wide map fills the box, a tall one stands in its middle. A very tall map (Ellinia's
+  // trees) makes the box taller, up to a limit, and its names go out beside it, each with a line
+  // to its mark. Without the picture (game pictures off, or not downloaded yet) the marks stand
+  // on a plain box in the same places; without the picture's marks, each portal sits in the third
+  // of the map the data names, and the box says so.
   import { pictureUrl } from "$lib/pictures";
   import { display } from "$lib/settings.svelte";
   import { tip } from "$lib/tip.svelte";
@@ -17,6 +19,7 @@
     exits,
     next = null,
     height = 96,
+    tallest = 200,
     onportal,
   }: {
     map: MapRef;
@@ -28,6 +31,8 @@
     next?: { portal: string | null; to: number } | null;
     /** The box's height in pixels; its width is the space it's given. */
     height?: number;
+    /** How tall the box may grow for a tall map, so it isn't a sliver. */
+    tallest?: number;
     /** A portal clicked, with its mark, so its map's card can open beside it. */
     onportal: (to: number, from: Element) => void;
   } = $props();
@@ -85,15 +90,47 @@
   });
   const src = $derived(picture && display.showPictures && !failed ? pictureUrl("mapview", mapId) : null);
 
+  /** Room kept round the map, so marks and names at its edges stay in the box. */
+  const EDGE = 10;
+  /** Narrower than this, the box grows taller for the map. */
+  const NARROWEST = 150;
+  /** With this much room beside the map, its names go there. */
+  const CALLOUT_ROOM = 96;
+
+  const aspect = $derived(placed ? picture!.height / picture!.width : 0);
+  /** The box's height: as given, or taller for a map that would otherwise be a sliver. */
+  const boxHeight = $derived(
+    placed && (height - 2 * EDGE) / aspect < NARROWEST ? Math.min(tallest, Math.round(NARROWEST * aspect + 2 * EDGE)) : height,
+  );
+
   /** The whole map, as big as the box allows, in its middle. Without the picture's size, a wide box. */
   const frame = $derived.by(() => {
     if (!width) return null;
     const pw = placed ? picture!.width : width;
-    const ph = placed ? picture!.height : height;
-    const scale = Math.min(width / pw, height / ph);
+    const ph = placed ? picture!.height : boxHeight;
+    const scale = Math.min((width - 2 * EDGE) / pw, (boxHeight - 2 * EDGE) / ph);
     const w = pw * scale;
     const h = ph * scale;
-    return { w, h, left: (width - w) / 2, top: (height - h) / 2 };
+    return { w, h, left: (width - w) / 2, top: (boxHeight - h) / 2 };
+  });
+
+  /** Names out beside a narrow map, on its left or right as their portal is, kept apart and in the box. */
+  const callouts = $derived.by(() => {
+    if (!frame || (width - frame.w) / 2 < CALLOUT_ROOM) return null;
+    const f = frame;
+    const place = (side: "left" | "right") => {
+      const list = [...named]
+        .filter((m) => (side === "left" ? m.x < 0.5 : m.x >= 0.5))
+        .map((m) => ({ m, dx: f.left + m.x * f.w, dy: f.top + m.y * f.h }))
+        .sort((a, b) => a.dy - b.dy);
+      let floor = EDGE;
+      return list.map((c) => {
+        const y = Math.min(Math.max(c.dy, floor), boxHeight - EDGE);
+        floor = y + 20;
+        return { ...c, y, side };
+      });
+    };
+    return [...place("left"), ...place("right")];
   });
 
   function title(m: Mark) {
@@ -102,7 +139,7 @@
   }
 </script>
 
-<div class="box" class:rough={!placed} style:height="{height}px" bind:clientWidth={width}>
+<div class="box" class:rough={!placed} style:height="{boxHeight}px" bind:clientWidth={width}>
   {#if frame}
     <div class="layer" style:width="{frame.w}px" style:height="{frame.h}px" style:left="{frame.left}px" style:top="{frame.top}px">
       <!-- The frame hugs the map; the box's room around it stays the card's. -->
@@ -122,14 +159,39 @@
           style:left="{m.x * 100}%"
           style:top="{m.y * 100}%"
           aria-label={title(m)}
-          use:tip={label ? null : title(m)}
+          use:tip={label && !callouts ? null : title(m)}
           onclick={(e) => onportal(m.to, e.currentTarget)}
         >
           <span class="dot"></span>
-          {#if label}<span class="name">{m.name}</span>{/if}
+          {#if label && !callouts}<span class="name">{m.name}</span>{/if}
         </button>
       {/each}
     </div>
+  {/if}
+  {#if callouts && frame}
+    <svg class="lines" aria-hidden="true">
+      {#each callouts as c, i (i)}
+        <line
+          class:lit={nextMarks.has(c.m)}
+          x1={c.side === "left" ? frame.left - 6 : frame.left + frame.w + 6}
+          y1={c.y}
+          x2={c.dx}
+          y2={c.dy}
+        />
+      {/each}
+    </svg>
+    {#each callouts as c, i (i)}
+      <button
+        class="callout {c.side}"
+        class:lit={nextMarks.has(c.m)}
+        style:top="{c.y}px"
+        style:left={c.side === "right" ? `${frame.left + frame.w + 6}px` : null}
+        style:right={c.side === "left" ? `${width - frame.left + 6}px` : null}
+        style:max-width="{(width - frame.w) / 2 - 10}px"
+        aria-label={title(c.m)}
+        onclick={(e) => onportal(c.m.to, e.currentTarget)}><span class="name">{c.m.name}</span></button
+      >
+    {/each}
   {/if}
   {#if !placed && marks.length}
     <span class="rough-note" use:tip={"The data has no picture of this map: each portal stands in the third of it the data names"}>rough</span>
@@ -269,6 +331,55 @@
       animation: none;
       box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent);
     }
+  }
+
+  /* Names beside a narrow map, joined to their marks by a thin line. */
+  .lines {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+
+  .lines line {
+    stroke: var(--border-strong);
+    stroke-width: 1;
+  }
+
+  .lines line.lit {
+    stroke: var(--accent-strong);
+    stroke-width: 1.5;
+  }
+
+  .callout {
+    position: absolute;
+    display: flex;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    transform: translateY(-50%);
+  }
+
+  .callout .name {
+    max-width: 100%;
+  }
+
+  .callout.lit .name {
+    background: var(--accent-strong);
+    color: var(--accent-ink);
+    font-weight: var(--weight-strong);
+  }
+
+  .callout:hover .name {
+    color: var(--map);
+  }
+
+  .callout:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 4px;
   }
 
   .rough-note {
