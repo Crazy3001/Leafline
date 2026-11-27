@@ -105,6 +105,8 @@
   const route = $derived(dest ? trip.route : null);
   const step = $derived(route?.steps[trip.next] ?? null);
   const left = $derived(route ? route.steps.length - trip.next : 0);
+  /** The map you were on before this one, whose way back is where you came in; held while the map is. */
+  const came = $derived(trip.cameFrom && trip.cameFrom.id !== hereId ? trip.cameFrom.id : null);
   /** The portal to take from this map, when the next step is a portal from here. */
   const next = $derived(step && !step.travel && step.from.id === hereId ? { portal: step.portal, to: step.to.id } : null);
 
@@ -166,6 +168,7 @@
       {picture}
       exits={card?.exits ?? []}
       {next}
+      {came}
       height={line ? 72 : 112}
       tallest={line ? 140 : 200}
       onportal={portalCard}
@@ -178,6 +181,7 @@
       current={reading ? here : null}
       points={picture?.points ?? null}
       {next}
+      {came}
       {perSide}
       doors={0}
       hub={pin}

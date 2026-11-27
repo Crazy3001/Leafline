@@ -15,6 +15,9 @@ wrong for you, [report it](https://github.com/Crazy3001/Leafline/issues/new?temp
   names out beside it. The line under the compass opens every portal by name and the whole
   route; × stops. On a phone it sits under the header. When the minimap's name is out of view
   for a few seconds, it shows the map you were last seen on.
+  The way back to the map you were on before is ringed in white and named, "came in": the
+  nearest the compass can say to where you stand, since it doesn't read your dot on the minimap.
+  Arriving by scroll, taxi or death rings nothing.
 - On the website, Go here now follows you on the desk too (it only did in the phone view).
 - Now's This map no longer stops updating on a map with two ways out to the same map.
 - **Search as you type.** The search box at the top of every page drops down matches as you type:

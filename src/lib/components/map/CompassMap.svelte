@@ -7,7 +7,11 @@
   // trees) makes the box taller, up to a limit, and its names go out beside it, each with a line
   // to its mark. Without the picture (game pictures off, or not downloaded yet) the marks stand
   // on a plain box in the same places; without the picture's marks, each portal sits in the third
-  // of the map the data names, and the box says so.
+  // of the map the data names, and the box says so. The way back to the map you were on before
+  // carries a white ring and its name, as where you came in: the minimap's own dot isn't read, so
+  // it is the nearest Leafline can say to where you stand.
+  import { LogIn } from "@lucide/svelte";
+
   import { pictureUrl } from "$lib/pictures";
   import { display } from "$lib/settings.svelte";
   import { tip } from "$lib/tip.svelte";
@@ -18,6 +22,7 @@
     picture,
     exits,
     next = null,
+    came = null,
     height = 96,
     tallest = 200,
     onportal,
@@ -29,6 +34,8 @@
     exits: MapExit[];
     /** The portal the trip takes next from this map. */
     next?: { portal: string | null; to: number } | null;
+    /** The map the player was on before this one: the portals back to it are where they came in. */
+    came?: number | null;
     /** The box's height in pixels; its width is the space it's given. */
     height?: number;
     /** How tall the box may grow for a tall map, so it isn't a sliver. */
@@ -68,15 +75,18 @@
     return new Set(named.length ? named : marks.filter((m) => m.to === next.to));
   });
 
+  /** Where you came in: the portals back to the map before, unless one is the way on. */
+  const cameMarks = $derived(new Set(came == null ? [] : marks.filter((m) => m.to === came && !nextMarks.has(m))));
+
   /** A way across rather than a door: the map's side portals, and anything the data doesn't call in or out. */
   const door = (m: Mark) => m.exit?.direction === "in" || m.exit?.direction === "out";
   /** With no trip, the furthest left and right ways across carry names. */
   const named = $derived.by(() => {
-    if (next) return new Set(nextMarks);
+    if (next) return new Set([...nextMarks, ...cameMarks]);
     const across = marks.filter((m) => !door(m) && !m.exit?.hidden);
-    if (!across.length) return new Set<Mark>();
+    if (!across.length) return new Set<Mark>(cameMarks);
     const byX = [...across].sort((a, b) => a.x - b.x);
-    return new Set([byX[0], byX[byX.length - 1]]);
+    return new Set([byX[0], byX[byX.length - 1], ...cameMarks]);
   });
 
   let width = $state(0);
@@ -135,7 +145,8 @@
 
   function title(m: Mark) {
     const what = m.exit?.hidden ? "Hidden portal" : door(m) ? "Door" : "Portal";
-    return `${nextMarks.has(m) ? "Next · " : ""}${what} to ${m.name}`;
+    const lead = nextMarks.has(m) ? "Next · " : cameMarks.has(m) ? "You came in here · " : "";
+    return `${lead}${what} to ${m.name}`;
   }
 </script>
 
@@ -150,9 +161,11 @@
       {#each marks as m, i (i)}
         {@const lit = nextMarks.has(m)}
         {@const label = named.has(m)}
+        {@const entered = cameMarks.has(m)}
         <button
           class="mark"
           class:lit
+          class:came={entered}
           class:door={door(m)}
           class:hidden={m.exit?.hidden}
           class:right={m.x > 0.6}
@@ -163,7 +176,7 @@
           onclick={(e) => onportal(m.to, e.currentTarget)}
         >
           <span class="dot"></span>
-          {#if label && !callouts}<span class="name">{m.name}</span>{/if}
+          {#if label && !callouts}<span class="name">{#if entered}<LogIn size={10} />{/if}{m.name}</span>{/if}
         </button>
       {/each}
     </div>
@@ -173,6 +186,7 @@
       {#each callouts as c, i (i)}
         <line
           class:lit={nextMarks.has(c.m)}
+          class:came={cameMarks.has(c.m)}
           x1={c.side === "left" ? frame.left - 6 : frame.left + frame.w + 6}
           y1={c.y}
           x2={c.dx}
@@ -184,12 +198,14 @@
       <button
         class="callout {c.side}"
         class:lit={nextMarks.has(c.m)}
+        class:came={cameMarks.has(c.m)}
         style:top="{c.y}px"
         style:left={c.side === "right" ? `${frame.left + frame.w + 6}px` : null}
         style:right={c.side === "left" ? `${width - frame.left + 6}px` : null}
         style:max-width="{(width - frame.w) / 2 - 10}px"
         aria-label={title(c.m)}
-        onclick={(e) => onportal(c.m.to, e.currentTarget)}><span class="name">{c.m.name}</span></button
+        onclick={(e) => onportal(c.m.to, e.currentTarget)}
+        ><span class="name">{#if cameMarks.has(c.m)}<LogIn size={10} />{/if}{c.m.name}</span></button
       >
     {/each}
   {/if}
@@ -333,6 +349,28 @@
     }
   }
 
+  /* Where you came in: a white ring round the portal and its name, quieter than the way on. */
+  .came {
+    z-index: 1;
+  }
+
+  .came .dot {
+    box-shadow:
+      0 0 0 2px var(--bg),
+      0 0 0 4px var(--text);
+  }
+
+  .came .name {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 55%, transparent);
+  }
+
+  .came .name :global(svg) {
+    flex: none;
+  }
+
   /* Names beside a narrow map, joined to their marks by a thin line. */
   .lines {
     position: absolute;
@@ -345,6 +383,10 @@
   .lines line {
     stroke: var(--border-strong);
     stroke-width: 1;
+  }
+
+  .lines line.came {
+    stroke: color-mix(in srgb, var(--text) 60%, transparent);
   }
 
   .lines line.lit {
