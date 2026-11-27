@@ -356,6 +356,10 @@
       {#if view !== "lookup"}
         <DeskSearch bind:this={deskSearch} onopen={openFound} onwords={searchWords} filter={view === "quests" ? questFilter : null} />
       {/if}
+      <!-- The compass: the map you're on and its portals, the next one lit on a trip. One line in
+           the row; its map floats under it on hover or click, so the page below stays put. -->
+      <span class="spacer"></span>
+      <div class="compass-slot"><Compass bar onpick={() => go("map")} /></div>
       <span class="spacer"></span>
       {#if can.popOut}<button
         class="pill"
@@ -371,23 +375,21 @@
         onclick={toggleOnTop}>{#if onTop}<PinOff size={14} />{:else}<Pin size={14} />{/if}</button
       >{/if}
     </div>
-    <!-- The compass: the map you're on and its portals, the next one lit on a trip. A band of its
-         own, centred, so the names stay readable beside the search and buttons. -->
-    <div class="compass-row"><Compass onpick={() => go("map")} /></div>
-
     <div class="view" class:narrow={narrowViews.includes(view)} class:full={view === "planner" || view === "layout"} aria-label={viewName(view)}>
       {#key view}
         {#if view === "now"}
           <!-- The bar above says who you are and the session's numbers. The map you're on comes first,
-               where the eye goes while playing, with the session's chart beside it; then what to do
-               next and your quests. Typing a session in is on Train. -->
-          <div class="now-top">
-            <DeskMap ongo={() => go("map")} />
-            <TrainPanel {level} map={live.analysis?.map ?? null} session={live.session} only="chart" />
-          </div>
-          <div class="now-r1">
-            <NextUp onme={() => go("me")} />
-            <DeskQuests ongo={() => go("quests")} />
+               where the eye goes while playing, with the session's chart under it; what to do next
+               and your quests beside them. Typing a session in is on Train. -->
+          <div class="now">
+            <div class="now-left">
+              <div class="now-map"><DeskMap ongo={() => go("map")} /></div>
+              <div class="now-session"><TrainPanel {level} map={live.analysis?.map ?? null} session={live.session} only="chart" /></div>
+            </div>
+            <div class="now-right">
+              <div class="now-next"><NextUp onme={() => go("me")} /></div>
+              <div class="now-quests"><DeskQuests ongo={() => go("quests")} /></div>
+            </div>
           </div>
         {:else if view === "quests"}
           <div class="stack"><PanelView panel="quests" analysis={live.analysis} session={live.session} roomy topSearch /></div>
@@ -470,10 +472,25 @@
     flex: 1;
   }
 
-  .compass-row {
+  /* Between the search and the buttons, centred, as wide as the room allows. */
+  .compass-slot {
+    flex: 0 1 420px;
+    min-width: 220px;
     display: flex;
     justify-content: center;
-    padding: 0 var(--space-4) var(--space-3);
+  }
+
+  /* A narrow window: the compass gets a line of its own under the search and buttons. */
+  @container desk-main (max-width: 760px) {
+    .top {
+      flex-wrap: wrap;
+    }
+
+    .compass-slot {
+      order: 1;
+      flex: 1 1 100%;
+      min-width: 0;
+    }
   }
 
   .pill {
@@ -573,31 +590,71 @@
     margin-right: 0;
   }
 
-  /* Now: this map and the session's chart side by side, then Next up and Quests. Narrow windows stack them. */
-  .now-top {
+  /*
+   * Now, on a wide desk: this map over the session's chart in the left half, Next up and Quests a
+   * quarter each beside them, each as tall as it needs. Narrower, Next up and Quests share the right
+   * half, one over the other; a phone's width stacks the map, Next up, Quests, then the session.
+   */
+  .now {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
     gap: var(--space-4);
     align-items: start;
   }
 
-  .now-r1 {
-    display: grid;
-    grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+  .now-left {
+    display: flex;
+    flex-direction: column;
     gap: var(--space-4);
-    align-items: start;
+    min-width: 0;
   }
 
-  /* Panels' own side margins are for the overlay; the rows space them here. */
-  .now-top :global(.card),
-  .now-r1 :global(.card) {
+  .now-right {
+    display: contents;
+  }
+
+  /* Panels' own side margins are for the overlay; the grid spaces them here. */
+  .now :global(.card) {
     margin: 0;
   }
 
-  @container desk-main (max-width: 1000px) {
-    .now-top,
-    .now-r1 {
+  @container desk-main (max-width: 1430px) {
+    .now {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+
+    .now-right {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-4);
+      min-width: 0;
+    }
+  }
+
+  @container desk-main (max-width: 760px) {
+    .now {
       grid-template-columns: minmax(0, 1fr);
+    }
+
+    .now-left,
+    .now-right {
+      display: contents;
+    }
+
+    .now-map {
+      order: 1;
+    }
+
+    .now-next {
+      order: 2;
+    }
+
+    .now-quests {
+      order: 3;
+    }
+
+    .now-session {
+      order: 4;
     }
   }
 

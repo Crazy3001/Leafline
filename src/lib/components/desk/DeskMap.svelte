@@ -2,7 +2,7 @@
   // The desk view's map card on Now: the map you're on, its picture, the level of what lives there,
   // its monsters and their drops as pictures with names, and the ways out. Everything opens its own
   // card. With the game not read, it shows the map the character was last on, marked as such.
-  // `wide` lays it out across Now's top: the picture beside everything else.
+  // The picture keeps the map's own shape: a wide map runs across the top, a tall one stands beside.
   import { MapPin } from "@lucide/svelte";
   import { untrack } from "svelte";
 
@@ -16,7 +16,7 @@
   import TitledCard from "$lib/ui/TitledCard.svelte";
   import type { MapDetails } from "$lib/types";
 
-  let { ongo, wide = false }: { ongo: () => void; wide?: boolean } = $props();
+  let { ongo }: { ongo: () => void } = $props();
 
   watchRegion();
   watchProfile();
@@ -53,7 +53,7 @@
   /** The map shown isn't read now. */
   const stale = $derived(!reading && card != null);
   const seenAt = $derived(reading ? null : who.seenAt);
-  const mobs = $derived(card ? [...card.mobs].sort((a, b) => b.count - a.count).slice(0, wide ? 6 : 5) : []);
+  const mobs = $derived(card ? [...card.mobs].sort((a, b) => b.count - a.count).slice(0, 5) : []);
   /** Ways out, once each: two portals to the same map the same way (a dungeon's two doors) are one. */
   const exits = $derived(
     card
@@ -63,7 +63,15 @@
           .slice(0, 6)
       : [],
   );
+  /** The map's picture showed, and its width over its height. */
   let pictured = $state(false);
+  let aspect = $state(1);
+  function showPicture(shown: boolean, size: { width: number; height: number } | null) {
+    pictured = shown && size != null && size.width > 0 && size.height > 0;
+    if (pictured) aspect = size!.width / size!.height;
+  }
+  /** Twice as wide as tall or more, the picture runs across the card; else it stands beside the rest. */
+  const beside = $derived(pictured && aspect < 2);
 
   /** The most likely drops of the monsters here, a few at most, from the drop list on this PC. */
   let drops = $state<string[]>([]);
@@ -82,7 +90,7 @@
           const seen = new Set<string>();
           const items: string[] = [];
           for (const m of found) for (const d of m.drops) if (!seen.has(d.item) && seen.add(d.item)) items.push(d.item);
-          drops = items.slice(0, wide ? 8 : 6);
+          drops = items.slice(0, 6);
         })
         .catch(() => (drops = [])),
     );
@@ -93,9 +101,9 @@
 
 <TitledCard title="This map" icon={MapPin} tone="violet" more="Map" onmore={ongo}>
   {#if card}
-    <div class="body" class:wide class:pictured>
+    <div class="body" class:beside style:--aspect={aspect}>
       <div class="pic" class:shown={pictured}>
-        {#key card.map.id}<Pic kind="mapview" id={card.map.id} size={null} fit="cover" onstate={(s) => (pictured = s)} />{/key}
+        {#key card.map.id}<Pic kind="mapview" id={card.map.id} size={null} onstate={showPicture} />{/key}
       </div>
       <div class="info">
         <div>
@@ -157,10 +165,10 @@
     gap: var(--space-3);
   }
 
-  /* Across Now's top: the picture on the left, the rest beside it. */
-  .body.wide.pictured {
+  /* A tall or square map: the picture on the left, the rest beside it. */
+  .body.beside {
     display: grid;
-    grid-template-columns: minmax(220px, 2fr) minmax(0, 3fr);
+    grid-template-columns: auto minmax(0, 1fr);
     align-items: start;
     gap: var(--space-4);
   }
@@ -172,36 +180,37 @@
     min-width: 0;
   }
 
+  /*
+   * The whole map at its own shape, never cropped: across the card up to 220px tall, or beside
+   * the rest up to 300px tall and under half the card's width.
+   */
   .pic {
     display: none;
-    height: 120px;
     overflow: hidden;
     border-radius: var(--radius);
     background: var(--surface-2);
   }
 
-  .wide .pic {
-    height: 200px;
-  }
-
   .pic.shown {
     display: block;
+    width: min(100%, calc(220px * var(--aspect)));
+    aspect-ratio: var(--aspect);
+    margin: 0 auto;
+  }
+
+  .beside .pic.shown {
+    width: min(calc(300px * var(--aspect)), 45cqw);
+    margin: 0;
   }
 
   .pic :global(img) {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+    display: block;
   }
 
   .name {
     font-family: var(--font-display);
     font-size: var(--text-lg);
     font-weight: var(--weight-strong);
-  }
-
-  .wide .name {
-    font-size: var(--text-xl);
   }
 
   /* Remembered from an earlier read, not read now. */
@@ -268,10 +277,15 @@
     color: var(--muted);
   }
 
-  /* A narrow window stacks the picture over the rest. */
-  @container tcard (max-width: 620px) {
-    .body.wide.pictured {
+  /* A narrow card stacks a tall picture over the rest, centred. */
+  @container tcard (max-width: 460px) {
+    .body.beside {
       display: flex;
+    }
+
+    .beside .pic.shown {
+      width: min(calc(240px * var(--aspect)), 100%);
+      margin: 0 auto;
     }
   }
 </style>
