@@ -21,6 +21,7 @@ const OFF_ROUTE_READINGS = 2;
 
 export const trip = $state<Trip>({
   here: null,
+  cameFrom: null,
   unsure: false,
   route: null,
   next: 0,
@@ -122,7 +123,7 @@ async function onReading(map: MapReading | null, data: string) {
   if (!destination) {
     // Nowhere to go: still keep track, so a destination set later starts from here.
     if (match.score >= TRUSTED_SCORE) {
-      if (trip.here?.id !== match.card.map.id) trip.here = match.card.map;
+      moveTo(match.card.map);
       trip.unsure = false;
     } else trip.unsure = true;
     return;
@@ -133,14 +134,13 @@ async function onReading(map: MapReading | null, data: string) {
     trip.unsure = true;
     // With no route yet there is nothing to hold, so start from the best guess.
     if (!trip.route && !trip.routing && !trip.here) {
-      trip.here = at.guess;
+      moveTo(at.guess);
       void routeFrom(at.guess, false);
     }
     return;
   }
   trip.unsure = false;
-  // The same map read again changes nothing: a new object each reading would resend the trip.
-  if (trip.here?.id !== at.at.id) trip.here = at.at;
+  moveTo(at.at);
   if (at.kind === "arrived") {
     straying = null;
     return arrive(destination, at.at);
@@ -161,6 +161,16 @@ async function onReading(map: MapReading | null, data: string) {
   if (straying.count < OFF_ROUTE_READINGS) return;
   straying = null;
   void routeFrom(at.at, true);
+}
+
+/**
+ * Places the player on `map`, remembering the map they were on before as where they came from.
+ * The same map read again changes nothing: a new object each reading would resend the trip.
+ */
+function moveTo(map: MapRef) {
+  if (trip.here?.id === map.id) return;
+  trip.cameFrom = trip.here;
+  trip.here = map;
 }
 
 /** Works out the way from a map to the nearest of the destination's maps. */
